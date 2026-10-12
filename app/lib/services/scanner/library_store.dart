@@ -13,6 +13,7 @@ import 'local_track.dart';
 import 'tracks_db.dart';
 import '../../stores/app_prefs.dart';
 import '../netease/track.dart';
+import '../../utils/safe_file.dart';
 
 part 'library_store/library_store_core.dart';
 part 'library_store/library_store_pager.dart';

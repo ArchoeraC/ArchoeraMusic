@@ -4,7 +4,6 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -32,6 +31,7 @@ import 'prefs_security.dart';
 import 'prefs_streaming.dart';
 import 'prefs_shortcuts.dart';
 import 'prefs_tag_rules.dart';
+import '../utils/safe_file.dart';
 
 export 'prefs_mcp.dart';
 export 'prefs_app.dart';
@@ -73,9 +73,10 @@ class AppPrefs {
 
   static AppPrefs load() {
     try {
-      final file = File(filePath);
-      if (!file.existsSync()) return AppPrefs();
-      final json = jsonDecode(file.readAsStringSync());
+      // 安全读取：拒绝非普通文件（FIFO 会阻塞、符号链接会重定向）+ 长度上限。
+      final text = SafeFile.readString(filePath);
+      if (text == null) return AppPrefs();
+      final json = jsonDecode(text);
       if (json is Map<String, dynamic>) return AppPrefs(initialData: json);
     } catch (_) {
       // 损坏的偏好文件：回退默认
@@ -88,9 +89,9 @@ class AppPrefs {
       // SEC-10：MCP 访问密钥绝不以明文落 prefs.json（权威存储见 McpKeyStore）。
       // 双保险：即使内存 [data] 残留历史值，落盘前也剥离。
       data.remove(mcpAccessKeyKey);
-      final file = File(filePath);
-      file.parent.createSync(recursive: true);
-      file.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(data));
+      // 安全写入：同目录唯一临时名 + rename（符号链接只被替换、不被穿透）。
+      SafeFile.writeAtomicString(
+          filePath, const JsonEncoder.withIndent('  ').convert(data));
     } catch (_) {
       // 持久化失败不阻塞（自用项目，偏好丢失可接受）
     }

@@ -2,6 +2,11 @@
 
 > 状态：**已实施（vault-1 ~ vault-4 + 第六步口令模式全部完成，2026-08-12）**；**2026-10 重构后模式收敛为 crypto / slots（m1 / m2a / m2b）**——详见下方重构说明。
 > ⚠️ 已知缺口与待修复项见 [security-review-2026-10-11.md](security-review-2026-10-11.md)（本计划的补强台账）。
+>
+> **⚠️ 实现迁移（2026-10-12）**：vault 实现已由 **C# NativeAOT 迁移为 Rust**（`app/core/vault-rs`，三端）；
+> `app/core/vault/`（C#）**已删除**，字节/协议兼容改由 `app/core/vault-rs/testdata/` 的**冻结黄金夹具**锚定
+> （活体 oracle `cross_parity.sh` 一并删除）。**下文历史章节中的 "C# NativeAOT" 保留为当时的设计与状态记录**，
+> 现状以 [vault-security-notes.md](vault-security-notes.md) 与 [vault-enhanced-scheme.md](vault-enhanced-scheme.md) 为准。
 > 定位：把本地凭据（流媒体服务器密码、网易/酷狗 session）从「明文落盘 + 进程存活期明文」改造为
 > **静态加密存储（vault）+ 按需流式解密 + 运行时内存保护 + 一键销毁**，防磁盘泄露与「销毁即失效」。
 >
@@ -263,7 +268,7 @@ vault：  校验父进程身份（OS 提供 pid + 可执行文件路径）→ �
 
 | 层 | 文件 | 改动 | 状态 |
 |---|---|---|---|
-| vault 核心 | `app/core/vault/`（C# NativeAOT） | vault 文件读写（**crypto `'C'` / slots `'S'` 两种容器**）、AES-256-GCM 加解密、主密钥管理（OS 安全存储 / `file` / slots 槽位表：口令 / 设备 / 恢复 / 口令+设备）、尾部 HMAC verify-before-decrypt、销毁（含 `.bak` + `device.key`）、密钥 mlock | ✅ |
+| vault 核心 | 三端 `app/core/vault-rs`（Rust；C# 版已于 2026-10-12 删除） | vault 文件读写（**crypto `'C'` / slots `'S'` 两种容器**）、AES-256-GCM 加解密、主密钥管理（OS 安全存储 / `file` / slots 槽位表：口令 / 设备 / 恢复 / 口令+设备）、尾部 HMAC verify-before-decrypt、销毁（含 `.bak` + `device.key`）、密钥 mlock（`src/memguard.rs`：每缓冲独占页 + `MADV_DONTDUMP` + drop 时 zeroize）、安全落盘（`src/safefile.rs`：写侧进程唯一 tmp + 拒绝符号链接/FIFO；读侧 `read_regular_limited` 判长/拒非普通文件）、容量上限写入侧前置校验（单条 ≤ 4 MiB−16 B / 整库 ≤ 16 MiB） | ✅（2026-10-12 红队复验后补齐，见 security-review SEC-35/36/37/38） |
 | Dart 注入 | `vault_session_store.dart` / `streaming_store.dart` | 写穿缓存 + vault 会话读写；`loadSecret(id)` 按需单条解密（不再启动预取）；不再读明文 sessionStore | ✅ |
 | Dart 登录 | `kugou_api.dart` / netease 登录模块 | 登录成功经 VaultSessionStore 改写 vault（不落 Dart 明文状态） | ✅ |
 | Dart 清除 | 设置-安全入口 | 「清除所有本地凭据」接 `VaultProcess.destroy`（删 vault + `.bak` + `device.key` + 份额/锁定状态 + 本地锚点/标记） | ✅ |
@@ -330,7 +335,7 @@ vault：  校验父进程身份（OS 提供 pid + 可执行文件路径）→ �
 
 ### 8.1 vault-1：vault 核心（C# NativeAOT）
 
-- 实现：`app/core/vault/`（`src/Vault.csproj` net9.0 `<PublishAot>true`，产物 `archoera-vault`）；
+- 实现：`app/core/vault-rs/`（Rust，三端；旧 C# 实现 `app/core/vault/` 已于 2026-10-12 删除）；
 - CLI（命令走 argv，均非密文；`set` 密文负载经 stdin 首行）：
   - `ping` / `init <dataDir> → ok <b64T>`（返回会话锚点 T）/ `status <dataDir> → ok {"initialized":true|false}` / `destroy <dataDir> → ok`；
   - **`set`/`get`/`delete` 独立子命令已删除**——凭据访问只经 `serve` 会话（杜绝绕过父进程身份校验的独立调用路径）；
@@ -402,7 +407,8 @@ vault：  校验父进程身份（OS 提供 pid + 可执行文件路径）→ �
 
 | 套件 | 覆盖 | 结果 |
 |---|---|---|
-| `app/core/vault/test.sh`（18 项） | init 锚点 / serve 会话全链路（HMAC 独立验证 + **握手 marker 断言**）/ 独立运行拒绝 ×2 / 错误握手 ×2 / 磁盘无明文 / 缺 S fail-closed / GCM 篡改拦截 / 信号终止可感知 / destroy / **selftest（RFC 9106 向量）** / **口令模式全链路（init-password→口令握手→set/get/quit）** / **错误口令锁定退避 + 锁定期间拒绝 + 退避后恢复** | ✅ |
+| ~~`app/core/vault/test.sh`~~（C#，**已退役** 2026-10-12） | 历史状态记录（该实现已删除，仅存于 git 历史） | 🗑️ |
+| `app/core/vault-rs/test.sh` + `test-windows.sh` + `cross-macos.sh` | Rust 三端端到端 + 内存护栏 + 安全落盘 + 沙箱完整性 + 金夹具 + 跨 OS 互通 | ✅ |
 | `flutter test`（45 项） | 含 `vault_process_v4_test.dart`（中文往返 + marker=ok / 锚点不一致拒绝服务 / 信号终止感知 + crash 标记契约 + **TEST marker 字段断言**）、`vault_session_store_test.dart` 新增**口令模式用例**（initPassword + mode=password + 口令握手 set/get + 错误口令被拒）、既有 vault 测试适配 async API | ✅ |
 | `cargo test`（11 项） | 下载器加解密往返 | ✅ |
 | `dart analyze lib test` | 无问题 | ✅ |

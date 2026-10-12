@@ -33,6 +33,7 @@ import 'package:crypto/crypto.dart';
 import '../app/watermark.dart';
 import 'log/log.dart';
 import 'native_lib_paths.dart';
+import '../utils/safe_file.dart';
 
 class NativeIntegrity {
   NativeIntegrity._();
@@ -90,9 +91,18 @@ class NativeIntegrity {
       _warnUnsignedOnce();
     }
     final expected = entries[_basename(path)];
+    // 先判类型（不跟随符号链接）：FIFO / 符号链接 / 设备 → 直接判完整性失败，
+    // 否则 `readAsBytesSync` 会**阻塞**（植入 FIFO 即可冻结界面）或顺着链接读别处。
+    final kind = FileSystemEntity.typeSync(path, followLinks: false);
+    if (kind != FileSystemEntityType.file) {
+      throw StateError('原生库完整性校验失败：$path（非普通文件：$kind）');
+    }
     String actual;
     try {
-      actual = sha256.convert(File(path).readAsBytesSync()).toString();
+      // SafeFile：拒绝非普通文件 + 长度上限（防植入 FIFO 阻塞 / 巨型文件 OOM）。
+      final bytes = SafeFile.readBytes(path, maxBytes: 512 << 20, allowSymlink: false);
+      if (bytes == null) throw const FileSystemException('无法读取（非普通文件或超限）');
+      actual = sha256.convert(bytes).toString();
     } catch (err) {
       throw StateError('原生库完整性校验失败：$path（无法读取：$err）');
     }
@@ -123,8 +133,10 @@ class NativeIntegrity {
     _located = true;
     final file = _findManifest();
     if (file == null) return null;
+    // 非普通文件：视同「无清单」（同删除清单的告警路径），绝不阻塞读取。
+    final text = SafeFile.readString(file.path, maxBytes: 8 << 20, allowSymlink: false);
+    if (text == null) return null;
     _manifestPath = file.absolute.path;
-    final text = file.readAsStringSync();
     _entries = _parse(text);
     _checkSignature(file, text);
     return _entries;
@@ -141,8 +153,13 @@ class NativeIntegrity {
       return;
     }
     _signaturePresent = true;
+    final sigBytes = SafeFile.readBytes(sig.path, maxBytes: 1 << 20, allowSymlink: false);
+    if (sigBytes == null) {
+      _signatureValid = false; // 非普通文件 / 超限：视为签名存在但非法（fail-closed），且不阻塞读取
+      return;
+    }
     try {
-      final bytes = sig.readAsBytesSync();
+      final bytes = sigBytes;
       final key = debugTestMode ? debugPublicKeyHex : null;
       // key 非空仅出现在 debugTestMode（测试接缝）；生产恒用内嵌官方公钥分支。
       _signatureValid = key != null

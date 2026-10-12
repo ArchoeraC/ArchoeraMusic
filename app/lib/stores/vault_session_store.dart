@@ -10,6 +10,7 @@ import '../services/security/data_destroyer.dart' show shredFile;
 import '../services/security/vault_kdf.dart';
 import '../services/security/vault_process.dart';
 import 'data_dir.dart';
+import '../utils/safe_file.dart';
 
 /// vault 会话存储：凭据加密落盘（`credentials.vault`；crypto 单因子存
 /// OS 安全存储/文件密钥库，或 slots 槽位表封装主密钥），替代原明文
@@ -239,9 +240,10 @@ class VaultSessionStore implements SessionStore {
   /// 迁移失败保留原文件（安全设置页「清除会话」仍可兜底删除）。
   Future<void> _migrateLegacy({String? password, String? recoveryCode}) async {
     final legacy = File(_legacyPath());
-    if (!legacy.existsSync()) return;
+    final legacyText = SafeFile.readString(legacy.path); // 非普通文件 → 视为不存在
+    if (legacyText == null) return;
     try {
-      final json = jsonDecode(legacy.readAsStringSync());
+      final json = jsonDecode(legacyText);
       if (json is Map<String, dynamic>) {
         for (final e in json.entries) {
           final v = e.value;

@@ -1,0 +1,18 @@
+{
+ "mode": "m2a",
+ "password": "golden-m2a-pw",
+ "recovery_code": "H1WA-06E1-DVEA-EJFG-S66Y-64ZP-BCG3-N08J-VZPQ-0F6Y-77DN-CG24-9R40",
+ "kdf": {
+  "m": 8192,
+  "t": 1,
+  "p": 1
+ },
+ "slot_kinds": [
+  4,
+  3
+ ],
+ "entries": {
+  "kugou:session": "golden-kugou-session-token",
+  "netease:cookie": "golden-netease-cookie-value"
+ }
+}

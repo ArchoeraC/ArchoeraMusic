@@ -147,7 +147,7 @@ install(FILES "${SUBSONIC_SRC_DIR}/archoera_transcoder.dll"
 # vault（凭据保险库）：Rust 静态链接可执行（core/vault-rs，cargo build --release
 # --target x86_64-pc-windows-msvc -C target-feature=+crt-static；见 core/build_windows.bat），
 # 随包分发供 Dart 按需 spawn（凭据加解密；OS 授权份额存 DPAPI）。
-# Windows 已不再使用 C# NativeAOT vault（core/vault/**）。
+# C# NativeAOT vault（app/core/vault/**）已于 2026-10-12 删除。
 set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault-rs/build")
 install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault.exe"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)

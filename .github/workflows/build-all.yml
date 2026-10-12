@@ -376,7 +376,7 @@ jobs:
         #   vswhere→vcvars64（MSVC 环境）→ audio-engine（cargo tempo + cl 直编
         #   fft.dll/archoera_mediaengine.dll）→ scraper（CMake+vcpkg toolchain）
         #   → scanner（dotnet publish）→ downloader（cargo）→ subsonic（go+rust）
-        #   → vault（dotnet publish）。
+        #   → vault-rs（cargo 静态单文件）。
         # 依赖由上方步骤提前安装（vcpkg headers 缺失时 bat 内自动 install 兜底），
         # 脚本只做编译引导。与 build-linux.sh / build-macos.sh 同构，本地开发
         # 与 CI 共用同一入口，逻辑改动只落一处。

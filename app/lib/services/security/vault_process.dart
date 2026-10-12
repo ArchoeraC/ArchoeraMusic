@@ -12,8 +12,9 @@ import 'package:flutter/foundation.dart';
 
 import '../log/log.dart';
 import '../native_integrity.dart';
+import '../../utils/safe_file.dart';
 
-/// 凭据保险库进程（`archoera-vault` NativeAOT 可执行）封装。
+/// 凭据保险库进程（`archoera-vault`，三端 Rust 静态可执行）封装。
 ///
 /// 会话模式（credential-vault-plan §3.8）：每次操作 spawn `serve` 会话——
 /// 血缘校验 → 握手（H/C 经 stdin，应答含锚点 T + HMAC）→ 命令 → `quit` 即退。
@@ -71,6 +72,11 @@ class VaultProcess {
   static bool get _allowEnvBin =>
       kDebugMode || const bool.fromEnvironment('ARCHOERA_ALLOW_VAULT_BIN');
 
+  /// 「沙箱被蓄意破坏」专用退出码（与 vault 侧 `guard::SANDBOX_BREACH_EXIT` 对齐）：
+  /// 可观测的蓄意破坏（加载器注入变量等）→ vault 自毁退出 87 → 本层与「异常退出」
+  /// 同等对待（crash 标记 → [exit(86)] 连带主程序退出）。
+  static const int sandboxBreachExit = 87;
+
   static const String markerOk = 'ok';
   static const String markerCrash = 'crash';
   static const String markerFail = 'fail';
@@ -79,10 +85,12 @@ class VaultProcess {
   static const Duration _cmdTimeout = Duration(seconds: 15);
 
   /// 候选相对路径（bundle `native/` 平铺优先，dev 产物目录兜底）。
+  /// vault 为三端 Rust 版：dev 产物在 `core/vault-rs/build/`（`vault-rs/build.sh`）；
+  /// C# 版（`core/vault/`）已于 2026-10-12 删除。
   static const List<String> _candidates = [
     'native',
-    'core/vault/build',
-    'vault/build',
+    'core/vault-rs/build',
+    'vault-rs/build',
   ];
 
   static String? _binary;
@@ -157,7 +165,7 @@ class VaultProcess {
       return null;
     }();
     if (found == null) {
-      throw VaultException('未找到 $_exeName（bundle/native 或 core/vault/build）');
+      throw VaultException('未找到 $_exeName（bundle/native 或 core/vault-rs/build）');
     }
     // SEC-08：加载/执行（--version）前先校验原生完整性清单——签名存在则
     // fail-closed 验签 + 摘要，避免执行可能被篡改的 vault 字节。
@@ -215,7 +223,7 @@ class VaultProcess {
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     if (payload.isNotEmpty) {
       try {
-        await File(_authFile(dataDir)).writeAsString(payload);
+        SafeFile.writeAtomicString(_authFile(dataDir), payload);
       } catch (_) {
         // 锚点保存失败不阻断初始化（后续会话将重新补建）
       }
@@ -240,7 +248,7 @@ class VaultProcess {
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     if (payload.isNotEmpty) {
       try {
-        await File(_authFile(dataDir)).writeAsString(payload);
+        SafeFile.writeAtomicString(_authFile(dataDir), payload);
       } catch (_) {
         // 锚点保存失败不阻断初始化（后续会话将重新补建）
       }
@@ -357,7 +365,7 @@ class VaultProcess {
   static Future<void> _saveAnchor(String dataDir, String payload) async {
     if (payload.isEmpty) return;
     try {
-      await File(_authFile(dataDir)).writeAsString(payload);
+      SafeFile.writeAtomicString(_authFile(dataDir), payload);
     } catch (_) {}
   }
 
@@ -469,8 +477,10 @@ class VaultProcess {
   static bool consumeCrashMarker(String dataDir) {
     try {
       final f = File(_markerFile(dataDir));
-      if (!f.existsSync()) return false;
-      final marker = f.readAsStringSync().trim();
+      // 非普通文件（被植入 FIFO / 符号链接）→ 视为无标记并忽略：绝不能让读取阻塞界面。
+      // 长度上限 64 B（标记词）顺带防超大文件。
+      final marker = SafeFile.readString(f.path, maxBytes: 64, allowSymlink: false);
+      if (marker == null) return false;
       f.deleteSync();
       return marker == markerCrash;
     } catch (_) {
@@ -497,19 +507,23 @@ class VaultProcess {
     return d == 0;
   }
 
-  /// 会话退出记录：写标记 + 非预期（crash）联动终止主进程。
+  /// 退出码 → 标记判定（纯函数，便于单测；[VaultProcess] 语义见 [_record]）。
+  @visibleForTesting
+  static String markerForExit(int code, {required bool normal}) {
+    if (!normal || code < 0 || code == sandboxBreachExit) {
+      // 非预期：信号终止 / 挂起 / 无响应 EOF / **沙箱被蓄意破坏（87）**
+      return markerCrash;
+    }
+    if (code == 0) return markerOk;
+    return markerFail; // vault 主动报错退出（如解锁失败），不联动
+  }
+
+  /// 会话退出记录：写标记 + 非预期（含沙箱被破坏 87）联动终止主进程。
   static Future<void> _record(String dataDir, int code,
       {required bool normal}) async {
-    final String marker;
-    if (!normal || code < 0) {
-      marker = markerCrash; // 信号终止 / 挂起 / 无响应 EOF：非预期
-    } else if (code == 0) {
-      marker = markerOk;
-    } else {
-      marker = markerFail; // vault 主动报错退出（如解锁失败），不联动
-    }
+    final String marker = markerForExit(code, normal: normal);
     try {
-      await File(_markerFile(dataDir)).writeAsString(marker);
+      SafeFile.writeAtomicString(_markerFile(dataDir), marker);
     } catch (_) {}
     if (marker == markerCrash) _abort(dataDir);
   }
@@ -564,11 +578,17 @@ class VaultProcess {
   /// 文件损坏 → fail-closed 崩掉整个应用（2026-08-13 修复实录）。
   static Future<void> _verifyAnchor(String dataDir, List<int> t) async {
     final f = File(_authFile(dataDir));
-    if (!f.existsSync()) {
-      await f.writeAsString(base64Encode(t));
+    final kind = FileSystemEntity.typeSync(f.path, followLinks: false);
+    if (kind == FileSystemEntityType.notFound) {
+      SafeFile.writeAtomicString(f.path, base64Encode(t)); // 首次：建立锚点（TOFU 引导）
       return;
     }
-    final raw = f.readAsBytesSync();
+    // 锚点文件必须是**普通文件**（allowSymlink:false）：被植入 FIFO / 符号链接 / 设备时
+    // 直接 fail-closed —— 否则 `readAsBytesSync` 会阻塞（FIFO）或顺着链接读别处。
+    final raw = SafeFile.readBytes(f.path, maxBytes: 4096, allowSymlink: false);
+    if (raw == null) {
+      throw VaultException('vault 锚点文件异常（$kind）：拒绝服务');
+    }
     List<int>? saved;
     try {
       saved = base64Decode(String.fromCharCodes(raw).trim());

@@ -8,6 +8,7 @@ import 'dart:io';
 import '../netease/track.dart';
 import '../../stores/data_dir.dart';
 import 'playback_state.dart';
+import '../../utils/safe_file.dart';
 
 /// 播放会话快照（仅记录关闭前的最后一次：队列 + 当前曲 + 位置 + 播放模式）。
 ///
@@ -155,9 +156,8 @@ class PlaybackSessionStore {
   /// 写入快照（覆盖旧快照；失败静默，不影响播放主流程）。
   void save(PlaybackSnapshot snapshot) {
     try {
-      final file = File(filePath);
-      file.parent.createSync(recursive: true);
-      file.writeAsStringSync(
+      SafeFile.writeAtomicString(
+        filePath,
         const JsonEncoder.withIndent('  ').convert(snapshot.toJson()),
       );
     } catch (_) {
@@ -178,9 +178,9 @@ class PlaybackSessionStore {
   /// 读取最近一次快照；无快照 / 损坏时返回 null。
   PlaybackSnapshot? load() {
     try {
-      final file = File(filePath);
-      if (!file.existsSync()) return null;
-      final json = jsonDecode(file.readAsStringSync());
+      final text = SafeFile.readString(filePath);
+      if (text == null) return null;
+      final json = jsonDecode(text);
       if (json is! Map<String, dynamic>) return null;
       final snapshot = PlaybackSnapshot.fromJson(json);
       // 无任何可恢复内容视为无效快照

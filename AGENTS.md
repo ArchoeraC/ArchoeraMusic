@@ -60,6 +60,20 @@ cargo build --release --target x86_64-apple-darwin    --manifest-path app/core/s
 > `flutter gen-l10n`（`flutter build/test` 也会自动生成）以刷新生成代码。
 > `build_windows.bat` / `build-macos.sh` 已含该模块的预构建（幂等）。
 
+改动凭据保险库（`app/core/vault-rs`，三端 Rust 静态进程）时另跑：
+```bash
+cd app/core/vault-rs
+./build-test.sh && ./test.sh      # Linux 端到端：容器/KDF、内存护栏、安全落盘、
+                                  # 沙箱完整性·非自毁、黄金夹具、并发语义
+./test-windows.sh                 # Wine 上跑真实 Windows 产物（需 wine + msvc-wine + lld-link；缺则跳过）
+./cross-macos.sh                  # Linux 上用 macOS SDK 交叉构建（仅编译期；运行期待真机）
+./gen_testdata.sh                 # ⚠ 仅当确认容器格式未变时重生成「黄金夹具」（字节兼容锚点）
+```
+> C# 版 vault（`app/core/vault/`）已于 2026-10-12 **删除**：字节/协议兼容改由
+> `app/core/vault-rs/testdata/` 的**冻结黄金夹具**锚定（`test.sh` §14 + `test-windows.sh` §11）。
+> 沙箱/内存语义见 [docs/vault-security-notes.md](docs/vault-security-notes.md) 与
+> [docs/security-review-2026-10-11.md](docs/security-review-2026-10-11.md)（SEC-35 起）。
+
 Windows/MSVC 兼容自检（本机可交叉，无需 Windows SDK）：
 ```bash
 cd app/core/audio-engine

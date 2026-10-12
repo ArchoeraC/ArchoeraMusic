@@ -41,14 +41,9 @@ updates:
       interval: weekly
     labels: [dependencies, go]
 
-  # ── .NET（扫描器 / vault）──
+  # ── .NET（扫描器）──
   - package-ecosystem: nuget
     directory: /app/core/scanner
-    schedule:
-      interval: weekly
-    labels: [dependencies, dotnet]
-  - package-ecosystem: nuget
-    directory: /app/core/vault/src
     schedule:
       interval: weekly
     labels: [dependencies, dotnet]
