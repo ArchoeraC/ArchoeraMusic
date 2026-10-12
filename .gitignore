@@ -63,6 +63,10 @@ app/core/vault/src/build/
 app/core/vault/src/bin/
 app/core/vault/src/obj/
 
+# vault-rs（Rust 静态凭据保险库；cargo target/ + build.sh / build-test.sh 产物）
+app/core/vault-rs/target/
+app/core/vault-rs/build/
+
 # 打包输出（packaging/linux/package*.sh 的中间暂存与最终产物）
 dist/
 packaging/linux/work/

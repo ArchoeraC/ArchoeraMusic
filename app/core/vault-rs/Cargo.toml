@@ -1,0 +1,36 @@
+[package]
+name = "archoera-vault"
+version = "0.1.0"
+edition = "2021"
+description = "ArchoeraMusic 凭据保险库（Rust 重实现，与 C# 版字节兼容）"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[[bin]]
+name = "archoera-vault"
+path = "src/main.rs"
+
+[features]
+default = []
+# 测试构建标记（等价 C# VAULT_TESTING）：--version / 握手上报 TEST 标记。
+vault_testing = []
+
+[dependencies]
+# 纯 Rust 加密栈（无 OpenSSL），保证 crt-static / musl 静态链接成立。
+argon2 = { version = "0.5", default-features = false, features = ["alloc"] }
+aes-gcm = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
+hkdf = "0.12"
+sha2 = "0.10"
+hmac = "0.12"
+subtle = "2"
+zeroize = "1"
+getrandom = "0.2"
+base64 = "0.22"
+libc = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
