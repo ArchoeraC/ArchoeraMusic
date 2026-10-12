@@ -1029,43 +1029,49 @@ PY
 mv "$DATA12/secret.key.bak" "$DATA12/secret.key"
 pass "file 缺 secret.key → SHARE_MISSING（fail-closed）"
 
-# ④ env 密钥覆盖：错误 env → SHARE_MISMATCH；正确 env（init 时注入）→ 解锁
+# ④ stdin 密钥注入：init-file --key-stdin 指定 K（不经 argv/env）→ 解锁；篡改 secret.key → SHARE_MISMATCH
 KEYHEX=$(python3 -c "import secrets;print(secrets.token_hex(32))")
-python3 - "$VAULT" "$DATA12" "$KEYHEX" <<'PY' || fail "env 密钥不配对应 SHARE_MISMATCH"
+run destroy "$DATA13" >/dev/null 2>&1 || true
+OUT=$(printf '%s\n' "$KEYHEX" | "$VAULT" init-file "$DATA13" --key-stdin 2>&1) || true
+case "$OUT" in ok\ *) : ;; *) fail "stdin 密钥 init-file 失败: $OUT";; esac
+python3 - "$VAULT" "$DATA13" "$KEYHEX" <<'PY' || fail "stdin 注入的密钥应解锁"
 import base64, os, subprocess, sys
 vault, data, keyhex = sys.argv[1:4]
-env = dict(os.environ); env["ARCHOERA_VAULT_SECRET_KEY"] = keyhex
+raw = open(os.path.join(data, "secret.key"), "rb").read()
+assert raw.hex() == keyhex, "secret.key 应为 stdin 注入的 K: %r" % raw.hex()
 p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 p.stdin.write(("handshake %s %s\n" % (
     base64.b64encode(os.urandom(32)).decode(),
     base64.b64encode(os.urandom(16)).decode())).encode())
 p.stdin.flush()
 resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("err SHARE_MISMATCH"), "错误 env 密钥应 SHARE_MISMATCH: %r" % resp
+assert resp.startswith("ok handshake"), "stdin 注入的密钥应解锁: %r" % resp
 p.stdin.close(); p.wait(timeout=5)
 print("ok")
 PY
-OUT=$(ARCHOERA_VAULT_SECRET_KEY="$KEYHEX" "$VAULT" init-file "$DATA13" 2>&1) || true
-case "$OUT" in ok\ *) : ;; *) fail "env 密钥 init-file 失败: $OUT";; esac
-python3 - "$VAULT" "$DATA13" "$KEYHEX" <<'PY' || fail "正确 env 密钥应解锁"
+# 篡改 secret.key（与 vault 不配对）→ SHARE_MISMATCH（fail-closed）
+python3 - "$DATA13" <<'PY'
+import os, sys
+open(os.path.join(sys.argv[1], "secret.key"), "wb").write(os.urandom(32))
+PY
+python3 - "$VAULT" "$DATA13" <<'PY' || fail "篡改 secret.key 应 SHARE_MISMATCH"
 import base64, os, subprocess, sys
-vault, data, keyhex = sys.argv[1:4]
-env = dict(os.environ); env["ARCHOERA_VAULT_SECRET_KEY"] = keyhex
+vault, data = sys.argv[1:3]
 p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE,
-                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 p.stdin.write(("handshake %s %s\n" % (
     base64.b64encode(os.urandom(32)).decode(),
     base64.b64encode(os.urandom(16)).decode())).encode())
 p.stdin.flush()
 resp = p.stdout.readline().decode().rstrip("\n")
-assert resp.startswith("ok handshake"), "正确 env 密钥应解锁: %r" % resp
+assert resp.startswith("err SHARE_MISMATCH"), "篡改 secret.key 应 SHARE_MISMATCH: %r" % resp
 p.stdin.close(); p.wait(timeout=5)
 print("ok")
 PY
-pass "file env 密钥覆盖（错误 → SHARE_MISMATCH / 正确 → 解锁）"
+pass "file stdin 密钥注入（--key-stdin → 解锁；篡改 secret.key → SHARE_MISMATCH）"
 
-# ⑤ ARCHOERA_VAULT_BACKEND=file 初始化路径（等价 init-file，供主进程经 env 注入）
+# ⑤ ARCHOERA_VAULT_BACKEND=file 初始化路径（等价 init-file，供主进程显式选择后端）
 run destroy "$DATA13" >/dev/null || fail "destroy DATA13 失败"
 OUT=$(ARCHOERA_VAULT_BACKEND=file "$VAULT" init-crypto "$DATA13" 2>&1) || true
 case "$OUT" in
@@ -1075,7 +1081,7 @@ esac
 pass "ARCHOERA_VAULT_BACKEND=file 初始化路径（等价 init-file）"
 
 # ⑥ 跨目录独立性：B 的 init-file 不覆盖 A 的密钥（文件按目录天然隔离，契约验证）
-#    先等 ④ env 错误解锁触发的 1s 锁定退避过期，避免误伤本用例
+#    先等 ④ 篡改密钥触发的 1s 锁定退避过期，避免误伤本用例
 sleep 2
 OUT=$("$VAULT" init-file "$DATA11" 2>&1) || true
 case "$OUT" in ok\ *) : ;; *) fail "init-file B 失败: $OUT";; esac

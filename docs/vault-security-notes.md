@@ -50,7 +50,7 @@
 | `ARCHOERA_VAULT_INSECURE_FILE_STORE=1` | 测试专用明文存储（份额明文落盘） | 仅存在于**测试构建**（`VAULT_TESTING` 条件编译）；生产构建不编译该逻辑，设置亦无效 | ❌ 不设置 |
 | `ARCHOERA_VAULT_BIN` | 显式指定 vault 二进制路径 | 显式信任边界：**跳过默认路径的 PROD 校验**（marker 存在性仍校验）；能设置进程环境即属调用方权限 | ❌ 不设置 |
 | `ARCHOERA_VAULT_BACKEND=file` | 选择 **v4-file** 后端（单因子、主密钥整体落盘 `secret.key`） | **弱化**等级：单文件密钥泄露即凭据全泄露，弱于 v1 OS 存储（见 §已知缺口 SEC-02） | ❌ 不设置 |
-| `ARCHOERA_VAULT_SECRET_KEY` | 覆盖 v4-file 主密钥 K | 主密钥**经环境变量传递**，会出现在 `/proc/<pid>/environ`（同用户可读），可能进入日志 / 崩溃转储 / CI 记录 | ❌ 禁用（SEC-02） |
+| `ARCHOERA_VAULT_SECRET_KEY` | ~~覆盖 v4-file 主密钥 K~~ | **已移除**（SEC-02）：改为 `init-file --key-stdin`（stdin 首行 hex64，不经 argv/env）；env 会出现在 `/proc/<pid>/environ`（同用户可读），故不再支持 | ⛔ 已移除 |
 | `ARCHOERA_VAULT_FINGERPRINT` | 覆盖 v3 设备指纹（`machine-id` / `MachineGuid` / `IOPlatformUUID`）来源 | 影响设备绑定份额的派生输入（见 §已知缺口 SEC-13） | ❌ 不设置 |
 | `ARCHOERA_VAULT_PARENT_OK` | 血缘白名单（逗号分隔可执行名） | **由调用方（主进程）注入，可被自造** → 血缘 / 握手**不防同用户攻击者**（SEC-07） | ✅ 主进程自动注入 |
 | `ARCHOERA_VAULT_NO_ABORT=1` | 崩溃联动测试豁免（仅写 `vault.marker`，不 `exit(86)`） | 测试专用；设置后崩溃不在主进程侧 fail-closed | ❌ 不设置 |
@@ -62,12 +62,13 @@
 
 - **第二套密钥体系未纳入 vault**（SEC-01）：Subsonic 敏感字段以 `enc:v1:` 落在 `database/user.db`，密钥自举到 `dataDir/secret.key`——
   vault 的 v1-v3 强度提升**不覆盖**此类凭据；
-- **v4-file 模式与主密钥 env**（SEC-02）：`ARCHOERA_VAULT_BACKEND=file` / `ARCHOERA_VAULT_SECRET_KEY` 为单因子 / env 传密钥，
-  与 [credential-vault-plan.md](credential-vault-plan.md) §3.8「argv / 环境不携带任何凭据」的表述冲突；
-- **启动预取常驻明文**（SEC-03）：Dart 侧 `StreamingStore.preloadSecrets()` 启动即解密全部流媒体凭据常驻内存，
-  且 Dart 字符串不可 zeroize、不受 mlock 保护；
+- **v4-file 模式与主密钥 env**（SEC-02）：v4-file 为单因子（K 落盘 `secret.key`），选用即显式降级；
+  原 `ARCHOERA_VAULT_SECRET_KEY` **env 注入已移除**，改为 `init-file --key-stdin`（不经 argv/env）——
+  与 [credential-vault-plan.md](credential-vault-plan.md) §3.8「argv / 环境不携带任何凭据」一致；
+- **启动预取常驻明文**（SEC-03，**已知接受项**）：Dart 侧 `StreamingStore.preloadSecrets()` 启动即解密全部流媒体凭据常驻内存，
+  且 Dart 字符串不可 zeroize、不受 mlock 保护；缓解为主进程 `PR_SET_DUMPABLE=0` + `RLIMIT_CORE=0`（不覆盖同用户读 `/proc/<pid>/mem`）；
 - **PROD marker 定性过高**（SEC-04）：marker 为可伪造字符串，只能防「误用测试构建」，**不能防替换二进制本身**；
 - **lockout / auth / marker 同用户可写**（SEC-05）：`vault.lockout` 可删（重置退避）、`vault.auth` 可随 vault 一并替换（锚点失效）、
-  `vault.marker` 可伪造（DoS 或掩盖崩溃）；
+  `vault.marker` 可伪造（DoS 或掩盖崩溃）——**已如实声明：这些文件不构成对同用户攻击者的防线**（加固待办：状态移入 OS 安全存储 / HMAC 绑定 / 防伪造）；
 - **KDF 参数无加载上限**（SEC-06）：恶意头部的 Argon2id `m / t / p` 可致解锁前内存 / CPU DoS（`VaultLimits` 未覆盖）；
 - **血缘 / 握手不防同用户**（SEC-07）：`ARCHOERA_VAULT_PARENT_OK` 由发起方注入，可自造通过。
