@@ -16,10 +16,10 @@
 library;
 
 import 'dart:convert';
-import 'dart:io';
 
 import '../log/log.dart';
 import '../security/vault_process.dart';
+import '../../utils/safe_file.dart';
 
 /// MCP 访问密钥的内存缓存 + 凭据保险库读写。
 class McpKeyStore {
@@ -89,9 +89,9 @@ class McpKeyStore {
   /// 从 `prefs.json` 读取历史明文密钥（文件缺失/损坏/无键返回 null）。
   static String? readLegacy(String dataDir) {
     try {
-      final f = File('$dataDir/prefs.json');
-      if (!f.existsSync()) return null;
-      final json = jsonDecode(f.readAsStringSync());
+      final text = SafeFile.readString('$dataDir/prefs.json');
+      if (text == null) return null;
+      final json = jsonDecode(text);
       if (json is Map) {
         final v = json[legacyPrefsKey];
         if (v is String && v.trim().isNotEmpty) return v.trim();
@@ -105,12 +105,13 @@ class McpKeyStore {
   /// 移除 `prefs.json` 中的历史明文密钥（幂等；GUI 已不再写入）。
   static void clearLegacy(String dataDir) {
     try {
-      final f = File('$dataDir/prefs.json');
-      if (!f.existsSync()) return;
-      final json = jsonDecode(f.readAsStringSync());
+      final text = SafeFile.readString('$dataDir/prefs.json');
+      if (text == null) return;
+      final json = jsonDecode(text);
       if (json is! Map || !json.containsKey(legacyPrefsKey)) return;
       json.remove(legacyPrefsKey);
-      f.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(json));
+      SafeFile.writeAtomicString(
+          '$dataDir/prefs.json', const JsonEncoder.withIndent('  ').convert(json));
     } catch (_) {
       // 清理失败不阻断：后续 [AppPrefs.save] 亦会剥离该键
     }

@@ -12,6 +12,17 @@
 //!        `QueryFullProcessImageNameW` 取父进程映像路径，大小写不敏感比较）+
 //!        `SetProcessMitigationPolicy`（ACG/CIG/扩展点/严格句柄/CFG/镜像，best-effort）；
 //!        父死检测由 `GetExitCodeProcess` 兜底。
+//!
+//! **沙箱被蓄意破坏 → 自毁并连带主程序退出**（对齐主程序 fail-closed 契约）：
+//! - **可观测**的蓄意破坏（加载器注入变量）→ 打印 `err` 后以 [`SANDBOX_BREACH_EXIT`]
+//!   终止；应用侧把它与「异常退出」同等对待 → crash 标记 → `exit(86)` **连带主程序退出**；
+//! - **不可观测**的攻破（同用户 `ptrace` / 读 `/proc/<pid>/mem`——内核层已拒绝，
+//!   vault 自身无从感知）**不做猜测式检测**：自造检测器只会误报、且在真实攻击面前失效；
+//!   防线是 `PR_SET_DUMPABLE=0` / `mlock` / 静态链接「不让读」，不是「被打就自毁」；
+//! - **数据完整性失败**（HMAC/GCM/头部损坏）**不升级**为自毁：那可能是磁盘损坏，
+//!   且会成为攻击者可用的「丢个坏文件就让应用自杀」DoS 原语——此类只拒绝本次操作；
+//! - **任何情况下都不删除用户凭据**：自毁 = 进程终止 + 会话态清零（`zeroize`/`munlock`），
+//!   ≠ 数据销毁；数据销毁只有显式 `destroy`（或设置面板）一条路径。
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,33 +35,55 @@ pub fn seccomp_active() -> bool {
     SECCOMP_ACTIVE.load(Ordering::SeqCst)
 }
 
-/// 血缘校验 + 安全武装；返回父进程 pid。
-pub fn verify_and_arm() -> Result<i32> {
+/// 「沙箱被蓄意破坏」专用退出码：应用侧（`vault_process.dart`）据此判定为致命
+/// （与信号终止同等 → crash 标记 → `exit(86)` 连带主程序退出）。
+///
+/// 三端声明一致（应用侧常量对齐）；**仅 unix 有可观测的等价信号**（见 [`sandbox_breach`]）——
+/// Windows 不做反调试类检测（项目政策：不引入启发式反调试伪装），故此处允许未使用。
+#[allow(dead_code)]
+pub const SANDBOX_BREACH_EXIT: i32 = 87;
+
+/// 以专用退出码终止（先打印 `err` 供日志/测试断言）。
+///
+/// 仅 unix：Linux 的加载器注入面（`LD_PRELOAD`/`LD_AUDIT`）、macOS 的 `DYLD_INSERT_LIBRARIES`
+/// 是可观测的**蓄意破坏**信号；Windows 无等价物（详见模块注释）。
+#[cfg(unix)]
+fn sandbox_breach(msg: &str) -> ! {
+    println!("err {msg}");
+    let _ = std::io::Write::flush(&mut std::io::stdout());
+    std::process::exit(SANDBOX_BREACH_EXIT)
+}
+
+/// 进程硬化（**不含血缘校验**）：注入面环境检查 + 内存锁配额 + `RLIMIT_CORE=0` +
+/// `PR_SET_DUMPABLE=0` + seccomp（Linux）/ 缓解策略（Windows）/ `RLIMIT_CORE=0`（macOS）。
+///
+/// **所有命令**都必须调用一次（见 `main`）：一次性命令（`init-*` / `set-kdf` /
+/// `destroy` / `status`）同样在内存里持有口令与主密钥（`init-m2a` 还会打印恢复码），
+/// 若未硬化，则同用户可读其 `/proc/<pid>/mem`、崩溃可写出含口令的 core。
+/// 血缘校验（`verify_and_arm`）只在 `serve` 需要——它是「防误用/自动化」而非
+/// 防同用户（见威胁模型），且让一次性 CLI 在打包布局下仍可被用户手工调用
+/// （如 `archoera-vault destroy <dir>`，见 vault-security-notes）。
+pub fn harden_process() -> Result<()> {
     #[cfg(target_os = "linux")]
     {
         let preload = std::env::var("LD_PRELOAD").unwrap_or_default();
         let audit = std::env::var("LD_AUDIT").unwrap_or_default();
         if !preload.is_empty() || !audit.is_empty() {
-            return Err(VaultError::invalid_operation(
-                "检测到 LD_PRELOAD/LD_AUDIT，拒绝运行以防注入",
-            ));
+            // 蓄意注入 = 沙箱被破坏：自毁（异常退出）并让主程序连带 fail-closed。
+            sandbox_breach("检测到 LD_PRELOAD/LD_AUDIT，沙箱被破坏，拒绝运行并终止");
         }
     }
     #[cfg(target_os = "macos")]
     {
         let insert = std::env::var("DYLD_INSERT_LIBRARIES").unwrap_or_default();
         if !insert.is_empty() {
-            return Err(VaultError::invalid_operation(
-                "检测到 DYLD_INSERT_LIBRARIES，拒绝运行以防注入",
-            ));
+            sandbox_breach("检测到 DYLD_INSERT_LIBRARIES，沙箱被破坏，拒绝运行并终止");
         }
     }
 
-    let ppid = get_parent_pid();
-    if ppid <= 1 {
-        return Err(VaultError::invalid_operation("独立运行被拒：父进程缺失"));
-    }
-    verify_parent_identity(ppid)?;
+    // 内存锁配额：先尽力抬高（RLIMIT_MEMLOCK 软限→硬限 / Windows 工作集下界），
+    // 让主密钥与明文缓冲的 mlock/VirtualLock 更容易成功（见 memguard）。
+    crate::memguard::raise_lock_quota();
 
     #[cfg(target_os = "linux")]
     {
@@ -71,6 +104,17 @@ pub fn verify_and_arm() -> Result<i32> {
     {
         apply_windows_mitigations();
     }
+    Ok(())
+}
+
+/// 血缘校验 + 进程硬化；返回父进程 pid（仅 `serve` 需要血缘部分）。
+pub fn verify_and_arm() -> Result<i32> {
+    harden_process()?;
+    let ppid = get_parent_pid();
+    if ppid <= 1 {
+        return Err(VaultError::invalid_operation("独立运行被拒：父进程缺失"));
+    }
+    verify_parent_identity(ppid)?;
     Ok(ppid)
 }
 
@@ -546,4 +590,100 @@ pub unsafe fn probe_socket(domain: libc::c_int) -> libc::c_int {
 #[cfg(not(unix))]
 pub unsafe fn probe_socket(_domain: libc::c_int) -> libc::c_int {
     -1
+}
+
+// ── denylist 逐条生效性自检（仅 Linux）────────────────────────────
+
+/// 被拒系统调用名单（x86_64 / aarch64 同序）。
+#[cfg(target_os = "linux")]
+pub const DENY_NAMES: [&str; 33] = [
+    "ptrace",
+    "process_vm_readv",
+    "process_vm_writev",
+    "execve",
+    "execveat",
+    "kexec_load",
+    "kexec_file_load",
+    "bpf",
+    "userfaultfd",
+    "perf_event_open",
+    "open_by_handle_at",
+    "process_madvise",
+    "pidfd_getfd",
+    "init_module",
+    "finit_module",
+    "delete_module",
+    "reboot",
+    "swapon",
+    "swapoff",
+    "mount",
+    "umount2",
+    "pivot_root",
+    "chroot",
+    "setns",
+    "unshare",
+    "open_tree",
+    "move_mount",
+    "fsopen",
+    "fsmount",
+    "fspick",
+    "io_uring_setup",
+    "io_uring_enter",
+    "io_uring_register",
+];
+
+#[cfg(target_os = "linux")]
+fn deny_numbers() -> &'static [i32] {
+    match std::env::consts::ARCH {
+        "x86_64" => seccomp::X64_DENIED,
+        "aarch64" => seccomp::ARM64_DENIED,
+        _ => &[],
+    }
+}
+
+/// 逐条验证 denylist 生效：每个被拒系统调用各 fork 一个子进程去实际调用——
+/// 子进程被内核以 `SIGSYS` 终止即视为**生效**（`SECCOMP_RET_KILL_PROCESS`）。
+/// 返回 `(总数, 生效数, 未生效名单)`。用于「沙箱完整性」自检：不只看过滤器是否装载，
+/// 而是逐条确认名单真的拦得住（名单漂移 / 内核 ABI 差异都会在这里暴露）。
+#[cfg(target_os = "linux")]
+pub fn probe_denylist() -> (usize, usize, Vec<&'static str>) {
+    let nrs = deny_numbers();
+    let total = nrs.len();
+    let mut killed = 0usize;
+    let mut missed: Vec<&'static str> = Vec::new();
+    for (i, nr) in nrs.iter().enumerate() {
+        let name = DENY_NAMES.get(i).copied().unwrap_or("?");
+        // SAFETY: fork 在过滤器下是放行系统调用；子进程只做一次探测即 _exit。
+        let pid = unsafe { libc::fork() };
+        if pid == 0 {
+            // 子进程：直接发起该系统调用（参数全 0；过滤器生效时根本不会执行到返回）。
+            unsafe {
+                libc::syscall(*nr as libc::c_long, 0usize, 0usize, 0usize, 0usize, 0usize, 0usize);
+                libc::_exit(0); // 未被拒 → 自检将报告「未生效」
+            }
+        } else if pid > 0 {
+            let mut status = 0i32;
+            unsafe {
+                libc::waitpid(pid, &mut status, 0);
+            }
+            let sig = if libc::WIFSIGNALED(status) {
+                libc::WTERMSIG(status)
+            } else {
+                0
+            };
+            if sig == libc::SIGSYS {
+                killed += 1;
+            } else {
+                missed.push(name);
+            }
+        } else {
+            missed.push(name); // fork 失败：保守计为未验证
+        }
+    }
+    (total, killed, missed)
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn probe_denylist() -> (usize, usize, Vec<&'static str>) {
+    (0, 0, Vec::new())
 }

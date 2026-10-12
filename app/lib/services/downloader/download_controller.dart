@@ -19,7 +19,6 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,6 +32,7 @@ import '../../stores/providers.dart';
 import '../log/log.dart';
 import 'download_platform.dart';
 import 'downloader_engine.dart';
+import '../../utils/safe_file.dart';
 
 part 'download_controller/download_controller_core.dart';
 part 'download_controller/download_controller_actions.dart';

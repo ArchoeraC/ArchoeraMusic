@@ -140,11 +140,10 @@ impl SecretStore for FileStore {
         "file"
     }
     fn load(&self, _key: &str) -> Result<Option<Vec<u8>>> {
-        let path = self.key_path();
-        if !path.exists() {
-            return Ok(None);
-        }
-        let raw = std::fs::read(&path)?;
+        let raw = match crate::safefile::read_regular_limited(&self.key_path(), 4096)? {
+            Some(v) => v,
+            None => return Ok(None),
+        };
         // 槽位值：legacy 32B 原始 K，或含退避状态的 ShareBundle。
         if raw.len() == KEY_SIZE || raw.len() >= ShareBundle::SIZE {
             Ok(Some(raw))
@@ -153,17 +152,9 @@ impl SecretStore for FileStore {
         }
     }
     fn store(&self, _key: &str, value: &[u8]) -> Result<()> {
-        std::fs::create_dir_all(&self.data_dir)?;
-        let path = self.key_path();
-        let tmp = PathBuf::from(format!("{}.tmp", path.display()));
-        std::fs::write(&tmp, value)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
-        }
-        std::fs::rename(&tmp, &path)?;
-        Ok(())
+        // 私有原子写（0600，tmp 独占、拒绝符号链接/FIFO）：K 的落盘路径同样受
+        // 「符号链接穿透写 / FIFO 挂死」防线保护。
+        crate::safefile::write_atomic(&self.key_path(), value, true)
     }
     fn delete(&self, _key: &str) -> Result<()> {
         let path = self.key_path();
@@ -249,24 +240,19 @@ impl SecretStore for DpapiStore {
 
     fn load(&self, _key: &str) -> Result<Option<Vec<u8>>> {
         use zeroize::Zeroize;
-        let path = Path::new(&self.file);
-        if !path.exists() {
-            return Ok(None);
-        }
-        let mut raw = std::fs::read(path)?;
-        let plain = dpapi::unprotect(&raw);
-        raw.zeroize();
+        let raw = match crate::safefile::read_regular_limited(Path::new(&self.file), 65536)? {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+        let mut cipher = raw;
+        let plain = dpapi::unprotect(&cipher);
+        cipher.zeroize();
         Ok(Some(plain?))
     }
 
     fn store(&self, _key: &str, value: &[u8]) -> Result<()> {
-        let path = Path::new(&self.file);
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
         let cipher = dpapi::protect(value)?;
-        std::fs::write(path, &cipher)?;
-        Ok(())
+        crate::safefile::write_atomic(Path::new(&self.file), &cipher, false)
     }
 
     fn delete(&self, _key: &str) -> Result<()> {

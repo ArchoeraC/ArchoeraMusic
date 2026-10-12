@@ -233,7 +233,7 @@ vault = header{magic,ver,vaultId,kdf,salt,alg} + entries(AEAD_K) + trailer(HMAC_
 - **父进程 fail-closed + UI 告警**（扩展已有雏形）：vault 异常终止 / 完整性校验失败 / 锚点不符 →
   主进程按 fail-closed 处理（已有 `exit(86)` + `VaultCrashGate`），并弹**安全告警**：
   "检测到异常/可能被干预，已终止以保护凭据；请从官方来源重装或核查系统环境"。
-- **零化内存密钥**：终止/异常退出路径 zeroize mlock 缓冲（已有），**内存态不残留**。
+- **零化内存密钥**：终止/异常退出路径 zeroize mlock 缓冲（**Rust `memguard` 已落地**，见 §14 / SEC-35/36），**内存态不残留**。
 - **数据不动**：持久 vault 文件保持不变；重启后重新解锁即可——**这正是"不擦数据"换来的安全**。
 - **副作用（可接受）**：误报只造成"一次重启 + 告警"（非数据损失）；攻击者可借此制造反复重启（DoS），
   但**不影响数据完整性**。
@@ -321,7 +321,7 @@ vault = header{magic,ver,vaultId,kdf,salt,alg} + entries(AEAD_K) + trailer(HMAC_
 - 单容器 + 最小 header；按需解密单条（✅ SEC-03 方向，`loadSecret(id)`）。
   **⚠️ 未落地**：大库流式解密 / 增量写——当前 `VaultFile.Load` **整文件读入**（上限 16 MiB）。
 - AEAD 用 **AES-256-GCM**（✅ 已落地，`alg=1`）。**⚠️ 未落地**：无 AES 指令时的 **ChaCha20-Poly1305 回退**——当前仅 AES-GCM 一种。
-- 解锁密钥在 vault 进程内短时持有于 mlock 缓冲；主进程不缓存口令（✅ 每次操作按需注入或会话口令）。
+- 解锁密钥在 vault 进程内短时持有于 mlock 缓冲（**Rust `memguard`：每缓冲独占页 + drop 时 zeroize/munlock**）；主进程不缓存口令（✅ 每次操作按需注入或会话口令）。
 - **⚠️ 未落地**：IPC 二进制帧——当前仍为 stdin/stdout **base64 文本行**协议。
 
 ---
@@ -373,6 +373,16 @@ vault = header{magic,ver,vaultId,kdf,salt,alg} + entries(AEAD_K) + trailer(HMAC_
 
 **缺口 1 · slots 退避可被同用户重置（C2）**：slots 模式无份额槽 → 退避落在明文 `<dataDir>/vault.lockout`，**删除该文件即可清零退避**（实测删除后再试不再"锁定"）。与 SEC-05 同类：**任何软件态退避在"能删状态的同用户攻击者"面前都不可强制**（离线暴破本就无法限速）。**真正杠杆是 KDF 成本 + 口令/恢复码熵**。缓解：可选把退避同时写 OS 安全存储（Windows/macOS 提升删除成本，Linux libsecret 同用户仍可读/删）；文档如实声明。
 
+**缺口 3 · Rust 移植缺内存护栏与 zeroize 覆盖（SEC-35/36，已修）**：Rust 重实现一度只保留 `zeroize` 而丢掉
+C# `MemGuard` 的 `mlock`/`VirtualLock`/`MADV_DONTDUMP`，且 `get`/`set` 明文与会话主密钥直接 drop → 主密钥可被换出到
+swap/pagefile，Windows 上实测可在会话内存中扫到已删除凭据。**已修**：`memguard.rs`（每缓冲独占页锁定）+ 全路径
+`Zeroizing`/`LockedBuffer` + 原始句柄 I/O；复验「已删除凭据残留 0 命中」。
+
+**缺口 4 · 敏感文件符号链接穿透 / FIFO 挂死（SEC-37/38，已修）**：`.tmp`/`.bak` 被预置符号链接时旧实现
+（`File::create`/`fs::copy`）会写到链接指向的任意文件，`.tmp` 场景还会把 vault 文件本身换成符号链接；
+`.tmp` 为 FIFO 时 `open(O_WRONLY)` **永久阻塞**（写路径无超时）。**已修**：`safefile.rs` 统一安全落盘
+（读 `O_NOFOLLOW`、写 `O_CREAT|O_EXCL` 独占 tmp、非普通文件一律拒绝、`.bak` 原子写）。
+
 **缺口 2 · m2b 为单因子（H2）**：m2b 仅设备槽，**读到 `device.key`（0600，同用户可读）即离线解出全部明文**（实测仅凭 `device.key` + vault 文件成功解出凭据）。属 m2b 的定义使然（本机级、弱于 m2a）。建议：UI 明确标注"本机级（较弱）"或直接不提供 m2b 入口（Vault 保留支持）。
 
 **已定决策（2026-10 复核，对应上述发现）**：
@@ -391,7 +401,7 @@ vault = header{magic,ver,vaultId,kdf,salt,alg} + entries(AEAD_K) + trailer(HMAC_
 
 - **A · LD_PRELOAD 注入（曾经成立，已修）**：vault 为动态链接 PIE、继承环境；`LD_PRELOAD=<evil.so>` hook `read` 即可读到标准输入握手里的明文口令 → 再用该口令离线解出全部凭据（**实测完全失守**）。
   - **修补**：① Dart 侧 spawn vault（`start`+`runSync`）改用**净化环境**（剔除 `LD_PRELOAD`/`LD_AUDIT`/`LD_LIBRARY_PATH`/`DYLD_*`，并以 `includeParentEnvironment:false` 不再合并父环境）；② vault 侧 `VerifyAndArm` 在 Linux 检出 `LD_PRELOAD`/`LD_AUDIT` 非空、macOS 检出 `DYLD_INSERT_LIBRARIES` 非空即**拒绝运行**（在读任何输入之前）。
-  - **残余**：属"提高门槛"而非边界——系统级 `/etc/ld.so.preload`、或已被攻陷的父程序注入不受控。**根治办法是静态链接**（`ld.so` 不参与，`LD_PRELOAD` 失效）——**Linux 已落地**：`native/archoera-vault` 改由 `app/core/vault-rs` 的 **Rust 静态单文件**承接（`+crt-static`；CI 走 musl 静态），C# NativeAOT 因链接器断言失败无法静态化（§13-E）。**Windows / macOS 亦已改用同一 Rust 版**（`app/core/vault-rs`：Windows 走 DPAPI、无 `LD_PRELOAD` 类加载器注入面；macOS 走 Keychain，仍以过程护栏「拒绝非空 `DYLD_INSERT_LIBRARIES`」+ Dart 侧环境净化兜底）；Windows/macOS 运行期行为**待真机 / Wine 验证**。C# NativeAOT vault 已不再进入任何平台产物。
+  - **残余**：属"提高门槛"而非边界——系统级 `/etc/ld.so.preload`、或已被攻陷的父程序注入不受控。**根治办法是静态链接**（`ld.so` 不参与，`LD_PRELOAD` 失效）——**Linux 已落地**：`native/archoera-vault` 改由 `app/core/vault-rs` 的 **Rust 静态单文件**承接（`+crt-static`；CI 走 musl 静态），C# NativeAOT 因链接器断言失败无法静态化（§13-E）。**Windows / macOS 亦已改用同一 Rust 版**（`app/core/vault-rs`：Windows 走 DPAPI、无 `LD_PRELOAD` 类加载器注入面；macOS 走 Keychain，仍以过程护栏「拒绝非空 `DYLD_INSERT_LIBRARIES`」+ Dart 侧环境净化兜底）；Windows/macOS 运行期行为：**Windows 已在 Wine 上端到端实测**（见 §14 与 `app/core/vault-rs/test-windows.sh`），macOS 仅完成 Linux 交叉编译检查、运行期待真机。**内存护栏（mlock/VirtualLock + zeroize）已由 `app/core/vault-rs/src/memguard.rs` 在 Rust 三端落地**（见 §14、SEC-35/36）。C# NativeAOT vault 已不再进入任何平台产物。
 - **B · `/proc/<pid>/environ`**：被 `PR_SET_DUMPABLE=0` 拒绝（口令也不经 env 传递）。
 - **C · `ARCHOERA_VAULT_BIN` 伪造 vault（曾经成立，已修）**：应用会把明文口令交给 env 指定的二进制，而 marker 与握手 HMAC 均可自算，**不构成对 vault 二进制的认证**。
   - **修补**：`ARCHOERA_VAULT_BIN` **仅在 debug/测试构建生效**（`kDebugMode`；或显式 `ARCHOERA_ALLOW_VAULT_BIN`）；**release 忽略**，走默认解析 + key1 签名清单校验 + 父进程身份校验。
@@ -401,20 +411,67 @@ vault = header{magic,ver,vaultId,kdf,salt,alg} + entries(AEAD_K) + trailer(HMAC_
 ## 14. 多端"需真机验证"清单（本地仅交叉编译 / 单测）
 
 **三端现均为 Rust 版**（`app/core/vault-rs`）：`app/core/vault-rs/test.sh` +
-`app/core/vault-rs/cross_parity.sh`（与 C# 双向互解互读）在 Linux 本地全绿；macOS /
-Windows 目标已 `cargo check`（`x86_64-pc-windows-msvc`、`aarch64/x86_64-apple-darwin`）
-且纯函数单测通过。以下**运行期行为必须在对应真机 / Wine 复验**（本机无 Windows/macOS
-运行环境）：
+`app/core/vault-rs/testdata/` 黄金夹具（冻结的容器格式锚点）在 Linux/Wine 两侧读回一致；macOS /
+Windows 目标已双架构/双工具链构建，纯函数单测通过。此外：
+
+- `app/core/vault-rs/test-windows.sh`：Wine 上跑**真实 Windows 产物**（msvc-wine +
+  LLVM `lld-link` 交叉构建；经 `wine cmd /c` 启动——Unix 侧 wine 直启时 Wine 不回填
+  父 pid）。
+- `app/core/vault-rs/cross-macos.sh`：Linux 上用 macOS SDK + `ld64.lld` 交叉构建双架构
+  并 `lipo` 合包（`minos` / `Security.framework` 断言），**仅编译期**。
+
+**已由 Wine 实测**（Windows 目标）：DPAPI（`CryptProtectData`/`CryptUnprotectData`）读写
+`<dataDir>/sshare.bin` 与免密握手；父进程 `NtQueryInformationProcess` +
+`QueryFullProcessImageNameW` 打包布局路径绑定（预期主程序放行 / 非预期拒绝 / 大小写不敏感）；
+`crt-static` exe 在无 MSVC 运行时环境的启动；会话超时（握手 10s、空闲 30s 自退、`set`
+负载 30s）；各模式 init/serve/destroy、退避锁定、KDF 重键、畸形与超长输入、并发多会话；
+以及「Windows 写 → Linux Rust 读」「Windows 读 Linux 黄金夹具」的双向跨 OS 互通。
+
+**本轮红队复验后已修补**（SEC-35/36/37/38，证据见
+[security-review §8.5](security-review-2026-10-11.md)）：
+
+- **内存护栏**（`memguard.rs`）：主密钥 / KEK / 单条明文进 `LockedBuffer` —— Linux `mlock`、
+  Windows `VirtualLock`、Linux `MADV_DONTDUMP`，**每缓冲独占页**（页对齐），drop 时 zeroize + 解锁；
+  启动尽力抬额限，失败如实告警并降级为「仅 zeroize」（`selftest-mem` 可查）。**回归**：会话期 `VmLck>0`；
+- **zeroize 覆盖**：`get`/`set` 明文、响应串、会话主密钥、读线程行缓冲收口 `LockedBuffer`/`Zeroizing`；
+  stdout/stdin 改**原始句柄 + 自有可零化缓冲**（std 全局缓冲会留明文——实测 Windows 内存扫描可命中）。
+  修补后复验：**已删除凭据残留 0 命中**；
+- **安全落盘**（`safefile.rs`）：`.tmp`/`.bak`/`secret.key`/`device.key`/`sshare.bin`/`vault.lockout`
+  读写统一原语 —— **写**：`<file>.tmp.<pid>`（进程唯一，避免并发互删）`O_CREAT|O_EXCL` 独占、
+  非普通文件即拒绝、`.bak` 原子写；**读**：`read_regular_limited`（拒绝符号链接/FIFO/目录 +
+  读前按元数据判长 + `take` 封顶防增长 TOCTOU）。**回归**：`.tmp` 符号链接/FIFO、`.bak` 符号链接、
+  vault 符号链接、`vault.lockout` 植入 FIFO/符号链接→`/dev/zero`/超大文件（§13.5）。
+- **容量上限写入侧前置校验**（SEC-43）：单条明文 ≤ 4 MiB−16 B、整库 ≤ 16 MiB，超限**落盘前**拒绝
+  —— 否则会写出「下次加载即被拒」的自锁库（实测 4096 KiB 一次写入即可击穿）。**回归** §15。
+- **App 层文件访问收口**（SEC-47，`lib/utils/safe_file.dart`）：全部配置/状态文件与封面/清单等
+  改走安全读写（读「必须普通文件」+ 长度上限；写「唯一临时名 + rename」→ 符号链接只被替换不被穿透）；
+  擦除器只擦普通文件、不把非普通路径交给 Go 代理。回归 `test/safe_file_test.dart`。
+- **并发语义 = 兼容并发**（SEC-46）：写命令以**阻塞式跨进程独占锁**（`flock`/`LockFileEx`，内核唤醒、
+  非轮询、崩溃自动释放）保护「加载 → 改 → 保存」，消除「最后写者获胜」的**静默丢更新**；
+  锁范围=单条命令，锁文件 `vault.lock` 永不删除。**回归** §16（持锁阻塞 / 重键 ∥ 写入不丢更新）。
+
+**沙箱覆盖与完整性**（SEC-41，第八批）：硬化已提到 `main` 入口——**所有命令**（含一次性
+`init-*`/`set-kdf`/`destroy`/`status`）都装载 `mlock` 配额 / `RLIMIT_CORE=0` /
+`PR_SET_DUMPABLE=0` / seccomp / Windows 缓解；血缘校验仍只 `serve`（保证打包布局下用户可手工
+`destroy <dir>`）。新增 `selftest-seccomp list` 对 denylist **逐条**实际调用验证（实测 33/33 被
+`SIGSYS` 终止）。「打爆沙箱」实测**不会自毁数据**：信号 / seccomp 违例 / 篡改 vault·device.key·
+secret.key / 注入 / 重复 init 均只 fail-closed 拒绝，唯一销毁入口是显式 `destroy`（详见
+security-review §8.5 与 `test.sh` §13）。
+
+**仍不可在应用层封闭**（已具体化声明）：Windows 无「禁同用户读进程内存」等价物
+（`mlock` 防换页不防读），且 DPAPI 份额无 `pOptionalEntropy` → 同用户任意进程可解封主密钥并直解 vault
+（SEC-39）；Wine 的 DPAPI 为固定密钥实现，**不能**用于验证用户绑定，须真机复验。
+
+**仍待真机**：
 
 - **macOS**：`proc_pidpath`（libproc 经 `dlopen`/`dlsym` 解析 + 绝对路径回退）在
   Apple Silicon 的运行期解析；Keychain（`security-framework` 的
   `kSecClassGenericPassword` / `SecItem*`）读写与作用域 account；universal（`lipo`
   双架构）在 `.app` 单一 `native/` 目录（Xcode 与 CI 一致）下的端到端打包与加载；
-  `DYLD_INSERT_LIBRARIES` 拒绝与 `RLIMIT_CORE=0`。
-- **Windows**：DPAPI（`CryptProtectData`/`CryptUnprotectData`）路径读写与
-  `<dataDir>/sshare.bin`；父进程 `NtQueryInformationProcess` + `QueryFullProcessImageNameW`
-  路径比较（忽略大小写）；`SetProcessMitigationPolicy`（ACG/CIG/扩展点/严格句柄/CFG/镜像）
-  运行期的生效 / best-effort 降级；`crt-static` exe 在无 MSVC 运行时环境的启动。
+  `DYLD_INSERT_LIBRARIES` 拒绝与 `RLIMIT_CORE=0`。（源码级已与 C# `KeychainStore`
+  逐项比对：service / scoped account / 属性集 / scoped 优先 + legacy 回退。）
+- **Windows**：`SetProcessMitigationPolicy`（ACG/CIG/扩展点/严格句柄/CFG/镜像）运行期的
+  生效 / best-effort 降级（Wine 下无法观测生效情况）；真机上的 DPAPI 用户绑定语义。
 - **Linux aarch64**：seccomp denylist 与 `/proc/<ppid>/exe` 校验（x86_64 已测）；静态
   二进制（musl / crt-static）在不同发行版上的加载。
 - **三端**：加载器注入拒绝（Linux 已测；macOS `DYLD_INSERT_LIBRARIES` 待真机）；

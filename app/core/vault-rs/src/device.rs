@@ -26,13 +26,14 @@ pub fn create_and_save(data_dir: &str) -> Result<Vec<u8>> {
 
 /// 读取设备材料；文件缺失抛 [VaultError::NeedRecovery]。
 pub fn load(data_dir: &str) -> Result<Vec<u8>> {
-    let path = path_for(data_dir);
-    if !path.exists() {
-        return Err(VaultError::need_recovery(
-            "设备密钥缺失（device.key 不存在）：设备因子不可用，请改用恢复码解锁",
-        ));
-    }
-    let raw = std::fs::read(&path)?;
+    let raw = match crate::safefile::read_regular_limited(&path_for(data_dir), 4096)? {
+        Some(v) => v,
+        None => {
+            return Err(VaultError::need_recovery(
+                "设备密钥缺失（device.key 不存在）：设备因子不可用，请改用恢复码解锁",
+            ))
+        }
+    };
     if raw.len() != KEY_SIZE {
         return Err(VaultError::invalid_data(format!(
             "device.key 长度异常（{} 字节，应为 {}）",
@@ -43,24 +44,15 @@ pub fn load(data_dir: &str) -> Result<Vec<u8>> {
     Ok(raw)
 }
 
-/// 原子写（tmp + 0600 + rename；失败保留原文件）。
+/// 原子写（tmp 独占创建 + 0600 + rename；失败保留原文件）。
+/// tmp 为符号链接/FIFO 时拒绝写入（防写入穿透与挂死）。
 pub fn save(data_dir: &str, key: &[u8]) -> Result<()> {
     if key.len() != KEY_SIZE {
         return Err(VaultError::argument(format!(
             "设备材料须为 {KEY_SIZE} 字节"
         )));
     }
-    std::fs::create_dir_all(data_dir)?;
-    let path = path_for(data_dir);
-    let tmp = PathBuf::from(format!("{}.tmp", path.display()));
-    std::fs::write(&tmp, key)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600))?;
-    }
-    std::fs::rename(&tmp, &path)?;
-    Ok(())
+    crate::safefile::write_atomic(&path_for(data_dir), key, true)
 }
 
 /// 删除设备材料（不存在则忽略）。

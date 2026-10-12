@@ -59,7 +59,7 @@ jobs:
           repo-checkout: false
 
   dotnet-audit:
-    name: dotnet vulnerable packages (scanner / vault)
+    name: dotnet vulnerable packages (scanner)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -70,9 +70,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for proj in app/core/scanner/scanner.csproj \
-                      app/core/scanner/scanner-ffi/scanner-ffi.csproj \
-                      app/core/vault/src/Vault.csproj; do
-            echo "── $proj ──"
-            dotnet list "$proj" package --vulnerable --include-transitive
-          done
+          dotnet list app/core/scanner/scanner.csproj package --vulnerable --include-transitive

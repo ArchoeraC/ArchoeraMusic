@@ -121,7 +121,15 @@ impl VaultLockout {
     }
 
     fn read_file(&self) -> (i32, i64) {
-        let text = match std::fs::read_to_string(&self.path) {
+        // 走安全读取：**拒绝符号链接 / FIFO / 超大文件**（否则植入 FIFO 会让
+        // `read_to_string` 阻塞在 open，vault 卡死在握手路径且无超时覆盖），
+        // 任何异常一律视为「无锁定」——退避状态是 best-effort，绝不能成为可用性攻击面。
+        const MAX_LOCKOUT_BYTES: u64 = 4096;
+        let bytes = match crate::safefile::read_regular_limited(&self.path, MAX_LOCKOUT_BYTES) {
+            Ok(Some(b)) => b,
+            _ => return (0, 0),
+        };
+        let text = match String::from_utf8(bytes) {
             Ok(t) => t,
             Err(_) => return (0, 0),
         };
@@ -135,10 +143,8 @@ impl VaultLockout {
     }
 
     fn write_file(&self, failures: i32, until: i64) {
-        let _ = std::fs::create_dir_all(self.path.parent().unwrap_or(Path::new(".")));
-        let tmp = PathBuf::from(format!("{}.tmp", self.path.display()));
-        if std::fs::write(&tmp, format!("{failures} {until}")).is_ok() {
-            let _ = std::fs::rename(&tmp, &self.path);
-        }
+        // 与其它敏感区间一致：独占 tmp + 拒绝符号链接/FIFO（退避状态本身是明文，
+        // 但仍不应成为「覆盖任意文件 / 挂死保存路径」的入口）。
+        let _ = crate::safefile::write_atomic(&self.path, format!("{failures} {until}").as_bytes(), false);
     }
 }

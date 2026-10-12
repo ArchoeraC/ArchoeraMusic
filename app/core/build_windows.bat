@@ -255,7 +255,7 @@ rem =====================================================================
 rem  7. vault：vault-rs（Rust 静态链接凭据保险库，Windows）
 rem     产物 core/vault-rs/build/archoera-vault.exe，由 app/windows/CMakeLists
 rem     install 进 native/（Dart 按需 spawn；OS 授权份额存 DPAPI）。
-rem     Windows 已不再使用 C# NativeAOT vault（apps/core/vault/** 仅 Linux
+rem     C# NativeAOT vault（app/core/vault/**）已于 2026-10-12 删除（仅 Linux
 rem     历史保留，Windows/macOS 一律走 Rust 版）。
 rem     -C target-feature=+crt-static：自包含 CRT，免 MSVC 运行时 DLL 依赖。
 rem =====================================================================

@@ -664,19 +664,25 @@ pass "dev 布局放行（build/ 下 serve 握手成功）"
 # 从 stdin 握手窃取明文口令。PlatformGuard.VerifyAndArm 在武装前检查注入变量并
 # 直接拒绝（Dart 侧 spawn 另有环境净化，双保险）。此处用**不存在**的 .so 路径，
 # 仅验证拒绝分支（不会真正加载）；上方无注入的各 serve 用例须保持绿。
+# 注入面 = **可观测的蓄意破坏**：打印 err 后以专用退出码 87 终止（自毁），
+# 应用侧把 87 与信号终止同等判为 crash → exit(86) 连带主程序退出（SEC-42）。
+LD_PRELOAD_RC=0
 LD_PRELOAD_OUT=$(LD_PRELOAD=/nonexistent/archoera-inject-test.so \
-  "$VAULT" serve "$DATA_M2B" <<<'handshake AAAA BBBB' 2>/dev/null) || true
+  "$VAULT" serve "$DATA_M2B" <<<'handshake AAAA BBBB' 2>/dev/null) || LD_PRELOAD_RC=$?
 case "$LD_PRELOAD_OUT" in
   err*拒绝运行*) : ;;
   *) fail "LD_PRELOAD 非空应被 vault 拒绝（got: $LD_PRELOAD_OUT）";;
 esac
+[ "$LD_PRELOAD_RC" = "87" ] || fail "沙箱被蓄意破坏应以退出码 87 终止（got $LD_PRELOAD_RC）"
+LD_AUDIT_RC=0
 LD_AUDIT_OUT=$(LD_AUDIT=/nonexistent/archoera-inject-test.so \
-  "$VAULT" serve "$DATA_M2B" <<<'handshake AAAA BBBB' 2>/dev/null) || true
+  "$VAULT" serve "$DATA_M2B" <<<'handshake AAAA BBBB' 2>/dev/null) || LD_AUDIT_RC=$?
 case "$LD_AUDIT_OUT" in
   err*拒绝运行*) : ;;
   *) fail "LD_AUDIT 非空应被 vault 拒绝（got: $LD_AUDIT_OUT）";;
 esac
-pass "加载器注入拒绝（LD_PRELOAD / LD_AUDIT 非空 → serve err 拒绝运行）"
+[ "$LD_AUDIT_RC" = "87" ] || fail "沙箱被蓄意破坏应以退出码 87 终止（got $LD_AUDIT_RC）"
+pass "加载器注入拒绝（LD_PRELOAD / LD_AUDIT → err + 退出码 87：自毁并连带主程序退出）"
 
 # ════════════════════════════════════════════════════════════════════
 # 7. seccomp 自保护：过滤器已装载 + 违例系统调用被内核 SIGSYS 终止
@@ -937,5 +943,629 @@ OUT=$(printf '%s\n' "pw" | "$VAULT" set-kdf "$DATA_KDFCR" \
         --kdf-m 65536 --kdf-t 3 --kdf-p 1 2>&1) || true
 case "$OUT" in err*该模式不支持更改\ KDF*) : ;; *) fail "crypto set-kdf 应不支持: $OUT";; esac
 pass "crypto/file set-kdf → err 该模式不支持更改 KDF（无口令 KDF 可重键）"
+
+# ════════════════════════════════════════════════════════════════════
+# 12. 内存护栏（mlock + zeroize）与安全落盘（符号链接 / FIFO 拒绝）
+# ════════════════════════════════════════════════════════════════════
+# 覆盖 docs/security-review 的 Rust 移植回归与文件系统面：
+#   - R1：主密钥/明文缓冲真的 mlock（`selftest-mem` + 会话期 VmLck>0）；
+#   - X1：`<file>.tmp` / `<file>.bak` 被预置为符号链接 → 拒绝写入、不穿透覆盖；
+#   - X2：`<file>.tmp` 被预置为 FIFO → 拒绝写入（不得挂死在 open(O_WRONLY)）；
+#   - X1c：vault 文件本身被换成符号链接 → 拒绝读取（防重定向）。
+
+# R1-a：内存护栏自检（容器内 RLIMIT_MEMLOCK=0 时降级为「仅 zeroize」，如实跳过断言）
+MEM_OUT=$("$VAULT" selftest-mem 2>&1) || fail "selftest-mem 执行失败"
+case "$MEM_OUT" in ok\ memguard\ *) : ;; *) fail "selftest-mem 输出异常: $MEM_OUT";; esac
+MEMLOCK_KB=$(ulimit -l 2>/dev/null || echo 0)
+case "$MEM_OUT" in
+  *locked=true*) pass "memguard：敏感缓冲已 mlock（selftest-mem locked=true）";;
+  *) if [ "${MEMLOCK_KB:-0}" = "0" ]; then
+       echo "  ！RLIMIT_MEMLOCK=0（受限环境）：memguard 降级为「仅 zeroize」，跳过 mlock 断言"
+     else
+       fail "RLIMIT_MEMLOCK=$MEMLOCK_KB 但 mlock 未生效: $MEM_OUT"
+     fi;;
+esac
+
+# R1-b：serve 会话持锁主密钥期间 VmLck > 0；且不被相邻缓冲的 munlock 误解除
+DATA_MEM="$(mktemp -d)"
+run init-m1 "$DATA_MEM" >/dev/null <<<"mem-pw" || fail "内存护栏用例 init-m1 失败"
+python3 - "$VAULT" "$DATA_MEM" <<'PY' || fail "会话期主密钥未保持 mlock"
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+env = dict(os.environ, ARCHOERA_VAULT_BACKEND="file")
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     stderr=subprocess.PIPE, env=env)
+def cmd(line, payload=None):
+    p.stdin.write((line + "\n" + (payload + "\n" if payload is not None else "")).encode())
+    p.stdin.flush()
+    return p.stdout.readline().decode().rstrip("\n")
+
+b32 = base64.b64encode(os.urandom(32)).decode()
+b16 = base64.b64encode(os.urandom(16)).decode()
+assert cmd("handshake %s %s %s" % (b32, b16, base64.b64encode(b"mem-pw").decode())
+           ).startswith("ok handshake")
+
+def vmlck():
+    for l in open("/proc/%d/status" % p.pid):
+        if l.startswith("VmLck:"):
+            return int(l.split()[1])
+    return -1
+
+assert vmlck() > 0, "会话空闲期 VmLck 应为正（主密钥页已锁）: %d" % vmlck()
+assert cmd("set mem:v", base64.b64encode(b"x" * 256).decode()) == "ok"
+assert cmd("get mem:v").startswith("ok ")
+assert vmlck() > 0, "命令往返后主密钥页被误解锁: %d" % vmlck()
+close = cmd("quit")
+assert close == "ok"
+p.stdin.close()
+assert p.wait(timeout=15) == 0
+print("ok")
+PY
+rm -rf "$DATA_MEM"
+pass "memguard：会话期主密钥页保持 mlock（VmLck>0，命令往返不误解锁）"
+
+# X1/X2：tmp 与 bak 被预置为符号链接 / FIFO → 拒绝写入且不穿透
+DATA_FS="$(mktemp -d)"
+CANARY="$(mktemp -d)/canary.txt"
+printf 'ORIGINAL-CONTENT' > "$CANARY"
+check_no_clobber() { # <场景名>
+  [ "$(cat "$CANARY")" = "ORIGINAL-CONTENT" ] || fail "$1：canary 被覆盖（符号链接穿透写）"
+  [ ! -L "$DATA_FS/credentials.vault" ] || fail "$1：vault 文件被替换为符号链接（重定向）"
+}
+
+run init-m1 "$DATA_FS" >/dev/null <<<"fs-pw" || fail "落盘用例 init-m1 失败"
+
+# 触发一次保存（set），把 vault 应答打到 stdout。独立脚本文件 + timeout，
+# 保证 FIFO 场景下旧实现（阻塞在 open(O_WRONLY)）会被 timeout 抓成失败而不是挂死。
+# 因临时文件名是**进程唯一**的 `<vault>.tmp.<pid>`（并发安全，见 safefile.rs），
+# 攻击面植入必须在 vault 启动后按**它自己的 pid** 落到该名上（本脚本内完成）。
+WRITER="$(mktemp)"
+cat > "$WRITER" <<'PYEOF'
+import base64, os, subprocess, sys
+vault, data = sys.argv[1:3]
+plant = sys.argv[3] if len(sys.argv) > 3 else ""   # "" | symlink:<target> | fifo:
+env = dict(os.environ, ARCHOERA_VAULT_BACKEND="file")
+p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     stderr=subprocess.PIPE, env=env)
+def cmd(line, payload=None):
+    p.stdin.write((line + "\n" + (payload + "\n" if payload is not None else "")).encode())
+    p.stdin.flush()
+    return p.stdout.readline().decode().rstrip("\n")
+b32 = base64.b64encode(os.urandom(32)).decode()
+b16 = base64.b64encode(os.urandom(16)).decode()
+assert cmd("handshake %s %s %s" % (b32, b16, base64.b64encode(b"fs-pw").decode())
+           ).startswith("ok handshake")
+tmp = os.path.join(data, "credentials.vault.tmp.%d" % p.pid)
+if plant:
+    kind, _, target = plant.partition(":")
+    if kind == "symlink":
+        if os.path.lexists(tmp):
+            os.remove(tmp)
+        os.symlink(target, tmp)
+    elif kind == "fifo":
+        os.mkfifo(tmp)
+r = cmd("set fs:x", base64.b64encode(b"value").decode())
+try:
+    p.stdin.close()
+except OSError:
+    pass
+p.wait(timeout=15)
+print(r)
+PYEOF
+SERVE_WRITE() { timeout 30 python3 "$WRITER" "$VAULT" "$DATA_FS" "$@" 2>/dev/null; }
+
+# X1-a：实际使用的 tmp 名被植入符号链接 → 拒绝写入（不穿透覆盖、不重定向）
+OUT=$(SERVE_WRITE "symlink:$CANARY") || true
+case "$OUT" in err*非普通文件*) : ;; *) fail "tmp 符号链接应拒绝写入: $OUT";; esac
+check_no_clobber "X1-a(tmp 符号链接)"
+pass "符号链接：tmp（<vault>.tmp.<pid>）被植入符号链接 → 拒绝写入（不穿透、不重定向）"
+
+# X2：实际使用的 tmp 名被植入 FIFO（旧实现会永久阻塞在 open(O_WRONLY)）
+OUT=$(SERVE_WRITE "fifo:") || fail "FIFO 场景挂死或异常退出（保存路径不得阻塞）"
+case "$OUT" in err*非普通文件*) : ;; *) fail "tmp FIFO 应拒绝写入: $OUT";; esac
+pass "FIFO：tmp（<vault>.tmp.<pid>）被植入 FIFO → 拒绝写入（不挂死保存路径）"
+
+# X1-b：bak 预置符号链接（备份为 best-effort，但绝不可穿透覆盖）
+rm -f "$DATA_FS/credentials.vault.bak"
+ln -s "$CANARY" "$DATA_FS/credentials.vault.bak"
+OUT=$(SERVE_WRITE) || true
+case "$OUT" in ok) : ;; *) fail "bak 符号链接不应影响保存本身: $OUT";; esac
+check_no_clobber "X1-b(bak 符号链接)"
+rm -f "$DATA_FS/credentials.vault.bak"
+pass "符号链接：bak 预置为符号链接 → 不穿透（canary 未受影响）"
+
+# X1-c：vault 文件本身被换成符号链接 → 拒绝读取
+DATA_REDIR="$(mktemp -d)"
+run init-m1 "$DATA_REDIR" >/dev/null <<<"redir-pw" || fail "重定向用例 init-m1 失败"
+mv "$DATA_REDIR/credentials.vault" "$DATA_REDIR/real.vault"
+ln -s "$DATA_REDIR/real.vault" "$DATA_REDIR/credentials.vault"
+OUT=$(run status "$DATA_REDIR" 2>&1) || true
+case "$OUT" in err*符号链接*) : ;; *) fail "vault 文件为符号链接时应拒绝读取: $OUT";; esac
+rm -rf "$DATA_REDIR" "$DATA_FS" "$(dirname "$CANARY")"
+rm -f "$WRITER"
+pass "符号链接：vault 文件被替换为符号链接 → 拒绝读取（防重定向）"
+
+# ════════════════════════════════════════════════════════════════════
+# 13. 沙箱完整性（覆盖所有命令 + denylist 逐条生效）与「非自毁」语义
+# ════════════════════════════════════════════════════════════════════
+# 13.1 一次性命令同样硬化：`init-*` / `set-kdf` / `destroy` / `status` 也在内存里持有
+#      口令与主密钥（`init-m2a` 还会打印恢复码）——必须与 serve 一样武装
+#      （Seccomp 过滤器已装载 / `/proc/<pid>/mem` 不可读（dumpable=0）/ core 上限 0）。
+# 13.2 denylist **逐条**生效：不只看过滤器是否装载，而是每条被拒系统调用都实际调用一次，
+#      内核以 SIGSYS 终止才算生效（名单漂移 / 内核 ABI 差异会在此暴露）。
+# 13.3 打爆沙箱**不自毁**：SIGKILL/SIGSEGV 活动会话、篡改/截断 vault、篡改 device.key
+#      → 数据未被销毁、仍可解锁；且崩溃不产 core（RLIMIT_CORE=0 + dumpable=0）。
+# 13.4 唯一的数据销毁入口是**显式** `destroy`。
+DATA_SANDBOX="$(mktemp -d)"
+run init-m1 "$DATA_SANDBOX" >/dev/null <<<"sandbox-pw" || fail "沙箱用例 init-m1 失败"
+
+python3 - "$PWD/$VAULT" "$DATA_SANDBOX" <<'PY' || fail "沙箱完整性验证失败"
+import base64, hashlib, os, signal, subprocess, sys, tempfile, time
+
+vault, data = (os.path.abspath(a) for a in sys.argv[1:3])
+env = dict(os.environ, ARCHOERA_VAULT_BACKEND="file")
+B32 = base64.b64encode(os.urandom(32)).decode()
+B16 = base64.b64encode(os.urandom(16)).decode()
+PW = base64.b64encode(b"sandbox-pw").decode()
+VAL = base64.b64encode(b"must-never-be-destroyed").decode()
+
+
+def proc_status(pid, key):
+    for l in open("/proc/%d/status" % pid):
+        if l.startswith(key + ":"):
+            return l.split(":", 1)[1].strip()
+    return None
+
+
+def limits(pid, key):
+    # 形如 `Max core file size        0                    0                    bytes`
+    # → tokens: Max core file size <soft> <hard> bytes
+    for l in open("/proc/%d/limits" % pid):
+        if l.startswith(key):
+            return l.split()[4]
+    return None
+
+
+# ── 13.1 一次性命令硬化采样 ──
+# 让 set-kdf 阻塞在「读口令」上（不发送 stdin），从而稳定采样其进程属性；
+# 硬化发生在 main() 入口、任何口令/密钥进入内存之前。
+p = subprocess.Popen([vault, "set-kdf", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     stderr=subprocess.PIPE)
+time.sleep(0.3)
+assert p.poll() is None, "set-kdf 已退出，无法采样（预期阻塞在 stdin 读口令）"
+assert proc_status(p.pid, "Seccomp") == "2", "一次性命令未装载 seccomp: %r" % proc_status(p.pid, "Seccomp")
+assert limits(p.pid, "Max core file size") == "0", "一次性命令 core 上限非 0"
+try:
+    fd = os.open("/proc/%d/mem" % p.pid, os.O_RDONLY)
+    os.close(fd)
+    raise AssertionError("一次性命令的 /proc/<pid>/mem 仍可读（dumpable 未清）")
+except PermissionError:
+    pass
+p.kill()
+p.wait(timeout=30)
+print("  ✓ 13.1 一次性命令（set-kdf）已硬化：seccomp=2 / mem 不可读 / core=0")
+
+# ── 13.2 denylist 逐条生效 ──
+out = subprocess.run([vault, "selftest-seccomp", "list"], stdout=subprocess.PIPE,
+                     stderr=subprocess.DEVNULL, env=env, timeout=120)
+lines = [l for l in out.stdout.decode().splitlines() if l.startswith("ok denylist")]
+assert lines, "selftest-seccomp list 无输出"
+txt = lines[0]
+killed, total = txt.split("killed=")[1].split(" ")[0].split("/")
+assert killed == total and "failed=-" in txt, "denylist 存在未生效条目: %s" % txt
+print("  ✓ 13.2 denylist 逐条生效（%s 条系统调用均被 SIGSYS 终止）" % killed)
+
+# ── 13.3 打爆沙箱不自毁 ──
+def unset_lockout():
+    lk = os.path.join(data, "vault.lockout")
+    if os.path.exists(lk):
+        os.remove(lk)
+
+
+def read_value():
+    unset_lockout()
+    q = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env)
+    q.stdin.write(("handshake %s %s %s\n" % (B32, B16, PW)).encode()); q.stdin.flush()
+    hs = q.stdout.readline().decode().rstrip("\n")
+    if not hs.startswith("ok handshake"):
+        q.kill(); return False, hs
+    q.stdin.write(b"get keep:v\n"); q.stdin.flush()
+    got = q.stdout.readline().decode().rstrip("\n")
+    q.stdin.write(b"quit\n"); q.stdin.flush(); q.stdout.readline()
+    q.stdin.close(); q.wait(timeout=30)
+    return got == "ok " + VAL, got
+
+
+# 写入一条要守护的凭据
+s = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     stderr=subprocess.PIPE, env=env)
+s.stdin.write(("handshake %s %s %s\n" % (B32, B16, PW)).encode()); s.stdin.flush()
+hs0 = s.stdout.readline().decode().rstrip("\n")
+assert hs0.startswith("ok handshake"), "写入会话握手失败: %r（stderr=%r）" % (
+    hs0, s.stderr.read(400) if s.poll() is not None else b"")
+s.stdin.write(b"set keep:v\n" + VAL.encode() + b"\n"); s.stdin.flush()
+r0 = s.stdout.readline().decode().rstrip("\n")
+assert r0 == "ok", "写入 keep:v 失败: %r" % r0
+s.stdin.write(b"quit\n"); s.stdin.flush(); s.stdout.readline()
+s.stdin.close(); s.wait(timeout=30)
+
+vault_file = os.path.join(data, "credentials.vault")
+original = open(vault_file, "rb").read()
+
+# (a) 活动会话中被 SIGKILL / SIGSEGV 打爆 → 数据仍在、仍可读、且不产 core
+cwd = tempfile.mkdtemp(prefix="sandbox-core-")
+for sig in (signal.SIGKILL, signal.SIGSEGV):
+    t = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env, cwd=cwd)
+    t.stdin.write(("handshake %s %s %s\n" % (B32, B16, PW)).encode()); t.stdin.flush()
+    assert t.stdout.readline().decode().startswith("ok handshake")
+    t.send_signal(sig)
+    t.wait(timeout=30)
+    ok, got = read_value()
+    assert ok, "信号 %s 后凭据不可读（可能被销毁）: %r" % (sig, got)
+    assert os.path.exists(vault_file), "vault 文件消失"
+cores = [f for f in os.listdir(cwd) if f.startswith("core")]
+assert not cores, "崩溃产出了 core（RLIMIT_CORE=0 未生效）: %s" % cores
+print("  ✓ 13.3a SIGKILL/SIGSEGV 打爆会话：凭据仍在、仍可读、未产 core")
+
+# (b) 篡改 / 截断 vault → serve 被拒，文件不被删除；复原后仍可读
+for name, bad in (("翻转尾部字节", original[:-1] + bytes([original[-1] ^ 1])),
+                  ("截断一半", original[: len(original) // 2])):
+    open(vault_file, "wb").write(bad)
+    q = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env)
+    q.stdin.write(("handshake %s %s %s\n" % (B32, B16, PW)).encode()); q.stdin.flush()
+    hs = q.stdout.readline().decode().rstrip("\n")
+    q.kill(); q.wait(timeout=30)
+    assert hs.startswith("err"), "%s 后应被拒: %r" % (name, hs)
+    assert os.path.exists(vault_file), "%s 后 vault 文件被删除" % name
+    open(vault_file, "wb").write(original)
+    ok, got = read_value()
+    assert ok, "复原后不可读: %r" % got
+print("  ✓ 13.3b 篡改/截断 vault：被拒但未删除，复原后凭据完好")
+
+# (c) 篡改 device.key（m2b）→ 被拒且文件未被删除（未自毁）
+d2 = tempfile.mkdtemp(prefix="sandbox-m2b-")
+subprocess.run([vault, "init-m2b", d2], stdout=subprocess.DEVNULL, env=env)
+dk = os.path.join(d2, "device.key")
+orig_dk = open(dk, "rb").read()
+open(dk, "wb").write(b"\x00" * 32)
+q = subprocess.Popen([vault, "serve", d2], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     stderr=subprocess.PIPE, env=env)
+q.stdin.write(("handshake %s %s\n" % (B32, B16)).encode()); q.stdin.flush()
+hs = q.stdout.readline().decode().rstrip("\n")
+q.kill(); q.wait(timeout=30)
+assert hs.startswith("err") and os.path.exists(dk), "篡改 device.key: %r" % hs
+open(dk, "wb").write(orig_dk)
+# 上面的失败握手会写入退避状态（1s 锁定）：清掉以免误判「复原后不可解锁」
+lk2 = os.path.join(d2, "vault.lockout")
+if os.path.exists(lk2):
+    os.remove(lk2)
+q = subprocess.Popen([vault, "serve", d2], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     stderr=subprocess.PIPE, env=env)
+q.stdin.write(("handshake %s %s\n" % (B32, B16)).encode()); q.stdin.flush()
+ok2 = q.stdout.readline().decode().startswith("ok handshake")
+q.stdin.write(b"quit\n"); q.stdin.flush(); q.stdout.readline()
+q.stdin.close(); q.wait(timeout=30)
+assert ok2, "复原 device.key 后仍不可解锁"
+print("  ✓ 13.3c 篡改 device.key：被拒但未删除，复原后仍可解锁")
+
+# ── 13.4 唯一销毁入口 = 显式 destroy ──
+subprocess.run([vault, "destroy", data], stdout=subprocess.DEVNULL, env=env)
+left = sorted(os.listdir(data))
+# 唯一允许残留的是跨进程写锁文件（`vault.lock`，内容为空、非敏感面；删除它会让互斥失效）。
+assert left == ["vault.lock"], "显式 destroy 后应只剩 vault.lock: %s" % left
+print("  ✓ 13.4 唯一数据销毁入口是显式 destroy（沙箱被打爆时从未销毁）")
+PY
+rm -rf "$DATA_SANDBOX"
+# 13.5 状态文件（`vault.lockout`）被植入 **FIFO / 符号链接 / 超大文件** → 不得挂死或 OOM。
+# 退避状态是 best-effort：读取走安全原语（拒绝非普通文件 + 长度上限），异常一律视为「无锁定」，
+# 否则植入一个 FIFO 就能让 `read_to_string` 阻塞在 open、把 vault 卡死在握手路径（无超时覆盖）。
+python3 - "$PWD/$VAULT" <<'PY' || fail "退避状态文件注入防护失败"
+import base64, os, select, subprocess, sys, tempfile
+
+vault = os.path.abspath(sys.argv[1])
+env = dict(os.environ, ARCHOERA_VAULT_BACKEND="file")
+B32 = base64.b64encode(bytes(range(32))).decode()
+B16 = base64.b64encode(bytes(range(16))).decode()
+PW = base64.b64encode(b"lockout-pw").decode()
+
+for kind in ("fifo", "symlink", "huge"):
+    d = tempfile.mkdtemp(prefix="lockout-" + kind + "-")
+    subprocess.run([vault, "init-m1", d], input=b"lockout-pw\n", stdout=subprocess.DEVNULL, env=env)
+    lk = os.path.join(d, "vault.lockout")
+    if kind == "fifo":
+        os.mkfifo(lk)
+    elif kind == "symlink":
+        os.symlink("/dev/zero", lk)      # 无限内容：若不设上限会 OOM / 永不结束
+    else:
+        open(lk, "wb").write(b"9" * 200000)
+    p = subprocess.Popen([vault, "serve", d], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env)
+    p.stdin.write(("handshake %s %s %s\n" % (B32, B16, PW)).encode()); p.stdin.flush()
+    r, _, _ = select.select([p.stdout], [], [], 10)
+    assert r, "vault.lockout=%s：握手 10s 无响应（挂死）" % kind
+    line = p.stdout.readline().decode().rstrip("\n")
+    assert line.startswith("ok handshake"), "vault.lockout=%s：应视为无锁定并正常解锁，得到 %r" % (kind, line)
+    p.stdin.write(b"quit\n"); p.stdin.flush(); p.stdout.readline()
+    p.stdin.close(); p.wait(timeout=30)
+print("  ✓ 13.5 vault.lockout 被植入 FIFO / 符号链接(/dev/zero) / 超大文件 → 均正常解锁（不挂死、不 OOM）")
+PY
+
+pass "沙箱完整性 + 非自毁：所有命令硬化 / denylist 逐条生效 / 打爆沙箱不销毁数据"
+
+# ════════════════════════════════════════════════════════════════════
+# 14. 黄金夹具（golden fixtures）：容器格式与 KDF/HKDF/AEAD 语义的字节兼容锚点
+# ════════════════════════════════════════════════════════════════════
+# C# 版（app/core/vault/）已删除 → 字节兼容不再靠「活体 oracle 互解互读」，而靠
+# **冻结夹具**（app/core/vault-rs/testdata/，由当时的实现一次性生成入库）：
+# 每个夹具都必须能解开并读回固定值，且头部结构与记录一致——任何破坏读取兼容性的
+# 改动都会在这里失败。重新生成仅在同名格式未变时进行（./gen_testdata.sh）。
+python3 - "$PWD/$VAULT" "$PWD/testdata" <<'PY' || fail "黄金夹具验证失败"
+import base64, json, os, shutil, struct, subprocess, sys, tempfile
+
+vault, base = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
+env = dict(os.environ)  # 不设 ARCHOERA_VAULT_BACKEND：夹具自带 backend 指纹，须自行配对
+B32 = base64.b64encode(bytes(range(32))).decode()
+B16 = base64.b64encode(bytes(range(16))).decode()
+
+
+def load(name):
+    """读取夹具（只读基准）→ 复制到临时目录后使用（会话会写 .bak/.lockout）。"""
+    src = os.path.join(base, name)
+    meta = json.load(open(os.path.join(src, "unlock.json")))
+    d = tempfile.mkdtemp(prefix="golden-" + name + "-")
+    shutil.copytree(src, d, dirs_exist_ok=True)
+    return d, meta
+
+
+def read_entries(d, fields, expect, label):
+    p = subprocess.Popen([vault, "serve", d], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env)
+    p.stdin.write(("handshake " + " ".join(fields) + "\n").encode()); p.stdin.flush()
+    hs = p.stdout.readline().decode().rstrip("\n")
+    assert hs.startswith("ok handshake"), "%s 握手失败: %r" % (label, hs)
+    got = {}
+    for uid in expect:
+        p.stdin.write(("get %s\n" % uid).encode()); p.stdin.flush()
+        r = p.stdout.readline().decode().rstrip("\n")
+        got[uid] = None if r == "ok null" else base64.b64decode(r.split(" ", 1)[1]).decode()
+    p.stdin.write(b"quit\n"); p.stdin.flush(); p.stdout.readline()
+    p.stdin.close()
+    assert p.wait(timeout=30) == 0, "%s 退出码非 0" % label
+    return got
+
+
+def b64(s):
+    return base64.b64encode(s.encode()).decode()
+
+
+def check_mode(name, d, meta, expect):
+    """头部结构（模式/槽位/KDF）与条目值双向核对。"""
+    raw = open(os.path.join(d, "credentials.vault"), "rb").read()
+    assert raw[:4] == b"AVLT", "%s: magic 不符" % name
+    mode = meta["mode"]
+    assert raw[4] == (ord("C") if mode == "crypto" else ord("S")), "%s: 模式字节不符" % name
+    if mode == "crypto":
+        blen = raw[40]
+        assert raw[41:41 + blen].decode() == meta["backend"], "%s: backend 指纹不符" % name
+        got = read_entries(d, [B32, B16], expect, name)
+    else:
+        assert raw[29] == 1, "%s: alg 应为 1(AES-256-GCM)" % name
+        n = raw[30]
+        kinds, off = [], 31
+        for _ in range(n):
+            kinds.append(raw[off])
+            m, t, p = struct.unpack_from("<III", raw, off + 1)
+            wrapped_len = struct.unpack_from("<H", raw, off + 1 + 12 + 16 + 12)[0]
+            off += 1 + 12 + 16 + 12 + 2 + wrapped_len
+        assert kinds == meta["slot_kinds"], "%s: 槽位种类不符 %r != %r" % (name, kinds, meta["slot_kinds"])
+        if meta.get("kdf"):
+            m, t, p = struct.unpack_from("<III", raw, 32)
+            assert [m, t, p] == [meta["kdf"]["m"], meta["kdf"]["t"], meta["kdf"]["p"]], \
+                "%s: KDF 参数不符 %r" % (name, (m, t, p))
+        if mode == "m1":
+            got = read_entries(d, [B32, B16, b64(meta["password"])], expect, name)
+        elif mode == "m2a":
+            got = read_entries(d, [B32, B16, b64(meta["password"])], expect, name + "(口令)")
+            assert got == expect, "%s 口令路径读出不符" % name
+            got = read_entries(d, [B32, B16, b64(meta["recovery_code"]), b64("rec")],
+                               expect, name + "(恢复码)")
+        else:  # m2b：仅设备槽
+            got = read_entries(d, [B32, B16], expect, name)
+    assert got == expect, "%s 读出不符: %r" % (name, got)
+    print("  ✓ 14 %s（%s）：%s + 两条目一致" % (
+        name, meta["mode"], {"crypto": "'C' 头/backend 冻结",
+                             "m1": "口令槽 + KDF 冻结",
+                             "m2a": "pwdev/recovery 两条 HKDF",
+                             "m2b": "device HKDF"}[meta["mode"]]))
+
+
+for name in ("crypto-file", "m1", "m2a", "m2b"):
+    d, meta = load(name)
+    check_mode(name, d, meta, meta["entries"])
+    shutil.rmtree(d, ignore_errors=True)
+print("ok")
+PY
+pass "黄金夹具：4 模式容器格式与 KDF/HKDF/AEAD 语义锚点（读回固定值）"
+
+# ════════════════════════════════════════════════════════════════════
+# 15. 写入侧容量上限：单条 / 整库超限必须**落盘前拒绝**（不得写成「下次加载即被拒」的自锁）
+# ════════════════════════════════════════════════════════════════════
+# 回归实测过的可用性自毁：只在加载侧校验时，一次 4096 KiB 明文 `set` 会「回 ok」，
+# 但库此后无法加载（只能靠 .bak 救）；累计 >16 MiB 同理。现两处都在写入侧前置校验。
+DATA_CAP="$(mktemp -d)"
+run init-m1 "$DATA_CAP" >/dev/null <<<"cap-pw" || fail "容量用例 init-m1 失败"
+python3 - "$PWD/$VAULT" "$DATA_CAP" <<'PY' || fail "写入侧容量上限验证失败"
+import base64, os, subprocess, sys
+
+vault, data = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
+env = dict(os.environ, ARCHOERA_VAULT_BACKEND="file")
+B32 = base64.b64encode(bytes(range(32))).decode()
+B16 = base64.b64encode(bytes(range(16))).decode()
+PW = base64.b64encode(b"cap-pw").decode()
+MAX_ENTRY = 4 * 1024 * 1024
+TAG = 16
+
+
+def session():
+    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env)
+    p.stdin.write(("handshake %s %s %s\n" % (B32, B16, PW)).encode()); p.stdin.flush()
+    assert p.stdout.readline().decode().startswith("ok handshake"), "解锁失败（库被自锁？）"
+    return p
+
+
+def cmd(p, line, payload=None):
+    p.stdin.write((line + "\n" + (payload + "\n" if payload is not None else "")).encode())
+    p.stdin.flush()
+    return p.stdout.readline().decode().rstrip("\n")
+
+
+def close(p):
+    try:
+        p.stdin.write(b"quit\n"); p.stdin.flush(); p.stdout.readline()
+    except Exception:
+        pass
+    p.stdin.close(); p.wait(timeout=60)
+
+
+p = session()
+# 边界：明文上限 = 4 MiB − 16B（GCM tag）→ 恰达上限应成功
+r_ok = cmd(p, "set keep:limit", base64.b64encode(b"a" * (MAX_ENTRY - TAG)).decode())
+assert r_ok == "ok", "明文恰达上限应写入成功: %r" % r_ok
+# 覆盖成小值腾出空间
+assert cmd(p, "set keep:limit", base64.b64encode(b"b").decode()) == "ok"
+# 越界 +1B → 必须拒绝
+r_bad = cmd(p, "set over:limit", base64.b64encode(b"a" * (MAX_ENTRY - TAG + 1)).decode())
+assert r_bad.startswith("err") and "过大" in r_bad, "单条超限应拒绝: %r" % r_bad
+# 超限尝试后库仍可加载（未自锁）
+assert cmd(p, "get over:limit") == "ok null", "超限条目不应落库"
+# 累计超整库上限 → 拒绝（且此前已写入的条目仍在）
+val = base64.b64encode(os.urandom(1536 * 1024)).decode()
+last = ""
+for i in range(1, 14):
+    last = cmd(p, "set fill:%d" % i, val)
+    if not last.startswith("ok"):
+        break
+assert "容量上限" in last, "整库超限应以「容量上限」拒绝: %r" % last
+close(p)
+
+p = session()          # 关键回归：整库超限后仍能解锁（此前为「文件过大…拒绝加载」）
+assert cmd(p, "get fill:1").startswith("ok "), "既有条目应完好"
+close(p)
+print("  ✓ 15 写入侧容量：单条边界（%d B 通过 / +1B 拒绝）与整库上限均落盘前拒绝，未自锁"
+      % (MAX_ENTRY - TAG))
+PY
+rm -rf "$DATA_CAP"
+pass "写入侧容量上限：单条/整库超限落盘前拒绝（不再出现「写完即无法加载」的自锁）"
+
+# ════════════════════════════════════════════════════════════════════
+# 16. 并发语义：**兼容并发**（跨进程写锁）而非「最后写者获胜」
+# ════════════════════════════════════════════════════════════════════
+# 16a 锁原语：外部进程持 `vault.lock` 独占锁时，vault 的写命令必须**阻塞等待**（内核事件唤醒，
+#     非轮询），释放后立即完成；崩溃自动释放（无需人工清理）。
+# 16b 丢失更新：`set-kdf`（重键）与另一会话的 `set` 交错时，后者必须基于**重键后**的状态保存，
+#     否则会把旧 KDF 头部写回（重键被静默回滚）。无锁实现下该用例会失败。
+DATA_CONC="$(mktemp -d)"
+run init-m1 "$DATA_CONC" >/dev/null <<<"conc-pw" || fail "并发用例 init-m1 失败"
+python3 - "$PWD/$VAULT" "$DATA_CONC" <<'PY' || fail "并发语义验证失败"
+import base64, fcntl, os, select, subprocess, sys, threading, time
+
+vault, data = os.path.abspath(sys.argv[1]), os.path.abspath(sys.argv[2])
+env = dict(os.environ, ARCHOERA_VAULT_BACKEND="file")
+B32 = base64.b64encode(bytes(range(32))).decode()
+B16 = base64.b64encode(bytes(range(16))).decode()
+PW = base64.b64encode(b"conc-pw").decode()
+LOCK = os.path.join(data, "vault.lock")
+
+
+def session():
+    p = subprocess.Popen([vault, "serve", data], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=env)
+    p.stdin.write(("handshake %s %s %s\n" % (B32, B16, PW)).encode()); p.stdin.flush()
+    assert p.stdout.readline().decode().startswith("ok handshake"), "解锁失败"
+    return p
+
+
+def cmd(p, line, payload=None):
+    p.stdin.write((line + "\n" + (payload + "\n" if payload is not None else "")).encode())
+    p.stdin.flush()
+    return p.stdout.readline().decode().rstrip("\n")
+
+
+def close(p):
+    try:
+        p.stdin.write(b"quit\n"); p.stdin.flush(); p.stdout.readline()
+    except Exception:
+        pass
+    p.stdin.close(); p.wait(timeout=60)
+
+
+# ── 16a 锁原语：外部持锁 → 写命令阻塞；释放 → 完成 ──
+# 注意：握手路径里的「取/建锚点」也会取一次锁（读-改-写），故外部持锁必须**在握手之后**再拿，
+# 否则会先卡在握手（那是锁生效的另一种表现，但会让本用例测不到 set 的阻塞）。
+assert os.path.exists(LOCK), "锁文件应在首次写入后存在: %s" % LOCK
+p = session()
+holder = open(LOCK, "r+b")
+fcntl.flock(holder.fileno(), fcntl.LOCK_EX)      # 模拟另一进程持锁
+result = {}
+resumed = threading.Event()
+
+def do_set():
+    result["r"] = cmd(p, "set lock:probe", base64.b64encode(b"v").decode())
+    resumed.set()
+
+t = threading.Thread(target=do_set); t.start()
+blocked = not resumed.wait(timeout=0.8)          # 0.8s 内不应完成
+fcntl.flock(holder.fileno(), fcntl.LOCK_UN)
+holder.close()
+t.join(timeout=30)
+assert blocked, "外部持锁期间写命令竟已完成（锁未生效）"
+assert result.get("r") == "ok", "释放锁后写命令应完成: %r" % result.get("r")
+close(p)
+print("  ✓ 16a 跨进程写锁：外部持锁时写命令阻塞等待，释放后立即完成（无轮询）")
+
+# ── 16b 丢失更新：CLI 重键（慢，持锁数百 ms～秒）与并发 serve 写入交错，二者都必须保留 ──
+# `set-kdf` 是 CLI 命令（不在 serve 协议内），但要持同一把写锁；若无锁，serve 侧会基于
+# 「重键前」的状态保存 → 把旧 KDF 头部写回（重键被静默回滚）。有锁则 serve 侧等待后基于新状态保存。
+new_kdf = {"m": 131072, "t": 4, "p": 1}
+p_set = session()
+r1, r2 = {}, {}
+
+def rekey():
+    r1["p"] = subprocess.run(
+        [vault, "set-kdf", data, "--kdf-m", str(new_kdf["m"]),
+         "--kdf-t", str(new_kdf["t"]), "--kdf-p", str(new_kdf["p"])],
+        input=b"conc-pw\n", stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=300)
+    r1["out"] = r1["p"].stdout.decode(errors="replace").strip()
+
+def setter():
+    time.sleep(0.15)          # 让重键先拿到锁
+    r2["r"] = cmd(p_set, "set conc:after", base64.b64encode(b"kept").decode())
+
+t1 = threading.Thread(target=rekey); t2 = threading.Thread(target=setter)
+t1.start(); t2.start(); t1.join(); t2.join()
+assert r1["p"].returncode == 0 and r1["out"].startswith("ok"), "重键应成功: rc=%d %r" % (
+    r1["p"].returncode, r1["out"])
+assert r2["r"] == "ok", "并发 set 应成功: %r" % r2["r"]
+close(p_set)
+
+# 校验：新 KDF 参数**与**新条目同时存在（否则说明发生了丢失更新）
+import struct
+raw = open(os.path.join(data, "credentials.vault"), "rb").read()
+m, t, pp = struct.unpack_from("<III", raw, 32)
+assert (m, t, pp) == (new_kdf["m"], new_kdf["t"], new_kdf["p"]), \
+    "重键被丢失更新回滚：头部 KDF=%r" % ((m, t, pp),)
+p = session()
+got = cmd(p, "get conc:after")
+assert got.startswith("ok ") and base64.b64decode(got.split(" ", 1)[1]) == b"kept", \
+    "并发写入的条目丢失: %r" % got
+close(p)
+print("  ✓ 16b 无丢失更新：重键头部（%d/%d/%d）与并发写入的条目同时保留" % (m, t, pp))
+PY
+rm -rf "$DATA_CONC"
+pass "并发语义：兼容并发（阻塞式跨进程写锁）——无丢失更新、崩溃自动释放、不引入轮询"
 
 echo "全部通过 ✔"

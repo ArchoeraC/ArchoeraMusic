@@ -286,13 +286,19 @@ cd app && flutter run -d linux      # 本地调试
   新增转储 / 探针工具命名遵循 `*_dump` / `*_probe`（已被 .gitignore 覆盖，不入库）。
 - Zig 内核第三方来源（参考实现 / 移植表）必须在 `docs/audio-kernel-zig.md` 登记表更新。
 
-### 5.3 C#（`app/core/scanner/`、`app/core/vault/`）
+### 5.3 C#（`app/core/scanner/`）
 
 - NativeAOT 约束：避免重型反射 / `dynamic` / 未注解的序列化，发布模式必须可 AOT。
-- vault 属安全边界：修改握手协议 / marker / 份额存储逻辑需同步更新
-  [docs/vault-security-notes.md](docs/vault-security-notes.md)，
-  且测试改动不得把测试专用逻辑引入生产构建路径（SEC-19 已删除测试明文存储后门 `InsecureFileStore`；
-  `VAULT_TESTING` 仅保留构建标记，存储后端与生产一致）。
+
+### 5.4 vault（Rust，`app/core/vault-rs/`，三端）
+
+- 属安全边界：修改握手协议 / marker / 份额存储 / 沙箱护栏需同步更新
+  [docs/vault-security-notes.md](docs/vault-security-notes.md)，且测试改动不得把测试专用逻辑引入生产构建路径
+  （SEC-19 已删除测试明文存储后门；`vault_testing` 仅保留构建标记，存储后端与生产一致）。
+- 本地跑：`app/core/vault-rs/test.sh`（Linux 端到端）、`test-windows.sh`（Wine）、`cross-macos.sh`
+  （Linux 交叉编译检查）、`gen_testdata.sh`（**仅确认格式未变时**重新生成黄金夹具）。
+- **字节兼容锚点**：容器格式与 KDF/HKDF/AEAD 语义由 `app/core/vault-rs/testdata/` 的
+  **冻结黄金夹具**锚定（C# 活体 oracle 已于 2026-10-12 随 `app/core/vault/` 删除）。
 
 ### 5.4 C++（`app/core/scraper/`）
 
@@ -329,7 +335,7 @@ cd app && flutter run -d linux      # 本地调试
 | Dart 单元 / Widget | `cd app && flutter test`（`app/test/`） | 每次 PR |
 | C 引擎 / C++ / Rust / Go 原生测试 | 各模块 `tests/`；Zig `zig build test`；Rust `cargo test --manifest-path app/core/<mod>/Cargo.toml`（downloader / shell）；CI workflow 内置 | 改动对应模块时 |
 | 内嵌原生 CLI | `cargo test --manifest-path app/core/shell/Cargo.toml`；ARB 改动后 `flutter gen-l10n` | 改动 `app/core/shell` 或 `app/lib/l10n/*.arb` 时 |
-| vault 端到端 | CI 内置；本地 `app/core/vault/` 测试脚本 | 改动 vault / 会话存储时 |
+| vault 端到端 | `app/core/vault-rs/test.sh`（Linux）/ `test-windows.sh`（Wine，需 wine+msvc-wine）/ `cross-macos.sh`（交叉编译检查）；CI 内置 | 改动 vault / 会话存储时 |
 | 三端构建 | `.github/workflows/build-all.yml`（tag `v*` 或手动触发） | 合入主干后由维护者触发 |
 | 手动回归 | 播放 / seek / 切歌 / 登录 / 下载 / 扫描 / 刮削核心路径 | 涉及播放链路与数据面改动时 |
 | 基准 / 性能 | `app/core/audio-engine/tests/bench/run_suite.py`（内核单测 + ctest + 逐格式 scorecard + 池并发 + scanner）+ 内存基线对比 | 触及解码 / DSP / 播放 / 内存 / 缓存链路时 |

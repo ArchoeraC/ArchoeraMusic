@@ -21,6 +21,7 @@ import '../../stores/data_dir.dart';
 import '../security/vault_kdf.dart';
 import '../security/vault_process.dart';
 import 'streaming_types.dart';
+import '../../utils/safe_file.dart';
 
 /// 服务器配置存储。
 class StreamingStore {
@@ -262,9 +263,9 @@ class StreamingStore {
     final cache = _secretCache.putIfAbsent(filePath, () => {});
     var pendingMigration = false;
     try {
-      final file = File(filePath);
-      if (!file.existsSync()) return (servers: const [], activeServerId: null);
-      final json = jsonDecode(file.readAsStringSync());
+      final text = SafeFile.readString(filePath);
+      if (text == null) return (servers: const [], activeServerId: null);
+      final json = jsonDecode(text);
       if (json is Map) {
         final raw = json['servers'];
         final activeServerId = json['activeServerId']?.toString();
@@ -382,9 +383,9 @@ class StreamingStore {
   /// 保存误覆盖/漏删既有凭据条目）。
   static Set<String> _persistedIds() {
     try {
-      final file = File(filePath);
-      if (!file.existsSync()) return const {};
-      final json = jsonDecode(file.readAsStringSync());
+      final text = SafeFile.readString(filePath);
+      if (text == null) return const {};
+      final json = jsonDecode(text);
       if (json is Map && json['servers'] is List) {
         final out = <String>{};
         for (final e in (json['servers'] as List).whereType<Map>()) {
@@ -450,9 +451,7 @@ class StreamingStore {
     required bool includeSecrets,
   }) {
     try {
-      final file = File(filePath);
-      file.parent.createSync(recursive: true);
-      file.writeAsStringSync(const JsonEncoder.withIndent('  ').convert({
+      SafeFile.writeAtomicString(filePath, const JsonEncoder.withIndent('  ').convert({
         'servers': [
           for (final s in servers)
             if (includeSecrets) s.toJson() else _withoutSecrets(s),
