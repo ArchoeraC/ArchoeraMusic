@@ -37,6 +37,7 @@ constexpr uint32_t CAP_SYSTEM_THEME = 1u << 8;
 constexpr uint32_t CAP_DEEP_LINK = 1u << 9;
 constexpr uint32_t CAP_REVEAL_PATH = 1u << 10;
 constexpr uint32_t CAP_TRAY = 1u << 11;
+constexpr uint32_t CAP_SECURE_FILE = 1u << 12;
 
 // ── 事件类型 / 命令 ───────────────────────────────────────────────
 constexpr int32_t EVENT_MEDIA_COMMAND = 1;

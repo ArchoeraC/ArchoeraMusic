@@ -126,6 +126,7 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_DEEP_LINK          (1u << 9)   /* archoera:// 协议唤醒（ABI v2） */
 #define APL_CAP_REVEAL_PATH        (1u << 10)  /* 文件管理器定位路径（免提权、零子进程） */
 #define APL_CAP_TRAY               (1u << 11)  /* 系统托盘图标 + 上下文菜单（ABI v3） */
+#define APL_CAP_SECURE_FILE        (1u << 12)  /* 安全文件原语（原生 open(2)，ABI v4） */
 ```
 
 协议唤醒（`APL_CAP_DEEP_LINK`，ABI v2 起）：`apl_protocol_register/unregister`
@@ -190,6 +191,33 @@ typedef struct AplTrackMeta {
 **所有权**：Dart → Zig 的结构体与字符串仅在调用期间有效（Dart 侧保证存活到同步调用返回）；
 Zig 内部需要跨调用留存（SMTC 异步 set、MPRIS 属性缓存）时**在调用内深拷贝**；
 Zig → Dart 方向只有 POD 事件，**永不向 Dart 返回需释放的内存**。
+
+### 3.2.1 安全文件原语（`APL_CAP_SECURE_FILE`，ABI v4 起）
+
+收口 Dart `SafeFile`（`app/lib/utils/safe_file.dart`）记录的 TOCTOU 残余——`dart:io`
+无 `O_NONBLOCK`/`O_NOFOLLOW`，类型判定与真正读写之间存在极窄竞态窗口。以**原生
+`open(2)`** 一次性完成「打开即校验」：
+
+```c
+/* 读普通文件；out==NULL 仅探测大小（写 *inout_len），否则读入 out（容量 *inout_len）。
+   打开 O_RDONLY|O_NONBLOCK（allow_symlink==0 追加 O_NOFOLLOW），随后按**句柄** fstat
+   必须是普通文件：FIFO/设备/目录/符号链接(拒绝时)/超限一律负值（O_NONBLOCK 保证 FIFO
+   打开不阻塞）。输入契约同 apl_reveal_path：绝对本地路径，拒绝 URI/相对路径/设备命名空间。 */
+int32_t apl_file_read(const char* path, int32_t allow_symlink, int64_t max_bytes,
+                      uint8_t* out, size_t* inout_len);
+/* 原子写：同目录随机唯一临时名 O_CREAT|O_EXCL|O_NOFOLLOW → 写全 → fsync → rename
+   （rename 不跟随符号链接，符号链接只被替换、不被穿透）。 */
+int32_t apl_file_write_atomic(const char* path, const uint8_t* data, size_t len);
+```
+
+- **缓冲所有权**：调用方提供缓冲；本模块**永不返回需 Dart 释放的内存**（两段式读：
+  先 `out==NULL` 探测大小，再按大小分配读入）。
+- **平台**：Linux/macOS 走 POSIX `open(2)`（共用 `src/safe_file_posix.h`）；Windows 走
+  `CreateFileW` + `FILE_FLAG_OPEN_REPARSE_POINT` + `GetFileType==FILE_TYPE_DISK` /
+  `BY_HANDLE_FILE_INFORMATION` 判定，临时名 `CREATE_NEW` + `MoveFileExW` 替换。
+- **Dart 接线**：能力位可用时 `PlatformCapabilities.instance()` 注入
+  `NativeSafeFileBackend`（`SafeFile.backend`）；未注入（桥接缺失 / 非桌面 / 单测）
+  退回纯 Dart 实现，语义不变。免提权、零子进程。
 
 ### 3.3 SystemPower（三平台全覆盖，2026-09-10 决策）
 

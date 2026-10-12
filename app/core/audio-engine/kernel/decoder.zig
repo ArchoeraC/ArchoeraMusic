@@ -203,7 +203,7 @@ pub fn open(allocator: std.mem.Allocator, path: []const u8, info: *Info) Error!D
 
 /// 带显式 Io 的 open（Pool worker 用各自每线程 Io 打开文件，见 §3 Zig 0.16 原语修订）
 pub fn openWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []const u8, info: *Info) Error!Decoder {
-    var reader = try io.Reader.openPathWith(io_inst, path);
+    var reader = try io.Reader.openSourceWith(io_inst, allocator, path);
     errdefer reader.deinit();
     const fmt = try probe.probe(&reader);
     return registry.dispatch(fmt, allocator, &reader, info);
@@ -254,7 +254,7 @@ pub fn openHintedWithIo(
     fmt: probe.Format,
     info: *Info,
 ) Error!Decoder {
-    var reader = try io.Reader.openPathWith(io_inst, path);
+    var reader = try io.Reader.openSourceWith(io_inst, allocator, path);
     errdefer reader.deinit();
     return openHintedReader(allocator, &reader, fmt, info);
 }
@@ -293,7 +293,7 @@ pub fn openMeta(allocator: std.mem.Allocator, path: []const u8, info: *Info) Err
 }
 
 pub fn openMetaWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []const u8, info: *Info) Error!OpenedMeta {
-    var reader = try io.Reader.openPathWith(io_inst, path);
+    var reader = try io.Reader.openSourceWith(io_inst, allocator, path);
     errdefer reader.deinit();
     const fmt = try probe.probe(&reader);
     const r = try registry.dispatchMeta(fmt, allocator, &reader, info);

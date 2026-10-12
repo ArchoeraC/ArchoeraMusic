@@ -13,6 +13,7 @@
 #include "backend.h"
 
 #include "core.h"
+#include "safe_file_posix.h"  // Linux/macOS 共用安全文件原语（header-only）
 
 #include <dbus/dbus.h>
 #include <dlfcn.h>
@@ -1915,7 +1916,7 @@ uint32_t caps() {
     uint32_t c = CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_MEDIA_SESSION |
                  CAP_MEDIA_SEEK | CAP_MEDIA_ARTWORK | CAP_APP_INSTANCE |
                  CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME | CAP_DEEP_LINK |
-                 CAP_REVEAL_PATH | CAP_TRAY;
+                 CAP_REVEAL_PATH | CAP_TRAY | CAP_SECURE_FILE;
     const bool hasDisplay = std::getenv("WAYLAND_DISPLAY") != nullptr ||
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
@@ -2424,6 +2425,16 @@ int32_t revealPath(const char* path) {
     const std::string dir = isDir ? p : parentDir(p);
     if (!dir.empty() && gioOpenDir(dir)) return OK;
     return ERR_BACKEND;
+}
+
+// ── 安全文件原语（POSIX open(2)）───────────────────────────────────
+int32_t fileRead(const char* path, bool allow_symlink, int64_t max_bytes, uint8_t* out,
+                 size_t* inout_len) {
+    return safeFileReadPosix(path, allow_symlink, max_bytes, out, inout_len);
+}
+
+int32_t fileWriteAtomic(const char* path, const uint8_t* data, size_t len) {
+    return safeFileWriteAtomicPosix(path, data, len);
 }
 
 // ── 系统托盘后端接口 ──────────────────────────────────────────────

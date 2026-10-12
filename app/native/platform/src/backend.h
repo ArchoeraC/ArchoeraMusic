@@ -48,6 +48,12 @@ int32_t notify(const char* title, const char* body);
 // 文件管理器定位路径（文件 → 打开所在目录并选中；目录 → 打开）。
 int32_t revealPath(const char* path);
 
+// 安全文件原语（原生 open(2)；见 include/archoera_platform.h APL_CAP_SECURE_FILE）。
+// fileRead：out==NULL 探测大小（写 *inout_len）；否则读入 out（容量 *inout_len）。
+int32_t fileRead(const char* path, bool allow_symlink, int64_t max_bytes, uint8_t* out,
+                 size_t* inout_len);
+int32_t fileWriteAtomic(const char* path, const uint8_t* data, size_t len);
+
 // 系统托盘（见 include/archoera_platform.h）。
 int32_t trayCreate(const char* icon_path);
 int32_t trayDestroy();

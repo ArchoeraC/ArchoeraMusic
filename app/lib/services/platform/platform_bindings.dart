@@ -14,6 +14,7 @@ library;
 
 import 'dart:async';
 import 'dart:ffi';
+import 'dart:typed_data';
 import 'dart:ui' show Color;
 
 import 'package:ffi/ffi.dart';
@@ -43,6 +44,7 @@ const int aplCapSystemTheme = 1 << 8;
 const int aplCapDeepLink = 1 << 9;
 const int aplCapRevealPath = 1 << 10;
 const int aplCapTray = 1 << 11;
+const int aplCapSecureFile = 1 << 12;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -57,7 +59,7 @@ const int aplEventTrayDoubleClick = 10;
 const int aplEventTrayRightClick = 11;
 const int aplEventTrayMenuCommand = 12;
 
-const int aplAbiVersion = 3;
+const int aplAbiVersion = 4;
 
 /// 托盘菜单项（对齐 `AplTrayMenuItem`）：id==0 为分隔符；checked==-1 非复选。
 class AplTrayMenuItem {
@@ -218,6 +220,9 @@ typedef _AplTraySetTooltipC = Int32 Function(Pointer<Utf8> tooltip);
 typedef _AplTraySetVisibleC = Int32 Function(Int32 visible);
 typedef _AplTraySetMenuC = Int32 Function(Pointer<AplTrayMenuItemFfi> items, Int32 count);
 typedef _AplTraySetMenuTriggerC = Int32 Function(Int32 trigger);
+typedef _AplFileReadC = Int32 Function(Pointer<Utf8> path, Int32 allowSymlink, Int64 maxBytes,
+    Pointer<Uint8> out, Pointer<Size> inoutLen);
+typedef _AplFileWriteAtomicC = Int32 Function(Pointer<Utf8> path, Pointer<Uint8> data, Size len);
 typedef _SetEventCallbackC = Int32 Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
 typedef _SetLogSinkC = Void Function(Pointer<NativeFunction<AplLogFnC>> fn);
@@ -256,6 +261,9 @@ typedef _AplTraySetTooltipD = int Function(Pointer<Utf8> tooltip);
 typedef _AplTraySetVisibleD = int Function(int visible);
 typedef _AplTraySetMenuD = int Function(Pointer<AplTrayMenuItemFfi> items, int count);
 typedef _AplTraySetMenuTriggerD = int Function(int trigger);
+typedef _AplFileReadD = int Function(Pointer<Utf8> path, int allowSymlink, int maxBytes,
+    Pointer<Uint8> out, Pointer<Size> inoutLen);
+typedef _AplFileWriteAtomicD = int Function(Pointer<Utf8> path, Pointer<Uint8> data, int len);
 typedef _SetEventCallbackD = int Function(
     Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
 typedef _SetLogSinkD = void Function(Pointer<NativeFunction<AplLogFnC>> fn);
@@ -388,6 +396,9 @@ class PlatformBindings {
             lib.lookupFunction<_AplTraySetMenuC, _AplTraySetMenuD>('apl_tray_set_menu'),
         _traySetMenuTriggerFn = lib.lookupFunction<_AplTraySetMenuTriggerC,
             _AplTraySetMenuTriggerD>('apl_tray_set_menu_trigger'),
+        _fileRead = lib.lookupFunction<_AplFileReadC, _AplFileReadD>('apl_file_read'),
+        _fileWriteAtomic = lib.lookupFunction<_AplFileWriteAtomicC, _AplFileWriteAtomicD>(
+            'apl_file_write_atomic'),
         _setCallback = lib
             .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback'),
         _setLogSink =
@@ -431,6 +442,8 @@ class PlatformBindings {
   final _AplTraySetVisibleD _traySetVisibleFn;
   final _AplTraySetMenuD _traySetMenuFn;
   final _AplTraySetMenuTriggerD _traySetMenuTriggerFn;
+  final _AplFileReadD _fileRead;
+  final _AplFileWriteAtomicD _fileWriteAtomic;
   final _SetEventCallbackD _setCallback;
   final _SetLogSinkD _setLogSink;
 
@@ -478,6 +491,48 @@ class PlatformBindings {
     try {
       return _revealPath(p);
     } finally {
+      malloc.free(p);
+    }
+  }
+
+  /// 安全文件读取（原生 `open(2)`，`apl_file_*`）：探测大小 → 读满。
+  /// 非普通文件 / 超限 / 不存在 / 失败返回 null；空文件返回空 [Uint8List]。
+  Uint8List? fileReadBytes(
+    String path, {
+    required int maxBytes,
+    required bool allowSymlink,
+  }) {
+    final p = path.toNativeUtf8();
+    final len = calloc<Size>();
+    try {
+      final allow = allowSymlink ? 1 : 0;
+      // 第一段：探测大小（out == nullptr）。
+      if (_fileRead(p, allow, maxBytes, nullptr, len) != aplOk) return null;
+      final size = len.value;
+      if (size == 0) return Uint8List(0);
+      final buf = malloc.allocate<Uint8>(size);
+      try {
+        len.value = size;
+        if (_fileRead(p, allow, maxBytes, buf, len) != aplOk) return null;
+        return Uint8List.fromList(buf.asTypedList(len.value));
+      } finally {
+        malloc.free(buf);
+      }
+    } finally {
+      calloc.free(len);
+      malloc.free(p);
+    }
+  }
+
+  /// 安全原子写（原生临时名 + rename）；返回是否成功。
+  bool fileWriteAtomic(String path, List<int> bytes) {
+    final p = path.toNativeUtf8();
+    final buf = bytes.isEmpty ? nullptr : malloc.allocate<Uint8>(bytes.length);
+    try {
+      if (buf != nullptr) buf.asTypedList(bytes.length).setAll(0, bytes);
+      return _fileWriteAtomic(p, buf, bytes.length) == aplOk;
+    } finally {
+      if (buf != nullptr) malloc.free(buf);
       malloc.free(p);
     }
   }
