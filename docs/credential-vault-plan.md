@@ -130,6 +130,10 @@ app_config/
 
 - 首启检测到旧明文 sessionStore：一次性加密迁移进 vault，随后**彻底删除明文存储**（含备份路径）；
 - 迁移失败（如 keyring 不可用）→ 保留明文并显著警示，不静默降级。
+- **跨存储事务与崩溃一致性（SEC-16）**：模式切换 / 设备绑定升级涉及 vault 文件 + OS 份额 / `device.seal`
+  两个存储，单文件原子替换覆盖不到两步之间被 kill。实现以「先写可丢弃旁路、最后写权威 vault」排序 +
+  失败回滚，保证任何时刻被 kill 仅残留孤儿份额 / 熵文件（按 vault 模式判定，不被读取），不会产生不可解 vault；
+  详见 [device-bound-vault-plan.md](device-bound-vault-plan.md) §8/§11。
 
 ### 3.6 运行时内存保护（Linux 机制学习，三平台映射）
 
