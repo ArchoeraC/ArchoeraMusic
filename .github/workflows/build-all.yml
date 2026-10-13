@@ -292,7 +292,7 @@ jobs:
         # Release 下 Xcode 按 ARCHS（arm64 x86_64）构建通用二进制，静态库需双架构
         # slice；脚本阶段亦会幂等 rustup target add 兜底（本地开发用）。
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26'
           cache-dependency-path: app/core/subsonic/go.sum
