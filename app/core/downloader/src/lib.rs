@@ -896,6 +896,65 @@ fn max_speed_bytes() -> Option<u64> {
     }
 }
 
+/// 下载请求最大重定向跳数：超过即停（避免被无休止 3xx 拖住）。
+const MAX_DOWNLOAD_REDIRECTS: usize = 5;
+
+/// 重定向目标是否允许（客户端侧防御纵深）：仅 http(s)、必须有主机，且
+/// - 主机是 IP 字面量时必须是公网地址（拒绝回环 / 私网 / 链路本地 / 未指定 / 组播 /
+///   IPv6 唯一本地）；
+/// - 主机名不得是本机或常见内网名（localhost / .localhost / .local / .internal / .lan）。
+///
+/// 只拦字面量与常见内网名，**不做 DNS 解析**（重定向判定在同步回调里，域名解析到私网
+/// 无法在此同步获知）；足以挡掉「3xx 直接指向本机端口 / 内网字面量」这类最直白的引渡，
+/// 且不会误伤公网 CDN 的正常跨主机跳转。
+fn redirect_target_allowed(url: &reqwest::Url) -> bool {
+    let scheme = url.scheme();
+    if scheme != "https" && scheme != "http" {
+        return false;
+    }
+    let Some(raw_host) = url.host_str() else {
+        return false;
+    };
+    let host = raw_host.trim_matches(|c| c == '[' || c == ']').to_ascii_lowercase();
+    if host.is_empty() {
+        return false;
+    }
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return is_public_ip(ip);
+    }
+    if host == "localhost" {
+        return false;
+    }
+    !HOST_SUFFIX_BLOCKLIST.iter().any(|s| host.ends_with(s))
+}
+
+/// 主机名黑名单后缀（对齐服务端 OutboundUrlGuard 的内网名口径）。
+const HOST_SUFFIX_BLOCKLIST: [&str; 5] = [".localhost", ".local", ".internal", ".lan", ".home"];
+
+/// 地址是否为公网可访问（回环 / 私网 / 链路本地 / 未指定 / 组播 / 保留段一律 false）。
+fn is_public_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            let o = v4.octets();
+            !(v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_multicast()
+                || o[0] == 0
+                || (o[0] == 100 && (64..=127).contains(&o[1])))
+        }
+        std::net::IpAddr::V6(v6) => {
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                // IPv6 唯一本地地址 fc00::/7
+                || (v6.segments()[0] & 0xfe00) == 0xfc00)
+        }
+    }
+}
+
 /// 流式下载：HTTP GET → tmpPath → fsync → 原子 rename（参考 download-engine）
 ///
 /// v2 增强：
@@ -1178,6 +1237,16 @@ pub extern "C" fn archoera_downloader_init(
     let client = match reqwest::Client::builder()
         // 对齐 Dart HttpClient：仅 HTTP/1.1（酷狗风控对 HTTP/2 请求返回空 data）
         .http1_only()
+        // 重定向封顶 + 拒绝被 3xx 引到本机/内网（公网 CDN 的正常跨主机跳转不受影响）
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= MAX_DOWNLOAD_REDIRECTS
+                || !redirect_target_allowed(attempt.url())
+            {
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        }))
         .build()
     {
         Ok(c) => c,
@@ -2131,7 +2200,7 @@ mod finalize_tests {
 
 #[cfg(test)]
 mod download_integrity_tests {
-    use super::{check_completed, open_tmp_file_fresh};
+    use super::{check_completed, open_tmp_file_fresh, redirect_target_allowed};
     use std::path::PathBuf;
 
     fn unique_dir(tag: &str) -> PathBuf {
@@ -2194,5 +2263,39 @@ mod download_integrity_tests {
         assert!(check_completed(101, Some(100)).is_err());
         // 未声明长度 → 无法判定，放行
         assert!(check_completed(60, None).is_ok());
+    }
+
+    /// 重定向目标只放行公网 http(s)，挡掉回环 / 私网 / 链路本地 / 内网名。
+    #[test]
+    fn redirect_target_blocks_local_and_private() {
+        let ok = |s: &str| redirect_target_allowed(&reqwest::Url::parse(s).unwrap());
+
+        // 公网（域名 + 公网 IP）放行
+        assert!(ok("https://cdn.example.com/song.flac"));
+        assert!(ok("http://aqqmusic.tc.qq.com/M500.mp3"));
+        assert!(ok("https://8.8.8.8/x"));
+        assert!(ok("https://[2001:4860:4860::8888]/x"));
+
+        // 回环 / 私网 / 链路本地 / 未指定（IPv4）
+        assert!(!ok("http://127.0.0.1:8080/x"));
+        assert!(!ok("http://10.0.0.5/x"));
+        assert!(!ok("http://192.168.1.1/x"));
+        assert!(!ok("http://172.16.0.1/x"));
+        assert!(!ok("http://169.254.1.1/x"));
+        assert!(!ok("http://0.0.0.0/x"));
+        assert!(!ok("http://100.64.0.1/x"));
+
+        // 回环 / 唯一本地（IPv6）
+        assert!(!ok("http://[::1]/x"));
+        assert!(!ok("http://[fc00::1]/x"));
+
+        // 内网主机名
+        assert!(!ok("http://localhost/x"));
+        assert!(!ok("http://foo.localhost/x"));
+        assert!(!ok("http://db.internal/x"));
+        assert!(!ok("http://nas.lan/x"));
+
+        // 非 http(s)
+        assert!(!ok("ftp://example.com/x"));
     }
 }
