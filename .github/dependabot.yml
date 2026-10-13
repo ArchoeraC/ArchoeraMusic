@@ -1,13 +1,31 @@
 # SEC-26：依赖漏洞 / 更新扫描（Dependabot）。
-# 覆盖仓库内全部包生态；GitHub Actions 依赖按 pinned SHA 定期升级。
+#
+# ⚠️ 当前**停用版本更新（version updates）**：每个生态 open-pull-requests-limit = 0。
+#    原因（2026-10-13）：本文件随 PR #125 首次生效后，Dependabot 立即批量开单（#126–#143），
+#    其中 pub 生态在无国内镜像的解析环境下，会把 app/pubspec.lock 的 89 个包 host
+#    从 pub.flutter-io.cn 全量改回默认源（pub.dartlang.org）；github-actions 多为跨大版本
+#    跳变且直接改写 release 关键路径（build-all.yml）。依赖升级改为**本地显式处理**：
+#    在本机（保留镜像）升级并跑通 dart analyze / flutter test / cargo test / go test 后，
+#    逐个评审提交。
+#
+#    重新启用：把对应生态的 open-pull-requests-limit 改回正整数（如 5）。
+#    参见 GitHub 文档 “configuration-options-for-the-dependabot.yml-file” 的
+#    open-pull-requests-limit 一节。
+#
+# 注：本仓库 Dependabot 漏洞告警（alerts）与安全更新（security updates）本身处于关闭状态；
+#     漏洞扫描由 .github/workflows/security-audit.yml（cargo audit / govulncheck /
+#     dotnet --vulnerable）承担。停用版本更新不影响该扫描。
+#
+# 注：停用 github-actions 版本更新后，SEC-21 的 action SHA pin 不再自动滚动，
+#     需人工定期核对升级（见 docs/supply-chain.md）。
 version: 2
 updates:
-  # ── GitHub Actions（含 release 关键路径，SEC-21 的 SHA pin 由它滚动）──
+  # ── GitHub Actions（含 release 关键路径，SEC-21 的 SHA pin 原由它滚动）──
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels:
       - dependencies
       - ci
@@ -17,21 +35,25 @@ updates:
     directory: /app/core/downloader
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, rust]
   - package-ecosystem: cargo
     directory: /app/core/shell
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, rust]
   - package-ecosystem: cargo
     directory: /app/core/subsonic/transcoder
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, rust]
   - package-ecosystem: cargo
     directory: /app/core/audio-engine/tempo-rs
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, rust]
 
   # ── Go（Subsonic 协议层）──
@@ -39,6 +61,7 @@ updates:
     directory: /app/core/subsonic
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, go]
 
   # ── .NET（扫描器）──
@@ -46,6 +69,7 @@ updates:
     directory: /app/core/scanner
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, dotnet]
 
   # ── Dart / Flutter ──
@@ -53,5 +77,5 @@ updates:
     directory: /app
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, flutter]
