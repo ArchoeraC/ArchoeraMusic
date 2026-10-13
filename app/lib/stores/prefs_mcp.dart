@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import '../services/mcp/mcp_key_store.dart';
 import 'app_prefs.dart';
 
 // ── MCP 接入（本地控制服务）偏好键（mcp. 前缀）──────────────────────
@@ -65,7 +66,11 @@ extension McpPrefs on AppPrefs {
       clampMcpPort((data[mcpPortKey] as num?)?.toInt() ?? defaultMcpPort);
 
   /// 访问密钥（生成为 128-bit 十六进制；空串 = 尚未生成）。
-  String get mcpAccessKey => (data[mcpAccessKeyKey] as String?)?.trim() ?? '';
+  ///
+  /// SEC-10：权威存储为凭据保险库（[McpKeyStore]，uid=`mcp:accessKey`）；
+  /// [data] 中的 `mcp.accessKey` 仅为历史明文兜底（GUI 不再写入）。
+  String get mcpAccessKey =>
+      McpKeyStore.cached ?? (data[mcpAccessKeyKey] as String?)?.trim() ?? '';
 
   /// 是否允许免密钥访问（默认关）。
   bool get mcpAllowKeyless =>
@@ -88,8 +93,14 @@ extension McpPrefs on AppPrefs {
   AppPrefs copyWithMcpPort(int value) =>
       AppPrefs(initialData: {...data, mcpPortKey: clampMcpPort(value)});
 
-  AppPrefs copyWithMcpAccessKey(String value) =>
-      AppPrefs(initialData: {...data, mcpAccessKeyKey: value});
+  /// 清除 [data] 中的历史明文密钥（SEC-10：写密钥一律经凭据保险库）。
+  ///
+  /// 保留 [value] 形参以兼容原调用点，但密钥绝不落 `prefs.json`——原实现
+  /// 把值写回 `data`，会导致后续任何 `save()` 把明文重新写盘。
+  AppPrefs copyWithMcpAccessKey(String value) {
+    final next = {...data}..remove(mcpAccessKeyKey);
+    return AppPrefs(initialData: next);
+  }
 
   AppPrefs copyWithMcpAllowKeyless(bool value) =>
       AppPrefs(initialData: {...data, mcpAllowKeylessKey: value});

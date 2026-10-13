@@ -20,18 +20,23 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      with:
+        toolchain: stable
+        # vault-rs 静态保险库：装 musl target 后 build.sh 自动走 musl 静态链接
+        # （不依赖静态 glibc，Fedora 等未装 glibc-static 的发行版亦可；见 link-mode.sh）。
+        targets: x86_64-unknown-linux-musl
 
-    - uses: actions/setup-go@v6
+    - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
       with:
         go-version: '1.26'
         cache-dependency-path: app/core/subsonic/go.sum
 
-    - uses: actions/setup-dotnet@v5
+    - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
       with:
         dotnet-version: '10.0.x'
 
-    - uses: subosito/flutter-action@v2
+    - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
       with:
         channel: stable
         cache: true
@@ -59,7 +64,7 @@ runs:
     # 自建最小版只依赖 libc/libm/libz，内嵌约 10MB 且 soname 固定。
     - name: Cache minimal FFmpeg
       id: ffmpeg-cache
-      uses: actions/cache@v5
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: ~/.local/ffmpeg-minimal
         # tls 段：自包含 mbedTLS 引入后旧缓存（无 .mbedtls-tls 标记）必须失效重建，
@@ -94,6 +99,30 @@ runs:
       # 帮助与标签文案。构建期由 flutter build 的 CMake 目标再编译为 staticlib 链入 runner。
       run: cargo test --release --manifest-path app/core/shell/Cargo.toml
 
+    - name: Rust unit tests (downloader)
+      shell: bash
+      # 下载器：路径清洗 / 临时文件安全 / 标签 / 解析器向量（SEC-11/33 回归在此拦截）。
+      run: cargo test --release --manifest-path app/core/downloader/Cargo.toml
+
+    - name: Rust unit tests (subsonic transcoder)
+      shell: bash
+      run: cargo test --release --manifest-path app/core/subsonic/transcoder/Cargo.toml
+
+    - name: Rust unit tests (vault-rs 静态保险库)
+      shell: bash
+      # 保险库纯函数单测（Argon2id RFC 9106 向量 / 恢复码 Crockford Base32 归一化）。
+      # 全链路 E2E（init/serve/篡改/seccomp）见 app/core/vault-rs/test.sh（本地/真机运行）。
+      run: cargo test --release --manifest-path app/core/vault-rs/Cargo.toml
+
+    - name: Go unit tests (subsonic)
+      shell: bash
+      working-directory: app/core/subsonic
+      # 子进程协议层：build / vet / test（SEC-01 凭据迁移与畸形密文回归）。
+      run: |
+        go build ./...
+        go vet ./...
+        go test ./...
+
     - name: Flutter pub get
       shell: bash
       working-directory: app
@@ -104,21 +133,25 @@ runs:
       working-directory: app
       run: dart analyze lib
 
-    - name: Test (unit smoke)
+    # SEC-27：跑**完整** Flutter 测试套件（不再只跑 widget 冒烟 + vault 单文件）。
+    # 原生模块（scanner / audio-engine / downloader / platform）已在上面构建，
+    # 相关 FFI 用例可正常加载；vault 用例经环境变量指向测试二进制。
+    - name: Test (full flutter suite)
       shell: bash
       working-directory: app
-      run: flutter test test/widget_test.dart
-
-    - name: Test vault 会话存储（凭据保险库端到端）
-      shell: bash
-      working-directory: app
+      env:
+        # headless runner 无 D-Bus Secret Service：构建测试二进制（vault_testing
+        # feature 条件编译，与生产唯一区别是构建标记为 TEST；存储行为完全一致），
+        # 并经 ARCHOERA_VAULT_BACKEND=file 选择**生产 FileStore**（文件密钥后端）——
+        # SEC-19 后不再有测试专用明文存储后门。
+        # Linux 已改用 vault-rs 的 Rust 静态单文件（core/vault-rs，免疫 LD_PRELOAD）；
+        # 指向绝对路径，避免 working-directory 相对解析。
+        ARCHOERA_VAULT_BIN: ${{ github.workspace }}/app/core/vault-rs/build/archoera-vault-test
+        ARCHOERA_VAULT_BACKEND: 'file'
       run: |
-        # headless runner 无 D-Bus Secret Service：构建测试二进制（VAULT_TESTING
-        # 条件编译，含测试明文存储；生产 build.sh 产物不含该逻辑，绝不用于测试）
-        bash core/vault/build-test.sh linux-x64
-        ARCHOERA_VAULT_BIN=$PWD/core/vault/build/archoera-vault-test \
-        ARCHOERA_VAULT_INSECURE_FILE_STORE=1 \
-          flutter test test/vault_session_store_test.dart
+        set -euo pipefail
+        bash core/vault-rs/build-test.sh
+        flutter test
 
     - name: Build Flutter Linux (release)
       shell: bash

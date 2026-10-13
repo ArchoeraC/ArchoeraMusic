@@ -14,6 +14,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/streaming/streaming_provider.dart';
+import '../services/streaming/streaming_store.dart';
 import '../services/streaming/streaming_types.dart';
 import '../stores/app_prefs.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -140,19 +141,32 @@ class _StreamingServerListState extends ConsumerState<StreamingServerList> {
     toast(l10n.streamingServerRemoved);
   }
 
-  /// 打开添加 / 编辑表单弹窗。
+  /// 打开添加 / 编辑表单弹窗。编辑既有服务器时按需从 vault 解密凭据，
+  /// 仅用于预填口令字段（密码不驻留列表状态）。
   Future<void> _showServerForm(
     BuildContext context,
     AppLocalizations l10n, {
     StreamingServerConfig? existing,
   }) async {
+    var formConfig = existing;
+    if (existing != null) {
+      await StreamingStore.loadSecret(existing.id);
+      final sec = StreamingStore.cachedSecret(existing.id);
+      if (sec != null) {
+        formConfig = existing.copyWith(
+          password: sec['password'] ?? existing.password,
+          accessToken: sec['accessToken'] ?? existing.accessToken,
+        );
+      }
+    }
+    if (!context.mounted) return;
     await SDialog.show(
       context,
-      title: existing == null
+      title: formConfig == null
           ? l10n.streamingServerAdd
           : l10n.streamingServerEdit,
       width: 520,
-      child: _ServerForm(existing: existing),
+      child: _ServerForm(existing: formConfig),
     );
   }
 

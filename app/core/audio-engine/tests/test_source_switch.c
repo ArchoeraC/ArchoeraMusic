@@ -523,6 +523,33 @@ static void run_rate_lock(const char *old_wav, const char *new_wav,
     archoera_mediaengine_destroy(e);
 }
 
+/* E. 切档后活动源必须同步为暂存（新档位）URL。
+   回归：修前 handle_commit_source 只换 e->p 不换 e->source，切档后 seek 的会话
+   重建会复用**旧档位** URL（在线直链可能已过期 → 重建失败、进度条拖不回原位）。 */
+static void run_source_sync_case(const char *open_src, const char *stage_src, const char *sdir)
+{
+    EngineConfig cfg = ENGINE_CONFIG_DEFAULT;
+    ArchoeraMediaEngine *e;
+    char errbuf[256];
+    char cmd[1024];
+    const char *active;
+
+    cfg.skip_encoder = true;
+    e = archoera_mediaengine_create(open_src, &cfg, NULL, sdir, errbuf, sizeof(errbuf));
+    CHECK(e != NULL, "E 引擎会话可创建（headless）");
+    if (!e) return;
+    snprintf(cmd, sizeof(cmd), "{\"type\":\"prepare_source\",\"url\":\"%s\"}", stage_src);
+    archoera_mediaengine_command(e, cmd);
+    archoera_mediaengine_command(e, "{\"type\":\"commit_source\"}");
+    CHECK(wait_done(e, 30000) == 1, "E 引擎在预算内正常结束");
+
+    /* 引擎线程已退出：无并发，读活动源安全。 */
+    active = archoera_mediaengine_source(e);
+    CHECK(active != NULL && strcmp(active, stage_src) == 0,
+          "E commit 后活动源 == 暂存（新档位）URL");
+    archoera_mediaengine_destroy(e);
+}
+
 int main(void)
 {
     char base[] = "/tmp/archoera-srcswitch-test-XXXXXX";
@@ -576,6 +603,21 @@ int main(void)
     if (mkdir(sdir2, 0700) == 0 &&
         write_sine_wav(wav2_path, 12.0, 48000) == 48000) {
         run_rate_lock(wav_path, wav2_path, sdir2, 44100);
+
+        /* E. 切档后活动源同步（用与 open 不同的 wav2 作为暂存 URL）。 */
+        {
+            char sdir4[512];
+            snprintf(sdir4, sizeof(sdir4), "%s/session4", base);
+            if (mkdir(sdir4, 0700) == 0) {
+                char p4[640];
+                run_source_sync_case(wav_path, wav2_path, sdir4);
+                snprintf(p4, sizeof(p4), "%s/stream.pcm", sdir4);
+                unlink(p4);
+            } else {
+                perror("mkdir session4");
+                g_fail = 1;
+            }
+        }
     } else {
         perror("rate-lock 夹具");
         g_fail = 1;

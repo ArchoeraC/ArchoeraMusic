@@ -13,6 +13,7 @@ import 'package:material_color_utilities/material_color_utilities.dart';
 
 import '../services/playback/playback_notifier.dart';
 import '../stores/app_prefs.dart';
+import '../utils/safe_file.dart';
 
 /// 封面取样尺寸（对齐原版 COVER_SAMPLE_SIZE=64，缩图降计算量）。
 const int _sampleSize = 64;
@@ -67,9 +68,10 @@ Future<Color?> extractDominantColor(String cover) async {
       }
     } else {
       final path = cover.startsWith('file://') ? cover.substring(7) : cover;
-      final file = File(path);
-      if (!file.existsSync()) return null;
-      bytes = file.readAsBytesSync();
+      // 安全读取：封面路径可能来自用户音乐库（同用户可写）——拒绝 FIFO/设备/目录与超大文件。
+      final safe = SafeFile.readBytes(path, maxBytes: 64 << 20);
+      if (safe == null) return null;
+      bytes = safe;
     }
   } catch (_) {
     return null;

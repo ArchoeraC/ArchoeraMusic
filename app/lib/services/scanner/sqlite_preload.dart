@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
+import '../native_integrity.dart';
 import '../native_lib_paths.dart';
 
 /// 预加载内置 SQLite（`libe_sqlite3`），统一 dart sqlite3 包与
@@ -43,6 +44,7 @@ void preloadBundledSqlite({String? path}) {
   if (!Platform.isLinux) {
     // macOS（两级命名空间）与 Windows（每模块导入表）不存在全局符号
     // 遮蔽问题，走默认加载。
+    NativeIntegrity.verifyOrThrow(resolved);
     DynamicLibrary.open(resolved);
     return;
   }
@@ -63,6 +65,7 @@ void preloadBundledSqlite({String? path}) {
   final dlopen = libdl().lookupFunction<
       Pointer<Void> Function(Pointer<Utf8>, Int32),
       Pointer<Void> Function(Pointer<Utf8>, int)>('dlopen');
+  NativeIntegrity.verifyOrThrow(resolved);
   final cstr = resolved.toNativeUtf8();
   try {
     // RTLD_GLOBAL 使符号进入全局符号表，`source: process` 的 native assets

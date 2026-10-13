@@ -23,11 +23,9 @@ mixin _LibraryStoreCore on Notifier<LibraryState> {
     if (state.initialized) return;
     List<String> dirs;
     try {
-      final f = File(LibraryNotifier._scanDirsFile());
-      if (f.existsSync()) {
-        dirs = (jsonDecode(f.readAsStringSync()) as List<dynamic>)
-            .whereType<String>()
-            .toList();
+      final text = SafeFile.readString(LibraryNotifier._scanDirsFile());
+      if (text != null) {
+        dirs = (jsonDecode(text) as List<dynamic>).whereType<String>().toList();
       } else {
         dirs = const [];
       }
@@ -101,9 +99,8 @@ mixin _LibraryStoreCore on Notifier<LibraryState> {
 
   void _persistScanDirs() {
     try {
-      final f = File(LibraryNotifier._scanDirsFile());
-      f.parent.createSync(recursive: true);
-      f.writeAsStringSync(jsonEncode(state.scanDirs));
+      SafeFile.writeAtomicString(
+          LibraryNotifier._scanDirsFile(), jsonEncode(state.scanDirs));
     } catch (_) {}
   }
 

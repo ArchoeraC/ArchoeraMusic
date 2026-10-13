@@ -7,7 +7,11 @@ part of '../artist_detail_page.dart';
 extension _StreamingArtistDetailPageActions on _StreamingArtistDetailPageState {
   Future<void> _load() async {
     _startLoading();
-    final cfg = ref.read(streamingProvider).activeServer;
+    final id = ref.read(streamingProvider).activeServerId;
+    // 凭据按需解密：解析带凭据配置并发起请求（不读状态明文）。
+    final cfg = id == null
+        ? null
+        : await ref.read(streamingProvider.notifier).resolvedServer(id);
     if (cfg == null) {
       _setLoadError('no-server');
       return;

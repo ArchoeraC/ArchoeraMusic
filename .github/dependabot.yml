@@ -1,0 +1,57 @@
+# SEC-26：依赖漏洞 / 更新扫描（Dependabot）。
+# 覆盖仓库内全部包生态；GitHub Actions 依赖按 pinned SHA 定期升级。
+version: 2
+updates:
+  # ── GitHub Actions（含 release 关键路径，SEC-21 的 SHA pin 由它滚动）──
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - ci
+
+  # ── Rust（下载器 / archoerashell / transcoder / tempo-rs）──
+  - package-ecosystem: cargo
+    directory: /app/core/downloader
+    schedule:
+      interval: weekly
+    labels: [dependencies, rust]
+  - package-ecosystem: cargo
+    directory: /app/core/shell
+    schedule:
+      interval: weekly
+    labels: [dependencies, rust]
+  - package-ecosystem: cargo
+    directory: /app/core/subsonic/transcoder
+    schedule:
+      interval: weekly
+    labels: [dependencies, rust]
+  - package-ecosystem: cargo
+    directory: /app/core/audio-engine/tempo-rs
+    schedule:
+      interval: weekly
+    labels: [dependencies, rust]
+
+  # ── Go（Subsonic 协议层）──
+  - package-ecosystem: gomod
+    directory: /app/core/subsonic
+    schedule:
+      interval: weekly
+    labels: [dependencies, go]
+
+  # ── .NET（扫描器）──
+  - package-ecosystem: nuget
+    directory: /app/core/scanner
+    schedule:
+      interval: weekly
+    labels: [dependencies, dotnet]
+
+  # ── Dart / Flutter ──
+  - package-ecosystem: pub
+    directory: /app
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels: [dependencies, flutter]

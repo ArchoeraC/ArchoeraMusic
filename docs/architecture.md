@@ -76,7 +76,7 @@ SQLite 写入经 `/api/db/*` 代理串行化），2026-09-06 随去侧车化整�
 | 在线平台 API / 歌词 | **纯 Dart 移植**（`app/lib/core/apis/`：netease / kugou / qqmusic / lyric，纯 Dart 直连） |
 | 音乐库 / 扫描 / 刮削 / 下载 | **原生模块 FFI 直连进程内**（C# / C++ / Rust），直写 SQLite（§8） |
 | 播放 | **C 引擎 FFI 直连**（PCM 落盘 + miniaudio 自播，§5） |
-| 配置 / 会话 / 队列 / 缓存 | **Dart 本地**（`config/settings.json` 原子写 + vault 2-of-2 保险库 + drift/Hive） |
+| 配置 / 会话 / 队列 / 缓存 | **Dart 本地**（`config/settings.json` 原子写 + vault 保险库（crypto / slots m1·m2a·m2b，m2b 本机级·较弱） + drift/Hive） |
 | Subsonic | **Go c-shared FFI 直连**（可选启用；与独立服务端共享同一份代码，build tag 区分） |
 
 ---
@@ -293,9 +293,21 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - **会话持久化**：各平台登录成功后 cookie 由 Dart 本地层 + vault 持久化，重启不丢
 - **二维码登录流程**（netease）：`login_qr_create` → `login_qr_key` → `login_qr_check` 轮询（Flutter 展示二维码 + 定时探测）→ 成功后 `login_status` 确认 + 会话回写
 - **登录态检测**：启动/打开播放前调 `login_status`（netease）；失效 → 播放返回 403/401 → `player:sourceError` → UI 提示重新登录
-- **登出**：`logout` 清平台 cookie + `sessions` 表
-- **多账号**：自用单账号起步，`sessions` 表结构预留多平台多账号切换
+- **登出**：`logout` 清平台 cookie（Dart 本地层会话记录 + vault 内密文），**不涉及 `sessions` 表**（已废弃，见 §8）
+- **多账号**：自用单账号起步；多平台多账号切换在 Dart 本地层会话记录中预留（§8 的 `sessions`/`downloads` 表方案已废弃，勿按表实现）
 - KuGou / QQ 登录（Phase 2/3）：对齐 netease 模式，各自 modules 内封装
+
+### 7.5 Subsonic 认证与传输（SEC-32）
+
+- **认证模式**：客户端对自建 Subsonic 服务端**仅使用 token 认证**——每次请求带随机盐 `s`
+  与 `t = md5(密码 + 盐)`（`subsonic_client.dart :: _buildAuth`，12 字符 hex 随机盐），
+  **不发送明文密码**（服务端兼容 `p=` 明文与 `enc:hex:` 形态仅为协议兼容，本客户端不用）。
+- **传输**：外部服务器地址由 `useHttps` 决定 `https://` / `http://`（`subsonic_local.dart ::
+  resolvedServerBaseUrl`）；内嵌自建服务端固定走回环 `http://<host>:<port>`。
+  若用户为外部服务器填 `http://`，令牌 / 搜索词 / 播放内容在链路上可被同网段嗅探——
+  隐私政策（`privacy.md` §5.2）已披露，建议优先 `https://` 或仅在可信内网使用。
+- **不拒绝但警示**：为兼容常见的自建内网 `http://` 服务器，不强制拒绝明文 HTTP（否则大量
+  合法自托管场景不可用）；以文档 / 设置说明提示风险。
 
 ---
 
@@ -306,15 +318,22 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 | 数据 | 存储 | 归属 / 访问方 |
 |---|---|---|
 | 曲库 tracks（元数据 / 路径 / 时长 / 歌词 / 封面）| SQLite `database/library.db`（WAL）| C# scanner 直写；Go subsonic FFI 直读；Dart（TracksDb）只读 |
-| Subsonic 用户 / 收藏 / 播放列表 / 分享 | SQLite `database/user.db`（WAL，独立加密库）| Go subsonic FFI 与 Dart（SubsonicAdmin）直读直写；敏感字段（密码）以 `enc:v1:` AES-256-GCM 字段级加密落盘 |
+| Subsonic 用户 / 收藏 / 播放列表 / 分享 | SQLite `database/user.db`（WAL，独立库）| Go subsonic FFI 与 Dart（SubsonicAdmin）直读直写；**用户密码已移入凭据保险库**（`uid=subsonic:<username>`，SEC-01），`password_cipher` 列仅存空串占位（旧库 `enc:v1:` 密文在首次打开时解密迁入 vault 后置空，随后仅作迁移回退） |
 | 平台会话 cookie / 下载任务 | Dart 本地层（drift/Hive + vault） | 登录态与下载任务本地持久化（原侧车 `sessions`/`downloads` 表方案已废弃） |
 | 配置 | `config/settings.json`（原子写 + 迁移）| Dart |
 | 队列 / 播放历史 / UI 偏好 | Dart 本地（drift 或 Hive）| Flutter |
 | 日志 | `logs/archoera.log`（单文件，硬上限 4 MiB，超限原地截断）| 全层统一（Dart/桥接/引擎/Rust/Zig）经 `app/native/log` 核心写穿；可在设置页关闭落盘；格式与分级见 `docs/unified-logging.md` |
 
-**拆分原则**：媒体库（高频读写、多进程共享、无敏感数据）与用户数据（低频、含凭据、需加密）物理隔离——
-- 用户库路径 `dataDir/database/user.db`，与媒体库同目录独立文件，密钥自举到 `dataDir/secret.key`；
+**拆分原则**：媒体库（高频读写、多进程共享、无敏感数据）与用户数据（低频、含用户与其社交数据）物理隔离——
+- 用户库路径 `dataDir/database/user.db`，与媒体库同目录独立文件。**Subsonic 用户密码不再由 `dataDir/secret.key`
+  字段级加密承载**（SEC-01）：密码经 vault 统一持久化（`uid=subsonic:<username>`，Dart `VaultSubsonicCredentialStore`），
+  服务端认证经 `archoera_subsonic_set_credentials` 注入内存凭据表；`password_cipher` 仅为空串占位。
+  `secret.key` 仍**保留**——vault 的 `file` 后端（crypto 模式的单因子文件密钥）以同一文件名存放主密钥，二者不再交叉；
 - 旧版（library.db 内嵌 subsonic_* 表）数据在服务端启动时经 `MigrateUserDB` 自动迁移到 user.db 并删除媒体库旧表（幂等，密文原样搬运不重加密）；
+  更旧的 `enc:v1:` 用户密码在 `SubsonicAdmin.open` 时解密迁入 vault（成功才置空 `password_cipher`，失败保留待重试）；
+- **启动注入时序（SEC-01 落地注意）**：`SubsonicAdmin.open` 从 vault 载回密码后，须在启动流程显式调用
+  `pushCredentialsToServer()` 把内存凭据表注入 Go 层（server 认证优先查表）。当前本地 Subsonic 服务端管理路径
+  尚未在 UI 启用（仅 smoke/CLI 触达），**启用时须补齐此调用**，否则认证会回退到 `enc:v1:` 迁移回退分支；
 - scanner 直写媒体库、subsonic 服务端直读直写媒体库与用户库、前端读媒体库的四方访问模型保持不变。
 
 ---

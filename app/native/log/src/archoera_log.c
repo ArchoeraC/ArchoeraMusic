@@ -224,6 +224,123 @@ static size_t era_build_body(char *body, size_t cap, const char *tag,
     return len;
 }
 
+/* ── 敏感字段脱敏（SEC-09）──────────────────────────────────────── */
+/*
+ * 就地把敏感参数的值替换为等长 '*'（不改长度、无动态分配、O(n)）。
+ * 覆盖三类形态：
+ *   - URL / 表单查询：`key=value`（value 止于 & 空白 引号 ) } ] , ; >）；
+ *   - 头 / 字段：`key: value`（value 止于行尾）；
+ *   - Subsonic 单字母查询键 p/t/s：仅当处于查询上下文（紧跟 `?`/`&` 且后接
+ *     `=`）时掩码，避免误伤普通文本里的 `top=2`/`step=1`/`t=1`。
+ * key 匹配大小写不敏感、要求左边界（前一字符非 [A-Za-z0-9_-]）。
+ * 未知命名不掩码，属已知接受项，见安全评审 SEC-09。
+ */
+static int era_is_key_char(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '_' || c == '-';
+}
+
+/* Subsonic / 通用短键 p(P)/t(T)/s(S)：仅在查询上下文（?/& 前缀且后接 =）掩码。 */
+static int era_is_short_query_key(char c) {
+    return c == 'p' || c == 'P' || c == 't' || c == 'T' || c == 's' ||
+           c == 'S';
+}
+
+static int era_eq_ci(const char *a, const char *b, size_t n) {
+    size_t i;
+    for (i = 0; i < n; i++) {
+        char ca = a[i], cb = b[i];
+        if (ca >= 'A' && ca <= 'Z') ca = (char)(ca - 'A' + 'a');
+        if (cb >= 'A' && cb <= 'Z') cb = (char)(cb - 'A' + 'a');
+        if (ca != cb) return 0;
+    }
+    return 1;
+}
+
+static const char *const era_sensitive_keys[] = {
+    "token",        "access_token", "refresh_token", "id_token",
+    "cookie",       "set-cookie",   "password",      "passwd",
+    "pwd",          "secret",       "client_secret", "secret_key",
+    "signature",    "sig",          "api_key",       "apikey",
+    "api-key",      "access_key",   "authorization", "auth",
+    "session",      "sessionid",    "session_id",    "jsessionid",
+    "csrf",         "xsrf",
+    /* SEC-10：MCP 访问密钥请求头。`-` 属 key 字符，整个 token 为
+       `x-archoera-key`，故须按整串登记（登记 `archoera-key` 不命中）。 */
+    "x-archoera-key",
+    NULL};
+
+static int era_is_sensitive_key(const char *s, size_t n) {
+    int i;
+    for (i = 0; era_sensitive_keys[i] != NULL; i++) {
+        if (strlen(era_sensitive_keys[i]) == n &&
+            era_eq_ci(s, era_sensitive_keys[i], n)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* 掩码 value（header_mode：仅到行尾；否则到常见分隔符）。返回末尾指针。 */
+static char *era_mask_value(char *v, int header_mode) {
+    /* 保留分隔符后的前导空白（如 "Cookie: " 的尾随空格），便于阅读；
+       该空白不属于敏感值本身。 */
+    while (*v == ' ' || *v == '\t') v++;
+    while (*v != '\0') {
+        char c = *v;
+        if (header_mode) {
+            if (c == '\n' || c == '\r') break;
+        } else if (c == '&' || c == ' ' || c == '\t' || c == '\n' ||
+                   c == '\r' || c == '"' || c == '\'' || c == ')' ||
+                   c == '}' || c == ']' || c == ',' || c == ';' || c == '>') {
+            break;
+        }
+        *v = '*';
+        v++;
+    }
+    return v;
+}
+
+void archoera_log_scrub(char *s) {
+    char *p;
+    if (s == NULL) return;
+    p = s;
+    while (*p != '\0') {
+        char *q;
+        /* 左边界要求：行首或前一字符非 key 字符。 */
+        if (p != s && era_is_key_char(p[-1])) {
+            p++;
+            continue;
+        }
+        q = p;
+        while (era_is_key_char(*q)) q++;
+        if (q == p) { /* 当前字符非 key 字符：前进一格，避免死循环 */
+            p++;
+            continue;
+        }
+        {
+            char *sep = q;
+            while (*sep == ' ' || *sep == '\t') sep++;
+            /* 单字母查询键 p/t/s：仅限查询上下文，避免误伤普通文本。 */
+            if ((size_t)(q - p) == 1 && era_is_short_query_key(p[0]) &&
+                p != s && (p[-1] == '?' || p[-1] == '&') && *sep == '=') {
+                p = era_mask_value(sep + 1, 0);
+                continue;
+            }
+            if (era_is_sensitive_key(p, (size_t)(q - p))) {
+                if (*sep == '=') {
+                    p = era_mask_value(sep + 1, 0);
+                    continue;
+                } else if (*sep == ':') {
+                    p = era_mask_value(sep + 1, 1);
+                    continue;
+                }
+            }
+        }
+        p = q; /* 跳过整个 key 词 */
+    }
+}
+
 /* ── 公开 API ───────────────────────────────────────────────────── */
 
 int archoera_log_init(const char *dir, const char *file_base, int min_level,
@@ -343,6 +460,8 @@ void archoera_log_write(int level, const char *tag, const char *message) {
 #endif
 
     era_build_body(body, sizeof(body), tag, message);
+    /* 敏感字段脱敏（SEC-09）：stderr 与落盘一致，含各原生组件注入的 sink 文本。 */
+    archoera_log_scrub(body);
 
     /* stderr（着色 LEVEL 记号，整行即时 flush）。 */
     if (g_color_effective) {

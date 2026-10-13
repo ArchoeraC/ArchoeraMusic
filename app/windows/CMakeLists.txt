@@ -144,9 +144,11 @@ install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_subsonic.dll"
 install(FILES "${SUBSONIC_SRC_DIR}/archoera_transcoder.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 
-# vault（凭据保险库）：NativeAOT 可执行（dotnet publish，见 core/vault/build.sh），
-# 随包分发供 Dart 按需 spawn（凭据加解密 2-of-2；OS 授权份额存 DPAPI）。
-set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault/build")
+# vault（凭据保险库）：Rust 静态链接可执行（core/vault-rs，cargo build --release
+# --target x86_64-pc-windows-msvc -C target-feature=+crt-static；见 core/build_windows.bat），
+# 随包分发供 Dart 按需 spawn（凭据加解密；OS 授权份额存 DPAPI）。
+# C# NativeAOT vault（app/core/vault/**）已于 2026-10-12 删除。
+set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault-rs/build")
 install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault.exe"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 
@@ -196,6 +198,54 @@ add_dependencies(${BINARY_NAME} archoera_log_cmake)
 
 install(FILES "${ARCHOERA_LOG_BUILD_DIR}/out/archoera_log.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime)
+
+# === 原生库完整性清单（SEC-08）===
+# 纯 CMake 生成（不依赖 bash/sh）：对 native/ 下全部文件，以及 exe 根
+# archoera_music.exe / archoera_kernel.dll、data/app.so 计算 SHA-256，
+# 写入 native/ARCHOERA-NATIVE-MANIFEST.txt，供 Dart 在 DynamicLibrary.open
+# 前按 basename 校验（打包态 fail-closed，见 lib/services/native_integrity.dart）。
+# 该 install(CODE) 声明于全部 native/ install 之后，故执行时文件已就位。
+# ⚠️ 前缀一律用**非转义**的 ${CMAKE_INSTALL_PREFIX}（生成期求值，genex 一并解析）：
+# Flutter 模板把 CMAKE_INSTALL_PREFIX 设为生成器表达式 $<TARGET_FILE_DIR:...>，
+# 且 MSBuild 的 INSTALL 用 `cmake -DBUILD_TYPE=Release -P cmake_install.cmake`
+# （不传 -DCMAKE_INSTALL_PREFIX）驱动 → 安装期该变量仍是**字面 genex**。
+# 若写成 \${CMAKE_INSTALL_PREFIX}（转义→推迟到安装期），Windows 上会得到含
+# `<`/`>` 的非法路径，file(MAKE_DIRECTORY) 直接致命错误 → INSTALL 退出 1 →
+# MSB3073（Linux 因 `<`/`>` 合法而静默建垃圾目录，故仅 Windows 暴露）。
+# 与 Flutter 模板自身的 install(CODE)（用非转义 ${INSTALL_BUNDLE_DATA_DIR}）一致。
+install(CODE "
+  set(_nativedir \"${CMAKE_INSTALL_PREFIX}/native\")
+  file(MAKE_DIRECTORY \"\${_nativedir}\")
+  set(_manifest \"\${_nativedir}/ARCHOERA-NATIVE-MANIFEST.txt\")
+  set(_lines \"\")
+  file(GLOB _files \"\${_nativedir}/*\")
+  foreach(_f IN LISTS _files)
+    if(IS_DIRECTORY \"\${_f}\")
+      continue()
+    endif()
+    get_filename_component(_base \"\${_f}\" NAME)
+    if(_base STREQUAL \"ARCHOERA-NATIVE-MANIFEST.txt\")
+      continue()
+    endif()
+    file(SHA256 \"\${_f}\" _hash)
+    list(APPEND _lines \"\${_hash}  \${_base}\")
+  endforeach()
+  foreach(_f \"${CMAKE_INSTALL_PREFIX}/archoera_music.exe\"
+            \"${CMAKE_INSTALL_PREFIX}/archoera_kernel.dll\"
+            \"${CMAKE_INSTALL_PREFIX}/data/app.so\")
+    if(EXISTS \"\${_f}\")
+      get_filename_component(_base \"\${_f}\" NAME)
+      file(SHA256 \"\${_f}\" _hash)
+      list(APPEND _lines \"\${_hash}  \${_base}\")
+    endif()
+  endforeach()
+  if(_lines)
+    list(SORT _lines)
+    string(ASCII 10 _nl)
+    string(REPLACE \";\" \"\${_nl}\" _out \"\${_lines}\")
+    file(WRITE \"\${_manifest}\" \"\${_out}\${_nl}\")
+  endif()
+" COMPONENT Runtime)
 
 # === vcpkg 运行时 DLL（FFmpeg 等动态依赖）===
 # audio-engine（archoera_mediaengine.dll / scraper）经 vcpkg import libs 动态链接

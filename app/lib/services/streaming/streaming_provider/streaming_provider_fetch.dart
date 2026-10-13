@@ -42,7 +42,7 @@ mixin _StreamingNotifierFetchActions on Notifier<StreamingState>, _StreamingNoti
 
   /// 拉歌曲列表（懒加载：首次或显式刷新才请求）。
   Future<void> _fetchSongsImpl({bool force = false}) async {
-    final client = _client;
+    final client = await _resolvedClient();
     if (client == null || _fetching) return;
     if (_songsLoaded && !force) return;
     _fetching = true;
@@ -60,7 +60,7 @@ mixin _StreamingNotifierFetchActions on Notifier<StreamingState>, _StreamingNoti
   }
 
   Future<void> _fetchAlbumsImpl({bool force = false}) async {
-    final client = _client;
+    final client = await _resolvedClient();
     if (client == null || _fetching) return;
     if (_albumsLoaded && !force) return;
     _fetching = true;
@@ -77,7 +77,7 @@ mixin _StreamingNotifierFetchActions on Notifier<StreamingState>, _StreamingNoti
   }
 
   Future<void> _fetchArtistsImpl({bool force = false}) async {
-    final client = _client;
+    final client = await _resolvedClient();
     if (client == null || _fetching) return;
     if (_artistsLoaded && !force) return;
     _fetching = true;
@@ -94,7 +94,7 @@ mixin _StreamingNotifierFetchActions on Notifier<StreamingState>, _StreamingNoti
   }
 
   Future<void> _fetchPlaylistsImpl({bool force = false}) async {
-    final client = _client;
+    final client = await _resolvedClient();
     if (client == null || _fetching) return;
     if (_playlistsLoaded && !force) return;
     _fetching = true;

@@ -65,6 +65,10 @@ extension _SecuritySectionActions on _SecuritySectionState {
     try {
       VaultProcess.destroy(resolveDataDir());
     } catch (_) {}
+    // SEC-10：MCP 访问密钥随 vault 销毁（uid `mcp:accessKey`）一并失效；
+    // 清内存缓存并移除历史 prefs.json 明文键。
+    McpKeyStore.reset();
+    McpKeyStore.clearLegacy(resolveDataDir());
     final r = destroySensitiveFiles([vaultFilePath(), sessionStorePath()]);
     _afterDestroyed(l10n.settingsSecuritySession, r);
   }
@@ -99,6 +103,10 @@ extension _SecuritySectionActions on _SecuritySectionState {
     try {
       VaultProcess.destroy(resolveDataDir());
     } catch (_) {}
+    // SEC-10：MCP 访问密钥随 vault 销毁（uid `mcp:accessKey`）一并失效；
+    // 清内存缓存并移除历史 prefs.json 明文键。
+    McpKeyStore.reset();
+    McpKeyStore.clearLegacy(resolveDataDir());
     final r = destroySensitiveFiles([
       streamingServersPath(),
       vaultFilePath(),
@@ -150,71 +158,32 @@ extension _SecuritySectionActions on _SecuritySectionState {
     );
   }
 
-  Future<void> _enableDeviceBind() async {
+  /// 切换 Argon2id 强度预设：验证当前口令 → `set-kdf` 重封装口令槽
+  /// （主密钥与条目不变）→ 持久化预设。失败显示 vault 返回的错误。
+  Future<void> _onKdfPresetChanged(String preset) async {
+    if (_deviceBusy || preset == ref.read(appPrefsProvider).vaultKdfPreset) {
+      return;
+    }
     final l10n = context.l10n;
-    final privacyOk = await SDialog.show<bool>(
-      context,
-      title: l10n.settingsDeviceBindPrivacyTitle,
-      description: l10n.settingsDeviceBindPrivacyDesc,
-      child: const SizedBox.shrink(),
-      actions: [
-        SButton(
-          label: l10n.commonCancel,
-          variant: SButtonVariant.secondary,
-          size: SButtonSize.small,
-          onPressed: () => Navigator.of(context).pop(false),
-        ),
-        SButton(
-          label: l10n.settingsDeviceBindEnable,
-          icon: EtaIcons.shieldOutline,
-          variant: SButtonVariant.primary,
-          size: SButtonSize.small,
-          onPressed: () => Navigator.of(context).pop(true),
-        ),
-      ],
+    final pw = await _promptRecoveryPassword(
+      title: l10n.settingsKdfPasswordTitle,
+      description: l10n.settingsKdfPasswordDesc,
+      hint: l10n.settingsKdfPasswordHint,
     );
-    if (privacyOk != true || !mounted) return;
-    final res = await _promptRecoveryPassword(
-      title: l10n.settingsDeviceBindRecoveryTitle,
-      description: l10n.settingsDeviceBindRecoveryDesc,
-      optional: true,
-    );
-    if (res == null || !mounted) return;
-    final dataDir = resolveDataDir();
+    if (pw == null || pw.isEmpty || !mounted) return;
     setState(() => _deviceBusy = true);
     try {
-      final s0 = getRuntime().sessionStore;
-      if (s0 is VaultSessionStore) await s0.flush();
-      await StreamingStore.flush();
-      if (_vaultMode == null) {
-        if (res.isEmpty) {
-          await VaultProcess.initDevice(dataDir);
-        } else {
-          await VaultProcess.initDevice(dataDir, recoveryPassword: res);
-        }
-      } else {
-        final s = getRuntime().sessionStore;
-        final password = s is VaultSessionStore ? s.sessionPassword : null;
-        if (res.isEmpty) {
-          await VaultProcess.upgradeDevice(dataDir, password: password);
-        } else {
-          await VaultProcess.upgradeDevice(
-            dataDir,
-            recoveryPassword: res,
-            password: password,
-          );
-        }
-      }
       final s = getRuntime().sessionStore;
-      if (s is VaultSessionStore) s.syncMode('multiseal');
-      StreamingStore.syncPasswordState(null);
-      if (!mounted) return;
-      if (await _promptRestartAfterModeChange() && mounted) {
-        await _restartApp();
-        return;
+      if (s is VaultSessionStore) {
+        await s.setKdfPreset(preset, password: pw);
+      } else {
+        await StreamingStore.setKdfPreset(preset, password: pw);
       }
-      toast(l10n.toastDeviceBindEnabled, type: ToastType.success);
+      ref.read(appPrefsProvider.notifier).setVaultKdfPreset(preset);
+      if (!mounted) return;
+      toast(l10n.toastKdfRepacked, type: ToastType.success);
     } on VaultException catch (e) {
+      if (!mounted) return;
       toast(e.message, type: ToastType.error);
     } finally {
       if (mounted) setState(() => _deviceBusy = false);
@@ -222,76 +191,18 @@ extension _SecuritySectionActions on _SecuritySectionState {
     }
   }
 
-  Future<void> _disableDeviceBind() async {
-    final l10n = context.l10n;
-    final dataDir = resolveDataDir();
-    final hasRecovery = await VaultProcess.hasRecovery(dataDir);
-    if (!mounted) return;
-    String? res;
-    if (hasRecovery) {
-      res = await _promptRecoveryPassword(
-        title: l10n.settingsDeviceBindCloseTitle,
-        description: l10n.settingsDeviceBindCloseConfirmDesc,
-        hint: l10n.settingsDeviceBindCloseHint,
-      );
-      if (res == null || res.isEmpty || !context.mounted) return;
-    } else {
-      res = await _promptNewV2Password();
-      if (res == null || res.isEmpty || !context.mounted) return;
-    }
-    setState(() => _deviceBusy = true);
-    try {
-      final s0 = getRuntime().sessionStore;
-      if (s0 is VaultSessionStore) await s0.flush();
-      await StreamingStore.flush();
-      final ok = await VaultProcess.clearDeviceSeal(dataDir, res);
-      if (ok) {
-        final s = getRuntime().sessionStore;
-        if (s is VaultSessionStore) {
-          s.syncMode('password', sessionPassword: res);
-        }
-        StreamingStore.syncPasswordState(res);
-        if (!mounted) return;
-        if (await _promptRestartAfterModeChange() && mounted) {
-          await _restartApp();
-          return;
-        }
-      }
-      toast(
-        ok ? l10n.toastDeviceBindClosed : l10n.toastDeviceBindRecoveryNeeded,
-        type: ok ? ToastType.success : ToastType.warning,
-      );
-    } on VaultException catch (e) {
-      toast(l10n.toastDeviceBindCloseFailed(error: e.message), type: ToastType.error);
-    } finally {
-      if (mounted) setState(() => _deviceBusy = false);
-      await _refreshVault();
-    }
-  }
-
-  Future<String?> _promptNewV2Password() {
-    final l10n = context.l10n;
-    return SDialog.show<String>(
-      context,
-      title: l10n.settingsVaultCloseV3PasswordTitle,
-      description: l10n.settingsVaultCloseV3PasswordDesc,
-      child: _NewPasswordField(
-        newHint: l10n.settingsVaultSwitchToPasswordNewHint,
-        confirmHint: l10n.settingsVaultSwitchToPasswordConfirmHint,
-        mismatchText: l10n.settingsVaultSwitchToPasswordMismatch,
-      ),
-    );
-  }
-
+  /// 切换凭据加密方案：确认（销毁重建，无迁移）→（m1/m2a）设置口令 →
+  /// 销毁现有保险库 + 备份 + device.key → 按新方案初始化 →（m2a）一次性展示
+  /// 恢复码 → 冷切重启。方案间加密结构不兼容，旧凭据随销毁清空需重新登录。
   Future<void> _switchScheme(String target) async {
     final l10n = context.l10n;
     final ok = await SDialog.show<bool>(
       context,
       title: l10n.settingsSchemeSwitchTitle,
       description: [
-        if (target == 'vault') l10n.settingsSchemeSwitchToVaultWarning,
         if (target == 'file') l10n.settingsSchemeSwitchToFileWarning,
         l10n.settingsSchemeSwitchRebuildDesc,
+        l10n.settingsSchemeSwitchEraseWarning,
       ].join('\n\n'),
       child: const SizedBox.shrink(),
       actions: [
@@ -311,24 +222,49 @@ extension _SecuritySectionActions on _SecuritySectionState {
       ],
     );
     if (ok != true || !mounted) return;
+
+    // m1/m2a：初始化前先取解锁口令（用户取消则中止，此时尚未销毁现有数据）。
+    String? password;
+    if (target == 'm1' || target == 'm2a') {
+      password = await _promptNewPassword();
+      if (password == null || password.isEmpty || !mounted) return;
+    }
+
     setState(() => _deviceBusy = true);
+    VaultInitM2a? m2a;
     try {
       final s = getRuntime().sessionStore;
       if (s is VaultSessionStore) await s.flush();
       await StreamingStore.flush();
+      // 全量销毁：vault 文件 + 授权侧份额 + `.bak` + device.key + 本地锚点/标记。
       VaultProcess.destroy(resolveDataDir());
-      if (target == 'vault') {
-        await VaultProcess.init(resolveDataDir());
-      } else if (target == 'file') {
-        await VaultProcess.initFile(resolveDataDir());
-      } else {
-        await VaultProcess.initCrypto(resolveDataDir());
+      // m1/m2a 初始化按当前 Argon2id 预设选取参数（非密文，走 argv）。
+      final kdf = vaultKdfPresetById(
+          ref.read(appPrefsProvider).vaultKdfPreset);
+      switch (target) {
+        case 'file':
+          await VaultProcess.initFile(resolveDataDir());
+        case 'm1':
+          await VaultProcess.initM1(resolveDataDir(), password!,
+              kdfM: kdf.mKiB, kdfT: kdf.t, kdfP: kdf.p);
+        case 'm2a':
+          m2a = await VaultProcess.initM2a(resolveDataDir(), password!,
+              kdfM: kdf.mKiB, kdfT: kdf.t, kdfP: kdf.p);
+        case 'm2b':
+          await VaultProcess.initM2b(resolveDataDir());
+        case 'crypto':
+        default:
+          await VaultProcess.initCrypto(resolveDataDir());
       }
       ref.read(appPrefsProvider.notifier).setCredentialScheme(target);
-      if (s is VaultSessionStore) {
-        s.syncMode(target == 'vault' ? 'os' : 'crypto');
+      if (target == 'm2a') {
+        // m2a 恢复码随新库重新生成：作废旧确认标记 → 强制重新备份。
+        ref.read(appPrefsProvider.notifier).setM2aRecoveryAcked(false);
       }
-      StreamingStore.syncPasswordState(null);
+      if (target == 'm2a' && m2a != null && m2a.recoveryCode.isNotEmpty) {
+        if (!mounted) return;
+        await _showRecoveryCode(m2a.recoveryCode);
+      }
       if (!mounted) return;
       if (await _promptRestartAfterModeChange() && mounted) {
         await _restartApp();
@@ -343,111 +279,106 @@ extension _SecuritySectionActions on _SecuritySectionState {
     }
   }
 
-  Future<void> _onModeSelected(String target) async {
+  /// 新口令输入（含二次确认）；不一致/为空时确认按钮禁用。返回 null = 取消。
+  Future<String?> _promptNewPassword() {
     final l10n = context.l10n;
-    if (_deviceBusy || target == _vaultMode) return;
-    if (_vaultMode == 'password' && !_v2Unlocked) {
-      toast(l10n.settingsVaultNeedUnlockFirst, type: ToastType.warning);
-      return;
-    }
-    switch (target) {
-      case 'os':
-        if (_vaultMode == 'multiseal') {
-          toast(l10n.settingsVaultV3NoDirectV1, type: ToastType.warning);
-        } else {
-          await _switchToOs();
-        }
-      case 'password':
-        if (_vaultMode == 'multiseal') {
-          await _disableDeviceBind();
-        } else {
-          await _switchToPassword();
-        }
-      case 'multiseal':
-        await _enableDeviceBind();
-    }
-    await _refreshVault();
-  }
-
-  Future<void> _switchToPassword() async {
-    final l10n = context.l10n;
-    final res = await SDialog.show<String>(
+    return SDialog.show<String>(
       context,
-      title: l10n.settingsVaultSwitchToPasswordTitle,
-      description: l10n.settingsVaultSwitchToPasswordDesc,
+      title: l10n.settingsSchemePasswordTitle,
+      description: l10n.settingsSchemePasswordDesc,
       child: _NewPasswordField(
-        newHint: l10n.settingsVaultSwitchToPasswordNewHint,
-        confirmHint: l10n.settingsVaultSwitchToPasswordConfirmHint,
-        mismatchText: l10n.settingsVaultSwitchToPasswordMismatch,
+        hint: l10n.settingsSchemePasswordHint,
+        confirmHint: l10n.settingsSchemePasswordConfirmHint,
+        mismatch: l10n.settingsSchemePasswordMismatch,
+        cancelLabel: l10n.commonCancel,
+        confirmLabel: l10n.commonConfirm,
       ),
     );
-    if (res == null || res.isEmpty || !mounted) return;
-    final s = getRuntime().sessionStore;
-    if (s is! VaultSessionStore) return;
-    setState(() => _deviceBusy = true);
-    try {
-      await s.flush();
-      await StreamingStore.flush();
-      await s.switchMode('password', newPassword: res);
-      StreamingStore.syncPasswordState(res);
-      if (!mounted) return;
-      if (await _promptRestartAfterModeChange() && mounted) {
-        await _restartApp();
-        return;
-      }
-      toast(l10n.toastVaultSwitchedToPassword, type: ToastType.success);
-    } on VaultException catch (e) {
-      toast(e.message, type: ToastType.error);
-    } finally {
-      if (mounted) setState(() => _deviceBusy = false);
-      await _refreshVault();
-    }
   }
 
-  Future<void> _switchToOs() async {
+  /// m2a 恢复码一次性展示（不可关闭/不可返回键 dismiss，唯一按钮 = 已抄写确认）。
+  /// 确认后持久化 ack 标记并移除设置页的持久备份提醒。
+  ///
+  /// 注：刻意**不提供**「重新生成恢复码」动作——vault 侧无 regenerate 命令，
+  /// 恢复槽只在 `init-m2a` 时一次性封装；伪造一个半可用动作（失败/无效果）
+  /// 不如不提供。恢复码遗失仅能销毁重建（重新初始化 m2a 会生成新恢复码）。
+  Future<void> _showRecoveryCode(String code) async {
     final l10n = context.l10n;
-    final ok = await SDialog.show<bool>(
-      context,
-      title: l10n.settingsVaultSwitchToOsTitle,
-      description: l10n.settingsVaultSwitchToOsDesc,
-      child: const SizedBox.shrink(),
-      actions: [
-        SButton(
-          label: l10n.commonCancel,
-          variant: SButtonVariant.secondary,
-          size: SButtonSize.small,
-          onPressed: () => Navigator.of(context).pop(false),
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          icon: const Icon(EtaIcons.shieldOutline),
+          title: Text(l10n.settingsSchemeRecoveryDialogTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.settingsSchemeRecoveryDialogDesc,
+                style: const TextStyle(height: 1.45),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: SelectableText(
+                  code,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: SButton(
+                  label: l10n.settingsSchemeRecoveryCopy,
+                  variant: SButtonVariant.ghost,
+                  size: SButtonSize.small,
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: code));
+                    if (!ctx.mounted) return;
+                    toast(
+                      l10n.settingsSchemeRecoveryCopied,
+                      type: ToastType.success,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                ref.read(appPrefsProvider.notifier).setM2aRecoveryAcked(true);
+                Navigator.of(ctx).pop();
+              },
+              child: Text(l10n.settingsSchemeRecoveryDialogAck),
+            ),
+          ],
         ),
-        SButton(
-          label: l10n.commonConfirm,
-          icon: EtaIcons.check,
-          variant: SButtonVariant.primary,
-          size: SButtonSize.small,
-          onPressed: () => Navigator.of(context).pop(true),
-        ),
-      ],
+      ),
     );
-    if (ok != true || !mounted) return;
-    final s = getRuntime().sessionStore;
-    if (s is! VaultSessionStore) return;
-    setState(() => _deviceBusy = true);
-    try {
-      await s.flush();
-      await StreamingStore.flush();
-      await s.switchMode('os');
-      StreamingStore.syncPasswordState(null);
-      if (!mounted) return;
-      if (await _promptRestartAfterModeChange() && mounted) {
-        await _restartApp();
-        return;
-      }
-      toast(l10n.toastVaultSwitchedToOs, type: ToastType.success);
-    } on VaultException catch (e) {
-      toast(e.message, type: ToastType.error);
-    } finally {
-      if (mounted) setState(() => _deviceBusy = false);
-      await _refreshVault();
-    }
+    if (mounted) setState(() {});
+  }
+
+  /// 设置页持久提醒的「我已保存」动作（用户在别处已抄写恢复码时消费提醒）。
+  void _ackRecoveryCode() {
+    ref.read(appPrefsProvider.notifier).setM2aRecoveryAcked(true);
+    setState(() {});
   }
 
   Future<bool> _promptRestartAfterModeChange() async {
@@ -489,59 +420,6 @@ extension _SecuritySectionActions on _SecuritySectionState {
     await quitApplication(ref);
   }
 
-  Future<void> _changeRecoveryPassword() async {
-    final l10n = context.l10n;
-    final res = await _promptRecoveryPassword(
-      title: l10n.settingsDeviceBindChangeRecoveryTitle,
-      description: l10n.settingsDeviceBindChangeRecoveryDesc,
-    );
-    if (res == null || res.isEmpty || !context.mounted) return;
-    setState(() => _deviceBusy = true);
-    try {
-      await VaultProcess.setRecoveryPassword(resolveDataDir(), res);
-      toast(l10n.toastDeviceBindRecoverySet, type: ToastType.success);
-    } on VaultException catch (e) {
-      toast(e.message, type: ToastType.error);
-    } finally {
-      if (mounted) setState(() => _deviceBusy = false);
-    }
-  }
-
-  Future<void> _rebindDevice() async {
-    final l10n = context.l10n;
-    final ok = await SDialog.show<bool>(
-      context,
-      title: l10n.settingsDeviceBindRebindTitle,
-      description: l10n.settingsDeviceBindRebindDesc,
-      child: const SizedBox.shrink(),
-      actions: [
-        SButton(
-          label: l10n.commonCancel,
-          variant: SButtonVariant.secondary,
-          size: SButtonSize.small,
-          onPressed: () => Navigator.of(context).pop(false),
-        ),
-        SButton(
-          label: l10n.settingsDeviceBindRebindConfirm,
-          icon: EtaIcons.lockOutline,
-          variant: SButtonVariant.primary,
-          size: SButtonSize.small,
-          onPressed: () => Navigator.of(context).pop(true),
-        ),
-      ],
-    );
-    if (ok != true || !context.mounted) return;
-    setState(() => _deviceBusy = true);
-    try {
-      await VaultProcess.rebind(resolveDataDir());
-      toast(l10n.toastDeviceBindRebound, type: ToastType.success);
-    } on VaultException catch (e) {
-      toast(e.message, type: ToastType.error);
-    } finally {
-      if (mounted) setState(() => _deviceBusy = false);
-    }
-  }
-
   Future<void> _recoverVault() async {
     final l10n = context.l10n;
     final res = await _promptRecoveryPassword(
@@ -561,28 +439,6 @@ extension _SecuritySectionActions on _SecuritySectionState {
       }
       if (!mounted) return;
       toast(l10n.toastDeviceBindRecovered, type: ToastType.success);
-      final rebind = await SDialog.show<bool>(
-        context,
-        title: l10n.settingsDeviceBindRebindTitle,
-        description: l10n.settingsDeviceBindRebindDesc,
-        child: const SizedBox.shrink(),
-        actions: [
-          SButton(
-            label: l10n.commonCancel,
-            variant: SButtonVariant.secondary,
-            size: SButtonSize.small,
-            onPressed: () => Navigator.of(context).pop(false),
-          ),
-          SButton(
-            label: l10n.settingsDeviceBindRebindConfirm,
-            icon: EtaIcons.lockOutline,
-            variant: SButtonVariant.primary,
-            size: SButtonSize.small,
-            onPressed: () => Navigator.of(context).pop(true),
-          ),
-        ],
-      );
-      if (rebind == true && mounted) await _rebindDevice();
     } on VaultException catch (e) {
       toast(e.message, type: ToastType.error);
     } finally {

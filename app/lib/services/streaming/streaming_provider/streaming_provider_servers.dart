@@ -14,6 +14,7 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
   }
 
   /// 生成新服务器配置并入库；首台服务器自动设为激活并连接。
+  /// 凭据直接写穿 vault 缓存，状态只保留非敏感元数据（不驻留明文）。
   Future<void> _addServerImpl(StreamingServerInput input) async {
     final cfg = StreamingServerConfig(
       id: newUuid(),
@@ -26,7 +27,8 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
       username: input.username.trim(),
       password: input.password,
     );
-    state = state.copyWith(servers: [...state.servers, cfg]);
+    StreamingStore.saveSecret(cfg.id, password: input.password);
+    state = state.copyWith(servers: [...state.servers, cfg.withoutSecrets()]);
     if (state.activeServerId == null) {
       await _setActiveServerImpl(cfg.id);
     } else {
@@ -35,6 +37,8 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
   }
 
   /// 更新服务器配置；若为当前激活服务器则按新配置重连（刷新 token）。
+  /// 凭据合并写入 vault（先 loadSecret 确保既有 token 不被覆盖），
+  /// 状态只保留非敏感元数据。
   Future<void> _updateServerImpl(String id, StreamingServerInput input) async {
     final old = state.serverById(id);
     if (old == null) return;
@@ -46,8 +50,9 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
       isArchoeraServer: input.isArchoeraServer,
       useHttps: input.useHttps,
       username: input.username.trim(),
-      password: input.password,
     );
+    await StreamingStore.loadSecret(id); // 确保缓存含既有凭据（保留 token）
+    StreamingStore.saveSecret(id, password: input.password);
     state = state.copyWith(
       servers: [for (final s in state.servers) s.id == id ? updated : s],
     );
@@ -108,19 +113,23 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
   /// Jellyfin/Emby 先鉴权换 accessToken/userId（回填配置），Subsonic 系
   /// 直接 ping；成功回填 lastConnected 并持久化。
   Future<void> _connectImpl() async {
-    final cfg = state.activeServer;
-    if (cfg == null) return;
+    final base = state.activeServer;
+    if (base == null) return;
     if (state.connecting) return;
     state = state.copyWith(connecting: true, connectionError: null);
     try {
-      final client = StreamingClient(cfg);
-      var working = cfg;
-      if (needsAccessToken(cfg.type)) {
+      // 凭据按需解密（不在启动时批量进堆）；仅本次连接临时持有。
+      await StreamingStore.loadSecret(base.id);
+      var working = _mergeSecret(state.serverById(base.id) ?? base);
+      final client = StreamingClient(working);
+      if (needsAccessToken(working.type)) {
         final auth = await client.authenticate();
-        working = cfg.copyWith(
+        working = working.copyWith(
           accessToken: auth.accessToken,
           userId: auth.userId,
         );
+        // 鉴权 token 直接落 vault（合并，不写入长驻状态）
+        StreamingStore.saveSecret(base.id, accessToken: auth.accessToken);
       }
       final ping = await StreamingClient(working).ping();
       if (!ping.ok) {
@@ -134,9 +143,11 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
       working = working.copyWith(
         lastConnected: DateTime.now().millisecondsSinceEpoch,
       );
+      // 状态只回填非敏感元数据（password/accessToken 剥除）
+      final meta = working.withoutSecrets();
       state = state.copyWith(
         servers: [
-          for (final s in state.servers) s.id == working.id ? working : s,
+          for (final s in state.servers) s.id == meta.id ? meta : s,
         ],
         connecting: false,
         connected: true,

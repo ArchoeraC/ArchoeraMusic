@@ -16,6 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/betastudio2/archoera-subsonic/config"
+	"github.com/betastudio2/archoera-subsonic/credentials"
 	"github.com/betastudio2/archoera-subsonic/crypto"
 	"github.com/betastudio2/archoera-subsonic/model"
 )
@@ -445,8 +446,9 @@ func GetUserByUsername(username string) (*model.SubsonicUser, error) {
 	return &u, nil
 }
 
-// CreateUser 创建用户（密码加密落盘）；同名用户已存在时返回错误。
-// 供 standalone/Docker 入口引导管理员使用（桌面端由 Dart 侧 SubsonicAdmin 创建）。
+// CreateUser 创建用户（密码加密落盘 + 写入内存凭据表）；同名用户已存在时返回错误。
+// 供 standalone/Docker 入口引导管理员使用（桌面端由 Dart 侧 SubsonicAdmin 创建，
+// 密码改存 vault 且 password_cipher 置空串）。
 func CreateUser(id, username, password string, isAdmin bool) error {
 	existing, err := GetUserByUsername(username)
 	if err == nil && existing != nil {
@@ -464,7 +466,12 @@ func CreateUser(id, username, password string, isAdmin bool) error {
 		"INSERT INTO subsonic_users (id, username, password_cipher, is_admin, created_at) VALUES (?, ?, ?, ?, ?)",
 		id, username, cipher, admin, nowMs(),
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	// 同步内存凭据表：standalone/Docker 认证优先查表（不再依赖密文解密路径）。
+	credentials.Set(username, password)
+	return nil
 }
 
 // ListUsers 列出全部用户

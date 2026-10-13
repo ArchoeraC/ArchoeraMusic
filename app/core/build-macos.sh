@@ -2,12 +2,11 @@
 # =====================================================================
 #  ArchoeraMusic macOS 全模块一站式构建脚本（对齐 build_windows.bat 模式）
 #
-#  在单个 bash 会话内完成全部原生模块编译（arm64 默认，Intel 机器改
-#   SCANNER/VAULT RID 传 osx-x64）：
+#  在单个 bash 会话内完成全部原生模块编译（vault 产出 universal 二进制）：
 #    1. audio-engine : CMake（FFmpeg 解码/EQ/FFT + Rust tempo）
 #    2. scraper      : CMake（openssl keg-only 需 CMAKE_PREFIX_PATH）
 #    3. scanner      : dotnet publish (NativeAOT) + libe_sqlite3
-#    4. vault        : dotnet publish (NativeAOT 凭据保险库)
+#    4. vault        : cargo build（vault-rs，Rust 凭据保险库，universal）
 #    5. downloader   : cargo build --release (cdylib)
 #    6. subsonic     : cargo transcoder + go c-shared + go standalone
 #    7. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
@@ -60,17 +59,21 @@ cmake --build "$ROOT/scraper/build" -j"$JOBS"
 echo "[build-macos] ===== scanner (NativeAOT, RID=$RID) ====="
 bash "$ROOT/scanner/build.sh" "$RID"
 
-echo "[build-macos] ===== vault (NativeAOT 凭据保险库, RID=$RID) ====="
-# macOS NativeAOT Swift 库链接（dotnet/runtime#125858）：.NET 10 的
-# System.Security.Cryptography.Native.Apple 含 Swift 编译的 pal_swiftbindings.o，
-# 其 __swift_FORCE_LOAD_$_swift_* 符号依赖系统 Swift 运行时库。根因是 .NET 10
-# 默认部署目标 AppleMinOSVersion=12.0，而 macOS-14/15 runner 的 /usr/lib/swift
-# 库 minOS≥13 被 ld_classic 按版本拒绝；修复在 csproj 内覆盖 AppleMinOSVersion=14.0。
-# 此处再注入两个候选库目录兜底（SDK 的 .tbd stub + toolchain 的 macosx 目录），
-# 由 csproj 项目级 LinkerArg 消费（静态求值，必生效）。
-export SDKROOT="$(xcrun --show-sdk-path)"
-export SWIFT_TOOLCHAIN_LIB="$(dirname "$(dirname "$(xcrun -f swift)")")/lib/swift/macosx"
-bash "$ROOT/vault/build.sh" "$RID"
+echo "[build-macos] ===== vault (Rust 静态链接, vault-rs, universal) ====="
+# vault-rs：Rust 实现（OS 授权份额存 Keychain；容器格式由 testdata/ 黄金夹具锚定字节兼容）。
+# 逐架构构建后 lipo 成 universal（与 archoerashell 的 universal 处理同构）；
+# Runner.xcodeproj 的拷贝阶段与 CI bundle 步骤均从 core/vault-rs/build/ 取。
+# macOS 已不再使用 C# NativeAOT vault（app/core/vault/** 已于 2026-10-12 删除，
+# 字节兼容改由 app/core/vault-rs/testdata/ 黄金夹具锚定）。
+# 目标架构已由 CI（rustup target add）或本地 rustup 预装；此处幂等兜底。
+for _t in aarch64-apple-darwin x86_64-apple-darwin; do
+  rustup target add "$_t" >/dev/null 2>&1 || true
+  cargo build --release --manifest-path "$ROOT/vault-rs/Cargo.toml" --target "$_t"
+done
+mkdir -p "$ROOT/vault-rs/build"
+lipo -create -output "$ROOT/vault-rs/build/archoera-vault" \
+  "$ROOT/vault-rs/target/aarch64-apple-darwin/release/archoera-vault" \
+  "$ROOT/vault-rs/target/x86_64-apple-darwin/release/archoera-vault"
 
 echo "[build-macos] ===== downloader (Rust cdylib) ====="
 cargo build --release --manifest-path "$ROOT/downloader/Cargo.toml"

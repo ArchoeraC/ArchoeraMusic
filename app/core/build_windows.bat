@@ -9,7 +9,7 @@ rem    3. scraper      : CMake + vcpkg toolchain（Windows 保留 CMake）
 rem    4. scanner      : dotnet publish (NativeAOT) + e_sqlite3.dll
 rem    5. downloader   : cargo build --release (cdylib)
 rem    6. subsonic     : cargo transcoder + go c-shared + go standalone
-rem    7. vault        : dotnet publish (NativeAOT 凭据保险库)
+rem    7. vault        : cargo build（vault-rs，Rust 静态链接凭据保险库）
 rem    8. shell        : cargo staticlib（内嵌原生 CLI archoerashell，链入 Windows runner）
 rem
 rem  依赖（vcpkg FFmpeg、MSVC、Rust、Go、.NET、CMake）由 CI workflow 提前安装，
@@ -252,21 +252,29 @@ copy /y "%TRANS_SRC%" build\ >nul
 popd
 
 rem =====================================================================
-rem  7. vault：dotnet publish (NativeAOT 凭据保险库)
+rem  7. vault：vault-rs（Rust 静态链接凭据保险库，Windows）
+rem     产物 core/vault-rs/build/archoera-vault.exe，由 app/windows/CMakeLists
+rem     install 进 native/（Dart 按需 spawn；OS 授权份额存 DPAPI）。
+rem     C# NativeAOT vault（app/core/vault/**）已于 2026-10-12 删除（仅 Linux
+rem     历史保留，Windows/macOS 一律走 Rust 版）。
+rem     -C target-feature=+crt-static：自包含 CRT，免 MSVC 运行时 DLL 依赖。
 rem =====================================================================
-echo [build_windows] ===== vault =====
-pushd "%ROOT%vault"
+echo [build_windows] ===== vault (Rust static, vault-rs) =====
+pushd "%ROOT%vault-rs"
 if not exist build mkdir build
-rem -o 固定 publish 目录：不依赖 bin\x64\Release\<tfm>\win-x64 路径
-rem （Windows AOT 输出带 x64 前缀，且随 TFM 升级会漂移）
-dotnet publish src\Vault.csproj -c Release -r win-x64 -o build\publish
-if errorlevel 1 exit /b 1
-copy /y "build\publish\archoera-vault.exe" build\ >nul
-if not exist "build\archoera-vault.exe" (
-    echo [build_windows] ERROR: archoera-vault.exe 未复制到 build/
-    exit /b 1
-)
+set "RUSTFLAGS=-C target-feature=+crt-static"
+cargo build --release --target x86_64-pc-windows-msvc
+if errorlevel 1 goto vault_fail
+set "RUSTFLAGS="
+copy /y "target\x86_64-pc-windows-msvc\release\archoera-vault.exe" "build\archoera-vault.exe" >nul
+if not exist "build\archoera-vault.exe" goto vault_fail
 popd
+goto vault_done
+:vault_fail
+popd
+echo [build_windows] ERROR: vault-rs（archoera-vault.exe）构建/复制失败
+exit /b 1
+:vault_done
 
 rem =====================================================================
 rem  8. platform bridge：平台能力桥接（app/native/platform，CMake C++/MSVC）

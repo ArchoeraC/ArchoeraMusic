@@ -2,16 +2,18 @@
 #
 # 关键路径（发布/签名/打包/CI）必须由维护者审阅，防止供应链篡改。
 # 语法：<path> <owner...>（GitHub 取最后一个匹配规则）。
+# 允许批准人（Code Owners / required reviewers）：@BetaStudio2、@NyaNyagulugulu
+# （两人任一的 approval 即满足 `protect-main` 的 Require review from Code Owners）。
 
-*                       @BetaStudio2
+*                       @BetaStudio2 @NyaNyagulugulu
 
 # CI 与发布流程
-/.github/               @BetaStudio2
-/.github/workflows/     @BetaStudio2
+/.github/               @BetaStudio2 @NyaNyagulugulu
+/.github/workflows/     @BetaStudio2 @NyaNyagulugulu
 
 # 防伪/签名工具与公钥
-/app/tool/              @BetaStudio2
-/app/lib/app/watermark.dart @BetaStudio2
+/app/tool/              @BetaStudio2 @NyaNyagulugulu
+/app/lib/app/watermark.dart @BetaStudio2 @NyaNyagulugulu
 
 # 打包脚本
-/packaging/             @BetaStudio2
+/packaging/             @BetaStudio2 @NyaNyagulugulu

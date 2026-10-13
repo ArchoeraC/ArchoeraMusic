@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 
 import '../log/log.dart';
+import '../native_integrity.dart';
 import '../native_lib_paths.dart';
 import 'sqlite_preload.dart';
 
@@ -64,6 +65,7 @@ class ScannerLibrary {
     // 仍可能有后台线程（写库/线程池）在运行，且**无模块级 destroy/join**；
     // 立即 `DynamicLibrary.close()` 会 unmap 其代码段导致进程崩溃（实测）。
     // 故 scanner 保持常驻（不做 unload），仅本文件的 registry 引用计数不启用。
+    NativeIntegrity.verifyOrThrow(path);
     final lib = DynamicLibrary.open(path);
     return ScannerLibrary._(lib)..installLogSink();
   }

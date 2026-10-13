@@ -1,0 +1,11 @@
+{
+ "mode": "m2b",
+ "kdf": null,
+ "slot_kinds": [
+  2
+ ],
+ "entries": {
+  "kugou:session": "golden-kugou-session-token",
+  "netease:cookie": "golden-netease-cookie-value"
+ }
+}

@@ -21,12 +21,14 @@ import 'ffi_system_power.dart';
 import 'ffi_system_deep_link.dart';
 import 'ffi_system_window.dart';
 import 'ffi_system_tray.dart';
+import 'native_safe_file.dart';
 import 'platform_bindings.dart';
 import 'system_deep_link.dart';
 import 'system_media.dart';
 import 'system_power.dart';
 import 'system_window.dart';
 import 'system_tray.dart';
+import '../../utils/safe_file.dart';
 
 class PlatformCapabilities {
   PlatformCapabilities._(
@@ -59,6 +61,9 @@ class PlatformCapabilities {
   bool get deepLinkAvailable => caps & aplCapDeepLink != 0;
   bool get trayAvailable => caps & aplCapTray != 0;
   bool get bridgeLoaded => _bindings != null;
+
+  /// 是否具备「安全文件原语」能力（原生 `open(2)`，收口 SafeFile 的 TOCTOU 残余）。
+  bool get secureFileAvailable => caps & aplCapSecureFile != 0;
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
   /// 桥接不可用 / 无该能力 → 抛 [StateError]：**不再静默放行多开**
@@ -134,6 +139,11 @@ class PlatformCapabilities {
     if (existing != null) return existing;
     final b = PlatformBindings.tryLoad();
     final caps = b?.capabilities() ?? 0;
+    // 安全文件：能力可用即把 SafeFile 切到原生后端（消除 dart:io 的 TOCTOU 残余）；
+    // 否则保持纯 Dart 实现（行为不变）。
+    if (b != null && caps & aplCapSecureFile != 0) {
+      SafeFile.backend = NativeSafeFileBackend(b);
+    }
     final built = PlatformCapabilities._(
       b,
       caps: caps,

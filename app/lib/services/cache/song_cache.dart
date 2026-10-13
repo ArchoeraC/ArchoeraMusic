@@ -95,8 +95,18 @@ class SongCache {
       final res = await req.close().timeout(timeout);
       client.close();
       if (res.statusCode != HttpStatus.ok) return;
+      // 安全打开：先删除已存在的同名路径（`openSync` 会**跟随符号链接**并 truncate 目标，
+      // 故被植入链接时必须先删除链接本身），再创建并**不跟随地**校验确为普通文件。
+      if (FileSystemEntity.typeSync(part.path, followLinks: false) !=
+          FileSystemEntityType.notFound) {
+        part.deleteSync();
+      }
       final sink = part.openSync(mode: FileMode.writeOnly);
       try {
+        if (FileSystemEntity.typeSync(part.path, followLinks: false) !=
+            FileSystemEntityType.file) {
+          throw const FileSystemException('缓存分片非普通文件');
+        }
         await for (final chunk in res) {
           sink.writeFromSync(chunk);
         }

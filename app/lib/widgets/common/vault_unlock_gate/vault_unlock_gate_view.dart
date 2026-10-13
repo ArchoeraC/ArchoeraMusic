@@ -9,6 +9,12 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
     if (!_needsUnlock) return widget.child;
     final l10n = context.l10n;
     final scheme = Theme.of(context).colorScheme;
+    final title = _useRecovery ? l10n.vaultUnlockRecoveryTitle
+        : l10n.vaultUnlockTitle;
+    final desc =
+        _useRecovery ? l10n.vaultUnlockRecoveryDesc : l10n.vaultUnlockDesc;
+    final hint =
+        _useRecovery ? l10n.vaultUnlockRecoveryHint : l10n.vaultUnlockHint;
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -19,10 +25,14 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(EtaIcons.lockOutline, size: 56, color: scheme.primary),
+                Icon(
+                  _useRecovery ? EtaIcons.shieldOutline : EtaIcons.lockOutline,
+                  size: 56,
+                  color: scheme.primary,
+                ),
                 const SizedBox(height: 20),
                 Text(
-                  l10n.vaultUnlockTitle,
+                  title,
                   textAlign: TextAlign.center,
                   style: Theme.of(
                     context,
@@ -30,7 +40,7 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  l10n.vaultUnlockDesc,
+                  desc,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -42,29 +52,31 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
                 TextField(
                   controller: _ctrl,
                   autofocus: true,
-                  obscureText: _obscure,
+                  obscureText: !_useRecovery && _obscure,
                   enabled: !_busy,
                   onSubmitted: (_) => _unlock(),
                   style: const TextStyle(fontSize: 14),
                   decoration: InputDecoration(
-                    hintText: l10n.vaultUnlockHint,
+                    hintText: hint,
                     prefixIcon: const Icon(EtaIcons.keyOutline),
                     isDense: true,
                     errorText: _error,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    suffixIcon: IconButton(
-                      tooltip: l10n.settingsDeviceBindShowPassword,
-                      iconSize: 18,
-                      onPressed: _toggleObscure,
-                      icon: Icon(
-                        _obscure
-                            ? EtaIcons.eyeCloseOutline
-                            : EtaIcons.eyeOutline,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
+                    suffixIcon: _useRecovery
+                        ? null
+                        : IconButton(
+                            tooltip: l10n.settingsDeviceBindShowPassword,
+                            iconSize: 18,
+                            onPressed: _toggleObscure,
+                            icon: Icon(
+                              _obscure
+                                  ? EtaIcons.eyeCloseOutline
+                                  : EtaIcons.eyeOutline,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -82,6 +94,16 @@ extension _VaultUnlockGateView on _VaultUnlockGateState {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
+                // m2a：口令 / 恢复码双通道切换（恢复码经 store 透传恢复槽）。
+                if (_isM2a)
+                  TextButton(
+                    onPressed: _busy ? null : _toggleRecovery,
+                    child: Text(
+                      _useRecovery
+                          ? l10n.vaultUnlockPasswordAction
+                          : l10n.vaultUnlockRecoveryAction,
+                    ),
+                  ),
                 TextButton(
                   onPressed: _busy ? null : _skipUnlock,
                   child: Text(l10n.vaultUnlockSkip),

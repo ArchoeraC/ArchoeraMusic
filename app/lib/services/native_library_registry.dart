@@ -26,6 +26,7 @@ library;
 import 'dart:ffi';
 
 import 'log/log.dart';
+import 'native_integrity.dart';
 import 'native_lib_paths.dart';
 
 class _Entry {
@@ -48,7 +49,9 @@ DynamicLibrary acquire(NativeModule m, {String? path}) {
     existing.refs++;
     return existing.lib;
   }
-  final lib = DynamicLibrary.open(path ?? NativeLibPaths.resolveRequired(m));
+  final resolved = path ?? NativeLibPaths.resolveRequired(m);
+  NativeIntegrity.verifyOrThrow(resolved);
+  final lib = DynamicLibrary.open(resolved);
   _entries[m] = _Entry(lib, permanent: false)..refs = 1;
   return lib;
 }
@@ -60,7 +63,9 @@ DynamicLibrary acquirePermanent(NativeModule m, {String? path}) {
     existing.refs++;
     return existing.lib;
   }
-  final lib = DynamicLibrary.open(path ?? NativeLibPaths.resolveRequired(m));
+  final resolved = path ?? NativeLibPaths.resolveRequired(m);
+  NativeIntegrity.verifyOrThrow(resolved);
+  final lib = DynamicLibrary.open(resolved);
   _entries[m] = _Entry(lib, permanent: true)..refs = 1;
   return lib;
 }
