@@ -1,0 +1,42 @@
+# ArchoeraMusic indexer analyzer 测试向量
+# 格式: input<TAB>expectedTokens<TAB>expectedPinyin<TAB>expectedInitials
+#   - '#' 开头为注释；'*' 表示该列不校验。
+#   - tokens/pinyin/initials 均为 Analyzer.Analyze(input) 的空格分隔输出。
+# 1) 中文 bigram+unigram 分词（bigram 内含 "爱你"）
+我好爱你啊	我好 好爱 爱你 你啊 我 好 爱 你 啊	wo hao ai ni a	whana
+# 2) 全拼 + 首字母
+我爱你	我爱 爱你 我 爱 你	wo ai ni	wan
+# 3) 繁体与简体归一化结果相同（愛→爱）
+我愛你	我爱 爱你 我 爱 你	wo ai ni	wan
+# 4) 纯拉丁整词
+Hello World	hello world	hello world	hello world
+# 5) 全角字母/数字（NFKC → 半角；字母/数字各自成段）
+ＡＢＣ１２３	abc 123	abc 123	abc 123
+# 6) 中英数混合
+周杰伦Jay2010	周杰 杰伦 周 杰 伦 jay 2010	zhou jie lun jay 2010	zjl jay 2010
+# 7) 标点折叠为分隔（全角逗号/叹号）
+你好，世界！	你好 你 好 世界 世 界	ni hao shi jie	nh sj
+# 8) 单字查询（unigram 命中）
+国	国	guo	g
+# 9) 空串
+			*
+# 10) 纯标点
+，。！			*
+# 11) 索引侧不切分连写全拼（P4 只在查询侧切分；Analyze 词元/拼音输出保持原整词）
+woaini	woaini	woaini	woaini
+# 12) 索引侧纯拉丁整词（英文不被误切）
+zjl	zjl	zjl	zjl
+# 13) NFKC 逐字符兼容折叠（v2；仅 BMP、逐字符）：ﬁ→fi / ①→1 / Ⅻ→xii / 全角→半角
+ﬁ	fi	fi	fi
+①	1	1	1
+Ⅻ	xii	xii	xii
+ＡＢＣ	abc	abc	abc
+# 14) 兼容表意字折叠：U+FA12（晴）→ U+6674（晴）
+晴	晴	qing	q
+# 15) NFKC 全范围（v3）：非 BMP 星平面兼容字符折叠为 ASCII
+𝑨	a	a	a
+𝟎	0	0	0
+# 16) 词级多音字消歧（v4，ToolGood.Words）：重庆/银行 按词取正确读音
+重庆	重庆 重 庆	chong qing	cq
+银行	银行 银 行	yin hang	yh
+单田芳	单田 田芳 单 田 芳	dan tian fang	dtf

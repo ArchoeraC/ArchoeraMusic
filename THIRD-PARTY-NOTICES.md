@@ -45,6 +45,29 @@ MPL-1.1 / 公有领域）。
 - **替换权**：依 LGPL-2.1，你可获得对应源码，并以修改后的 TagLib 动态库替换本程序
   运行时所加载的 `libtag` / `libtag.dylib` / `tag.dll`。
 
+## 编译期内嵌的托管 / 语言运行时依赖（各原生模块）
+
+以下组件经各自语言工具链**随附源码编译进**本程序分发的原生库（如 `scanner-ffi`、`indexer-ffi`），
+许可均为宽松或 weak-copyleft，与 AGPL-3.0 聚合分发兼容；逐项说明与源码获取方式见对应模块的
+`THIRD-PARTY-LICENSES.md`。各模块的**逐项清单（含传递依赖）**随包分发为
+`licenses/<模块>-THIRD-PARTY-LICENSES.md`（如 `audio-engine-THIRD-PARTY-LICENSES.md`、
+`downloader-THIRD-PARTY-LICENSES.md`、`scraper-THIRD-PARTY-LICENSES.md`、
+`subsonic-THIRD-PARTY-LICENSES.md` 等）。
+
+| 模块 | 组件 | 许可 | 说明 |
+|---|---|---|---|
+| scanner（C#） | `TagLibSharp` 2.3.0 | **LGPL-2.1** | 音频元数据读写；.NET 程序集引用，替换/重链说明见模块文档 |
+| scanner（C#） | `Microsoft.Data.Sqlite` 10.0.12 | MIT | SQLite 的 ADO.NET 提供程序 |
+| scanner（C#） | `SQLitePCLRaw.lib.e_sqlite3` 3.53.3 | **Apache-2.0** | 原生 SQLite（SQLite 本体与 FTS5 为**公有领域**），随 FFI 分发 |
+| indexer（C#） | `ToolGood.Words` 3.1.0.3 | **Apache-2.0** | 汉字转拼音（词级多音字）、繁简 / 全角互换 |
+| indexer（C#） | `Microsoft.Data.Sqlite` 10.0.12 | MIT | SQLite 的 ADO.NET 提供程序 |
+| indexer（C#） | `SQLitePCLRaw.lib.e_sqlite3` 3.53.3 | **Apache-2.0** | 原生 SQLite（含 FTS5，公有领域），随 FFI 分发 |
+
+> 本地曲库搜索索引器另内嵌由 Unicode 数据离线生成的查询表（`data/nfkc.tsv`、
+> `data/def_en2hanzi.tsv`、`data/def_hanzi2en.tsv`，派生自 **Unihan `kDefinition`** 等），
+> 受 [Unicode License](https://www.unicode.org/license.txt) 约束——详见
+> `app/core/indexer/THIRD-PARTY-LICENSES.md`。
+
 ## 在线服务 / 外部 API（非内嵌代码）
 
 本程序可选用第三方在线服务；这些服务**不随包分发**，仅经其公开 HTTP API 访问，**不并入、不链接其源代码**。
@@ -66,6 +89,17 @@ MPL-1.1 / 公有领域）。
 MingCute / Tabler / Lucide）的**官方许可正文**一并随 `licenses/` 目录分发
 （同源文件见 `app/assets/licenses/`），并在「设置 → 关于 → 字体署名」中完整展示。
 字体/图标来源与许可逐项见 `docs/acknowledgements.md`。
+
+## 应用内查看
+
+随包 `licenses/` 目录分发以下**完整许可正文**（同源文件见 `app/assets/licenses/`）：
+**GNU AGPL-3.0**（本程序自身许可，仓库根 `LICENSE` 的随包副本）、
+**Apache-2.0、MIT、BSD-3-Clause、ISC、MPL-2.0、LGPL-2.1、LGPL-3.0、MIT-0、CC0-1.0、
+Unlicense、WTFPL、Unicode License**（另含字体 / 图标官方正文 MiSans / Manrope OFL-1.1 /
+EtaIcons 上游字形集许可）。各组件完整许可正文并在应用内「设置 → 关于 → 第三方开源许可」
+中按许可正文分组查看（随包原生依赖 + Dart/Flutter pub 依赖）；未被任何组件直接引用的
+正文亦在该弹窗末尾「其他随包许可正文」兜底列出。各原生模块的**逐项清单（含传递依赖）**
+随包分发为 `licenses/<模块>-THIRD-PARTY-LICENSES.md`。
 
 ## 合规说明（非法律意见）
 

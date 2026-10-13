@@ -1,0 +1,38 @@
+# ArchoeraMusic indexer 查询侧（AnalyzeQuery）测试向量
+# 格式与 analyzer.tsv 相同：input<TAB>expectedTokens<TAB>expectedPinyin<TAB>expectedInitials
+#   - 运行器按文件名前缀 `query` 分派到 Analyzer.AnalyzeQuery（含 P4 连写全拼切分）。
+#   - '*' 表示该列不校验；纯拉丁查询 initials 为 null（另在 Program.cs 直接断言）。
+# 1) 连写全拼：完整覆盖 → 切为音节序列（设计文档 §4.2 混合 / 全拼）
+woaini	woaini	wo ai ni	*
+woai	woai	wo ai	*
+# 2) 拼音前缀 / 混合：末音节单字母（a/o/e）被英文过度切分门控拒绝 → 保持整词
+#    （woa 旧行为为 wo a；门控要求每个音节长度 ≥2，故不再切分）
+woa	woa	woa	*
+# 3) 英文 / 无音节可切：保持整词
+hello	hello	hello	*
+zjl	zjl	zjl	*
+wan	wan	wan	*
+# 3b) 英文过度切分门控：最长优先结果含单字母音节 → 整体拒绝（不退回 ba na na）
+banana	banana	banana	*
+adele	adele	adele	*
+# 3c) 三音节 / 首音节 ≥4 的真·连写全拼仍可切分
+zhaoliying	zhaoliying	zhao li ying	*
+xiaoai	xiaoai	xiao ai	*
+# 3d) 已知残留：pan da 与常用连写拼音 zenme(怎么)/shenme(什么) 同形，不拦截
+panda	panda	pan da	*
+# 3e) v4 已删除 data/en_blocklist.tsv：长度 ≥6 的英文词不再被拦截，按音节切分
+aiding	aiding	ai ding	*
+shanghai	shanghai	shang hai	*
+# 4) 带空格全拼：逐音节（与旧行为一致）
+wo ai ni	wo ai ni	wo ai ni	*
+# 5) 中文：拼音逐字主读音，首字母整串
+我爱你	我爱 爱你 我 爱 你	wo ai ni	wan
+# 6) 中英混合：CJK 段逐字词元 + 拉丁整词（woaini 在拼音列切分）
+我爱woaini	我爱 我 爱 woaini	wo ai wo ai ni	wa woaini
+# 7) NFKC 折叠与索引侧同构：ﬁ→fi（查询侧词元/拼音一致）
+ﬁ	fi	fi	*
+# 8) NFKC 全范围（v3）：非 BMP 星平面兼容字母折叠为 ASCII（查询侧同构）
+𝑨	a	a	*
+# 9) 词级多音字消歧（v4，ToolGood.Words）：CJK 查询按词取正确读音
+重庆	重庆 重 庆	chong qing	cq
+银行	银行 银 行	yin hang	yh

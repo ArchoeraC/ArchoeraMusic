@@ -8,7 +8,8 @@
 | 组件 | 版本 | 许可证 | 说明 |
 |---|---|---|---|
 | `TagLibSharp` | 2.3.0 | **LGPL-2.1** | 音频元数据读写（MP3/FLAC/OGG/M4A/APE/WAV/DSF 等） |
-| `Microsoft.Data.Sqlite` | 9.0.0 | MIT | SQLite 的 ADO.NET 提供程序 |
+| `Microsoft.Data.Sqlite` | 10.0.12 | MIT | SQLite 的 ADO.NET 提供程序 |
+| `SQLitePCLRaw.lib.e_sqlite3` | 3.53.3 | **Apache-2.0** | 原生 SQLite 静态库（随 FFI 分发为 `libe_sqlite3`/`e_sqlite3.dll`，**含 FTS5**；pin 版本消除 CVE-2025-6965，与 `app/core/indexer` 同栈） |
 
 ## TagLibSharp（LGPL-2.1）声明
 
@@ -24,7 +25,7 @@ TagLibSharp 替换/重新链接本程序所引用的该程序集。
 
 ## 合规评估（非法律意见）
 
-`TagLibSharp`（LGPL-2.1，.NET 程序集引用，替换/重链说明见上）与 `Microsoft.Data.Sqlite`（MIT）在各自许可条款下可与本项目 AGPL-3.0 代码共存。
+`TagLibSharp`（LGPL-2.1，.NET 程序集引用，替换/重链说明见上）与 `Microsoft.Data.Sqlite`（MIT）、`SQLitePCLRaw.lib.e_sqlite3`（Apache-2.0；SQLite 本体为公有领域）在各自许可条款下可与本项目 AGPL-3.0 代码共存。
 本文档为项目维护者的合理努力评估，不构成法律意见；正式依据以上游官方许可文本为准。
 
 ---

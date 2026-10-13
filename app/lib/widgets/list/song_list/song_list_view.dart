@@ -101,6 +101,8 @@ extension _SongListView on _SongListState {
                         batchActive: _batchActive,
                         selected: _selected.contains(songLikeKey(item)),
                         onToggleSelect: () => _toggleSelect(track, index),
+                        highlightOf: widget.highlightOf,
+                        lyricSnippet: widget.lyricSnippetOf?.call(track),
                       );
                     },
                   ),

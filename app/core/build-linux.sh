@@ -6,11 +6,12 @@
 #    1. audio-engine : CMake（FFmpeg 解码/EQ/FFT + Rust tempo）
 #    2. scraper      : CMake（C++ 元数据刮削）
 #    3. scanner      : dotnet publish (NativeAOT) + libe_sqlite3
-#    4. vault        : cargo build（vault-rs，Rust 静态链接凭据保险库）
-#    5. downloader   : cargo build --release (cdylib)
-#    6. subsonic     : cargo transcoder + go c-shared + go standalone
-#    7. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
-#    8. shell        : cargo staticlib（内嵌原生 CLI archoerashell，链入 Linux runner）
+#    4. indexer      : dotnet publish (NativeAOT, indexer-ffi) + libe_sqlite3
+#    5. vault        : cargo build（vault-rs，Rust 静态链接凭据保险库）
+#    6. downloader   : cargo build --release (cdylib)
+#    7. subsonic     : cargo transcoder + go c-shared + go standalone
+#    8. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
+#    9. shell        : cargo staticlib（内嵌原生 CLI archoerashell，链入 Linux runner）
 #
 #  依赖（FFmpeg 开发包 / CMake / Rust / Go / .NET / Clang）由 CI workflow
 #  提前安装或由本地开发环境提供，本脚本只做编译引导（幂等，可重复执行）。
@@ -60,6 +61,12 @@ cmake --build "$ROOT/scraper/build" -j"$JOBS"
 
 echo "[build-linux] ===== scanner (NativeAOT) ====="
 bash "$ROOT/scanner/build.sh" linux-x64
+
+# 本地曲库搜索索引器（indexer-ffi，.NET NativeAOT，与 scanner 同栈）：
+# 产出 indexer/build/{indexer-ffi.so, libe_sqlite3.so}，由 linux/CMakeLists 装进
+# bundle/native/（总开关默认关时 Dart 侧不加载，见 lib/services/search/）。
+echo "[build-linux] ===== indexer (NativeAOT) ====="
+bash "$ROOT/indexer/build.sh" linux-x64
 
 # vault（凭据保险库）：Linux 用 vault-rs 的 **Rust 静态单文件**（+crt-static，CI 走
 # musl 静态）替代 C# NativeAOT——ld.so 不参与 → 免疫 LD_PRELOAD/LD_LIBRARY_PATH

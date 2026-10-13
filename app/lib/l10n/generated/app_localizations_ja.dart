@@ -3512,6 +3512,23 @@ class AppLocalizationsJa extends AppLocalizations {
       '本ソフトウェアには以下のフォントが同梱されています。\n· MiSans（© Xiaomi、MiSans フォント知的財産権許諾契約に基づき使用）\n· Manrope（© The Manrope Project Authors、SIL Open Font License 1.1）\n· EtaIcons（自作アイコンフォント、字形は MingCute / Tabler / Lucide 由来）\n· EtaMark（自作ブランドマークフォント）\n\n以下に各フォント・字形の公式ライセンス全文を掲載します。';
 
   @override
+  String get settingsSectionThirdPartyLicenses => 'サードパーティ製ライセンス';
+
+  @override
+  String get settingsThirdPartyNative => '同梱のネイティブ依存関係';
+
+  @override
+  String get settingsThirdPartyPackages => 'Dart / Flutter パッケージ';
+
+  @override
+  String get settingsThirdPartyLicensesText =>
+      '本ソフトウェアは以下のサードパーティ製オープンソースコンポーネントを同梱またはリンクしています。以下では**ライセンス本文**ごとにグループ化し、各コンポーネントのライセンス全文を掲載します（法的文書は翻訳しません）：\n· 同梱のネイティブ依存関係：各ネイティブモジュールがコンパイル時に組み込む、または動的にリンクするサードパーティ製ライブラリ；\n· Dart / Flutter パッケージ：`pub` 依存関係で、各パッケージが登録するライセンスを実行時に集約。\n\n完全な一覧と各項目の説明は同梱の `licenses/` ディレクトリおよび `THIRD-PARTY-NOTICES.md` を参照してください。';
+
+  @override
+  String get settingsThirdPartyLicensesEntryDesc =>
+      '同梱の依存関係とオープンソースコンポーネントのライセンスを表示';
+
+  @override
   String get commonNoLyrics => '歌詞がありません';
 
   @override
@@ -4396,6 +4413,99 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get settingsScanQuarantineClearAllConfirm =>
       '隔離フォルダ内のすべてのファイルを削除しますか？この操作は元に戻せません。';
+
+  @override
+  String get settingsCatSearchIndex => 'ローカル検索';
+
+  @override
+  String get settingsSearchIndexSubtitle =>
+      'ローカルライブラリ検索インデックス · 既定はオフ · 有効時は関連度順で歌詞とメタデータを検索';
+
+  @override
+  String get settingsSectionSearchIndex => 'ローカルライブラリ検索インデックス';
+
+  @override
+  String get settingsSearchIndexEnable => 'ローカルライブラリ検索インデックスを有効化';
+
+  @override
+  String get settingsSearchIndexEnableOn =>
+      'オン：バックグラウンドで索引を構築し、関連度順で検索（歌詞 / ピンイン対応）';
+
+  @override
+  String get settingsSearchIndexEnableOff =>
+      'オフ：基本検索のみ（タイトル / アーティスト / アルバム）、索引なし・ディスク消費ゼロ';
+
+  @override
+  String get settingsSearchIndexLrc => '.lrc サイドカー歌詞を索引';
+
+  @override
+  String get settingsSearchIndexLrcDesc =>
+      '音声ファイルと同名の .lrc 歌詞も索引します（マスタースイッチが必要）';
+
+  @override
+  String get settingsSearchIndexNote =>
+      '索引は派生データです：既定はオフでコストゼロ。有効化すると初回構築に時間とディスク（1万曲で数百 MB 程度）を使用し、失敗時は自動で基本検索にフォールバックします。';
+
+  @override
+  String get settingsSectionSearchIndexStatus => '状態とメンテナンス';
+
+  @override
+  String get settingsSearchIndexStatusDisabled => '無効';
+
+  @override
+  String get settingsSearchIndexStatusReady => '索引準備完了';
+
+  @override
+  String get settingsSearchIndexStatusBuilding => '索引を構築中…';
+
+  @override
+  String get settingsSearchIndexStatusPending => '未準備（初回検索または再構築時にオンデマンド構築）';
+
+  @override
+  String settingsSearchIndexStatusError({required String reason}) {
+    return '索引を利用できません：$reason（基本検索にフォールバック）';
+  }
+
+  @override
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  }) {
+    return '構築中：$phase　$processed/$total';
+  }
+
+  @override
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  }) {
+    return '前回の構築：$indexed 曲、$duration 秒';
+  }
+
+  @override
+  String settingsSearchIndexSize({required String size}) {
+    return '索引サイズ：$size';
+  }
+
+  @override
+  String get settingsSearchIndexRebuild => '索引を再構築';
+
+  @override
+  String get settingsSearchIndexDelete => '索引を削除';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmTitle => '検索索引を削除しますか？';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmBody =>
+      '索引が使用するディスク容量を解放します。次回の検索で再構築されます。ライブラリと元ファイルには影響しません。';
+
+  @override
+  String get settingsSearchIndexDeleted => '検索索引を削除しました';
+
+  @override
+  String get settingsSearchIndexRebuildStarted => '索引の再構築を開始しました';
 
   @override
   String get libraryFullScan => '全件スキャン';

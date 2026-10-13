@@ -1,0 +1,6 @@
+# 本地曲库搜索索引器构建产物（由 build.sh / dotnet 生成，不入库）
+bin/
+obj/
+build/
+indexer-ffi/bin/
+indexer-ffi/obj/

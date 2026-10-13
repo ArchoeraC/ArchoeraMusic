@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// 回归测试：关于页的三份长文（软件声明 / 隐私政策 / 字体署名）以「点击按钮
-// 才展开」的弹窗呈现，且内容完整（含新增的开源许可章节与隐私政策章节）、
-// 长文本滚动不溢出。
+// 回归测试：关于页的长文（软件声明 / 隐私政策 / 字体署名 / 第三方开源许可）
+// 以「点击按钮才展开」的弹窗呈现，且内容完整（含新增的开源许可章节与隐私政策
+// 章节）、长文本滚动不溢出。
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,5 +74,18 @@ void main() {
     // 随弹窗内嵌展示官方许可正文原文。
     expect(find.textContaining('SIL OPEN FONT LICENSE'), findsWidgets);
     expect(find.textContaining('MiSans字体知识产权许可协议'), findsWidgets);
+  });
+
+  testWidgets('第三方开源许可弹窗：含原生依赖分组与许可正文', (tester) async {
+    await openDialog(tester, showThirdPartyLicensesDialog);
+    expect(find.text('第三方开源许可'), findsOneWidget);
+    // 原生依赖分组小标题。
+    expect(find.textContaining('随包原生依赖'), findsWidgets);
+    // 分组标题含组件名与许可标识。
+    expect(find.textContaining('ToolGood.Words'), findsWidgets);
+    expect(find.textContaining('FFmpeg'), findsWidgets);
+    // 许可正文原文。
+    expect(find.textContaining('Apache License'), findsWidgets);
+    expect(find.textContaining('UNICODE LICENSE V3'), findsWidgets);
   });
 }

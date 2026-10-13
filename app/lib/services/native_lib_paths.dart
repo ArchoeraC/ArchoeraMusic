@@ -29,8 +29,27 @@ enum NativeModule {
     candidates: ['native', 'scanner/build', 'core/scanner/build'],
   ),
 
+  /// 本地曲库搜索索引库（indexer-ffi.{so,dylib,dll}，无 lib 前缀；
+  /// C# NativeAOT，与 scanner 同栈）。仅在总开关开启时按需加载。
+  indexer(
+    'indexer-ffi',
+    libPrefix: false,
+    envName: 'ARCHOERA_INDEXER_FFI',
+    candidates: ['native', 'indexer/build', 'core/indexer/build'],
+  ),
+
   /// SQLite 原生库（libe_sqlite3.{so,dylib} / e_sqlite3.dll），与 scanner 同目录。
-  sqlite('e_sqlite3', candidates: ['native', 'scanner/build', 'core/scanner/build']),
+  /// indexer 目录同样随包分发同名 `libe_sqlite3`（闭包），故一并纳入候选。
+  sqlite(
+    'e_sqlite3',
+    candidates: [
+      'native',
+      'scanner/build',
+      'core/scanner/build',
+      'indexer/build',
+      'core/indexer/build',
+    ],
+  ),
 
   /// 刮削库（libarchoera_scraper.{so,dylib} / archoera_scraper.dll）。
   scraper(

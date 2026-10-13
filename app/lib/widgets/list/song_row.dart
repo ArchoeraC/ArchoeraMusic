@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/netease/track.dart';
+import '../../services/search/search_highlight.dart';
 import '../../services/source/source_platform.dart';
 import '../dialogs/collection_platform.dart';
 import '../../easter_egg/mouse_dodge.dart';
@@ -53,6 +54,8 @@ class SongRow extends ConsumerStatefulWidget {
     this.batchActive = false,
     this.selected = false,
     this.onToggleSelect,
+    this.highlightOf,
+    this.lyricSnippet,
   });
 
   final Track item;
@@ -72,6 +75,21 @@ class SongRow extends ConsumerStatefulWidget {
   final bool batchActive;
   final bool selected;
   final VoidCallback? onToggleSelect;
+
+  /// 可选搜索结果高亮：给定展示文本 → 命中区间（标题 / 副标题 / 专辑）。
+  ///
+  /// 为 `null`（默认）时行渲染与不传时**逐像素一致**（关闭态零成本）；关闭态与
+  /// 非搜索态一律传 null。区间由页面侧经 `SearchHighlighter` 记忆化，行内每帧
+  /// rebuild 命中缓存、不重复计算（见 `services/search/search_highlight.dart`）。
+  final List<MatchRange> Function(String text)? highlightOf;
+
+  /// 可选歌词命中**行内片段**（歌词命中行的命中窗口文本）。
+  ///
+  /// 为 `null`（默认）时行渲染与不传该参数时**逐像素一致**（关闭态 / 非搜索态
+  /// 零成本）；非空时在歌手 / 专辑下方以次要样式单行省略显示（不改变固定行高）。
+  /// 片段由页面在**页加载异步路径**算好并缓存，本组件只同步读取（见
+  /// `services/search/search_lyric_snippet.dart`）。
+  final String? lyricSnippet;
 
   @override
   ConsumerState<SongRow> createState() => _SongRowState();

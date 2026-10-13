@@ -8,6 +8,8 @@
 #     依 FFmpeg 的 COPYING.LGPLv2.1（同一 LGPL-2.1 文本）覆盖
 #   - 字体 / 图标官方许可正文（app/assets/licenses/）→ MiSans / Manrope(OFL 1.1) / EtaIcons
 #   - THIRD-PARTY-NOTICES.md（根目录，聚合声明 + 源码/替换权）
+#   - 各原生模块的 THIRD-PARTY-LICENSES.md（scanner / indexer / audio-engine …，
+#     以「<模块>-THIRD-PARTY-LICENSES.md」随包分发，供核对逐项依赖与许可）
 #
 #  用法: bundle-licenses.sh <bundle 目录>
 #  环境: FFMPEG_PREFIX（默认 $HOME/.local/ffmpeg-minimal）
@@ -20,8 +22,11 @@ prefix="${FFMPEG_PREFIX:-$HOME/.local/ffmpeg-minimal}"
 dest="$bundle/licenses"
 mkdir -p "$dest"
 
-# 1) 聚合声明
+# 1) 聚合声明 + 本程序自身许可（AGPL-3.0 正文，随包保证 §4「附许可副本」）
 [[ -f "$root/THIRD-PARTY-NOTICES.md" ]] && cp -f "$root/THIRD-PARTY-NOTICES.md" "$dest/"
+if [[ -f "$root/LICENSE" ]]; then
+  cp -f "$root/LICENSE" "$dest/ArchoeraMusic-LICENSE.txt"
+fi
 
 # 2) 字体 / 图标官方许可正文（随包内嵌；与「设置 → 关于 → 字体署名」同源）
 font_lic="$root/app/assets/licenses"
@@ -63,6 +68,17 @@ if [[ -z "$tag_src" ]]; then
     echo "[bundle-licenses] 警告: 未找到 TagLib 许可文本，且无 LGPL-2.1 兜底" >&2
   fi
 fi
+
+# 4) 各原生模块第三方登记：随包分发，便于用户/下游核对逐项依赖与许可
+#    （scanner / indexer / audio-engine / scraper / downloader / subsonic / shell / vault-rs …）
+shopt -s nullglob
+for f in "$root"/app/core/*/THIRD-PARTY-LICENSES.md \
+         "$root"/app/core/*/*/THIRD-PARTY-LICENSES.md ; do
+  [[ -f "$f" ]] || continue
+  mod="$(basename "$(dirname "$f")")"
+  cp -f "$f" "$dest/${mod}-THIRD-PARTY-LICENSES.md"
+done
+shopt -u nullglob
 
 echo "[bundle-licenses] $dest:"
 ls -1 "$dest"
