@@ -13,7 +13,7 @@
 | SEC-23 | `release` 作业在签名前**校验发版 tag 指向受保护长分支**（`main` 或 `ArchoeraOS`）的祖先提交，否则拒绝构建/签名 | `build-all.yml` release 作业 |
 | SEC-24 | tag 名经 **`$GITHUB_REF_NAME` 环境变量**注入，`run:` 内不再内插 `${{ github.ref_name }}` | `build-all.yml` |
 | SEC-25 | release 作业生成 **CycloneDX SBOM** 并写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业 |
-| SEC-26 | 新增 **Dependabot**（github-actions / cargo / gomod / nuget / pub）与**各生态漏洞扫描**工作流（`cargo audit` / `govulncheck` / `dotnet list package --vulnerable`） | `.github/dependabot.yml`、`security-audit.yml` |
+| SEC-26 | **各生态漏洞扫描**工作流（`cargo audit` / `govulncheck` / `dotnet list package --vulnerable`）；Dependabot 配置保留但**版本更新已停用**（依赖改为定期手动同步，见 §3） | `.github/dependabot.yml`、`security-audit.yml` |
 | SEC-27 | CI 跑**完整 `flutter test`**（不再只跑 widget 冒烟）+ vault 用例（指向测试二进制）+ downloader/subsonic 的 `cargo test` / `go test` | `actions/build-linux/action.yml` |
 | SEC-08 | release 作业对目录型产物的 `ARCHOERA-NATIVE-MANIFEST.txt` 做 **key1 ECDSA/SHA-256 分离签名**（`.sig1`），运行期内嵌公钥验签 + 摘要 | `build-all.yml` release 作业 + `app/tool/sign_native_manifest.sh` |
 
@@ -56,7 +56,13 @@
 
 ## 3. 维护要点
 
-- 升级 Actions 时**保持 SHA pin**（Dependabot 的 `github-actions` 会自动发 PR，合并后仍为 SHA）。
+- 升级 Actions 时**保持 SHA pin**（pin 到目标版本 tag 对应的 40 位 commit SHA）。
+- **依赖升级：定期手动同步**（2026-10-13 起）。Dependabot 的**版本更新已全量停用**
+  （`.github/dependabot.yml` 各生态 `open-pull-requests-limit: 0`）：它会在缺少国内镜像的
+  解析环境下重写 `app/pubspec.lock`（把 89 处 host 从 `pub.flutter-io.cn` 全量改回默认源）
+  并批量开跨大版本 PR（含 release 关键路径）。改由维护者在本机（保留镜像）升级，
+  跑通 `cargo test` / `go test` / `dart analyze lib` / `flutter test` 后再提交。
+  需要恢复自动化时，把对应生态的 `open-pull-requests-limit` 改回正整数即可。
 - `dtolnay/rust-toolchain` 因 pin 到 SHA，工具链经 `with: toolchain: stable` 指定（ref 不再是工具链名）。
 - 新增任何 `uses:` 一律 pin SHA；`run:` 内**禁止**内插 `${{ github.* }}`（用环境变量）。
 - `release` 作业的 Environment 人工审批（`release`）是签名的最后一道人工门；SEC-23 的
