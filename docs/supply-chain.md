@@ -63,5 +63,11 @@
   tag 祖先校验在其之前拦截「tag 指向未评审提交」。
 - **漏洞处置**：`security-audit.yml` 首次运行即发现 downloader 的
   `rustls` RUSTSEC-2026-0285（已 `cargo update -p rustls --precise 0.23.45` 修复）。
+  后续同类处置：downloader 的 `quinn-proto`（`reqwest` → `quinn`，仅存在于锁文件/
+  特定 target，不在宿主构建图内）在 2026-10-12 公告库更新后命中
+  RUSTSEC-2026-0338…0342（0.11.17 / 0.11.18 起修复），已
+  `cargo update -p quinn-proto` 升至 0.11.19；同批把被 yank 的 `chacha20`
+  （`rand 0.10` → `chacha20`）升至 0.10.2，消掉 audit 的 yanked 告警。
+  两者都只动锁文件、不改 `Cargo.toml` 约束。
   确属**不适用**的公告才可经 `ignore` 放行，且须在 workflow 注释写明理由
   （如 RUSTSEC-2023-0071：`rsa` 仅用于公钥加密、不持私钥）。
