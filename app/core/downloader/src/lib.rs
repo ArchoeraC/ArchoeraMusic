@@ -896,6 +896,65 @@ fn max_speed_bytes() -> Option<u64> {
     }
 }
 
+/// 下载请求最大重定向跳数：超过即停（避免被无休止 3xx 拖住）。
+const MAX_DOWNLOAD_REDIRECTS: usize = 5;
+
+/// 重定向目标是否允许（客户端侧防御纵深）：仅 http(s)、必须有主机，且
+/// - 主机是 IP 字面量时必须是公网地址（拒绝回环 / 私网 / 链路本地 / 未指定 / 组播 /
+///   IPv6 唯一本地）；
+/// - 主机名不得是本机或常见内网名（localhost / .localhost / .local / .internal / .lan）。
+///
+/// 只拦字面量与常见内网名，**不做 DNS 解析**（重定向判定在同步回调里，域名解析到私网
+/// 无法在此同步获知）；足以挡掉「3xx 直接指向本机端口 / 内网字面量」这类最直白的引渡，
+/// 且不会误伤公网 CDN 的正常跨主机跳转。
+fn redirect_target_allowed(url: &reqwest::Url) -> bool {
+    let scheme = url.scheme();
+    if scheme != "https" && scheme != "http" {
+        return false;
+    }
+    let Some(raw_host) = url.host_str() else {
+        return false;
+    };
+    let host = raw_host.trim_matches(|c| c == '[' || c == ']').to_ascii_lowercase();
+    if host.is_empty() {
+        return false;
+    }
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return is_public_ip(ip);
+    }
+    if host == "localhost" {
+        return false;
+    }
+    !HOST_SUFFIX_BLOCKLIST.iter().any(|s| host.ends_with(s))
+}
+
+/// 主机名黑名单后缀（对齐服务端 OutboundUrlGuard 的内网名口径）。
+const HOST_SUFFIX_BLOCKLIST: [&str; 5] = [".localhost", ".local", ".internal", ".lan", ".home"];
+
+/// 地址是否为公网可访问（回环 / 私网 / 链路本地 / 未指定 / 组播 / 保留段一律 false）。
+fn is_public_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            let o = v4.octets();
+            !(v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_unspecified()
+                || v4.is_broadcast()
+                || v4.is_multicast()
+                || o[0] == 0
+                || (o[0] == 100 && (64..=127).contains(&o[1])))
+        }
+        std::net::IpAddr::V6(v6) => {
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                // IPv6 唯一本地地址 fc00::/7
+                || (v6.segments()[0] & 0xfe00) == 0xfc00)
+        }
+    }
+}
+
 /// 流式下载：HTTP GET → tmpPath → fsync → 原子 rename（参考 download-engine）
 ///
 /// v2 增强：
@@ -942,11 +1001,14 @@ async fn download_to_file(
     }
     // resume 判定：206 Partial Content（服务器接受 Range）
     let resume = existing > 0 && status == reqwest::StatusCode::PARTIAL_CONTENT;
-    // total：206 时 content-length 是剩余量，需加上已有字节
-    let total = if resume {
-        resp.content_length().map(|cl| existing + cl).or(resolved.file_size)
-    } else {
-        resp.content_length().or(resolved.file_size)
+    // http_len：HTTP 头声明的本次响应体长度。必须在 `resp.bytes_stream()` 按值消费
+    // resp 之前取出——既用于进度 total，也用于落盘前的完整性判定（Bug B）。
+    let http_len = resp.content_length();
+    // total：206 时 content-length 是剩余量，需加上已有字节；缺失时回落声明大小仅用于进度展示。
+    let total = match http_len {
+        Some(cl) if resume => Some(existing + cl),
+        Some(cl) => Some(cl),
+        None => resolved.file_size,
     };
 
     if let Some(parent) = dest.parent() {
@@ -958,7 +1020,8 @@ async fn download_to_file(
             Err(e) => return Err(DownloadError { msg: format!("打开临时文件失败: {e}"), cancel: false, paused: false }),
         }
     } else {
-        match open_tmp_file(tmp, false).await {
+        // 非续传：清掉可能残留的 .tmp 后以 create_new 重建（清残留链接/文件，避免 EEXIST）
+        match open_tmp_file_fresh(tmp).await {
             Ok(f) => f,
             Err(e) => return Err(DownloadError { msg: format!("创建临时文件失败: {e}"), cancel: false, paused: false }),
         }
@@ -1030,6 +1093,16 @@ async fn download_to_file(
         }
     }
 
+    // 落盘前完整性判定（Bug B）：服务器声明了长度时必须「实收 == 期望」，否则删除 .tmp
+    // 并报错，绝不把截断文件 fsync + rename 落盘。http_len 缺失（分块传输/未声明长度）
+    // 时无法判定，跳过。期望值续传时为 existing + cl（已含续传前字节），否则为 cl。
+    let expected = http_len.map(|cl| if resume { existing + cl } else { cl });
+    if let Err(msg) = check_completed(received, expected) {
+        drop(file);
+        let _ = tokio::fs::remove_file(tmp).await;
+        return Err(DownloadError { msg, cancel: false, paused: false });
+    }
+
     // fsync + 原子落盘（戒律 13.3：不留下半写文件）
     if let Err(e) = file.sync_all().await {
         drop(file);
@@ -1059,6 +1132,34 @@ async fn open_tmp_file(tmp: &PathBuf, append: bool) -> std::io::Result<tokio::fs
     }
     set_nofollow(&mut opts);
     opts.open(tmp).await
+}
+
+/// 打开一个全新的下载临时文件（SEC-33 安全语义 + Bug A 自愈）：
+/// 先 `remove_file` 清掉可能残留的 `.tmp`，再以 `create_new` 新建。
+///
+/// 为什么必须先 remove：`open_tmp_file(tmp, false)` 用 `O_CREAT|O_EXCL`，对**已存在**路径
+/// 直接返回 `EEXIST`。残留来源有二——`resume=false` 但 `.tmp` 是普通文件（服务器忽略
+/// Range 返回 200）、或残留 0 字节 `.tmp`；此时若不自愈，任务会一直报「创建临时文件失败」。
+/// `remove_file`（unlink）只删除链接本身、**不跟随**符号链接，随后 `create_new` 仍保持
+/// 「绝不打开已存在路径」的语义（Windows 无 `O_NOFOLLOW` 也安全）。
+async fn open_tmp_file_fresh(tmp: &PathBuf) -> std::io::Result<tokio::fs::File> {
+    match tokio::fs::remove_file(tmp).await {
+        Ok(()) => {}
+        // 本就不存在 → 正常路径，无需自愈
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+    open_tmp_file(tmp, false).await
+}
+
+/// 下载完整性判定（纯函数，Bug B）：服务器声明了期望长度时，实收字节必须与之相等；
+/// `expected` 为 `None`（未声明长度，无法判定）时直接通过。
+/// 返回 `Err` 时携带「下载不完整: 实收/期望 字节」文案，供上层删除 .tmp 并报错。
+fn check_completed(received: u64, expected: Option<u64>) -> std::result::Result<(), String> {
+    match expected {
+        Some(exp) if received != exp => Err(format!("下载不完整: {received}/{exp} 字节")),
+        _ => Ok(()),
+    }
 }
 
 /// 跳过符号链接（Unix `O_NOFOLLOW`；其它平台 no-op）。
@@ -1136,6 +1237,16 @@ pub extern "C" fn archoera_downloader_init(
     let client = match reqwest::Client::builder()
         // 对齐 Dart HttpClient：仅 HTTP/1.1（酷狗风控对 HTTP/2 请求返回空 data）
         .http1_only()
+        // 重定向封顶 + 拒绝被 3xx 引到本机/内网（公网 CDN 的正常跨主机跳转不受影响）
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= MAX_DOWNLOAD_REDIRECTS
+                || !redirect_target_allowed(attempt.url())
+            {
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        }))
         .build()
     {
         Ok(c) => c,
@@ -2084,5 +2195,107 @@ mod finalize_tests {
         assert!(super::open_tmp_file(&tmp, true).await.is_err());
         assert_eq!(std::fs::read(&victim).unwrap(), b"sacred");
         let _ = std::fs::remove_dir_all(&d);
+    }
+}
+
+#[cfg(test)]
+mod download_integrity_tests {
+    use super::{check_completed, open_tmp_file_fresh, redirect_target_allowed};
+    use std::path::PathBuf;
+
+    fn unique_dir(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "archoera-dl-integ-{tag}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// Bug A：残留的普通 `.tmp` 必须被清理后重建（返回 Ok 且长度为 0），
+    /// 不能因 `create_new` 命中已存在路径而 `EEXIST`。
+    #[tokio::test]
+    async fn open_tmp_file_fresh_truncates_existing() {
+        let d = unique_dir("fresh");
+        let tmp = d.join("a.tmp");
+        std::fs::write(&tmp, b"stale-bytes").unwrap();
+
+        let f = open_tmp_file_fresh(&tmp).await.unwrap();
+        drop(f);
+        // 路径仍存在，但已被清空（以 create_new 重建的普通文件）
+        assert_eq!(std::fs::metadata(&tmp).unwrap().len(), 0);
+        assert!(std::fs::symlink_metadata(&tmp).unwrap().file_type().is_file());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Bug A + SEC-33：`tmp` 是指向 victim 的符号链接时，fresh 只 unlink 链接本身，
+    /// victim 内容不被改写，且重建后的 tmp 是普通文件（非链接）。
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn open_tmp_file_fresh_replaces_symlink_without_following() {
+        let d = unique_dir("freshlink");
+        let victim = d.join("victim.txt");
+        let tmp = d.join("a.tmp");
+        std::fs::write(&victim, b"sacred").unwrap();
+        std::os::unix::fs::symlink(&victim, &tmp).unwrap();
+
+        let f = open_tmp_file_fresh(&tmp).await.unwrap();
+        drop(f);
+        assert_eq!(std::fs::read(&victim).unwrap(), b"sacred");
+        let m = std::fs::symlink_metadata(&tmp).unwrap();
+        assert!(m.file_type().is_file());
+        assert!(!m.file_type().is_symlink());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Bug B：完整性判定纯函数的两种情况——声明长度须严格一致，缺失长度则无法判定放行。
+    #[test]
+    fn check_completed_matches_length_or_skips() {
+        // 声明长度且实收一致 → 通过
+        assert!(check_completed(100, Some(100)).is_ok());
+        // 声明长度但截断 → 报「下载不完整」
+        let err = check_completed(60, Some(100)).unwrap_err();
+        assert!(err.contains("下载不完整"), "{err}");
+        assert!(err.contains("60/100"), "{err}");
+        // 多收（理论上不该发生）同样视为不一致
+        assert!(check_completed(101, Some(100)).is_err());
+        // 未声明长度 → 无法判定，放行
+        assert!(check_completed(60, None).is_ok());
+    }
+
+    /// 重定向目标只放行公网 http(s)，挡掉回环 / 私网 / 链路本地 / 内网名。
+    #[test]
+    fn redirect_target_blocks_local_and_private() {
+        let ok = |s: &str| redirect_target_allowed(&reqwest::Url::parse(s).unwrap());
+
+        // 公网（域名 + 公网 IP）放行
+        assert!(ok("https://cdn.example.com/song.flac"));
+        assert!(ok("http://aqqmusic.tc.qq.com/M500.mp3"));
+        assert!(ok("https://8.8.8.8/x"));
+        assert!(ok("https://[2001:4860:4860::8888]/x"));
+
+        // 回环 / 私网 / 链路本地 / 未指定（IPv4）
+        assert!(!ok("http://127.0.0.1:8080/x"));
+        assert!(!ok("http://10.0.0.5/x"));
+        assert!(!ok("http://192.168.1.1/x"));
+        assert!(!ok("http://172.16.0.1/x"));
+        assert!(!ok("http://169.254.1.1/x"));
+        assert!(!ok("http://0.0.0.0/x"));
+        assert!(!ok("http://100.64.0.1/x"));
+
+        // 回环 / 唯一本地（IPv6）
+        assert!(!ok("http://[::1]/x"));
+        assert!(!ok("http://[fc00::1]/x"));
+
+        // 内网主机名
+        assert!(!ok("http://localhost/x"));
+        assert!(!ok("http://foo.localhost/x"));
+        assert!(!ok("http://db.internal/x"));
+        assert!(!ok("http://nas.lan/x"));
+
+        // 非 http(s)
+        assert!(!ok("ftp://example.com/x"));
     }
 }
