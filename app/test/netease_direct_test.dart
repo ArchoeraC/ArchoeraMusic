@@ -10,6 +10,8 @@
 /// 加密原语与请求层来自 apis 包（app/lib/core/apis/netease/，纯 Dart 直连）。
 library;
 
+import 'dart:io' show Platform;
+
 import 'package:archoera_music/apis/netease/core/crypto.dart';
 import 'package:archoera_music/services/netease/apis_netease_caller.dart';
 import 'package:archoera_music/services/netease/netease_api.dart';
@@ -17,6 +19,12 @@ import 'package:archoera_music/services/netease/track.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // song_url（可播直链）用例需「出口能取到可播 URL」：GitHub 境外出口对热门/
+  // 会员曲目一律返回空直链（地域/版权差异，非链路故障），而加密/搜索/歌词等
+  // 用例与此无关。默认跳过，设 ARCHOERA_ONLINE_TEST=1 启用（与
+  // online_playback_test.dart 同口径；CI 默认不跑，避免出口相关假红）。
+  final onlineEnabled = Platform.environment['ARCHOERA_ONLINE_TEST'] == '1';
+
   test('weapi 输出结构', () {
     final enc = nmWeapi({'s': 'test', 'type': 1, 'limit': 1, 'offset': 0, 'total': true});
     expect(enc.params, isNotEmpty);
@@ -62,6 +70,9 @@ void main() {
       // ignore: avoid_print
       print('URL[${picked!.title}] -> $url');
     },
+    skip: onlineEnabled
+        ? null
+        : '需出口可取到可播直链：设 ARCHOERA_ONLINE_TEST=1 启用',
     timeout: const Timeout(Duration(seconds: 30)),
   );
 }
