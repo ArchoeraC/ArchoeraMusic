@@ -227,7 +227,7 @@ jobs:
       - name: Cache vcpkg installed (恢复；ffmpeg/taglib 等预编译跨 run 秒级恢复)
         if: matrix.os == 'windows'
         id: vcpkg-cache
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           # 同时缓存 vcpkg 二进制缓存（archives）：只缓存 vcpkg_installed 时
           # vcpkg install 仍会因 ABI/完整性校验重编 ffmpeg（~13 分钟）；缓存
@@ -343,7 +343,7 @@ jobs:
       - name: Cache minimal FFmpeg (macOS)
         if: matrix.os == 'macos'
         id: ffmpeg-cache-macos
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.local/ffmpeg-minimal
           # tls 段：自包含 mbedTLS 引入后旧缓存（无 .mbedtls-tls 标记）必须失效重建。
