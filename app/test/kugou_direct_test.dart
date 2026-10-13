@@ -21,6 +21,12 @@ import 'package:archoera_music/services/netease/track.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // song_url（可播直链）用例需「出口能取到可播 URL」：GitHub 境外出口对部分
+  // 曲目（含 128k 档）会返回 null（地域/版权差异，非链路故障）。搜索/解析/
+  // 歌词/签名等与出口无关的断言照常执行；直链断言默认跳过，设
+  // ARCHOERA_ONLINE_TEST=1 启用（与 online_playback_test.dart 同口径）。
+  final onlineEnabled = Platform.environment['ARCHOERA_ONLINE_TEST'] == '1';
+
   // ── 加密 / 签名单元测试 ──────────────────────────────────────────
 
   test('signatureAndroidParams 输出 32 位 hex', () {
@@ -149,6 +155,12 @@ void main() {
       // ignore: avoid_print
       print('[KG] ${first.title} - ${first.artistNames} '
           '品质=${first.kugou!.available}');
+
+      // 以上搜索解析与出口无关；以下直链依赖出口取到可播 URL（见 main 顶部注释）。
+      if (!onlineEnabled) {
+        markTestSkipped('song_url 直链需出口可取可播 URL：设 ARCHOERA_ONLINE_TEST=1 启用');
+        return;
+      }
 
       // 免费歌（小苹果原版 128k，status=1 可播）
       const freeHash = '9ec281b0d7e8d236e435c965b0365b07';
