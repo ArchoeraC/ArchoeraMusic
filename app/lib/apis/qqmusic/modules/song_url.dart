@@ -61,16 +61,29 @@ String _randGuid() {
   return sb.toString();
 }
 
-/// 轻量探活：拉候选 URL 前 256 字节，确认 2xx 且非文本/JSON/HTML。
+/// 探活超时：同时覆盖「响应头」与「读取判定所需字节」两个阶段。
+const Duration _probeTimeout = Duration(seconds: 4);
+
+/// 判定可播所需的最小响应体字节数：读满即停，避免把整首读进内存。
+const int _probeMinBytes = 64;
+
+/// 轻量探活：拉候选 URL 前若干字节，确认 2xx 且非文本/JSON/HTML。
 /// 对齐 Mineraudio 的音频探测——避免把「HTTP 200 但其实是错误页/空体」的
 /// purl 交给播放器/下载器。探测失败时回落首个非空 purl（不因探测不可靠而丢源）。
+///
+/// 只读到判定所需的 [_probeMinBytes] 字节就 `break`：`await for` 跳出会自动
+/// 取消订阅，**不会**把整个响应体读进内存（此前用 `fold` 全量读取，若 CDN
+/// 忽略 Range 返回 200，无损 FLAC 会被整体读入而有 OOM 风险）。头部与体读取
+/// 共用 [_probeTimeout]，服务端发完头再 stall 也会被判为不可播。
+///
+/// 本函数仅用于取链探活，真正的下载读取走各自的下载通道，不受影响。
 Future<bool> _probePlayable(HttpClient client, String url) async {
   try {
     final req = await client.getUrl(Uri.parse(url));
     req.headers.set('Range', 'bytes=0-255');
     req.headers.set('User-Agent', qmWebUa);
     req.headers.set('Referer', 'https://y.qq.com/');
-    final res = await req.close().timeout(const Duration(seconds: 4));
+    final res = await req.close().timeout(_probeTimeout);
     final status = res.statusCode;
     if (status != 200 && status != 206) return false;
     final mime = res.headers.contentType?.mimeType ?? '';
@@ -80,8 +93,12 @@ Future<bool> _probePlayable(HttpClient client, String url) async {
         mime.contains('html')) {
       return false;
     }
-    final bytes = await res.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
-    return bytes.length >= 64;
+    var received = 0;
+    await for (final chunk in res.timeout(_probeTimeout)) {
+      received += chunk.length;
+      if (received >= _probeMinBytes) break;
+    }
+    return received >= _probeMinBytes;
   } catch (_) {
     return false;
   }
