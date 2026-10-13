@@ -3629,6 +3629,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'This software bundles the following fonts:\n· MiSans (© Xiaomi, under the MiSans Font Intellectual Property License Agreement)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (self-built icon font; glyphs from MingCute / Tabler / Lucide)\n· EtaMark (self-built brand-mark font)\n\nFull official license texts follow below.';
 
   @override
+  String get settingsSectionThirdPartyLicenses => 'Third-Party Licenses';
+
+  @override
+  String get settingsThirdPartyNative => 'Bundled native dependencies';
+
+  @override
+  String get settingsThirdPartyPackages => 'Dart / Flutter packages';
+
+  @override
+  String get settingsThirdPartyLicensesText =>
+      'This software bundles or links the following third-party open-source components. They are grouped below by **license text**, each with the component\'s full license (legal texts are not translated):\n· Bundled native dependencies: third-party libraries compiled into or dynamically linked by the native modules;\n· Dart / Flutter packages: `pub` dependencies, aggregated at runtime from the licenses each package registers.\n\nSee the bundled `licenses/` directory and `THIRD-PARTY-NOTICES.md` for the full list and per-component notes.';
+
+  @override
+  String get settingsThirdPartyLicensesEntryDesc =>
+      'View licenses of bundled dependencies and open-source components';
+
+  @override
   String get commonNoLyrics => 'No lyrics';
 
   @override
@@ -4558,6 +4575,100 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsScanQuarantineClearAllConfirm =>
       'Delete every file in the quarantine folder? This cannot be undone.';
+
+  @override
+  String get settingsCatSearchIndex => 'Local Search';
+
+  @override
+  String get settingsSearchIndexSubtitle =>
+      'Local library search index · off by default · relevance-ranked lyrics & metadata';
+
+  @override
+  String get settingsSectionSearchIndex => 'Local Library Search Index';
+
+  @override
+  String get settingsSearchIndexEnable => 'Enable local library search index';
+
+  @override
+  String get settingsSearchIndexEnableOn =>
+      'On: index builds in the background, search ranks by relevance (lyrics / pinyin)';
+
+  @override
+  String get settingsSearchIndexEnableOff =>
+      'Off: basic search only (title / artist / album); no index, no disk usage';
+
+  @override
+  String get settingsSearchIndexLrc => 'Index .lrc sidecar lyrics';
+
+  @override
+  String get settingsSearchIndexLrcDesc =>
+      'Also index .lrc lyrics named after the audio file (master switch required)';
+
+  @override
+  String get settingsSearchIndexNote =>
+      'The index is derived data: off by default and free; enabling builds it in the background using time and disk (hundreds of MB for 10k tracks), and failures fall back to basic search automatically.';
+
+  @override
+  String get settingsSectionSearchIndexStatus => 'Status & Maintenance';
+
+  @override
+  String get settingsSearchIndexStatusDisabled => 'Disabled';
+
+  @override
+  String get settingsSearchIndexStatusReady => 'Index ready';
+
+  @override
+  String get settingsSearchIndexStatusBuilding => 'Building index…';
+
+  @override
+  String get settingsSearchIndexStatusPending =>
+      'Not ready (builds on first search or rebuild)';
+
+  @override
+  String settingsSearchIndexStatusError({required String reason}) {
+    return 'Index unavailable: $reason (fell back to basic search)';
+  }
+
+  @override
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  }) {
+    return 'Building: $phase　$processed/$total';
+  }
+
+  @override
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  }) {
+    return 'Last build: $indexed tracks in ${duration}s';
+  }
+
+  @override
+  String settingsSearchIndexSize({required String size}) {
+    return 'Index size: $size';
+  }
+
+  @override
+  String get settingsSearchIndexRebuild => 'Rebuild index';
+
+  @override
+  String get settingsSearchIndexDelete => 'Delete index';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmTitle => 'Delete search index?';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmBody =>
+      'This frees the disk space used by the index; it will be rebuilt on the next search. The library and source files are not affected.';
+
+  @override
+  String get settingsSearchIndexDeleted => 'Search index deleted';
+
+  @override
+  String get settingsSearchIndexRebuildStarted => 'Rebuilding index…';
 
   @override
   String get libraryFullScan => 'Full Scan';

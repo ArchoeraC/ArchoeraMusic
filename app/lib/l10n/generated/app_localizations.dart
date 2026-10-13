@@ -6448,6 +6448,36 @@ abstract class AppLocalizations {
   /// **'本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。'**
   String get settingsFontCreditsText;
 
+  /// No description provided for @settingsSectionThirdPartyLicenses.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'第三方开源许可'**
+  String get settingsSectionThirdPartyLicenses;
+
+  /// No description provided for @settingsThirdPartyNative.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'随包原生依赖'**
+  String get settingsThirdPartyNative;
+
+  /// No description provided for @settingsThirdPartyPackages.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Dart / Flutter 包'**
+  String get settingsThirdPartyPackages;
+
+  /// No description provided for @settingsThirdPartyLicensesText.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本软件随包内嵌或链接以下第三方开源组件，下方按其**许可正文**分组列出各组件的许可全文（法定文本不翻译）：\n· 随包原生依赖：各原生模块编译期内嵌或动态链接的第三方库；\n· Dart / Flutter 包：`pub` 依赖，运行时聚合各包自行登记的许可。\n\n各组件完整许可正文亦随包 `licenses/` 分发；完整清单与逐项说明另见 `THIRD-PARTY-NOTICES.md`。'**
+  String get settingsThirdPartyLicensesText;
+
+  /// No description provided for @settingsThirdPartyLicensesEntryDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'查看随包依赖与开源组件的许可正文'**
+  String get settingsThirdPartyLicensesEntryDesc;
+
   /// No description provided for @commonNoLyrics.
   ///
   /// In zh_CN, this message translates to:
@@ -8059,6 +8089,157 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'确定删除隔离区中的所有文件吗？该操作不可恢复。'**
   String get settingsScanQuarantineClearAllConfirm;
+
+  /// No description provided for @settingsCatSearchIndex.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本地搜索'**
+  String get settingsCatSearchIndex;
+
+  /// No description provided for @settingsSearchIndexSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本地曲库搜索索引 · 默认关闭 · 开启后按相关度搜索歌词与元数据'**
+  String get settingsSearchIndexSubtitle;
+
+  /// No description provided for @settingsSectionSearchIndex.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本地曲库搜索索引'**
+  String get settingsSectionSearchIndex;
+
+  /// No description provided for @settingsSearchIndexEnable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用本地曲库搜索索引'**
+  String get settingsSearchIndexEnable;
+
+  /// No description provided for @settingsSearchIndexEnableOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开启：后台构建索引，搜索按相关度排序（支持歌词 / 拼音）'**
+  String get settingsSearchIndexEnableOn;
+
+  /// No description provided for @settingsSearchIndexEnableOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭：使用基础搜索（标题 / 歌手 / 专辑），不建索引、零磁盘占用'**
+  String get settingsSearchIndexEnableOff;
+
+  /// No description provided for @settingsSearchIndexLrc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'索引 .lrc 侧车歌词'**
+  String get settingsSearchIndexLrc;
+
+  /// No description provided for @settingsSearchIndexLrcDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'同时索引与音频同名的 .lrc 歌词（需先启用总开关）'**
+  String get settingsSearchIndexLrcDesc;
+
+  /// No description provided for @settingsSearchIndexNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'索引是派生数据：默认关闭零成本；开启后首次构建占用时间与磁盘（随曲库增长，约数百 MB @ 万首），构建失败会自动回退基础搜索。'**
+  String get settingsSearchIndexNote;
+
+  /// No description provided for @settingsSectionSearchIndexStatus.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'状态与维护'**
+  String get settingsSectionSearchIndexStatus;
+
+  /// No description provided for @settingsSearchIndexStatusDisabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未启用'**
+  String get settingsSearchIndexStatusDisabled;
+
+  /// No description provided for @settingsSearchIndexStatusReady.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'索引就绪'**
+  String get settingsSearchIndexStatusReady;
+
+  /// No description provided for @settingsSearchIndexStatusBuilding.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'正在构建索引…'**
+  String get settingsSearchIndexStatusBuilding;
+
+  /// No description provided for @settingsSearchIndexStatusPending.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未就绪（首次搜索或重建时按需构建）'**
+  String get settingsSearchIndexStatusPending;
+
+  /// No description provided for @settingsSearchIndexStatusError.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'索引不可用：{reason}（已回退基础搜索）'**
+  String settingsSearchIndexStatusError({required String reason});
+
+  /// No description provided for @settingsSearchIndexProgress.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'构建中：{phase}　{processed}/{total}'**
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  });
+
+  /// No description provided for @settingsSearchIndexLastResult.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'上次构建：{indexed} 条，用时 {duration} 秒'**
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  });
+
+  /// No description provided for @settingsSearchIndexSize.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'索引体积：{size}'**
+  String settingsSearchIndexSize({required String size});
+
+  /// No description provided for @settingsSearchIndexRebuild.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重建索引'**
+  String get settingsSearchIndexRebuild;
+
+  /// No description provided for @settingsSearchIndexDelete.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除索引'**
+  String get settingsSearchIndexDelete;
+
+  /// No description provided for @settingsSearchIndexDeleteConfirmTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除搜索索引？'**
+  String get settingsSearchIndexDeleteConfirmTitle;
+
+  /// No description provided for @settingsSearchIndexDeleteConfirmBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'删除后释放索引占用的磁盘空间；下次搜索会重新构建。此操作不影响曲库与源文件。'**
+  String get settingsSearchIndexDeleteConfirmBody;
+
+  /// No description provided for @settingsSearchIndexDeleted.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已删除搜索索引'**
+  String get settingsSearchIndexDeleted;
+
+  /// No description provided for @settingsSearchIndexRebuildStarted.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已开始重建索引'**
+  String get settingsSearchIndexRebuildStarted;
 
   /// No description provided for @libraryFullScan.
   ///

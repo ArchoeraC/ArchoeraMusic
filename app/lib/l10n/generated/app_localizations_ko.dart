@@ -3515,6 +3515,23 @@ class AppLocalizationsKo extends AppLocalizations {
       '이 소프트웨어에는 다음 글꼴이 포함되어 있습니다:\n· MiSans (© Xiaomi, MiSans 글꼴 지식재산권 허락 계약에 따라 사용)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (자체 제작 아이콘 글꼴; 글리프 출처 MingCute / Tabler / Lucide)\n· EtaMark (자체 제작 브랜드 마크 글꼴)\n\n아래에 각 글꼴·글리프의 공식 라이선스 전문을 수록합니다.';
 
   @override
+  String get settingsSectionThirdPartyLicenses => '서드파티 오픈소스 라이선스';
+
+  @override
+  String get settingsThirdPartyNative => '동봉된 네이티브 종속성';
+
+  @override
+  String get settingsThirdPartyPackages => 'Dart / Flutter 패키지';
+
+  @override
+  String get settingsThirdPartyLicensesText =>
+      '이 소프트웨어는 다음 서드파티 오픈소스 구성 요소를 동봉하거나 링크합니다. 아래에서는 **라이선스 본문**별로 묶어 각 구성 요소의 라이선스 전문을 수록합니다(법적 문구는 번역하지 않음):\n· 동봉된 네이티브 종속성: 각 네이티브 모듈이 컴파일 시 포함하거나 동적으로 링크하는 서드파티 라이브러리;\n· Dart / Flutter 패키지: `pub` 종속성으로, 각 패키지가 등록한 라이선스를 런타임에 집계.\n\n전체 목록과 구성 요소별 설명은 동봉된 `licenses/` 디렉터리와 `THIRD-PARTY-NOTICES.md`를 참조하세요.';
+
+  @override
+  String get settingsThirdPartyLicensesEntryDesc =>
+      '동봉된 종속성 및 오픈소스 구성 요소의 라이선스 보기';
+
+  @override
   String get commonNoLyrics => '가사 없음';
 
   @override
@@ -4401,6 +4418,100 @@ class AppLocalizationsKo extends AppLocalizations {
   @override
   String get settingsScanQuarantineClearAllConfirm =>
       '격리 폴더의 모든 파일을 삭제할까요? 이 작업은 되돌릴 수 없습니다.';
+
+  @override
+  String get settingsCatSearchIndex => '로컬 검색';
+
+  @override
+  String get settingsSearchIndexSubtitle =>
+      '로컬 라이브러리 검색 인덱스 · 기본 꺼짐 · 켜면 관련도순으로 가사와 메타데이터 검색';
+
+  @override
+  String get settingsSectionSearchIndex => '로컬 라이브러리 검색 인덱스';
+
+  @override
+  String get settingsSearchIndexEnable => '로컬 라이브러리 검색 인덱스 사용';
+
+  @override
+  String get settingsSearchIndexEnableOn =>
+      '켜짐: 백그라운드에서 인덱스를 구축하고 관련도순으로 검색(가사 / 병음 지원)';
+
+  @override
+  String get settingsSearchIndexEnableOff =>
+      '꺼짐: 기본 검색만(제목 / 아티스트 / 앨범), 인덱스 없음 · 디스크 사용 없음';
+
+  @override
+  String get settingsSearchIndexLrc => '.lrc 사이드카 가사 인덱싱';
+
+  @override
+  String get settingsSearchIndexLrcDesc =>
+      '오디오와 같은 이름의 .lrc 가사도 함께 인덱싱합니다(마스터 스위치 필요)';
+
+  @override
+  String get settingsSearchIndexNote =>
+      '인덱스는 파생 데이터입니다: 기본값은 꺼짐이며 비용이 없습니다. 켜면 최초 구축에 시간과 디스크(1만 곡 기준 수백 MB)를 사용하며, 실패하면 자동으로 기본 검색으로 폴백합니다.';
+
+  @override
+  String get settingsSectionSearchIndexStatus => '상태 및 유지 관리';
+
+  @override
+  String get settingsSearchIndexStatusDisabled => '사용 안 함';
+
+  @override
+  String get settingsSearchIndexStatusReady => '인덱스 준비됨';
+
+  @override
+  String get settingsSearchIndexStatusBuilding => '인덱스 구축 중…';
+
+  @override
+  String get settingsSearchIndexStatusPending =>
+      '준비 안 됨(첫 검색 또는 재구축 시 온디맨드 구축)';
+
+  @override
+  String settingsSearchIndexStatusError({required String reason}) {
+    return '인덱스 사용 불가: $reason(기본 검색으로 폴백)';
+  }
+
+  @override
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  }) {
+    return '구축 중: $phase　$processed/$total';
+  }
+
+  @override
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  }) {
+    return '마지막 구축: $indexed곡, $duration초';
+  }
+
+  @override
+  String settingsSearchIndexSize({required String size}) {
+    return '인덱스 크기: $size';
+  }
+
+  @override
+  String get settingsSearchIndexRebuild => '인덱스 재구축';
+
+  @override
+  String get settingsSearchIndexDelete => '인덱스 삭제';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmTitle => '검색 인덱스를 삭제할까요?';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmBody =>
+      '인덱스가 사용하는 디스크 공간을 해제합니다. 다음 검색 시 다시 구축됩니다. 라이브러리와 원본 파일에는 영향을 주지 않습니다.';
+
+  @override
+  String get settingsSearchIndexDeleted => '검색 인덱스를 삭제했습니다';
+
+  @override
+  String get settingsSearchIndexRebuildStarted => '인덱스 재구축을 시작했습니다';
 
   @override
   String get libraryFullScan => '전체 스캔';

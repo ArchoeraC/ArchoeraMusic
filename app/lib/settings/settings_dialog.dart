@@ -27,6 +27,7 @@ import '../widgets/common/toast.dart';
 import 'cache_section.dart';
 import 'history_section.dart';
 import 'scans_section.dart';
+import 'search_section.dart';
 import 'security_section.dart';
 import 'settings_categories.dart';
 import 'settings_sections.dart';

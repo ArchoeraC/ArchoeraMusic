@@ -106,11 +106,12 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   COMPONENT Runtime)
 
 # === ArchoeraMusic 原生产物打包（与 linux/CMakeLists.txt 对齐）===
-# 引擎模块位于 app/core/{audio-engine,scanner,scraper,subsonic}，产物由独立构建链
-# 产出（CI workflow 在 flutter build 前显式构建）；install 统一装进 native/ 平铺
+# 引擎模块位于 app/core/{audio-engine,scanner,indexer,scraper,subsonic}，产物由独立
+# 构建链产出（CI workflow 在 flutter build 前显式构建）；install 统一装进 native/ 平铺
 # （对齐 ffi-libs-layout 计划；NativeLibPaths 祖先链优先查 native/）：
 #   Release/native/{archoera-audio-engine.exe,archoera_mediaengine.dll,fft.dll}
 #   Release/native/{scanner-ffi.dll,e_sqlite3.dll}
+#   Release/native/{indexer-ffi.dll}（e_sqlite3.dll 已由 scanner 提供，indexer 仅兜底）
 #   Release/native/archoera_scraper.dll
 #   Release/native/{libarchoera_subsonic.dll,archoera_transcoder.dll}
 #   Release/native/archoera-vault.exe
@@ -118,6 +119,7 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
 # 源产物缺失时跳过（OPTIONAL），保证未构建原生模块时仍可跑 Flutter 构建。
 set(ENGINE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/build")
 set(SCANNER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scanner/build")
+set(INDEXER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/indexer/build")
 set(SCRAPER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scraper/build")
 set(SUBSONIC_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/subsonic/build")
 
@@ -137,6 +139,16 @@ install(FILES "${ENGINE_SRC_DIR}/archoera_kernel.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/e_sqlite3.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# 本地曲库搜索索引库（indexer-ffi，.NET NativeAOT；NativeModule.indexer 按需加载，
+# 总开关默认关）。源产物由 core/indexer/build.sh / build_windows.bat 产出。
+install(FILES "${INDEXER_SRC_DIR}/indexer-ffi.dll"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# e_sqlite3.dll 兜底：indexer 亦随包分发同版本（与 scanner 同 NuGet 包）；
+# 仅当 scanner 目录缺失时由 indexer 补齐，避免与上方同名产物重复安装。
+if(NOT EXISTS "${SCANNER_SRC_DIR}/e_sqlite3.dll")
+  install(FILES "${INDEXER_SRC_DIR}/e_sqlite3.dll"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+endif()
 install(FILES "${SCRAPER_SRC_DIR}/archoera_scraper.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_subsonic.dll"

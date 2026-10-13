@@ -1,0 +1,227 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// 本地曲库搜索索引器 P5 性能 harness —— 查询延迟（同一进程内循环）。
+//
+// 目的：在**单个进程内**对 search.db 反复执行一组代表查询，测量 P50 / P95，
+// 排除 `dotnet run` / 进程启动开销（设计文档 §7.3 / §7.4）。
+//
+// 直接复用生产 FtsStore（同一 MATCH + bm25 权重路径）与 Analyzer（查询侧同构），
+// 不复制逻辑、不新增依赖。A/B 两组（拼音列开 / 关）各跑一次。
+//
+// 用法：
+//   qbench --index <search.db> --label A --pinyin on|off
+//          [--repeats 60] [--warmup 5] [--limit 50] [--out <json>]
+// 退出码：0 成功；1 参数 / 运行错误。
+
+using System.Diagnostics;
+using System.Text.Json;
+using Archoera.Indexer;
+
+namespace Archoera.Indexer.Bench;
+
+/// <summary>查询延迟测量 harness（in-process，排除进程启动开销）。</summary>
+public static class QueryBench
+{
+    /// <summary>代表查询（§8）：中文子串 / 中文短语 / 繁体 / 拼音连写 / 首字母 / 拉丁前缀 / 拉丁整词。</summary>
+    private sealed record QueryCase(string Name, string Text);
+
+    private static readonly QueryCase[] Cases =
+    {
+        new("cjk_substring", "\u7231\u4f60"),          // 爱你
+        new("cjk_phrase", "\u6211\u597d\u7231\u4f60"),  // 我好爱你
+        new("traditional", "\u611b"),                    // 愛（繁体，查询侧归一）
+        new("pinyin_joined", "woaini"),
+        new("pinyin_initials", "wan"),
+        new("latin_prefix", "love"),
+        new("latin_word", "hello"),
+    };
+
+    public static int Main(string[] args)
+    {
+        string? index = null;
+        string? outPath = null;
+        var label = "A";
+        var pinyinMode = "on";
+        var repeats = 60;
+        var warmup = 5;
+        var limit = 50;
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--index" when i + 1 < args.Length: index = args[++i]; break;
+                case "--label" when i + 1 < args.Length: label = args[++i]; break;
+                case "--pinyin" when i + 1 < args.Length: pinyinMode = args[++i]; break;
+                case "--out" when i + 1 < args.Length: outPath = args[++i]; break;
+                case "--repeats" when i + 1 < args.Length && int.TryParse(args[++i], out var r): repeats = r; break;
+                case "--warmup" when i + 1 < args.Length && int.TryParse(args[++i], out var w): warmup = w; break;
+                case "--limit" when i + 1 < args.Length && int.TryParse(args[++i], out var l): limit = l; break;
+                case "-h" or "--help":
+                    Console.Error.WriteLine(
+                        "qbench --index <search.db> --label A --pinyin on|off [--repeats N] [--warmup N] [--limit N] [--out f.json]");
+                    return 0;
+            }
+        }
+
+        if (index is null || !File.Exists(index))
+        {
+            Console.Error.WriteLine("缺少有效 --index <search.db>");
+            return 1;
+        }
+        if (repeats <= 0) repeats = 1;
+
+        var withPinyin = !string.Equals(pinyinMode, "off", StringComparison.OrdinalIgnoreCase);
+
+        using var store = new FtsStore();
+        store.Open(index, build: false);
+
+        var queries = new List<object>();
+        var pooled = new List<double>(Cases.Length * repeats);
+
+        foreach (var q in Cases)
+        {
+            var match = BuildMatch(q, withPinyin);
+            var rows = 0;
+
+            for (var i = 0; i < warmup; i++) rows = RunOnce(store, match, limit);
+
+            var samples = new List<double>(repeats);
+            for (var i = 0; i < repeats; i++)
+            {
+                var t0 = Stopwatch.GetTimestamp();
+                rows = RunOnce(store, match, limit);
+                var t1 = Stopwatch.GetTimestamp();
+                samples.Add((t1 - t0) * 1000.0 / Stopwatch.Frequency);
+            }
+
+            samples.Sort();
+            pooled.AddRange(samples);
+
+            var p50 = Percentile(samples, 0.50);
+            var p95 = Percentile(samples, 0.95);
+            var mean = samples.Count > 0 ? samples.Sum() / samples.Count : 0.0;
+
+            queries.Add(new
+            {
+                name = q.Name,
+                text = q.Text,
+                match,
+                rows,
+                count = samples.Count,
+                p50_ms = Round(p50),
+                p95_ms = Round(p95),
+                mean_ms = Round(mean),
+                min_ms = Round(samples.Count > 0 ? samples[0] : 0.0),
+                max_ms = Round(samples.Count > 0 ? samples[^1] : 0.0),
+            });
+
+            Console.WriteLine(
+                $"[{label}] {q.Name,-16} rows={rows,6} p50={p50,8:F3}ms p95={p95,8:F3}ms  expr={match}");
+        }
+
+        pooled.Sort();
+        var pooledP50 = Percentile(pooled, 0.50);
+        var pooledP95 = Percentile(pooled, 0.95);
+        var pooledMean = pooled.Count > 0 ? pooled.Sum() / pooled.Count : 0.0;
+
+        var report = new
+        {
+            label,
+            index = Path.GetFullPath(index),
+            pinyin = withPinyin,
+            repeats,
+            warmup,
+            limit,
+            queries,
+            pooled = new
+            {
+                count = pooled.Count,
+                p50_ms = Round(pooledP50),
+                p95_ms = Round(pooledP95),
+                mean_ms = Round(pooledMean),
+                max_ms = Round(pooled.Count > 0 ? pooled[^1] : 0.0),
+            },
+        };
+
+        var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
+        if (outPath is not null) File.WriteAllText(outPath, json);
+        Console.WriteLine(json);
+
+        return 0;
+    }
+
+    private static int RunOnce(FtsStore store, string matchExpr, int limit)
+        => store.Search(matchExpr, limit, 0).Count;
+
+    /// <summary>
+    /// 构造 FTS5 MATCH 表达式（查询侧同构语义，设计文档 §4）：
+    ///   - **中文查询**（含 CJK）：只用词元解释（CJK bigram+unigram），空格 = 隐式 AND；
+    ///   - **拉丁查询**：词元解释（拉丁整词，追加 `*` 前缀）；若查询侧分析出与整词不同的
+    ///     全拼音节序列（如 `woaini` → `wo ai ni`），追加拼音解释（末音节前缀），OR 组合；
+    ///     首字母形态（如 `wan`）作为单 token 存在于 pinyin 列，默认全列 MATCH 即可命中。
+    /// `--pinyin off`（B 组，拼音列留空）不追加拼音解释，模拟关闭拼音时的用户可见行为。
+    /// </summary>
+    private static string BuildMatch(QueryCase q, bool withPinyin)
+    {
+        var analyzed = Analyzer.AnalyzeQuery(q.Text);
+        var lexical = analyzed.Lexical.Where(t => t.Length > 0).ToList();
+        var hasCjk = q.Text.Any(Analyzer.IsCjk);
+
+        var lexExpr = lexical.Count > 0 ? AndExpr(lexical) : null;
+
+        // 仅纯拉丁查询考虑拼音解释；中文查询保持纯词元（避免无谓放宽）。
+        string? pinyinExpr = null;
+        if (withPinyin && !hasCjk && analyzed.Pinyin.Count > 0)
+        {
+            var syllables = string.Join(' ', analyzed.Pinyin);
+            var whole = string.Join(' ', lexical);
+            if (!string.Equals(syllables, whole, StringComparison.Ordinal))
+                pinyinExpr = PinyinExpr(analyzed.Pinyin);
+        }
+
+        if (lexExpr is null && pinyinExpr is null) return "\"\"";
+        if (lexExpr is null) return pinyinExpr!;
+        if (pinyinExpr is null) return lexExpr;
+        return $"({lexExpr}) OR ({pinyinExpr})";
+    }
+
+    private static string AndExpr(IReadOnlyList<string> tokens)
+        => string.Join(" AND ", tokens.Select(
+            t => Quote(t) + (IsLatinOrDigit(t) ? "*" : string.Empty)));
+
+    /// <summary>全拼音节 AND（末音节前缀，支持边打边搜）。</summary>
+    private static string PinyinExpr(IReadOnlyList<string> tokens)
+    {
+        var parts = new List<string>(tokens.Count);
+        for (var i = 0; i < tokens.Count; i++)
+            parts.Add(Quote(tokens[i]) + (i == tokens.Count - 1 ? "*" : string.Empty));
+        return string.Join(" AND ", parts);
+    }
+
+    private static string Quote(string token) => "\"" + token.Replace("\"", "\"\"") + "\"";
+
+    private static bool IsLatinOrDigit(string token)
+    {
+        if (token.Length == 0) return false;
+        foreach (var c in token)
+        {
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))) return false;
+        }
+        return true;
+    }
+
+    /// <summary>最近秩（nearest-rank）百分位；列表须已升序。</summary>
+    private static double Percentile(List<double> sorted, double p)
+    {
+        if (sorted.Count == 0) return 0.0;
+        var idx = (int)Math.Ceiling(p * sorted.Count) - 1;
+        if (idx < 0) idx = 0;
+        if (idx >= sorted.Count) idx = sorted.Count - 1;
+        return sorted[idx];
+    }
+
+    private static double Round(double v) => Math.Round(v, 4, MidpointRounding.AwayFromZero);
+}
