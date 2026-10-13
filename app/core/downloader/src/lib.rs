@@ -1946,7 +1946,7 @@ mod identity_tests {
 
     fn set_identity_json(json: &str) -> i32 {
         let c = CString::new(json).unwrap();
-        unsafe { archoera_downloader_set_identity(c.as_ptr()) }
+        archoera_downloader_set_identity(c.as_ptr())
     }
 
     /// 注入值优先：酷狗 mid / 网易 deviceId / _ntes_nuid 全部用注入值
@@ -1992,7 +1992,7 @@ mod identity_tests {
         assert_eq!(kugou_mid(), "1234567890");
 
         // 清除 → 注入值不再生效
-        unsafe { archoera_downloader_clear_identity() };
+        archoera_downloader_clear_identity();
         let mid1 = kugou_mid();
         assert_ne!(mid1, "1234567890");
         // 会话内稳定：连续两次取 mid 相同（惰性生成只写回一次）

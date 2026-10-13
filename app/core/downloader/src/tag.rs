@@ -271,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn strip_scans_fLaC_when_declared_size_bogus() {
+    fn strip_scans_flac_when_declared_size_bogus() {
         // 声明大小异常（110 字节）但窗口内能扫到真实 fLaC → 按实际偏移剥离
         let mut data = Vec::new();
         data.extend_from_slice(b"ID3");
@@ -288,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn strip_skips_when_no_fLaC_in_window() {
+    fn strip_skips_when_no_flac_in_window() {
         // 声明大小异常且窗口内找不到 fLaC → 不剥离、不破坏原文件
         let mut data = Vec::new();
         data.extend_from_slice(b"ID3");
