@@ -1077,7 +1077,7 @@ jobs:
       # 注：完整的「每个构建作业自带溯源 + macOS 公证 / Windows Authenticode
       # 代码签名」仍为待办（见 docs/supply-chain.md）。
       - name: 生成构建溯源 attestation（SEC-25）
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: 'assets/*'
 
