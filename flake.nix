@@ -3,7 +3,7 @@
   #
   # 拆成多个 derivation，便于**增量构建**：Nix 按输入哈希缓存成功产物，改动某一
   # 模块只重编它及其下游，已成功的阶段直接跳过。
-  #   ffmpegMinimal → kernel → audioEngine / scraper / scanner / vault(Rust) /
+  #   ffmpegMinimal → kernel → audioEngine / scraper / scanner / indexer / vault(Rust) /
   #                   downloader / subsonic / platform → default(app)
   #
   # 构建需要联网（pub / NuGet / crates.io / go modules / FFmpeg 源码），故：
@@ -262,7 +262,47 @@ NUGETCFG
         meta = commonMeta // { description = "ArchoeraMusic library scanner (NativeAOT)"; };
       };
 
-      # ── 6. vault（Rust 静态单文件；C# 版已于 2026-10-12 删除）────────────
+      # ── 6. indexer（.NET NativeAOT 本地曲库搜索索引；与 scanner 同栈）─────
+      # 产物 indexer-ffi.so + libe_sqlite3.so（libe_sqlite3 与 scanner 同 NuGet 版本；
+      # scanner 目录缺失时由 Flutter linux/CMakeLists 兜底使用）。
+      # data/*.tsv 为随源码提交的派生表，故无需 python3 现场生成。
+      indexer = pkgs.stdenv.mkDerivation {
+        pname = "archoera-indexer";
+        inherit version;
+        src = src;
+        nativeBuildInputs = with pkgs; [
+          dotnet-sdk_10
+          clang
+          cacert
+          curl
+        ];
+        buildInputs = with pkgs; [ zlib ];
+        strictDeps = false;
+        dontConfigure = true;
+        dontConfigureNuget = true;
+        preBuild = netEnv + nugetSetup;
+        buildPhase = ''
+          runHook preBuild
+          set -euo pipefail
+          (
+            cd app/core/indexer
+            dotnet publish indexer-ffi/indexer-ffi.csproj -c Release -r linux-x64 -o build/publish
+            cp build/publish/indexer-ffi.so build/
+            cp build/publish/libe_sqlite3.so build/
+          )
+          runHook postBuild
+        '';
+        installPhase = ''
+          runHook preInstall
+          mkdir -p $out
+          cp -a app/core/indexer/build/indexer-ffi.so \
+                app/core/indexer/build/libe_sqlite3.so $out/
+          runHook postInstall
+        '';
+        meta = commonMeta // { description = "ArchoeraMusic local search indexer (NativeAOT)"; };
+      };
+
+      # ── 7. vault（Rust 静态单文件；C# 版已于 2026-10-12 删除）────────────
       vault = pkgs.stdenv.mkDerivation {
         pname = "archoera-vault";
         inherit version;
@@ -298,7 +338,7 @@ NUGETCFG
         meta = commonMeta // { description = "ArchoeraMusic credential vault (Rust, static)"; };
       };
 
-      # ── 7. downloader（Rust cdylib）──────────────────────────────────────
+      # ── 8. downloader（Rust cdylib）──────────────────────────────────────
       downloader = pkgs.stdenv.mkDerivation {
         pname = "archoera-downloader";
         inherit version;
@@ -328,7 +368,7 @@ NUGETCFG
         meta = commonMeta // { description = "ArchoeraMusic downloader (Rust)"; };
       };
 
-      # ── 8. subsonic（Go c-shared + Rust 转码器）──────────────────────────
+      # ── 9. subsonic（Go c-shared + Rust 转码器）──────────────────────────
       subsonic = pkgs.stdenv.mkDerivation {
         pname = "archoera-subsonic";
         inherit version;
@@ -360,7 +400,7 @@ NUGETCFG
         meta = commonMeta // { description = "ArchoeraMusic subsonic server (Go + Rust)"; };
       };
 
-      # ── 9. platform bridge（C++ + CMake，dbus）───────────────────────────
+      # ── 10. platform bridge（C++ + CMake，dbus）───────────────────────────
       platform = pkgs.stdenv.mkDerivation {
         pname = "archoera-platform";
         inherit version;
@@ -388,7 +428,7 @@ NUGETCFG
         meta = commonMeta // { description = "ArchoeraMusic platform bridge"; };
       };
 
-      # ── 10. Flutter 应用 + 组装 ──────────────────────────────────────────
+      # ── 11. Flutter 应用 + 组装 ──────────────────────────────────────────
       archoera-music = pkgs.stdenv.mkDerivation {
         pname = "archoera-music";
         inherit version;
@@ -459,19 +499,21 @@ NUGETCFG
           # 放回原生模块产物（Flutter 的 linux/CMakeLists 从 core/*/build 安装；
           # downloader 由 Flutter 的 CMake 内嵌 cargo 构建，无需预置）
           mkdir -p app/core/audio-engine/build app/core/audio-engine/zig-out \
-            app/core/scanner/build app/core/scraper/build app/core/subsonic/build \
+            app/core/scanner/build app/core/indexer/build app/core/scraper/build \
+            app/core/subsonic/build \
             app/core/vault-rs/build app/native/platform/build/out
           cp -a ${audioEngine}/. app/core/audio-engine/build/
           cp -a ${kernel}/. app/core/audio-engine/zig-out/
           cp -a ${scanner}/. app/core/scanner/build/
+          cp -a ${indexer}/. app/core/indexer/build/
           cp -a ${scraper}/. app/core/scraper/build/
           cp -a ${subsonic}/. app/core/subsonic/build/
           cp -a ${vault}/. app/core/vault-rs/build/
           cp -a ${platform}/. app/native/platform/build/out/
           # cp -a 从只读 Nix store 拷贝会把目标目录也设成只读，导致 CMake 目标
           # （audio_engine_cmake / subsonic_go）无法创建 pkgRedirects → 递归加写权限。
-          chmod -R u+w app/core/audio-engine app/core/scanner app/core/scraper \
-            app/core/subsonic app/core/vault-rs app/native/platform
+          chmod -R u+w app/core/audio-engine app/core/scanner app/core/indexer \
+            app/core/scraper app/core/subsonic app/core/vault-rs app/native/platform
 
           echo "==> flutter build linux"
           (
@@ -543,6 +585,7 @@ NUGETCFG
           audioEngine
           scraper
           scanner
+          indexer
           vault
           downloader
           subsonic

@@ -37,10 +37,14 @@ mixin _LibraryStoreCore on Notifier<LibraryState> {
   }
 
   /// 按当前搜索条件取全量（不含 lyrics），供「播放全部」建队列。
+  ///
+  /// 索引排行路径下按排行顺序取行（与列表一致）；否则既有 `LIKE` 全量。
   Future<List<TrackRow>> _allTracks() async {
     try {
       final db = TracksDb.open();
-      final rows = db.allTracks(query: state.searchQuery);
+      final rows = state.searchIndexActive
+          ? db.listTracksByIds(state.rankedIds)
+          : db.allTracks(query: state.searchQuery);
       db.close();
       return rows;
     } catch (_) {

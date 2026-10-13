@@ -7,6 +7,7 @@ rem    1. vswhere 定位 VS + call vcvars64.bat（MSVC/cl.exe/link.exe 环境）
 rem    2. audio-engine : cargo tempo staticlib + cl 直编 fft.dll / archoera_mediaengine.dll
 rem    3. scraper      : CMake + vcpkg toolchain（Windows 保留 CMake）
 rem    4. scanner      : dotnet publish (NativeAOT) + e_sqlite3.dll
+rem    4b. indexer     : dotnet publish (NativeAOT, indexer-ffi) + e_sqlite3.dll
 rem    5. downloader   : cargo build --release (cdylib)
 rem    6. subsonic     : cargo transcoder + go c-shared + go standalone
 rem    7. vault        : cargo build（vault-rs，Rust 静态链接凭据保险库）
@@ -203,6 +204,29 @@ rem csproj 的 CopyToScannerBuild target（AfterTargets=Publish）已把主库�
 rem e_sqlite3.dll 复制到 build/（publish 目录含 x64 子目录，不在此硬编码路径）
 if not exist "build\scanner-ffi.dll" (
     echo [build_windows] ERROR: scanner-ffi.dll 未复制到 build/
+    exit /b 1
+)
+if not exist "build\e_sqlite3.dll" (
+    echo [build_windows] ERROR: SQLitePCLRaw 原生库缺失 ^(e_sqlite3.dll^)
+    exit /b 1
+)
+popd
+
+rem =====================================================================
+rem  4b. indexer：dotnet publish (NativeAOT) + sqlite 原生库（与 scanner 同栈）
+rem      本地曲库搜索索引器 indexer-ffi.dll；由 app/windows/CMakeLists install
+rem      进 native/（总开关默认关时 Dart 侧不加载，见 lib/services/search/）。
+rem =====================================================================
+echo [build_windows] ===== indexer =====
+pushd "%ROOT%indexer"
+if not exist build mkdir build
+dotnet publish indexer-ffi\indexer-ffi.csproj -c Release -r win-x64
+if errorlevel 1 exit /b 1
+
+rem csproj 的 CopyToIndexerBuild target（AfterTargets=Publish）已把主库与
+rem e_sqlite3.dll 复制到 build/（publish 目录含 x64 子目录，不在此硬编码路径）
+if not exist "build\indexer-ffi.dll" (
+    echo [build_windows] ERROR: indexer-ffi.dll 未复制到 build/
     exit /b 1
 )
 if not exist "build\e_sqlite3.dll" (

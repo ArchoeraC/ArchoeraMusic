@@ -9,6 +9,9 @@
 #  清单格式：每行 "<64-hex-sha256>  <basename>"（两个空格分隔），按基名排序；
 #  键为文件名基（库与其清单同目录），校验方只按 basename 查表。
 #
+#  覆盖 bundled native/ 下的全部 FFI 库（含 scanner-ffi / indexer-ffi 及其
+#  同目录 libe_sqlite3），无需逐库枚举。
+#
 #  用法：gen_native_manifest.sh <native_dir> [extra_file ...]
 #    <native_dir>  安装后的 native/ 目录（其下常规文件全部纳入）
 #    extra_file    额外纳入的文件（如 exe 根的可执行文件、data/app.so）

@@ -3668,6 +3668,23 @@ class AppLocalizationsDe extends AppLocalizations {
       'Diese Software enthält die folgenden Schriftarten:\n· MiSans (© Xiaomi, gemäß der MiSans Font Intellectual Property License Agreement)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (selbst erstellte Icon-Schriftart; Glyphen von MingCute / Tabler / Lucide)\n· EtaMark (selbst erstellte Markenzeichenschrift)\n\nDie vollständigen offiziellen Lizenztexte folgen unten.';
 
   @override
+  String get settingsSectionThirdPartyLicenses => 'Lizenzen Dritter';
+
+  @override
+  String get settingsThirdPartyNative => 'Mitgelieferte native Abhängigkeiten';
+
+  @override
+  String get settingsThirdPartyPackages => 'Dart-/Flutter-Pakete';
+
+  @override
+  String get settingsThirdPartyLicensesText =>
+      'Diese Software enthält oder verlinkt die folgenden Open-Source-Komponenten Dritter. Sie sind unten nach **Lizenztext** gruppiert, jeweils mit dem vollständigen Lizenztext (Rechtstexte werden nicht übersetzt):\n· Mitgelieferte native Abhängigkeiten: Bibliotheken Dritter, die in die nativen Module einkompiliert oder dynamisch verlinkt sind;\n· Dart-/Flutter-Pakete: `pub`-Abhängigkeiten, zur Laufzeit aus den von den Paketen registrierten Lizenzen zusammengeführt.\n\nDie vollständige Liste samt Einzelhinweisen siehe mitgeliefertes Verzeichnis `licenses/` und `THIRD-PARTY-NOTICES.md`.';
+
+  @override
+  String get settingsThirdPartyLicensesEntryDesc =>
+      'Lizenzen mitgelieferter Abhängigkeiten und Open-Source-Komponenten anzeigen';
+
+  @override
   String get commonNoLyrics => 'Keine Songtexte';
 
   @override
@@ -4605,6 +4622,102 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsScanQuarantineClearAllConfirm =>
       'Alle Dateien im Quarantäneordner löschen? Dies kann nicht rückgängig gemacht werden.';
+
+  @override
+  String get settingsCatSearchIndex => 'Lokale Suche';
+
+  @override
+  String get settingsSearchIndexSubtitle =>
+      'Suchindex der lokalen Bibliothek · standardmäßig aus · bei Aktivierung Relevanzsortierung für Lyrics & Metadaten';
+
+  @override
+  String get settingsSectionSearchIndex => 'Suchindex der lokalen Bibliothek';
+
+  @override
+  String get settingsSearchIndexEnable =>
+      'Suchindex der lokalen Bibliothek aktivieren';
+
+  @override
+  String get settingsSearchIndexEnableOn =>
+      'Ein: Index wird im Hintergrund erstellt, Suche nach Relevanz (Lyrics / Pinyin)';
+
+  @override
+  String get settingsSearchIndexEnableOff =>
+      'Aus: nur einfache Suche (Titel / Künstler / Album), kein Index, kein Speicherverbrauch';
+
+  @override
+  String get settingsSearchIndexLrc => '.lrc-Sidecar-Lyrics indexieren';
+
+  @override
+  String get settingsSearchIndexLrcDesc =>
+      'Auch gleichnamige .lrc-Lyrics indexieren (Hauptschalter erforderlich)';
+
+  @override
+  String get settingsSearchIndexNote =>
+      'Der Index ist abgeleitet: standardmäßig aus und kostenlos; beim Aktivieren werden im Hintergrund Zeit und Speicher belegt (bei 10.000 Titeln einige hundert MB); bei Fehlern wird automatisch auf die einfache Suche zurückgefallen.';
+
+  @override
+  String get settingsSectionSearchIndexStatus => 'Status & Wartung';
+
+  @override
+  String get settingsSearchIndexStatusDisabled => 'Deaktiviert';
+
+  @override
+  String get settingsSearchIndexStatusReady => 'Index bereit';
+
+  @override
+  String get settingsSearchIndexStatusBuilding => 'Index wird erstellt…';
+
+  @override
+  String get settingsSearchIndexStatusPending =>
+      'Nicht bereit (wird bei erster Suche oder Neuerstellung gebaut)';
+
+  @override
+  String settingsSearchIndexStatusError({required String reason}) {
+    return 'Index nicht verfügbar: $reason (auf einfache Suche zurückgefallen)';
+  }
+
+  @override
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  }) {
+    return 'Erstellen: $phase　$processed/$total';
+  }
+
+  @override
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  }) {
+    return 'Letzter Aufbau: $indexed Titel in ${duration}s';
+  }
+
+  @override
+  String settingsSearchIndexSize({required String size}) {
+    return 'Indexgröße: $size';
+  }
+
+  @override
+  String get settingsSearchIndexRebuild => 'Index neu erstellen';
+
+  @override
+  String get settingsSearchIndexDelete => 'Index löschen';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmTitle => 'Suchindex löschen?';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmBody =>
+      'Gibt den vom Index belegten Speicher frei; er wird bei der nächsten Suche neu erstellt. Bibliothek und Quelldateien bleiben unberührt.';
+
+  @override
+  String get settingsSearchIndexDeleted => 'Suchindex gelöscht';
+
+  @override
+  String get settingsSearchIndexRebuildStarted =>
+      'Index-Neuerstellung gestartet';
 
   @override
   String get libraryFullScan => 'Vollständiger Scan';

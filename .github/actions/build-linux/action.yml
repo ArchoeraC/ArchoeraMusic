@@ -83,7 +83,7 @@ runs:
         echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
         echo "LD_LIBRARY_PATH=$PREFIX/lib" >> "$GITHUB_ENV"
 
-    # 原生模块一站式入口（audio-engine / scraper / scanner / vault /
+    # 原生模块一站式入口（audio-engine / scraper / scanner / indexer / vault /
     # downloader / subsonic / platform），逻辑只落一处，对齐 build_windows.bat。
     - name: Build native modules
       shell: bash
@@ -134,7 +134,7 @@ runs:
       run: dart analyze lib
 
     # SEC-27：跑**完整** Flutter 测试套件（不再只跑 widget 冒烟 + vault 单文件）。
-    # 原生模块（scanner / audio-engine / downloader / platform）已在上面构建，
+    # 原生模块（scanner / indexer / audio-engine / downloader / platform）已在上面构建，
     # 相关 FFI 用例可正常加载；vault 用例经环境变量指向测试二进制。
     - name: Test (full flutter suite)
       shell: bash
@@ -163,6 +163,21 @@ runs:
     - name: Bundle self-contained runtime libs
       shell: bash
       run: bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle
+
+    - name: Verify indexer-ffi bundled (Linux)
+      shell: bash
+      # 硬校验：本地曲库搜索索引器（indexer-ffi.so）及其 SQLite 依赖必须进
+      # bundle/native/，且计入 SHA-256 完整性清单（SEC-08，由 bundle-linux-runtime.sh
+      # 末尾调用的 gen_native_manifest.sh 生成）。
+      run: |
+        set -euo pipefail
+        NATIVE=app/build/linux/x64/release/bundle/native
+        for f in indexer-ffi.so libe_sqlite3.so; do
+          [ -f "$NATIVE/$f" ] || { echo "::error::$f 未打入 Linux bundle"; exit 1; }
+        done
+        grep -q 'indexer-ffi.so' "$NATIVE/ARCHOERA-NATIVE-MANIFEST.txt" \
+          || { echo "::error::完整性清单缺 indexer-ffi.so"; exit 1; }
+        echo "OK: indexer-ffi 已入包并计入清单"
 
     # LGPL 合规：随包附 FFmpeg / TagLib 许可文本 + 聚合声明（见根 THIRD-PARTY-NOTICES.md）
     - name: Bundle third-party licenses (LGPL 合规)
