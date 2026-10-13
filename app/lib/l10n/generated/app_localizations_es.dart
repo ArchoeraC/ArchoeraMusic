@@ -6032,4 +6032,154 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get playlistRemoveFailed => 'No se pudo quitar';
+
+  @override
+  String get settingsSchemeM1Title => 'M1 Contraseña';
+
+  @override
+  String get settingsSchemeM1Badge => 'Contraseña';
+
+  @override
+  String get settingsSchemeM1Desc =>
+      'Ranura solo con contraseña: introduce la contraseña en cada inicio (envuelto con Argon2id, sin dependencia del llavero del SO).';
+
+  @override
+  String get settingsSchemeM1ModeDesc =>
+      'M1: la clave maestra se envuelve con una clave derivada de la contraseña en la tabla de ranuras de la bóveda: autónoma, sin llavero del SO. Recuerda la contraseña.';
+
+  @override
+  String get settingsSchemeM2aTitle => 'M2A Contraseña + dispositivo';
+
+  @override
+  String get settingsSchemeM2aBadge => '2FA';
+
+  @override
+  String get settingsSchemeM2aDesc =>
+      'Contraseña + device.key local + código de recuperación de un solo uso: máxima seguridad; si se pierde device.key, desbloquea con el código de recuperación.';
+
+  @override
+  String get settingsSchemeM2aModeDesc =>
+      'M2A: la clave maestra se envuelve con la contraseña y la clave de este dispositivo, más una ranura de recuperación. Tras cambiar de equipo, desbloquea con el código de recuperación.';
+
+  @override
+  String get settingsSchemeM2bTitle => 'M2B Solo dispositivo';
+
+  @override
+  String get settingsSchemeM2bBadge => 'Sin contraseña';
+
+  @override
+  String get settingsSchemeM2bDesc =>
+      'Solo device.key local: sin contraseña en este equipo, sin contraseña ni código de recuperación; si se pierde device.key, no se puede recuperar.';
+
+  @override
+  String get settingsSchemeM2bModeDesc =>
+      'M2B: solo la clave del dispositivo envuelve la clave maestra (sin contraseña en este equipo). Sin ranura de recuperación: si se pierde la clave del dispositivo, no se puede recuperar.';
+
+  @override
+  String get settingsSchemeSwitchEraseWarning =>
+      'Continuar destruye la bóveda de credenciales actual (incluida la bóveda de respaldo y device.key). Se borrarán las credenciales de inicio de sesión y las contraseñas de streaming; habrá que iniciar sesión de nuevo.';
+
+  @override
+  String get settingsSchemeResetHint =>
+      'Destruir las sesiones de cuentas de terceros también elimina la bóveda de credenciales, su copia de seguridad (.bak) y el device.key local.';
+
+  @override
+  String get settingsSchemeRecoveryDialogTitle =>
+      'Guarda el código de recuperación';
+
+  @override
+  String get settingsSchemeRecoveryDialogDesc =>
+      'Esta es la única vez que se muestra el código de recuperación. Anótalo o cópialo en un lugar seguro: si se pierde, no podrás desbloquear las credenciales tras cambiar de equipo.';
+
+  @override
+  String get settingsSchemeRecoveryDialogAck => 'Lo he guardado';
+
+  @override
+  String get settingsSchemeRecoveryCopy => 'Copiar código de recuperación';
+
+  @override
+  String get settingsSchemeRecoveryCopied => 'Código de recuperación copiado';
+
+  @override
+  String get settingsSchemeRecoveryReminder =>
+      'Copia de seguridad del código de recuperación sin confirmar: tras cambiar de equipo no podrás desbloquear las credenciales. Anótalo y guárdalo ahora.';
+
+  @override
+  String get settingsSchemeRecoveryReminderAck => 'Lo he guardado';
+
+  @override
+  String get settingsSchemePasswordTitle =>
+      'Establecer contraseña de desbloqueo';
+
+  @override
+  String get settingsSchemePasswordDesc =>
+      'Esta contraseña desbloquea la bóveda de credenciales y se pide en cada inicio. Recuérdala bien; no se puede recuperar.';
+
+  @override
+  String get settingsSchemePasswordHint => 'Introduce la contraseña';
+
+  @override
+  String get settingsSchemePasswordConfirmHint =>
+      'Vuelve a introducir la contraseña';
+
+  @override
+  String get settingsSchemePasswordMismatch => 'Las dos entradas no coinciden';
+
+  @override
+  String get vaultUnlockRecoveryTitle =>
+      'Desbloquear con código de recuperación';
+
+  @override
+  String get vaultUnlockRecoveryDesc =>
+      'Falta la clave del dispositivo (device.key) o es otro equipo. Introduce el código de recuperación guardado al crear la bóveda.';
+
+  @override
+  String get vaultUnlockRecoveryHint => 'Código de recuperación';
+
+  @override
+  String get vaultUnlockRecoveryAction => 'Usar código de recuperación';
+
+  @override
+  String get vaultUnlockPasswordAction => 'Usar contraseña';
+
+  @override
+  String get vaultUnlockRecoveryFailed =>
+      'Código de recuperación incorrecto, inténtalo de nuevo';
+
+  @override
+  String get vaultUnlockNeedRecovery =>
+      'Falta la clave del dispositivo: desbloquea con tu código de recuperación';
+
+  @override
+  String get settingsKdfTitle => 'Fuerza de Argon2id';
+
+  @override
+  String get settingsKdfSubtitle =>
+      'Mayor = más resistente a fuerza bruta pero desbloqueo más lento (baja ≈200ms / media ≈400ms / alta ≈1.5s). Solo los esquemas con contraseña (M1/M2A) pueden ajustarlo.';
+
+  @override
+  String get settingsKdfLow => 'Baja';
+
+  @override
+  String get settingsKdfMedium => 'Media';
+
+  @override
+  String get settingsKdfHigh => 'Alta';
+
+  @override
+  String get settingsKdfUnsupported =>
+      'El esquema actual no usa un KDF de contraseña, por lo que no se puede ajustar la fuerza.';
+
+  @override
+  String get settingsKdfPasswordTitle => 'Verificar contraseña actual';
+
+  @override
+  String get settingsKdfPasswordDesc =>
+      'Cambiar la fuerza de Argon2id vuelve a envolver la ranura de contraseña (la clave maestra y las credenciales guardadas no cambian). Introduce tu contraseña de desbloqueo actual.';
+
+  @override
+  String get settingsKdfPasswordHint => 'Contraseña actual';
+
+  @override
+  String get toastKdfRepacked => 'Reenvuelto sin pérdida de datos';
 }

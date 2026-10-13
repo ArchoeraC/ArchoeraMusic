@@ -1,0 +1,16 @@
+{
+ "mode": "m1",
+ "password": "golden-m1-pw",
+ "kdf": {
+  "m": 8192,
+  "t": 1,
+  "p": 1
+ },
+ "slot_kinds": [
+  1
+ ],
+ "entries": {
+  "kugou:session": "golden-kugou-session-token",
+  "netease:cookie": "golden-netease-cookie-value"
+ }
+}

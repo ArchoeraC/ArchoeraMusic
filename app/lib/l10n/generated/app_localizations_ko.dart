@@ -5762,4 +5762,148 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get playlistRemoveFailed => '제거하지 못했습니다';
+
+  @override
+  String get settingsSchemeM1Title => 'M1 비밀번호';
+
+  @override
+  String get settingsSchemeM1Badge => '비밀번호';
+
+  @override
+  String get settingsSchemeM1Desc =>
+      '비밀번호 전용 슬롯: 실행할 때마다 비밀번호를 입력해 잠금 해제합니다(Argon2id 래핑, OS 키체인 불필요).';
+
+  @override
+  String get settingsSchemeM1ModeDesc =>
+      'M1: 마스터 키가 비밀번호에서 파생된 키로 vault 슬롯 테이블에 래핑됩니다. 자체 완결형이며 OS 키체인이 필요 없습니다. 비밀번호를 꼭 기억하세요.';
+
+  @override
+  String get settingsSchemeM2aTitle => 'M2A 비밀번호 + 기기';
+
+  @override
+  String get settingsSchemeM2aBadge => '2단계';
+
+  @override
+  String get settingsSchemeM2aDesc =>
+      '비밀번호 + 로컬 device.key + 일회용 복구 코드: 가장 강력합니다. device.key를 잃으면 복구 코드로 잠금 해제합니다.';
+
+  @override
+  String get settingsSchemeM2aModeDesc =>
+      'M2A: 마스터 키가 비밀번호와 이 기기의 키로 이중 래핑되고 복구 슬롯도 함께 있습니다. 기기를 바꾸면 복구 코드로 잠금 해제하세요.';
+
+  @override
+  String get settingsSchemeM2bTitle => 'M2B 기기 전용';
+
+  @override
+  String get settingsSchemeM2bBadge => '비밀번호 없음';
+
+  @override
+  String get settingsSchemeM2bDesc =>
+      '로컬 device.key 전용: 이 기기에서는 비밀번호 없이 잠금 해제되며 비밀번호도 복구 코드도 없습니다. device.key를 잃으면 복구할 수 없습니다.';
+
+  @override
+  String get settingsSchemeM2bModeDesc =>
+      'M2B: 기기 키만 마스터 키를 래핑합니다(이 기기에서 비밀번호 불필요). 복구 슬롯이 없어 기기 키를 잃으면 복구할 수 없습니다.';
+
+  @override
+  String get settingsSchemeSwitchEraseWarning =>
+      '계속하면 현재 자격 증명 vault를 파괴합니다(백업 vault와 device.key 포함). 저장된 로그인 자격 증명과 스트리밍 비밀번호가 지워지며 다시 로그인해야 합니다.';
+
+  @override
+  String get settingsSchemeResetHint =>
+      '서드파티 계정 세션을 파괴하면 자격 증명 vault, 백업(.bak), 로컬 device.key도 함께 삭제됩니다.';
+
+  @override
+  String get settingsSchemeRecoveryDialogTitle => '복구 코드를 저장하세요';
+
+  @override
+  String get settingsSchemeRecoveryDialogDesc =>
+      '복구 코드는 이번에만 표시됩니다. 안전한 곳에 적어 두거나 복사해 두세요. 잃어버리면 기기를 바꾼 뒤 자격 증명을 잠금 해제할 수 없습니다(다른 복구 방법이 없습니다).';
+
+  @override
+  String get settingsSchemeRecoveryDialogAck => '저장했습니다';
+
+  @override
+  String get settingsSchemeRecoveryCopy => '복구 코드 복사';
+
+  @override
+  String get settingsSchemeRecoveryCopied => '복구 코드를 복사했습니다';
+
+  @override
+  String get settingsSchemeRecoveryReminder =>
+      '복구 코드 백업이 확인되지 않았습니다. 기기를 바꾸면 자격 증명을 잠금 해제할 수 없습니다. 지금 적어서 저장하세요.';
+
+  @override
+  String get settingsSchemeRecoveryReminderAck => '저장했습니다';
+
+  @override
+  String get settingsSchemePasswordTitle => '잠금 해제 비밀번호 설정';
+
+  @override
+  String get settingsSchemePasswordDesc =>
+      '이 비밀번호는 자격 증명 vault를 잠금 해제하며 실행할 때마다 필요합니다. 꼭 기억하세요. 복구할 수 없습니다.';
+
+  @override
+  String get settingsSchemePasswordHint => '비밀번호 입력';
+
+  @override
+  String get settingsSchemePasswordConfirmHint => '비밀번호 다시 입력';
+
+  @override
+  String get settingsSchemePasswordMismatch => '두 입력이 일치하지 않습니다';
+
+  @override
+  String get vaultUnlockRecoveryTitle => '복구 코드로 잠금 해제';
+
+  @override
+  String get vaultUnlockRecoveryDesc =>
+      '기기 키(device.key)가 없거나 다른 기기입니다. vault 생성 시 저장한 복구 코드를 입력하세요.';
+
+  @override
+  String get vaultUnlockRecoveryHint => '복구 코드';
+
+  @override
+  String get vaultUnlockRecoveryAction => '복구 코드 사용';
+
+  @override
+  String get vaultUnlockPasswordAction => '비밀번호 사용';
+
+  @override
+  String get vaultUnlockRecoveryFailed => '복구 코드가 올바르지 않습니다. 다시 시도하세요';
+
+  @override
+  String get vaultUnlockNeedRecovery => '기기 키가 없습니다. 복구 코드로 잠금 해제하세요';
+
+  @override
+  String get settingsKdfTitle => 'Argon2id 강도';
+
+  @override
+  String get settingsKdfSubtitle =>
+      '높을수록 무차별 대입에 강하지만 잠금 해제가 느려집니다(낮음 ≈200ms / 보통 ≈400ms / 높음 ≈1.5s). 비밀번호 방식(M1/M2A)에서만 조정할 수 있습니다.';
+
+  @override
+  String get settingsKdfLow => '낮음';
+
+  @override
+  String get settingsKdfMedium => '보통';
+
+  @override
+  String get settingsKdfHigh => '높음';
+
+  @override
+  String get settingsKdfUnsupported =>
+      '현재 방식은 비밀번호 KDF를 사용하지 않아 강도를 조정할 수 없습니다.';
+
+  @override
+  String get settingsKdfPasswordTitle => '현재 비밀번호 확인';
+
+  @override
+  String get settingsKdfPasswordDesc =>
+      'Argon2id 강도를 변경하면 비밀번호 슬롯을 다시 감쌉니다(마스터 키와 저장된 자격 증명은 그대로 유지). 현재 잠금 해제 비밀번호를 입력하세요.';
+
+  @override
+  String get settingsKdfPasswordHint => '현재 비밀번호';
+
+  @override
+  String get toastKdfRepacked => '다시 감쌌습니다. 데이터 손실 없음';
 }

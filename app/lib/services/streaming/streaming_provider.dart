@@ -197,6 +197,11 @@ class StreamingNotifier extends Notifier<StreamingState>
 
   StreamingServerConfig? serverConfigById(String id) => state.serverById(id);
 
+  /// 解析指定服务器为带凭据的配置（异步）：凭据按需从 vault 惰性解密，
+  /// 仅临时返回给调用方构造客户端，不写回长驻 [StreamingState]。
+  Future<StreamingServerConfig?> resolvedServer(String id) =>
+      _keepAliveDuring(() => _resolvedServerImpl(id));
+
   Future<void> fetchSongs({bool force = false}) =>
       _keepAliveDuring(() => _fetchSongsImpl(force: force));
 
@@ -217,9 +222,9 @@ class StreamingNotifier extends Notifier<StreamingState>
 ///
 /// autoDispose：状态（服务器列表 / 连接态 / 四个 Tab 的懒加载缓存）由流媒体页
 /// 与设置面板按需 `ref.watch` 持有；页面子树卸载（后台卸载页面 / 播放页展开）后
-/// 释放内存。播放中的服务器配置与鉴权 token 已落盘（`StreamingStore`），播放
-/// 途中的 `resolvePlayUrl` / 歌词来源仅同步读取 `serverConfigById`，按需从磁盘
-/// 重建即可，不依赖内存连接态跨页常驻。
+/// 释放内存。播放中的服务器凭据已落盘（`StreamingStore`）且**不驻留 UI 状态**，
+/// 播放途中的 `resolvePlayUrl` / 歌词来源经 `resolvedServer` 按需惰性解密后
+/// 临时构造客户端，不依赖内存连接态跨页常驻（SEC-03）。
 final streamingProvider =
     NotifierProvider.autoDispose<StreamingNotifier, StreamingState>(
       StreamingNotifier.new,

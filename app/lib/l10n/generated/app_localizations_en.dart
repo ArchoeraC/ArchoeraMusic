@@ -5943,4 +5943,149 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playlistRemoveFailed => 'Failed to remove';
+
+  @override
+  String get settingsSchemeM1Title => 'M1 Password';
+
+  @override
+  String get settingsSchemeM1Badge => 'Password';
+
+  @override
+  String get settingsSchemeM1Desc =>
+      'Password-only slot: enter your password at each launch (Argon2id-wrapped, no OS keychain dependency).';
+
+  @override
+  String get settingsSchemeM1ModeDesc =>
+      'M1: the master key is wrapped by a password-derived key in the vault slot table — self-contained, no OS keychain. Remember the password.';
+
+  @override
+  String get settingsSchemeM2aTitle => 'M2A Password + Device';
+
+  @override
+  String get settingsSchemeM2aBadge => '2FA';
+
+  @override
+  String get settingsSchemeM2aDesc =>
+      'Password + local device.key + a one-time recovery code: strongest; use the recovery code if device.key is lost.';
+
+  @override
+  String get settingsSchemeM2aModeDesc =>
+      'M2A: the master key is wrapped by both your password and the key of this device, plus a recovery slot. After a device change, unlock with the recovery code.';
+
+  @override
+  String get settingsSchemeM2bTitle => 'M2B Device only';
+
+  @override
+  String get settingsSchemeM2bBadge => 'Passwordless';
+
+  @override
+  String get settingsSchemeM2bDesc =>
+      'Local device.key only: passwordless on this machine, no password and no recovery code; if device.key is lost, credentials cannot be recovered.';
+
+  @override
+  String get settingsSchemeM2bModeDesc =>
+      'M2B: only the device key wraps the master key — passwordless on this machine. No recovery slot: if the device key is lost, credentials are unrecoverable.';
+
+  @override
+  String get settingsSchemeSwitchEraseWarning =>
+      'Continuing destroys the current credential vault (including the backup vault and device.key). All stored login credentials and streaming passwords will be cleared and require re-login.';
+
+  @override
+  String get settingsSchemeResetHint =>
+      'Resetting the third-party account sessions also destroys the credential vault, its backup (.bak) and the local device.key.';
+
+  @override
+  String get settingsSchemeRecoveryDialogTitle => 'Save your recovery code';
+
+  @override
+  String get settingsSchemeRecoveryDialogDesc =>
+      'This is the only time the recovery code is shown. Write it down or copy it somewhere safe: if it is lost, credentials cannot be unlocked after a device change (no other way to recover).';
+
+  @override
+  String get settingsSchemeRecoveryDialogAck => 'I have saved it';
+
+  @override
+  String get settingsSchemeRecoveryCopy => 'Copy recovery code';
+
+  @override
+  String get settingsSchemeRecoveryCopied => 'Recovery code copied';
+
+  @override
+  String get settingsSchemeRecoveryReminder =>
+      'Recovery code not confirmed as backed up: after a device change, credentials cannot be unlocked. Write it down and save it now.';
+
+  @override
+  String get settingsSchemeRecoveryReminderAck => 'I have saved it';
+
+  @override
+  String get settingsSchemePasswordTitle => 'Set the unlock password';
+
+  @override
+  String get settingsSchemePasswordDesc =>
+      'This password unlocks the credential vault and is required at every launch. Remember it well; it cannot be recovered.';
+
+  @override
+  String get settingsSchemePasswordHint => 'Enter password';
+
+  @override
+  String get settingsSchemePasswordConfirmHint => 'Re-enter password';
+
+  @override
+  String get settingsSchemePasswordMismatch => 'The two entries do not match';
+
+  @override
+  String get vaultUnlockRecoveryTitle => 'Unlock with recovery code';
+
+  @override
+  String get vaultUnlockRecoveryDesc =>
+      'The device key (device.key) is missing or this is a different machine. Enter the recovery code saved when the vault was created.';
+
+  @override
+  String get vaultUnlockRecoveryHint => 'Recovery code';
+
+  @override
+  String get vaultUnlockRecoveryAction => 'Use recovery code';
+
+  @override
+  String get vaultUnlockPasswordAction => 'Use password';
+
+  @override
+  String get vaultUnlockRecoveryFailed => 'Wrong recovery code, try again';
+
+  @override
+  String get vaultUnlockNeedRecovery =>
+      'Device key missing: unlock with your recovery code';
+
+  @override
+  String get settingsKdfTitle => 'Argon2id strength';
+
+  @override
+  String get settingsKdfSubtitle =>
+      'Higher = stronger against brute force but slower unlock (low ≈200ms / medium ≈400ms / high ≈1.5s). Only password schemes (M1/M2A) can adjust this.';
+
+  @override
+  String get settingsKdfLow => 'Low';
+
+  @override
+  String get settingsKdfMedium => 'Medium';
+
+  @override
+  String get settingsKdfHigh => 'High';
+
+  @override
+  String get settingsKdfUnsupported =>
+      'The current scheme does not use a password KDF, so strength cannot be adjusted.';
+
+  @override
+  String get settingsKdfPasswordTitle => 'Verify current password';
+
+  @override
+  String get settingsKdfPasswordDesc =>
+      'Changing Argon2id strength re-wraps the password slot (master key and stored credentials stay unchanged). Enter your current unlock password.';
+
+  @override
+  String get settingsKdfPasswordHint => 'Current password';
+
+  @override
+  String get toastKdfRepacked => 'Re-wrapped with no data loss';
 }

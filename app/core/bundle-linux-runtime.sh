@@ -91,3 +91,18 @@ fi
 
 echo "[bundle-linux-runtime] 完成；native/ 内嵌库："
 find "$native" -maxdepth 1 -type f -name '*.so*' -printf '  %f\n' | sort
+
+# 原生库完整性清单（SEC-08）：必须在**全部二进制后处理之后**生成——上面的
+# 闭包收拢与 patchelf RUNPATH 改写都会改变 native/ 库的字节，提前生成即失效。
+# 生成 native/ARCHOERA-NATIVE-MANIFEST.txt，供 Dart 在 DynamicLibrary.open 前
+# 按 basename 校验 SHA-256（打包态 fail-closed，见 lib/services/native_integrity.dart）。
+# 脚本缺失/失败不阻断打包（仅告警）。
+manifest_gen="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tool" 2>/dev/null && pwd)/gen_native_manifest.sh"
+if [[ -f "$manifest_gen" ]]; then
+  manifest_extra=()
+  [[ -f "$bundle/archoera_music" ]] && manifest_extra+=("$bundle/archoera_music")
+  sh "$manifest_gen" "$native" "${manifest_extra[@]}" || echo "[bundle-linux-runtime] 警告: 完整性清单生成失败" >&2
+else
+  echo "[bundle-linux-runtime] 警告: 未找到 gen_native_manifest.sh，跳过完整性清单" >&2
+fi
+

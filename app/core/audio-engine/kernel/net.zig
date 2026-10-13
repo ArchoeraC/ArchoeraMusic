@@ -114,6 +114,10 @@ pub const NetError = error{
     HttpProtocol,
     HttpHeadersOversize,
     TooManyRedirects,
+    /// 重定向导致 https→http 明文降级（拒绝）
+    InsecureRedirect,
+    /// 公网源重定向到回环 / 私网 / 链路本地主机（SSRF，拒绝）
+    PrivateRedirect,
     SeekFailed,
     Aborted,
     OutOfMemory,
@@ -257,6 +261,65 @@ pub fn resolveLocation(
     return out.items;
 }
 
+/// 判定 IP 地址是否为本机 / 局域网范围（回环 / 私网 / 链路本地 / 未指定 / CGNAT）。
+/// 用于 [checkRedirectPolicy] 的 SSRF 防护。
+fn isLocalAddr(addr: std.Io.net.IpAddress) bool {
+    switch (addr) {
+        .ip4 => |a| {
+            const b = a.bytes;
+            if (b[0] == 0) return true; // 0.0.0.0/8（未指定 / this-network）
+            if (b[0] == 127) return true; // 127.0.0.0/8 回环
+            if (b[0] == 10) return true; // 10.0.0.0/8
+            if (b[0] == 172 and (b[1] & 0xf0) == 16) return true; // 172.16.0.0/12
+            if (b[0] == 192 and b[1] == 168) return true; // 192.168.0.0/16
+            if (b[0] == 169 and b[1] == 254) return true; // 169.254.0.0/16 链路本地
+            if (b[0] == 100 and (b[1] & 0xc0) == 64) return true; // 100.64.0.0/10 CGNAT
+            return false;
+        },
+        .ip6 => |a| {
+            const b = a.bytes;
+            // ::（未指定）与 ::1（回环）
+            if (std.mem.allEqual(u8, b[0..15], 0) and (b[15] == 0 or b[15] == 1)) return true;
+            if ((b[0] & 0xfe) == 0xfc) return true; // fc00::/7 唯一本地
+            if (b[0] == 0xfe and (b[1] & 0xc0) == 0x80) return true; // fe80::/10 链路本地
+            if (std.Io.net.Ip4Address.fromIp6(a)) |v4| return isLocalAddr(.{ .ip4 = v4 }); // IPv4-mapped
+            return false;
+        },
+    }
+}
+
+/// 主机名是否明显指向本机 / 局域网（**字面量**判定：IP 字面量与 `localhost`/`.local` 后缀）。
+/// 域名需 DNS 解析后才能判定，属已知边界（见 [checkRedirectPolicy]）。
+pub fn isLocalHost(host: []const u8) bool {
+    if (host.len == 0) return true;
+    if (std.ascii.eqlIgnoreCase(host, "localhost")) return true;
+    if (std.ascii.endsWithIgnoreCase(host, ".localhost")) return true;
+    if (std.ascii.endsWithIgnoreCase(host, ".local")) return true;
+    const addr = std.Io.net.IpAddress.parse(host, 0) catch return false;
+    return isLocalAddr(addr);
+}
+
+/// 重定向安全策略（纯函数，便于单测；SEC-12）：
+/// - `base_url` 为 https 而重定向目标为 http → 拒绝（防明文降级泄露带签名 URL）；
+/// - 原始 URL 为公网主机（`origin_local == false`）而重定向目标为本机 / 私网 / 链路本地
+///   → 拒绝（防平台返回的 URL 被劫持后诱导内核 SSRF 内网）。
+///
+/// 已知边界：仅按**主机字面量**判定，不覆盖域名解析后落到私网（DNS rebinding）；
+/// 原始 URL 本身为自建内网服务时（`origin_local == true`）允许同域内网重定向。
+pub fn checkRedirectPolicy(
+    origin_local: bool,
+    base_url: []const u8,
+    new_url: []const u8,
+) NetError!void {
+    const base_tls = std.ascii.startsWithIgnoreCase(base_url, "https://");
+    const new_tls = std.ascii.startsWithIgnoreCase(new_url, "https://");
+    if (base_tls and !new_tls) return error.InsecureRedirect;
+    if (origin_local) return;
+    var hb: [host_max + 16]u8 = undefined;
+    const parts = parseUrl(new_url, &hb) catch return error.BadUrl;
+    if (isLocalHost(parts.host)) return error.PrivateRedirect;
+}
+
 /// 已解析的响应头（指向内部 head 缓冲；仅在本次响应头有效期内使用）
 const ResponseHead = struct {
     status: u16,
@@ -281,6 +344,9 @@ pub const HttpStream = struct {
     /// 额外请求头（owned；`\n` 或 `\r\n` 分行，可空）。随重定向原样重发。
     /// 由宿主按源注入（如 NekoMusic 的 `X-Neko-Client` / `User-Agent`）。
     headers: []u8,
+
+    /// 初始 URL 是否为本机 / 私网主机（SEC-12：决定重定向到内网是否放行）。
+    origin_local: bool = false,
 
     // IO 实例（全进程单一常驻；见 globalIo）
     io: Io,
@@ -384,6 +450,12 @@ pub const HttpStream = struct {
             .io = undefined,
         };
         self.io = globalIo();
+        // SEC-12：记录初始 URL 是否指向本机 / 私网（重定向策略用）。
+        self.origin_local = blk: {
+            var hb: [host_max + 16]u8 = undefined;
+            const parts = parseUrl(self.cur_url, &hb) catch break :blk false;
+            break :blk isLocalHost(parts.host);
+        };
         self.configureFromEnv(opts);
         self.startWatchdog();
         errdefer {
@@ -624,6 +696,11 @@ pub const HttpStream = struct {
                     return error.TooManyRedirects;
                 }
                 const new_url = try resolveLocation(self.gpa, self.cur_url, loc, &self.url_scratch);
+                // SEC-12：拒绝 https→http 降级与「公网源 → 内网」重定向。
+                checkRedirectPolicy(self.origin_local, self.cur_url, new_url) catch |e| {
+                    self.disconnect();
+                    return e;
+                };
                 const dup = self.gpa.dupe(u8, new_url) catch return error.OutOfMemory;
                 self.gpa.free(self.cur_url);
                 self.cur_url = dup;
@@ -657,9 +734,13 @@ pub const HttpStream = struct {
             }
             self.net_pos = start_off;
 
-            // 服务端忽略 Range（返回 200）且目标偏移 > 0：前向丢弃对齐
-            if (head.status == 200 and range_start > 0) {
-                try self.discard(range_start);
+            // 服务端未精确满足 Range：**前向丢弃差值对齐到请求偏移**。
+            //   - 200（忽略 Range，整段从 0 返回）：起点 0 < range_start；
+            //   - 206 但 Content-Range 起点低于请求偏移（部分转码器按帧/块向下对齐）。
+            // 若不补齐，内核逻辑游标（range_start）会领先底层流，后续读取**整体偏早**
+            // （固定偏差），表现为 seek 落点比目标提前。
+            if (range_start > start_off) {
+                try self.discard(range_start - start_off);
                 self.net_pos = range_start;
             }
             return;
@@ -1066,6 +1147,59 @@ test "resolveLocation: 绝对 / 根相对 / 相对" {
     }
 }
 
+test "isLocalHost: 回环 / 私网 / 链路本地 / 公网" {
+    // 本机 / 内网
+    try testing.expect(isLocalHost("localhost"));
+    try testing.expect(isLocalHost("foo.localhost"));
+    try testing.expect(isLocalHost("printer.local"));
+    try testing.expect(isLocalHost("127.0.0.1"));
+    try testing.expect(isLocalHost("127.9.9.9"));
+    try testing.expect(isLocalHost("10.1.2.3"));
+    try testing.expect(isLocalHost("172.16.0.1"));
+    try testing.expect(isLocalHost("172.31.255.255"));
+    try testing.expect(isLocalHost("192.168.1.1"));
+    try testing.expect(isLocalHost("169.254.1.1"));
+    try testing.expect(isLocalHost("100.64.0.1"));
+    try testing.expect(isLocalHost("::1"));
+    try testing.expect(isLocalHost("::"));
+    try testing.expect(isLocalHost("fe80::1"));
+    try testing.expect(isLocalHost("fd00::1"));
+    try testing.expect(isLocalHost("::ffff:127.0.0.1"));
+    // 公网
+    try testing.expect(!isLocalHost("example.com"));
+    try testing.expect(!isLocalHost("8.8.8.8"));
+    try testing.expect(!isLocalHost("172.32.0.1"));
+    try testing.expect(!isLocalHost("192.169.0.1"));
+    try testing.expect(!isLocalHost("2001:4860:4860::8888"));
+}
+
+test "checkRedirectPolicy: 降级 / 公网→内网 拒绝" {
+    // https → http 降级
+    try testing.expectError(
+        error.InsecureRedirect,
+        checkRedirectPolicy(false, "https://a.com/x", "http://a.com/y"),
+    );
+    // 公网 → 内网（SSRF）
+    try testing.expectError(
+        error.PrivateRedirect,
+        checkRedirectPolicy(false, "http://a.com/x", "http://127.0.0.1:8080/y"),
+    );
+    try testing.expectError(
+        error.PrivateRedirect,
+        checkRedirectPolicy(false, "https://a.com/x", "https://10.0.0.5/y"),
+    );
+    // 允许：同公网主机、http→https 升级
+    try checkRedirectPolicy(false, "http://a.com/x", "https://cdn.example.net/y");
+    try checkRedirectPolicy(false, "https://a.com/x", "https://b.com/y");
+    // 允许：原始源本身为本机（自建服务器），内网重定向放行
+    try checkRedirectPolicy(true, "http://127.0.0.1:8080/a", "http://10.0.0.5/b");
+    // 即便原始源为本机，https→http 降级仍拒绝
+    try testing.expectError(
+        error.InsecureRedirect,
+        checkRedirectPolicy(true, "https://127.0.0.1/a", "http://127.0.0.1/b"),
+    );
+}
+
 test "Content-Range 解析" {
     try testing.expectEqual(@as(?u64, 0), parseContentRangeStart("bytes 0-1023/4096"));
     try testing.expectEqual(@as(?u64, 4096), parseContentRangeTotal("bytes 0-1023/4096"));
@@ -1243,6 +1377,22 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
     const body = payload[@intCast(start)..];
 
     var hdr: [512]u8 = undefined;
+    if (std.mem.eql(u8, target, "/shift")) {
+        // 206 但 Content-Range 起点**低于请求偏移** 8 字节（部分转码器按帧/块向下
+        // 对齐）：内核必须前向丢弃差值对齐到请求偏移，否则后续读取整体偏早 8 字节。
+        const s2: u64 = if (start >= 8) start - 8 else 0;
+        const b2 = payload[@intCast(s2)..];
+        var h2: [512]u8 = undefined;
+        const hs2 = std.fmt.bufPrint(
+            &h2,
+            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {d}-{d}/{d}\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
+            .{ s2, last, payload.len, b2.len },
+        ) catch return;
+        w.writeAll(hs2) catch return;
+        w.writeAll(b2) catch return;
+        w.flush() catch {};
+        return;
+    }
     const hs = std.fmt.bufPrint(
         &hdr,
         "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {d}-{d}/{d}\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
@@ -1428,6 +1578,27 @@ test "HttpStream: 服务端忽略 Range（恒 200）下前向 seek" {
     var got: [100]u8 = undefined;
     try testing.expectEqual(@as(usize, 100), try readAllInto(hs, &got));
     try testing.expectEqualSlices(u8, payload[3000..3100], &got);
+}
+
+test "HttpStream: 206 Content-Range 起点低于请求偏移时前向对齐（不偏早）" {
+    const payload = try makeTestPayload(testing.allocator, 5000);
+    defer testing.allocator.free(payload);
+    const ts = try TestServer.start(payload);
+    defer ts.stopAndDestroy();
+
+    const url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/shift", .{ts.port});
+    defer testing.allocator.free(url);
+
+    const hs = try HttpStream.open(testing.allocator, url);
+    defer hs.close();
+    // 先读 2000 字节（net 游标 2000），再回退 seek 到 1000 → 触发 Range 重请求。
+    var pre: [2000]u8 = undefined;
+    try testing.expectEqual(@as(usize, 2000), try readAllInto(hs, &pre));
+    try testing.expect(hs.seek(1000, 0, 0));
+    // 服务端返回 Content-Range: bytes 992-…（低 8 字节）：必须丢弃 8 字节对齐到 1000。
+    var got: [64]u8 = undefined;
+    try testing.expectEqual(@as(usize, 64), try readAllInto(hs, &got));
+    try testing.expectEqualSlices(u8, payload[1000..1064], &got);
 }
 
 test "HttpStream: 断流续传（服务端中途断开 → Range 重连）" {

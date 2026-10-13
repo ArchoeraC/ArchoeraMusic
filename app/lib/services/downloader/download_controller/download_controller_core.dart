@@ -123,9 +123,9 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     if (_engineDesired || (_engine?.isInitialized ?? false)) return;
     var pending = false;
     try {
-      final f = File('${resolveDataDir()}/download_history.json');
-      if (f.existsSync()) {
-        final decoded = jsonDecode(f.readAsStringSync());
+      final text = SafeFile.readString('${resolveDataDir()}/download_history.json');
+      if (text != null) {
+        final decoded = jsonDecode(text);
         pending =
             decoded is Map &&
             decoded['tasks'] is List &&

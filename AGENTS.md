@@ -60,6 +60,20 @@ cargo build --release --target x86_64-apple-darwin    --manifest-path app/core/s
 > `flutter gen-l10n`（`flutter build/test` 也会自动生成）以刷新生成代码。
 > `build_windows.bat` / `build-macos.sh` 已含该模块的预构建（幂等）。
 
+改动凭据保险库（`app/core/vault-rs`，三端 Rust 静态进程）时另跑：
+```bash
+cd app/core/vault-rs
+./build-test.sh && ./test.sh      # Linux 端到端：容器/KDF、内存护栏、安全落盘、
+                                  # 沙箱完整性·非自毁、黄金夹具、并发语义
+./test-windows.sh                 # Wine 上跑真实 Windows 产物（需 wine + msvc-wine + lld-link；缺则跳过）
+./cross-macos.sh                  # Linux 上用 macOS SDK 交叉构建（仅编译期；运行期待真机）
+./gen_testdata.sh                 # ⚠ 仅当确认容器格式未变时重生成「黄金夹具」（字节兼容锚点）
+```
+> C# 版 vault（`app/core/vault/`）已于 2026-10-12 **删除**：字节/协议兼容改由
+> `app/core/vault-rs/testdata/` 的**冻结黄金夹具**锚定（`test.sh` §14 + `test-windows.sh` §11）。
+> 沙箱/内存语义见 [docs/vault-security-notes.md](docs/vault-security-notes.md) 与
+> [docs/security-review-2026-10-11.md](docs/security-review-2026-10-11.md)（SEC-35 起）。
+
 Windows/MSVC 兼容自检（本机可交叉，无需 Windows SDK）：
 ```bash
 cd app/core/audio-engine
@@ -179,14 +193,19 @@ bash app/tool/sign_watermark.sh          # 本地运行；CI 环境会拒绝执�
 - **Environment `release`**：Required reviewers = 维护者；部署仅允许 tag `v*`；
   含 Environment secret `ARCHOERA_WM_KEY1_PEM`（key1 PEM）。
 - **Ruleset `protect-main`**（branch）：要求 PR、禁止强推（non_fast_forward）、禁止删除；
-  Required approvals = 0（单人可自建 PR 自合并）。**禁止直接 push `main`**。
+  **Require review from Code Owners = 开启**（SEC-22：`CODEOWNERS` 覆盖 CI/签名/打包/水印等
+  关键路径，普通写权限者无法自合并这些改动）；Required approvals = 0 且维护者是 bypass actor，
+  故维护者可自建 PR 自合并（不会被锁死）。**禁止直接 push `main`**。
+  允许批准人：**@BetaStudio2、@NyaNyagulugulu**（两人任一的 approval 即满足 Code Owners 评审）。
 - **Ruleset `protect-archoeraos`**（branch `ArchoeraOS`）：禁止删除（`deletion`）、禁止强推
   （`non_fast_forward`）；**不要求 PR**（保留维护者直接推送的长期分支工作流）。
   `ArchoeraOS` 是长期维护的发行版分支，承载 shell/网络/蓝牙/安装向导等大量独有提交，
   **不得删除**。
 - **Ruleset `protect-release-tags`**（tag `v*`）：禁止**更新/删除**已发布 tag（不可移动）。
   故打 tag 前务必确认版本号。
-- **CODEOWNERS**：`.github/CODEOWNERS` 把 CI/工具/打包/水印等关键路径指向维护者。
+- **CODEOWNERS**：`.github/CODEOWNERS` 把 CI/工具/打包/水印等关键路径指向维护者
+  （**@BetaStudio2、@NyaNyagulugulu**）；
+  由 `protect-main` 的 **Require review from Code Owners** 强制生效（SEC-22）。
 
 ## 触发一次 Release（端到端）
 1. **升版本**：改 `app/pubspec.yaml` 的 `version:`（如 `0.9.15+8`）。

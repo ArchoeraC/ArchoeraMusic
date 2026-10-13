@@ -130,6 +130,11 @@ func DecryptString(ciphertext string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// 防御畸形存量数据：GCM.Open 对 nonce 长度不符会 panic（非返回错误），
+	// 而密文来源为可被篡改的本地文件/DB → 必须先校验，避免拖垮整个进程。
+	if len(iv) != gcm.NonceSize() {
+		return "", fmt.Errorf("invalid iv length %d (expected %d)", len(iv), gcm.NonceSize())
+	}
 
 	// Go GCM expects tag appended to ciphertext
 	combined := append(ct, tag...)

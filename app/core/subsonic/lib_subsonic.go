@@ -8,7 +8,8 @@
 // FFI 化（Dart 直连）：
 //   - create 异步启动 http server（监听端口供外部 Subsonic 客户端连接，服务端=发送方）
 //   - 事件（started/error/scan-request）经 poll_event 拉取
-//   - 凭据加解密导出给 Dart 管理层（格式与 TS encryptString 兼容）
+//   - 凭据加解密导出保留给旧 user.db 密文迁移（新凭据由 Dart 走 vault 承载）
+//   - set_credentials 注入用户密码内存表（认证优先查表，见 credentials 包）
 package main
 
 /*
@@ -34,6 +35,7 @@ import (
 	"unsafe"
 
 	"github.com/betastudio2/archoera-subsonic/config"
+	"github.com/betastudio2/archoera-subsonic/credentials"
 	"github.com/betastudio2/archoera-subsonic/crypto"
 	"github.com/betastudio2/archoera-subsonic/db"
 	"github.com/betastudio2/archoera-subsonic/logging"
@@ -207,6 +209,29 @@ func archoera_subsonic_destroy(h C.intptr_t) {
 		_ = st.srv.Shutdown(ctx)
 	}
 	<-st.done
+}
+
+//export archoera_subsonic_set_credentials
+func archoera_subsonic_set_credentials(handle C.intptr_t, jsonC *C.char) C.int {
+	// 校验句柄存在（仅要求服务实例已创建；本调用不改动实例状态）
+	mu.Lock()
+	_, ok := states[int64(handle)]
+	mu.Unlock()
+	if !ok {
+		return -1
+	}
+	if jsonC == nil {
+		return -1
+	}
+	var m map[string]string
+	if err := json.Unmarshal([]byte(C.GoString(jsonC)), &m); err != nil {
+		return -1
+	}
+	if m == nil {
+		m = map[string]string{}
+	}
+	credentials.ReplaceAll(m)
+	return 0
 }
 
 //export archoera_subsonic_encrypt

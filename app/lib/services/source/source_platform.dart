@@ -1336,7 +1336,9 @@ class _StreamingSource extends SourcePlatform {
       log?.call('流媒体曲目缺少 serverId/originalId: ${track.title}');
       return null;
     }
-    final cfg = ref.read(streamingProvider.notifier).serverConfigById(serverId);
+    // 凭据按需从 vault 惰性解密后临时构造客户端（不读长驻状态中的明文）。
+    final cfg =
+        await ref.read(streamingProvider.notifier).resolvedServer(serverId);
     if (cfg == null) {
       log?.call('流媒体服务器不存在: $serverId（${track.title}）');
       return null;
