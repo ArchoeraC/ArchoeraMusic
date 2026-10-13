@@ -199,7 +199,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # ───────────────────────── macOS（Homebrew 依赖）────────────────
       - name: Install Homebrew deps
@@ -582,7 +582,7 @@ jobs:
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libdbus-1-dev libx11-dev libxi-dev libopus-dev \
             patchelf nasm
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/build-linux
         with:
           cache_key_suffix: ubuntu2404
@@ -642,7 +642,7 @@ jobs:
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libopus-dev \
             libdbus-1-dev libx11-dev libxi-dev \
             patchelf nasm git curl wget xz-utils unzip zip jq file
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
       - uses: ./.github/actions/build-linux
@@ -687,7 +687,7 @@ jobs:
             opus-devel libX11-devel libXi-devel \
             rpm-build zstd libarchive
           # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
       - uses: ./.github/actions/build-linux
@@ -731,7 +731,7 @@ jobs:
             taglib curl openssl sqlite nlohmann-json opus \
             gtk3 dbus libx11 libxi
           # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
       - uses: ./.github/actions/build-linux
@@ -773,7 +773,7 @@ jobs:
     if: needs.preflight.outputs.linux_appimage == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
@@ -831,7 +831,7 @@ jobs:
     if: needs.preflight.outputs.linux_flatpak == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
@@ -874,7 +874,7 @@ jobs:
     if: needs.preflight.outputs.linux_nix == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: DeterminateSystems/nix-installer-action@e50d5f73bfe71c2dd0aa4218de8f4afa59f8f81d # v16
         with:
           extra-conf: |
@@ -929,7 +929,7 @@ jobs:
       attestations: write
     steps:
       - name: Checkout (签名工具 + 公钥)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # SEC-23：拒绝「tag 指向未评审提交」。发版 tag 必须指向受保护长分支
       # （main 或 ArchoeraOS）的祖先提交，否则不放行构建/签名。用 gh api compare

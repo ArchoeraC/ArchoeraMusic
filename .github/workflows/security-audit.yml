@@ -36,7 +36,7 @@ jobs:
           - app/core/subsonic/transcoder
           - app/core/audio-engine/tempo-rs
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -50,7 +50,7 @@ jobs:
     name: govulncheck (subsonic)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1
         with:
           go-version-input: '1.26'
@@ -62,7 +62,7 @@ jobs:
     name: dotnet vulnerable packages (scanner)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: '10.0.x'
