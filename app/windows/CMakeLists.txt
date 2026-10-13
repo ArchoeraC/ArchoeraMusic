@@ -205,8 +205,16 @@ install(FILES "${ARCHOERA_LOG_BUILD_DIR}/out/archoera_log.dll"
 # 写入 native/ARCHOERA-NATIVE-MANIFEST.txt，供 Dart 在 DynamicLibrary.open
 # 前按 basename 校验（打包态 fail-closed，见 lib/services/native_integrity.dart）。
 # 该 install(CODE) 声明于全部 native/ install 之后，故执行时文件已就位。
+# ⚠️ 前缀一律用**非转义**的 ${CMAKE_INSTALL_PREFIX}（生成期求值，genex 一并解析）：
+# Flutter 模板把 CMAKE_INSTALL_PREFIX 设为生成器表达式 $<TARGET_FILE_DIR:...>，
+# 且 MSBuild 的 INSTALL 用 `cmake -DBUILD_TYPE=Release -P cmake_install.cmake`
+# （不传 -DCMAKE_INSTALL_PREFIX）驱动 → 安装期该变量仍是**字面 genex**。
+# 若写成 \${CMAKE_INSTALL_PREFIX}（转义→推迟到安装期），Windows 上会得到含
+# `<`/`>` 的非法路径，file(MAKE_DIRECTORY) 直接致命错误 → INSTALL 退出 1 →
+# MSB3073（Linux 因 `<`/`>` 合法而静默建垃圾目录，故仅 Windows 暴露）。
+# 与 Flutter 模板自身的 install(CODE)（用非转义 ${INSTALL_BUNDLE_DATA_DIR}）一致。
 install(CODE "
-  set(_nativedir \"\${CMAKE_INSTALL_PREFIX}/native\")
+  set(_nativedir \"${CMAKE_INSTALL_PREFIX}/native\")
   file(MAKE_DIRECTORY \"\${_nativedir}\")
   set(_manifest \"\${_nativedir}/ARCHOERA-NATIVE-MANIFEST.txt\")
   set(_lines \"\")
@@ -222,9 +230,9 @@ install(CODE "
     file(SHA256 \"\${_f}\" _hash)
     list(APPEND _lines \"\${_hash}  \${_base}\")
   endforeach()
-  foreach(_f \"\${CMAKE_INSTALL_PREFIX}/archoera_music.exe\"
-            \"\${CMAKE_INSTALL_PREFIX}/archoera_kernel.dll\"
-            \"\${CMAKE_INSTALL_PREFIX}/data/app.so\")
+  foreach(_f \"${CMAKE_INSTALL_PREFIX}/archoera_music.exe\"
+            \"${CMAKE_INSTALL_PREFIX}/archoera_kernel.dll\"
+            \"${CMAKE_INSTALL_PREFIX}/data/app.so\")
     if(EXISTS \"\${_f}\")
       get_filename_component(_base \"\${_f}\" NAME)
       file(SHA256 \"\${_f}\" _hash)
