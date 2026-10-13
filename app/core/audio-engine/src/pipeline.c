@@ -202,6 +202,9 @@ typedef struct {
 
 static bool source_is_url(const char *s)
 {
+    /* 仅 http(s) 走网络传输路径。`file:` URI **不**在此列：本地源统一走本地分支
+     * （native_decoder_open / decoder_open），由内核 kernel/uri.zig 解析 file://
+     * 为绝对路径（百分号解码 / 盘符 / localhost）；FFmpeg 兜底亦原生识别 file:。 */
     return s && (strncmp(s, "http://", 7) == 0 || strncmp(s, "https://", 8) == 0);
 }
 

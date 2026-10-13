@@ -22,6 +22,25 @@ Future<void> _waitDone(
   }
 }
 
+/// 在 [base] 下（递归）找第一个 >20KB 的 mp3；目录不存在或不可读（权限等）
+/// 时返回 null，而不是让用例失败。
+Future<String?> _findMp3Sample(String base) async {
+  final d = Directory(base);
+  if (!d.existsSync()) return null;
+  try {
+    await for (final e in d.list(recursive: true, followLinks: false)) {
+      if (e is File &&
+          e.path.toLowerCase().endsWith('.mp3') &&
+          e.lengthSync() > 20000) {
+        return e.path;
+      }
+    }
+  } on FileSystemException {
+    return null;
+  }
+  return null;
+}
+
 void main() {
   test('仅整理：源文件移入 目标目录/{artist}/{album}/', () async {
     final so = ScraperBindings.resolveSoPath();
@@ -29,21 +48,28 @@ void main() {
       markTestSkipped('libarchoera_scraper 未构建，跳过');
       return;
     }
-    // 找一份真实音频样本（用户音乐目录优先，回退 /tmp）
-    final home = Platform.environment['HOME'];
+    // 找一份真实音频样本，确定性优先：
+    //   1) 仓库内置 MP3 样本（app/core/audio-engine/kernel/fmt/mp3/samples/，
+    //      随仓库分发；flutter test 的 CWD = app/，故用包根相对路径）；
+    //   2) 再回退用户音乐目录 `$HOME/音乐`（不可读时静默跳过）。
+    // 不再递归扫 /tmp：CI/发行版上 /tmp 含 systemd 私有目录（不可列举 →
+    // PathAccessException 直接炸用例），且只能撞运气命中别的用例的临时残留，
+    // 属非确定性来源（见 AGENTS「偶发失败不得当抖动重试掩盖」）。
     final seeds = <String>[];
-    for (final base in [if (home != null) '$home/音乐', '/tmp']) {
-      final d = Directory(base);
-      if (!d.existsSync()) continue;
-      await for (final e in d.list(recursive: true, followLinks: false)) {
-        if (e is File &&
-            e.path.toLowerCase().endsWith('.mp3') &&
-            e.lengthSync() > 20000) {
-          seeds.add(e.path);
-          break;
-        }
+    for (final rel in const [
+      'core/audio-engine/kernel/fmt/mp3/samples/lame_mono.mp3',
+      'core/audio-engine/kernel/fmt/mp3/samples/cbr_mono.mp3',
+    ]) {
+      final f = File(rel);
+      if (f.existsSync() && f.lengthSync() > 20000) {
+        seeds.add(f.absolute.path);
+        break;
       }
-      if (seeds.isNotEmpty) break;
+    }
+    if (seeds.isEmpty) {
+      final home = Platform.environment['HOME'];
+      final found = home == null ? null : await _findMp3Sample('$home/音乐');
+      if (found != null) seeds.add(found);
     }
     if (seeds.isEmpty) {
       markTestSkipped('无可用音频样本');

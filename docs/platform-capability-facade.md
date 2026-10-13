@@ -46,6 +46,13 @@
 > `org.kde.StatusNotifierItem`+`com.canonical.dbusmenu`（纯 libdbus）/ macOS
 > `NSStatusItem`。用于替代 Flutter 插件 `tray_manager`（其 0.6+ 引入 `nativeapi`/
 > `cnativeapi` 依赖，且第三方 C++ 在 MSVC 下有告警）。
+>
+> **SystemLocation 权限门禁（SEC-30，落地前必须满足）**：`locate()` 涉及敏感权限，实现必须满足四项——
+> ① **用户显式授权**（首次使用经系统权限对话框 / 明确 UI 提示，绝不静默采集）；② **可随时关闭**；
+> ③ **仅用于天气功能本身**；④ **不做二次利用**（不落盘、不上传、不用于定位以外目的）。
+> 未授权 / 用户关闭 / 平台无能力时 `locate()` 抛可回退错误，由天气层走「系统 → IP」回退链（§3 空实现静默降级）；
+> 禁止后台静默采集或无 UI 授权时调用。对齐 [CONTRIBUTING.md](../CONTRIBUTING.md) §2.5 与
+> [AGENTS.md](../AGENTS.md) 最小权限原则。
 
 ### 2.2 不属于本层（边界标注）
 
@@ -85,6 +92,11 @@ abstract interface class SystemPower {
 对齐 `power_saver.dart` 的 try-catch 降级与 `weather_api.dart` 的「系统 → IP」回退链。
 
 ## 4. 实现形态
+
+> ⚠️ **本节已被 §7.3 / §7.4 取代（SEC-29）**——下方「纯 Dart + 条件导入」「插件通道」路线**已被禁止**：按
+> [AGENTS.md](../AGENTS.md) 与 [CONTRIBUTING.md](../CONTRIBUTING.md) §2，平台能力一律走
+> `app/native/platform`（C++/ObjC++）原生桥接 + `dart:ffi`（`apl_*` C ABI），**禁止 Dart 直调平台 API、
+> 禁止 MethodChannel / 平台插件、禁止 `Process.run` / 子进程**。以下保留仅作历史对照。
 
 - **位置**：`app/lib/services/platform/<capability>/`：`<capability>.dart`（接口契约）+
   `<platform>.dart`（实现）+ 工厂（条件导入 / 平台注册表），主程序仅注入接口；

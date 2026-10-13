@@ -126,6 +126,7 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_DEEP_LINK          (1u << 9)   /* archoera:// 协议唤醒（ABI v2） */
 #define APL_CAP_REVEAL_PATH        (1u << 10)  /* 文件管理器定位路径（免提权、零子进程） */
 #define APL_CAP_TRAY               (1u << 11)  /* 系统托盘图标 + 上下文菜单（ABI v3） */
+#define APL_CAP_SECURE_FILE        (1u << 12)  /* 安全文件原语（原生 open(2)，ABI v4） */
 ```
 
 协议唤醒（`APL_CAP_DEEP_LINK`，ABI v2 起）：`apl_protocol_register/unregister`
@@ -133,12 +134,24 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 `apl_deep_link_forward` 次实例转发、`apl_window_activate` 置前主窗口；
 接收侧发 `APL_EVENT_DEEP_LINK` 信号，Dart 收到后调用 `apl_deep_link_take`。
 
+> **外部输入契约（SEC-31）**：deep link 接收的是**本机任意程序（含浏览器）都可触发**的
+> 外部 URI，故三端后端只识别**自有方案前缀 `archoera://`**（Linux 命令行 / `OpenUri`、
+> Windows `WM_COPYDATA` / argv、macOS AppleEvent 均在入队前按前缀过滤），其余一律丢弃；
+> 交给 Dart 的内容仍按「只解析自有 host/path 形式、未知 host 忽略」处理。该能力免提权
+> 注册，不接受任意 URL 打开/执行语义。
+
 文件管理器定位（`APL_CAP_REVEAL_PATH`，ABI v2 起）：`apl_reveal_path(path)`
 在系统文件管理器中定位路径（文件 → 打开所在目录并选中；目录 → 打开）——
 音乐库「定位文件」、下载「打开所在目录」、隔离区「打开目录」统一走本能力，
 **不再起 `xdg-open`/`explorer` 等子进程**。Linux 走 `org.freedesktop.FileManager1`
 D-Bus（回退 GIO 默认应用打开所在目录）；Windows 走 `SHOpenFolderAndSelectItems` /
 `ShellExecute`；macOS 走 `NSWorkspace`。
+
+> **输入契约（SEC-31）**：`apl_reveal_path` 只接受应用内已解析的**绝对本地路径**——
+> 在 `apl.cpp` 边界拒绝 URI（`scheme://`，含 `file://`/`http://`）与相对路径
+> （返回 `APL_ERR_STATE`），再由各后端要求路径**存在**。本能力只做「定位 / 打开」，
+> 不执行目标（Windows 对目录 `ShellExecute "open"` 亦交 Explorer）。托盘图标路径
+> 同样由 Dart 落临时文件后传入，属应用自产路径。
 
 系统托盘（`APL_CAP_TRAY`，ABI v3 起）：`apl_tray_create(icon_path)` /
 `apl_tray_destroy` / `apl_tray_set_icon` / `apl_tray_set_tooltip` /
@@ -178,6 +191,33 @@ typedef struct AplTrackMeta {
 **所有权**：Dart → Zig 的结构体与字符串仅在调用期间有效（Dart 侧保证存活到同步调用返回）；
 Zig 内部需要跨调用留存（SMTC 异步 set、MPRIS 属性缓存）时**在调用内深拷贝**；
 Zig → Dart 方向只有 POD 事件，**永不向 Dart 返回需释放的内存**。
+
+### 3.2.1 安全文件原语（`APL_CAP_SECURE_FILE`，ABI v4 起）
+
+收口 Dart `SafeFile`（`app/lib/utils/safe_file.dart`）记录的 TOCTOU 残余——`dart:io`
+无 `O_NONBLOCK`/`O_NOFOLLOW`，类型判定与真正读写之间存在极窄竞态窗口。以**原生
+`open(2)`** 一次性完成「打开即校验」：
+
+```c
+/* 读普通文件；out==NULL 仅探测大小（写 *inout_len），否则读入 out（容量 *inout_len）。
+   打开 O_RDONLY|O_NONBLOCK（allow_symlink==0 追加 O_NOFOLLOW），随后按**句柄** fstat
+   必须是普通文件：FIFO/设备/目录/符号链接(拒绝时)/超限一律负值（O_NONBLOCK 保证 FIFO
+   打开不阻塞）。输入契约同 apl_reveal_path：绝对本地路径，拒绝 URI/相对路径/设备命名空间。 */
+int32_t apl_file_read(const char* path, int32_t allow_symlink, int64_t max_bytes,
+                      uint8_t* out, size_t* inout_len);
+/* 原子写：同目录随机唯一临时名 O_CREAT|O_EXCL|O_NOFOLLOW → 写全 → fsync → rename
+   （rename 不跟随符号链接，符号链接只被替换、不被穿透）。 */
+int32_t apl_file_write_atomic(const char* path, const uint8_t* data, size_t len);
+```
+
+- **缓冲所有权**：调用方提供缓冲；本模块**永不返回需 Dart 释放的内存**（两段式读：
+  先 `out==NULL` 探测大小，再按大小分配读入）。
+- **平台**：Linux/macOS 走 POSIX `open(2)`（共用 `src/safe_file_posix.h`）；Windows 走
+  `CreateFileW` + `FILE_FLAG_OPEN_REPARSE_POINT` + `GetFileType==FILE_TYPE_DISK` /
+  `BY_HANDLE_FILE_INFORMATION` 判定，临时名 `CREATE_NEW` + `MoveFileExW` 替换。
+- **Dart 接线**：能力位可用时 `PlatformCapabilities.instance()` 注入
+  `NativeSafeFileBackend`（`SafeFile.backend`）；未注入（桥接缺失 / 非桌面 / 单测）
+  退回纯 Dart 实现，语义不变。免提权、零子进程。
 
 ### 3.3 SystemPower（三平台全覆盖，2026-09-10 决策）
 

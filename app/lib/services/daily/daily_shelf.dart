@@ -16,6 +16,7 @@ import 'dart:io';
 
 import '../../stores/data_dir.dart';
 import '../netease/track.dart';
+import '../../utils/safe_file.dart';
 
 /// 逻辑日切换时刻（本地时间）。与首页「凌晨<5 点算深夜」一致。
 const int kDailyRolloverHour = 5;
@@ -92,9 +93,9 @@ class DailyShelfStore {
   /// 读取全部账号的书架；无文件 / 损坏时返回空表。
   Map<String, List<DailyShelfDay>> readAll() {
     try {
-      final file = File(filePath);
-      if (!file.existsSync()) return {};
-      final json = jsonDecode(file.readAsStringSync());
+      final text = SafeFile.readString(filePath);
+      if (text == null) return {};
+      final json = jsonDecode(text);
       if (json is! Map) return {};
       final users = json['users'];
       if (users is! Map) return {};
@@ -130,9 +131,8 @@ class DailyShelfStore {
       all[uid] = list.length > kDailyShelfCap
           ? list.sublist(0, kDailyShelfCap)
           : list;
-      final file = File(filePath);
-      file.parent.createSync(recursive: true);
-      file.writeAsStringSync(
+      SafeFile.writeAtomicString(
+        filePath,
         const JsonEncoder.withIndent('  ').convert({
           'v': 1,
           'users': {
@@ -163,9 +163,8 @@ class DailyShelfStore {
         clear();
         return;
       }
-      final file = File(filePath);
-      file.parent.createSync(recursive: true);
-      file.writeAsStringSync(
+      SafeFile.writeAtomicString(
+        filePath,
         const JsonEncoder.withIndent('  ').convert({
           'v': 1,
           'users': {

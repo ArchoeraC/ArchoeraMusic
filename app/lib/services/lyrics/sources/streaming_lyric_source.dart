@@ -46,9 +46,9 @@ class StreamingLyricSource implements LyricSource {
     if (serverId == null || originalId == null || originalId.isEmpty) {
       return null;
     }
-    final cfg = _ref
-        .read(streamingProvider.notifier)
-        .serverConfigById(serverId);
+    // 凭据按需从 vault 惰性解密后临时构造客户端。
+    final cfg =
+        await _ref.read(streamingProvider.notifier).resolvedServer(serverId);
     if (cfg == null) return null;
     try {
       final lyrics = await StreamingClient(cfg).getLyrics(

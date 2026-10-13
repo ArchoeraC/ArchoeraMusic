@@ -11,8 +11,43 @@
 #include "backend.h"
 #include "core.h"
 
+#include <cstring>
+
 namespace {
-constexpr int32_t kAbiVersion = 3;
+constexpr int32_t kAbiVersion = 4;
+
+// SEC-31：reveal 路径输入契约——仅接受应用内已解析的**绝对本地路径**。
+// 拒绝空串、URI（`scheme://`，含 `file://`/`http://`）与相对路径；C 串天然在 NUL 截断。
+bool isAbsoluteLocalPath(const char* p) {
+#ifdef _WIN32
+    // `X:\` / `X:/` 盘符绝对路径，或 `\\server\share` UNC。
+    if (p[0] == '\\' && p[1] == '\\') return true;
+    const bool alpha = (p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z');
+    return alpha && p[1] == ':' && (p[2] == '\\' || p[2] == '/');
+#else
+    return p[0] == '/';
+#endif
+}
+
+// 安全文件原语：拒绝 Windows 设备命名空间（`\\.\pipe\…`、`\\.\C:` 等），
+// 避免把命名管道/设备当普通文件打开（打开命名管道可能阻塞）。
+bool isDeviceNamespace(const char* p) {
+#ifdef _WIN32
+    return p[0] == '\\' && p[1] == '\\' && p[2] == '.' &&
+           (p[3] == '\\' || p[3] == '\0');
+#else
+    (void)p;
+    return false;
+#endif
+}
+
+// 安全文件原语通用输入契约：绝对本地路径 + 非 URI + 非设备命名空间。
+bool isSafeLocalPath(const char* path) {
+    if (path == nullptr || *path == '\0') return false;
+    if (std::strstr(path, "://") != nullptr) return false;
+    if (isDeviceNamespace(path)) return false;
+    return isAbsoluteLocalPath(path);
+}
 }  // namespace
 
 extern "C" {
@@ -135,7 +170,26 @@ int32_t apl_notify(const char* title, const char* body) {
 int32_t apl_reveal_path(const char* path) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     if (path == nullptr || *path == '\0') return archoera::ERR_STATE;
+    // SEC-31：仅接受应用内已解析的绝对本地路径；拒绝 URI 与相对路径。
+    if (std::strstr(path, "://") != nullptr) return archoera::ERR_STATE;
+    if (!isAbsoluteLocalPath(path)) return archoera::ERR_STATE;
     return archoera::revealPath(path);
+}
+
+int32_t apl_file_read(const char* path, int32_t allow_symlink, int64_t max_bytes,
+                      uint8_t* out, size_t* inout_len) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (inout_len == nullptr || max_bytes <= 0) return archoera::ERR_STATE;
+    // 安全文件契约：绝对本地路径 + 非 URI + 非设备命名空间。
+    if (!isSafeLocalPath(path)) return archoera::ERR_STATE;
+    return archoera::fileRead(path, allow_symlink != 0, max_bytes, out, inout_len);
+}
+
+int32_t apl_file_write_atomic(const char* path, const uint8_t* data, size_t len) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (len > 0 && data == nullptr) return archoera::ERR_STATE;
+    if (!isSafeLocalPath(path)) return archoera::ERR_STATE;
+    return archoera::fileWriteAtomic(path, data, len);
 }
 
 int32_t apl_tray_create(const char* icon_path) {

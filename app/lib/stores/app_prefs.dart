@@ -2,12 +2,13 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/log/log.dart';
+import '../services/mcp/mcp_key_store.dart';
 import '../services/playback/playback_session.dart';
 import 'data_dir.dart';
 import 'prefs_mcp.dart';
@@ -30,6 +31,7 @@ import 'prefs_security.dart';
 import 'prefs_streaming.dart';
 import 'prefs_shortcuts.dart';
 import 'prefs_tag_rules.dart';
+import '../utils/safe_file.dart';
 
 export 'prefs_mcp.dart';
 export 'prefs_app.dart';
@@ -71,9 +73,10 @@ class AppPrefs {
 
   static AppPrefs load() {
     try {
-      final file = File(filePath);
-      if (!file.existsSync()) return AppPrefs();
-      final json = jsonDecode(file.readAsStringSync());
+      // 安全读取：拒绝非普通文件（FIFO 会阻塞、符号链接会重定向）+ 长度上限。
+      final text = SafeFile.readString(filePath);
+      if (text == null) return AppPrefs();
+      final json = jsonDecode(text);
       if (json is Map<String, dynamic>) return AppPrefs(initialData: json);
     } catch (_) {
       // 损坏的偏好文件：回退默认
@@ -83,9 +86,12 @@ class AppPrefs {
 
   void save() {
     try {
-      final file = File(filePath);
-      file.parent.createSync(recursive: true);
-      file.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(data));
+      // SEC-10：MCP 访问密钥绝不以明文落 prefs.json（权威存储见 McpKeyStore）。
+      // 双保险：即使内存 [data] 残留历史值，落盘前也剥离。
+      data.remove(mcpAccessKeyKey);
+      // 安全写入：同目录唯一临时名 + rename（符号链接只被替换、不被穿透）。
+      SafeFile.writeAtomicString(
+          filePath, const JsonEncoder.withIndent('  ').convert(data));
     } catch (_) {
       // 持久化失败不阻塞（自用项目，偏好丢失可接受）
     }
@@ -703,9 +709,9 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置凭据加密方案（crypto=LEGACY 单因子推荐 / vault=2-of-2 实验性）。
-  /// 由安全设置页/首次启动对话框在「销毁重建 + 冷切重启」后调用；
-  /// 重启后 [VaultSessionStore]/[StreamingStore] 惰性重建按本偏好初始化。
+  /// 设置凭据加密方案（crypto/file/m1/m2a/m2b）。
+  /// 由安全设置页在「销毁重建 + 冷切重启」后调用；重启后
+  /// [VaultSessionStore]/[StreamingStore] 惰性重建按本偏好初始化。
   void setCredentialScheme(String value) {
     state = state.copyWithCredentialScheme(value);
     state.save();
@@ -714,6 +720,20 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 标记首次启动「加密方案选择」对话框已展示（一次性）。
   void setSchemeDialogShown(bool value) {
     state = state.copyWithSchemeDialogShown(value);
+    state.save();
+  }
+
+  /// 标记 m2a 恢复码已由用户确认抄写/保存（设置页持久提醒的消费标记）。
+  void setM2aRecoveryAcked(bool value) {
+    state = state.copyWithM2aRecoveryAcked(value);
+    state.save();
+  }
+
+  /// 设置 Argon2id 强度预设（'low'|'medium'|'high'）。
+  /// 由安全设置页在 `set-kdf` 成功重封装后调用持久化；重启/重新初始化
+  /// m1/m2a 时按本预设选取参数。
+  void setVaultKdfPreset(String value) {
+    state = state.copyWithVaultKdfPreset(value);
     state.save();
   }
 
@@ -978,9 +998,15 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   }
 
   /// 写入访问密钥（首次开启时由服务生成 128-bit 十六进制）。
+  ///
+  /// SEC-10：密钥权威存储为凭据保险库（[McpKeyStore]，异步写穿），同步缓存先
+  /// 更新以保证服务即时取到；`prefs.json` 不再保留明文。方法保持同步（调用方
+  /// 依赖），vault 写入经 [unawaited] 后台进行（失败仅告警，不影响本会话）。
   void setMcpAccessKey(String value) {
-    state = state.copyWithMcpAccessKey(value);
+    McpKeyStore.setCached(value);
+    state = state.copyWithMcpAccessKey('');
     state.save();
+    unawaited(McpKeyStore.persist(resolveDataDir(), value));
   }
 
   /// 设置是否允许免密钥访问（默认关）。

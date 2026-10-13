@@ -10,6 +10,8 @@
 /// - 扫码登录：qq 出码真实请求（不扫码，仅验证拿到 key + 图）
 library;
 
+import 'dart:io' show Platform;
+
 import 'package:archoera_music/apis/qqmusic/api.dart';
 import 'package:archoera_music/apis/qqmusic/core/qrc.dart';
 import 'package:archoera_music/services/netease/netease_api.dart';
@@ -26,6 +28,12 @@ void main() {
 
   // ── 真实链路（搜索 → song_url 直链） ─────────────────────────────
   final api = QqMusicApi();
+
+  // song_url（可播直链）用例需「出口能取到可播 URL」：GitHub 境外出口对免费/
+  // 公版曲目同样返回空直链（地域/版权差异，非链路故障），而搜索/出码/歌词等
+  // 用例与此无关。默认跳过，设 ARCHOERA_ONLINE_TEST=1 启用（与
+  // online_playback_test.dart 同口径；CI 默认不跑，避免出口相关假红）。
+  final onlineEnabled = Platform.environment['ARCHOERA_ONLINE_TEST'] == '1';
 
   test('直连搜索解析（真实请求）', () async {
     final result = await api.searchSongs('命运交响曲 贝多芬', page: 1, limit: 3);
@@ -54,7 +62,9 @@ void main() {
     }
     expect(url, isNotNull, reason: '免费曲目应能取到直链: $lastErr');
     expect(url, startsWith('http'));
-  }, timeout: const Timeout(Duration(seconds: 40)));
+  }, timeout: const Timeout(Duration(seconds: 40)), skip: onlineEnabled
+      ? null
+      : '需出口可取到可播直链：设 ARCHOERA_ONLINE_TEST=1 启用');
 
   test('song_url：VIP 曲目按接口语义拒绝（不绕过）', () async {
     final result = await api.searchSongs('晴天 周杰伦', page: 1, limit: 1);

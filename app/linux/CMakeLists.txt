@@ -263,7 +263,7 @@ endif()
 #   bundle/native/{archoera-vault}
 #   bundle/native/libarchoera_downloader.so
 # 产物由独立构建链产出（audio-engine/scraper: cmake; scanner: dotnet publish;
-# subsonic: build.sh 即 cargo + go；downloader: cargo）。
+# subsonic: build.sh 即 cargo + go; downloader: cargo; vault(Linux): cargo vault-rs）。
 # OPTIONAL：源产物缺失时跳过（如未构建 subsonic 仍可跑 Flutter 构建）。
 set(ENGINE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/build")
 set(SCANNER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scanner/build")
@@ -295,10 +295,13 @@ install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_subsonic.so"
 install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_transcoder.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 
-# vault（凭据保险库）：NativeAOT 可执行（dotnet publish，见 core/vault/build.sh），
-# 随包分发供 Dart 按需 spawn（凭据加解密 2-of-2；OS 授权份额存系统密钥环）。
-# 独立构建链产出（与 scanner 一致），缺失时跳过（会话降级为内存持久化）。
-set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault/build")
+# vault（凭据保险库）：Linux 用 vault-rs 的 **Rust 静态单文件**（+crt-static，CI 走
+# musl 静态，见 core/vault-rs/build.sh）——无动态依赖，ld.so 不参与，免疫
+# LD_PRELOAD/LD_LIBRARY_PATH；Linux 上 crypto 走 file 后端、slots 自包含，不依赖
+# libsecret。随包分发供 Dart 按需 spawn。（macOS/Windows 亦为 vault-rs，DPAPI/Keychain；
+# 运行路径待真机/Wine 复验。）
+# 独立构建链产出，缺失时跳过（会话降级为内存持久化）。
+set(VAULT_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/vault-rs/build")
 install(PROGRAMS "${VAULT_SRC_DIR}/archoera-vault"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 
