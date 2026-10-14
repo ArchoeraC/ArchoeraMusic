@@ -53,9 +53,13 @@ incs=(-I "$PLATFORM_DIR/include" -I "$PLATFORM_DIR/src")
 if [ -n "$CPPWINRT_INCLUDE" ]; then incs+=("-I$CPPWINRT_INCLUDE"); fi
 
 set +e
+# /Fo：中间 .obj 必须落 BUILD_DIR —— MSVC 默认把 .obj 写在**当前工作目录**，
+# 从仓库根调用本脚本会在仓库里留下 apl.obj / core.obj / backend_windows.obj
+#（2026-10-14 实录）。与 verify_macos.sh 显式 `-o $BUILD_DIR/...` 的做法对齐。
 cl /nologo /std:c++20 /EHsc /O2 /W3 /permissive- /Zc:__cplusplus /utf-8 \
    /DARCHOERA_PLATFORM_BUILD "${incs[@]}" \
    /LD \
+   "/Fo$BUILD_DIR/" \
    "$PLATFORM_DIR/src/core.cpp" \
    "$PLATFORM_DIR/src/apl.cpp" \
    "$PLATFORM_DIR/src/backend_windows.cpp" \

@@ -223,7 +223,7 @@ void main() {
     final vaultFile = File('${tmp.path}/credentials.vault');
     expect(vaultFile.existsSync(), isTrue);
 
-    VaultProcess.destroy(tmp.path);
+    await VaultProcess.destroy(tmp.path);
     expect(vaultFile.existsSync(), isFalse, reason: 'destroy 应删除 vault 文件');
   });
 }
