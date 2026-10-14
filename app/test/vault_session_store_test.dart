@@ -33,6 +33,10 @@ void main() {
       ? '需要 ARCHOERA_VAULT_BIN 指向测试构建（见文件头运行前提）'
       : null;
 
+  final skipNoVault = Platform.environment['ARCHOERA_VAULT_BIN'] == null
+      ? '需要 ARCHOERA_VAULT_BIN 指向测试构建'
+      : null;
+
   Future<Directory> makeTmp(String prefix) async {
     final tmp = await Directory.systemTemp.createTemp(prefix);
     addTearDown(() => tmp.deleteSync(recursive: true));
@@ -111,6 +115,22 @@ void main() {
           reason: '${f.path} 不应含明文');
     }
   });
+
+  test('m2a 方案 + 库缺失：不静默降级为 crypto，等待显式初始化', () async {
+    final tmp = await makeTmp('vault_m2a_missing');
+    final store = VaultSessionStore(dataDir: tmp.path, defaultScheme: 'm2a');
+    await store.initialize();
+    if (!store.vaultAvailable) {
+      markTestSkipped('vault 不可用，跳过');
+      return;
+    }
+    // 关键：绝不 auto-init 成单因子 crypto（安全降级 + pref/容器不一致）
+    expect(File('${tmp.path}/credentials.vault').existsSync(), isFalse,
+        reason: 'm2a 需要用户因子，库缺失时不得自动初始化任何容器');
+    expect(store.mode, isNull, reason: '应保持未初始化，交由 UI 初始化门');
+    expect(store.needsPassword, isTrue,
+        reason: '应提示需要口令（用户显式初始化/解锁），而非静默建库');
+  }, skip: skipNoVault);
 
   test('file 方案：defaultScheme=file 惰性 init-file → mode crypto + backend file + 往返', () async {
     final tmp = await makeTmp('vault_file_store');

@@ -241,6 +241,15 @@ class VaultProcess {
     }
   }
 
+  /// 是否**免密**方案——只有它们可以在「库缺失」时被**惰性自动初始化**。
+  ///
+  /// m1 / m2a / m2b 需要用户因子（口令 / `device.key` / 恢复码）：库缺失时**绝不能**
+  /// 静默 auto-init 成单因子 `crypto`——那既是**安全降级**（用户选了双因子却得到单因子），
+  /// 又会造成「pref 说 m2a、容器是 crypto」的不一致。此类方案交给 UI 的初始化/解锁门
+  /// 提示用户显式选择并设置因子。
+  static bool isPasswordlessScheme(String scheme) =>
+      scheme == 'crypto' || scheme == 'file';
+
   /// 初始化后**自验证**：用刚设置的口令（m2b/crypto 传 null=免密）真实走一次解锁握手。
   ///
   /// **为什么必须有**：方案切换会先销毁旧库再初始化新方案；若新库初始化「成功」
