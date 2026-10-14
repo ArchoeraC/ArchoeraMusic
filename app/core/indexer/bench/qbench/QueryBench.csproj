@@ -36,18 +36,26 @@
     <!-- 与 tests/ 同源共享生产分析器 / 存储（显式 Link，不复制逻辑）：
          只取查询路径所需的最小闭包，不含 Program / IndexerEngine / LrcReader。 -->
     <Compile Include="../../Analyzer.cs" Link="Analyzer.cs" />
+    <Compile Include="../../Japanese.cs" Link="Japanese.cs" />
     <Compile Include="../../Pinyin.cs" Link="Pinyin.cs" />
     <Compile Include="../../PinyinSegmenter.cs" Link="PinyinSegmenter.cs" />
     <Compile Include="../../HanziData.cs" Link="HanziData.cs" />
     <Compile Include="../../Log.cs" Link="Log.cs" />
     <Compile Include="../../IndexStore.cs" Link="IndexStore.cs" />
     <Compile Include="../../FtsStore.cs" Link="FtsStore.cs" />
+    <Compile Include="../../../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- 与 CLI 相同的数据表版本（EmbeddedResource 固定 LogicalName，供 HanziData 按名查找）。
          nfkc：兼容折叠；def_*：Unihan 释义查询扩展（T1 查询侧跨语言候选）。
          拼音/繁简/全角走 ToolGood.Words，GB18030 走框架 CodePages。 -->
+    <EmbeddedResource Include="../../data/kana_romaji.tsv" Link="data/kana_romaji.tsv">
+      <LogicalName>Archoera.Indexer.data.kana_romaji.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../data/ja_readings.tsv" Link="data/ja_readings.tsv">
+      <LogicalName>Archoera.Indexer.data.ja_readings.tsv</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="../../data/nfkc.tsv" Link="data/nfkc.tsv">
       <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
     </EmbeddedResource>

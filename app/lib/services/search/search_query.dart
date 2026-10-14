@@ -8,27 +8,55 @@
 /// 语义对齐设计文档 `docs/local-search-index-plan.md` §4 / §5.2 / §9.3：
 ///   - `Lexical`：词法词元加双引号转义；**连续多个 CJK bigram** 合并为引号短语
 ///     （`"我爱 爱你"`，要求位置相邻以提升中文短语精度），其余逐个 `AND`；
-///     末 token 若为拉丁/数字则追加 `*`（前缀，边打边搜）；
-///   - `Pinyin`：音节 `AND`，末音节 `*`；音节数 ≥2 时额外提供「首音节前缀」变体
-///     （见 [_pinyinBranch]，P4）；
-///   - `Initials`：首字母串 `"wan"*`；
+///     末 token 若为拉丁/数字且 ≥ [minPrefixTokenLength] 则追加 `*`（前缀，边打边搜）；
+///   - `Pinyin`：`全拼音节`——单音节 ≥3 字符 `"hao"*`（前缀）；**≥2 音节为相邻短语** `"wo ai ni"`
+///     （P5 实测修订：任意位置 `AND` 会把整库几乎全部命中，见 [_pinyinBranch]）；
+///     漏字 / 换位由 [compilePinyinLoose] 作为**兜底趟**恢复（见 [minPrefixTokenLength]）；
+///   - `Initials`：**列过滤**到首字母列（`initials_meta_tok` / `initials_lyrics_tok`，v4 分列）；≥2 字符前缀；
+///   - `Reading`（v5，兜底趟）：拉丁 / 数字词元的字母 bigram `AND` 到读音列
+///     （日文假名 / 汉字读音的罗马字；见 [compileReading]）；
 ///   - `CrossLingual`（T1）：跨语言候选逐个原样 `quoteToken` 后以 `OR` 组合
 ///     （候选**之间** OR，非 AND；`love` → `"爱" OR "恋" …`）——英文查询召回含对应
-///     汉字的内容 / 中文查询召回含英文释义的内容；
-///   - 四支以 `OR` 组合（任一层命中即召回）。
+///     汉字的内容 / 中文查询召回含英文释义的内容。**默认不并入**主表达式，
+///     由 [compileCrossLingual] 作为兜底趟单独执行（见 [compileMatch] 的 `includeCrossLingual`）；
+///   - 主趟各支以 `OR` 组合（任一层命中即召回）。
 ///
 /// 安全：所有词元都经 [quoteToken] 转义（内部 `"` 翻倍），杜绝 FTS5 语法
 /// 错误与表达式注入；空查询返回 `null`（调用方视为「无关键字」回退原列表）。
 library;
 
+import 'script_ranges.dart';
 import 'search_models.dart';
 
 /// 元数据列过滤用的 FTS5 列集合（`scope=metadata`；不含歌词 / 译文 / 音译段）。
+///
+/// v4 起拼音 / 首字母按**元数据段 / 歌词段**分列，故这里只列元数据那两列——
+/// `scope=metadata` 于是真正「只搜标题 / 歌手 / 专辑 / 文件名」（旧版混列时收不住，见设计文档 §4.5）。
 const String metadataColumns =
-    'title_tok artist_tok album_tok filename_tok pinyin_tok';
+    'title_tok artist_tok album_tok filename_tok pinyin_meta_tok initials_meta_tok reading_meta_tok';
+
+/// 索引里存放拼音 / 首字母的列集合（查询该支时列过滤到这两列，避免误匹配标题里的拉丁词元）。
+const String pinyinColumns = 'pinyin_meta_tok pinyin_lyrics_tok';
+const String initialsColumns = 'initials_meta_tok initials_lyrics_tok';
+
+/// 索引里存放**日文读音**（假名 / 汉字读音 → 罗马字字母 bigram）的列集合（v5）。
+///
+/// 只有**元数据**读音（标题 / 歌手 / 专辑 / 文件名）：歌词罗马字检索是伪需求，且整段歌词读音
+/// bigram 会把索引推高约 2×（见设计文档 §4.2）。
+const String readingColumns = 'reading_meta_tok';
 
 /// 单次模糊编译的**变体总数**默认上限（防止长串 / 多词元生成巨型 MATCH，设计文档 §4.6）。
 const int defaultMaxFuzzyVariants = 500;
+
+/// 拼音 / 拉丁词元加前缀 `*`（边打边搜）的**最小长度**。
+///
+/// ≤2 字符的前缀（`"a"*` / `"wo"*` / `"ni"*`）在宽命中集上代价极高：30k 语料实测
+/// `"ni"*` 命中 30000/30000、单条 59ms（FTS5 的 `ORDER BY bm25` 要给全部命中打分）。
+/// 而 1–2 字符输入本身几乎没有识别力，改精确匹配既便宜又更准；3 字符起才加速前缀。
+const int minPrefixTokenLength = 3;
+
+/// 首字母串加前缀 `*` 的**最小长度**（首字母列空间小，2 字符起即可前缀）。
+const int minInitialsPrefixLength = 2;
 
 /// 替换容错的**受限字母表**（编辑距离 ≤ 1 的替换集合，刻意不用完整 26 字母）。
 ///
@@ -70,11 +98,17 @@ String quoteToken(String token) => '"${token.replaceAll('"', '""')}"';
 /// 编译为 FTS5 `MATCH` 表达式；无可匹配内容返回 `null`。
 ///
 /// [scope] 为 [LocalSearchScope.metadata] 时对整个表达式施加前缀列过滤
-/// `{title_tok artist_tok album_tok filename_tok pinyin_tok} : (...)`，
+/// `{title_tok artist_tok album_tok filename_tok pinyin_tok initials_tok} : (...)`，
 /// 只扫元数据段（不触歌词 / 译文 / 音译），见设计文档 §4.5。
+///
+/// [includeCrossLingual] 默认 false：跨语言支（T1）的候选多为**高频英文词**
+/// （`愛` → `love`），`OR` 进表达式会把命中集放大到近乎整库（30k 实测单条 116ms）。
+/// 调用方（[SearchIndex.search]）先跑不含该支的精确查询，**仅当命中过窄**时才用
+/// [compileCrossLingual] 补一趟——跨语言召回归为「渐进兜底」而非每次都付全价。
 String? compileMatch(
   AnalyzerTokens tokens, {
   LocalSearchScope scope = LocalSearchScope.all,
+  bool includeCrossLingual = false,
 }) {
   final branches = <String>[];
 
@@ -87,8 +121,10 @@ String? compileMatch(
   final initials = _initialsBranch(tokens.initials);
   if (initials != null) branches.add(initials);
 
-  final crossLingual = _crossLingualBranch(tokens.crossLingual);
-  if (crossLingual != null) branches.add(crossLingual);
+  if (includeCrossLingual) {
+    final crossLingual = compileCrossLingual(tokens);
+    if (crossLingual != null) branches.add(crossLingual);
+  }
 
   if (branches.isEmpty) return null;
 
@@ -107,6 +143,19 @@ String? compileMatch(
 /// 汉字、CJK 字 → 英文释义词。**不加前缀 `*`**（候选为完整词 / 字，避免过度召回）；
 /// 空列表返回 null（不加此支）。单个候选不加包裹括号，多个候选整体加括号以便与
 /// 其它分支的 `AND` / `OR` 优先级隔离（FTS5 中 `AND` 比 `OR` 结合更紧）。
+///
+/// **调用约定**：本支是**渐进兜底**——[compileMatch] 默认不含它（见其 `includeCrossLingual`），
+/// 只有精确查询命中过窄时，调用方才单独用 [compileCrossLingual] 发第二趟。
+/// 跨语言支单独成趟的表达式（可选 [scope] 列过滤）；无候选返回 `null`。
+String? compileCrossLingual(
+  AnalyzerTokens tokens, {
+  LocalSearchScope scope = LocalSearchScope.all,
+}) {
+  final branch = _crossLingualBranch(tokens.crossLingual);
+  if (branch == null) return null;
+  return scope == LocalSearchScope.metadata ? '{$metadataColumns} : $branch' : branch;
+}
+
 String? _crossLingualBranch(List<String> terms) {
   final clean = terms
       .map((t) => t.trim())
@@ -122,6 +171,43 @@ String? _crossLingualBranch(List<String> terms) {
 /// 纯 CJK 查询无需模糊（拼音分支已覆盖同音错字）；只有拉丁词元才可能因拼写错误而漏召回。
 bool hasFuzzyEligible(AnalyzerTokens tokens) =>
     tokens.lexical.any(_isFuzzyEligible);
+
+/// **日文读音分支**（v5，设计文档 §4.2）：把查询里的**拉丁 / 数字词元**拆成字母 bigram **短语**
+/// （`"ku ur ra ar ri in"`——要求这些 bigram **连续**，等价于子串检索）后 `AND` 到读音列。
+///
+/// 为什么是**短语**而不是 `AND`：读数列为整段歌词的罗马字 bigram，`AND`（任意位置）会像当年
+/// 拼音音节 `AND` 一样把命中集放大到近乎整库（实测 165 首日文库里任一 3–6 个常见 bigram 组合
+/// 都命中 83–85 首）；短语要求**相邻**，正是「查子串」该有的语义（`kurarin` ⊂ `kyuukurarin`）。
+///
+/// 索引侧读音列存的是「假名 / 汉字读音 → 罗马字」的**字母 bigram**（与 CJK 的字符 bigram 同构），
+/// 故 `kurarin` 的 bigram 组能命中 `kyuukurarin` 这类连续子串（子串检索），
+/// 而纯汉字歌手名（米津玄師）也能经 Unihan 音训读命中（`kome` / `yone` / `tsu`）。
+///
+/// 边界：只取长度 ≥ 2 的**非子串脚本**词元（1 字符 bigram 无意义；汉字 / 假名词元由主趟的
+/// 字符 bigram 覆盖，不重复）。无可用词元返回 `null`（不加此支）。
+/// [scope]=metadata 时只用元数据白名单（其内含 `reading_meta_tok`）。
+String? compileReading(
+  AnalyzerTokens tokens, {
+  LocalSearchScope scope = LocalSearchScope.all,
+}) {
+  final parts = <String>[];
+  for (final token in tokens.lexical) {
+    final lower = token.toLowerCase();
+    if (lower.length < 2) continue;
+    if (lower.runes.any(isIndexedScript)) continue;
+    final bigrams = <String>[];
+    for (var i = 0; i + 1 < lower.length; i++) {
+      bigrams.add(lower.substring(i, i + 2));
+    }
+    // 单个引号短语 = 相邻 bigram 序列（FTS5 短语语义），等价于对该词元做子串检索。
+    if (bigrams.isNotEmpty) parts.add(quoteToken(bigrams.join(' ')));
+  }
+  if (parts.isEmpty) return null;
+  final body = parts.join(' AND ');
+  return scope == LocalSearchScope.metadata
+      ? '{$metadataColumns} : ($body)'
+      : '{$readingColumns} : ($body)';
+}
 
 /// 编译**模糊（容错）** FTS5 `MATCH` 表达式（**纯函数**，设计文档 §4.6 模糊 / 容错）。
 ///
@@ -201,7 +287,7 @@ String? _lexicalBranch(List<String> terms) {
     }
   }
 
-  final prefixLast = _isPrefixable(clean.last);
+  final prefixLast = _isPrefixable(clean.last) && clean.last.length >= minPrefixTokenLength;
   final parts = <String>[];
   for (var k = 0; k < chunks.length; k++) {
     final isLast = k == chunks.length - 1;
@@ -210,14 +296,50 @@ String? _lexicalBranch(List<String> terms) {
   return parts.join(' AND ');
 }
 
-/// 拼音分支：音节 `AND`，末音节前缀；音节数 ≥2 时额外 OR 一个「首音节前缀」变体。
+/// 拼音**宽松兜底**支：音节 `AND`（**与位置无关**），末音节 3 字符起加前缀。
 ///
-/// 现状（主形态）：末音节允许 `*`——覆盖「边打边搜」时末音节未输完（`woai` → `wo` + `ai*`）。
-/// P4 变体：当音节数 ≥2，再提供「首音节也允许前缀」的形态（`w ai ni` → `"w"* AND "ai" AND "ni"*`），
-/// 覆盖**首音节未输完 / 非末尾音节残缺**的混合输入——主形态无法命中（`"w"` 精确匹配不到 `wo`）。
+/// 用途（渐进第二趟）：主支 [compileMatch] 用**相邻短语**（精度高、命中集小），但
+/// **漏字 / 换位**（`周伦` → `周杰伦`、`爱我` → `我爱你`）这类「音节齐全但不相邻」的查询需要
+/// 位置无关的 `AND` 才能召回——这正是设计 §4.2 期望拼音支提供的容错能力。
+/// 仅当短语趟命中不足时才付这笔开销：位置无关的 `AND` 命中集可能很大
+/// （30k 实测 `wo ai ni` 任意位置命中 29763/30000、单条 ≈66ms，见 bench/REPORT.md §7）。
 ///
-/// 取舍：只对首音节放宽前缀（不选「全前缀」），把过度召回转到一个短音节上；
-/// 变体与主形态以 `OR` 组合，结果仍由 BM25 排序，属受控放大召回。
+/// 音节数 <2 返回 `null`（单音节主支本就是前缀形态，无需兜底）。
+/// [scope]=metadata 时施加整表达式列过滤（与 [compileMatch] 同规则）。
+String? compilePinyinLoose(
+  AnalyzerTokens tokens, {
+  LocalSearchScope scope = LocalSearchScope.all,
+}) {
+  final clean = tokens.pinyin
+      .map((t) => t.trim())
+      .where((t) => t.isNotEmpty)
+      .toList();
+  if (clean.length < 2) return null;
+  final body = _quotedAnd(clean,
+      prefixLast: clean.last.length >= minPrefixTokenLength);
+  final filtered = '{$pinyinColumns} : ($body)';
+  // 元数据范围时，元数据白名单比拼音列集合更窄（只到 pinyin_meta_tok）。
+  return scope == LocalSearchScope.metadata
+      ? '{$metadataColumns} : ($body)'
+      : filtered;
+}
+
+/// 拼音分支：`全拼音节` → FTS5 表达式。
+///
+/// **单音节**：3 字符起 `"wo"*`（前缀，边打边搜）；1–2 字符改精确（见 [minPrefixTokenLength]）。
+/// **≥2 音节**：`"wo ai ni"`——**位置相邻短语**（索引侧同一段拼音音节连续入列）。
+///
+/// 为什么 ≥2 音节改为短语（P5 实测修订，见 `app/core/indexer/bench/REPORT.md`）：
+/// 原先的「音节 `AND`（末音节前缀）+ 首音节前缀变体」是**任意位置**的 `AND`，常见拼音
+/// 查询会把整个曲库几乎全部命中（30k 语料上 `woaini` 命中 29763/30000），而 FTS5 的
+/// `ORDER BY bm25` 必须给全部命中打分——单条查询 131ms，且随曲库线性恶化；
+/// 首音节前缀变体是冗余支（语义上被主形态近似覆盖）却独占约 58ms。
+/// 短语把「相邻」这一用户真实语义写进查询：命中 4592（30k），延迟 18ms，精度同时更好
+/// （用户连写输入本就是一段连续拼音，不相邻的音节匹配纯属噪声）。
+///
+/// 末音节不再加 `*`：`PinyinSegmenter` 只产出**完整**音节（无法完整切分的输入保留整词，
+/// 落到单音节分支），故多音节分支的末音节不存在「打了一半」；实测短语前缀形态
+/// （`"wo ai ni"*`）比普通短语更慢（54ms vs 18ms）而召回无增。
 String? _pinyinBranch(List<String> terms) {
   final clean = terms
       .map((t) => t.trim())
@@ -225,29 +347,36 @@ String? _pinyinBranch(List<String> terms) {
       .toList();
   if (clean.isEmpty) return null;
 
-  final primary = _quotedAnd(clean, prefixFirst: false, prefixLast: true);
-  if (clean.length < 2) return primary;
-
-  final variant = _quotedAnd(clean, prefixFirst: true, prefixLast: true);
-  return '($primary OR $variant)';
+  final last = clean.last;
+  if (clean.length == 1) {
+    // 单音节：3 字符起加前缀（边打边搜）；1–2 字符前缀会把命中集放大到近乎整库。
+    final body = _quotedAnd(clean,
+        prefixLast: last.length >= minPrefixTokenLength);
+    return '{$pinyinColumns} : $body';
+  }
+  return '{$pinyinColumns} : ${quoteToken(clean.join(' '))}';
 }
 
-/// 音节/词元列表 → `"a" AND "b"*`；可选对首 / 末词元加前缀 `*`。
+/// 音节/词元列表 → `"a" AND "b"*`；可对末词元加前缀 `*`（边打边搜）。
 String _quotedAnd(
   List<String> terms, {
-  required bool prefixFirst,
-  required bool prefixLast,
+  bool prefixLast = false,
 }) {
   final parts = <String>[];
   for (var i = 0; i < terms.length; i++) {
-    final prefixed =
-        (i == 0 && prefixFirst) || (i == terms.length - 1 && prefixLast);
+    final prefixed = i == terms.length - 1 && prefixLast;
     parts.add(prefixed ? '${quoteToken(terms[i])}*' : quoteToken(terms[i]));
   }
   return parts.join(' AND ');
 }
 
 /// 首字母串 → `"wan"*`（含空格时逐段 `AND`，末段前缀）；空 / null 返回 null。
+/// 首字母分支：**列过滤**命中独立列 `initials_tok`（v3 起）。
+///
+/// 加 `{initials_tok} :` 前缀是关键——不带列过滤的 `"wan"*` 会去扫**所有**列，
+/// 包括拼音列（完 / 万 / 晚…），命中集近乎整库（30k 实测 29985/30000、56ms）。
+/// 末段加 `*`（边打边搜）：首字母列空间小（每源每段一个 token），2 字符起可安全前缀。
+/// 空 / null 返回 null。
 String? _initialsBranch(String? initials) {
   if (initials == null) return null;
   final terms = initials
@@ -255,7 +384,11 @@ String? _initialsBranch(String? initials) {
       .where((t) => t.isNotEmpty)
       .toList();
   if (terms.isEmpty) return null;
-  return _quotedAnd(terms, prefixFirst: false, prefixLast: true);
+  final last = terms.last;
+  final body = _quotedAnd(terms,
+      prefixLast: last.length >= minInitialsPrefixLength);
+  // 整体加括号：列过滤与 `OR` 混排时边界更明确（列过滤只作用于本支）。
+  return '({$initialsColumns} : $body)';
 }
 
 /// 模糊词法分支：与 [_lexicalBranch] 同构，但把拉丁/数字词元换成**变体 OR 组**。
@@ -302,7 +435,9 @@ String? _fuzzyLexicalBranch(List<String> terms, int maxVariants) {
       continue;
     }
 
-    final prefix = i == clean.length - 1 && _isPrefixable(clean[i]);
+    final prefix = i == clean.length - 1 &&
+        _isPrefixable(clean[i]) &&
+        clean[i].length >= minPrefixTokenLength;
     final list = variants[i];
     if (list != null && list.isNotEmpty) {
       final group = list
@@ -364,17 +499,14 @@ bool _isFuzzyEligible(String token) {
   return true;
 }
 
-/// 恰为两个 CJK 字符的词元（索引 / 查询侧的 bigram 形态）。
+/// 恰为两个**子串脚本**字符的词元（索引 / 查询侧的 bigram 形态）——
+/// 脚本集合见 [isIndexedScript]（汉字 / 假名 / 谚文，与原生 `ScriptRanges` 一致）。
 bool _isCjkBigram(String token) {
   final runes = token.runes;
   if (runes.length != 2) return false;
-  return runes.every(_isCjk);
+  return runes.every(isIndexedScript);
 }
 
-/// 拉丁 / 数字词元可加前缀：不含 CJK 即为真（分析器输出 CJK 与拉丁/数字互斥）。
-bool _isPrefixable(String token) => !token.runes.any(_isCjk);
-
-bool _isCjk(int rune) =>
-    (rune >= 0x3400 && rune <= 0x4DBF) || // 扩展 A
-    (rune >= 0x4E00 && rune <= 0x9FFF) || // 统一表意主区
-    (rune >= 0xF900 && rune <= 0xFAFF); // 兼容表意区
+/// 拉丁 / 数字词元可加前缀：不含子串脚本字符即为真
+/// （分析器输出「子串脚本」与「拉丁/数字」互斥）。
+bool _isPrefixable(String token) => !token.runes.any(isIndexedScript);

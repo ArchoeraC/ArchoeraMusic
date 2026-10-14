@@ -51,8 +51,39 @@ public static class Program
 
     private static void RunDirectAssertions()
     {
-        Assert("AnalyzerVersion == 5", Analyzer.AnalyzerVersion == 5,
+        Assert("AnalyzerVersion == 6", Analyzer.AnalyzerVersion == 6,
             Analyzer.AnalyzerVersion.ToString());
+
+        // 假名 / 谚文：子串分词（bigram+unigram），**不进拼音 / 首字母列**。
+        // 真实曲库实测：旧实现整段一个 token → 子串 `くらりん` ⊂ `きゅうくらりん` 命中 0。
+        var kana = Analyzer.Analyze("きゅうくらりん");
+        Assert("假名 tokens 含 bigram きゅ/くら/りん",
+            kana.Tokens.Contains("きゅ") && kana.Tokens.Contains("くら") && kana.Tokens.Contains("りん"),
+            kana.Tokens);
+        Assert("假名 pinyin 为空（不再镜像）", kana.Pinyin.Length == 0, kana.Pinyin);
+        Assert("假名 initials 为空", kana.PinyinInitials.Length == 0, kana.PinyinInitials);
+        var hangul = Analyzer.Analyze("한국어노래");
+        Assert("谚文 tokens 含 bigram 한국/노래",
+            hangul.Tokens.Contains("한국") && hangul.Tokens.Contains("노래"), hangul.Tokens);
+        Assert("谚文 pinyin 为空", hangul.Pinyin.Length == 0, hangul.Pinyin);
+
+        // 日文读音列（v5）：假名 → 罗马字 bigram；纯中文不产出（零体积 / 零噪声）。
+        var ja = Analyzer.Analyze("きゅうくらりん");
+        foreach (var bg in new[] { "ky", "yu", "uu", "uk", "ku", "ur", "ra", "ar", "ri", "in" })
+            Assert($"读音 bigram 含 '{bg}'", ja.Readings.Contains(bg), ja.Readings);
+        Assert("纯中文无读音列", Analyzer.Analyze("晴天").Readings.Length == 0,
+            Analyzer.Analyze("晴天").Readings);
+        // 整首标记为日文时，纯汉字段也查 Unihan 音训读（米津玄師 这类歌手名）
+        var kanjiWithJa = Analyzer.Analyze("愛", includeReadings: true);
+        Assert("汉字读音（愛 → ai）", kanjiWithJa.Readings.Contains('a'.ToString() + 'i'),
+            kanjiWithJa.Readings);
+        Assert("未标记时不产出汉字读音", Analyzer.Analyze("愛").Readings.Length == 0);
+
+        // 分层判定：假名行**不是**拉丁（罗马音）行——旧实现会把日文歌词行划进音译层。
+        Assert("假名行不算拉丁", !Archoera.Text.ScriptRanges.IsLatinLine("きゅうくらりん"));
+        Assert("谚文行不算拉丁", !Archoera.Text.ScriptRanges.IsLatinLine("한국어"));
+        Assert("罗马音行算拉丁", Archoera.Text.ScriptRanges.IsLatinLine("yue liang dai biao"));
+        Assert("中英混排行不算拉丁", !Archoera.Text.ScriptRanges.IsLatinLine("月亮 love"));
 
         Assert("IsCjk('我')", Analyzer.IsCjk('我'));
         Assert("!IsCjk('a')", !Analyzer.IsCjk('a'));
@@ -107,10 +138,8 @@ public static class Program
         // 索引侧 Analyze 词元输出不变（连写不切分）；v4 的版本递增来自拼音/繁简改走 ToolGood。
         Assert("Analyze 索引侧 woaini 不切分", Analyzer.Analyze("woaini").Pinyin == "woaini",
             Analyzer.Analyze("woaini").Pinyin);
-        Assert("AnalyzerVersion == 5", Analyzer.AnalyzerVersion == 5,
-            Analyzer.AnalyzerVersion.ToString());
 
-        // ---- 词级多音字消歧（v4，ToolGood.Words）----
+                // ---- 词级多音字消歧（v4，ToolGood.Words）----
         Assert("多音字 重庆 → chong qing", Analyzer.Analyze("重庆").Pinyin == "chong qing",
             Analyzer.Analyze("重庆").Pinyin);
         Assert("多音字 重庆 initials cq", Analyzer.Analyze("重庆").PinyinInitials == "cq",

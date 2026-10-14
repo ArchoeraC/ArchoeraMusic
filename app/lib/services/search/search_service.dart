@@ -124,6 +124,13 @@ class SearchService {
   /// 总开关是否开启（默认 false；关闭时整套能力零成本）。
   bool get enabled => appPrefsSnapshot?.enableLocalSearchIndex ?? false;
 
+  /// 只读索引是否**已打开且可用**（schema 版本匹配、未关闭）。
+  ///
+  /// 用于「曲库变更后是否需要让索引收敛」的判定：已就绪说明查询会走索引（不再回退
+  /// `LIKE`），此时曲库变了就必须增量收敛，否则新曲目搜不到；未就绪时首次构建
+  /// （[ensureIndex] / 启动预构建）本就基于最新曲库，无需在扫描后抢占资源。
+  bool get indexReady => _index?.available ?? false;
+
   /// `.lrc` 侧车歌词子开关（仅总开关开启时才有意义）。
   bool get indexLrc => appPrefsSnapshot?.indexLrc ?? false;
 

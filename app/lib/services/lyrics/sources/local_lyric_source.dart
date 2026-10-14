@@ -2,7 +2,9 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 本地歌词来源：优先 Track 内嵌，其次按 id/路径懒查 library.db。
+/// 本地歌词来源：优先 Track 内嵌 `tracks.lyrics`，其次按 id/路径懒查 `library.db`
+/// （[TracksDb] 在 `lyrics` 为空时回退 **scanner 写入的 `.lrc` 侧车原始文本 `lyrics_lrc`**，
+/// 见 §4.4——所以 `.lrc` 歌词在播放侧同样可用）。
 library;
 
 import '../../../apis/lyric/types.dart';

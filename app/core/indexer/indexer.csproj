@@ -22,6 +22,11 @@
     <Compile Remove="tests/**" />
     <!-- indexer-ffi/ 是独立 AOT 共享库，不得编入 CLI -->
     <Compile Remove="indexer-ffi/**" />
+    <!-- 侧车歌词读取：与 scanner **共用同一源文件**（避免两套解码 / 分层实现漂移）。
+         扫描器负责把 .lrc 解析结果写进 library.db，索引器只读 DB（零文件系统访问）。 -->
+    <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
+    <Compile Include="../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
+    <Compile Include="../shared/lyrics/LrcReader.cs" Link="shared/lyrics/LrcReader.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,6 +45,12 @@
          LogicalName 固定为稳定名字，测试程序集以同名 Link 共享，HanziData 按名查找。
          nfkc：兼容折叠；def_*：Unihan 释义查询扩展（T1 查询侧跨语言候选，不改索引侧）。
          拼音/繁简/全角走 ToolGood.Words，GB18030 走框架 CodePages。 -->
+    <EmbeddedResource Include="data/kana_romaji.tsv" Link="data/kana_romaji.tsv">
+      <LogicalName>Archoera.Indexer.data.kana_romaji.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="data/ja_readings.tsv" Link="data/ja_readings.tsv">
+      <LogicalName>Archoera.Indexer.data.ja_readings.tsv</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="data/nfkc.tsv">
       <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
     </EmbeddedResource>

@@ -18,6 +18,11 @@ import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
 import 'package:archoera_music/widgets/layout/nav_header.dart';
 
+/// 回归（2026-10）：搜索栏**展开后不能保持**——旧实现用 `Positioned.fill` 不透明拦截层收起下拉，
+/// 该层盖在搜索框之上，于是「展开后再次点击搜索框 / 点清除按钮 / 重新定位光标」都被判成
+/// 「点外部」→ 失焦收起。修复后：搜索框与下拉面板同属一个 `TapRegion` 组，只有点到组外才收起，
+/// 且**外部那一次点击不再被吞掉**（旧拦截层会吃掉首次外部点击）。
+///
 /// 测试用 AppPrefsNotifier：build 返回空预置（不读/写磁盘）。
 class _NoSideEffectsPrefsNotifier extends AppPrefsNotifier {
   @override
@@ -102,6 +107,80 @@ void main() {
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
     expect(tester.getSize(textField).width, closeTo(280, 0.5));
+  });
+
+  _searchBarKeepsOpenRegression();
+}
+
+/// 回归：展开后单击输入框 / 清除按钮**不收起**；点外部才收起且外部能收到点击。
+void _searchBarKeepsOpenRegression() {
+  testWidgets('展开后再次点击搜索框保持展开；点外部才收起（且外部收到点击）', (tester) async {
+    var outsideTaps = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPrefsProvider.overrideWith(_NoSideEffectsPrefsNotifier.new),
+        ],
+        child: MaterialApp.router(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: GoRouter(
+            initialLocation: '/',
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (_, _) => Scaffold(
+                  body: Column(
+                    children: [
+                      const NavHeader(),
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => outsideTaps++,
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final textField = find.byType(TextField);
+
+    // 展开
+    await tester.tap(textField);
+    await tester.pumpAndSettle();
+    expect(find.byType(SingleChildScrollView), findsOneWidget, reason: '聚焦后应展开下拉');
+    expect(tester.getSize(textField).width, closeTo(420, 0.5));
+
+    // ① 再次点击搜索框本身：必须**保持展开**（修复前被拦截层判为「点外部」→ 收起）
+    await tester.tap(textField);
+    await tester.pumpAndSettle();
+    expect(find.byType(SingleChildScrollView), findsOneWidget,
+        reason: '点击输入框不应收起搜索栏');
+    expect(tester.getSize(textField).width, closeTo(420, 0.5), reason: '保持展开宽度');
+
+    // ② 输入文字后点「清除」按钮：同属内部操作，仍保持展开
+    await tester.enterText(textField, '周杰伦');
+    await tester.pumpAndSettle();
+    final clearBtn = find.descendant(of: textField, matching: find.byType(IconButton));
+    expect(clearBtn, findsOneWidget, reason: '有内容时应出现清除按钮');
+    await tester.tap(clearBtn);
+    await tester.pumpAndSettle();
+    expect(find.byType(SingleChildScrollView), findsOneWidget,
+        reason: '点清除按钮不应收起搜索栏（修复前被拦截层挡住）');
+
+    // ③ 点组外：收起，且**外部收到这次点击**（旧拦截层会吞掉首次外部点击）
+    await tester.tapAt(const Offset(200, 500));
+    await tester.pumpAndSettle();
+    expect(find.byType(SingleChildScrollView), findsNothing, reason: '点外部应收起');
+    expect(tester.getSize(textField).width, closeTo(280, 0.5));
+    expect(outsideTaps, 1, reason: '外部点击不应被搜索栏吞掉');
   });
 }
 

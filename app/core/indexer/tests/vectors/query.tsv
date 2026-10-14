@@ -36,3 +36,5 @@ wo ai ni	wo ai ni	wo ai ni	*
 # 9) 词级多音字消歧（v4，ToolGood.Words）：CJK 查询按词取正确读音
 重庆	重庆 重 庆	chong qing	cq
 银行	银行 银 行	yin hang	yh
+# 5) 假名查询：词法即子串 bigram；无拼音 / 首字母
+きゅうくらりん	きゅ ゅう うく くら らり りん き ゅ う く ら り ん		

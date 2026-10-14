@@ -55,4 +55,19 @@ void main() {
     await SearchService.instance.reindex();
     expect(calls, 1);
   });
+
+  test('indexReady：未构建 / 关闭态一律 false（扫描后收敛的判定门）', () async {
+    final service = SearchService.instance;
+    expect(service.indexReady, isFalse);
+
+    appPrefsSnapshot = AppPrefs(initialData: {enableLocalSearchIndexKey: true});
+    // 总开关开启但尚未构建（未触碰模块 / search.db）→ 不作为收敛目标
+    expect(service.enabled, isTrue);
+    expect(service.indexReady, isFalse);
+
+    // 增量重建（接缝直通）也不会凭空让索引「就绪」
+    SearchService.instance.debugReindexOverride = () async {};
+    await service.reindex();
+    expect(service.indexReady, isFalse);
+  });
 }

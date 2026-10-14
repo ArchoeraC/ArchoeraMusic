@@ -2,13 +2,16 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Archoera.Indexer;
+using Archoera.Text;
+
+namespace Archoera.Lyrics;
 
 /// <summary>
-/// <c>.lrc</c> 侧车歌词读取结果（分层：原文 / 译文 / 音译）。
+/// <c>.lrc</c> 侧车读取结果（分层：原文 / 译文 / 音译）。
 /// </summary>
 public sealed class LrcContent
 {
@@ -60,9 +63,21 @@ public sealed class LrcContent
 /// 编码识别顺序：BOM（UTF-8 / UTF-16 LE / BE）→ 无 BOM 时严格 UTF-8 试解码 →
 /// .NET 框架内置 CodePages 的 **GB18030** 解码（覆盖 GBK / GB18030，含 4 字节序列）；
 /// 解码失败回退 UTF-8 替换（不崩溃）。
+///
+/// **归属（P5 实测修订）**：本实现由 **scanner 与 indexer 共用**（同一源文件，避免两套解码 /
+/// 分层漂移）。**扫描器**遍历目录时解析并写入 <c>library.db</c>（`lyrics_lrc` /
+/// `lyrics_lrc_trans` / `lyrics_lrc_romaji` + `lrc_mtime` / `lrc_size` / `lrc_checked`），
+/// 索引器与播放侧都只读 DB——索引器因此**零文件系统访问**，且侧车与曲目按 <c>tracks.id</c>
+/// 强绑定（旧实现在索引器里逐曲整目录枚举，成本 <c>O(曲目数 × 目录条目数)</c>：单目录 30k 曲实测
+/// 全量 +lrc 393s、零脏曲增量 161s，见 indexer `bench/REPORT.md`）。
+/// 本类保留目录探测 / 读取入口供扫描器使用（索引器不再调用）。
+/// 日志经 <see cref="Warn"/> 回调由宿主接管（本文件不依赖任何模块的 Log）。
 /// </summary>
 public static class LrcReader
 {
+    /// <summary>告警回调（宿主注入：scanner / indexer 各自的 Log）。空则静默。</summary>
+    public static Action<string>? Warn { get; set; }
+
     /// <summary>侧车探测结果（不读取内容；用于脏集判定；聚合主 / 译文 / 音译三层侧车）。</summary>
     public readonly record struct LrcProbe(bool Exists, string? Path, long Mtime, long Size)
     {
@@ -111,11 +126,26 @@ public static class LrcReader
     /// <c>Mtime</c> 取最大、<c>Size</c> 求和，使任一层侧车变动都能被脏集识别。
     /// 无任何侧车返回 <see cref="LrcProbe.None"/>。
     /// </summary>
-    public static LrcProbe Probe(string audioPath)
+    /// <summary>
+    /// 侧车三层路径 + 聚合 mtime / size（**扫描器入口**；只 stat、不读内容）。
+    /// 主 / 译文 / 音译任一层存在即 <see cref="Exists"/>；mtime 取各层最大、size 求和
+    /// （任一层变动都能被增量识别）。
+    /// </summary>
+    public readonly record struct Sidecars(string? Main, string? Trans, string? Romaji, long Mtime, long Size)
+    {
+        /// <summary>无任何侧车。</summary>
+        public static readonly Sidecars None = new(null, null, null, 0, 0);
+
+        /// <summary>主 / 译文 / 音译任一层存在。</summary>
+        public bool Exists => Main is not null || Trans is not null || Romaji is not null;
+    }
+
+    /// <summary>定位并 stat 三层侧车（扫描器入口；目录清单按目录缓存，见 <see cref="GetSidecarIndex"/>）。</summary>
+    public static Sidecars Find(string audioPath)
     {
         var (main, trans, romaji) = FindSidecars(audioPath);
-        bool exists = false;
-        string? first = null;
+        if (main is null && trans is null && romaji is null) return Sidecars.None;
+
         long mtime = 0, size = 0;
         foreach (var path in new[] { main, trans, romaji })
         {
@@ -124,8 +154,6 @@ public static class LrcReader
             {
                 var info = new FileInfo(path);
                 if (!info.Exists) continue;
-                exists = true;
-                first ??= path;
                 var m = new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeMilliseconds();
                 if (m > mtime) mtime = m;
                 size += info.Length;
@@ -135,7 +163,15 @@ public static class LrcReader
                 // 单个 stat 失败不影响其它侧车的判定
             }
         }
-        return exists ? new LrcProbe(true, first, mtime, size) : LrcProbe.None;
+        return new Sidecars(main, trans, romaji, mtime, size);
+    }
+
+    public static LrcProbe Probe(string audioPath)
+    {
+        var sidecars = Find(audioPath);
+        return sidecars.Exists
+            ? new LrcProbe(true, sidecars.Main ?? sidecars.Trans ?? sidecars.Romaji, sidecars.Mtime, sidecars.Size)
+            : LrcProbe.None;
     }
 
     /// <summary>
@@ -144,30 +180,41 @@ public static class LrcReader
     /// </summary>
     public static LrcContent Read(string audioPath)
     {
-        var probe = Probe(audioPath);
-        if (!probe.Exists) return new LrcContent { Exists = false };
+        var sidecars = Find(audioPath);
+        if (!sidecars.Exists) return new LrcContent { Exists = false };
 
-        var (main, trans, romaji) = FindSidecars(audioPath);
-
-        // 主 .lrc：按同时间戳多层启发式拆分；显式分层侧车存在时替换对应层。
-        var layers = main is not null && TryDecode(main) is { } raw
-            ? SplitText(raw)
-            : LrcLayers.Empty;
-
-        var original = layers.Original;
-        var translation = trans is not null ? JoinLines(TryDecodeLines(trans)) : layers.Translation;
-        var romanized = romaji is not null ? JoinLines(TryDecodeLines(romaji)) : layers.Romaji;
+        var layers = FromRawTexts(
+            sidecars.Main is null ? null : TryDecode(sidecars.Main),
+            sidecars.Trans is null ? null : TryDecode(sidecars.Trans),
+            sidecars.Romaji is null ? null : TryDecode(sidecars.Romaji));
 
         return new LrcContent
         {
             Exists = true,
-            Original = original,
-            Translation = translation,
-            Romaji = romanized,
-            Mtime = probe.Mtime,
-            Size = probe.Size,
-            LineCount = original.Length == 0 ? 0 : original.Split('\n').Length,
+            Original = layers.Original,
+            Translation = layers.Translation,
+            Romaji = layers.Romaji,
+            Mtime = sidecars.Mtime,
+            Size = sidecars.Size,
+            LineCount = layers.Original.Length == 0 ? 0 : layers.Original.Split('\n').Length,
         };
+    }
+
+    /// <summary>
+    /// **原始文本（未解码）→ 三层**——扫描器写库、索引器读库、<see cref="Read"/> 三者共用，
+    /// 保证「写入时的层划分」与「索引时的层划分」逐字一致（不会因两处实现漂移）。
+    ///
+    /// 主文本按 <see cref="SplitText"/> 的同时间戳多层启发式拆分；
+    /// 显式译文 / 音译文本存在时**直接替换**对应层（各自剥标签、trim、丢空行、以 <c>\n</c> 连接）。
+    /// </summary>
+    public static LrcLayers FromRawTexts(string? mainRaw, string? transRaw, string? romajiRaw)
+    {
+        var layers = string.IsNullOrEmpty(mainRaw) ? LrcLayers.Empty : SplitText(mainRaw);
+        var original = layers.Original;
+        var translation = transRaw is not null ? JoinLines(ExtractTextLines(transRaw)) : layers.Translation;
+        var romanized = romajiRaw is not null ? JoinLines(ExtractTextLines(romajiRaw)) : layers.Romaji;
+
+        return new LrcLayers(original, translation, romanized);
     }
 
     /// <summary>
@@ -184,38 +231,130 @@ public static class LrcReader
     private static (string? Main, string? Trans, string? Romaji) FindSidecars(string audioPath)
     {
         var directory = Path.GetDirectoryName(audioPath);
-        if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) return (null, null, null);
+        if (string.IsNullOrEmpty(directory)) return (null, null, null);
 
         var stem = Path.GetFileNameWithoutExtension(audioPath);
         if (string.IsNullOrEmpty(stem)) return (null, null, null);
 
-        List<string> files;
+        var index = GetSidecarIndex(directory);
+        if (index is null) return (null, null, null);
+
+        return (index.Resolve(stem), index.Resolve(stem + ".trans"), index.Resolve(stem + ".romaji"));
+    }
+
+    /// <summary>
+    /// 目录 → <c>.lrc</c> 清单（**每个目录只枚举一次**，进程内缓存）。
+    ///
+    /// 逐曲调用 <see cref="FindSidecars"/> 时若每次都整目录枚举，成本为
+    /// <c>O(曲目数 × 目录条目数)</c>——单目录扁平大库（数万首）会退化成分钟级甚至小时级，
+    /// 且每次增量（含零脏曲）都要重来一遍。缓存后为 <c>O(曲目数 + 目录条目数)</c>。
+    /// 清单按「文件名序最小者优先」建表，与逐曲枚举的确定性取法一致。
+    ///
+    /// 新鲜度：缓存条目记录建表时的**目录 mtime**，每次命中先比对；目录内容变动
+    /// （新增 / 删除 / 改名侧车）即重建——比每次整目录枚举只多一次 <c>stat</c>。
+    /// 另见 <see cref="ResetDirectoryCache"/>（每次构建开始前清空）。
+    /// 目录不存在返回 <c>null</c>；无法枚举只告警一次，不再逐曲重试。
+    /// </summary>
+    private static SidecarIndex? GetSidecarIndex(string directory)
+    {
+        // 命中且（信任本轮目录 mtime ｜ 目录 mtime 未变）→ 直接复用：**不产生任何 stat**。
+        if (SidecarCache.TryGetValue(directory, out var cached) &&
+            (TrustDirectoryStamp || cached.Stamp == DirectoryStamp(directory)))
+        {
+            return cached;
+        }
+
+        if (!Directory.Exists(directory)) return null;
+        var stamp = Directory.GetLastWriteTimeUtc(directory).Ticks;
+        return SidecarCache.AddOrUpdate(
+            directory,
+            _ => BuildSidecarIndex(directory, stamp),
+            (_, existing) => existing.Stamp == stamp ? existing : BuildSidecarIndex(directory, stamp));
+    }
+
+    /// <summary>目录 mtime（ticks）；目录不存在 / 不可读返回 <c>-1</c>（必然不等 → 触发重建）。</summary>
+    private static long DirectoryStamp(string directory)
+    {
+        try { return Directory.GetLastWriteTimeUtc(directory).Ticks; }
+        catch { return -1; }
+    }
+
+    private static SidecarIndex BuildSidecarIndex(string directory, long stamp)
+    {
+        var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            files = Directory.EnumerateFiles(directory)
+            var files = Directory.EnumerateFiles(directory)
                 .Where(f => string.Equals(Path.GetExtension(f), ".lrc", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal)
                 .ToList();
+            foreach (var file in files)
+                byName.TryAdd(Path.GetFileNameWithoutExtension(file), file);
         }
         catch (Exception ex)
         {
-            Log.LogWarn("indexer", $"枚举目录失败 {directory}: {ex.Message}");
-            return (null, null, null);
+            // 枚举失败：告警一次并缓存空清单（旧实现是逐曲重试 + 逐曲告警）
+            Warn?.Invoke($"枚举目录失败 {directory}: {ex.Message}");
+        }
+        return new SidecarIndex(byName, stamp);
+    }
+
+    /// <summary>
+    /// **开始一次扫描**（扫描器在每轮扫描开始时调用）：清空目录清单缓存，并在**本轮扫描内**
+    /// 信任首次读到的目录 mtime——之后每曲探测不再复核目录。
+    ///
+    /// 为什么安全：侧车**内容**变更靠 <c>FileInfo</c>（mtime/size）逐个识别，不依赖目录 mtime；
+    /// 目录 mtime 只覆盖「新增 / 删除 / 改名」而扫描同时也在做这件事（媒体文件的发现同理）——
+    /// 扫描**中途**落盘的侧车与媒体一样由下一轮扫描发现。这样把「每曲 2 次目录 stat」
+    /// 降为「每目录 1 次」（30k 曲单目录实测：省掉约 6 万次 stat）。
+    ///
+    /// 长驻调用方若需要**严格**新鲜度（每次调用都复核目录），用 <see cref="ResetDirectoryCache"/>。
+    /// 返回被清条目数。
+    /// </summary>
+    public static int BeginScan()
+    {
+        var cleared = SidecarCache.Count;
+        SidecarCache.Clear();
+        TrustDirectoryStamp = true;
+        return cleared;
+    }
+
+    /// <summary>
+    /// 清空目录清单缓存，返回被清条目数。**严格模式**：每次探测都复核目录 mtime
+    /// （新增 / 删除 / 改名立即生效）。扫描器请改用 <see cref="BeginScan"/>（更省 stat）。
+    /// </summary>
+    public static int ResetDirectoryCache()
+    {
+        var cleared = SidecarCache.Count;
+        SidecarCache.Clear();
+        TrustDirectoryStamp = false;
+        return cleared;
+    }
+
+    /// <summary>本轮是否信任目录 mtime（见 <see cref="BeginScan"/>）。</summary>
+    private static volatile bool TrustDirectoryStamp;
+
+    /// <summary>单个目录的 <c>.lrc</c> 清单：名称（去扩展名，大小写不敏感）→ 完整路径。</summary>
+    private sealed class SidecarIndex
+    {
+        private readonly Dictionary<string, string> _byName;
+
+        public SidecarIndex(Dictionary<string, string> byName, long stamp)
+        {
+            _byName = byName;
+            Stamp = stamp;
         }
 
-        string? main = null, trans = null, romaji = null;
-        foreach (var file in files)
-        {
-            var name = Path.GetFileNameWithoutExtension(file);
-            if (main is null && string.Equals(name, stem, StringComparison.OrdinalIgnoreCase))
-                main = file;
-            else if (trans is null && string.Equals(name, stem + ".trans", StringComparison.OrdinalIgnoreCase))
-                trans = file;
-            else if (romaji is null && string.Equals(name, stem + ".romaji", StringComparison.OrdinalIgnoreCase))
-                romaji = file;
-        }
-        return (main, trans, romaji);
+        /// <summary>建表时的目录 mtime（ticks），用于新鲜度比对。</summary>
+        public long Stamp { get; }
+
+        /// <summary>名称命中返回完整路径，否则 <c>null</c>。</summary>
+        public string? Resolve(string name) => _byName.TryGetValue(name, out var path) ? path : null;
     }
+
+    /// <summary>目录清单缓存（键为目录完整路径；值为不可变清单，构建后只读并发安全）。</summary>
+    private static readonly ConcurrentDictionary<string, SidecarIndex> SidecarCache =
+        new(StringComparer.Ordinal);
 
     /// <summary>剥离方括号标签与空行，返回纯文本行。</summary>
     private static List<string> ExtractTextLines(string raw)
@@ -305,25 +444,23 @@ public static class LrcReader
         }
     }
 
-    /// <summary>纯拉丁行（含字母、不含任何 CJK 字符）——音译 / 罗马音的保守判定。</summary>
-    private static bool IsLatinLine(string text)
-    {
-        var hasLetter = false;
-        foreach (var ch in text)
-        {
-            if (Analyzer.IsCjk(ch)) return false;
-            if (char.IsLetter(ch)) hasLetter = true;
-        }
-        return hasLetter;
-    }
+    /// <summary>
+    /// 纯拉丁行（含拉丁字母、且不含汉字 / 假名 / 谚文）——音译 / 罗马音的保守判定。
+    /// 判定集中在 <see cref="ScriptRanges.IsLatinLine"/>（与索引器共用同一事实来源）：
+    /// 旧实现「不含 CJK 即拉丁」会把**假名行误判成罗马音**（真实日文曲库实测）。
+    /// </summary>
+    private static bool IsLatinLine(string text) => ScriptRanges.IsLatinLine(text);
 
-    /// <summary>解码失败返回 <c>null</c>（记录告警，不抛）。</summary>
-    private static string? TryDecode(string path)
+    /// <summary>
+    /// 解码侧车或内嵌歌词文本（**公开**：扫描器写库前读原始文本用）。
+    /// 解码失败返回 <c>null</c>（告警，不抛）。
+    /// </summary>
+    public static string? TryDecode(string path)
     {
         try { return Decode(path); }
         catch (Exception ex)
         {
-            Log.LogWarn("indexer", $"读取 .lrc 失败 {path}: {ex.Message}");
+            Warn?.Invoke($"读取 .lrc 失败 {path}: {ex.Message}");
             return null;
         }
     }

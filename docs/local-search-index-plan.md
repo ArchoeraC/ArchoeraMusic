@@ -140,15 +140,16 @@
 ```
 ┌────────────┐  写（既有，源真值）   ┌──────────────┐   读+分析    ┌────────────┐
 │  scanner   │ ───────────────────▶ │  library.db  │ ───────────▶ │  indexer    │
-│ (C#/AOT)   │   tracks(+lyrics)    │  (SQLite)    │  世代/增量   │ (C#/AOT 新) │
-└────────────┘                      └──────────────┘              └─────┬──────┘
-                                                                        │ 顺序写
-                                                     ┌──────────────────▼───────────────┐
-                                                     │ search.db（FTS5；世代化、可重建） │
-                                                     └──────────────────▲───────────────┘
-                                                                        │ 查询（MATCH + bm25）
-                                        ┌──────────────┐   只读+SQL    │
-                                        │  Dart UI     │ ──────────────┘
+│ (C#/AOT)   │ tracks(+lyrics,      │  (SQLite)    │  世代/增量   │ (C#/AOT 新) │
+│            │  +.lrc 列 §4.4)      │              │              └─────┬──────┘
+└─────┬──────┘                      └──────▲───────┘                    │ 顺序写
+      │ 遍历目录时解析 .lrc 写库            │ 歌词回退 `.lrc` 列          │
+      │ （共有实现 shared/lyrics）          │                     ┌───────▼────────────────┐
+      └────────────────────────────────────┘                     │ search.db（FTS5；世代化）│
+                                                                 └───────▲────────────────┘
+                                                                         │ 查询（MATCH + bm25）
+                                        ┌──────────────┐   只读+SQL     │
+                                        │  Dart UI     │ ───────────────┘
                                         │ (sqlite3 FFI)│   ← 分析器词元经 indexer_analyze FFI 取得
                                         └──────────────┘
 ```
@@ -156,6 +157,8 @@
 要点：
 
 1. **scanner 与 indexer 分离**：扫描在用户等待路径上；索引构建离线 / 空闲调度，避免拖慢扫描进度。
+   **`.lrc` 侧车由 scanner 解析入库**（§4.4）：索引器因此**零文件系统访问**，且侧车与曲目按
+   `tracks.id` 强绑定（旧实现在索引器里逐曲枚举目录，成本 `O(曲目数 × 目录条目数)`）。
 2. **索引不是源真值**：`library.db` 是唯一真值；`search.db` 可随时删除重建（`search.db` 落后是可接受的短暂状态）。
 3. **查询侧零原生依赖**：Dart `sqlite3` 直接对 `search.db` 跑 FTS5 `MATCH` + `bm25()`；
    唯一共享的是**分析器**——通过 `indexer_analyze` FFI 取词元串，保证测试向量一致（避免 Dart / C# 双实现漂移）。
@@ -164,6 +167,32 @@
    总开关关闭时不加载（§2.4）。
 5. **默认关闭**：总开关默认关（§2.4）。关闭时上图整条 indexer / `FTS5` 链路**不参与**，Dart 搜索直接走
    `library.db` 的 `LIKE`（现状）。
+
+### 3.1 模块边界与契约（**indexer 不并入 scanner**）
+
+**indexer 不做什么**（P5 已删）：不遍历媒体目录、不发现 `.lrc`、不解码歌词——那是 scanner 的活；
+indexer 现在是纯 `library.db → search.db` 变换器（除自身产物外**零文件系统访问**，见 §4.4）。
+
+**为什么仍保持两个 NativeAOT 产物**：
+
+1. **可选性 / 按需加载**：总开关默认关 → **不加载** indexer、不建库、搜索回退 `LIKE`（§2.4 +
+   [module-on-demand-load-plan.md](module-on-demand-load-plan.md)）；scanner 是**必需**模块
+   （源真值 + 播放侧歌词也靠它）。合并会把「默认零成本」退化成「总是常驻」。
+2. **生命周期不同**：扫描在用户等待路径（进度 / 取消，30k 约 0.3–0.6s）；索引构建后台 / 空闲
+   （30k 全量 ≈36s、可取消、可删除重建、世代化 + 版本触发全量重建，§5.3 / §6）。
+3. **派生数据可丢弃**：`search.db` 随时可删 / 可换（`IndexStore` 抽象正是 P5 判定的落点），
+   不该与源真值写入路径绑死。
+4. **单写者**：scanner 独占写 `library.db`、indexer 独占写 `search.db`（WAL，无写锁竞争）。
+5. **查询侧仍需它**：Dart 的 `MATCH` 编译与高亮拼音走 `indexer_analyze`（查询侧分析必须与索引期分词同源）。
+
+**契约（两模块之间只有这几条）**：
+
+- scanner 写 `library.db`：tracks 元数据 + 内嵌歌词 + `.lrc` 侧车列（§4.4）；
+- indexer 只读 `library.db`、独占写 `search.db`，**不碰音乐目录**；
+- 曲库层在**扫描完成后**调 `SearchService.reindex()` 做增量收敛（`library_store_scan.dart`；
+  仅 `indexReady` 时触发，关闭态零成本）——否则索引就绪态查询不再回退 `LIKE`，扫描新增的曲目会漏；
+- 共享代码只有一处：`shared/lyrics/LrcReader.cs`（两个 csproj 显式 `Compile Include`）。
+  分析器 / FTS5 / 查询侧 ABI 均在 indexer 内自洽。
 
 ---
 
@@ -177,15 +206,23 @@
 
 ### 4.1 归一化与分词
 
-1. **归一化**：NFKC（逐字符兼容折叠，全范围含非 BMP / 星平面，离线表 `data/nfkc.tsv`）→ 小写 → 全角转半角 → **繁转简** → 去标点 / 折叠空白。
-2. **脚本切分**：按字符类分 CJK / 拉丁 / 数字 / 其它。
-3. **分词**：
-   - **CJK → bigram（n=2）**；单字回退 **unigram**（保证 1 字查询可命中）。
-     > 依据：Groonga 默认 `TokenBigram`、Lucene `CJKBigramFilter`、Xapian `CJK_NGRAM`。
-     > bigram 在中文上是精度 / 召回的惯用折中（优于 unigram，接近词级切分且无需词典）。
-   - **拉丁 / 数字 → 整词**（不 n-gram）；查询侧允许**前缀**（`love` → `love*`）。
-4. **词元流**：输出以空格分隔的词元串，交 FTS5 `unicode61` 存储（§5）；保留位置供短语 / 邻近查询。
-   查询侧对**连续多个 CJK bigram** 改用引号短语（`"我爱 爱你"`，要求位置相邻）提升中文短语精度（P4）。
+**归一化**（顺序固定，索引 / 查询两侧同源）：逐字符 NFKC 兼容折叠（离线表 `data/nfkc.tsv`，`InvariantGlobalization` 下
+`String.Normalize` 不可用）→ 小写 → 繁转简（`ToolGood.Words` 词级）→ 标点 / 空白作分隔丢弃。
+
+**脚本分类**（`shared/text/ScriptRanges.cs`，scanner / indexer 共用一份）：
+
+| 脚本 | 分词 | 拼音 / 首字母列 |
+|---|---|---|
+| 汉字（统一表意 + 扩展 A + 兼容表意） | `bigram + unigram`（bigram 位置连续，便于短语） | ✅（ToolGood 读音 / 首字母） |
+| **假名（平 / 片 / 半角 / 音标扩展）** | `bigram + unigram` | ❌（无拼音读音，镜像过去只是噪声与体积） |
+| **谚文（音节 / 字母 / 兼容字母）** | `bigram + unigram` | ❌ |
+| 拉丁 / 数字 | 整词（末词 ≥3 字符可前缀） | ✅（整词原样镜像，保持既有语义） |
+
+> **P5 真实曲库实测修订**：旧实现只有「汉字」需要子串索引，假名 / 谚文落进「拉丁」分支 →
+> **整段一个 token**，子串查询必然落空（真实库 82/165 首歌词含假名，`くらりん` ⊂ `きゅうくらりん` 命中 **0**）；
+> 同时假名被镜像进拼音 / 首字母列（假名占歌词 9.6%），同一段文本等于存三份。
+> 归入子串脚本后：假名子串命中 1，歌词分层里假名行也不再被误判为「音译」层（见 §4.4）。
+> 词元输出变化 → `AnalyzerVersion` 5 → **6**（旧库全量重建）。
 
 ### 4.2 拼音搜索（重点之一）
 
@@ -197,17 +234,62 @@
 
 索引侧与查询侧一致：
 
-- 全拼：查询串切分为音节 → `AND` / 短语；**末音节允许 `prefix`**（`woai` → `wo` + `ai*`），支持边打边搜；
-  查询侧对**连写拉丁**按有效音节切分（`woaini` → `wo ai ni`；完整覆盖才切、否则保留整词如 `hello`），
-  音节数 ≥2 时追加「首音节前缀」变体以覆盖 `w ai ni` 一类混合输入（P4）；
+- 全拼：查询串切分为音节 → **单音节用 `prefix`**（`wo` → `"wo"*`，支持边打边搜），
+  **≥2 音节用相邻短语**（`wo ai ni` → `"wo ai ni"`，要求位置相邻）；
+  查询侧对**连写拉丁**按有效音节切分（`woaini` → `wo ai ni`；完整覆盖才切、否则保留整词如 `hello`）；
+  （P4 曾追加「首音节前缀」变体以覆盖 `w ai ni` 一类混合输入，**P5 实测后移除**——见下。）
   **英文过度切分门控**（P4 修复）：最长优先结果须满足「音节数 ≥2 且每个音节长度 ≥2」，
   否则整体拒绝（`banana` 不再切成 `ban an a`、`adele` 不再切成 `a de le`），宁可少切也不要误切；
   已知残留 `panda` → `pan da`（短同形词与 `mama`(妈妈) / `women`(我们) 无法区分，不拦截）；
   长度 ≥6 的英文词（`aiding` / `shanghai`）不再有阻断表保护，会按音节切分
   （`ai ding` / `shang hai`）——方向 A 重构已删除 `data/en_blocklist.tsv`，此为已知取舍；
-- 首字母：查询首字母串直接匹配；
+- **前缀长度门控**（P5 实测）：拼音 / 拉丁 / 数字词元**长度 <3 不加 `*`**（改精确命中）。
+  1–2 字符前缀（`"a"*` / `"wo"*` / `"ni"*`）在 30k 语料上命中 30000/30000、单条 59ms
+  （FTS5 `ORDER BY bm25` 要给全部命中打分），而这类短输入本身几乎没有识别力；
+- **首字母**：**独立列** `initials_tok`（v3 起），查询侧经 `{initials_tok} : "wan"*` **列过滤**命中，
+  ≥2 字符前缀；不再与拼音列同列（v2 的同列导致首字母查询命中拼音音节，见 §5.2）。
 - **多音字**：默认取主读音；高频多音字可索引**受控的多个候选**（膨胀是否可接受 → §8 评估）。
 - 数据来源与许可：见 §9.4。
+
+> **P5 实测修订：拼音 ≥2 音节从「任意位置 `AND`」改为「相邻短语」**（30k 语料，见
+> [app/core/indexer/bench/REPORT.md](../app/core/indexer/bench/REPORT.md)）。
+> 原因：FTS5 的 `ORDER BY bm25` 必须给**全部命中**打分，任意位置的 `AND` 让常见拼音查询
+> 命中几乎整个曲库（`woaini` 命中 29763/30000），单条查询 **131ms**（含冗余的首音节前缀变体，
+> 其独占 ≈58ms）；改成相邻短语后命中 4592、单条 **18ms**，且**精度更高**（用户连写输入本就是
+> 一段连续拼音，不相邻的音节匹配属噪声）。多音节分支不再对末音节加 `*`：`PinyinSegmenter`
+> 只产出完整音节，且实测短语前缀形态更慢（54ms vs 18ms）而召回无增。
+
+### 4.2.1 日文读音映射（假名 → 罗马字 + 汉字音训读）
+
+> 真实曲库实测驱动（§8.1：52/165 标题含假名、曲库以日文为主）：假名原先落进「拉丁」分支整段一个
+> token，罗马字检索（`kurarin` ⊂ `きゅうくらりん`）**命中 0**；而日文用户最自然的键入就是罗马字。
+
+- **数据（同一 Unihan 来源 / 同一 Unicode License / 同一定稿生成脚本）**：
+  - 汉字 → 假名读音（音读 + 训读）：`data/ja_readings.tsv` 由
+    `tools/gen_hanzi_data.py gen_ja_readings()` 从 Unihan **`kJapanese`**
+    （假名；不用 `kJapaneseOn/Kun`——那两个是**大写罗马字**，口径不同会漂移）生成；
+  - 假名 → 罗马字：`data/kana_romaji.tsv`（自研表，Hepburn 主拼 + 常见 Kunrei 变体；
+    促音「っ」重复后辅音、长音「ー」延长前元音、长元音用重复元音不用 macron）。
+- **产出列**：`reading_meta_tok`（**只索引元数据**：标题 / 歌手 / 专辑 / 文件名）。
+  值是罗马字的**字母 bigram**（与 CJK 字符 bigram 同构，故查询侧用**相邻短语**即等价子串检索）。
+  - **为什么不索引歌词读音**：整段歌词的读音 bigram 会把索引推高约 2×（真实 165 首实测
+    2.42MB → 4.53MB）；而「按罗马字搜歌词」是伪需求（用户按假名 / 汉字搜歌词，那条路已由
+    假名 / 汉字 bigram 主趟覆盖）。去掉后仅 **+3%**（2.21MB → 2.28MB）。
+- **只在「看起来是日文」时产出**：任一源含假名 → 整首标记为日文（真实曲库里歌手名常是**纯汉字**，
+  如 米津玄師，需要借书目标题里的假名把整首标为日文），纯中文曲库**零产出、零体积、零跨语言噪声**。
+- **查询侧**（`compileReading`，**渐进兜底趟**——排在拼音宽松兜底之后、跨语言兜底之前）：
+  把查询里的拉丁 / 数字词元拆成字母 bigram **短语**（`"ku ur ra ar ri in"`）。
+  - 用**短语**而非 `AND`：读数列是整段的连续罗马字，`AND`（任意位置）会像当年拼音 `AND` 一样
+    把命中集放大到近乎整库（实测任取 3–6 个常见 bigram 组合都命中 83–85/165）；短语要求**相邻**，
+    正是「查子串」的语义。乱串（`zorozoro`）实测命中 0。
+  - 只有元数据读音 → 该支天然是「标题 / 歌手 / 专辑 / 文件名」的罗马字检索，`scope=metadata`
+    下白名单更窄（`reading_meta_tok` 已在白名单内）。
+- **实测（真实 165 首日文曲库）**：`kurarin` → 1（きゅうくらりん）、`kyuukurarin` → 1、
+  `yorushika` → 2（ヨルシカ）、`yone` → 2（歌手 米津玄師）、`kome` → 2（米 训读）、乱串 → 0。
+- **已知限制**：Unihan 单字读音**不含跨字连读**（人名 / 地名的 nanori），故 `yonezu`（米津 连读）
+  这类**跨字训读不命中**；单字读音可用（`yone` / `kome` / `tsu` / `shin`）。补齐需 nanori 词表
+  （如 JMnedict，**CC-BY-SA**——与仓库现有 Unicode License 数据表不同，须由维护者决定是否引入）。
+- 词元输出变化 → `AnalyzerVersion` 5 → **6**（假名子串 + 读音列同一版里递增）。
 
 ### 4.3 多语言歌词层：原文 / 译文 / 音译（重点之二）
 
@@ -231,13 +313,43 @@
   （仅查询侧，不改索引内容 / 不递增 `AnalyzerVersion`）；更高覆盖率的**向量检索 / MT**
   仍不在本期（T2 另立）。
 
-### 4.4 `.lrc` 侧车歌词（可选，默认关闭；总开关关闭时不适用）
+### 4.4 `.lrc` 侧车歌词（**由 scanner 入库**；子开关默认关闭）
 
-- 约定：与音频同目录、同名 `.lrc`（大小写不敏感）。
-- 子设置项 `索引 .lrc 侧车歌词`（默认 **关**）；**仅当总开关「启用本地曲库搜索索引」开启时才有意义**；
-  关闭时不读、不索引，行为同现状。
-- 解析：复用现有 LRC 解析（`app/lib/services/lyrics/`），只取**文本行**（丢时间轴）。
-- 增量：`.lrc` 的 `(mtime, size)` 纳入脏集（§6）——侧车改动 → 该曲重索引。
+> P5 实测修订（旧实现在索引器里逐曲探测侧车，成本 `O(曲目数 × 目录条目数)`：单目录 30k 曲
+> 实测全量 +lrc **393s**、零脏曲增量 **161s**，见 [bench/REPORT.md](../app/core/indexer/bench/REPORT.md) §7）。
+
+- **归属**：侧车由**扫描器**在遍历目录时解析，写入 `library.db` 的
+  `lyrics_lrc` / `lyrics_lrc_trans` / `lyrics_lrc_romaji`（**原始文本**，保时间轴）
+  + `lrc_mtime` / `lrc_size` / `lrc_checked`（脏集锚点 + 存量库补齐标记）。
+  解码（BOM → 严格 UTF-8 → GB18030）与三层拆分实现**两个模块共用同一源文件**
+  （`app/core/shared/lyrics/LrcReader.cs`），避免两套实现漂移。
+- **编码**：BOM（UTF-8 / UTF-16 LE、BE）→ 无 BOM 时严格 UTF-8 试解码 → **GB18030**
+  （覆盖 GBK 及 4 字节序列，走 .NET 框架 `CodePagesEncodingProvider`）→ UTF-8 替换兜底（不崩溃）。
+  GB18030 是「动态字符串取编码 + 进程级 `RegisterProvider`」，属 NativeAOT **裁剪下最容易被悄悄弄坏**的一段，
+  故备有**出厂形态回归用例**：`app/test/scanner_direct_test.dart` 跑在 AOT 产物
+  `scanner/build/scanner-ffi.so` 上，四组**硬编码字节**（GBK 双字节 / GB18030 四字节 `U+20000` /
+  UTF-16LE+BOM / 严格 UTF-8）。**改解码路径或升 .NET 后必须重跑**（先 `core/scanner/build.sh` 重建 FFI）。
+- 约定：与音频同目录、同名 `.lrc`（大小写不敏感）；显式分层侧车 `<name>.trans.lrc` /
+  `<name>.romaji.lrc`。目录清单**每目录建一次**（scanner 侧），探测为 O(1)。
+- **索引器零文件系统访问**：只从 `library.db` 读上述列（`lrc_mtime/size` 与扫描器同源），
+  旧库缺列时自动降级为「无侧车」。
+- **播放侧同时受益**：`TracksDb.lyricsById/ByPath/ByIds` 在内嵌 `tracks.lyrics` 为空时回退
+  `lyrics_lrc`——此前 `.lrc` 只有索引器消费，出现「搜索得到、播放没词」的不一致。
+- 子设置项 `索引 .lrc 侧车歌词`（默认 **关**）：控制**是否把该层纳入索引**；
+  关闭时不索引、行为同现状（存储仍在库里，供播放侧使用）。
+- 增量：`lrc_mtime/size` 纳入脏集（§6）——扫描器侧车写入变化 → 该曲重索引；
+  媒体未变而侧车变化时，扫描器只 `UPDATE` 侧车列（不重解析标签）。
+- **每轮扫描的探测成本（实测 30k 曲 / 15k 侧车 / 单目录最坏布局，AOT 产物）**：
+  稳态增量（媒体与侧车都未变）整轮 **0.27–0.28s**（优化前 0.29s），其中侧车部分 ≲0.1s——因为
+  ①目录清单**每目录只枚举一次**（`BeginScan()` 起清空，本轮内信任目录 mtime → 每曲 **0 次目录 stat**），
+  ②只有**真有侧车**的曲目才 stat 那一两个文件（无侧车曲目零 stat）。
+  **同名 `.lrc` 的内容改写仍逐个 stat（mtime/size）**，故「改了侧车」立即可见；
+  只有「扫描**中途**新增/删除的侧车」与媒体文件同语义——下一轮扫描发现。
+- **升级落地（schema 变更不需要额外操作）**：旧库的 `lrc_checked` 为空 → **下一轮扫描**自动补齐
+  （只读 `.lrc`、不重解析标签；实测 30k 曲 +15k 侧车 **0.46s**，比稳态多 ~0.19s），
+  日志会打印「侧车首次探测=N」。触发路径是既有的自动扫描：进入音乐库页（≥5 分钟节流）、
+  新增/移除扫描目录、手动「扫描」。**补齐之前**索引器按「无侧车」降级且缺列时给出
+  可操作 WARN（`library.db 无 .lrc 侧车列 … 请先运行一次媒体扫描`），播放侧也只显示内嵌歌词——均不报错。
 
 ### 4.5 算力归属与"为什么不拖慢搜索"
 
@@ -253,6 +365,17 @@
   4. **缓存**：每曲分析结果持久化在 `search_docs`，重索引只重算脏曲；
   5. 铁律：**绝不把拼音 / 翻译放在查询路径上做**——那才是"拖慢搜索"的根源。
 
+- **宽命中查询的工作量上界（P5 实测新增）**：FTS5 的 `ORDER BY bm25` 必须给**全部命中**打分，
+  于是常见词元（拼音音节 / 首字母 / 高频英文词）把单条延迟推到 O(命中集)——30k 语料实测最坏 **131ms**。
+  对策：**候选集上限**（`SearchIndex.defaultCandidateCap = 5000`，C# 侧 `FtsStore.DefaultCandidateCap` 同值）——
+  先用**无排序**子查询按 rowid 取有界候选（可提前退出，成本有界），再只给这批候选做 bm25 排序：
+  `WHERE rowid IN (SELECT rowid FROM search_fts WHERE search_fts MATCH ? LIMIT 5000) ORDER BY score ...`。
+  **窄命中查询完全不受影响**（候选数 < 上限时等价原路径）；命中集远超上限时（近乎整库命中，
+  排序本就无意义）结果取自候选批——这是**有意**的降级，值取 5000 是「成本几乎不变（探针主导）而质量尽量高」的折中。
+- **元数据 / 歌词分列**：拼音与首字母各分两列（`pinyin_meta_tok` / `pinyin_lyrics_tok`、
+  `initials_meta_tok` / `initials_lyrics_tok`），于是 `scope=metadata` 的列过滤**真正**只扫元数据
+  （旧版混列时拼音查询收不住）；查询侧相应把这两支列过滤到对应列集合（也顺带减少与其它列拉丁词元的误匹配）。
+
 ### 4.6 参考实现对照
 
 | 引擎 | CJK 分词 | 子串 | 模糊 / 容错 | 拼音 | 译文 / 多语言 | 排序 |
@@ -267,31 +390,33 @@
 > 拼音 / 繁简 / 译文层 **所有通用引擎都不提供**，必须我们自己预处理——这正是"自研分析器"的价值，
 > 也是 Baloo 与现成引擎都缺的一环。
 
-**本期容错实现（P4，`search_query.dart` / `search_cjk_fuzzy.dart` / `search_index.dart`）**：
-不引入索引侧词典 / 触发器，在**查询编译**侧做**分级（三趟）**：
+**本期容错实现（P4 起，P5 收敛；`search_query.dart` / `search_cjk_fuzzy.dart` / `search_index.dart`）**：
+不引入索引侧词典 / 触发器，在**查询编译**侧做**分级（渐进五趟）**——逐趟递进、命中足够即短路：
 
-1. 第一趟精确 `compileMatch`（现状三支 OR）；命中数 ≥ 阈值（默认 1）→ 直接返回，**不触发**后续；
-2. 命中不足且查询含**拉丁/数字词法词元**时，第二趟 `compileFuzzy`：把这些词元展开为
-   **编辑距离 ≤ 1 的变体 OR 组**（删除 / 相邻换位 / **受限字母表替换**，不含插入；原词保留），
-   变体仍逐个转义、末词元仍加前缀 `*`；单次变体总数受 `maxVariants`（默认 500）约束，
-   超限只扩展末个拉丁词元。拼音分支天然覆盖**同音错字**（错字与正字拼音相同 → 命中），
-   故不重复扩展；模糊仅为精确的**超集**，召回放大由 BM25 排序约束；
-3. 仍不足且查询含 **CJK** 时，第三趟 `_runCjkVariants`：取查询的 **CJK 子序列**生成
-   **编辑距离 ≤ 1 变体**（**删除任一字符 / 相邻换位**，预算默认 ≤ 200 变体，
-   纯 Dart `cjkVariants`；不含插入），每个变体经**原生分析器**（`indexer_analyze`，
-   保证同构，不在 Dart 重实现分词）分析 → `compileMatch`，再合并为**单条** OR
-   `MATCH` 一次查询；结果与前面趟次合并去重、原始优先。
-   失败（无分析器 / 无变体 / 编译为空）仍降级返回。**覆盖边界**：
-   拼音分支是「**音节 AND、与位置无关**」，故纯 CJK 的**漏字（音节子集）/ 换位（音节集合不变）**
-   其实已被第一趟拼音覆盖；第三趟的增量价值主要在**查询多打一字 / 打错成非同音字**
-   （删除错字后子集命中，如 `周杰美`→`周杰`）。**替换型非同音错字（周杰伦→周杰轮）**
-   仍需相似字表，**不在本期**。
+1. **主趟** `compileMatch`：四条支 `OR`（词法 / 拼音 / 首字母 / ——跨语言支默认**不并入**）；
+   相邻短语拼音 + **独立首字母列** + **前缀长度门控**（见 §4.2）；
+2. **拼音宽松兜底** `compilePinyinLoose`（主趟 0 命中时）：音节**位置无关 `AND`**——
+   纯 CJK 的**漏字（音节子集）/ 换位（音节集合不变）**靠这一趟召回（`周伦` → `周杰伦`、
+   `爱我` → `我爱你`）；代价是命中集可能很大，故只在主趟不足时付；
+3. **跨语言兜底** `compileCrossLingual`（仍 0 命中时）：T1 候选 `OR`（见下）；
+4. **模糊趟**（含拉丁/数字词元时）`compileFuzzy`：把这些词元展开为**编辑距离 ≤ 1 的变体 OR 组**
+   （删除 / 相邻换位 / **受限字母表替换**，不含插入；原词保留），变体仍逐个转义、末词元按门控加前缀；
+   单次变体总数受 `maxVariants`（默认 500）约束，超限只扩展末个拉丁词元。
+   拼音支天然覆盖**同音错字**，故不重复扩展；模糊仅为精确的**超集**；
+5. **CJK 变体趟**（仍不足且查询含 CJK）`_runCjkVariants`：取查询的 CJK 子序列生成
+   **编辑距离 ≤ 1 变体**（**删除任一字符 / 相邻换位**，预算默认 ≤ 200，纯 Dart `cjkVariants`；
+   不含插入），每个变体经**原生分析器**（`indexer_analyze`，保证同构）分析 → `compileMatch`，
+   再合并为**单条** OR `MATCH` 一次查询。各趟结果合并去重、**前面的趟次优先**。
+   **替换型非同音错字（周杰伦→周杰轮）** 仍需相似字表，**不在本期**。
 
-**跨语言查询扩展（T1，`Analyzer.AnalyzeQuery` + `search_query.dart`）**：与容错并列的第 4 条查询分支——
+**跨语言查询扩展（T1，`Analyzer.AnalyzeQuery` + `search_query.dart`）**：第 4 条查询分支——
 原生分析器用 Unihan 释义扩展（`data/def_en2hanzi.tsv` / `data/def_hanzi2en.tsv`，`EmbeddedResource` 内嵌）
 把拉丁 / 数字词映射为候选汉字、CJK 字映射为英文释义词，逐候选 `quoteToken` 以 `OR` 组合（总预算 ≤ 32、
 去重、并剔除与查询拼音音节同形的噪声候选）；空则不加此支。**仅改查询侧**（`AnalyzeQuery`），
 索引侧 `Analyze` 与索引内容不变，故 T1 自身不递增 `AnalyzerVersion`。
+**P5 起改为渐进兜底**（`compileCrossLingual`）：候选多为高频英文词（`愛` → `love`），`OR` 进主表达式会把
+命中集放大到近乎整库（30k 实测单条 116ms → 移出主趟后降到 20ms 级），故只在主趟 / 拼音兜底趟均不足时
+单独成趟。
 
 **结果高亮（P4，`search_highlight.dart` / `search_highlight_pinyin.dart`）**：字面匹配之外，
 索引开启且已加载分析器时，用查询词元（`pinyin` / `initials`）在**展示文本的 CJK 段**内做
@@ -324,29 +449,40 @@ interface IndexStore {
 - 结构：**预分词**后写入内容列，交给 `unicode61` 存储（**无需自定义 C tokenizer**，可移植）：
 
 ```sql
-CREATE TABLE search_docs (
-  doc_id         INTEGER PRIMARY KEY,     -- 映射 tracks.id
+CREATE TABLE search_docs (            -- 仅元数据（v2 起 contentless，不再存 token 文本）
+  doc_id         INTEGER PRIMARY KEY, -- 映射 tracks.id
   track_id       TEXT NOT NULL UNIQUE,
-  title_tok      TEXT, artist_tok TEXT, album_tok TEXT,
-  lyrics_tok     TEXT,                    -- 原文
-  lyrics_tr_tok  TEXT,                    -- 译文
-  lyrics_rom_tok TEXT,                    -- 音译 / 罗马音
-  pinyin_tok     TEXT,                    -- 原文拼音（全拼音节 + 首字母）
-  filename_tok   TEXT,
-  indexed_mtime  INTEGER, indexed_generation INTEGER, schema_version INTEGER
+  indexed_mtime  INTEGER, indexed_lrc_mtime INTEGER, indexed_lrc_size INTEGER,
+  indexed_generation INTEGER, schema_version INTEGER
 );
 CREATE VIRTUAL TABLE search_fts USING fts5(
   title_tok, artist_tok, album_tok,
-  lyrics_tok, lyrics_tr_tok, lyrics_rom_tok, pinyin_tok, filename_tok,
-  content='search_docs', content_rowid='doc_id',
-  tokenize='unicode61'
+  lyrics_tok, lyrics_tr_tok, lyrics_rom_tok,
+  pinyin_meta_tok, pinyin_lyrics_tok,   -- v4：拼音按元数据段 / 歌词段分列
+  reading_meta_tok,                     -- v5：日文读音（假名 → 罗马字 bigram；仅元数据段，见 §4.2.1）
+  filename_tok,
+  initials_meta_tok, initials_lyrics_tok, -- v4：首字母同样分列（v3 曾为单列 initials_tok）
+  content='', contentless_delete=1, tokenize='unicode61'
 );
 ```
 
-- 排序：`ORDER BY bm25(search_fts, w_title, w_artist, w_album, w_lyrics, w_lyrics_tr, w_lyrics_rom, w_pinyin, w_filename)`。
-  权重示例：标题 4.0 / 歌手 3.0 / 专辑 2.0 / **原文歌词 1.5** / 拼音 2.0 / **译文 1.0** / **音译 0.5** / 文件名 1.0（评审时定）。
+- 排序：`ORDER BY bm25(search_fts, w_…)`，权重（实现值、列序一致）：
+  title 4.0 / artist 3.0 / album 2.0 / lyrics 1.5 / lyrics_tr 1.0 / lyrics_rom 0.5 /
+  **pinyin_meta 2.0 / pinyin_lyrics 1.5** / **reading_meta 2.0** / filename 1.0 /
+  **initials_meta 2.0 / initials_lyrics 1.5**。
+- **列序 = bm25 权重序，冻结**（每次 schema 变更只允许「改名 + 追加」，并在 Dart 侧同步
+  `expectedSchemaVersion` / `_bm25Weights` / `metadataColumns`）。
+- **元数据列白名单**：`title_tok artist_tok album_tok filename_tok pinyin_meta_tok initials_meta_tok`
+  ——v4 分列后 `scope=metadata` 才真正「只搜元数据」（旧版拼音 / 首字母混列，白名单收不住）。
+- **schema 版本**（`search_meta.schema_version`）：v1 external-content → **v2 contentless** →
+  **v3 首字母独立列**；变更即全量重建（Dart 侧 `SearchIndex.expectedSchemaVersion` 必须同步）。
+- **首字母独立列的理由**（P5 实测）：v2 把首字母串与全拼音节混在 `pinyin_tok`，首字母查询
+  （`"wan"*`）会命中拼音音节（完 / 万 / 晚…）——30k 语料命中 29985/30000、单条 56ms；拆列后
+  查询用 `{initials_tok} : "wan"*` 列过滤，命中集回归「真正以该首字母串开头的短语」。
 - `.lrc` 开关开启时，侧车文本行并入 `lyrics_tok`（保留来源标记以便排歧）。
 - **列过滤**：元数据查询用 `MATCH '{title_tok artist_tok album_tok} : ...'`，不触歌词 / 拼音列（§4.5）。
+- **侧车列不在本库**：`.lrc` 原始文本与锚点 (`lyrics_lrc*` / `lrc_mtime` / `lrc_size` / `lrc_checked`)
+  存在 **`library.db` 的 `tracks` 表**，由 scanner 写入（§4.4）；索引器只读它们，不读文件系统。
 - 查询：查询串经**同一分析器** → 词元 → 拼 `MATCH` 表达式（含 `prefix` / 引号短语）。
 - **为什么不用触发器 / external-content + 自定义 tokenizer**：
   1. 分析器无法在纯 SQL 触发器里运行；
@@ -393,8 +529,17 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
   待删除 = search_docs.track_id 不在 tracks 中
   ```
 
-- **`.lrc` 侧车**（总开关 + 子开关均开启时）：侧车 `(mtime, size)` 变化 → 该曲重索引；关闭**子开关** → 侧车内容从索引移除（总开关关闭时整体冻结，§2.4）。切换子开关即时触发一次增量收敛（P4），无需手动「重建索引」。
+- **`.lrc` 侧车**（总开关 + 子开关均开启时）：`lrc_mtime / lrc_size` 变化 → 该曲重索引；
+  这两个锚点由**扫描器**在解析侧车时写入 `library.db`（§4.4），索引器不读文件系统；
+  关闭**子开关** → 侧车内容从索引移除（总开关关闭时整体冻结，§2.4）。
+  切换子开关即时触发一次增量收敛（P4），无需手动「重建索引」。
+  扫描完成后曲库层还会主动触发一次增量收敛（`library_store_scan.dart`）——否则索引就绪态
+  查询不再回退 `LIKE`，扫描新增的曲目会漏。
 - **分析器 / schema 版本**：`analyzer_version` / `schema_version` 变化 → 强制**全量重建**（拼音 / 译文派生随之刷新）。
+  当前：`schema_version=4`（拼音 / 首字母元数据-歌词分列）、`analyzer_version=6`（假名 / 谚文改子串分词）。
+- **内嵌与侧车去重**：内嵌 `tracks.lyrics` 与 `.lrc` 侧车常是同一份歌词（真实库 126/151 首归一后逐字相同）——
+  归一（去空白）后相同则**只取一份**，避免同一段文本在倒排里存两遍（体积 + bm25 词频翻倍）；
+  部分重叠（如侧车另带「作词 / 作曲」行）仍按并集处理。真实库实测索引体积 2.61MB → 2.21MB（−15%，含假名去镜像）。
 - `applied_generation < scan_generation` ⇒ 索引落后（可触发增量）。
 - **read-your-writes 不保证**（索引是派生数据）：搜索可短暂落后于曲库，符合预期；
   用户可见的"改了标签但还没搜到"由"空闲自动增量"收敛。
@@ -447,6 +592,36 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
 
 建议以脚本 + 小样本先行（可复用 `app/core/scanner/bench` 的形式）。
 
+### 8.1 真实曲库实测（P5，本机 `/home/betastudio2/音乐`）
+
+| 项 | 值 |
+|---|---|
+| 规模 | **165 首**（151 FLAC + 14 MP3），5.6 GB，140 个艺术家目录 |
+| `.lrc` 侧车 | **165/165（100%）**，全部 UTF-8（无 GBK 样本；GBK 路径由合成用例 + AOT 回归覆盖，见 §4.4） |
+| 语言分布 | **日文为主**（PIKASONIC / ヨルシカ / 米津玄師 / 初音ミク …），中文与英文混杂；52/165 标题含假名、82/165 歌词含假名 |
+| 扫描 | 全量 **0.35s**，解析错误 **0** |
+| 索引 | 全量 **~1.0s**；索引体积 **2.21 MB**（假名去镜像 + 内嵌/侧车去重后，较修复前 2.61 MB **−15%**） |
+| 内嵌 vs 侧车 | 151 首两者都有，其中 **126 首归一后逐字相同**（→ 去重，§6） |
+
+**真实召回抽查**（生产同构表达式）：
+
+| 查询 | 结果 |
+|---|---|
+| 假名子串 `くらりん` ⊂ `きゅうくらりん` | 修复前 **0** → 现在 **1** ✓（§4.1） |
+| 汉字子串 `幸福` / 两字 `初音` | 19 / 4 ✓ |
+| 歌词拼音 `mi jin`（列 `pinyin_lyrics_tok`） | 2 ✓（歌手 米津玄師；kanji 走**中文拼音**，对日文曲库是个意外的搜索便利） |
+| 首字母 `mjx` | 2 ✓ |
+| `scope=metadata` 下 `mi jin` | 2 ✓（命中**歌手**字段——v4 分列后元数据范围真正只扫元数据） |
+| 拉丁 `love` / 跨语言 `("爱" OR "恋")` | 11 / 85（跨语言支很宽 → 保持**兜底趟**语义，§4.6） |
+| **日文读音（v5）** `kurarin` ⊂ `きゅうくらりん` | **1** ✓（修复前 0；`kyuukurarin` 同） |
+| **日文读音** `yorushika` → ヨルシカ | **2** ✓ |
+| **日文读音** `yone` / `kome` → 歌手 米津玄師 | **2** / **2** ✓（Unihan 单字音训读；跨字连读 `yonezu` 不支持，见 §4.2.1） |
+| **读音乱串** `zorozoro` | **0** ✓（短语语义，无假阳性） |
+
+> 索引体积（v5，含日文读音列）：**2.28 MB**（v4 为 2.21 MB，读音只索引元数据故仅 +3%）。
+> 已知限制：Unihan 单字读音**不含跨字连读 / nanori**（`yonezu` 不命中，单字可用）；详见 §4.2.1。
+
+
 ---
 
 ## 9. 模块与集成（对齐仓库约定）
@@ -454,18 +629,21 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
 ### 9.1 新原生模块 `app/core/indexer`（C# NativeAOT，与 scanner 并列）
 
 ```
-app/core/indexer/
-  indexer.csproj            # net10.0 / NativeAOT / AllowUnsafeBlocks
-  Program.cs                # CLI: indexer build [--full] [--index-lrc]
-  IndexerEngine.cs          # 增量调度 + 分层分析 + 写 FTS5
-  Analyzer.cs               # 归一化 / bigram / 繁简 / 分层（核心）
-  Pinyin.cs                 # 汉字→拼音（全拼 + 首字母；多音字候选）
-  LrcReader.cs              # .lrc 侧车读取（开关控制）
-  FtsStore.cs               # IndexStore 的 FTS5 实现
-  indexer-ffi/Ffi.cs        # C ABI 导出
-  build.sh
-  THIRD-PARTY-LICENSES.md
-  tests/                    # 分析器测试向量
+app/core/
+  shared/lyrics/LrcReader.cs # .lrc 解码（BOM→UTF-8→GB18030）+ 三层拆分 + 目录清单缓存
+                             #   **scanner 与 indexer 共用同一源文件**（各自 csproj Compile Include）
+  indexer/
+    indexer.csproj           # net10.0 / NativeAOT / AllowUnsafeBlocks
+    Program.cs               # CLI: indexer build [--full] [--index-lrc]
+    IndexerEngine.cs         # 增量调度 + 分层分析 + 写 FTS5（侧车只从 library.db 读）
+    Analyzer.cs              # 归一化 / bigram / 繁简 / 分层（核心）
+    Pinyin.cs                # 汉字→拼音（全拼 + 首字母；多音字候选）
+    FtsStore.cs              # IndexStore 的 FTS5 实现
+    indexer-ffi/Ffi.cs       # C ABI 导出
+    build.sh
+    THIRD-PARTY-LICENSES.md
+    tests/                   # 分析器测试向量 + 端到端
+  scanner/                   # 既有扫描器：遍历目录时**解析 .lrc 并写入 library.db**（§4.4）
 ```
 
 > 语言已定：**C#（NativeAOT）**，与 `scanner` 同栈——直接复用中文处理生态与构建链。
@@ -494,6 +672,14 @@ void indexer_set_log_sink(void (*sink)(int, const char*, const char*), int min_l
 - `lib/services/search/`：`search_index.dart`（打开 `search.db`、`MATCH`、`bm25`）、`search_bindings.dart`（FFI：run/cancel/analyze）、`search_models.dart`。
 - 注册：`NativeModule.indexer`（`native_lib_paths.dart`）、`native_library_registry.dart`、`native_integrity.dart`；
   **仅在总开关开启时 `acquire`**（关闭不加载，§2.4）。
+- **与 scanner 曲库的键联动**：索引只存 `search_docs.track_id`（= scanner 的 `tracks.id` = `md5(path)`），
+  **不存路径**；查询侧经 `TracksDb.existingTrackIds` 剔除已不在 `library.db` 的陈旧 id，
+  再按 id 取行 → 播放路径始终以 scanner 曲库为准（曲目改名 / 移动即新父键，旧文档由增量按
+  `seen` 集删除、新文档按脏集加入）。
+  **收敛触发**（P5 补）：`SearchService.reindex()` 除设置页与「`.lrc` 子开关切换」外，
+  另在**扫描完成且索引已就绪**时由曲库层调用（`library_store_scan.dart`）——否则扫描新增的曲目
+  在索引就绪态下搜索不到（索引就绪时查询不再回退 `LIKE`）。总开关关闭 / 未构建时不触发
+  （`SearchService.indexReady` 为 false，关闭态零成本）。
 - **设置入口**：总开关 `启用本地曲库搜索索引`（默认关）+ 子项 `索引 .lrc 侧车歌词`（默认关，仅在总开关开启时可用）
   + 动作「重建索引 / 删除索引」。关闭时 Dart 侧不打开 `search.db`、不调 `indexer_*` FFI。
 - UI：音乐库搜索框 / 全局搜索接入（排序替换现有 `LIKE`）；沿用 250ms 去抖；总开关关闭时保持现状 `LIKE`。

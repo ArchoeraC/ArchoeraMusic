@@ -22,7 +22,10 @@
   <ItemGroup>
     <!-- 共享 indexer 源码（与 CLI / 测试同源；显式 Link 而非通配 "../*.cs"，
          避免把 CLI 的 Program.cs 编入共享库导致入口冲突） -->
+    <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
+    <Compile Include="../../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
     <Compile Include="../Analyzer.cs" Link="Analyzer.cs" />
+    <Compile Include="../Japanese.cs" Link="Japanese.cs" />
     <Compile Include="../Pinyin.cs" Link="Pinyin.cs" />
     <Compile Include="../PinyinSegmenter.cs" Link="PinyinSegmenter.cs" />
     <Compile Include="../HanziData.cs" Link="HanziData.cs" />
@@ -31,13 +34,19 @@
     <Compile Include="../FtsStore.cs" Link="FtsStore.cs" />
     <Compile Include="../IndexerEngine.cs" Link="IndexerEngine.cs" />
     <Compile Include="../IndexerJson.cs" Link="IndexerJson.cs" />
-    <Compile Include="../LrcReader.cs" Link="LrcReader.cs" />
+    <Compile Include="../../shared/lyrics/LrcReader.cs" Link="shared/lyrics/LrcReader.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- 分析器数据表，LogicalName 固定供 HanziData 按名查找（NativeAOT 安全）。
          nfkc：兼容折叠；def_*：Unihan 释义查询扩展（T1 查询侧跨语言候选）。
          拼音/繁简/全角走 ToolGood.Words，GB18030 走框架 CodePages。 -->
+    <EmbeddedResource Include="../data/kana_romaji.tsv" Link="data/kana_romaji.tsv">
+      <LogicalName>Archoera.Indexer.data.kana_romaji.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../data/ja_readings.tsv" Link="data/ja_readings.tsv">
+      <LogicalName>Archoera.Indexer.data.ja_readings.tsv</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="../data/nfkc.tsv" Link="data/nfkc.tsv">
       <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
     </EmbeddedResource>

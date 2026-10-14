@@ -144,7 +144,8 @@ public static class Program
 
         using var store = new FtsStore();
         store.Open(indexPath, build: false);
-        var rows = store.Search(matchExpr, limit, 0);
+        // CLI 是人工判读工具：默认**不限候选**（0），看真实全量排序（生产走 candidateCap）。
+        var rows = store.Search(matchExpr, limit, 0, 0);
 
         // 附加 track_id 便于人工判读（只读连接，WAL 下可并发）
         var trackIds = ResolveTrackIds(indexPath, rows.Select(r => r.DocId).ToList());

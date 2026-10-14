@@ -19,18 +19,21 @@
 ///   - 超长查询（> [maxCjkQueryLength]）直接放弃（避免病态输入放大开销）。
 library;
 
-/// CJK 统一表意主区 + 扩展 A + 兼容表意区（**与 C# `Analyzer.IsCjk` 同范围**）。
-///
-/// 均为 BMP 码元，1 字符 ↔ 1 UTF-16 码元，故本层按码元处理安全。
-bool isCjkCodeUnit(int unit) =>
-    (unit >= 0x3400 && unit <= 0x4DBF) || // 扩展 A
-    (unit >= 0x4E00 && unit <= 0x9FFF) || // 统一表意主区
-    (unit >= 0xF900 && unit <= 0xFAFF); // 兼容表意区
+import 'script_ranges.dart';
 
-/// 查询是否含任意 CJK 字符（决定是否启用第三趟中文容错）。
+/// 汉字（表意）码元——**拼音高亮专用**（假名 / 谚文没有拼音读音）。
+///
+/// 均为 BMP 码元，1 字符 ↔ 1 UTF-16 码元，故按码元处理安全。
+bool isCjkCodeUnit(int unit) => isCjk(unit);
+
+/// 需要**子串索引**的脚本码元（汉字 / 假名 / 谚文，与原生 `ScriptRanges` 一致）：
+/// 这些脚本的漏字 / 相邻换位容错才有意义（假名同样是 bigram 索引，见设计文档 §4.1）。
+bool isIndexedScriptCodeUnit(int unit) => isIndexedScript(unit);
+
+/// 查询是否含任意子串脚本字符（决定是否启用第三趟容错）。
 bool queryHasCjk(String query) {
   for (var i = 0; i < query.length; i++) {
-    if (isCjkCodeUnit(query.codeUnitAt(i))) return true;
+    if (isIndexedScriptCodeUnit(query.codeUnitAt(i))) return true;
   }
   return false;
 }
@@ -42,7 +45,7 @@ String cjkSubsequence(String query) {
   final buf = StringBuffer();
   for (var i = 0; i < query.length; i++) {
     final unit = query.codeUnitAt(i);
-    if (isCjkCodeUnit(unit)) buf.writeCharCode(unit);
+    if (isIndexedScriptCodeUnit(unit)) buf.writeCharCode(unit);
   }
   return buf.toString();
 }
