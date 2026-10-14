@@ -18,6 +18,9 @@ mod lockout;
 mod memguard;
 mod safefile;
 mod recovery;
+// Linux/BSD 专用：Secret Service（libsecret）D-Bus 客户端。Windows/macOS 走 DPAPI/Keychain。
+#[cfg(all(unix, not(target_os = "macos")))]
+mod secret_service;
 mod service;
 mod share;
 mod serve;

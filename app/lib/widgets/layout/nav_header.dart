@@ -55,6 +55,14 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   late final TextEditingController _searchCtrl;
   final _searchFocus = FocusNode();
 
+  /// 搜索框 + 下拉面板的 **TapRegion 组**：两者同组 → 点面板 / 点输入框都算「内部」，
+  /// 只有点到组外才收起。
+  ///
+  /// 修复（2026-10）：旧实现用 `Positioned.fill` 不透明拦截层收起下拉，但该层盖在
+  /// **搜索框本身**之上——于是「展开后第二次点击搜索框」被当成点外部 → 输入框失焦收起，
+  /// 既不能保持展开状态，也无法点clear/前缀图标或重新定位光标（也被拦截层吞掉）。
+  final Object _searchTapGroup = Object();
+
   /// 搜索下拉锚点：聚焦展开内联面板，点击外部收起（对齐原版 NavSearch
   /// 的搜索历史/热搜/建议交互，但做内联下拉而非弹出式弹窗）。
   final _searchLayerLink = LayerLink();
@@ -157,17 +165,17 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     });
   }
 
-  /// 下拉浮层：透明拦截层（点击外部收起）+ 锚定面板。
+  /// 下拉浮层：只放**锚定面板**（外部点击收起改由 [TapRegion] 按组判定，见 [_searchTapGroup]）。
+  ///
+  /// 不再使用全屏拦截层：那样会「吞掉」第一次外部点击（点一下只收起、不生效），
+  /// 且盖住搜索框本身（本 bug 的成因）。
   Widget _buildSearchOverlay() {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _searchFocus.unfocus(),
-          ),
-        ),
-        CompositedTransformFollower(
+    return TapRegion(
+      // 与搜索框同组：点面板内部不收起
+      groupId: _searchTapGroup,
+      child: Stack(
+        children: [
+          CompositedTransformFollower(
           link: _searchLayerLink,
           // 面板顶边（followerAnchor topLeft）对齐搜索框底边
           // （targetAnchor bottomLeft）——Noctalia 式「嵌入」：面板紧贴
@@ -198,8 +206,9 @@ class _NavHeaderState extends ConsumerState<NavHeader>
               onPickPlaylist: _openSuggestPlaylist,
             ),
           ),
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -395,7 +404,10 @@ class _NavHeaderState extends ConsumerState<NavHeader>
               icon: const Icon(EtaIcons.leftSmall, size: 22),
             ),
             const SizedBox(width: 8),
-            _NavHeaderSearchField(
+            TapRegion(
+              groupId: _searchTapGroup,
+              onTapOutside: (_) => _searchFocus.unfocus(),
+              child: _NavHeaderSearchField(
               layerLink: _searchLayerLink,
               widthAnimation: _widthCtrl,
               collapsedWidth: _searchCollapsedWidth,
@@ -405,6 +417,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
               hintText: l10n.navHeaderSearchHint,
               onChanged: _onSearchChanged,
               onSubmitted: _submitSearch,
+              onTapOutside: (_) {},
+            ),
             ),
             const Spacer(),
             // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）

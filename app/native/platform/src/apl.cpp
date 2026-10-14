@@ -70,6 +70,10 @@ int32_t apl_shutdown(void) {
     archoera::setInitialized(false);
     return rc;
 }
+int32_t apl_harden_process(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::hardenProcess();
+}
 
 uint32_t apl_capabilities(void) { return archoera::caps(); }
 

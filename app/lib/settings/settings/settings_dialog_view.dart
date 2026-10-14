@@ -497,6 +497,18 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.soundLine,
       ),
       _SearchEntry(
+        SettingsCategory.searchIndex,
+        l10n.settingsSearchIndexEnable,
+        l10n.settingsSearchIndexEnableOff,
+        EtaIcons.search2,
+      ),
+      _SearchEntry(
+        SettingsCategory.searchIndex,
+        l10n.settingsSearchIndexLrc,
+        l10n.settingsSearchIndexLrcDesc,
+        EtaIcons.fileMusicOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.mediaSource,
         l10n.settingsCatMediaSource,
         l10n.settingsMediaSourceSubtitle,
@@ -549,6 +561,12 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsSectionFontCredits,
         l10n.settingsFontCreditsEntryDesc,
         EtaIcons.fontOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.about,
+        l10n.settingsSectionThirdPartyLicenses,
+        l10n.settingsThirdPartyLicensesEntryDesc,
+        EtaIcons.docmentOutline,
       ),
       _SearchEntry(
         SettingsCategory.developer,
@@ -691,6 +709,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                   ),
                   SettingsCategory.scrape => const ScrapeSection(),
                   SettingsCategory.scanner => const ScansSection(),
+                  SettingsCategory.searchIndex => const SearchSection(),
                   SettingsCategory.mediaSource => StreamingServerList(),
                   SettingsCategory.experimentalSource =>
                     const ExperimentalSourceSection(),

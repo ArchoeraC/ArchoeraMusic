@@ -28,6 +28,7 @@
 |---|---|---|
 | C 音频引擎 | `app/core/audio-engine/THIRD-PARTY-LICENSES.md` | miniaudio / FFmpeg 等 |
 | 扫描器（C#） | `app/core/scanner/THIRD-PARTY-LICENSES.md` | TagLibSharp / SQLitePCLRaw |
+| 本地搜索索引器（C#） | `app/core/indexer/THIRD-PARTY-LICENSES.md` | ToolGood.Words / SQLitePCLRaw / Microsoft.Data.Sqlite；数据表 `nfkc.tsv` / `def_en2hanzi.tsv` / `def_hanzi2en.tsv` / `ja_readings.tsv` 派生自 Unicode（Unicode License，含 Unihan `kDefinition` 与 **`kJapanese`**）；`kana_romaji.tsv` 为自研（标准罗马字事实） |
 | 刮削器（C++） | `app/core/scraper/THIRD-PARTY-LICENSES.md` | TagLib / nlohmann-json |
 | 下载引擎（Rust） | `app/core/downloader/THIRD-PARTY-LICENSES.md` | reqwest / lofty / RustCrypto |
 | Subsonic（Go + Rust） | `app/core/subsonic/THIRD-PARTY-LICENSES.md` | 转码器 / Go 依赖 |

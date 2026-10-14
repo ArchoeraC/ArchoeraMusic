@@ -364,7 +364,7 @@ jobs:
       - name: Build native modules (macOS 一站式脚本)
         if: matrix.os == 'macos'
         # 统一入口 app/core/build-macos.sh，收敛 audio-engine / scraper /
-        # scanner / vault / downloader / subsonic 全部原生模块编译：
+        # scanner / indexer / vault / downloader / subsonic 全部原生模块编译：
         # 本地开发与 CI 共用同一入口，逻辑改动只落一处（对齐 build_windows.bat）。
         # 依赖由上方步骤提前安装，脚本只做编译引导。
         run: bash app/core/build-macos.sh osx-arm64
@@ -375,7 +375,7 @@ jobs:
         # 统一入口 app/core/build_windows.bat，在单个 cmd 会话内完成全部模块：
         #   vswhere→vcvars64（MSVC 环境）→ audio-engine（cargo tempo + cl 直编
         #   fft.dll/archoera_mediaengine.dll）→ scraper（CMake+vcpkg toolchain）
-        #   → scanner（dotnet publish）→ downloader（cargo）→ subsonic（go+rust）
+        #   → scanner（dotnet publish）→ indexer（dotnet publish）→ downloader（cargo）→ subsonic（go+rust）
         #   → vault-rs（cargo 静态单文件）。
         # 依赖由上方步骤提前安装（vcpkg headers 缺失时 bat 内自动 install 兜底），
         # 脚本只做编译引导。与 build-linux.sh / build-macos.sh 同构，本地开发
@@ -424,9 +424,13 @@ jobs:
         working-directory: app
         run: dart analyze lib
 
-      - name: Test (unit smoke)
+      - name: Test (unit smoke + 平台桥接 ABI 守卫)
         working-directory: app
-        run: flutter test test/widget_test.dart
+        # native_platform_abi_test.dart 是纯文本静态检查（不依赖原生产物，
+        # 三端均可跑）：守住 backend.h 契约符号「无条件 + namespace archoera」
+        # 定义，防 2026-10-14 那类只在链接期暴露的 Windows LNK2019 复发。
+        # Linux job 跑完整套件时已自动覆盖，这里显式带上以覆盖 macOS/Windows。
+        run: flutter test test/widget_test.dart test/native_platform_abi_test.dart
 
       # ──────────────────────── Flutter 端构建（分平台）─────────────────
       - name: Build Flutter macOS
@@ -487,6 +491,19 @@ jobs:
           if (!(Test-Path $p)) { throw "archoera_kernel.dll 未打入 Windows 包（EraSync 内核缺失）" }
           Write-Host "OK: $p"
 
+      - name: Verify indexer-ffi bundled (Windows)
+        if: matrix.os == 'windows'
+        # 硬校验：本地曲库搜索索引器 indexer-ffi.dll 及其 SQLite 依赖必须在
+        # Release/native/（CMake install 目标），否则 indexer 功能缺失。
+        shell: pwsh
+        run: |
+          $rel = "app\build\windows\x64\runner\Release"
+          foreach ($f in @("native\indexer-ffi.dll", "native\e_sqlite3.dll")) {
+            $p = Join-Path $rel $f
+            if (!(Test-Path $p)) { throw "$f 未打入 Windows 包（indexer 缺失）" }
+            Write-Host "OK: $p"
+          }
+
       # ─────────────── macOS：把原生库拷入 .app（native/ 平铺）──────────
       - name: Bundle native libs into .app (native/ 平铺)
         if: matrix.os == 'macos'
@@ -501,6 +518,10 @@ jobs:
           cp app/core/audio-engine/build/archoera-audio-engine "$NATIVE/" || true
           cp app/core/audio-engine/build/*.dylib "$NATIVE/"
           cp app/core/scanner/build/*.dylib "$NATIVE/"
+          # 本地曲库搜索索引器（indexer-ffi，.NET NativeAOT）；libe_sqlite3 已随
+          # scanner 拷入，仅在其缺失时由 indexer 兜底（同名同版本）。
+          cp app/core/indexer/build/indexer-ffi.dylib "$NATIVE/"
+          [ -f "$NATIVE/libe_sqlite3.dylib" ] || cp app/core/indexer/build/libe_sqlite3.dylib "$NATIVE/"
           cp app/core/scraper/build/*.dylib "$NATIVE/"
           cp app/core/subsonic/build/*.dylib "$NATIVE/"
           cp app/core/downloader/target/release/libarchoera_downloader.dylib "$NATIVE/"
@@ -530,6 +551,20 @@ jobs:
 
           echo "native/ 内容:"
           ls -la "$NATIVE"
+
+      - name: Verify indexer-ffi bundled (macOS)
+        if: matrix.os == 'macos'
+        # 硬校验：本地曲库搜索索引器 indexer-ffi.dylib 及其 SQLite 依赖必须在
+        # .app/Contents/native/，且计入 SHA-256 完整性清单（SEC-08）。
+        run: |
+          set -euo pipefail
+          NATIVE="app/build/macos/Build/Products/Release/archoera_music.app/Contents/native"
+          for f in indexer-ffi.dylib libe_sqlite3.dylib; do
+            [ -f "$NATIVE/$f" ] || { echo "::error::$f 未打入 macOS 包（indexer 缺失）"; exit 1; }
+          done
+          grep -q 'indexer-ffi.dylib' "$NATIVE/ARCHOERA-NATIVE-MANIFEST.txt" \
+            || { echo "::error::完整性清单缺 indexer-ffi.dylib"; exit 1; }
+          echo "OK: indexer-ffi 已入包并计入清单"
 
       - name: Upload artifact (macOS .app)
         if: matrix.os == 'macos'

@@ -3067,6 +3067,10 @@ class AppLocalizationsZh extends AppLocalizations {
       'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      '本机没有可用的系统钥匙串（Linux 需 Secret Service / libsecret），LEGACY 无法启用。未改动任何内容——请改选 FILK（文件密钥）或 Vault。';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK 为兼容性降级方案：主密钥存于本地文件，一旦泄露全部凭据即暴露。仅限无 OS 钥匙串的 headless/Docker 环境使用。';
 
@@ -3082,6 +3086,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toastSchemeSwitched => '加密方案已切换，重启后生效';
+
+  @override
+  String get toastSchemeSwitchFailedKept => '切换失败：已保留原加密方案（未丢失任何凭据）。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系统保护';
@@ -3472,6 +3479,22 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get settingsFontCreditsText =>
       '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。';
+
+  @override
+  String get settingsSectionThirdPartyLicenses => '第三方开源许可';
+
+  @override
+  String get settingsThirdPartyNative => '随包原生依赖';
+
+  @override
+  String get settingsThirdPartyPackages => 'Dart / Flutter 包';
+
+  @override
+  String get settingsThirdPartyLicensesText =>
+      '本软件随包内嵌或链接以下第三方开源组件，下方按其**许可正文**分组列出各组件的许可全文（法定文本不翻译）：\n· 随包原生依赖：各原生模块编译期内嵌或动态链接的第三方库；\n· Dart / Flutter 包：`pub` 依赖，运行时聚合各包自行登记的许可。\n\n各组件完整许可正文亦随包 `licenses/` 分发；完整清单与逐项说明另见 `THIRD-PARTY-NOTICES.md`。';
+
+  @override
+  String get settingsThirdPartyLicensesEntryDesc => '查看随包依赖与开源组件的许可正文';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -4348,6 +4371,96 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsScanQuarantineClearAllConfirm => '确定删除隔离区中的所有文件吗？该操作不可恢复。';
+
+  @override
+  String get settingsCatSearchIndex => '本地搜索';
+
+  @override
+  String get settingsSearchIndexSubtitle => '本地曲库搜索索引 · 默认关闭 · 开启后按相关度搜索歌词与元数据';
+
+  @override
+  String get settingsSectionSearchIndex => '本地曲库搜索索引';
+
+  @override
+  String get settingsSearchIndexEnable => '启用本地曲库搜索索引';
+
+  @override
+  String get settingsSearchIndexEnableOn => '已开启：后台构建索引，搜索按相关度排序（支持歌词 / 拼音）';
+
+  @override
+  String get settingsSearchIndexEnableOff =>
+      '关闭：使用基础搜索（标题 / 歌手 / 专辑），不建索引、零磁盘占用';
+
+  @override
+  String get settingsSearchIndexLrc => '索引 .lrc 侧车歌词';
+
+  @override
+  String get settingsSearchIndexLrcDesc => '同时索引与音频同名的 .lrc 歌词（需先启用总开关）';
+
+  @override
+  String get settingsSearchIndexNote =>
+      '索引是派生数据：默认关闭零成本；开启后首次构建占用时间与磁盘（随曲库增长，约数百 MB @ 万首），构建失败会自动回退基础搜索。';
+
+  @override
+  String get settingsSectionSearchIndexStatus => '状态与维护';
+
+  @override
+  String get settingsSearchIndexStatusDisabled => '未启用';
+
+  @override
+  String get settingsSearchIndexStatusReady => '索引就绪';
+
+  @override
+  String get settingsSearchIndexStatusBuilding => '正在构建索引…';
+
+  @override
+  String get settingsSearchIndexStatusPending => '未就绪（首次搜索或重建时按需构建）';
+
+  @override
+  String settingsSearchIndexStatusError({required String reason}) {
+    return '索引不可用：$reason（已回退基础搜索）';
+  }
+
+  @override
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  }) {
+    return '构建中：$phase　$processed/$total';
+  }
+
+  @override
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  }) {
+    return '上次构建：$indexed 条，用时 $duration 秒';
+  }
+
+  @override
+  String settingsSearchIndexSize({required String size}) {
+    return '索引体积：$size';
+  }
+
+  @override
+  String get settingsSearchIndexRebuild => '重建索引';
+
+  @override
+  String get settingsSearchIndexDelete => '删除索引';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmTitle => '删除搜索索引？';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmBody =>
+      '删除后释放索引占用的磁盘空间；下次搜索会重新构建。此操作不影响曲库与源文件。';
+
+  @override
+  String get settingsSearchIndexDeleted => '已删除搜索索引';
+
+  @override
+  String get settingsSearchIndexRebuildStarted => '已开始重建索引';
 
   @override
   String get libraryFullScan => '全量扫描';
@@ -8879,6 +8992,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      '本机没有可用的系统钥匙串（Linux 需 Secret Service / libsecret），LEGACY 无法启用。未改动任何内容——请改选 FILK（文件密钥）或 Vault。';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK 为兼容性降级方案：主密钥存于本地文件，一旦泄露全部凭据即暴露。仅限无 OS 钥匙串的 headless/Docker 环境使用。';
 
@@ -8894,6 +9011,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get toastSchemeSwitched => '加密方案已切换，重启后生效';
+
+  @override
+  String get toastSchemeSwitchFailedKept => '切换失败：已保留原加密方案（未丢失任何凭据）。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系统保护';
@@ -9284,6 +9404,22 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   @override
   String get settingsFontCreditsText =>
       '本软件内置以下字体：\n· MiSans（© Xiaomi，依据《MiSans 字体知识产权许可协议》授权使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建图标字体，字形来自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌标识字体）\n\n下方为各字体与字形的官方许可正文原文。';
+
+  @override
+  String get settingsSectionThirdPartyLicenses => '第三方开源许可';
+
+  @override
+  String get settingsThirdPartyNative => '随包原生依赖';
+
+  @override
+  String get settingsThirdPartyPackages => 'Dart / Flutter 包';
+
+  @override
+  String get settingsThirdPartyLicensesText =>
+      '本软件随包内嵌或链接以下第三方开源组件，下方按其**许可正文**分组列出各组件的许可全文（法定文本不翻译）：\n· 随包原生依赖：各原生模块编译期内嵌或动态链接的第三方库；\n· Dart / Flutter 包：`pub` 依赖，运行时聚合各包自行登记的许可。\n\n各组件完整许可正文亦随包 `licenses/` 分发；完整清单与逐项说明另见 `THIRD-PARTY-NOTICES.md`。';
+
+  @override
+  String get settingsThirdPartyLicensesEntryDesc => '查看随包依赖与开源组件的许可正文';
 
   @override
   String get commonNoLyrics => '暂无歌词';
@@ -10160,6 +10296,96 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsScanQuarantineClearAllConfirm => '确定删除隔离区中的所有文件吗？该操作不可恢复。';
+
+  @override
+  String get settingsCatSearchIndex => '本地搜索';
+
+  @override
+  String get settingsSearchIndexSubtitle => '本地曲库搜索索引 · 默认关闭 · 开启后按相关度搜索歌词与元数据';
+
+  @override
+  String get settingsSectionSearchIndex => '本地曲库搜索索引';
+
+  @override
+  String get settingsSearchIndexEnable => '启用本地曲库搜索索引';
+
+  @override
+  String get settingsSearchIndexEnableOn => '已开启：后台构建索引，搜索按相关度排序（支持歌词 / 拼音）';
+
+  @override
+  String get settingsSearchIndexEnableOff =>
+      '关闭：使用基础搜索（标题 / 歌手 / 专辑），不建索引、零磁盘占用';
+
+  @override
+  String get settingsSearchIndexLrc => '索引 .lrc 侧车歌词';
+
+  @override
+  String get settingsSearchIndexLrcDesc => '同时索引与音频同名的 .lrc 歌词（需先启用总开关）';
+
+  @override
+  String get settingsSearchIndexNote =>
+      '索引是派生数据：默认关闭零成本；开启后首次构建占用时间与磁盘（随曲库增长，约数百 MB @ 万首），构建失败会自动回退基础搜索。';
+
+  @override
+  String get settingsSectionSearchIndexStatus => '状态与维护';
+
+  @override
+  String get settingsSearchIndexStatusDisabled => '未启用';
+
+  @override
+  String get settingsSearchIndexStatusReady => '索引就绪';
+
+  @override
+  String get settingsSearchIndexStatusBuilding => '正在构建索引…';
+
+  @override
+  String get settingsSearchIndexStatusPending => '未就绪（首次搜索或重建时按需构建）';
+
+  @override
+  String settingsSearchIndexStatusError({required String reason}) {
+    return '索引不可用：$reason（已回退基础搜索）';
+  }
+
+  @override
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  }) {
+    return '构建中：$phase　$processed/$total';
+  }
+
+  @override
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  }) {
+    return '上次构建：$indexed 条，用时 $duration 秒';
+  }
+
+  @override
+  String settingsSearchIndexSize({required String size}) {
+    return '索引体积：$size';
+  }
+
+  @override
+  String get settingsSearchIndexRebuild => '重建索引';
+
+  @override
+  String get settingsSearchIndexDelete => '删除索引';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmTitle => '删除搜索索引？';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmBody =>
+      '删除后释放索引占用的磁盘空间；下次搜索会重新构建。此操作不影响曲库与源文件。';
+
+  @override
+  String get settingsSearchIndexDeleted => '已删除搜索索引';
+
+  @override
+  String get settingsSearchIndexRebuildStarted => '已开始重建索引';
 
   @override
   String get libraryFullScan => '全量扫描';
@@ -14691,6 +14917,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       'Vault 為實驗性方案：切換後存在異常遺失 Cookie 的風險。';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      '本機沒有可用的系統鑰匙圈（Linux 需 Secret Service / libsecret），LEGACY 無法啟用。未變更任何內容——請改選 FILK（檔案金鑰）或 Vault。';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK 為相容性降級方案：主金鑰存於本機檔案，一旦外洩全部憑證即暴露。僅限無 OS 鑰匙圈的 headless/Docker 環境使用。';
 
@@ -14706,6 +14936,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get toastSchemeSwitched => '加密方案已切換，重啟後生效';
+
+  @override
+  String get toastSchemeSwitchFailedKept => '切換失敗：已保留原加密方案（未遺失任何憑證）。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系統保護';
@@ -15096,6 +15329,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsFontCreditsText =>
       '本軟體內建以下字體：\n· MiSans（© Xiaomi，依據《MiSans 字體知識產權許可協議》授權使用）\n· Manrope（© The Manrope Project Authors，SIL Open Font License 1.1）\n· EtaIcons（自建圖示字體，字形來自 MingCute / Tabler / Lucide）\n· EtaMark（自建品牌標識字體）\n\n下方為各字體與字形的官方授權條款原文。';
+
+  @override
+  String get settingsSectionThirdPartyLicenses => '第三方開源授權';
+
+  @override
+  String get settingsThirdPartyNative => '隨附原生相依';
+
+  @override
+  String get settingsThirdPartyPackages => 'Dart / Flutter 套件';
+
+  @override
+  String get settingsThirdPartyLicensesText =>
+      '本軟體隨附或連結以下第三方開源元件，下方依其**授權條款正文**分組列出各元件的授權全文（法定文本不翻譯）：\n· 隨附原生相依：各原生模組於編譯期內嵌或動態連結的第三方函式庫；\n· Dart / Flutter 套件：`pub` 相依，執行時彙整各套件自行登記的授權。\n\n各元件完整授權正文亦隨包 `licenses/` 分發；完整清單與逐項說明另見 `THIRD-PARTY-NOTICES.md`。';
+
+  @override
+  String get settingsThirdPartyLicensesEntryDesc => '查看隨附相依與開源元件的授權正文';
 
   @override
   String get commonNoLyrics => '暫無歌詞';
@@ -15972,6 +16221,97 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsScanQuarantineClearAllConfirm => '確定刪除隔離區中的所有檔案嗎？此操作無法復原。';
+
+  @override
+  String get settingsCatSearchIndex => '本機搜尋';
+
+  @override
+  String get settingsSearchIndexSubtitle =>
+      '本機曲庫搜尋索引 · 預設關閉 · 開啟後依相關度搜尋歌詞與中繼資料';
+
+  @override
+  String get settingsSectionSearchIndex => '本機曲庫搜尋索引';
+
+  @override
+  String get settingsSearchIndexEnable => '啟用本機曲庫搜尋索引';
+
+  @override
+  String get settingsSearchIndexEnableOn => '已開啟：背景建立索引，搜尋依相關度排序（支援歌詞 / 拼音）';
+
+  @override
+  String get settingsSearchIndexEnableOff =>
+      '關閉：使用基本搜尋（標題 / 演出者 / 專輯），不建立索引、零磁碟占用';
+
+  @override
+  String get settingsSearchIndexLrc => '索引 .lrc 側車歌詞';
+
+  @override
+  String get settingsSearchIndexLrcDesc => '同時索引與音訊同名的 .lrc 歌詞（需先啟用總開關）';
+
+  @override
+  String get settingsSearchIndexNote =>
+      '索引是衍生資料：預設關閉零成本；開啟後首次建立會占用時間與磁碟（隨曲庫成長，約數百 MB @ 萬首），建立失敗會自動回退基本搜尋。';
+
+  @override
+  String get settingsSectionSearchIndexStatus => '狀態與維護';
+
+  @override
+  String get settingsSearchIndexStatusDisabled => '未啟用';
+
+  @override
+  String get settingsSearchIndexStatusReady => '索引就緒';
+
+  @override
+  String get settingsSearchIndexStatusBuilding => '正在建立索引…';
+
+  @override
+  String get settingsSearchIndexStatusPending => '未就緒（首次搜尋或重建時按需建立）';
+
+  @override
+  String settingsSearchIndexStatusError({required String reason}) {
+    return '索引無法使用：$reason（已回退基本搜尋）';
+  }
+
+  @override
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  }) {
+    return '建立中：$phase　$processed/$total';
+  }
+
+  @override
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  }) {
+    return '上次建立：$indexed 首，耗時 $duration 秒';
+  }
+
+  @override
+  String settingsSearchIndexSize({required String size}) {
+    return '索引體積：$size';
+  }
+
+  @override
+  String get settingsSearchIndexRebuild => '重建索引';
+
+  @override
+  String get settingsSearchIndexDelete => '刪除索引';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmTitle => '刪除搜尋索引？';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmBody =>
+      '刪除後釋放索引占用的磁碟空間；下次搜尋會重新建立。此操作不影響曲庫與來源檔案。';
+
+  @override
+  String get settingsSearchIndexDeleted => '已刪除搜尋索引';
+
+  @override
+  String get settingsSearchIndexRebuildStarted => '已開始重建索引';
 
   @override
   String get libraryFullScan => '全量掃描';

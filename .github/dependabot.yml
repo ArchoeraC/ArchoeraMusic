@@ -71,6 +71,13 @@ updates:
       interval: weekly
     open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, dotnet]
+  # ── .NET（本地曲库搜索索引器；与 scanner 同 NuGet 栈）──
+  - package-ecosystem: nuget
+    directory: /app/core/indexer
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
+    labels: [dependencies, dotnet]
 
   # ── Dart / Flutter ──
   - package-ecosystem: pub

@@ -56,10 +56,14 @@ class VaultSessionStore implements SessionStore {
   final String defaultScheme;
 
   VaultSessionStore({String? dataDir, this.defaultScheme = 'crypto'})
-      : _dataDir = dataDir ?? resolveDataDir();
+    : _dataDir = dataDir ?? resolveDataDir();
 
   /// vault 当前可用（加载/持久化最近一次成功）。
   bool get vaultAvailable => _vaultOk;
+
+  /// 未解锁 / 不可用（含份额不配对、待恢复）→ 消费方不得把空会话当作「未登录」缓存。
+  @override
+  bool get isLocked => !_vaultOk;
 
   /// vault 模式：`crypto` | `m1` | `m2a` | `m2b`；未初始化/不可用返回 null。
   String? get mode => _mode;
@@ -116,8 +120,13 @@ class VaultSessionStore implements SessionStore {
   /// 成功后由调用方持久化偏好（本方法不触碰 prefs）。
   Future<void> setKdfPreset(String preset, {String? password}) async {
     final p = vaultKdfPresetById(preset);
-    await VaultProcess.setKdf(_dataDir,
-        m: p.mKiB, t: p.t, p: p.p, password: password ?? _sessionPassword);
+    await VaultProcess.setKdf(
+      _dataDir,
+      m: p.mKiB,
+      t: p.t,
+      p: p.p,
+      password: password ?? _sessionPassword,
+    );
   }
 
   /// 恢复解锁（m2a device.key 缺失）：用恢复码解锁并重新加载全部会话。
@@ -128,8 +137,11 @@ class VaultSessionStore implements SessionStore {
     try {
       final cache = <String, Map<String, String>>{};
       for (final platform in knownPlatforms) {
-        final raw = await VaultProcess.get(_dataDir, _uidFor(platform),
-            recoveryCode: recoveryCode);
+        final raw = await VaultProcess.get(
+          _dataDir,
+          _uidFor(platform),
+          recoveryCode: recoveryCode,
+        );
         if (raw == null) continue;
         final decoded = jsonDecode(utf8.decode(base64Decode(raw)));
         if (decoded is Map<String, dynamic>) {
@@ -171,12 +183,18 @@ class VaultSessionStore implements SessionStore {
       // 密钥模式（免 OS 钥匙串）——设置页/首次对话框选择后冷切重启生效。
       // 历史 'vault'（2-of-2，已移除）回落 crypto。
       if (!await VaultProcess.isInitialized(_dataDir)) {
+        // 惰性初始化**仅限免密方案**：m1/m2a/m2b 需要用户因子（口令/device.key/恢复码），
+        // 静默 init 成 crypto 是安全降级且会造成 pref/容器不一致 → 留给 UI 初始化门。
+        if (!VaultProcess.isPasswordlessScheme(defaultScheme)) {
+          stderr.writeln('[vault] 库缺失且方案 $defaultScheme 需要用户因子：等待显式初始化');
+          return;
+        }
         if (defaultScheme == 'file') {
           await VaultProcess.initFile(_dataDir);
         } else {
           await VaultProcess.initCrypto(_dataDir);
         }
-        _mode = 'crypto';
+        _mode = 'crypto'; // 模式恒为 crypto（'C'）；file 只是后端差异（backend=file）
       } else {
         _mode = await VaultProcess.mode(_dataDir);
       }
@@ -226,8 +244,12 @@ class VaultSessionStore implements SessionStore {
   Future<void> _loadFromVault({String? password, String? recoveryCode}) async {
     await _migrateLegacy(password: password, recoveryCode: recoveryCode);
     for (final platform in knownPlatforms) {
-      final raw = await VaultProcess.get(_dataDir, _uidFor(platform),
-          password: password, recoveryCode: recoveryCode);
+      final raw = await VaultProcess.get(
+        _dataDir,
+        _uidFor(platform),
+        password: password,
+        recoveryCode: recoveryCode,
+      );
       if (raw == null) continue;
       final decoded = jsonDecode(utf8.decode(base64Decode(raw)));
       if (decoded is Map<String, dynamic>) {
@@ -250,8 +272,13 @@ class VaultSessionStore implements SessionStore {
           if (v is Map<String, dynamic>) {
             final cookies = v.map((k, val) => MapEntry(k, val.toString()));
             if (cookies.isNotEmpty) {
-              await VaultProcess.set(_dataDir, _uidFor(e.key), jsonEncode(cookies),
-                  password: password, recoveryCode: recoveryCode);
+              await VaultProcess.set(
+                _dataDir,
+                _uidFor(e.key),
+                jsonEncode(cookies),
+                password: password,
+                recoveryCode: recoveryCode,
+              );
               _cache[e.key] = cookies;
             }
           }
@@ -305,8 +332,19 @@ class VaultSessionStore implements SessionStore {
         _vaultOk = false;
         return;
       }
+      // **锁定态（m1/m2a 本会话未解锁）：不尝试写入、不标失败、不刷警告**。
+      // 启动时库必然是锁着的（m2a 正常态），此处"必然失败"会被误读为故障，
+      // 并把 _vaultOk 污染为 false（2026-10-14 实录）。登录态仅内存保留，
+      // 解锁后由加载路径恢复权威值（load 为准，不把锁定期的临时值写回去）。
+      if ((_mode == 'm1' || _mode == 'm2a') &&
+          _sessionPassword == null &&
+          _sessionRecoveryCode == null) {
+        return;
+      }
       if (!await VaultProcess.isInitialized(_dataDir)) {
-        // 惰性重建（销毁后重新登录自动重建）：按默认方案初始化
+        // 库不存在：**仅免密方案**可惰性重建；m1/m2a/m2b 需要用户因子，
+        // 静默建 crypto 是安全降级且会造成 pref/容器不一致（同 _initialize 门控）。
+        if (!VaultProcess.isPasswordlessScheme(defaultScheme)) return;
         if (defaultScheme == 'file') {
           await VaultProcess.initFile(_dataDir);
         } else {
@@ -317,11 +355,20 @@ class VaultSessionStore implements SessionStore {
       _shareBroken = false; // 持久化成功（销毁重建后自动重建）→ 复位不配对标记
       final cookies = _cache[platform];
       if (cookies == null || cookies.isEmpty) {
-        await VaultProcess.delete(_dataDir, _uidFor(platform),
-            password: _sessionPassword, recoveryCode: _sessionRecoveryCode);
+        await VaultProcess.delete(
+          _dataDir,
+          _uidFor(platform),
+          password: _sessionPassword,
+          recoveryCode: _sessionRecoveryCode,
+        );
       } else {
-        await VaultProcess.set(_dataDir, _uidFor(platform), jsonEncode(cookies),
-            password: _sessionPassword, recoveryCode: _sessionRecoveryCode);
+        await VaultProcess.set(
+          _dataDir,
+          _uidFor(platform),
+          jsonEncode(cookies),
+          password: _sessionPassword,
+          recoveryCode: _sessionRecoveryCode,
+        );
       }
     } on VaultNeedRecoveryException catch (e) {
       // m2a device.key 缺失：标记待恢复（登录态仅内存保留，等待恢复流解锁）

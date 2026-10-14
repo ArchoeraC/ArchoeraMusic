@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>archoera-indexer</AssemblyName>
+    <RootNamespace>Archoera.Indexer</RootNamespace>
+    <!-- 分析器全程不依赖区域文化（NFKC / ToLowerInvariant / 码点分类） -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- 与 scanner 同栈：保留 unsafe 开关，便于后续 FFI（P2）。
+         本期分析器不使用指针，但保持配置一致 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- 启用 .NET 自带分析器（与 IDE 一致，构建期即暴露警告） -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- tests/ 是独立测试运行器（显式 Link 共享源码），不得编入 CLI -->
+    <Compile Remove="tests/**" />
+    <!-- indexer-ffi/ 是独立 AOT 共享库，不得编入 CLI -->
+    <Compile Remove="indexer-ffi/**" />
+    <!-- 侧车歌词读取：与 scanner **共用同一源文件**（避免两套解码 / 分层实现漂移）。
+         扫描器负责把 .lrc 解析结果写进 library.db，索引器只读 DB（零文件系统访问）。 -->
+    <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
+    <Compile Include="../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
+    <Compile Include="../shared/lyrics/LrcReader.cs" Link="shared/lyrics/LrcReader.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 与 scanner 同栈同版本：Microsoft.Data.Sqlite（MIT）+ 原生 SQLite（Apache-2.0，含 FTS5）。
+         CVE-2025-6965 修复见 scanner.csproj 说明，pin 3.53.3 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <!-- 拼音（含词级多音字消歧）/ 繁简 / 全角半角：ToolGood.Words（Apache-2.0）。
+         NativeAOT 需 TrimmerRootAssembly 保根（见 THIRD-PARTY-LICENSES.md）。 -->
+    <PackageReference Include="ToolGood.Words" Version="3.1.0.3" />
+    <TrimmerRootAssembly Include="ToolGood.Words" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 汉字数据表以 EmbeddedResource 编入（NativeAOT 安全，无动态反射）。
+         LogicalName 固定为稳定名字，测试程序集以同名 Link 共享，HanziData 按名查找。
+         nfkc：兼容折叠；def_*：Unihan 释义查询扩展（T1 查询侧跨语言候选，不改索引侧）。
+         拼音/繁简/全角走 ToolGood.Words，GB18030 走框架 CodePages。 -->
+    <EmbeddedResource Include="data/kana_romaji.tsv" Link="data/kana_romaji.tsv">
+      <LogicalName>Archoera.Indexer.data.kana_romaji.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="data/ja_readings.tsv" Link="data/ja_readings.tsv">
+      <LogicalName>Archoera.Indexer.data.ja_readings.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="data/nfkc.tsv">
+      <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="data/def_en2hanzi.tsv">
+      <LogicalName>Archoera.Indexer.data.def_en2hanzi.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="data/def_hanzi2en.tsv">
+      <LogicalName>Archoera.Indexer.data.def_hanzi2en.tsv</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

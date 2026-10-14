@@ -33,6 +33,10 @@ void main() {
       ? '需要 ARCHOERA_VAULT_BIN 指向测试构建（见文件头运行前提）'
       : null;
 
+  final skipNoVault = Platform.environment['ARCHOERA_VAULT_BIN'] == null
+      ? '需要 ARCHOERA_VAULT_BIN 指向测试构建'
+      : null;
+
   Future<Directory> makeTmp(String prefix) async {
     final tmp = await Directory.systemTemp.createTemp(prefix);
     addTearDown(() => tmp.deleteSync(recursive: true));
@@ -64,10 +68,8 @@ void main() {
     for (final f in files) {
       final bytes = f.readAsBytesSync();
       final text = utf8.decode(bytes, allowMalformed: true);
-      expect(text.contains('tok-1'), isFalse,
-          reason: '${f.path} 不应含明文');
-      expect(text.contains('cookie-x'), isFalse,
-          reason: '${f.path} 不应含明文');
+      expect(text.contains('tok-1'), isFalse, reason: '${f.path} 不应含明文');
+      expect(text.contains('cookie-x'), isFalse, reason: '${f.path} 不应含明文');
     }
 
     // clear → 条目删除
@@ -105,42 +107,115 @@ void main() {
     // 磁盘无明文（vault 文件与份额文件均不含明文串）
     for (final f in tmp.listSync(recursive: true).whereType<File>()) {
       final text = utf8.decode(f.readAsBytesSync(), allowMalformed: true);
-      expect(text.contains('crypto-tok'), isFalse,
-          reason: '${f.path} 不应含明文');
-      expect(text.contains('crypto-cookie'), isFalse,
-          reason: '${f.path} 不应含明文');
+      expect(text.contains('crypto-tok'), isFalse, reason: '${f.path} 不应含明文');
+      expect(
+        text.contains('crypto-cookie'),
+        isFalse,
+        reason: '${f.path} 不应含明文',
+      );
     }
   });
 
-  test('file 方案：defaultScheme=file 惰性 init-file → mode crypto + backend file + 往返', () async {
-    final tmp = await makeTmp('vault_file_store');
-
-    final store = VaultSessionStore(dataDir: tmp.path, defaultScheme: 'file');
+  test('m2a 方案 + 库缺失：不静默降级为 crypto，等待显式初始化', () async {
+    final tmp = await makeTmp('vault_m2a_missing');
+    final store = VaultSessionStore(dataDir: tmp.path, defaultScheme: 'm2a');
     await store.initialize();
     if (!store.vaultAvailable) {
-      markTestSkipped('vault 不可用，跳过持久化断言');
+      markTestSkipped('vault 不可用，跳过');
       return;
     }
-    expect(store.mode, 'crypto');
-    expect(await VaultProcess.backend(tmp.path), 'file',
-        reason: 'file 方案后端指纹应为 file');
+    // 关键：绝不 auto-init 成单因子 crypto（安全降级 + pref/容器不一致）
+    expect(
+      File('${tmp.path}/credentials.vault').existsSync(),
+      isFalse,
+      reason: 'm2a 需要用户因子，库缺失时不得自动初始化任何容器',
+    );
+    expect(store.mode, isNull, reason: '应保持未初始化，交由 UI 初始化门');
+    expect(store.needsPassword, isTrue, reason: '应提示需要口令（用户显式初始化/解锁），而非静默建库');
+  }, skip: skipNoVault);
 
-    store.save('kugou', {'token': 'file-tok'});
+  test('m2a 锁定态：save() 不写库、不标失败（2026-10-14 实录：启动期"必然失败"被误读）', () async {
+    final tmp = await makeTmp('vault_locked_write');
+    await VaultProcess.initM2a(
+      tmp.path,
+      'pw-123',
+      kdfM: 8192,
+      kdfT: 1,
+      kdfP: 1,
+    );
+
+    // 新会话（未解锁）：m2a → needsPassword
+    final store = VaultSessionStore(dataDir: tmp.path, defaultScheme: 'm2a');
+    await store.initialize();
+    expect(store.needsPassword, isTrue, reason: 'm2a 本会话未解锁');
+
+    store.save('netease', {'MUSIC_U': 'locked-write-should-not-persist'});
     await store.flush();
-    final reloaded = VaultSessionStore(dataDir: tmp.path, defaultScheme: 'file');
-    await reloaded.initialize();
-    expect(reloaded.get('kugou'), {'token': 'file-tok'});
-  });
+
+    // ① 库内**没有**写入该条目（锁定态不落盘，登录态仅内存）
+    expect(
+      await VaultProcess.get(tmp.path, 'session:netease', password: 'pw-123'),
+      isNull,
+      reason: '锁定态写入必须被静默跳过（不得落盘）',
+    );
+    // ② 状态未被污染：仍需解锁、未标为可用
+    expect(store.needsPassword, isTrue);
+    expect(store.vaultAvailable, isFalse, reason: '锁定态的"必然失败"不得把库标记为已破坏/不可用');
+  }, skip: skipNoVault);
+
+  test('m2a 方案 + 库缺失：写入路径不得静默建 crypto 库（安全降级 + pref/容器不一致）', () async {
+    final tmp = await makeTmp('vault_missing_write');
+    final store = VaultSessionStore(dataDir: tmp.path, defaultScheme: 'm2a');
+    await store.initialize();
+    store.save('netease', {'MUSIC_U': 'x'});
+    await store.flush();
+    expect(
+      File('${tmp.path}/credentials.vault').existsSync(),
+      isFalse,
+      reason: '需要用户因子的方案：库缺失时不得由写入路径惰性建 crypto 库',
+    );
+  }, skip: skipNoVault);
+
+  test(
+    'file 方案：defaultScheme=file 惰性 init-file → mode crypto + backend file + 往返',
+    () async {
+      final tmp = await makeTmp('vault_file_store');
+
+      final store = VaultSessionStore(dataDir: tmp.path, defaultScheme: 'file');
+      await store.initialize();
+      if (!store.vaultAvailable) {
+        markTestSkipped('vault 不可用，跳过持久化断言');
+        return;
+      }
+      expect(store.mode, 'crypto');
+      expect(
+        await VaultProcess.backend(tmp.path),
+        'file',
+        reason: 'file 方案后端指纹应为 file',
+      );
+
+      store.save('kugou', {'token': 'file-tok'});
+      await store.flush();
+      final reloaded = VaultSessionStore(
+        dataDir: tmp.path,
+        defaultScheme: 'file',
+      );
+      await reloaded.initialize();
+      expect(reloaded.get('kugou'), {'token': 'file-tok'});
+    },
+  );
 
   test('旧明文 netease_session.json 首启迁移并删除', () async {
     final tmp = await makeTmp('vault_migrate_test');
 
     // 预置旧明文文件（旧 FileSessionStore 格式：platform → cookies）
     final legacy = File('${tmp.path}/netease_session.json');
-    legacy.writeAsStringSync(jsonEncode({
-      'kugou': {'token': 'legacy-token', 'userid': '7'},
-      'netease': {'MUSIC_U': 'legacy-cookie'},
-    }));
+    legacy.writeAsStringSync(
+      jsonEncode({
+        'kugou': {'token': 'legacy-token', 'userid': '7'},
+        'netease': {'MUSIC_U': 'legacy-cookie'},
+      }),
+    );
 
     final store = VaultSessionStore(dataDir: tmp.path);
     await store.initialize();
@@ -195,15 +270,17 @@ void main() {
     await VaultProcess.initM1(tmp.path, pw);
     // 注意：Store 读取的 uid 带 `session:` 前缀（VaultSessionStore._uidFor）
     await VaultProcess.set(
-        tmp.path, 'session:kugou', jsonEncode({'token': 'tok-m1s'}),
-        password: pw);
+      tmp.path,
+      'session:kugou',
+      jsonEncode({'token': 'tok-m1s'}),
+      password: pw,
+    );
 
     // 重建 store（模拟重启）：m1 未解锁 → needsPassword（不静默降级）
     final store = VaultSessionStore(dataDir: tmp.path);
     await store.initialize();
     expect(store.mode, 'm1');
-    expect(store.needsPassword, isTrue,
-        reason: 'm1 未解锁应置 needsPassword');
+    expect(store.needsPassword, isTrue, reason: 'm1 未解锁应置 needsPassword');
     expect(store.vaultAvailable, isFalse);
     expect(store.get('kugou'), isEmpty);
 
@@ -238,8 +315,11 @@ void main() {
     final res = await VaultProcess.initM2a(tmp.path, pw);
     expect(res.recoveryCode, isNotEmpty);
     await VaultProcess.set(
-        tmp.path, 'session:kugou', jsonEncode({'token': 'tok-m2a'}),
-        password: pw);
+      tmp.path,
+      'session:kugou',
+      jsonEncode({'token': 'tok-m2a'}),
+      password: pw,
+    );
 
     // 口令路径解锁
     final store = VaultSessionStore(dataDir: tmp.path);
@@ -254,8 +334,11 @@ void main() {
     final broken = VaultSessionStore(dataDir: tmp.path);
     await broken.initialize();
     expect(await broken.unlockWithPassword(pw), isFalse);
-    expect(broken.needsRecovery, isTrue,
-        reason: 'device.key 丢失应置 needsRecovery');
+    expect(
+      broken.needsRecovery,
+      isTrue,
+      reason: 'device.key 丢失应置 needsRecovery',
+    );
 
     // 恢复码解锁 → 数据回读；恢复后持久化随恢复码落库
     expect(await broken.recover(res.recoveryCode), isTrue);
@@ -279,7 +362,10 @@ void main() {
 
     await VaultProcess.initM2b(tmp.path);
     await VaultProcess.set(
-        tmp.path, 'session:kugou', jsonEncode({'token': 'tok-m2b'}));
+      tmp.path,
+      'session:kugou',
+      jsonEncode({'token': 'tok-m2b'}),
+    );
 
     final store = VaultSessionStore(dataDir: tmp.path);
     await store.initialize();
@@ -328,14 +414,20 @@ void main() {
     StreamingStore.resetForTest();
     StreamingStore.dataDirOverride = tmp.path;
     await StreamingStore.preloadSecrets();
-    expect(StreamingStore.needsPassword, isTrue,
-        reason: 'm1 未解锁 preload 应置 needsPassword');
+    expect(
+      StreamingStore.needsPassword,
+      isTrue,
+      reason: 'm1 未解锁 preload 应置 needsPassword',
+    );
 
     // 正确口令解锁：解锁本身不批量解密（SEC-03），凭据经 loadSecret 惰性回读
     expect(await StreamingStore.unlockWithPassword(pw), isTrue);
     expect(StreamingStore.needsPassword, isFalse);
-    expect(StreamingStore.load().servers.first.password, isEmpty,
-        reason: 'unlock 不得批量解密');
+    expect(
+      StreamingStore.load().servers.first.password,
+      isEmpty,
+      reason: 'unlock 不得批量解密',
+    );
     await StreamingStore.loadSecret('srv1');
     final loaded = StreamingStore.load().servers.first;
     expect(loaded.password, 'pw-x');
@@ -344,8 +436,11 @@ void main() {
     StreamingStore.resetForTest();
     StreamingStore.dataDirOverride = tmp.path;
     await StreamingStore.preloadSecrets();
-    expect(await StreamingStore.unlockWithPassword('wrong'), isFalse,
-        reason: '错误口令不得误报解锁成功');
+    expect(
+      await StreamingStore.unlockWithPassword('wrong'),
+      isFalse,
+      reason: '错误口令不得误报解锁成功',
+    );
     expect(StreamingStore.needsPassword, isTrue);
   });
 

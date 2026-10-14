@@ -21,6 +21,9 @@ enum SettingsCategory {
   storage(EtaIcons.storageOutline),
   scrape(EtaIcons.magic3),
   scanner(EtaIcons.search3Outline),
+
+  /// 本地曲库搜索索引（默认关闭；开启后按相关度搜索歌词 / 元数据）。
+  searchIndex(EtaIcons.search2),
   mediaSource(EtaIcons.serverOutline),
 
   /// 实验性音源（第三方音源接入，默认关闭）。
@@ -49,6 +52,7 @@ enum SettingsCategory {
     storage => l10n.settingsCatStorage,
     scrape => l10n.settingsCatScrape,
     scanner => l10n.settingsCatScanner,
+    searchIndex => l10n.settingsCatSearchIndex,
     mediaSource => l10n.settingsCatMediaSource,
     experimentalSource => l10n.settingsCatExperimentalSource,
     mcp => l10n.settingsCatMcp,
@@ -68,6 +72,7 @@ enum SettingsCategory {
     storage => l10n.settingsStorageSubtitle,
     scrape => l10n.settingsScrapeSubtitle,
     scanner => l10n.settingsScannerSubtitle,
+    searchIndex => l10n.settingsSearchIndexSubtitle,
     mediaSource => l10n.settingsMediaSourceSubtitle,
     experimentalSource => l10n.settingsExperimentalSourceSubtitle,
     mcp => l10n.settingsMcpSubtitle,
