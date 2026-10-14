@@ -120,6 +120,19 @@ extension _SecuritySectionView on _SecuritySectionState {
               onPressed: _deviceBusy ? null : _recoverVault,
             ),
           ),
+        if (_needsUnlock && !_needsRecovery)
+          _SecurityBanner(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+            icon: EtaIcons.lockOutline,
+            text: l10n.vaultUnlockDesc,
+            scheme: scheme,
+            button: SButton(
+              label: l10n.vaultUnlockTitle,
+              variant: SButtonVariant.secondary,
+              size: SButtonSize.small,
+              onPressed: _deviceBusy ? null : _unlockWithPassword,
+            ),
+          ),
         if (_shareBroken)
           _SecurityBanner(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
@@ -166,7 +179,11 @@ extension _SecuritySectionView on _SecuritySectionState {
               Expanded(
                 child: Text(
                   _schemeDescFor(
-                      l10n, vaultSchemeAtSliderIndex(_vaultSliderPending ?? vaultSchemeSliderIndex(_scheme))),
+                    l10n,
+                    vaultSchemeAtSliderIndex(
+                      _vaultSliderPending ?? vaultSchemeSliderIndex(_scheme),
+                    ),
+                  ),
                   style: TextStyle(
                     fontSize: 11.5,
                     height: 1.4,
@@ -210,7 +227,8 @@ extension _SecuritySectionView on _SecuritySectionState {
   /// 无口令 KDF → 置灰并给出说明。切换需验证当前口令（见 [_onKdfPresetChanged]）。
   Widget _buildKdfSelector(AppLocalizations l10n, ColorScheme scheme) {
     // 优先回显 vault 实际生效强度（status.kdf）；读取失败/未匹配回退偏好。
-    final current = _presetIdForKdf(_vaultKdf) ??
+    final current =
+        _presetIdForKdf(_vaultKdf) ??
         ref.watch(appPrefsProvider).vaultKdfPreset;
     final supports = _scheme == 'm1' || _scheme == 'm2a';
     return Padding(
@@ -276,35 +294,44 @@ extension _SecuritySectionView on _SecuritySectionState {
     // Vault（M 系）三档变体合并为**一张**卡：卡名沿用 `Vault`（徽标「实验性」），
     // 具体档位在卡片下方的滑条里切换（见 [_buildVaultVariantSlider] 与
     // `vault_scheme_slider.dart`）。LEGACY / FILK 仍是各自独立的卡。
-    final cards = <({String value, String title, String badge, Color color,
-        String desc, bool? selectedOverride})>[
-      (
-        value: 'crypto',
-        title: l10n.settingsSchemeCryptoTitle,
-        badge: l10n.settingsSchemeCryptoBadge,
-        color: scheme.primary,
-        desc: l10n.settingsSchemeCryptoDesc,
-        selectedOverride: null,
-      ),
-      (
-        value: 'file',
-        title: l10n.settingsSchemeFileTitle,
-        badge: l10n.settingsSchemeFileBadge,
-        color: scheme.tertiary,
-        desc: l10n.settingsSchemeFileDesc,
-        selectedOverride: null,
-      ),
-      (
-        // 组卡：value 取当前变体（不在 M 系时给 M2A 作为进入默认），
-        // 选中态由 isVaultScheme(_scheme) 决定（组内任一档都算选中）。
-        value: isVaultScheme(_scheme) ? _scheme : 'm2a',
-        title: l10n.settingsSchemeVaultTitle,
-        badge: l10n.settingsSchemeVaultBadge,
-        color: scheme.secondary,
-        desc: l10n.settingsSchemeVaultDesc,
-        selectedOverride: isVaultScheme(_scheme),
-      ),
-    ];
+    final cards =
+        <
+          ({
+            String value,
+            String title,
+            String badge,
+            Color color,
+            String desc,
+            bool? selectedOverride,
+          })
+        >[
+          (
+            value: 'crypto',
+            title: l10n.settingsSchemeCryptoTitle,
+            badge: l10n.settingsSchemeCryptoBadge,
+            color: scheme.primary,
+            desc: l10n.settingsSchemeCryptoDesc,
+            selectedOverride: null,
+          ),
+          (
+            value: 'file',
+            title: l10n.settingsSchemeFileTitle,
+            badge: l10n.settingsSchemeFileBadge,
+            color: scheme.tertiary,
+            desc: l10n.settingsSchemeFileDesc,
+            selectedOverride: null,
+          ),
+          (
+            // 组卡：value 取当前变体（不在 M 系时给 M2A 作为进入默认），
+            // 选中态由 isVaultScheme(_scheme) 决定（组内任一档都算选中）。
+            value: isVaultScheme(_scheme) ? _scheme : 'm2a',
+            title: l10n.settingsSchemeVaultTitle,
+            badge: l10n.settingsSchemeVaultBadge,
+            color: scheme.secondary,
+            desc: l10n.settingsSchemeVaultDesc,
+            selectedOverride: isVaultScheme(_scheme),
+          ),
+        ];
     return LayoutBuilder(
       builder: (context, constraints) {
         final twoCol = constraints.maxWidth >= 420;
@@ -369,7 +396,11 @@ extension _SecuritySectionView on _SecuritySectionState {
         children: [
           Row(
             children: [
-              Icon(EtaIcons.keyOutline, size: 14, color: scheme.onSurfaceVariant),
+              Icon(
+                EtaIcons.keyOutline,
+                size: 14,
+                color: scheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 6),
               Text(
                 _vaultVariantTitle(l10n, pendingScheme),
@@ -428,14 +459,16 @@ extension _SecuritySectionView on _SecuritySectionState {
   }
 
   /// Vault 变体名（复用既有 M1 / M2A / M2B 文案）。
-  String _vaultVariantTitle(AppLocalizations l10n, String scheme) => switch (scheme) {
+  String _vaultVariantTitle(AppLocalizations l10n, String scheme) =>
+      switch (scheme) {
         'm1' => l10n.settingsSchemeM1Title,
         'm2b' => l10n.settingsSchemeM2bTitle,
         _ => l10n.settingsSchemeM2aTitle,
       };
 
   /// Vault 变体徽标（口令 / 双因子 / 免密）。
-  String _vaultVariantBadge(AppLocalizations l10n, String scheme) => switch (scheme) {
+  String _vaultVariantBadge(AppLocalizations l10n, String scheme) =>
+      switch (scheme) {
         'm1' => l10n.settingsSchemeM1Badge,
         'm2b' => l10n.settingsSchemeM2bBadge,
         _ => l10n.settingsSchemeM2aBadge,
@@ -492,11 +525,7 @@ class _SecurityBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 text,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: color,
-                  height: 1.35,
-                ),
+                style: TextStyle(fontSize: 12, color: color, height: 1.35),
               ),
             ),
             const SizedBox(width: 8),

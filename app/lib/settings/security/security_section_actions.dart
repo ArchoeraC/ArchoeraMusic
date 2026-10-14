@@ -252,17 +252,26 @@ extension _SecuritySectionActions on _SecuritySectionState {
       // 全量销毁：vault 文件 + 授权侧份额 + `.bak` + device.key + 本地锚点/标记。
       VaultProcess.destroy(resolveDataDir());
       // m1/m2a 初始化按当前 Argon2id 预设选取参数（非密文，走 argv）。
-      final kdf = vaultKdfPresetById(
-          ref.read(appPrefsProvider).vaultKdfPreset);
+      final kdf = vaultKdfPresetById(ref.read(appPrefsProvider).vaultKdfPreset);
       switch (target) {
         case 'file':
           await VaultProcess.initFile(resolveDataDir());
         case 'm1':
-          await VaultProcess.initM1(resolveDataDir(), password!,
-              kdfM: kdf.mKiB, kdfT: kdf.t, kdfP: kdf.p);
+          await VaultProcess.initM1(
+            resolveDataDir(),
+            password!,
+            kdfM: kdf.mKiB,
+            kdfT: kdf.t,
+            kdfP: kdf.p,
+          );
         case 'm2a':
-          m2a = await VaultProcess.initM2a(resolveDataDir(), password!,
-              kdfM: kdf.mKiB, kdfT: kdf.t, kdfP: kdf.p);
+          m2a = await VaultProcess.initM2a(
+            resolveDataDir(),
+            password!,
+            kdfM: kdf.mKiB,
+            kdfT: kdf.t,
+            kdfP: kdf.p,
+          );
         case 'm2b':
           await VaultProcess.initM2b(resolveDataDir());
         case 'crypto':
@@ -272,8 +281,10 @@ extension _SecuritySectionActions on _SecuritySectionState {
       // 初始化后**自验证**（安全网）：用刚输入的口令真实解锁一次。
       // 失败 → 抛异常 → catch 里 restore() 回滚快照（旧库原封不动）——
       // 杜绝「新库自己的口令打不开 + 旧库已销毁」的丢库事故（2026-10-14 实录）。
-      await VaultProcess.verifyUnlock(resolveDataDir(),
-          password: (target == 'm1' || target == 'm2a') ? password : null);
+      await VaultProcess.verifyUnlock(
+        resolveDataDir(),
+        password: (target == 'm1' || target == 'm2a') ? password : null,
+      );
       // 先持久化方案，再作废旧容器：中断也不会出现「容器是新的、pref 是旧的」。
       ref.read(appPrefsProvider.notifier).setCredentialScheme(target);
       if (target == 'm2a') {
@@ -293,8 +304,10 @@ extension _SecuritySectionActions on _SecuritySectionState {
       toast(l10n.toastSchemeSwitched, type: ToastType.success);
     } on VaultException catch (e) {
       snapshot?.restore(); // 回滚到切换前（旧方案继续可用）
-      toast('${e.message}\n${l10n.toastSchemeSwitchFailedKept}',
-          type: ToastType.error);
+      toast(
+        '${e.message}\n${l10n.toastSchemeSwitchFailedKept}',
+        type: ToastType.error,
+      );
     } catch (e) {
       snapshot?.restore();
       toast('$e\n${l10n.toastSchemeSwitchFailedKept}', type: ToastType.error);
@@ -350,9 +363,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(ctx)
-                      .colorScheme
-                      .onSurface
+                  color: Theme.of(ctx).colorScheme.onSurface
                       .withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -481,8 +492,41 @@ extension _SecuritySectionActions on _SecuritySectionState {
         toast(l10n.toastDeviceBindRecoverFailed, type: ToastType.error);
         return;
       }
+      // **必须**：解锁成功后的统一收尾（失效锁定期的空会话缓存 + 重读登录态）。
+      // 此前本入口只解锁了库、漏了这步 → 「恢复码解锁后登录态读不回来」（2026-10-14 实录）。
+      await refreshAfterVaultUnlock(ref);
       if (!mounted) return;
       toast(l10n.toastDeviceBindRecovered, type: ToastType.success);
+    } on VaultException catch (e) {
+      toast(e.message, type: ToastType.error);
+    } finally {
+      if (mounted) setState(() => _deviceBusy = false);
+      await _refreshVault();
+    }
+  }
+
+  /// 本会话用**口令**解锁（m1/m2a）。与解锁门同语义、同收尾：
+  /// 存在此入口是为了「门被跳过 / 门关掉后」仍能补解锁——否则用户会被卡在
+  /// 「内存态」（登录态读不回来）只能重启（2026-10-14 实录）。
+  Future<void> _unlockWithPassword() async {
+    final l10n = context.l10n;
+    final pw = await _promptRecoveryPassword(
+      title: l10n.vaultUnlockTitle,
+      description: l10n.vaultUnlockDesc,
+      hint: l10n.vaultUnlockHint,
+    );
+    if (pw == null || pw.isEmpty || !context.mounted) return;
+    setState(() => _deviceBusy = true);
+    try {
+      var ok = false;
+      final s = getRuntime().sessionStore;
+      if (s is VaultSessionStore) ok = await s.unlockWithPassword(pw);
+      if (await StreamingStore.unlockWithPassword(pw)) ok = true;
+      if (!ok) {
+        toast(l10n.vaultUnlockFailed, type: ToastType.error);
+        return;
+      }
+      await refreshAfterVaultUnlock(ref);
     } on VaultException catch (e) {
       toast(e.message, type: ToastType.error);
     } finally {

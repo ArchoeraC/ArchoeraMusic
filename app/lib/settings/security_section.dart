@@ -38,12 +38,14 @@ import '../../stores/app_prefs.dart';
 import '../../stores/data_dir.dart';
 import '../../stores/providers.dart';
 import '../../stores/vault_session_store.dart';
+import '../../stores/vault_unlock_refresh.dart';
 import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/s_dialog.dart';
 import '../../widgets/player/s_controls.dart';
 import 'security/vault_scheme_slider.dart';
 import '../services/security/vault_switch_snapshot.dart';
 import 'settings_widgets.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'security/security_section_actions.dart';
@@ -83,6 +85,16 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
         StreamingStore.needsRecovery;
   }
 
+  /// 本会话凭据库尚未解锁（m1/m2a）→ 设置页提供**补解锁**入口。
+  ///
+  /// 为什么必须有：解锁门可被「暂不解锁」跳过，而解锁动作此前只在门里调用过 →
+  /// 跳过之后本会话再无入口解锁，登录态读不回来只能重启（2026-10-14 实录）。
+  bool get _needsUnlock {
+    final s = getRuntime().sessionStore;
+    return (s is VaultSessionStore && s.needsPassword) ||
+        StreamingStore.needsPassword;
+  }
+
   bool get _shareBroken {
     final s = getRuntime().sessionStore;
     return s is VaultSessionStore && s.shareBroken;
@@ -93,7 +105,8 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
   int? _vaultSliderPending;
 
   /// 更新滑条拖动预览档位（view 扩展经此调用——扩展不能直接用 `setState`，属 protected 成员）。
-  void _setVaultSliderPending(int? index) => setState(() => _vaultSliderPending = index);
+  void _setVaultSliderPending(int? index) =>
+      setState(() => _vaultSliderPending = index);
 
   /// 当前生效方案（crypto/file/m1/m2a/m2b）。
   /// 已初始化的库按 status 返回的 mode/backend 判定（真实生效值）；
