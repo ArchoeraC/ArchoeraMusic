@@ -5,9 +5,10 @@
 //! 授权侧份额（S）承载 + 解锁退避状态（[ShareBundle]）+ 后端工厂。
 //!
 //! 生产后端：
-//!   - Linux：[FileStore]（`<dataDir>/secret.key`，0600）或 [NullSecretStore]
-//!     （slots 自包含）；[LibsecretStore] 仍为**桩**（无真实 libsecret 访问，
-//!     仅保留指纹/构造契约，无 D-Bus 时明确失败）。
+//!   - Linux：[LibsecretStore]（Secret Service / `org.freedesktop.Secret`，见
+//!     `src/secret_service.rs`；schema `archoera.vault` + 数据目录作用域 account）或
+//!     [FileStore]（`<dataDir>/secret.key`，0600，headless/显式降级）或 [NullSecretStore]
+//!     （slots 自包含）。**无 D-Bus / 钥匙串锁定时明确失败，不静默降级**。
 //!   - Windows：[DpapiStore]（`CryptProtectData` 密文落 `<dataDir>/sshare.bin`，
 //!     指纹 `dpapi`）——与 C# `DpapiStore` 语义一致（单槽、忽略 key）。
 //!   - macOS：[KeychainStore]（`kSecClassGenericPassword`，service
@@ -165,12 +166,18 @@ impl SecretStore for FileStore {
     }
 }
 
-/// Linux Secret Service（libsecret）后端——**V1 桩**：指纹/构造契约一致，
-/// 未接入真实 D-Bus 钥匙串（V1 以 FileStore/NullSecretStore 覆盖 headless 场景）。
-/// 仅在 Unix-非-macOS（Linux/BSD）编译；Windows/macOS 分别走 DPAPI/Keychain。
+/// Linux Secret Service（libsecret / `org.freedesktop.Secret`）后端。
+///
+/// **2026-10 由 V1 桩补为真实现**（见 `src/secret_service.rs`）：C# 时代的 vault 走 libsecret/GLib
+/// 能在此处读写份额，Rust 重写时只留了「未实现」桩，导致 Linux 上 `crypto`（LEGACY）无法启用
+/// ——这正是「切不回 LEGACY」的根因。现按 D-Bus 线协议直连（纯 Rust、无新依赖；沙箱已放行 AF_UNIX）。
+///
+/// 兼容性：`xdg:schema = archoera.vault` + `account = "{key}|{dataDir}"` 与 C# 逐字一致 → 老条目可读。
+/// fail-closed：无 session bus / 钥匙串锁定需交互 / 服务拒绝 / 结构不符 → 一律返回错误或视为无份额，
+/// **绝不静默降级**（由 `SecretStoreFactory` 决定是否改用 file 后端）。
 #[cfg(all(unix, not(target_os = "macos")))]
 pub struct LibsecretStore {
-    _data_dir: String,
+    data_dir: String,
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -186,8 +193,12 @@ impl LibsecretStore {
             ));
         }
         Ok(Self {
-            _data_dir: data_dir.to_string(),
+            data_dir: data_dir.to_string(),
         })
+    }
+
+    fn bus() -> Result<crate::secret_service::SessionBus> {
+        crate::secret_service::SessionBus::connect()
     }
 }
 
@@ -196,17 +207,33 @@ impl SecretStore for LibsecretStore {
     fn backend(&self) -> &str {
         "libsecret"
     }
-    fn load(&self, _key: &str) -> Result<Option<Vec<u8>>> {
-        // V1 桩：无真实钥匙串访问，视为无份额（fail-closed）。
-        Ok(None)
+    fn load(&self, key: &str) -> Result<Option<Vec<u8>>> {
+        let mut bus = Self::bus()?;
+        crate::secret_service::lookup_secret(
+            &mut bus,
+            crate::secret_service::LEGACY_SCHEMA,
+            key,
+            &self.data_dir,
+        )
     }
-    fn store(&self, _key: &str, _value: &[u8]) -> Result<()> {
-        Err(VaultError::SecretStoreUnavailable(
-            "Linux Secret Service 后端在 V1 中未实现（请使用 file 后端）".to_string(),
-        ))
+    fn store(&self, key: &str, value: &[u8]) -> Result<()> {
+        let mut bus = Self::bus()?;
+        crate::secret_service::store_secret(
+            &mut bus,
+            crate::secret_service::LEGACY_SCHEMA,
+            key,
+            &self.data_dir,
+            value,
+        )
     }
-    fn delete(&self, _key: &str) -> Result<()> {
-        Ok(())
+    fn delete(&self, key: &str) -> Result<()> {
+        let mut bus = Self::bus()?;
+        crate::secret_service::delete_secret(
+            &mut bus,
+            crate::secret_service::LEGACY_SCHEMA,
+            key,
+            &self.data_dir,
+        )
     }
 }
 
