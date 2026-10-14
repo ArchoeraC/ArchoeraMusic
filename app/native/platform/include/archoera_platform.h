@@ -64,15 +64,18 @@ APL_API int32_t apl_init(void);          /* 进程级一次；重复调用幂等
 APL_API int32_t apl_shutdown(void);      /* join 线程、释放抑制、注销媒体会话；幂等 */
 APL_API uint32_t apl_capabilities(void); /* 能力位图；未 init 亦可查询 */
 
-/* ── 进程硬化（防「同用户 core dump / ptrace 窃取内存明文」）──────────
- * 背景：应用进程必然在内存中持有已解密的流媒体凭据（如登录 cookie）；若该
- * 进程可被 core dump 或 ptrace，同用户攻击者**无需口令/设备因子**即可绕过
- * vault 取出明文（realpath：`kill -SEGV <app>` → systemd-coredump 落盘 →
- * 同用户读 core → 明文 cookie；m2a 三因子被完全绕过）。
- *   Linux  ：RLIMIT_CORE=0 + PR_SET_DUMPABLE=0（禁 core；禁 /proc/pid/mem 与 ptrace）
- *   macOS  ：RLIMIT_CORE=0 + PT_DENY_ATTACH
+/* ── 进程硬化（防「明文凭据随 core dump 落盘」）────────────────────
+ * 背景：应用进程必然在内存中持有已解密的流媒体凭据；若进程可产 core，同用户攻击者
+ * **无需口令/设备因子**即可绕过 vault（realpath：`kill -SEGV <app>` → systemd-coredump
+ * 落盘并对属主附加可读 ACL → 明文 cookie；m2a 三因子被完全绕过，且泄露**超出进程生命周期**）。
+ *   Linux  ：RLIMIT_CORE=0（禁 core；子进程继承）
+ *   macOS  ：RLIMIT_CORE=0
  *   Windows：关闭 WER 崩溃转储/错误框（best-effort；系统策略仍可覆盖）
- * 幂等；**release 构建生效**（debug 保留调试/产核能力）；core 限制由子进程继承。 */
+ * **刻意不设 `PR_SET_DUMPABLE=0` / `PT_DENY_ATTACH`**：二者会打断 vault 的**父进程血缘校验**
+ * （读父进程可执行文件路径），使凭据库整体不可用——同用户读内存（ptrace/process_vm_readv）
+ * 属已声明的 L2 残余（SEC-25），Linux 侧由内核 `kernel.yama.ptrace_scope=1` 阻断、macOS 侧由
+ * `task_for_pid` 默认需 root/entitlement 阻断。
+ * 幂等；**release 构建生效**（debug 保留调试/产核能力）。 */
 APL_API int32_t apl_harden_process(void);
 
 /* ── 统一日志 sink（宿主注入）───────────────────────────────────── */
