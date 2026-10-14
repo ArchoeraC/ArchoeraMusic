@@ -424,9 +424,13 @@ jobs:
         working-directory: app
         run: dart analyze lib
 
-      - name: Test (unit smoke)
+      - name: Test (unit smoke + 平台桥接 ABI 守卫)
         working-directory: app
-        run: flutter test test/widget_test.dart
+        # native_platform_abi_test.dart 是纯文本静态检查（不依赖原生产物，
+        # 三端均可跑）：守住 backend.h 契约符号「无条件 + namespace archoera」
+        # 定义，防 2026-10-14 那类只在链接期暴露的 Windows LNK2019 复发。
+        # Linux job 跑完整套件时已自动覆盖，这里显式带上以覆盖 macOS/Windows。
+        run: flutter test test/widget_test.dart test/native_platform_abi_test.dart
 
       # ──────────────────────── Flutter 端构建（分平台）─────────────────
       - name: Build Flutter macOS
