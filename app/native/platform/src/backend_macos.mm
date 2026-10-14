@@ -22,7 +22,6 @@
 
 #include <fcntl.h>
 #include <sys/file.h>
-#include <sys/ptrace.h>
 #include <sys/resource.h>
 #include <unistd.h>
 
@@ -355,13 +354,14 @@ uint32_t caps() {
 
 int32_t hardenProcess() {
 #ifdef NDEBUG
-    // 1) 禁 core（本进程与子进程）
+    // 仅禁 core：core dump 会把宿主内存中的明文凭据落盘（SEC-48）。
+    // 不设 `PT_DENY_ATTACH`：它与血缘校验所用的 `proc_pidpath` 同族自伤（可能使子进程
+    // 读不到父进程可执行文件路径），且 macOS 的 `task_for_pid` 默认即要求 root/entitlement
+    // ——同用户读内存本就不可行，无需牺牲可用性。
     struct rlimit rl;
     rl.rlim_cur = 0;
     rl.rlim_max = 0;
     setrlimit(RLIMIT_CORE, &rl);
-    // 2) 拒绝调试器/同用户 ptrace attach（取内存明文的主路径）
-    ptrace(PT_DENY_ATTACH, 0, 0, 0);
 #endif
     return OK;
 }

@@ -51,9 +51,10 @@
 > SEC-05 slots 模式（m1/m2a/m2b）份额现场派生、退避仍回退明文 `vault.lockout`（crypto 模式已内嵌 `master-share`）。
 > **第九批（红队复验：宿主进程硬化，2026-10-14）**：授权对**应用宿主进程**做同用户取明文复验 →
 > **SEC-48**（高）：宿主未硬化，`kill -SEGV` 产 core 即取出明文登录凭据（绕过 m2a 三因子，实测复现）。
-> 修复：新增平台 ABI `apl_harden_process()`（Linux `RLIMIT_CORE=0`+`PR_SET_DUMPABLE=0`；macOS `RLIMIT_CORE=0`+`PT_DENY_ATTACH`；
-> Windows 关 WER 转储/错误框 best-effort），Dart 在桥接 `apl_init` 后立即调用；release 生效。复验：不再产 core、
-> `/proc/pid/{mem,maps}` 拒绝。证据与残余见 §8.6。**同批**：Linux `crypto`（LEGACY）后端由 V1 桩补为**纯 Rust D-Bus/Secret Service 真实现**
+> 修复：新增平台 ABI `apl_harden_process()`（Linux/macOS `RLIMIT_CORE=0`；Windows 关 WER 转储/错误框 best-effort），
+> Dart 在桥接 `apl_init` 后立即调用；release 生效。复验：不再产 core。**`PR_SET_DUMPABLE=0` / `PT_DENY_ATTACH` 已撤回**
+> —— 实测会打断 vault 父进程血缘校验（读父 exe 被内核拒绝）致凭据库不可用；同用户读内存属 SEC-25 残余。
+> 证据与残余见 §8.6。**同批**：Linux `crypto`（LEGACY）后端由 V1 桩补为**纯 Rust D-Bus/Secret Service 真实现**
 > （兼容 KDE `CreateItem` 签名差异；无新依赖、沙箱未改；`crypto` 在 Linux 恢复可用）——补齐 [credential-vault-plan.md](credential-vault-plan.md) §8 的「libsecret 真机待验证」。
 > 修复后逐项把「状态」改为「已修复」并注明提交 / 版本
 > 范围：**文档层评审**——只读仓库文档与安全相关配置（CI 工作流 / 打包 / 工具脚本 / hooks），未做代码审计、未运行程序；
@@ -126,7 +127,7 @@
 | SEC-39 | 低 | **Windows 无「禁同用户读内存」等价物**：`OpenProcess`+`ReadProcessMemory` 未被 ACG/CIG 等缓解拦截；结合 DPAPI 无 `pOptionalEntropy`（份额可被同用户任意进程解封）→ 同用户进程可直读会话内存 / 离线解出条目明文 | vault-rs `guard.rs` 缓解集；`share.rs` DpapiStore | — | 已声明（第八批：文档具体化；应用层无法封闭——`mlock` 只防换页不防读，故 SEC-35/36 是唯一可减少暴露面的手段） |
 | ~~SEC-40~~ | — | ~~应用层 `vault.auth` 锚点只写不读~~ → **复核撤回**：`_verifyAnchor` 已做 TOFU 比对（`get`/`set` 前逐次校验，不一致即 `VaultException`），且 `app/test/vault_process_v4_test.dart` 有 e2e 用例覆盖 | — | — | 撤回（原判定系 grep 大小写失误；`vault.auth` 可被同用户一并改写属 SEC-05 已声明残余） |
 | SEC-47 | 中 | **App 层「裸」文件调用**（21 读 / 18 写 / 擦除器 1）：配置目录对同用户可写，植入 **FIFO** 会让 `readAsStringSync`/`openSync` 阻塞在打开阶段（界面/启动冻结）；植入**符号链接**会让读被重定向、**写穿透覆盖链接目标**，而 `data_destroyer` 的覆盖写更会**抹掉任意文件**；超大文件可 OOM | `app/lib/**`（`prefs.json`/`scan_dirs.json`/`streaming_servers.json`/`netease_session.json`/`last_session.json`/`daily_shelf.json`/`download_history.json`/封面/清单与签名等） | ❌ 未提 | 已修复（本轮：新增 `lib/utils/safe_file.dart` —— 读「必须是普通文件」+ 长度上限（`allowSymlink` 可选，兼容 dotfiles）；写「同目录唯一临时名 + rename」（符号链接只被替换不被穿透）；擦除器只擦普通文件；vault 锚点/标记/清单/签名/被校验库统一收口）；回归 `test/safe_file_test.dart`（普通/缺失/目录/符号链接/FIFO/不穿透写/失败不留残） |
-| SEC-48 | 高 | **应用进程未硬化 → 同用户「杀进程产 core」即可绕过 vault 取明文凭据**：应用进程必然在内存持有已解密的流媒体凭据（登录 cookie）。同用户攻击者无需口令/设备因子/恢复码，只需 `kill -SEGV <app pid>`（**不需要 ptrace**，同用户可对自身进程发信号）→ 内核产 core → `systemd-coredump` 落盘并对属主**附加可读 ACL** → `coredumpctl dump` 或直接读 `/var/lib/systemd/coredump/*` → `MUSIC_U`/`__csrf`/`_ntes_nuid` 等**明文**直接可用（实测复现）。m2a 三因子被完全绕过；且 core 落盘使泄露**超出进程生命周期**（退化为 L1 磁盘取证）。vault 子进程另有硬化（dumpable=0 + RLIMIT_CORE=0），但**持有明文的宿主进程没有** | `app/native/platform`（新增 `apl_harden_process`）+ `app/lib/services/platform/platform_bindings.dart` | ❌ 未提 | 已修复（2026-10-14）：`apl_harden_process()` —— Linux `RLIMIT_CORE=0` + `PR_SET_DUMPABLE=0`（禁 core；禁 `/proc/pid/{mem,maps}`、`process_vm_readv`、ptrace attach）；macOS `RLIMIT_CORE=0` + `PT_DENY_ATTACH`；Windows 关 WER 错误框/转储（best-effort）；Dart 在 `PlatformBindings.tryLoad` 中 `apl_init` 后**立即**调用（早于任何凭据入内存）；**release 生效**（debug 保留调试/产核能力），core 限制由子进程继承。复验：`kill -SEGV` **不再产 core**、`/proc/pid/mem|maps` 拒绝、无 ptrace 权限 |
+| SEC-48 | 高 | **应用进程未硬化 → 同用户「杀进程产 core」即可绕过 vault 取明文凭据**：应用进程必然在内存持有已解密的流媒体凭据（登录 cookie）。同用户攻击者无需口令/设备因子/恢复码，只需 `kill -SEGV <app pid>`（**不需要 ptrace**，同用户可对自身进程发信号）→ 内核产 core → `systemd-coredump` 落盘并对属主**附加可读 ACL** → `coredumpctl dump` 或直接读 `/var/lib/systemd/coredump/*` → `MUSIC_U`/`__csrf`/`_ntes_nuid` 等**明文**直接可用（实测复现）。m2a 三因子被完全绕过；且 core 落盘使泄露**超出进程生命周期**（退化为 L1 磁盘取证）。vault 子进程另有硬化（dumpable=0 + RLIMIT_CORE=0），但**持有明文的宿主进程没有** | `app/native/platform`（新增 `apl_harden_process`）+ `app/lib/services/platform/platform_bindings.dart` | ❌ 未提 | 已修复（2026-10-14，最终形态=**仅禁 core**）：`apl_harden_process()` —— Linux/macOS `setrlimit(RLIMIT_CORE,0)`（子进程继承）、Windows 关 WER 错误框/转储（best-effort）；Dart 在 `PlatformBindings.tryLoad` 中 `apl_init` 后**立即**调用（早于任何凭据入内存）；**release 生效**（debug 保留调试/产核能力）。复验：`kill -SEGV` **不再产 core**（coredumpctl 条数不变）。**已撤回 `PR_SET_DUMPABLE=0`/`PT_DENY_ATTACH`**：二者会让子进程读不到父进程可执行文件路径，**打断 vault 父进程血缘校验 → 凭据库整体不可用**（实测回归：`独立运行被拒：无法读取父进程可执行文件路径`）；该内存读取路径属已声明 L2 残余（SEC-25），Linux 由 `kernel.yama.ptrace_scope=1` 阻断、macOS 由 `task_for_pid` 默认需 root/entitlement 阻断 |
 | SEC-46 | 中 | **多会话并发写 = 「最后写者获胜」（静默丢更新）**：`set`/`delete`/`set-kdf`/`init`/`destroy` 均为「加载 → 改 → 保存」，两个会话基于同一份旧状态各自保存时，后写者会**静默覆盖**前者的条目或把重键头部写回（可用性/完整性双危）；此前无任何跨进程互斥 | vault-rs `service.rs`/`safefile.rs` | ❌ 未提 | 已修复（本轮定语义为**兼容并发**：新增 `safefile::DataDirLock`——`flock(LOCK_EX)` / `LockFileEx` **阻塞式**独占（内核事件唤醒，**非轮询**；`EINTR` 重试非忙等）、**崩溃由内核自动释放**、锁范围=单条命令、锁文件 `vault.lock` 走安全打开且**永不删除**（删了会让互斥失效）；`set`/`delete`/锚点/`set-kdf`/`init`/`destroy` 全部取锁）；回归 `test.sh` §16（外部持锁时写命令阻塞、释放后完成；CLI 重键 ∥ serve 写入 → 头部与条目**都在**） |
 | SEC-43 | 中 | **写入侧容量上限缺失 → 可用性自毁（自锁）**：`MAX_ENTRY_BYTES(4 MiB)` / `MAX_FILE_SIZE(16 MiB)` 仅在**加载**侧校验 → 一次 4 MiB 明文 `set` 会「回 ok」但库此后无法加载（实测；累计 >16 MiB 同理），只能靠 `.bak` 手工救 | vault-rs `format.rs`（`encrypt_entry`/`save`） | ❌ 未提 | 已修复（第八批补：`encrypt_entry` 校验单条（明文 ≤ 4 MiB−16B）、`save` 校验整库 ≤ 16 MiB，均**落盘前**拒绝）；回归 `test.sh` §15（边界 4194288 B 通过 / +1B 拒绝 + 整库上限 + 未自锁） |
 | SEC-44 | 中 | **退避状态文件读取未防护 → 植入即挂死/OOM**：`vault.lockout` 用 `fs::read_to_string` → 植入 **FIFO** 会让 `open` 阻塞在握手路径（无超时覆盖，实测挂死）；符号链接可重定向读取，超大文件可 OOM。vault 文件/`device.key`/`secret.key` 亦存在「读进内存后才判长度」的同类隐患 | vault-rs `lockout.rs`/`format.rs`/`device.rs`/`share.rs` | ❌ 未提 | 已修复（第八批补：新增 `safefile::read_regular_limited`——**读前**按元数据判长度 + 拒绝非普通文件；全部敏感读取改走它，退避状态异常一律视为「无锁定」）；回归 `test.sh` §13.5（FIFO / 符号链接→/dev/zero / 超大文件均正常解锁、不挂死） |
@@ -567,24 +568,38 @@ grep -a -oE 'MUSIC_U=[^;]{6,}' /tmp/core
 
 | 平台 | 措施 |
 |---|---|
-| Linux | `setrlimit(RLIMIT_CORE, 0)`（本进程 + 子进程继承）+ `prctl(PR_SET_DUMPABLE, 0)`（禁 core；禁 `/proc/pid/{mem,maps}`、`process_vm_readv`、ptrace attach） |
-| macOS | `setrlimit(RLIMIT_CORE, 0)` + `ptrace(PT_DENY_ATTACH)` |
+| Linux | `setrlimit(RLIMIT_CORE, 0)`（本进程 + 子进程继承）→ 禁 core |
+| macOS | `setrlimit(RLIMIT_CORE, 0)` → 禁 core |
 | Windows | 关闭 WER 崩溃转储/错误框（`SetErrorMode` + `WerSetFlags(NO_UI)`，best-effort） |
 
 Dart 侧在 `PlatformBindings.tryLoad()` 里 `apl_init` 成功**后立即**调用（早于任何凭据进入内存）；
 **release 构建生效**（debug 保留调试/产核能力，避免阻碍开发）。
 
-**复验**：加固后 `kill -SEGV` **不再新增 core**（`coredumpctl list` 条数不变）；
-`/proc/<pid>/mem` 与 `/proc/<pid>/maps` **拒绝访问**；`head -c1`、`process_vm_readv` 均失败。
+**复验（A/B 对照，决定性）**：`bash -c 'ulimit -c 0; kill -SEGV $$'` → `coredumpctl` 状态 **`none`**
+（"terminated abnormally **without generating a coredump**"）；对照组 `ulimit -c unlimited` → **`present` 56K**
+（"dumped core"）。即 `RLIMIT_CORE=0` 对**管道式** `core_pattern`（systemd-coredump）同样生效，应用进程同样观测到
+`without generating a coredump`。注意 `coredumpctl list` 的**条目数会 +1**（那是一条**无内容**的日志记录，
+status 列为 `none`），不能只看条数——须看 `info` 的 size/message。
+
+**首版矫枉过正与撤回（同日回归 → 修正）**：首版同时设了 `PR_SET_DUMPABLE=0`（macOS 为 `PT_DENY_ATTACH`），
+实测**打断 vault 的父进程血缘校验**——vault 在打包布局下要读 `/proc/<ppid>/exe` 与预期主程序比对，而
+`dumpable=0` 让**子进程**也读不到父进程的 `/proc/pid/exe`（内核 `ptrace_may_access` 语义；最小复现：
+父进程 `PR_SET_DUMPABLE=0` 后 `fork()`，子进程 `readlink("/proc/<父pid>/exe")` → `EACCES`），
+于是握手报 `独立运行被拒：无法读取父进程可执行文件路径`，**凭据库整体不可用**（登录态无法持久化）。
+故最终形态**只保留禁 core**：core 落盘是本次实测**唯一**能真正绕过 vault 的持久化路径，且与血缘校验无冲突；
+同用户直接读内存（`ptrace`/`process_vm_readv`/`/proc/pid/mem`）属 **SEC-25 已声明残余**（Linux 侧由
+`kernel.yama.ptrace_scope=1` 阻断、macOS 侧由 `task_for_pid` 默认需 root/entitlement 阻断，无法在普通用户
+权限内强制，尤其 `ptrace_scope=0` 的发行版）。**结论：安全机制之间不能互相拆台**——加固不得使既有防线失效。
 
 **残余（如实声明）**：
 
 1. **同用户运行期注入仍是硬上限**（SEC-25 已声明）：能 `LD_PRELOAD`/替换二进制/在加固前取得执行权的攻击者，
    仍可在硬化的进程内读内存——加固消除的是「**已退出进程的磁盘快照**」与「**非父进程 ptrace**」两条**可避免的放大器**。
-2. **Windows 无 Linux `PR_SET_DUMPABLE` 等价物**：转储是否落盘取决于系统 WER 策略（best-effort 抑制，非强制）。
-3. **debug 构建不硬化**：生产（release）路径生效；对 debug 产物的取证不在威胁模型内。
-4. **`exec` 后 dumpable 复位**：子进程 fork 继承 `RLIMIT_CORE=0`，但 exec 会复位 dumpable；
-   vault 自行硬化、其它辅助进程不持有 vault 明文。Dart `String` 不可 zeroize（SEC-03 残余）仍在。
+2. **同用户读内存（Linux `ptrace_scope=0` / 无 Yama 的发行版）**：未设 `PR_SET_DUMPABLE=0`（见上「撤回」），
+   该路径依赖内核 `kernel.yama.ptrace_scope=1`；建议发行版/文档引导用户保持默认 1（我们无权修改系统 sysctl）。
+3. **Windows 无 Linux `PR_SET_DUMPABLE` 等价物**：转储是否落盘取决于系统 WER 策略（best-effort 抑制，非强制）。
+4. **debug 构建不硬化**：生产（release）路径生效；对 debug 产物的取证不在威胁模型内。
+5. **辅助进程**：子进程 fork 继承 `RLIMIT_CORE=0`；vault 另行自硬化。Dart `String` 不可 zeroize（SEC-03 残余）仍在。
 
 **同批附带复验（低危，纵深）**：MCP 控制服务 `mcp.allowKeyless=true` → 本机任意进程可无密钥读库/控制播放
 （Playback/库统计实测可读）。浏览器侧已由 **Origin allowlist** 挡住（伪造 `Origin: https://evil.example` → 403），

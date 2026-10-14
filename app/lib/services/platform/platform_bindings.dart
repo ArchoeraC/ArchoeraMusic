@@ -466,10 +466,10 @@ class PlatformBindings {
   final _trayMenuCtrl = StreamController<AplTrayMenuCommandEvent>.broadcast();
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
-  /// 进程硬化：禁 core dump / 禁 ptrace（防同用户从内存快照取走已解密明文）。
-  /// Linux: RLIMIT_CORE=0 + PR_SET_DUMPABLE=0；macOS: RLIMIT_CORE=0 + PT_DENY_ATTACH；
-  /// Windows: 关闭 WER 崩溃转储/错误框（best-effort）。release 构建生效；幂等。
-  /// 返回 0=成功（桥接不可用时调用方忽略）。
+  /// 进程硬化：**禁 core dump**（防已解密明文随 core 落盘被同用户取走，见 SEC-48）。
+  /// Linux/macOS: RLIMIT_CORE=0；Windows: 关闭 WER 崩溃转储/错误框（best-effort）。
+  /// 刻意不设 PR_SET_DUMPABLE=0 / PT_DENY_ATTACH——那会打断 vault 的父进程血缘校验。
+  /// release 构建生效；幂等。返回 0=成功（桥接不可用时调用方忽略）。
   int hardenProcess() => _harden();
 
   int acquireInstance() => _instanceAcquire();
@@ -570,8 +570,8 @@ class PlatformBindings {
       final b = PlatformBindings._(lib);
       if (b._version() != aplAbiVersion) return null; // 契约版本不符 → Noop
       if (b._init() != aplOk) return null;
-      // 进程硬化（尽早）：禁 core / 禁 ptrace，阻断「同用户 SIGSEGV 产 core →
-      // 读 core 取明文凭据」这条绕过 vault 的路径。
+      // 进程硬化（尽早）：**禁 core**，阻断「同用户 SIGSEGV 产 core → 读 core 取明文凭据」
+      // 这条绕过 vault 的路径（SEC-48）。同用户读内存属已声明的 L2 残余（SEC-25）。
       b.hardenProcess();
       // 注入统一日志 sink：桥接内部诊断走 libarchoera_log（格式/落盘统一）。
       final sink = Log.nativeWritePointer;
