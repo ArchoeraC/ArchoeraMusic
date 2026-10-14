@@ -66,6 +66,24 @@
 #endif
 
 namespace archoera {
+// 进程硬化（SEE crypto/安全文档 SEC-48）：**定义必须置于任何 #if 之外** ——
+// 曾误插入 `#ifdef ARCHOERA_WINRT` 块内，而该宏在部分 CI 配置下未定义 →
+// 整个块不编译 → `apl.cpp` 链接期 LNK2019 unresolved external（2026-10-14 实录）。
+int32_t hardenProcess() {
+#ifdef NDEBUG
+    // 关闭致命错误框；WER 崩溃转储按系统策略 best-effort 抑制
+    // （Windows 没有等价于 Linux PR_SET_DUMPABLE 的进程级开关，残余见安全文档）。
+    ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+    HMODULE wer = ::LoadLibraryW(L"wer.dll");
+    if (wer != nullptr) {
+        using WerSetFlagsFn = HRESULT(WINAPI*)(DWORD);
+        auto fn = reinterpret_cast<WerSetFlagsFn>(::GetProcAddress(wer, "WerSetFlags"));
+        if (fn != nullptr) fn(0x2 /* WER_FAULT_REPORTING_NO_UI */);
+    }
+#endif
+    return OK;
+}
+
 namespace {
 
 // ── 诊断日志 ──────────────────────────────────────────────────────
@@ -625,20 +643,6 @@ void probe() {
     logRaw(buf);
 }
 
-int32_t hardenProcess() {
-#ifdef NDEBUG
-    // 关闭致命错误框；WER 崩溃转储按系统策略 best-effort 抑制
-    // （Windows 没有等价于 Linux PR_SET_DUMPABLE 的进程级开关，残余见安全文档）。
-    ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
-    HMODULE wer = ::LoadLibraryW(L"wer.dll");
-    if (wer != nullptr) {
-        using WerSetFlagsFn = HRESULT(WINAPI*)(DWORD);
-        auto fn = reinterpret_cast<WerSetFlagsFn>(::GetProcAddress(wer, "WerSetFlags"));
-        if (fn != nullptr) fn(0x2 /* WER_FAULT_REPORTING_NO_UI */);
-    }
-#endif
-    return OK;
-}
 
 int32_t init() {
     auto& s = state();

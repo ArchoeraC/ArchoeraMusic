@@ -36,6 +36,21 @@
 @class ArchoeraTrayTarget;
 
 namespace archoera {
+// 进程硬化（SEC-48）：**定义必须置于任何 #if 之外**（理由同 backend_windows.cpp）。
+int32_t hardenProcess() {
+#ifdef NDEBUG
+    // 仅禁 core：core dump 会把宿主内存中的明文凭据落盘（SEC-48）。
+    // 不设 `PT_DENY_ATTACH`：它与血缘校验所用的 `proc_pidpath` 同族自伤（可能使子进程
+    // 读不到父进程可执行文件路径），且 macOS 的 `task_for_pid` 默认即要求 root/entitlement
+    // ——同用户读内存本就不可行，无需牺牲可用性。
+    struct rlimit rl;
+    rl.rlim_cur = 0;
+    rl.rlim_max = 0;
+    setrlimit(RLIMIT_CORE, &rl);
+#endif
+    return OK;
+}
+
 
 // 推送一次当前系统强调色（定义见文件后部）；平台推送模型，Dart 不查询。
 void pushAccent();
@@ -352,19 +367,6 @@ uint32_t caps() {
            CAP_SECURE_FILE;
 }
 
-int32_t hardenProcess() {
-#ifdef NDEBUG
-    // 仅禁 core：core dump 会把宿主内存中的明文凭据落盘（SEC-48）。
-    // 不设 `PT_DENY_ATTACH`：它与血缘校验所用的 `proc_pidpath` 同族自伤（可能使子进程
-    // 读不到父进程可执行文件路径），且 macOS 的 `task_for_pid` 默认即要求 root/entitlement
-    // ——同用户读内存本就不可行，无需牺牲可用性。
-    struct rlimit rl;
-    rl.rlim_cur = 0;
-    rl.rlim_max = 0;
-    setrlimit(RLIMIT_CORE, &rl);
-#endif
-    return OK;
-}
 
 int32_t init() {
     ensureRemoteCommands();
