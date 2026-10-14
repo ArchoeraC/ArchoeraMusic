@@ -18,6 +18,9 @@ uint32_t caps();
 int32_t init();
 int32_t shutdown();
 
+// 进程硬化（禁 core / 禁 ptrace，防内存明文被同用户取走）；幂等；release 生效。
+int32_t hardenProcess();
+
 int32_t powerSetSleepInhibit(int32_t on);
 int32_t powerSetScreenEvents(int32_t on);
 

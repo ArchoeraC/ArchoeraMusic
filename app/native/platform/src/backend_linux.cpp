@@ -19,6 +19,8 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -1921,6 +1923,20 @@ uint32_t caps() {
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
     return c;
+}
+
+int32_t hardenProcess() {
+#ifdef NDEBUG
+    // 1) 禁 core：本进程与子进程（含 vault 子进程）均不再落盘内存快照。
+    struct rlimit rl;
+    rl.rlim_cur = 0;
+    rl.rlim_max = 0;
+    setrlimit(RLIMIT_CORE, &rl);
+    // 2) 禁 dumpable：同用户非 root 亦无法读 /proc/pid/mem、无法 ptrace attach
+    //    （含「同用户杀进程产 core」与「gdb -p」两条取明文路径）。
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+#endif
+    return OK;
 }
 
 int32_t init() {

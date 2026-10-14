@@ -625,6 +625,21 @@ void probe() {
     logRaw(buf);
 }
 
+int32_t hardenProcess() {
+#ifdef NDEBUG
+    // 关闭致命错误框；WER 崩溃转储按系统策略 best-effort 抑制
+    // （Windows 没有等价于 Linux PR_SET_DUMPABLE 的进程级开关，残余见安全文档）。
+    ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+    HMODULE wer = ::LoadLibraryW(L"wer.dll");
+    if (wer != nullptr) {
+        using WerSetFlagsFn = HRESULT(WINAPI*)(DWORD);
+        auto fn = reinterpret_cast<WerSetFlagsFn>(::GetProcAddress(wer, "WerSetFlags"));
+        if (fn != nullptr) fn(0x2 /* WER_FAULT_REPORTING_NO_UI */);
+    }
+#endif
+    return OK;
+}
+
 int32_t init() {
     auto& s = state();
     if (s.initialized) return OK;
