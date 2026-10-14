@@ -166,6 +166,10 @@ class StreamingStore {
   static Future<void> flush() => _queue;
 
   static void _enqueue(Future<bool> Function() op) {
+    // **锁定态（m1/m2a 本会话未解锁）不排持久化任务**：启动时库必为锁定，
+    // 此时写入必失败 → 只会刷"持久化失败"噪音（易被误读为故障）。
+    // 凭据仍在本进程内存缓存中；解锁后以库内权威值为准（不做锁定期的回写）。
+    if (_needsPassword) return;
     _queue = _queue.then((_) => op()).catchError((Object e) {
       stderr.writeln('[vault] 流媒体凭据持久化失败：$e');
       return false;
