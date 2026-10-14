@@ -250,7 +250,7 @@ void main() {
     expect(vaultFile.existsSync(), isTrue);
 
     // 全量销毁（安全设置页「清除会话」同一链路：删授权侧份额 + vault 文件）
-    VaultProcess.destroy(tmp.path);
+    await VaultProcess.destroy(tmp.path);
     expect(vaultFile.existsSync(), isFalse, reason: 'destroy 应删除 vault 文件');
 
     // destroy 后重建 store：无会话可加载
