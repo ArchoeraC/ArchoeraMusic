@@ -332,8 +332,19 @@ class VaultSessionStore implements SessionStore {
         _vaultOk = false;
         return;
       }
+      // **锁定态（m1/m2a 本会话未解锁）：不尝试写入、不标失败、不刷警告**。
+      // 启动时库必然是锁着的（m2a 正常态），此处"必然失败"会被误读为故障，
+      // 并把 _vaultOk 污染为 false（2026-10-14 实录）。登录态仅内存保留，
+      // 解锁后由加载路径恢复权威值（load 为准，不把锁定期的临时值写回去）。
+      if ((_mode == 'm1' || _mode == 'm2a') &&
+          _sessionPassword == null &&
+          _sessionRecoveryCode == null) {
+        return;
+      }
       if (!await VaultProcess.isInitialized(_dataDir)) {
-        // 惰性重建（销毁后重新登录自动重建）：按默认方案初始化
+        // 库不存在：**仅免密方案**可惰性重建；m1/m2a/m2b 需要用户因子，
+        // 静默建 crypto 是安全降级且会造成 pref/容器不一致（同 _initialize 门控）。
+        if (!VaultProcess.isPasswordlessScheme(defaultScheme)) return;
         if (defaultScheme == 'file') {
           await VaultProcess.initFile(_dataDir);
         } else {
