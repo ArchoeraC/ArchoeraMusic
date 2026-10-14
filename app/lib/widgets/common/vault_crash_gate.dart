@@ -68,7 +68,7 @@ class _VaultCrashGateState extends State<VaultCrashGate> {
   Future<void> _wipeAndRebuild() async {
     if (!mounted) return;
     try {
-      VaultProcess.destroy(resolveDataDir());
+      await VaultProcess.destroy(resolveDataDir());
     } catch (e) {
       Log.e('vault', '销毁失败：$e');
     }
