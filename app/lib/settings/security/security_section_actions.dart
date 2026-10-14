@@ -269,12 +269,18 @@ extension _SecuritySectionActions on _SecuritySectionState {
         default:
           await VaultProcess.initCrypto(resolveDataDir());
       }
-      snapshot.discard(); // 切换成功：旧容器作废（各方案密文结构不兼容）
+      // 初始化后**自验证**（安全网）：用刚输入的口令真实解锁一次。
+      // 失败 → 抛异常 → catch 里 restore() 回滚快照（旧库原封不动）——
+      // 杜绝「新库自己的口令打不开 + 旧库已销毁」的丢库事故（2026-10-14 实录）。
+      await VaultProcess.verifyUnlock(resolveDataDir(),
+          password: (target == 'm1' || target == 'm2a') ? password : null);
+      // 先持久化方案，再作废旧容器：中断也不会出现「容器是新的、pref 是旧的」。
       ref.read(appPrefsProvider.notifier).setCredentialScheme(target);
       if (target == 'm2a') {
         // m2a 恢复码随新库重新生成：作废旧确认标记 → 强制重新备份。
         ref.read(appPrefsProvider.notifier).setM2aRecoveryAcked(false);
       }
+      snapshot.discard(); // 验证通过：旧容器作废（各方案密文结构不兼容）
       if (target == 'm2a' && m2a != null && m2a.recoveryCode.isNotEmpty) {
         if (!mounted) return;
         await _showRecoveryCode(m2a.recoveryCode);
