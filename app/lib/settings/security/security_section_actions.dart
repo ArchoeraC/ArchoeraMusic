@@ -223,6 +223,15 @@ extension _SecuritySectionActions on _SecuritySectionState {
     );
     if (ok != true || !mounted) return;
 
+    // LEGACY 预检：本机系统钥匙串不可用时**先拒绝**（Linux 无 Secret Service 时
+    // init-crypto 直接不支持）。绝不先 destroy：destroy 会删掉系统钥匙串里的份额，
+    // 那是进程外状态、删了无法回滚（旧方案也回不去）。
+    if (target == 'crypto' && !await VaultProcess.canInitCrypto()) {
+      if (!mounted) return;
+      await _showLegacyUnsupported();
+      return;
+    }
+
     // m1/m2a：初始化前先取解锁口令（用户取消则中止，此时尚未销毁现有数据）。
     String? password;
     if (target == 'm1' || target == 'm2a') {
@@ -232,7 +241,11 @@ extension _SecuritySectionActions on _SecuritySectionState {
 
     setState(() => _deviceBusy = true);
     VaultInitM2a? m2a;
+    // 快照现有容器（同卷位移，保留 0600）：init 失败即回滚，避免「旧容器已删、新方案没成」
+    // 把库留在「未初始化」（登录态 / MCP 密钥只留内存）。
+    VaultSwitchSnapshot? snapshot;
     try {
+      snapshot = VaultSwitchSnapshot.capture(resolveDataDir());
       final s = getRuntime().sessionStore;
       if (s is VaultSessionStore) await s.flush();
       await StreamingStore.flush();
@@ -256,6 +269,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
         default:
           await VaultProcess.initCrypto(resolveDataDir());
       }
+      snapshot.discard(); // 切换成功：旧容器作废（各方案密文结构不兼容）
       ref.read(appPrefsProvider.notifier).setCredentialScheme(target);
       if (target == 'm2a') {
         // m2a 恢复码随新库重新生成：作废旧确认标记 → 强制重新备份。
@@ -272,7 +286,12 @@ extension _SecuritySectionActions on _SecuritySectionState {
       }
       toast(l10n.toastSchemeSwitched, type: ToastType.success);
     } on VaultException catch (e) {
-      toast(e.message, type: ToastType.error);
+      snapshot?.restore(); // 回滚到切换前（旧方案继续可用）
+      toast('${e.message}\n${l10n.toastSchemeSwitchFailedKept}',
+          type: ToastType.error);
+    } catch (e) {
+      snapshot?.restore();
+      toast('$e\n${l10n.toastSchemeSwitchFailedKept}', type: ToastType.error);
     } finally {
       if (mounted) setState(() => _deviceBusy = false);
       await _refreshVault();
@@ -418,6 +437,25 @@ extension _SecuritySectionActions on _SecuritySectionState {
       Log.e('vault', '重启应用失败（请手动重启）：$e');
     }
     await quitApplication(ref);
+  }
+
+  /// 本机系统钥匙串不可用 → LEGACY 无法启用：给出**明确原因与替代方案**（不销毁任何东西）。
+  Future<void> _showLegacyUnsupported() async {
+    final l10n = context.l10n;
+    await SDialog.show<void>(
+      context,
+      title: l10n.settingsSchemeCryptoTitle,
+      description: l10n.settingsSchemeUnsupportedLegacy,
+      child: const SizedBox.shrink(),
+      actions: [
+        SButton(
+          label: l10n.commonConfirm,
+          variant: SButtonVariant.primary,
+          size: SButtonSize.small,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
   }
 
   Future<void> _recoverVault() async {

@@ -214,6 +214,33 @@ class VaultProcess {
   /// 无份额配对、无口令、无设备熵，稳定性高于 2-of-2（不存在份额丢失
   /// 导致的凭据整体丢失）；安全性降为单点（OS 钥匙串被攻破 = 凭据全泄露）。
   /// 返回并保存会话锚点 T（`vault.auth`）。
+  /// **LEGACY（`crypto`，依赖系统钥匙串）在*本机*是否真的可用**（切换前预检）。
+  ///
+  /// 判据只能是「真的建一次库」：`status` 不反映后端能力，而某些平台/环境直接拒绝
+  /// （Linux 无 Secret Service 时 `init-crypto` 报 "Secret Service 后端在 V1 中未实现
+  /// （请使用 file 后端）"）。因此在**临时目录**里跑一次 `init-crypto` + `destroy`：
+  /// 不触碰现有容器，也不会把用户数据留在半初始化状态。
+  ///
+  /// 为什么必须预检而不能「失败再回滚」：`destroy` 会连**系统钥匙串里的份额**一并删除，
+  /// 那是进程外的状态、无法快照恢复——切到 LEGACY 失败后旧方案也回不去了。
+  static Future<bool> canInitCrypto() async {
+    if (!available) return false;
+    final tmp = Directory.systemTemp.createTempSync('archoera-vault-probe');
+    try {
+      await initCrypto(tmp.path);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      try {
+        destroy(tmp.path);
+      } catch (_) {}
+      try {
+        tmp.deleteSync(recursive: true);
+      } catch (_) {}
+    }
+  }
+
   static Future<String> initCrypto(String dataDir) async {
     final r = Process.runSync(binary, ['init-crypto', dataDir],
         stdoutEncoding: utf8,

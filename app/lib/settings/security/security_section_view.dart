@@ -151,6 +151,7 @@ extension _SecuritySectionView on _SecuritySectionState {
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
           child: _buildSchemeGrid(l10n, scheme),
         ),
+        if (isVaultScheme(_scheme)) _buildVaultVariantSlider(l10n, scheme),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
           child: Row(
@@ -164,7 +165,8 @@ extension _SecuritySectionView on _SecuritySectionState {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  _schemeDesc(l10n),
+                  _schemeDescFor(
+                      l10n, vaultSchemeAtSliderIndex(_vaultSliderPending ?? vaultSchemeSliderIndex(_scheme))),
                   style: TextStyle(
                     fontSize: 11.5,
                     height: 1.4,
@@ -271,14 +273,18 @@ extension _SecuritySectionView on _SecuritySectionState {
 
   /// 方案卡片响应式网格（每行两张；窄窗自动堆叠）。
   Widget _buildSchemeGrid(AppLocalizations l10n, ColorScheme scheme) {
+    // Vault（M 系）三档变体合并为**一张**卡：卡名沿用 `Vault`（徽标「实验性」），
+    // 具体档位在卡片下方的滑条里切换（见 [_buildVaultVariantSlider] 与
+    // `vault_scheme_slider.dart`）。LEGACY / FILK 仍是各自独立的卡。
     final cards = <({String value, String title, String badge, Color color,
-        String desc})>[
+        String desc, bool? selectedOverride})>[
       (
         value: 'crypto',
         title: l10n.settingsSchemeCryptoTitle,
         badge: l10n.settingsSchemeCryptoBadge,
         color: scheme.primary,
         desc: l10n.settingsSchemeCryptoDesc,
+        selectedOverride: null,
       ),
       (
         value: 'file',
@@ -286,27 +292,17 @@ extension _SecuritySectionView on _SecuritySectionState {
         badge: l10n.settingsSchemeFileBadge,
         color: scheme.tertiary,
         desc: l10n.settingsSchemeFileDesc,
+        selectedOverride: null,
       ),
       (
-        value: 'm1',
-        title: l10n.settingsSchemeM1Title,
-        badge: l10n.settingsSchemeM1Badge,
+        // 组卡：value 取当前变体（不在 M 系时给 M2A 作为进入默认），
+        // 选中态由 isVaultScheme(_scheme) 决定（组内任一档都算选中）。
+        value: isVaultScheme(_scheme) ? _scheme : 'm2a',
+        title: l10n.settingsSchemeVaultTitle,
+        badge: l10n.settingsSchemeVaultBadge,
         color: scheme.secondary,
-        desc: l10n.settingsSchemeM1Desc,
-      ),
-      (
-        value: 'm2a',
-        title: l10n.settingsSchemeM2aTitle,
-        badge: l10n.settingsSchemeM2aBadge,
-        color: scheme.primary,
-        desc: l10n.settingsSchemeM2aDesc,
-      ),
-      (
-        value: 'm2b',
-        title: l10n.settingsSchemeM2bTitle,
-        badge: l10n.settingsSchemeM2bBadge,
-        color: scheme.secondary,
-        desc: l10n.settingsSchemeM2bDesc,
+        desc: l10n.settingsSchemeVaultDesc,
+        selectedOverride: isVaultScheme(_scheme),
       ),
     ];
     return LayoutBuilder(
@@ -325,6 +321,7 @@ extension _SecuritySectionView on _SecuritySectionState {
                 child: _SchemeCard(
                   value: c.value,
                   selected: _scheme,
+                  selectedOverride: c.selectedOverride,
                   busy: _deviceBusy,
                   title: c.title,
                   badge: c.badge,
@@ -340,8 +337,9 @@ extension _SecuritySectionView on _SecuritySectionState {
     );
   }
 
-  String _schemeDesc(AppLocalizations l10n) {
-    switch (_scheme) {
+  /// 指定方案的「当前档位说明」。
+  String _schemeDescFor(AppLocalizations l10n, String scheme) {
+    switch (scheme) {
       case 'file':
         return l10n.settingsSchemeFileModeDesc;
       case 'm1':
@@ -355,6 +353,93 @@ extension _SecuritySectionView on _SecuritySectionState {
         return l10n.settingsSchemeCryptoModeDesc;
     }
   }
+
+  /// Vault 变体滑条（`M2B 仅设备` → `M1 口令` → `M2A 口令+设备`，**越往右越强**）。
+  ///
+  /// 拖动只更新预览（`_vaultSliderPending`），**松手**才提交给既有切换流程
+  /// （[_onSchemeSelected]：确认对话框 → 重建库），避免拖拽途中反复弹窗。
+  /// 档位名 / 徽标复用既有 M1/M2A/M2B 文案（无需新增本地化键）。
+  Widget _buildVaultVariantSlider(AppLocalizations l10n, ColorScheme scheme) {
+    final pending = _vaultSliderPending ?? vaultSchemeSliderIndex(_scheme);
+    final pendingScheme = vaultSchemeAtSliderIndex(pending);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(EtaIcons.keyOutline, size: 14, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(
+                _vaultVariantTitle(l10n, pendingScheme),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: scheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _vaultVariantBadge(l10n, pendingScheme),
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+          Slider(
+            value: pending.toDouble(),
+            min: 0,
+            max: (kVaultSchemeSliderOrder.length - 1).toDouble(),
+            divisions: kVaultSchemeSliderOrder.length - 1,
+            label: _vaultVariantTitle(l10n, pendingScheme),
+            onChanged: _deviceBusy
+                ? null
+                : (v) => _setVaultSliderPending(v.round()),
+            onChangeEnd: _deviceBusy
+                ? null
+                : (v) {
+                    final target = vaultSchemeAtSliderIndex(v.round());
+                    _setVaultSliderPending(null);
+                    _onSchemeSelected(target);
+                  },
+          ),
+          // 三档端点标注（左弱右强）：让滑条方向一眼可读
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (final variant in kVaultSchemeSliderOrder)
+                Flexible(
+                  child: Text(
+                    _vaultVariantBadge(l10n, variant),
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: variant == pendingScheme
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Vault 变体名（复用既有 M1 / M2A / M2B 文案）。
+  String _vaultVariantTitle(AppLocalizations l10n, String scheme) => switch (scheme) {
+        'm1' => l10n.settingsSchemeM1Title,
+        'm2b' => l10n.settingsSchemeM2bTitle,
+        _ => l10n.settingsSchemeM2aTitle,
+      };
+
+  /// Vault 变体徽标（口令 / 双因子 / 免密）。
+  String _vaultVariantBadge(AppLocalizations l10n, String scheme) => switch (scheme) {
+        'm1' => l10n.settingsSchemeM1Badge,
+        'm2b' => l10n.settingsSchemeM2bBadge,
+        _ => l10n.settingsSchemeM2aBadge,
+      };
 
   String _formatBytes(int bytes) {
     if (bytes <= 0) return '0 B';

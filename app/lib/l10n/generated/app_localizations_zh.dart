@@ -3067,6 +3067,10 @@ class AppLocalizationsZh extends AppLocalizations {
       'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      '本机没有可用的系统钥匙串（Linux 需 Secret Service / libsecret），LEGACY 无法启用。未改动任何内容——请改选 FILK（文件密钥）或 Vault。';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK 为兼容性降级方案：主密钥存于本地文件，一旦泄露全部凭据即暴露。仅限无 OS 钥匙串的 headless/Docker 环境使用。';
 
@@ -3082,6 +3086,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toastSchemeSwitched => '加密方案已切换，重启后生效';
+
+  @override
+  String get toastSchemeSwitchFailedKept => '切换失败：已保留原加密方案（未丢失任何凭据）。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系统保护';
@@ -8985,6 +8992,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      '本机没有可用的系统钥匙串（Linux 需 Secret Service / libsecret），LEGACY 无法启用。未改动任何内容——请改选 FILK（文件密钥）或 Vault。';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK 为兼容性降级方案：主密钥存于本地文件，一旦泄露全部凭据即暴露。仅限无 OS 钥匙串的 headless/Docker 环境使用。';
 
@@ -9000,6 +9011,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get toastSchemeSwitched => '加密方案已切换，重启后生效';
+
+  @override
+  String get toastSchemeSwitchFailedKept => '切换失败：已保留原加密方案（未丢失任何凭据）。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系统保护';
@@ -14903,6 +14917,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       'Vault 為實驗性方案：切換後存在異常遺失 Cookie 的風險。';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      '本機沒有可用的系統鑰匙圈（Linux 需 Secret Service / libsecret），LEGACY 無法啟用。未變更任何內容——請改選 FILK（檔案金鑰）或 Vault。';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK 為相容性降級方案：主金鑰存於本機檔案，一旦外洩全部憑證即暴露。僅限無 OS 鑰匙圈的 headless/Docker 環境使用。';
 
@@ -14918,6 +14936,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get toastSchemeSwitched => '加密方案已切換，重啟後生效';
+
+  @override
+  String get toastSchemeSwitchFailedKept => '切換失敗：已保留原加密方案（未遺失任何憑證）。';
 
   @override
   String get settingsVaultModeV1 => 'v1 系統保護';

@@ -3259,6 +3259,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Vault es experimental: las cookies pueden perderse tras el cambio.';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      'Este equipo no tiene un llavero del sistema utilizable (en Linux se requiere Secret Service / libsecret), por lo que LEGACY no se puede activar. No se ha cambiado nada: elige FILK (clave en archivo) o Vault.';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'El modo FILK es un respaldo de compatibilidad: la clave maestra vive en un archivo local. Si se filtra, todas las credenciales quedan expuestas. Solo para entornos headless/Docker sin llavero del sistema.';
 
@@ -3275,6 +3279,10 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get toastSchemeSwitched =>
       'Método de cifrado cambiado; efectivo tras reiniciar';
+
+  @override
+  String get toastSchemeSwitchFailedKept =>
+      'El cambio falló; se mantiene el esquema de cifrado anterior (no se perdió ninguna credencial).';
 
   @override
   String get settingsVaultModeV1 => 'v1 Protección del sistema';
