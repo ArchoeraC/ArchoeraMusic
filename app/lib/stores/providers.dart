@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import '../apis/netease/api.dart';
+
 import 'dart:async';
 import 'dart:ui' show Color;
 
@@ -46,6 +48,9 @@ class NeteaseAuthNotifier extends Notifier<NeteaseAccount?> {
 
   /// 启动初始化：匿名注册（幂等，LRU 缓存）+ 读取当前登录账号。
   Future<void> init() async {
+    // 先丢弃「库锁定期间」可能固化的空会话缓存，再重读登录态
+    // （解锁成功后的入口就是这里；不同步失效会导致登录态读不回来）。
+    invalidateNeteaseSessionCache();
     final api = ref.read(neteaseApiProvider);
     await api.ensureAnonymous();
     state = await api.loginStatus();
@@ -165,7 +170,9 @@ final eventBusProvider = Provider<EventBus>((ref) {
 // ── 播放历史 / 红心状态 ─────────────────────────────────────────
 
 /// 播放历史本地存储（sqlite UI 线程同步直写，见 [HistoryStore]）。
-final historyStoreProvider = Provider<HistoryStore>((ref) => HistoryStore.shared);
+final historyStoreProvider = Provider<HistoryStore>(
+  (ref) => HistoryStore.shared,
+);
 
 /// 红心状态（NT / KG「我喜欢」）。
 final likeControllerProvider = ChangeNotifierProvider<LikeController>(
