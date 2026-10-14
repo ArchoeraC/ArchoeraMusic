@@ -5710,6 +5710,12 @@ abstract class AppLocalizations {
   /// **'Vault 为实验性方案：切换后存在异常丢失 Cookie 的风险。'**
   String get settingsSchemeSwitchToVaultWarning;
 
+  /// No description provided for @settingsSchemeUnsupportedLegacy.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本机没有可用的系统钥匙串（Linux 需 Secret Service / libsecret），LEGACY 无法启用。未改动任何内容——请改选 FILK（文件密钥）或 Vault。'**
+  String get settingsSchemeUnsupportedLegacy;
+
   /// No description provided for @settingsSchemeSwitchToFileWarning.
   ///
   /// In zh_CN, this message translates to:
@@ -5739,6 +5745,12 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'加密方案已切换，重启后生效'**
   String get toastSchemeSwitched;
+
+  /// No description provided for @toastSchemeSwitchFailedKept.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换失败：已保留原加密方案（未丢失任何凭据）。'**
+  String get toastSchemeSwitchFailedKept;
 
   /// No description provided for @settingsVaultModeV1.
   ///

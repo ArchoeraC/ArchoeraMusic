@@ -3102,6 +3102,10 @@ class AppLocalizationsKo extends AppLocalizations {
       'Vault는 실험적 방식입니다: 전환 후 쿠키 유실 위험이 있습니다.';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      '이 환경에는 사용할 수 있는 OS 키체인이 없습니다(Linux는 Secret Service / libsecret 필요). LEGACY를 활성화할 수 없습니다. 변경된 내용은 없습니다. 대신 FILK(파일 키) 또는 Vault를 선택하세요.';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK는 호환성 대체 방식입니다: 마스터 키는 로컬 파일에 보관되며 유출 시 모든 자격 증명이 노출됩니다. OS 키체인이 없는 headless/Docker 환경 전용입니다.';
 
@@ -3117,6 +3121,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get toastSchemeSwitched => '암호화 방식을 전환했습니다. 재시작 후 적용됩니다';
+
+  @override
+  String get toastSchemeSwitchFailedKept =>
+      '전환에 실패했습니다. 이전 암호화 방식을 유지합니다(자격 증명 손실 없음).';
 
   @override
   String get settingsVaultModeV1 => 'v1 시스템 보호';
