@@ -63,7 +63,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
     if (ok != true || !context.mounted) return;
     await _revokeAll();
     try {
-      VaultProcess.destroy(resolveDataDir());
+      await VaultProcess.destroy(resolveDataDir());
     } catch (_) {}
     // SEC-10：MCP 访问密钥随 vault 销毁（uid `mcp:accessKey`）一并失效；
     // 清内存缓存并移除历史 prefs.json 明文键。
@@ -101,7 +101,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
     if (ok != true || !context.mounted) return;
     await _revokeAll();
     try {
-      VaultProcess.destroy(resolveDataDir());
+      await VaultProcess.destroy(resolveDataDir());
     } catch (_) {}
     // SEC-10：MCP 访问密钥随 vault 销毁（uid `mcp:accessKey`）一并失效；
     // 清内存缓存并移除历史 prefs.json 明文键。
@@ -250,7 +250,7 @@ extension _SecuritySectionActions on _SecuritySectionState {
       if (s is VaultSessionStore) await s.flush();
       await StreamingStore.flush();
       // 全量销毁：vault 文件 + 授权侧份额 + `.bak` + device.key + 本地锚点/标记。
-      VaultProcess.destroy(resolveDataDir());
+      await VaultProcess.destroy(resolveDataDir());
       // m1/m2a 初始化按当前 Argon2id 预设选取参数（非密文，走 argv）。
       final kdf = vaultKdfPresetById(ref.read(appPrefsProvider).vaultKdfPreset);
       switch (target) {

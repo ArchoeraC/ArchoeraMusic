@@ -181,6 +181,12 @@ class VaultProcess {
   /// [versionFatal]（UI 全屏警告仅允许退出）——即使攻击者把预编译的测试
   /// 二进制（含明文存储后门）替换进 bundle，应用也不会加载它。
   /// 显式 `ARCHOERA_VAULT_BIN` 不校验（显式信任边界，仅测试/CI 使用）。
+  ///
+  /// **本处保留同步 `Process.runSync`（有意）**：它由同步 getter [binary] →
+  /// [_resolveBinary] 触达，改成异步会牵动 `binary` 的整个同步调用面；而
+  /// `--version` 是**无外部 I/O 的本地探测**（不碰钥匙串/网络/DBus），
+  /// 实际不可阻塞。会因外部后端（如 Linux Secret Service）无响应而挂起的
+  /// 是 `status` / `init-*` / `destroy` —— 它们一律走 [_runBounded]。
   static void _verifyProduction(String path) {
     if (_verifiedBinary == path) return;
     final r = Process.runSync(path, ['--version'],
@@ -202,6 +208,33 @@ class VaultProcess {
       );
     }
     _verifiedBinary = path;
+  }
+
+  /// 有界执行单命令 vault 进程（异步 + 超时）。
+  ///
+  /// 背景（2026-10-14 全平台 CI 的 Ubuntu job 实录）：这些调用原先是
+  /// `Process.runSync(...)` —— **同步阻塞会冻死整个 isolate**，`package:test`
+  /// 的超时定时器根本没机会触发，表现就是「日志停住、几十分钟毫无输出」，
+  /// 只能人工取消。生产侧同理：vault 子进程一旦不返回（例如 Linux Secret
+  /// Service 无响应），宿主 Dart isolate 会被一起冻死。
+  ///
+  /// 改为异步 + [_cmdTimeout] 后：无响应 → 明确抛 [VaultException]，
+  /// 宿主 isolate 不再被堵住。参数**不含凭据**（凭据只经 stdin 传输）。
+  static Future<ProcessResult> _runBounded(String exe, List<String> args) async {
+    try {
+      return await Process.run(
+        exe,
+        args,
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8,
+        environment: sanitizedEnvironment(),
+        includeParentEnvironment: false,
+      ).timeout(_cmdTimeout);
+    } on TimeoutException {
+      throw VaultException(
+          'vault 进程无响应（超过 ${_cmdTimeout.inSeconds}s）：'
+          '${args.isEmpty ? exe : args.join(' ')}');
+    }
   }
 
   static String? _verifiedBinary;
@@ -271,11 +304,7 @@ class VaultProcess {
   }
 
   static Future<String> initCrypto(String dataDir) async {
-    final r = Process.runSync(binary, ['init-crypto', dataDir],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-        environment: sanitizedEnvironment(),
-        includeParentEnvironment: false);
+    final r = await _runBounded(binary, ['init-crypto', dataDir]);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     if (payload.isNotEmpty) {
       try {
@@ -296,11 +325,7 @@ class VaultProcess {
   /// 选用即显式接受该降级。** 复用 crypto 单因子全部配套（握手/崩溃联动/
   /// 目录隔离/可销毁）。返回并保存会话锚点 T（`vault.auth`）。
   static Future<String> initFile(String dataDir) async {
-    final r = Process.runSync(binary, ['init-file', dataDir],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-        environment: sanitizedEnvironment(),
-        includeParentEnvironment: false);
+    final r = await _runBounded(binary, ['init-file', dataDir]);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     if (payload.isNotEmpty) {
       try {
@@ -371,11 +396,7 @@ class VaultProcess {
   /// 当前口令承载槽的 Argon2id 强度（仅 m1/m2a；status JSON 的 `kdf` 字段）。
   /// crypto/m2b（无口令 KDF）或未初始化返回 null。
   static Future<({int m, int t, int p})?> kdf(String dataDir) async {
-    final r = Process.runSync(binary, ['status', dataDir],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-        environment: sanitizedEnvironment(),
-        includeParentEnvironment: false);
+    final r = await _runBounded(binary, ['status', dataDir]);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     final match = RegExp(r'"kdf":\{"m":(\d+),"t":(\d+),"p":(\d+)\}')
         .firstMatch(payload);
@@ -411,9 +432,20 @@ class VaultProcess {
       await p.stdin.flush();
     }
     await p.stdin.close();
-    final out = await p.stdout.transform(utf8.decoder).join();
-    final err = await p.stderr.transform(utf8.decoder).join();
-    return _parseSync(await p.exitCode, out, err);
+    try {
+      // 有界收尾：子进程不退出/流不收尾（外部后端无响应等）不得让宿主无限
+      // 等待——理由同 [_runBounded]。超时则击杀子进程后明确报错。
+      final out =
+          await p.stdout.transform(utf8.decoder).join().timeout(_cmdTimeout);
+      final err =
+          await p.stderr.transform(utf8.decoder).join().timeout(_cmdTimeout);
+      final code = await p.exitCode.timeout(_cmdTimeout);
+      return _parseSync(code, out, err);
+    } on TimeoutException {
+      p.kill(ProcessSignal.sigkill);
+      throw VaultException(
+          'vault 进程无响应（超过 ${_cmdTimeout.inSeconds}s）：${args.join(' ')}');
+    }
   }
 
   /// 保存会话锚点 T（`vault.auth`）；写盘失败不阻断初始化
@@ -427,11 +459,7 @@ class VaultProcess {
 
   /// 是否已初始化（解析 status JSON；未初始化时后续会话将被拒）。
   static Future<bool> isInitialized(String dataDir) async {
-    final r = Process.runSync(binary, ['status', dataDir],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-        environment: sanitizedEnvironment(),
-        includeParentEnvironment: false);
+    final r = await _runBounded(binary, ['status', dataDir]);
     return _parseSync(r.exitCode, r.stdout as String, r.stderr as String)
         .contains('"initialized":true');
   }
@@ -443,11 +471,7 @@ class VaultProcess {
   /// 方案由 prefs 偏好兜底（[SecurityPrefs.credentialScheme]，默认 crypto）；
   /// 仅 status 异常/二进制缺失（解析抛 [VaultException]）同样由调用方兜底为 null。
   static Future<String?> mode(String dataDir) async {
-    final r = Process.runSync(binary, ['status', dataDir],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-        environment: sanitizedEnvironment(),
-        includeParentEnvironment: false);
+    final r = await _runBounded(binary, ['status', dataDir]);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     final mode = RegExp(r'"mode":"(\w+)"').firstMatch(payload)?.group(1);
     if (mode != null) return mode;
@@ -459,22 +483,14 @@ class VaultProcess {
   /// `dpapi`/`keychain`/`libsecret`=OS 安全存储 / `none`=slots 自包含。
   /// crypto 模式由本字段区分「OS 存储」与「文件密钥」两种实现；未初始化返回 null。
   static Future<String?> backend(String dataDir) async {
-    final r = Process.runSync(binary, ['status', dataDir],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-        environment: sanitizedEnvironment(),
-        includeParentEnvironment: false);
+    final r = await _runBounded(binary, ['status', dataDir]);
     final payload = _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     return RegExp(r'"backend":"(\w+)"').firstMatch(payload)?.group(1);
   }
 
   /// 全量销毁：删授权侧份额 + vault 文件 + 本地锚点/标记（密文不可恢复）。
-  static void destroy(String dataDir) {
-    final r = Process.runSync(binary, ['destroy', dataDir],
-        stdoutEncoding: utf8,
-        stderrEncoding: utf8,
-        environment: sanitizedEnvironment(),
-        includeParentEnvironment: false);
+  static Future<void> destroy(String dataDir) async {
+    final r = await _runBounded(binary, ['destroy', dataDir]);
     _parseSync(r.exitCode, r.stdout as String, r.stderr as String);
     for (final f in [_authFile(dataDir), _markerFile(dataDir)]) {
       try {
