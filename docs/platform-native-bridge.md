@@ -108,6 +108,7 @@ app/native/platform/
 int32_t apl_abi_version(void);           /* 契约版本，Dart 侧校验 */
 int32_t apl_init(void);                  /* 进程级一次；重复调用幂等 OK */
 int32_t apl_shutdown(void);              /* join 线程、释放抑制、注销媒体会话 */
+int32_t apl_harden_process(void);        /* 进程硬化：禁 core / 禁 ptrace（release 生效） */
 uint32_t apl_capabilities(void);         /* 能力位图 */
 ```
 

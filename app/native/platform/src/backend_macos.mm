@@ -22,6 +22,8 @@
 
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/ptrace.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -349,6 +351,19 @@ uint32_t caps() {
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
            CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
            CAP_SECURE_FILE;
+}
+
+int32_t hardenProcess() {
+#ifdef NDEBUG
+    // 1) 禁 core（本进程与子进程）
+    struct rlimit rl;
+    rl.rlim_cur = 0;
+    rl.rlim_max = 0;
+    setrlimit(RLIMIT_CORE, &rl);
+    // 2) 拒绝调试器/同用户 ptrace attach（取内存明文的主路径）
+    ptrace(PT_DENY_ATTACH, 0, 0, 0);
+#endif
+    return OK;
 }
 
 int32_t init() {
