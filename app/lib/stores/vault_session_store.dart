@@ -56,10 +56,14 @@ class VaultSessionStore implements SessionStore {
   final String defaultScheme;
 
   VaultSessionStore({String? dataDir, this.defaultScheme = 'crypto'})
-      : _dataDir = dataDir ?? resolveDataDir();
+    : _dataDir = dataDir ?? resolveDataDir();
 
   /// vault 当前可用（加载/持久化最近一次成功）。
   bool get vaultAvailable => _vaultOk;
+
+  /// 未解锁 / 不可用（含份额不配对、待恢复）→ 消费方不得把空会话当作「未登录」缓存。
+  @override
+  bool get isLocked => !_vaultOk;
 
   /// vault 模式：`crypto` | `m1` | `m2a` | `m2b`；未初始化/不可用返回 null。
   String? get mode => _mode;
@@ -116,8 +120,13 @@ class VaultSessionStore implements SessionStore {
   /// 成功后由调用方持久化偏好（本方法不触碰 prefs）。
   Future<void> setKdfPreset(String preset, {String? password}) async {
     final p = vaultKdfPresetById(preset);
-    await VaultProcess.setKdf(_dataDir,
-        m: p.mKiB, t: p.t, p: p.p, password: password ?? _sessionPassword);
+    await VaultProcess.setKdf(
+      _dataDir,
+      m: p.mKiB,
+      t: p.t,
+      p: p.p,
+      password: password ?? _sessionPassword,
+    );
   }
 
   /// 恢复解锁（m2a device.key 缺失）：用恢复码解锁并重新加载全部会话。
@@ -128,8 +137,11 @@ class VaultSessionStore implements SessionStore {
     try {
       final cache = <String, Map<String, String>>{};
       for (final platform in knownPlatforms) {
-        final raw = await VaultProcess.get(_dataDir, _uidFor(platform),
-            recoveryCode: recoveryCode);
+        final raw = await VaultProcess.get(
+          _dataDir,
+          _uidFor(platform),
+          recoveryCode: recoveryCode,
+        );
         if (raw == null) continue;
         final decoded = jsonDecode(utf8.decode(base64Decode(raw)));
         if (decoded is Map<String, dynamic>) {
@@ -232,8 +244,12 @@ class VaultSessionStore implements SessionStore {
   Future<void> _loadFromVault({String? password, String? recoveryCode}) async {
     await _migrateLegacy(password: password, recoveryCode: recoveryCode);
     for (final platform in knownPlatforms) {
-      final raw = await VaultProcess.get(_dataDir, _uidFor(platform),
-          password: password, recoveryCode: recoveryCode);
+      final raw = await VaultProcess.get(
+        _dataDir,
+        _uidFor(platform),
+        password: password,
+        recoveryCode: recoveryCode,
+      );
       if (raw == null) continue;
       final decoded = jsonDecode(utf8.decode(base64Decode(raw)));
       if (decoded is Map<String, dynamic>) {
@@ -256,8 +272,13 @@ class VaultSessionStore implements SessionStore {
           if (v is Map<String, dynamic>) {
             final cookies = v.map((k, val) => MapEntry(k, val.toString()));
             if (cookies.isNotEmpty) {
-              await VaultProcess.set(_dataDir, _uidFor(e.key), jsonEncode(cookies),
-                  password: password, recoveryCode: recoveryCode);
+              await VaultProcess.set(
+                _dataDir,
+                _uidFor(e.key),
+                jsonEncode(cookies),
+                password: password,
+                recoveryCode: recoveryCode,
+              );
               _cache[e.key] = cookies;
             }
           }
@@ -323,11 +344,20 @@ class VaultSessionStore implements SessionStore {
       _shareBroken = false; // 持久化成功（销毁重建后自动重建）→ 复位不配对标记
       final cookies = _cache[platform];
       if (cookies == null || cookies.isEmpty) {
-        await VaultProcess.delete(_dataDir, _uidFor(platform),
-            password: _sessionPassword, recoveryCode: _sessionRecoveryCode);
+        await VaultProcess.delete(
+          _dataDir,
+          _uidFor(platform),
+          password: _sessionPassword,
+          recoveryCode: _sessionRecoveryCode,
+        );
       } else {
-        await VaultProcess.set(_dataDir, _uidFor(platform), jsonEncode(cookies),
-            password: _sessionPassword, recoveryCode: _sessionRecoveryCode);
+        await VaultProcess.set(
+          _dataDir,
+          _uidFor(platform),
+          jsonEncode(cookies),
+          password: _sessionPassword,
+          recoveryCode: _sessionRecoveryCode,
+        );
       }
     } on VaultNeedRecoveryException catch (e) {
       // m2a device.key 缺失：标记待恢复（登录态仅内存保留，等待恢复流解锁）
