@@ -122,8 +122,15 @@ Future<void> main(List<String> args) async {
   final sessionStore = VaultSessionStore(defaultScheme: prefs.credentialScheme);
   await sessionStore.initialize();
   if (!sessionStore.vaultAvailable) {
-    // 凭据保险库不可用：登录态仅内存保留（不静默降级为明文持久化）
-    Log.w('vault', '凭据保险库不可用，登录态将不持久化（重启需重新登录）');
+    // 区分两种"不可用"：① m1/m2a **本会话未解锁**（启动期正常态，用户解开即可）
+    // ② 真正不可用（缺二进制/损坏/份额不配对）。前者不该报 WARN——那会把正常启动
+    // 刷成故障告警（2026-10-14 实录：每次启动都出现，被误读为"登录验证失败"）。
+    if (sessionStore.needsPassword || sessionStore.needsRecovery) {
+      Log.i('vault', '凭据保险库待解锁（本会话）：登录态将在解锁后恢复，未解锁期间仅内存');
+    } else {
+      // 凭据保险库不可用：登录态仅内存保留（不静默降级为明文持久化）
+      Log.w('vault', '凭据保险库不可用，登录态将不持久化（重启需重新登录）');
+    }
   }
   // 流媒体服务器凭据从 vault 预取进内存缓存（[load] 同步接口的凭据来源，
   // 首帧读取前完成，避免同步接口依赖异步会话）
