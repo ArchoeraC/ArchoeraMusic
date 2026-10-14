@@ -18,13 +18,17 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Archoera.Indexer;
+using Archoera.Text;
 
 namespace Archoera.Indexer.Bench;
 
 /// <summary>查询延迟测量 harness（in-process，排除进程启动开销）。</summary>
 public static class QueryBench
 {
-    /// <summary>代表查询（§8）：中文子串 / 中文短语 / 繁体 / 拼音连写 / 首字母 / 拉丁前缀 / 拉丁整词。</summary>
+    /// <summary>
+    /// 代表查询（§8）：中文子串 / 中文短语 / 繁体 / **中文 + 首字母支** / 拼音连写 /
+    /// **单音节拼音前缀** / 首字母 / 拉丁前缀 / 拉丁整词。
+    /// </summary>
     private sealed record QueryCase(string Name, string Text);
 
     private static readonly QueryCase[] Cases =
@@ -32,7 +36,9 @@ public static class QueryBench
         new("cjk_substring", "\u7231\u4f60"),          // 爱你
         new("cjk_phrase", "\u6211\u597d\u7231\u4f60"),  // 我好爱你
         new("traditional", "\u611b"),                    // 愛（繁体，查询侧归一）
-        new("pinyin_joined", "woaini"),
+        new("cjk_with_initials", "\u6211\u7231\u4f60"),  // 我爱你（拼音支 + 首字母支 wan）
+        new("pinyin_joined", "woaini"),                  // 连写拼音 → 相邻短语
+        new("pinyin_prefix", "wo"),                      // 单音节前缀（边打边搜）
         new("pinyin_initials", "wan"),
         new("latin_prefix", "love"),
         new("latin_word", "hello"),
@@ -55,13 +61,15 @@ public static class QueryBench
                 case "--index" when i + 1 < args.Length: index = args[++i]; break;
                 case "--label" when i + 1 < args.Length: label = args[++i]; break;
                 case "--pinyin" when i + 1 < args.Length: pinyinMode = args[++i]; break;
+                case "--cap" when i + 1 < args.Length: _candidateCap = int.Parse(args[++i]); break;
                 case "--out" when i + 1 < args.Length: outPath = args[++i]; break;
                 case "--repeats" when i + 1 < args.Length && int.TryParse(args[++i], out var r): repeats = r; break;
                 case "--warmup" when i + 1 < args.Length && int.TryParse(args[++i], out var w): warmup = w; break;
                 case "--limit" when i + 1 < args.Length && int.TryParse(args[++i], out var l): limit = l; break;
                 case "-h" or "--help":
                     Console.Error.WriteLine(
-                        "qbench --index <search.db> --label A --pinyin on|off [--repeats N] [--warmup N] [--limit N] [--out f.json]");
+                        "qbench --index <search.db> --label A --pinyin on|off [--repeats N] [--warmup N] "
+                        + "[--limit N] [--cap N] [--out f.json]");
                     return 0;
             }
         }
@@ -83,16 +91,19 @@ public static class QueryBench
 
         foreach (var q in Cases)
         {
-            var match = BuildMatch(q, withPinyin);
+            var passes = BuildPasses(q, withPinyin);
+            var expr = passes[0];
             var rows = 0;
+            var usedPasses = 1;
 
-            for (var i = 0; i < warmup; i++) rows = RunOnce(store, match, limit);
+            for (var i = 0; i < warmup; i++)
+                (rows, usedPasses) = RunProgressive(store, passes, limit);
 
             var samples = new List<double>(repeats);
             for (var i = 0; i < repeats; i++)
             {
                 var t0 = Stopwatch.GetTimestamp();
-                rows = RunOnce(store, match, limit);
+                (rows, usedPasses) = RunProgressive(store, passes, limit);
                 var t1 = Stopwatch.GetTimestamp();
                 samples.Add((t1 - t0) * 1000.0 / Stopwatch.Frequency);
             }
@@ -108,7 +119,8 @@ public static class QueryBench
             {
                 name = q.Name,
                 text = q.Text,
-                match,
+                match = expr,
+                passes = usedPasses,
                 rows,
                 count = samples.Count,
                 p50_ms = Round(p50),
@@ -119,7 +131,8 @@ public static class QueryBench
             });
 
             Console.WriteLine(
-                $"[{label}] {q.Name,-16} rows={rows,6} p50={p50,8:F3}ms p95={p95,8:F3}ms  expr={match}");
+                $"[{label}] {q.Name,-16} rows={rows,6} passes={usedPasses} " +
+                $"p50={p50,8:F3}ms p95={p95,8:F3}ms  expr={expr}");
         }
 
         pooled.Sort();
@@ -132,6 +145,7 @@ public static class QueryBench
             label,
             index = Path.GetFullPath(index),
             pinyin = withPinyin,
+            candidateCap = _candidateCap,
             repeats,
             warmup,
             limit,
@@ -153,52 +167,184 @@ public static class QueryBench
         return 0;
     }
 
+    /// <summary>生产候选上限（与 Dart `SearchIndex.defaultCandidateCap` 一致；`--cap 0` 关闭）。</summary>
+    private static int _candidateCap = FtsStore.DefaultCandidateCap;
+
     private static int RunOnce(FtsStore store, string matchExpr, int limit)
-        => store.Search(matchExpr, limit, 0).Count;
+        => store.Search(matchExpr, limit, 0, _candidateCap).Count;
 
     /// <summary>
-    /// 构造 FTS5 MATCH 表达式（查询侧同构语义，设计文档 §4）：
-    ///   - **中文查询**（含 CJK）：只用词元解释（CJK bigram+unigram），空格 = 隐式 AND；
-    ///   - **拉丁查询**：词元解释（拉丁整词，追加 `*` 前缀）；若查询侧分析出与整词不同的
-    ///     全拼音节序列（如 `woaini` → `wo ai ni`），追加拼音解释（末音节前缀），OR 组合；
-    ///     首字母形态（如 `wan`）作为单 token 存在于 pinyin 列，默认全列 MATCH 即可命中。
-    /// `--pinyin off`（B 组，拼音列留空）不追加拼音解释，模拟关闭拼音时的用户可见行为。
+    /// 按生产短路语义依次跑各趟，返回（命中数, 实际执行趟数）：**第一个非空趟即停**
+    /// （生产侧命中 ≥1 即短路，见 `SearchIndex.search`）。
     /// </summary>
-    private static string BuildMatch(QueryCase q, bool withPinyin)
+    private static (int Rows, int Passes) RunProgressive(
+        FtsStore store, List<string> passes, int limit)
     {
-        var analyzed = Analyzer.AnalyzeQuery(q.Text);
-        var lexical = analyzed.Lexical.Where(t => t.Length > 0).ToList();
-        var hasCjk = q.Text.Any(Analyzer.IsCjk);
-
-        var lexExpr = lexical.Count > 0 ? AndExpr(lexical) : null;
-
-        // 仅纯拉丁查询考虑拼音解释；中文查询保持纯词元（避免无谓放宽）。
-        string? pinyinExpr = null;
-        if (withPinyin && !hasCjk && analyzed.Pinyin.Count > 0)
+        for (var i = 0; i < passes.Count; i++)
         {
-            var syllables = string.Join(' ', analyzed.Pinyin);
-            var whole = string.Join(' ', lexical);
-            if (!string.Equals(syllables, whole, StringComparison.Ordinal))
-                pinyinExpr = PinyinExpr(analyzed.Pinyin);
+            var rows = RunOnce(store, passes[i], limit);
+            if (rows > 0) return (rows, i + 1);
         }
-
-        if (lexExpr is null && pinyinExpr is null) return "\"\"";
-        if (lexExpr is null) return pinyinExpr!;
-        if (pinyinExpr is null) return lexExpr;
-        return $"({lexExpr}) OR ({pinyinExpr})";
+        return (0, passes.Count);
     }
 
-    private static string AndExpr(IReadOnlyList<string> tokens)
-        => string.Join(" AND ", tokens.Select(
-            t => Quote(t) + (IsLatinOrDigit(t) ? "*" : string.Empty)));
-
-    /// <summary>全拼音节 AND（末音节前缀，支持边打边搜）。</summary>
-    private static string PinyinExpr(IReadOnlyList<string> tokens)
+    /// <summary>
+    /// 构造**渐进查询趟**——与生产查询路径同构（`search_query.dart` 的 `compileMatch` /
+    /// `compilePinyinLoose` / `compileCrossLingual` + `SearchIndex.search` 的短路语义）：
+    ///   1. **主趟**：词法支（连续 CJK bigram 引号短语 + unigram `AND`，末拉丁/数字 ≥3 字符
+    ///      加 `*`）+ 拼音支（单音节 ≥3 字符前缀；**≥2 音节相邻短语**）+ 首字母支
+    ///      （`{initials_meta_tok initials_lyrics_tok} : "x"*`，≥2 字符前缀）——各支 `OR`；
+    ///   2. **拼音宽松兜底趟**（主趟 0 命中时）：音节位置无关 `AND`（恢复漏字 / 换位召回）；
+    ///   3. **日文读音兜底趟**（v5，仍 0 命中时）：拉丁词元 → 字母 bigram `AND` 到读音列；
+    ///   4. **跨语言兜底趟**（仍 0 命中时）：T1 候选 `OR`。
+    /// 生产侧命中 ≥1 即短路，本 harness 用「第一个非空趟」复现同一行为与代价。
+    /// </summary>
+    private static List<string> BuildPasses(QueryCase q, bool withPinyin)
     {
-        var parts = new List<string>(tokens.Count);
-        for (var i = 0; i < tokens.Count; i++)
-            parts.Add(Quote(tokens[i]) + (i == tokens.Count - 1 ? "*" : string.Empty));
+        var analyzed = Analyzer.AnalyzeQuery(q.Text);
+        var passes = new List<string>();
+
+        var branches = new List<string>();
+        var lexExpr = LexicalExpr(analyzed.Lexical.Where(t => t.Length > 0).ToList());
+        if (lexExpr is not null) branches.Add(lexExpr);
+        if (withPinyin)
+        {
+            var pinyinExpr = PinyinExpr(analyzed.Pinyin);
+            if (pinyinExpr is not null) branches.Add(pinyinExpr);
+            var initialsExpr = InitialsExpr(analyzed.PinyinInitials);
+            if (initialsExpr is not null) branches.Add(initialsExpr);
+        }
+        if (branches.Count > 0)
+            passes.Add(branches.Count == 1 ? branches[0] : $"({string.Join(" OR ", branches)})");
+
+        // 拼音宽松兜底（位置无关 AND；末音节 ≥3 字符前缀）
+        if (withPinyin && analyzed.Pinyin.Count >= 2)
+        {
+            var syllables = analyzed.Pinyin.Where(t => t.Trim().Length > 0).ToList();
+            var parts = new List<string>(syllables.Count);
+            for (var i = 0; i < syllables.Count; i++)
+                parts.Add(Quote(syllables[i]) +
+                          (i == syllables.Count - 1 && syllables[i].Length >= MinPrefixTokenLength
+                              ? "*" : string.Empty));
+            passes.Add($"({LB}{PinyinColumns}{RB} : ({string.Join(" AND ", parts)}))");
+        }
+
+        // 日文读音兜底（v5）：拉丁 / 数字词元 → 字母 bigram AND（与生产 compileReading 同构）
+        var readingParts = new List<string>();
+        foreach (var token in analyzed.Lexical)
+        {
+            var lower = token.ToLowerInvariant();
+            if (lower.Length < 2) continue;
+            if (lower.EnumerateRunes().Any(r =>
+                    r.Value <= char.MaxValue &&
+                    (ScriptRanges.IsCjk((char)r.Value) || ScriptRanges.IsSubstringScript((char)r.Value))))
+                continue;
+            // 单个引号短语 = 相邻 bigram 序列（与生产 compileReading 的短语语义一致）
+            var bigrams = new List<string>();
+            for (var k = 0; k + 1 < lower.Length; k++) bigrams.Add(lower.Substring(k, 2));
+            if (bigrams.Count > 0) readingParts.Add(Quote(string.Join(' ', bigrams)));
+        }
+        if (readingParts.Count > 0)
+            passes.Add($"({LB}{ReadingColumns}{RB} : ({string.Join(" AND ", readingParts)}))");
+
+        var crossExpr = CrossLingualExpr(analyzed.CrossLingual);
+        if (crossExpr is not null) passes.Add(crossExpr);
+
+        if (passes.Count == 0) passes.Add("\"\"");
+        return passes;
+    }
+
+    /// <summary>前缀（边打边搜）的最小词元长度：与生产侧 <c>minPrefixTokenLength</c> 一致。</summary>
+    private const int MinPrefixTokenLength = 3;
+
+    /// <summary>首字母前缀的最小长度：与生产侧 <c>minInitialsPrefixLength</c> 一致。</summary>
+    private const int MinInitialsPrefixLength = 2;
+
+    /// <summary>词法支：连续 CJK bigram 合并为引号短语，其余逐个 `AND`；末拉丁 / 数字加前缀。</summary>
+    private static string? LexicalExpr(IReadOnlyList<string> tokens)
+    {
+        if (tokens.Count == 0) return null;
+
+        var chunks = new List<string>();
+        var i = 0;
+        while (i < tokens.Count)
+        {
+            if (IsCjkBigram(tokens[i]))
+            {
+                var j = i;
+                while (j < tokens.Count && IsCjkBigram(tokens[j])) j++;
+                var run = tokens.Skip(i).Take(j - i).ToList();
+                chunks.Add(Quote(run.Count >= 2 ? string.Join(' ', run) : run[0]));
+                i = j;
+            }
+            else
+            {
+                chunks.Add(Quote(tokens[i]));
+                i++;
+            }
+        }
+
+        var prefixLast = IsLatinOrDigit(tokens[^1]) && tokens[^1].Length >= MinPrefixTokenLength;
+        var parts = new List<string>(chunks.Count);
+        for (var k = 0; k < chunks.Count; k++)
+            parts.Add(k == chunks.Count - 1 && prefixLast ? chunks[k] + "*" : chunks[k]);
         return string.Join(" AND ", parts);
+    }
+
+    /// <summary>拼音支：≥2 音节相邻短语 `"wo ai ni"`；单音节 ≥3 字符前缀 `"hao"*`（否则精确）；空返回 null。</summary>
+    private static string? PinyinExpr(IReadOnlyList<string> tokens)
+    {
+        var clean = tokens.Where(t => t.Trim().Length > 0).ToList();
+        if (clean.Count == 0) return null;
+        if (clean.Count == 1)
+        {
+            var only = clean[0];
+            var body = Quote(only) + (only.Length >= MinPrefixTokenLength ? "*" : string.Empty);
+            return $"({{{PinyinColumns}}} : {body})";
+        }
+        return $"({{{PinyinColumns}}} : {Quote(string.Join(' ', clean))})";
+    }
+
+    /// <summary>FTS5 列过滤定界符（`{col1 col2} : expr`）。</summary>
+    private const string LB = "{";
+    private const string RB = "}";
+
+    /// <summary>拼音列集合（v4：元数据段 / 歌词段分列）。</summary>
+    private const string PinyinColumns = "pinyin_meta_tok pinyin_lyrics_tok";
+
+    /// <summary>首字母列集合（v4：元数据段 / 歌词段分列）。</summary>
+    private const string InitialsColumns = "initials_meta_tok initials_lyrics_tok";
+
+    /// <summary>日文读音列集合（v5：假名 / 汉字读音 → 罗马字字母 bigram）。</summary>
+    private const string ReadingColumns = "reading_meta_tok";
+
+    /// <summary>首字母支：列过滤到首字母两列（v4 分列）；末段 ≥2 字符前缀；空 / null 返回 null。</summary>
+    private static string? InitialsExpr(string? initials)
+    {
+        if (string.IsNullOrWhiteSpace(initials)) return null;
+        var parts = initials.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return null;
+        var body = string.Join(" AND ", parts.Select(
+            (t, i) => Quote(t) + (i == parts.Length - 1 && t.Length >= MinInitialsPrefixLength
+                ? "*" : string.Empty)));
+        return $"({{{InitialsColumns}}} : {body})";
+    }
+
+
+    /// <summary>跨语言支（T1）：候选逐个加引号后 `OR`（候选间 OR）；空返回 null。</summary>
+    private static string? CrossLingualExpr(IReadOnlyList<string> candidates)
+    {
+        var clean = candidates.Where(t => t.Trim().Length > 0).ToList();
+        if (clean.Count == 0) return null;
+        return clean.Count == 1
+            ? Quote(clean[0])
+            : "(" + string.Join(" OR ", clean.Select(Quote)) + ")";
+    }
+
+    private static bool IsCjkBigram(string token)
+    {
+        var runes = token.EnumerateRunes().ToList();
+        return runes.Count == 2 && runes.All(r => r.Value <= char.MaxValue && Analyzer.IsCjk((char)r.Value));
     }
 
     private static string Quote(string token) => "\"" + token.Replace("\"", "\"\"") + "\"";

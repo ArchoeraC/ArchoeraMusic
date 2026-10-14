@@ -182,6 +182,7 @@ class SInput extends StatefulWidget {
     this.keyboardType,
     this.enabled = true,
     this.obscureText = false,
+    this.onTapOutside,
   });
 
   final TextEditingController? controller;
@@ -197,6 +198,11 @@ class SInput extends StatefulWidget {
   final TextInputType? keyboardType;
   final bool enabled;
   final bool obscureText;
+
+  /// 透传给内部 [TextField] 的 `onTapOutside`（默认 `null` = Flutter 桌面端「点外部失焦」行为）。
+  /// 搜索栏把它设成空实现：收起改由外层 [TapRegion] 按**组**判定（面板算「内部」），
+  /// 否则点下拉面板会被当成「点外部」而先失焦收起（见 nav_header.dart）。
+  final ValueChanged<PointerDownEvent>? onTapOutside;
 
   @override
   State<SInput> createState() => _SInputState();
@@ -228,6 +234,7 @@ class _SInputState extends State<SInput> {
         textInputAction: widget.textInputAction,
         onSubmitted: widget.onSubmitted,
         onChanged: widget.onChanged,
+        onTapOutside: widget.onTapOutside,
         style: const TextStyle(fontSize: 13.5),
         cursorColor: scheme.primary,
         decoration: InputDecoration(

@@ -3,6 +3,18 @@
 本目录 `app/core/indexer` 为 ArchoeraMusic 的 C# / .NET 本地曲库搜索索引器，
 其自研代码随本软件以 AGPL-3.0 授权，第三方组件与数据按各自许可使用（逐项登记见下）。
 
+## 自带数据表（Unicode License）
+
+| 表 | 来源 | 许可证 | 说明 |
+|---|---|---|---|
+| `data/nfkc.tsv` | Python 标准库 `unicodedata`（NFKC） | **Unicode License** | 逐字符兼容折叠 |
+| `data/def_en2hanzi.tsv` / `data/def_hanzi2en.tsv` | Unihan **`kDefinition`** | **Unicode License** | 跨语言释义候选（T1，查询侧） |
+| `data/ja_readings.tsv` | Unihan **`kJapanese`** | **Unicode License** | 日文音读 + 训读（假名；索引期转罗马字写入 `reading_meta_tok`） |
+| `data/kana_romaji.tsv` | **自研**（标准罗马字事实） | 同本项目（AGPL-3.0-or-later） | 假名 → 罗马字（Hepburn 主拼 + Kunrei 变体） |
+
+> 三张 Unihan 派生表由 `tools/gen_hanzi_data.py` **确定、可重跑**生成（`reference/unihan/Unihan.zip`，
+> 经宿主机代理下载，仅生成期需要；产物随仓库提交以便审计）。
+
 ## NuGet 依赖
 
 | 组件 | 版本 | 许可证 | 说明 |

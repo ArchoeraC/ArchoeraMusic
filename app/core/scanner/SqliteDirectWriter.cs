@@ -52,6 +52,7 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         EnsureTracksTable();
         EnsureStageTable();
         EnsureLoudnessColumns(); // 旧库补列（幂等；新建库已在 CREATE 中含列）
+        EnsureSidecarColumns();  // 同上：.lrc 侧车列（v3）
 
         // 读连接（WAL 下可并发读）
         _readConn = new SqliteConnection($"Data Source={dbPath}");
@@ -125,18 +126,24 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
 
     // ============ 读操作（独立读连接 + 锁，调用线程同步执行） ============
 
-    public Task<ConcurrentDictionary<string, (long Mtime, long Size)>> LoadTrackSnapshotAsync(CancellationToken ct = default)
+    public Task<ConcurrentDictionary<string, TrackSnapshot>> LoadTrackSnapshotAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var dict = new ConcurrentDictionary<string, (long, long)>(StringComparer.Ordinal);
+        var dict = new ConcurrentDictionary<string, TrackSnapshot>(StringComparer.Ordinal);
         lock (_readLock)
         {
             using var cmd = _readConn.CreateCommand();
-            cmd.CommandText = "SELECT path, COALESCE(file_mtime, 0), COALESCE(file_size, 0) FROM tracks";
+            // .lrc 侧车状态一并载入：媒体未变但侧车变化（或存量库 lrc_checked 为空）
+            // 时仍需补一次侧车列，故不能只看 (mtime, size)。
+            cmd.CommandText =
+                "SELECT path, COALESCE(file_mtime, 0), COALESCE(file_size, 0), " +
+                "COALESCE(lrc_mtime, 0), COALESCE(lrc_size, 0), COALESCE(lrc_checked, 0) FROM tracks";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                dict[reader.GetString(0)] = (reader.GetInt64(1), reader.GetInt64(2));
+                dict[reader.GetString(0)] = new TrackSnapshot(
+                    reader.GetInt64(1), reader.GetInt64(2),
+                    reader.GetInt64(3), reader.GetInt64(4), reader.GetInt64(5) != 0);
             }
         }
         return Task.FromResult(dict);
@@ -223,12 +230,14 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                     (id, path, title, track, artists, album, duration, cover,
                      codec, sample_rate, bit_rate, channels, bits_per_sample,
                      file_size, file_mtime, file_ctime, scanned_at, lyrics,
-                     loudness_lufs, loudness_peak)
+                     loudness_lufs, loudness_peak,
+                     lyrics_lrc, lyrics_lrc_trans, lyrics_lrc_romaji, lrc_mtime, lrc_size, lrc_checked)
                 SELECT
                     id, path, title, track, artists, album, duration, cover,
                     codec, sample_rate, bit_rate, channels, bits_per_sample,
                     file_size, file_mtime, file_ctime, scanned_at, lyrics,
-                    loudness_lufs, loudness_peak
+                    loudness_lufs, loudness_peak,
+                    lyrics_lrc, lyrics_lrc_trans, lyrics_lrc_romaji, lrc_mtime, lrc_size, lrc_checked
                 FROM _scanner_stage_tracks
                 WHERE true
                 ON CONFLICT(id) DO UPDATE SET
@@ -251,7 +260,21 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                     lyrics = excluded.lyrics,
                     -- 普通扫描（未开 --analyze-loudness）staging 为 NULL：保留已分析值。
                     loudness_lufs = COALESCE(excluded.loudness_lufs, tracks.loudness_lufs),
-                    loudness_peak = COALESCE(excluded.loudness_peak, tracks.loudness_peak);
+                    loudness_peak = COALESCE(excluded.loudness_peak, tracks.loudness_peak),
+                    -- .lrc 侧车：本轮**探测过**（`lrc_checked` 非空）就照 staging 原值取
+                    -- ——包括「侧车被删掉」时的 NULL（否则会残留旧文本）；
+                    -- 本轮未探测（staging 为 NULL）才保留既有值。
+                    lyrics_lrc = CASE WHEN excluded.lrc_checked IS NULL
+                        THEN tracks.lyrics_lrc ELSE excluded.lyrics_lrc END,
+                    lyrics_lrc_trans = CASE WHEN excluded.lrc_checked IS NULL
+                        THEN tracks.lyrics_lrc_trans ELSE excluded.lyrics_lrc_trans END,
+                    lyrics_lrc_romaji = CASE WHEN excluded.lrc_checked IS NULL
+                        THEN tracks.lyrics_lrc_romaji ELSE excluded.lyrics_lrc_romaji END,
+                    lrc_mtime = CASE WHEN excluded.lrc_checked IS NULL
+                        THEN tracks.lrc_mtime ELSE excluded.lrc_mtime END,
+                    lrc_size = CASE WHEN excluded.lrc_checked IS NULL
+                        THEN tracks.lrc_size ELSE excluded.lrc_size END,
+                    lrc_checked = COALESCE(excluded.lrc_checked, tracks.lrc_checked);
                 DELETE FROM _scanner_stage_tracks;
             ";
             cmd.ExecuteNonQuery();
@@ -435,7 +458,13 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                 scanned_at INTEGER NOT NULL,
                 lyrics TEXT,
                 loudness_lufs REAL,
-                loudness_peak REAL
+                loudness_peak REAL,
+                lyrics_lrc TEXT,
+                lyrics_lrc_trans TEXT,
+                lyrics_lrc_romaji TEXT,
+                lrc_mtime INTEGER,
+                lrc_size INTEGER,
+                lrc_checked INTEGER
             );
             CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
             CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album);
@@ -467,7 +496,13 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                 scanned_at INTEGER NOT NULL,
                 lyrics TEXT,
                 loudness_lufs REAL,
-                loudness_peak REAL
+                loudness_peak REAL,
+                lyrics_lrc TEXT,
+                lyrics_lrc_trans TEXT,
+                lyrics_lrc_romaji TEXT,
+                lrc_mtime INTEGER,
+                lrc_size INTEGER,
+                lrc_checked INTEGER
             )
         ";
         cmd.ExecuteNonQuery();
@@ -482,12 +517,28 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
                 (id, path, title, track, artists, album, duration, cover,
                  codec, sample_rate, bit_rate, channels, bits_per_sample,
                  file_size, file_mtime, file_ctime, scanned_at, lyrics,
-                 loudness_lufs, loudness_peak)
+                 loudness_lufs, loudness_peak,
+                 lyrics_lrc, lyrics_lrc_trans, lyrics_lrc_romaji, lrc_mtime, lrc_size, lrc_checked)
             VALUES
                 (@id, @path, @title, @track, @artists, @album, @duration, @cover,
                  @codec, @sampleRate, @bitRate, @channels, @bitsPerSample,
                  @fileSize, @fileMtime, @fileCtime, @scannedAt, @lyrics,
-                 @loudnessLufs, @loudnessPeak)
+                 @loudnessLufs, @loudnessPeak,
+                 @lyricsLrc, @lyricsLrcTrans, @lyricsLrcRomaji, @lrcMtime, @lrcSize, @lrcChecked)
+        ";
+
+        // 仅侧车变更（媒体未变）的项走 UPDATE：只写 .lrc 列 + 锚点，绝不覆盖已解析的元数据。
+        using var sidecarCmd = _conn.CreateCommand();
+        sidecarCmd.Transaction = tx;
+        sidecarCmd.CommandText = @"
+            UPDATE tracks SET
+                lyrics_lrc = @lyricsLrc,
+                lyrics_lrc_trans = @lyricsLrcTrans,
+                lyrics_lrc_romaji = @lyricsLrcRomaji,
+                lrc_mtime = @lrcMtime,
+                lrc_size = @lrcSize,
+                lrc_checked = @lrcChecked
+            WHERE id = @id
         ";
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -495,6 +546,20 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
         foreach (var t in tracks)
         {
             ct.ThrowIfCancellationRequested();
+
+            if (t.SidecarOnly)
+            {
+                sidecarCmd.Parameters.Clear();
+                sidecarCmd.Parameters.AddWithValue("@id", t.Id);
+                sidecarCmd.Parameters.AddWithValue("@lyricsLrc", (object?)t.LyricsLrc ?? DBNull.Value);
+                sidecarCmd.Parameters.AddWithValue("@lyricsLrcTrans", (object?)t.LyricsLrcTrans ?? DBNull.Value);
+                sidecarCmd.Parameters.AddWithValue("@lyricsLrcRomaji", (object?)t.LyricsLrcRomaji ?? DBNull.Value);
+                sidecarCmd.Parameters.AddWithValue("@lrcMtime", (object?)t.LrcMtime ?? DBNull.Value);
+                sidecarCmd.Parameters.AddWithValue("@lrcSize", (object?)t.LrcSize ?? DBNull.Value);
+                sidecarCmd.Parameters.AddWithValue("@lrcChecked", (object?)t.LrcChecked ?? DBNull.Value);
+                sidecarCmd.ExecuteNonQuery();
+                continue;
+            }
 
             cmd.Parameters.Clear();
             cmd.Parameters.AddWithValue("@id", t.Id);
@@ -520,6 +585,12 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
             cmd.Parameters.AddWithValue("@lyrics", (object?)t.Lyrics ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@loudnessLufs", (object?)t.LoudnessLufs ?? DBNull.Value);
             cmd.Parameters.AddWithValue("@loudnessPeak", (object?)t.LoudnessPeak ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@lyricsLrc", (object?)t.LyricsLrc ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@lyricsLrcTrans", (object?)t.LyricsLrcTrans ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@lyricsLrcRomaji", (object?)t.LyricsLrcRomaji ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@lrcMtime", (object?)t.LrcMtime ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@lrcSize", (object?)t.LrcSize ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@lrcChecked", (object?)t.LrcChecked ?? DBNull.Value);
 
             cmd.ExecuteNonQuery();
         }
@@ -600,6 +671,45 @@ public sealed class SqliteDirectWriter : IScannerDatabase, IDisposable
             alter.ExecuteNonQuery();
         }
     }
+
+    /// <summary>
+    /// 幂等迁移：为**已存在**的 tracks / staging 表补 <c>.lrc</c> 侧车列
+    /// （新建库已在 CREATE TABLE 中带列）。列类型不同，故单独处理（见 <see cref="EnsureLoudnessColumns"/>）。
+    /// </summary>
+    private void EnsureSidecarColumns()
+    {
+        EnsureSidecarColumnsOn(_conn, "tracks");
+        EnsureSidecarColumnsOn(_conn, "_scanner_stage_tracks");
+    }
+
+    private static void EnsureSidecarColumnsOn(SqliteConnection c, string table)
+    {
+        var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var probe = c.CreateCommand())
+        {
+            probe.CommandText = $"PRAGMA table_info({table})";
+            using var reader = probe.ExecuteReader();
+            while (reader.Read()) existing.Add(reader.GetString(1));
+        }
+        foreach (var (col, type) in SidecarColumns)
+        {
+            if (existing.Contains(col)) continue;
+            using var alter = c.CreateCommand();
+            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {col} {type}";
+            alter.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>.lrc 侧车列（顺序固定；迁移 / CREATE 共用）。新增列只需追加，勿改动既有名字。</summary>
+    private static readonly (string Name, string Type)[] SidecarColumns =
+    {
+        ("lyrics_lrc", "TEXT"),
+        ("lyrics_lrc_trans", "TEXT"),
+        ("lyrics_lrc_romaji", "TEXT"),
+        ("lrc_mtime", "INTEGER"),
+        ("lrc_size", "INTEGER"),
+        ("lrc_checked", "INTEGER"),
+    };
 
     /// <summary>响度分析列（顺序固定；迁移/CREATE 共用）。</summary>
     private static readonly string[] LoudnessColumns = { "loudness_lufs", "loudness_peak" };

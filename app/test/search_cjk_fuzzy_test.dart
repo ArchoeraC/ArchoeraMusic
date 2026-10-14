@@ -13,6 +13,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:archoera_music/services/search/search_cjk_fuzzy.dart';
 
 void main() {
+  group('子串脚本范围（汉字 / 假名 / 谚文）', () {
+    test('假名 / 谚文也算「需要子串索引」，故容错同样启用', () {
+      expect(queryHasCjk('きゅうくらりん'), isTrue);
+      expect(queryHasCjk('한국어노래'), isTrue);
+      // 纯拉丁 / 数字仍为 false（走拉丁模糊趟）
+      expect(queryHasCjk('hello'), isFalse);
+    });
+
+    test('isCjkCodeUnit 只认汉字（拼音高亮用）', () {
+      expect(isCjkCodeUnit('周'.codeUnitAt(0)), isTrue);
+      expect(isCjkCodeUnit('き'.codeUnitAt(0)), isFalse, reason: '假名没有拼音');
+      expect(isIndexedScriptCodeUnit('き'.codeUnitAt(0)), isTrue);
+    });
+  });
+
   group('queryHasCjk', () {
     test('纯 CJK / 中英混合为真，纯拉丁为假', () {
       expect(queryHasCjk('周杰伦'), isTrue);

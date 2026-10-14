@@ -59,7 +59,51 @@ public sealed class TrackMetadata
     [JsonConverter(typeof(LongTimestampConverter))]
     public long Ctime { get; set; } // 毫秒
     public string? Lyrics { get; set; }
+
+    // ---- .lrc 侧车（v3：**扫描器负责解析并写库**，索引器 / 播放侧只读 DB）----
+    // 存**原始文本**（含时间轴 / 标签）：播放侧可直接当 LRC 解析，索引器经共享
+    // LrcReader.FromRawTexts 拆「原文 / 译文 / 音译」三层——两侧共用一份实现。
+
+    /// <summary>主 <c>.lrc</c>（与音频同名）原始文本；无侧车为 <c>null</c>。</summary>
+    public string? LyricsLrc { get; set; }
+
+    /// <summary>显式译文侧车 <c>&lt;name&gt;.trans.lrc</c> 原始文本；无则 <c>null</c>。</summary>
+    public string? LyricsLrcTrans { get; set; }
+
+    /// <summary>显式音译侧车 <c>&lt;name&gt;.romaji.lrc</c> 原始文本；无则 <c>null</c>。</summary>
+    public string? LyricsLrcRomaji { get; set; }
+
+    /// <summary>
+    /// 侧车聚合 mtime（Unix 毫秒；无侧车为 0）。<c>null</c> = 本轮**未探测**侧车
+    /// （写库时保留既有值，避免未开 .lrc 的扫描把已写入的侧车清掉）——索引器脏集判定锚点。
+    /// </summary>
+    public long? LrcMtime { get; set; }
+
+    /// <summary>侧车聚合字节大小（无侧车为 0；<c>null</c> = 未探测）——索引器脏集判定锚点。</summary>
+    public long? LrcSize { get; set; }
+
+    /// <summary>
+    /// 本次已探测过侧车（写 1）。用于**存量库一次性补齐**：旧库该列为 0 / NULL 时，
+    /// 即使媒体未变也要在这一轮解析侧车（只读 <c>.lrc</c>，不重解析标签）。
+    /// </summary>
+    public long? LrcChecked { get; set; }
+
+    /// <summary>
+    /// **仅更新侧车列**（媒体未变、但侧车新增 / 改动 / 首次补齐时使用）：
+    /// 队列里这类项走 UPDATE（只写 <c>lyrics_lrc*</c> / <c>lrc_*</c>），不进 staging，
+    /// 避免用默认值覆盖已解析的元数据。
+    /// </summary>
+    [JsonIgnore]
+    public bool SidecarOnly { get; set; }
 }
+
+/// <summary>
+/// 增量扫描快照项：媒体 <c>(mtime, size)</c> + scanner 已写入的 <c>.lrc</c> 侧车状态。
+/// 媒体与侧车都未变才整首跳过；侧车变化（或 <paramref name="LrcChecked"/> 为 false 的存量库）
+/// 只补一次侧车列。
+/// </summary>
+public readonly record struct TrackSnapshot(
+    long Mtime, long Size, long LrcMtime, long LrcSize, bool LrcChecked);
 
 public sealed class ArtistRef
 {

@@ -158,7 +158,14 @@ CREATE TABLE IF NOT EXISTS tracks (
     scanned_at INTEGER NOT NULL,
     lyrics TEXT,
     loudness_lufs REAL,
-    loudness_peak REAL
+    loudness_peak REAL,
+    -- .lrc 侧车：**扫描器**解析写入（索引器 / 播放侧只读 DB；见 shared/lyrics/LrcReader.cs）
+    lyrics_lrc TEXT,
+    lyrics_lrc_trans TEXT,
+    lyrics_lrc_romaji TEXT,
+    lrc_mtime INTEGER,
+    lrc_size INTEGER,
+    lrc_checked INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
 CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album);
@@ -198,6 +205,18 @@ def generate(out_dir: str, tracks: int, seed: int, min_kb: int, max_kb: int,
             total_lyrics_bytes += len(lyrics.encode("utf-8"))
             mtime = 1_600_000_000_000 + i * 1000
 
+            # 约 50% 曲目有同名侧车（确定性：由 per-track rng 决定）。
+            # 侧车**内容照写文件**（贴近真实磁盘布局），但库里的 `lyrics_lrc*` 才是
+            # 索引器读取的来源——扫描器就该把这些列写进去（本生成器扮演扫描器）。
+            lrc_text = None
+            if rng.random() < lrc_ratio:
+                lrc_text = gen_lrc(rng, lyrics)
+                with open(os.path.join(audio_dir, f"{tid}.lrc"), "w", encoding="utf-8") as f:
+                    f.write(lrc_text)
+                lrc_count += 1
+
+            lrc_m = (mtime + 1) if lrc_text is not None else 0
+            lrc_s = len(lrc_text.encode("utf-8")) if lrc_text is not None else 0
             rows.append((
                 tid, path, title, rng.randint(1, 20),
                 json.dumps(artists, ensure_ascii=False),
@@ -209,20 +228,16 @@ def generate(out_dir: str, tracks: int, seed: int, min_kb: int, max_kb: int,
                 rng.randint(3_000_000, 12_000_000), mtime,
                 mtime - rng.randint(0, 86_400_000), 1_700_000_000_000,
                 lyrics, None, None,
+                lrc_text, None, None, lrc_m, lrc_s, 1,
             ))
-
-            # 约 50% 曲目写同名侧车（确定性：由 per-track rng 决定）。
-            if rng.random() < lrc_ratio:
-                with open(os.path.join(audio_dir, f"{tid}.lrc"), "w", encoding="utf-8") as f:
-                    f.write(gen_lrc(rng, lyrics))
-                lrc_count += 1
 
         conn.executemany(
             """INSERT INTO tracks
                (id, path, title, track, artists, album, duration, codec, sample_rate,
                 bit_rate, channels, bits_per_sample, file_size, file_mtime, file_ctime,
-                scanned_at, lyrics, loudness_lufs, loudness_peak)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                scanned_at, lyrics, loudness_lufs, loudness_peak,
+                lyrics_lrc, lyrics_lrc_trans, lyrics_lrc_romaji, lrc_mtime, lrc_size, lrc_checked)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             rows,
         )
         conn.commit()

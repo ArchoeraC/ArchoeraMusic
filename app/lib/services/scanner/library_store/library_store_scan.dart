@@ -55,6 +55,17 @@ mixin _LibraryStoreScan on Notifier<LibraryState>, _LibraryStoreCore {
         scanErrors: result.errors,
       );
       await _reloadTracks();
+      // 扫描 → 索引收敛（与 scanner 曲库的键联动）：曲库变了而 `search.db` 还是旧的，
+      // 新曲目就搜不到——索引就绪时查询**不再回退 `LIKE`**，旧的父键（`tracks.id` =
+      // md5(path)）集合会直接漏掉新增曲目、并可能残留已删除的 id（查询侧虽会剔除
+      // 已不存在的 id，但新增曲目无从出现）。故扫描完成后按脏集增量收敛。
+      //
+      // 只在**索引已就绪**时收敛：未就绪时首次构建本就基于最新曲库；总开关关闭时
+      // 索引已关闭（[SearchService.indexReady] 为 false）且 [SearchService.reindex]
+      // 内部零成本返回，符合「关闭态零成本」。
+      if (SearchService.instance.indexReady) {
+        unawaited(SearchService.instance.reindex());
+      }
     } catch (e) {
       state = state.copyWith(scanning: false, error: e.toString());
     } finally {

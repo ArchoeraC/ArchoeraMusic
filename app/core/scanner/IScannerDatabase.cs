@@ -21,10 +21,10 @@ public interface IScannerDatabase
     Task MergeStagedTracksAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// 加载所有曲目的快照（path → (mtime, size)），用于增量扫描比对。
+    /// 加载所有曲目的快照（path → 媒体 mtime/size + .lrc 侧车状态），用于增量扫描比对。
     /// 快照中的残留 = 磁盘已删除的文件，由调用方负责清理。
     /// </summary>
-    Task<ConcurrentDictionary<string, (long Mtime, long Size)>> LoadTrackSnapshotAsync(CancellationToken ct = default);
+    Task<ConcurrentDictionary<string, TrackSnapshot>> LoadTrackSnapshotAsync(CancellationToken ct = default);
 
     /// <summary>删除指定路径列表的曲目</summary>
     Task<int> DeleteTracksByPathsAsync(List<string> paths, CancellationToken ct = default);

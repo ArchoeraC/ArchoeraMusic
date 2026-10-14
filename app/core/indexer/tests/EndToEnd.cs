@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Text;
+using Archoera.Lyrics;
 using Microsoft.Data.Sqlite;
 
 namespace Archoera.Indexer.Tests;
@@ -29,6 +30,7 @@ internal static class EndToEnd
             FullAndIncremental(root);
             MissingScannerMeta(root);
             LrcReading(root);
+            SidecarDirectoryCache(root);
             MultilingualLayers(root);
         }
         finally
@@ -67,9 +69,13 @@ internal static class EndToEnd
             InsertTrack(conn, "t4", song4, "Delete Me", "[]", null, "将被删除", 4000);
         }
 
-        // 侧车歌词（t3）：含时间轴 / 元数据标签，应只取文本行
-        File.WriteAllText(Path.Combine(dirB, "song3.lrc"),
-            "[by:test]\n[00:01.00]蓝蓝的天\n[00:02.50]白云飘\n", new UTF8Encoding(false));
+        // 侧车歌词（t3）：由**扫描器写入 library.db**（索引器只读 DB）。
+        // 含时间轴 / 元数据标签，索引器经共享 LrcReader.FromRawTexts 只取文本行。
+        using (var conn = Open(db))
+        {
+            SetSidecar(conn, "t3",
+                "[by:test]\n[00:01.00]蓝蓝的天\n[00:02.50]白云飘\n");
+        }
 
         // ---- 全量构建 ----
         var full = RunEngine(db, index, full: true, lrc: false);
@@ -81,8 +87,8 @@ internal static class EndToEnd
         Program.Check("世代化: 无 search.db.tmp", !File.Exists(index + ".tmp"));
         Program.Check("世代化: 无 search.db.tmp-wal", !File.Exists(index + ".tmp-wal"));
 
-        Program.Check("meta.analyzer_version==5", Meta(index, "analyzer_version") == "5", Meta(index, "analyzer_version"));
-        Program.Check("meta.schema_version==2", Meta(index, "schema_version") == "2", Meta(index, "schema_version"));
+        Program.Check("meta.analyzer_version==6", Meta(index, "analyzer_version") == "6", Meta(index, "analyzer_version"));
+        Program.Check("meta.schema_version==5", Meta(index, "schema_version") == "5", Meta(index, "schema_version"));
         Program.Check("meta.index_lrc==0", Meta(index, "index_lrc") == "0", Meta(index, "index_lrc"));
         Program.Check("meta.pinyin==1", Meta(index, "pinyin") == "1", Meta(index, "pinyin"));
         Program.Check("meta.applied_generation==5", Meta(index, "applied_generation") == "5", Meta(index, "applied_generation"));
@@ -96,8 +102,8 @@ internal static class EndToEnd
         Program.Check("contentless: search_docs 仅 7 列元数据",
             Scalar(index, "SELECT COUNT(*) FROM pragma_table_info('search_docs')") == 7,
             Scalar(index, "SELECT COUNT(*) FROM pragma_table_info('search_docs')").ToString());
-        Program.Check("contentless: search_docs 无 token 文本列（title_tok/pinyin_tok）",
-            Scalar(index, "SELECT COUNT(*) FROM pragma_table_info('search_docs') WHERE name IN ('title_tok','pinyin_tok')") == 0);
+        Program.Check("contentless: search_docs 无 token 文本列（title_tok/pinyin_meta_tok）",
+            Scalar(index, "SELECT COUNT(*) FROM pragma_table_info('search_docs') WHERE name IN ('title_tok','pinyin_meta_tok')") == 0);
         Program.Check("contentless: 列过滤 {title_tok} : (\"晴天\") 命中 t1",
             MatchContainsTrack(index, "{title_tok} : (\"晴天\")", "t1"));
         Program.Check("contentless: 短语 \"wo ai ni\" 命中 t1",
@@ -116,17 +122,30 @@ internal static class EndToEnd
             MatchCount(index, "愛").ToString());
         Program.Check("MATCH 分析('愛') 命中 t2", MatchCount(index, Analyzed("愛")) >= 1);
         Program.Check("分析('愛') 命中 t2 的 doc", MatchContainsTrack(index, Analyzed("愛"), "t2"));
-        // 拼音（全拼短语）与首字母（单 token）
+        // 拼音（全拼相邻短语）与首字母（v4：元数据/歌词分列）
         Program.Check("MATCH pinyin 短语 'wo ai ni' 命中 t1", MatchContainsTrack(index, "\"wo ai ni\"", "t1"));
         Program.Check("MATCH 首字母 'wanzg' 命中 t1", MatchContainsTrack(index, "wanzg", "t1"));
-        // P4 连写全拼：查询侧把 woaini 切为 wo/ai/ni，末音节前缀 → 命中 t1（镜像 Dart compileMatch）
+        // v4 分列：**元数据**首字母（晴天 → qt）在 initials_meta_tok；
+        // **歌词**首字母（我爱你中国 → wanzg）在 initials_lyrics_tok。
+        Program.Check("首字母列过滤 {initials_meta_tok} : 'qt'（标题首字母）命中 t1",
+            MatchContainsTrack(index, "{initials_meta_tok} : \"qt\"", "t1"));
+        Program.Check("首字母列过滤 {initials_lyrics_tok} : 'wanzg'（歌词首字母）命中 t1",
+            MatchContainsTrack(index, "{initials_lyrics_tok} : \"wanzg\"", "t1"));
+        Program.Check("歌词首字母不在 initials_meta_tok（v4 分列）",
+            !MatchContainsTrack(index, "{initials_meta_tok} : \"wanzg\"", "t1"));
+        // 首字母串（wan / wanzg…）不在拼音两列 → 拼音列过滤下不命中
+        Program.Check("拼音两列 : 'wanzg' 不命中（首字母已拆出）",
+            !MatchContainsTrack(index, "{pinyin_meta_tok pinyin_lyrics_tok} : \"wanzg\"", "t1"));
+        // v4 分列：歌词拼音不在元数据拼音列 → 元数据范围的列过滤收得住（旧版混列时收不住）
+        Program.Check("歌词拼音不在 pinyin_meta_tok（v4 分列）",
+            MatchContainsTrack(index, "{pinyin_lyrics_tok} : \"wo ai ni\"", "t1")
+            && !MatchContainsTrack(index, "{pinyin_meta_tok} : \"wo ai ni\"", "t1"));
+        // 连写全拼（查询侧 woaini → wo ai ni，镜像 Dart compileMatch 的相邻短语）
         var woaini = Analyzer.AnalyzeQuery("woaini").Pinyin;
         Program.Check("E2E 连写全拼分析 == wo ai ni", string.Join(' ', woaini) == "wo ai ni",
             string.Join(' ', woaini));
-        var woainiExpr = string.Join(" AND ", woaini.Select(
-            (t, i) => $"\"{t}\"{(i == woaini.Count - 1 ? "*" : string.Empty)}"));
-        Program.Check($"MATCH 连写全拼表达式 {woainiExpr} 命中 t1",
-            MatchContainsTrack(index, woainiExpr, "t1"), woainiExpr);
+        Program.Check("MATCH 连写全拼短语 \"wo ai ni\" 命中 t1",
+            MatchContainsTrack(index, "\"wo ai ni\"", "t1"));
         // 拉丁前缀 / 整词
         Program.Check("MATCH 'hello' 命中 t3", MatchContainsTrack(index, "hello", "t3"));
         Program.Check("MATCH 前缀 'hel*' 命中 t3", MatchContainsTrack(index, "hel*", "t3"));
@@ -205,6 +224,95 @@ internal static class EndToEnd
     }
 
     /* ------------------------------------------------------------------ */
+    /* .lrc 目录清单缓存（O(曲目 × 目录条目) → O(曲目 + 目录条目)）          */
+    /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 侧车目录清单缓存的语义：命中 / 大小写不敏感 / 确定性取文件名序最小者 /
+    /// 三类侧车（主 · trans · romaji）/ 目录内容变动后立即可见 / 显式清空缓存。
+    /// </summary>
+    private static void SidecarDirectoryCache(string root)
+    {
+        var dir = Path.Combine(root, "sidecar-cache");
+        Directory.CreateDirectory(dir);
+        var audio = Path.Combine(dir, "song.mp3");
+
+        LrcReader.ResetDirectoryCache();
+        Program.Check("lrc 缓存: 空目录无侧车", LrcReader.FindSidecar(audio) is null,
+            LrcReader.FindSidecar(audio) ?? "(null)");
+
+        // 主侧车（小写）+ 显式分层侧车：一次目录枚举后应三类都能解析
+        var main = Path.Combine(dir, "song.lrc");
+        var trans = Path.Combine(dir, "song.TRANS.LRC"); // 大小写不敏感
+        var romaji = Path.Combine(dir, "song.romaji.lrc");
+        File.WriteAllText(main, "[00:01.00]原文\n", new UTF8Encoding(false));
+        File.WriteAllText(trans, "译文\n", new UTF8Encoding(false));
+        File.WriteAllText(romaji, "yi wen\n", new UTF8Encoding(false));
+        LrcReader.ResetDirectoryCache();
+
+        var layers = LrcReader.Read(audio);
+        Program.Check("lrc 缓存: 主侧车命中", layers.Exists && layers.Text == "原文", layers.Text);
+        Program.Check("lrc 缓存: 译文层命中", layers.Translation == "译文", layers.Translation);
+        Program.Check("lrc 缓存: 音译层命中", layers.Romaji == "yi wen", layers.Romaji);
+
+        // 同名多份（仅大小写 / 名字序不同）→ 取文件名序（Ordinal）最小者，确定性
+        var dupUpper = Path.Combine(dir, "SONG.lrc");
+        var dupLower = Path.Combine(dir, "Song.lrc");
+        File.WriteAllText(dupUpper, "[00:01.00]大写\n", new UTF8Encoding(false));
+        File.WriteAllText(dupLower, "[00:01.00]小写\n", new UTF8Encoding(false));
+        LrcReader.ResetDirectoryCache();
+        // Ordinal 序：'S'(0x53) < 's'(0x73)，且 'O'(0x4F) < 'o'(0x6F) → SONG.lrc 胜出
+        Program.Check("lrc 缓存: 同名取 Ordinal 最小者", LrcReader.FindSidecar(audio) == dupUpper,
+            Path.GetFileName(LrcReader.FindSidecar(audio) ?? "(null)"));
+
+        // 新增侧车且**目录 mtime 前进**（显式推进，避免依赖 FS 时间粒度）→ 缓存失效、立即可见
+        var added = Path.Combine(dir, "added.mp3");
+        Program.Check("lrc 缓存: 新曲目初始无侧车", LrcReader.FindSidecar(added) is null);
+        var addedLrc = Path.Combine(dir, "added.lrc");
+        File.WriteAllText(addedLrc, "[00:01.00]新增\n", new UTF8Encoding(false));
+        Directory.SetLastWriteTimeUtc(dir, Directory.GetLastWriteTimeUtc(dir).AddSeconds(2));
+        Program.Check("lrc 缓存: 目录 mtime 变化后可见", LrcReader.FindSidecar(added) == addedLrc,
+            Path.GetFileName(LrcReader.FindSidecar(added) ?? "(null)"));
+
+        // 显式清空缓存（每次构建开始前调用）：清后仍能正确解析
+        Program.Check("lrc 缓存: Reset 返回清理条目数", LrcReader.ResetDirectoryCache() >= 1);
+        Program.Check("lrc 缓存: Reset 后主侧车仍命中", LrcReader.FindSidecar(audio) == dupUpper,
+            Path.GetFileName(LrcReader.FindSidecar(audio) ?? "(null)"));
+
+        // ---- BeginScan（扫描器入口）：本轮**信任**目录 mtime，但侧车**文件**仍逐个 stat ----
+        var scanDir = Path.Combine(root, "sidecar-scan-scope");
+        Directory.CreateDirectory(scanDir);
+        var scanAudio = Path.Combine(scanDir, "s.mp3");
+        var scanLrc = Path.Combine(scanDir, "s.lrc");
+        File.WriteAllText(scanLrc, "[00:01.00]第一版\n", new UTF8Encoding(false));
+        LrcReader.BeginScan();
+        var first = LrcReader.Find(scanAudio);
+        Program.Check("lrc 扫描域: 首轮可见", first.Exists && first.Main == scanLrc,
+            Path.GetFileName(first.Main ?? "(null)"));
+
+        // 侧车**内容**改写（同名）：仍必须看到新 mtime/size —— 这是「信任目录 mtime」安全的前提
+        var beforeMtime = first.Mtime;
+        File.WriteAllText(scanLrc, "[00:01.00]第二版内容更长一点\n", new UTF8Encoding(false));
+        File.SetLastWriteTimeUtc(scanLrc, DateTime.UtcNow.AddSeconds(5));
+        var rewritten = LrcReader.Find(scanAudio);
+        Program.Check("lrc 扫描域: 同名改写仍逐个 stat（mtime 前进）",
+            rewritten.Mtime > beforeMtime && rewritten.Size != first.Size,
+            $"{rewritten.Mtime}>{beforeMtime} size={rewritten.Size}/{first.Size}");
+
+        // 本轮**新增**侧车：信任目录 mtime → 本轮不发现（与 scanner 对媒体文件的语义一致：
+        // 扫描中途落盘的由下一轮发现）；下一轮 BeginScan 即可见
+        var lateAudio = Path.Combine(scanDir, "late.mp3");
+        Program.Check("lrc 扫描域: 新曲目本轮无侧车", !LrcReader.Find(lateAudio).Exists);
+        var lateLrc = Path.Combine(scanDir, "late.lrc");
+        File.WriteAllText(lateLrc, "[00:01.00]迟到\n", new UTF8Encoding(false));
+        Program.Check("lrc 扫描域: 本轮新增侧车不在本轮生效（信任目录语义）",
+            !LrcReader.Find(lateAudio).Exists, "(应在下一轮可见)");
+        LrcReader.BeginScan();
+        Program.Check("lrc 扫描域: 下一轮可见新侧车", LrcReader.Find(lateAudio).Main == lateLrc,
+            Path.GetFileName(LrcReader.Find(lateAudio).Main ?? "(null)"));
+    }
+
+    /* ------------------------------------------------------------------ */
     /* .lrc 编码 / 标签剥离                                                */
     /* ------------------------------------------------------------------ */
 
@@ -273,6 +381,8 @@ internal static class EndToEnd
         var songD = Path.Combine(dir, "plain.mp3");        // 纯文本内嵌
         var songE = Path.Combine(dir, "notrans.mp3");      // 无译文
         var songH = Path.Combine(dir, "dual.mp3");         // 双语主 .lrc（同时间戳 3 行）
+        var songDup = Path.Combine(dir, "dup.mp3");        // 内嵌 == 侧车（去重用例）
+        var songOne = Path.Combine(dir, "one.mp3");        // 仅内嵌（对照组）
 
         CreateLibrary(db, generation: 1);
         using (var conn = Open(db))
@@ -284,20 +394,40 @@ internal static class EndToEnd
             InsertTrack(conn, "tD", songD, "纯文本", "[]", null, "只此一行原文", 3);
             InsertTrack(conn, "tE", songE, "无译文", "[]", null, "没有翻译", 4);
             InsertTrack(conn, "tH", songH, "双语LRC", "[]", null, null, 5);
+            // 去重用例：tDUP 的内嵌与侧车**同一文本**；tONE 只有内嵌（同文本）——
+            // 除侧车外两行完全一致，故 FTS 各列 token 数应逐列相同（去重生效）。
+            InsertTrack(conn, "tDUP", songDup, "去重", "[]", null, "[00:02.00]相同歌词内容", 6);
+            InsertTrack(conn, "tONE", songOne, "去重", "[]", null, "[00:02.00]相同歌词内容", 7);
         }
 
-        File.WriteAllText(Path.Combine(dir, "sidecar.lrc"),
-            "[00:01.00]月亮代表我的心\n[00:02.00]轻轻地\n", new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(dir, "sidecar.trans.lrc"),
-            "[00:01.00]The moon represents my heart\n[00:02.00]gently\n", new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(dir, "sidecar.romaji.lrc"),
-            "[00:01.00]yue liang dai biao wo de xin\n[00:02.00]qing qing de\n", new UTF8Encoding(false));
-        File.WriteAllText(Path.Combine(dir, "notrans.lrc"), "[00:01.00]没有翻译\n", new UTF8Encoding(false));
         File.WriteAllText(Path.Combine(dir, "dual.lrc"),
             "[00:01.00]你好世界\n[00:01.00]hello world\n[00:01.00]ni hao shi jie\n", new UTF8Encoding(false));
 
+        // tC / tE / tH 的侧车文本由**扫描器写入 library.db**（索引器只读 DB）：
+        // 原始文本保时间轴，索引器经共享 LrcReader.FromRawTexts 拆层。
+        using (var conn = Open(db))
+        {
+            SetSidecar(conn, "tC",
+                "[00:01.00]月亮代表我的心\n[00:02.00]轻轻地\n",
+                "[00:01.00]The moon represents my heart\n[00:02.00]gently\n",
+                "[00:01.00]yue liang dai biao wo de xin\n[00:02.00]qing qing de\n");
+            SetSidecar(conn, "tE", "[00:01.00]没有翻译\n");
+            SetSidecar(conn, "tH",
+                "[00:01.00]你好世界\n[00:01.00]hello world\n[00:01.00]ni hao shi jie\n");
+            // 与内嵌同文本（仅时间轴不同）→ 归一后相同 → 应只索引一份
+            SetSidecar(conn, "tDUP", "[00:01.00]相同歌词内容\n");
+        }
+
         var result = RunEngine(db, index, full: true, lrc: true);
-        Program.Check("层拆分: indexed==5", result.Indexed == 5, result.Indexed.ToString());
+        Program.Check("层拆分: indexed==7", result.Indexed == 7, result.Indexed.ToString());
+
+        // 内嵌与侧车**完全相同** → 只索引一份（真实曲库 126/151 首属这种情形，否则同一段
+        // 文本在倒排里存两遍）。判定用 FTS 的逐列 token 数（`search_fts_docsize`）：两行除
+        // 侧车外完全一致，故去重生效时 docsize 逐列相同（未去重则歌词 / 拼音列翻倍）。
+        var dupSize = DocSizeHex(index, "tDUP");
+        var oneSize = DocSizeHex(index, "tONE");
+        Program.Check("去重: 内嵌==侧车时 docsize 与仅内嵌完全一致",
+            dupSize.Length > 0 && dupSize == oneSize, $"{dupSize} vs {oneSize}");
 
         // 内嵌双语（同时间戳 3 行）：原文 / 译文 / 音译分别入列，互不掺混。
         Program.Check("层拆分: 内嵌原文 '我爱你' 命中原文列 tB",
@@ -373,6 +503,7 @@ internal static class EndToEnd
     {
         if (File.Exists(path)) File.Delete(path);
         using var conn = Open(path);
+        // 与 scanner 的 tracks 表同形（v3：含 .lrc 侧车列——**扫描器写入、索引器只读**）。
         Exec(conn, """
             CREATE TABLE tracks (
                 id TEXT PRIMARY KEY, path TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
@@ -380,7 +511,9 @@ internal static class EndToEnd
                 duration INTEGER NOT NULL, cover TEXT, codec TEXT, sample_rate INTEGER,
                 bit_rate INTEGER, channels INTEGER, bits_per_sample INTEGER,
                 file_size INTEGER NOT NULL, file_mtime INTEGER, file_ctime INTEGER,
-                scanned_at INTEGER NOT NULL, lyrics TEXT, loudness_lufs REAL, loudness_peak REAL
+                scanned_at INTEGER NOT NULL, lyrics TEXT, loudness_lufs REAL, loudness_peak REAL,
+                lyrics_lrc TEXT, lyrics_lrc_trans TEXT, lyrics_lrc_romaji TEXT,
+                lrc_mtime INTEGER, lrc_size INTEGER, lrc_checked INTEGER
             )
             """);
         if (generation.HasValue)
@@ -388,6 +521,28 @@ internal static class EndToEnd
             Exec(conn, "CREATE TABLE _scanner_meta (generation INTEGER)");
             Exec(conn, $"INSERT INTO _scanner_meta (generation) VALUES ({generation.Value})");
         }
+    }
+
+    /// <summary>
+    /// 写入 scanner 负责的 <c>.lrc</c> 侧车列（**索引器只读 DB**，不再读文件系统）：
+    /// 存**原始文本**（保时间轴，播放侧也用同一份），mtime/size 供脏集判定。
+    /// </summary>
+    private static void SetSidecar(
+        SqliteConnection conn, string id, string? main, string? trans = null, string? romaji = null,
+        long mtime = 100)
+    {
+        var exists = main is not null || trans is not null || romaji is not null;
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText =
+            "UPDATE tracks SET lyrics_lrc=@m, lyrics_lrc_trans=@t, lyrics_lrc_romaji=@r, "
+            + "lrc_mtime=@mt, lrc_size=@s, lrc_checked=1 WHERE id=@id";
+        cmd.Parameters.AddWithValue("@m", (object?)main ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@t", (object?)trans ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@r", (object?)romaji ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@mt", exists ? mtime : 0);
+        cmd.Parameters.AddWithValue("@s", (main?.Length ?? 0) + (trans?.Length ?? 0) + (romaji?.Length ?? 0));
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.ExecuteNonQuery();
     }
 
     private static void InsertTrack(
@@ -489,6 +644,19 @@ internal static class EndToEnd
     }
 
     /// <summary>与 CLI <c>query</c> 同构：把“人话”经分析器归一为空格连接的 MATCH 表达式。</summary>
+    /// <summary>FTS 逐列 token 数（`search_fts_docsize.size` 的十六进制），用于判「是否重复索引」。</summary>
+    private static string DocSizeHex(string index, string trackId)
+    {
+        using var conn = new SqliteConnection($"Data Source={index};Mode=ReadOnly");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText =
+            "SELECT hex(sz) FROM search_fts_docsize "
+            + "WHERE id = (SELECT doc_id FROM search_docs WHERE track_id = @t)";
+        cmd.Parameters.AddWithValue("@t", trackId);
+        return cmd.ExecuteScalar()?.ToString() ?? "";
+    }
+
     private static string Analyzed(string text)
     {
         var tokens = Analyzer.AnalyzeQuery(text).Lexical.Where(t => t.Length > 0).ToList();

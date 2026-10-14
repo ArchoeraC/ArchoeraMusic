@@ -12,7 +12,7 @@
 /// 2. 每个 CJK 段经 [analyze]（FFI `indexer_analyze`，与索引同构）取全拼音节
 ///    （1 汉字 ↔ 1 音节）与首字母；
 /// 3. 用查询词元的 `pinyin`（音节序列）在段内做**连续子序列匹配**（末音节可前缀，
-///    与查询侧 `_pinyinBranch` 一致；音节数 ≥2 时另试「首音节前缀」变体）；
+///    与查询侧 `_pinyinBranch` 一致；单音节允许前缀，≥2 音节要求相邻且逐位相等）；
 /// 4. 用查询词元的 `initials`（首字母串）与「全拼串」做**前缀 / 连续匹配**——
 ///    覆盖 `wan`（首字母）这类查询（`initials` 为 null 时其 `pinyin` 串即候选）；
 /// 5. 合并去重、按 start 升序（[mergeMatchRanges]）。
@@ -96,8 +96,8 @@ String _initialsOf(List<String> syllables) {
   return buf.toString();
 }
 
-/// 音节序列匹配：查询音节在段内**连续**命中（末音节可前缀；音节数 ≥2 时另试
-/// 首音节也可前缀的变体，与查询侧 `_pinyinBranch` 的两形态一致）。
+/// 音节序列匹配：查询音节在段内**连续**命中（与查询侧 [_pinyinBranch] 同构——
+/// 单音节允许前缀 `"wo"*`；≥2 音节要求逐位相等，即相邻短语 `"wo ai ni"`）。
 List<MatchRange> _matchPinyin(
   List<String> querySyllables,
   List<String> segmentSyllables,
@@ -106,35 +106,28 @@ List<MatchRange> _matchPinyin(
   final query = _normalize(querySyllables);
   if (query.isEmpty || query.length > segmentSyllables.length) return const [];
 
+  final prefixLast = query.length == 1;
   final out = <MatchRange>[];
   for (var start = 0; start + query.length <= segmentSyllables.length; start++) {
-    if (_runMatches(segmentSyllables, start, query, prefixFirst: false)) {
+    if (_runMatches(segmentSyllables, start, query, prefixLast: prefixLast)) {
       out.add(MatchRange(offset + start, offset + start + query.length));
-    }
-  }
-  if (query.length >= 2) {
-    for (var start = 0; start + query.length <= segmentSyllables.length; start++) {
-      if (_runMatches(segmentSyllables, start, query, prefixFirst: true)) {
-        out.add(MatchRange(offset + start, offset + start + query.length));
-      }
     }
   }
   return out;
 }
 
-/// 从 [start] 起，`query` 各行与段音节逐位匹配；末音节（及 [prefixFirst] 时的
-/// 首音节）允许前缀，其余要求完全相等。
+/// 从 [start] 起，`query` 各行与段音节逐位匹配；[prefixLast] 为真时末音节允许前缀
+/// （仅单音节查询），其余要求完全相等。
 bool _runMatches(
   List<String> syllables,
   int start,
   List<String> query, {
-  required bool prefixFirst,
+  required bool prefixLast,
 }) {
   for (var k = 0; k < query.length; k++) {
     final segment = syllables[start + k].toLowerCase();
     final token = query[k];
-    final boundary = k == query.length - 1 || (prefixFirst && k == 0);
-    if (boundary) {
+    if (k == query.length - 1 && prefixLast) {
       if (!segment.startsWith(token)) return false;
     } else if (segment != token) {
       return false;

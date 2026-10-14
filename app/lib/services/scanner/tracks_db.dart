@@ -272,8 +272,33 @@ class TracksDb {
   }
 
   /// 按 id 懒查内嵌歌词（列表查询不再携带；仅在需要歌词时调用）。
+  /// 歌词选择表达式：优先内嵌 `tracks.lyrics`；为空则回退 **scanner 写入的 `.lrc` 侧车原始文本**
+  /// （`lyrics_lrc`，v3 起由扫描器写库）——播放侧因此也能拿到 `.lrc` 歌词（此前只有索引器读侧车，
+  /// 导致「搜索得到、播放没词」）。旧库无该列时退回只读 `lyrics`（列探测一次后缓存）。
+  String get _lyricsExpr => _hasLrcColumn
+      ? "COALESCE(NULLIF(TRIM(lyrics), ''), lyrics_lrc) AS lyrics"
+      : 'lyrics';
+
+  bool? _hasLrcColumnCache;
+
+  /// `tracks.lyrics_lrc` 是否存在（旧库 / 未扫描过的新库为 false）。
+  bool get _hasLrcColumn {
+    final cached = _hasLrcColumnCache;
+    if (cached != null) return cached;
+    bool has;
+    try {
+      final c = _db.select(
+        "SELECT COUNT(*) AS c FROM pragma_table_info('tracks') WHERE name = 'lyrics_lrc'",
+      );
+      has = ((c.first['c'] as int?) ?? 0) > 0;
+    } catch (_) {
+      has = false;
+    }
+    return _hasLrcColumnCache = has;
+  }
+
   String? lyricsById(String id) {
-    final rows = _db.select('SELECT lyrics FROM tracks WHERE id = ?', [id]);
+    final rows = _db.select('SELECT $_lyricsExpr FROM tracks WHERE id = ?', [id]);
     return rows.isEmpty ? null : rows.first['lyrics'] as String?;
   }
 
@@ -289,7 +314,7 @@ class TracksDb {
       final slice = ids.sublist(i, min(i + chunk, ids.length));
       final placeholders = List.filled(slice.length, '?').join(', ');
       final rows = _db.select(
-        'SELECT id, lyrics FROM tracks WHERE id IN ($placeholders)',
+        'SELECT id, $_lyricsExpr FROM tracks WHERE id IN ($placeholders)',
         slice,
       );
       for (final row in rows) {
@@ -304,7 +329,7 @@ class TracksDb {
 
   /// 按路径懒查内嵌歌词。
   String? lyricsByPath(String path) {
-    final rows = _db.select('SELECT lyrics FROM tracks WHERE path = ?', [path]);
+    final rows = _db.select('SELECT $_lyricsExpr FROM tracks WHERE path = ?', [path]);
     return rows.isEmpty ? null : rows.first['lyrics'] as String?;
   }
 

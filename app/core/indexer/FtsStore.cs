@@ -35,19 +35,43 @@ public sealed class FtsStore : IIndexStoreAdmin
     /// <summary>
     /// schema 版本；schema 变更必须递增（触发全量重建）。
     /// v2：external-content → contentless（<c>search_docs</c> 去掉 token 文本列）。
+    /// v3：新增独立列 <c>initials_tok</c>（首字母从 <c>pinyin_tok</c> 拆出，见 <see cref="Bm25Weights"/>）。
     /// </summary>
-    public const int SchemaVersionValue = 2;
+    public const int SchemaVersionValue = 5;
 
     /// <summary>FTS 列（顺序 = bm25 权重顺序，冻结）。</summary>
     private const string FtsColumns =
-        "title_tok, artist_tok, album_tok, lyrics_tok, lyrics_tr_tok, lyrics_rom_tok, pinyin_tok, filename_tok";
+        "title_tok, artist_tok, album_tok, lyrics_tok, lyrics_tr_tok, lyrics_rom_tok, "
+        + "pinyin_meta_tok, pinyin_lyrics_tok, reading_meta_tok, "
+        + "filename_tok, initials_meta_tok, initials_lyrics_tok";
 
     /// <summary>
     /// bm25 权重，顺序与 <see cref="FtsColumns"/> 严格一致：
     /// title 4.0 / artist 3.0 / album 2.0 / lyrics 1.5 / lyrics_tr 1.0 / lyrics_rom 0.5 /
-    /// pinyin 2.0 / filename 1.0（设计文档 §5.2 / 交付约定）。
+    /// pinyin_meta 2.0 / pinyin_lyrics 1.5 / filename 1.0 / initials_meta 2.0 / initials_lyrics 1.5
+    /// （设计文档 §5.2 / 交付约定）。
+    ///
+    /// <c>initials_tok</c> 是**独立列**（v3 起）：v2 把首字母串混在 <c>pinyin_tok</c> 里，
+    /// 于是首字母查询（`"wan"*`）会命中拼音音节（完 / 万 / 晚…），命中集近乎整库
+    /// （30k 语料实测 `"wan"*` 命中 29985/30000、单条 56ms）——独立成列后首字母只与
+    /// 真正的首字母串互比。其权重取 2.0（与拼音同档：二者都是「同一批字段的另一种写法」）。
     /// </summary>
-    private static readonly double[] Bm25Weights = { 4.0, 3.0, 2.0, 1.5, 1.0, 0.5, 2.0, 1.0 };
+    private static readonly double[] Bm25Weights =
+    {
+        4.0,  // title
+        3.0,  // artist
+        2.0,  // album
+        1.5,  // lyrics（原文）
+        1.0,  // lyrics_tr（译文）
+        0.5,  // lyrics_rom（音译）
+        2.0,  // pinyin_meta（元数据拼音：与 title/artist 同档）
+        1.5,  // pinyin_lyrics（歌词拼音：与歌词原文同档）
+        2.0,  // reading_meta（日文读音：与拼音同档；**只索引元数据**——歌词罗马字检索是伪需求，
+              //        且整段歌词读音 bigram 会把索引推高约 2×，见设计文档 §4.2）
+        1.0,  // filename
+        2.0,  // initials_meta
+        1.5,  // initials_lyrics
+    };
 
     private SqliteConnection? _conn;
     private SqliteTransaction? _tx;
@@ -133,7 +157,9 @@ public sealed class FtsStore : IIndexStoreAdmin
             ins.Transaction = _tx;
             ins.CommandText = $"""
                 INSERT INTO search_fts (rowid, {FtsColumns})
-                VALUES (@id, @title, @artist, @album, @lyrics, @tr, @rom, @pinyin, @filename)
+                VALUES (@id, @title, @artist, @album, @lyrics, @tr, @rom,
+                        @pinyinMeta, @pinyinLyrics, @readingMeta,
+                        @filename, @initialsMeta, @initialsLyrics)
                 """;
             AddTokenParameters(ins, docId, f);
             ins.ExecuteNonQuery();
@@ -193,8 +219,16 @@ public sealed class FtsStore : IIndexStoreAdmin
         }
     }
 
+    /// <summary>
+    /// **候选集上限**（宽命中查询的工作量上界；0 = 不限）。与 Dart 侧
+    /// `SearchIndex.defaultCandidateCap` 是同一个策略：先按 rowid 顺序取有界候选（无排序、
+    /// 可提前退出），再只给这批候选做 bm25 排序——`ORDER BY bm25` 否则要给**全部命中**打分。
+    /// </summary>
+    public const int DefaultCandidateCap = 5000;
+
     /// <inheritdoc />
-    public List<(long DocId, double Score)> Search(string matchExpr, int limit, int offset)
+    public List<(long DocId, double Score)> Search(
+        string matchExpr, int limit, int offset, int candidateCap)
     {
         var conn = EnsureOpen();
         CommitTx(); // 让未落盘的写入对查询可见（调试用途）
@@ -202,14 +236,26 @@ public sealed class FtsStore : IIndexStoreAdmin
         var weights = string.Join(", ", Bm25Weights.Select(
             w => w.ToString(CultureInfo.InvariantCulture)));
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"""
-            SELECT rowid, bm25(search_fts, {weights}) AS score
-            FROM search_fts
-            WHERE search_fts MATCH @q
-            ORDER BY score
-            LIMIT @limit OFFSET @offset
-            """;
+        // candidateCap > 0：先取有界候选再排序；= 0：原路径（全部命中打分），供对照。
+        cmd.CommandText = candidateCap > 0
+            ? $"""
+                SELECT rowid, bm25(search_fts, {weights}) AS score
+                FROM search_fts
+                WHERE rowid IN (
+                    SELECT rowid FROM search_fts WHERE search_fts MATCH @q LIMIT @cap
+                )
+                ORDER BY score
+                LIMIT @limit OFFSET @offset
+                """
+            : $"""
+                SELECT rowid, bm25(search_fts, {weights}) AS score
+                FROM search_fts
+                WHERE search_fts MATCH @q
+                ORDER BY score
+                LIMIT @limit OFFSET @offset
+                """;
         cmd.Parameters.AddWithValue("@q", matchExpr);
+        if (candidateCap > 0) cmd.Parameters.AddWithValue("@cap", candidateCap);
         cmd.Parameters.AddWithValue("@limit", limit <= 0 ? -1 : limit);
         cmd.Parameters.AddWithValue("@offset", offset < 0 ? 0 : offset);
 
@@ -463,8 +509,12 @@ public sealed class FtsStore : IIndexStoreAdmin
         cmd.Parameters.AddWithValue("@lyrics", f.LyricsTok);
         cmd.Parameters.AddWithValue("@tr", f.LyricsTrTok);
         cmd.Parameters.AddWithValue("@rom", f.LyricsRomTok);
-        cmd.Parameters.AddWithValue("@pinyin", f.PinyinTok);
+        cmd.Parameters.AddWithValue("@pinyinMeta", f.PinyinMetaTok);
+        cmd.Parameters.AddWithValue("@pinyinLyrics", f.PinyinLyricsTok);
+        cmd.Parameters.AddWithValue("@readingMeta", f.ReadingMetaTok);
         cmd.Parameters.AddWithValue("@filename", f.FilenameTok);
+        cmd.Parameters.AddWithValue("@initialsMeta", f.InitialsMetaTok);
+        cmd.Parameters.AddWithValue("@initialsLyrics", f.InitialsLyricsTok);
     }
 
     private void AfterWrite()
