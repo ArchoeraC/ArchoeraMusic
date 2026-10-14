@@ -41,6 +41,8 @@ import '../../stores/vault_session_store.dart';
 import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/s_dialog.dart';
 import '../../widgets/player/s_controls.dart';
+import 'security/vault_scheme_slider.dart';
+import '../services/security/vault_switch_snapshot.dart';
 import 'settings_widgets.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
@@ -85,6 +87,13 @@ class _SecuritySectionState extends ConsumerState<SecuritySection> {
     final s = getRuntime().sessionStore;
     return s is VaultSessionStore && s.shareBroken;
   }
+
+  /// Vault 变体滑条的**拖动预览**档位（null = 未拖动，回显当前生效档位）。
+  /// 松手才会经 [_onSchemeSelected] 提交切换。
+  int? _vaultSliderPending;
+
+  /// 更新滑条拖动预览档位（view 扩展经此调用——扩展不能直接用 `setState`，属 protected 成员）。
+  void _setVaultSliderPending(int? index) => setState(() => _vaultSliderPending = index);
 
   /// 当前生效方案（crypto/file/m1/m2a/m2b）。
   /// 已初始化的库按 status 返回的 mode/backend 判定（真实生效值）；

@@ -3236,6 +3236,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'Vault ist experimentell: Nach dem Wechsel können Cookies verloren gehen.';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      'Auf diesem System ist kein nutzbarer OS-Schlüsselbund verfügbar (Linux benötigt Secret Service / libsecret); LEGACY kann daher nicht aktiviert werden. Es wurde nichts geändert – wähle stattdessen FILK (Dateischlüssel) oder Vault.';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK ist ein Kompatibilitäts-Fallback: Der Hauptschlüssel liegt in einer lokalen Datei. Läuft diese aus, sind alle Anmeldedaten offengelegt. Nur für headless/Docker ohne OS-Schlüsselbund gedacht.';
 
@@ -3252,6 +3256,10 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get toastSchemeSwitched =>
       'Verschlüsselungsverfahren gewechselt; wirksam nach Neustart';
+
+  @override
+  String get toastSchemeSwitchFailedKept =>
+      'Wechsel fehlgeschlagen; das vorherige Verschlüsselungsschema bleibt aktiv (keine Zugangsdaten verloren).';
 
   @override
   String get settingsVaultModeV1 => 'v1 Systemschutz';

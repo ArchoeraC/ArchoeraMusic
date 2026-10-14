@@ -3098,6 +3098,10 @@ class AppLocalizationsJa extends AppLocalizations {
       'Vault は実験的スキームです：切り替え後、クッキーが失われるリスクがあります。';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      'この環境には利用可能な OS キーチェーンがありません（Linux では Secret Service / libsecret が必要）。LEGACY は有効化できません。何も変更していません。FILK（ファイルキー）または Vault を選択してください。';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK は互換性フォールバックです：マスターキーはローカルファイルに保存され、漏洩するとすべての認証情報が露出します。OS キーチェーンが無いヘッドレス/Docker 環境専用です。';
 
@@ -3113,6 +3117,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get toastSchemeSwitched => '暗号化スキームを切り替えました。再起動後に有効になります';
+
+  @override
+  String get toastSchemeSwitchFailedKept =>
+      '切り替えに失敗しました。以前の暗号化方式を維持します（資格情報は失われません）。';
 
   @override
   String get settingsVaultModeV1 => 'v1 システム保護';

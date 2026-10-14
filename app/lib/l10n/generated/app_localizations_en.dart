@@ -3198,6 +3198,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Vault is experimental: cookies may be lost after switching.';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      'This host has no usable OS keychain (Linux needs Secret Service / libsecret), so LEGACY cannot be enabled. Nothing was changed — choose FILK (file key) or Vault instead.';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'FILK is a compatibility fallback: the master key lives in a local file. If that file leaks, all credentials are exposed. Use only for headless/Docker servers without an OS keychain.';
 
@@ -3214,6 +3218,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get toastSchemeSwitched =>
       'Encryption scheme switched; effective after restart';
+
+  @override
+  String get toastSchemeSwitchFailedKept =>
+      'Switch failed; the previous encryption scheme was kept (no credentials lost).';
 
   @override
   String get settingsVaultModeV1 => 'v1 OS protection';
