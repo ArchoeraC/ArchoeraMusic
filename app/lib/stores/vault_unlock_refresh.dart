@@ -1,0 +1,32 @@
+// ArchoeraMusic UI
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+import '../apis/netease/api.dart';
+import '../services/downloader/download_controller.dart';
+import '../services/log/log.dart';
+import 'providers.dart';
+
+/// 解锁成功后的**统一收尾**：丢弃「凭据库锁定期」固化的空会话缓存 → 重读登录态
+/// → 重注下载引擎会话。
+///
+/// **所有解锁入口都必须调用本函数**（解锁门口令/恢复码、设置页口令/恢复码……）。
+///
+/// 2026-10-14 实录（两个同类缺口）：
+/// 1) `_loadSession()` 会把锁定期间读到的**空会话**固化进缓存 → 解锁后
+///    `loginStatus()` 仍读旧空值 → 「解锁了但登录态读不回来」；
+/// 2) 设置页的恢复码解锁只解锁了库、**漏了这一步** → 同样读不回来。
+/// 故把收尾集中到一处，并在 [NeteaseAuthNotifier.init] 内再做一次缓存失效（双保险）。
+///
+/// [ref] 传 `ref`（`WidgetRef`）或 `ProviderContainer`——两者都提供 `.read`，
+/// 便于 widget 与单元测试共用同一条路径。
+Future<void> refreshAfterVaultUnlock(dynamic ref) async {
+  invalidateNeteaseSessionCache();
+  try {
+    await ref.read(neteaseAuthProvider.notifier).init();
+  } catch (e) {
+    // 网络异常不阻断解锁（登录态可能仍为空，用户可后续重登）。
+    Log.e('vault', '解锁后登录态刷新失败：$e');
+  }
+  ref.read(downloadControllerProvider.notifier).syncSessions();
+}

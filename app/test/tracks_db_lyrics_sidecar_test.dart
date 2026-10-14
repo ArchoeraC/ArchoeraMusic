@@ -55,7 +55,7 @@ void main() {
     insert('t1', '内嵌', '[00:01.00]内嵌歌词\n', '[00:01.00]侧车歌词\n');
     insert('t2', '侧车', null, '[00:01.00]侧车独有\n');
     insert('t3', '都没有', '   ', null);
-    db.dispose();
+    db.close();
     return path;
   }
 

@@ -7,12 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../apis/runtime.dart';
 import '../../l10n/l10n.dart';
-import '../../services/downloader/download_controller.dart';
-import '../../services/log/log.dart';
 import '../common/overlay_host.dart';
 import '../../services/streaming/streaming_store.dart';
-import '../../stores/providers.dart';
 import '../../stores/vault_session_store.dart';
+import '../../stores/vault_unlock_refresh.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
@@ -132,14 +130,9 @@ class _VaultUnlockGateState extends ConsumerState<VaultUnlockGate> {
         });
         return;
       }
-      // 解锁成功：重读登录态（vault 解锁前缓存为空）+ 重注下载引擎会话。
-      // 网络异常不阻断解锁（登录态可能仍为空，用户可后续重登）。
-      try {
-        await ref.read(neteaseAuthProvider.notifier).init();
-      } catch (e) {
-        Log.e('vault', '解锁后登录态刷新失败：$e');
-      }
-      ref.read(downloadControllerProvider.notifier).syncSessions();
+      // 解锁成功：**统一收尾**（失效锁定期的空会话缓存 → 重读登录态 → 重注下载会话）。
+      // 与设置页解锁共用同一路径，避免「某个入口漏了刷新」。
+      await refreshAfterVaultUnlock(ref);
       if (mounted) setState(() => _needsUnlock = false);
     } finally {
       if (mounted && _needsUnlock) setState(() => _busy = false);

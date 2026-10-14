@@ -58,20 +58,20 @@ void main() {
 
     test('拼音：≥2 音节编译为「位置相邻短语」+ 列过滤到拼音两列（v4）', () {
       final expr = compileMatch(const AnalyzerTokens(pinyin: ['wo', 'ai', 'ni']));
-      expect(expr, '{pinyin_meta_tok pinyin_lyrics_tok} : ' + '"wo ai ni"');
+      expect(expr, '{pinyin_meta_tok pinyin_lyrics_tok} : ''"wo ai ni"');
     });
 
     test('拼音：单音节 3 字符起加前缀，1–2 字符精确（前缀长度门控）', () {
-      expect(compileMatch(const AnalyzerTokens(pinyin: ['hao'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ' + '"hao"*');
+      expect(compileMatch(const AnalyzerTokens(pinyin: ['hao'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ''"hao"*');
       // 2 字符前缀（"wo"* / "ni"*）会把命中集放大到近乎整库 → 精确匹配
-      expect(compileMatch(const AnalyzerTokens(pinyin: ['wo'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ' + '"wo"');
-      expect(compileMatch(const AnalyzerTokens(pinyin: ['ni'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ' + '"ni"');
-      expect(compileMatch(const AnalyzerTokens(pinyin: ['w'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ' + '"w"');
+      expect(compileMatch(const AnalyzerTokens(pinyin: ['wo'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ''"wo"');
+      expect(compileMatch(const AnalyzerTokens(pinyin: ['ni'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ''"ni"');
+      expect(compileMatch(const AnalyzerTokens(pinyin: ['w'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ''"w"');
     });
 
     test('拼音：双音节同样是短语（不再有首音节前缀变体）', () {
-      expect(compileMatch(const AnalyzerTokens(pinyin: ['w', 'ai'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ' + '"w ai"');
-      expect(compileMatch(const AnalyzerTokens(pinyin: ['wo', 'ai'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ' + '"wo ai"');
+      expect(compileMatch(const AnalyzerTokens(pinyin: ['w', 'ai'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ''"w ai"');
+      expect(compileMatch(const AnalyzerTokens(pinyin: ['wo', 'ai'])), '{pinyin_meta_tok pinyin_lyrics_tok} : ''"wo ai"');
     });
 
     test('首字母：列过滤到首字母两列（v4），2 字符起加前缀', () {
@@ -116,7 +116,7 @@ void main() {
       ));
       expect(
         expr,
-        '("abc"* OR {pinyin_meta_tok pinyin_lyrics_tok} : ' + '"hao"* OR ({initials_meta_tok initials_lyrics_tok} : "wan"*))',
+        '("abc"* OR {pinyin_meta_tok pinyin_lyrics_tok} : ''"hao"* OR ({initials_meta_tok initials_lyrics_tok} : "wan"*))',
       );
     });
 
@@ -128,7 +128,7 @@ void main() {
       ));
       expect(
         expr,
-        '("woaini"* OR {pinyin_meta_tok pinyin_lyrics_tok} : ' + '"wo ai ni")',
+        '("woaini"* OR {pinyin_meta_tok pinyin_lyrics_tok} : ''"wo ai ni")',
       );
     });
   });
