@@ -171,12 +171,18 @@ class VaultSessionStore implements SessionStore {
       // 密钥模式（免 OS 钥匙串）——设置页/首次对话框选择后冷切重启生效。
       // 历史 'vault'（2-of-2，已移除）回落 crypto。
       if (!await VaultProcess.isInitialized(_dataDir)) {
+        // 惰性初始化**仅限免密方案**：m1/m2a/m2b 需要用户因子（口令/device.key/恢复码），
+        // 静默 init 成 crypto 是安全降级且会造成 pref/容器不一致 → 留给 UI 初始化门。
+        if (!VaultProcess.isPasswordlessScheme(defaultScheme)) {
+          stderr.writeln('[vault] 库缺失且方案 $defaultScheme 需要用户因子：等待显式初始化');
+          return;
+        }
         if (defaultScheme == 'file') {
           await VaultProcess.initFile(_dataDir);
         } else {
           await VaultProcess.initCrypto(_dataDir);
         }
-        _mode = 'crypto';
+        _mode = 'crypto'; // 模式恒为 crypto（'C'）；file 只是后端差异（backend=file）
       } else {
         _mode = await VaultProcess.mode(_dataDir);
       }
