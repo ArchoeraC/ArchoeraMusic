@@ -91,6 +91,25 @@ void main() {
     return (m: u32(b, 32), t: u32(b, 36), p: u32(b, 40));
   }
 
+  test('verifyUnlock 自验证：正确口令通过 / 错误口令抛错（防「新库口令对不上」丢库）', () async {
+    final tmp = await makeTmp('vault_v4_verify');
+    if (!VaultProcess.available) {
+      markTestSkipped('vault 不可用，跳过');
+      return;
+    }
+    const pw = 'correct-horse-battery';
+    await VaultProcess.initM2a(tmp.path, pw, kdfM: 8192, kdfT: 1, kdfP: 1);
+
+    // 正确口令：自验证通过（切换流程据此才敢丢弃旧容器）
+    await VaultProcess.verifyUnlock(tmp.path, password: pw);
+
+    // 错误口令：必须抛（否则切换会把旧库丢掉、新库又打不开）
+    await expectLater(
+      VaultProcess.verifyUnlock(tmp.path, password: 'wrong-password'),
+      throwsA(isA<VaultException>()),
+    );
+  }, skip: skipNoTestBin);
+
   test('crypto/file 正常会话：set/get 中文往返 + marker=ok', () async {
     final tmp = await makeTmp('vault_v4_normal');
     if (!VaultProcess.available) {
