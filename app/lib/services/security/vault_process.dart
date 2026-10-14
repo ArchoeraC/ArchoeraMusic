@@ -241,6 +241,26 @@ class VaultProcess {
     }
   }
 
+  /// 初始化后**自验证**：用刚设置的口令（m2b/crypto 传 null=免密）真实走一次解锁握手。
+  ///
+  /// **为什么必须有**：方案切换会先销毁旧库再初始化新方案；若新库初始化「成功」
+  /// 但用户输入的口令与写入的因子不一致（臆造/输入法差异/交互流程异常），
+  /// 就会出现「新库自己的口令打不开 + 旧库已销毁」＝丢库（真实事故 2026-10-14：
+  /// m2a 切换后只能靠恢复码救）。自验证失败 → 调用方回滚快照，旧库原封不动。
+  /// 凭据用后即弃，不缓存。
+  static Future<void> verifyUnlock(String dataDir, {String? password}) async {
+    final _VaultSession s;
+    try {
+      s = await _VaultSession.open(dataDir, password: password);
+    } on VaultVersionException {
+      rethrow; // 版本异常有独立 fatal 语义（删副本 + 仅可退出），不包装
+    } catch (e) {
+      throw VaultException(
+          '新库自验证失败：初始化写入的因子无法用刚输入的口令解锁（$e）；已回滚，旧库未动');
+    }
+    await s.close();
+  }
+
   static Future<String> initCrypto(String dataDir) async {
     final r = Process.runSync(binary, ['init-crypto', dataDir],
         stdoutEncoding: utf8,

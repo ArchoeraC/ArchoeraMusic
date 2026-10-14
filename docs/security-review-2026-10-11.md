@@ -101,7 +101,7 @@
 | SEC-13 | 中 | 设备指纹与项目自身红线（CONTRIBUTING §2.5）冲突 + 隐私政策未披露 | CONTRIBUTING §2.5；device-bound-vault-plan §5.1；downloader-identity-plan §3.1；privacy §二 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
 | SEC-14 | 低 | vault 安全声明 env 清单不完整 | vault-security-notes §测试明文存储/§二进制替换防护 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-15 | 低 | OS 份额共享只写「应用副本覆盖」，未写「第三方应用可读」 | vault-security-notes §份额覆盖风险 | ❌ 未提 | 已修复（文档·第一批，ed17b5f1；**2026-10-14** Linux libsecret 补实现后在 vault-scheme-comparison §4 补写「同会话应用无客户端侧 ACL」残余） |
-| SEC-16 | 低 | 迁移 / 模式切换跨存储的崩溃一致性未列风险 | device-bound-vault-plan §8；credential-vault-plan §3.4 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
+| SEC-16 | 低 | 迁移 / 模式切换跨存储的崩溃一致性未列风险 | device-bound-vault-plan §8；credential-vault-plan §3.4 | ❌ 未提 | 已修复（文档·第四批，a39ffd41；**代码补强 2026-10-14**：方案切换在 `init` 后**自验证**（`VaultProcess.verifyUnlock` 用刚输入口令真实解锁一次），失败即回滚快照（旧库原封不动）；且**先持久化方案再丢弃旧容器**——消除「新库口令对不上 + 旧库已销毁」与「容器新 / pref 旧」两类不可解态，见 §8.7） |
 | SEC-17 | 低 | architecture 内部残留（`sessions` 表已废弃 vs cookie 落点） | architecture §7.4/§8 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-18 | 低 | 归档评分件与现行口径不一致（明文密码 / 无哈希 / GetUsers） | archive/archoera-robustness-score §6 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-19 | 低 | 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 无删除里程碑 | vault-security-notes §测试明文存储 | ⏳ 已声明计划 | 已修复（文档·第一批 ed17b5f1；**后门已删除·第七批 2026-10-12**：移除 `InsecureFileStore`，测试改用生产 `FileStore`） |
@@ -605,6 +605,31 @@ status 列为 `none`），不能只看条数——须看 `info` 的 size/message
 （Playback/库统计实测可读）。浏览器侧已由 **Origin allowlist** 挡住（伪造 `Origin: https://evil.example` → 403），
 但 **Host 未校验**（`Host: evil.example.com` 仍 `200`）——DNS rebinding 的前置条件。建议：默认关闭 keyless，
 并校验 `Host` 属于本机白名单（纵深防御，非阻塞项）。
+
+---
+
+## 8.7 第九批随访（2026-10-14）：方案切换的「新库口令对不上」丢库风险
+
+**现场（维护者本机实测）**：m2a 方案一次切换后，用户输入口令解锁持续报
+`SHARE_MISMATCH AES-256-GCM 认证失败`，最终触发退避锁定。取证：容器在切换时刻被**重新初始化**
+（2535B→322B、新 `vault_id`/`device.key`/锚点/标记，槽=口令+设备 / 恢复码，条目=1），
+`prefs.security.scheme=m2a`、`m2aRecoveryAcked=true` —— 即**切换成功执行完**（旧库按设计被销毁，
+切换对话已明示），但**新库的口令与用户以为的不一致**（或用户未改用新口令）。
+
+**机理**：切换流程是「快照 → `destroy`（旧库/份额一并销毁）→ `init` 新方案 → `discard` 快照」。
+初始化成功后**没有任何验证**证明「新库能被刚输入的口令解开」；一旦不一致，旧库已销毁 →
+只能靠 m2a **恢复码**（`HKDF(恢复码, salt, RECOVERY_INFO)`，**不依赖口令与 `device.key`**，
+见 `vault-rs/src/service.rs` m2a `rec` 分支 + 单测「device.key 丢失后恢复码解锁」）或重建。
+
+**修复**（同批落地）：
+1. `VaultProcess.verifyUnlock(dataDir, password:)`：`init` 成功后**立即用刚输入的口令做一次真实解锁往返**；
+   失败 → 抛错 → 现有 `catch` 回滚快照（**旧库原封不动**，并提示「已回滚，旧库未动」）。
+2. 顺序改为 **`setCredentialScheme` → `discard`**：即使中断/崩溃也不会留下「容器是新的、pref 是旧的」。
+3. 回归：`vault_process_v4_test.dart`「verifyUnlock 自验证：正确口令通过 / 错误口令抛错」。
+4. 恢复码仍是最后兜底（界面已有「用恢复码解锁」入口，`VaultUnlockGate`）。
+
+**残余**：`destroy` 删除的**系统钥匙串份额**（crypto 模式）仍在进程外、无法随快照回滚——故 crypto
+切换前置 `canInitCrypto()` 预检（临时目录探测，不触碰真实库）；其余方案的 `destroy` 均在快照内可回滚。
 
 ---
 
