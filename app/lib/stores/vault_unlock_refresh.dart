@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import '../apis/netease/api.dart';
+import '../apis/qqmusic/core/request.dart';
 import '../services/downloader/download_controller.dart';
 import '../services/log/log.dart';
 import 'providers.dart';
@@ -21,12 +22,26 @@ import 'providers.dart';
 /// [ref] 传 `ref`（`WidgetRef`）或 `ProviderContainer`——两者都提供 `.read`，
 /// 便于 widget 与单元测试共用同一条路径。
 Future<void> refreshAfterVaultUnlock(dynamic ref) async {
+  // ① 先丢弃「库锁定期间」可能固化的各平台内存缓存（否则解锁后仍读到空）。
   invalidateNeteaseSessionCache();
+  qmReloadQQMusicCookies(); // QQ cookies 为进程级缓存，须显式失效
+
+  // ② 逐平台重读登录态。四个平台的"登录态来源"各不相同：
+  //    NetEase：Notifier（显式 init）
+  //    Kugou  ：API 实例在**构造期**从库内会话恢复 → 重建实例
+  //    Neko   ：显式 `restore()`（bootstrap 入口）
+  //    QQ     ：进程级 cookie 缓存 → 已在 ① 失效，此后按需重取
   try {
     await ref.read(neteaseAuthProvider.notifier).init();
   } catch (e) {
     // 网络异常不阻断解锁（登录态可能仍为空，用户可后续重登）。
-    Log.e('vault', '解锁后登录态刷新失败：$e');
+    Log.e('vault', '解锁后登录态刷新失败（NetEase）：$e');
+  }
+  ref.invalidate(kugouApiProvider);
+  try {
+    await ref.read(nekoApiProvider).restore();
+  } catch (e) {
+    Log.e('vault', '解锁后登录态刷新失败（Neko）：$e');
   }
   ref.read(downloadControllerProvider.notifier).syncSessions();
 }
