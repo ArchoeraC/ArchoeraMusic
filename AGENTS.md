@@ -68,6 +68,8 @@ cd app/core/vault-rs
 ./test-windows.sh                 # Wine 上跑真实 Windows 产物（需 wine + msvc-wine + lld-link；缺则跳过）
 ./cross-macos.sh                  # Linux 上用 macOS SDK 交叉构建（仅编译期；运行期待真机）
 ./gen_testdata.sh                 # ⚠ 仅当确认容器格式未变时重生成「黄金夹具」（字节兼容锚点）
+# Linux Secret Service（libsecret，crypto/LEGACY 后端）真机端到端；无桌面钥匙串时自动跳过：
+ARCHOERA_SECRET_SERVICE_E2E=1 cargo test --bin archoera-vault e2e
 ```
 > C# 版 vault（`app/core/vault/`）已于 2026-10-12 **删除**：字节/协议兼容改由
 > `app/core/vault-rs/testdata/` 的**冻结黄金夹具**锚定（`test.sh` §14 + `test-windows.sh` §11）。
