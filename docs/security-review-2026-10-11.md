@@ -591,6 +591,17 @@ status 列为 `none`），不能只看条数——须看 `info` 的 size/message
 `kernel.yama.ptrace_scope=1` 阻断、macOS 侧由 `task_for_pid` 默认需 root/entitlement 阻断，无法在普通用户
 权限内强制，尤其 `ptrace_scope=0` 的发行版）。**结论：安全机制之间不能互相拆台**——加固不得使既有防线失效。
 
+**第二轮复验（2026-10-14，登录态下重新撬锁）**：加固后按同一路径重打 ——
+`kill -SEGV` 后 `systemd-coredump` 明确记 **"terminated abnormally without generating a coredump"**，
+`/var/lib/systemd/coredump` **无文件**、`coredumpctl dump` 仅回 994B **元数据记录**（已扫描：无凭据特征）✓；
+`/proc/<pid>/mem` 与 `process_vm_readv` 被内核拒（`kernel.yama.ptrace_scope=1`）✓；
+`/proc/<pid>/environ`/磁盘/日志/prefs 均无明文 ✓；MCP（keyless）工具面无凭据通道
+（`get_preferences` 对含 `key/secret/token/password/cookie/credential` 的键一律剔除）✓。
+**意外发现（非漏洞、但文档定性偏高）**：vault 的**进程血缘校验可被绕过** —— 把 `archoera-vault`
+复制到非 `native/` 目录即按 "dev/测试布局" 跳过校验（实测）；但**因子仍挡住**（无口令/恢复码
+报 `m2a 需要 handshake <口令>`）。故已在 credential-vault-plan §3.5 把「双因子：进程血缘 + 主密钥持有」
+更正为「纵深两层，真正的门＝主密钥持有」，与代码注释一致。
+
 **残余（如实声明）**：
 
 1. **同用户运行期注入仍是硬上限**（SEC-25 已声明）：能 `LD_PRELOAD`/替换二进制/在加固前取得执行权的攻击者，
