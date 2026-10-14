@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using Archoera.Lyrics;
 using TagLibFile = TagLib.File;
 
 namespace Archoera.Scanner;
@@ -83,6 +84,12 @@ public sealed class ScannerEngine
         public int Errors;
         public int Trained;
         public int ConsecutiveErrors;
+
+        /// <summary>
+        /// 本轮**首次**探测侧车的曲目数（增量扫描）。用于「升级补齐」的可见性：
+        /// 旧库的 <c>lrc_checked</c> 为空 → 本轮把侧车列补上（只读 <c>.lrc</c>，不重解析标签）。
+        /// </summary>
+        public int LrcBackfilled;
     }
 
     public ScannerEngine(
@@ -162,6 +169,13 @@ public sealed class ScannerEngine
 
         // 1. 收集文件（自动去重，防止重叠目录导致同一文件被处理两次）
         LogInfo($"开始扫描 (incremental={_incremental}, parallelism={_maxParallelism}): {string.Join(", ", dirs)}");
+
+        // .lrc 侧车目录清单：缓存只在**本轮扫描内**有效（开跑前清空，长驻 FFI 进程不持有陈旧清单）；
+        // 告警走本模块日志。清单每目录建一次 + 本轮信任目录 mtime → 每曲探测 0 次 stat
+        // （只有真有侧车的曲目才 stat 那一两个文件），总成本 O(目录数 + 侧车数)。
+        LrcReader.Warn = LogWarn;
+        LrcReader.BeginScan();
+
         var files = CollectFiles(dirs, progress, ct);
         if (files.Count > _maxScanFiles)
         {
@@ -174,7 +188,7 @@ public sealed class ScannerEngine
 
         // 2. 全量扫描模式：清空所有曲目记录 + 错误记录
         //    增量扫描模式：加载 tracks 快照到内存做比对（无需 _scanner_blueprint 表）
-        ConcurrentDictionary<string, (long Mtime, long Size)>? trackSnapshot = null;
+        ConcurrentDictionary<string, TrackSnapshot>? trackSnapshot = null;
         if (!_incremental)
         {
             LogInfo("全量扫描模式：清空所有曲目记录 + 错误记录");
@@ -238,22 +252,54 @@ public sealed class ScannerEngine
 
                 Volatile.Write(ref currentPath, file);
 
-                // 增量扫描：从内存快照 TryRemove，不变跳过
-                bool shouldSkip = false;
                 var fi = SafeFileInfo(file);
+
+                // ---- .lrc 侧车：与媒体是否变化**无关**（媒体未变但侧车新增 / 改动，
+                //      或存量库首轮补齐：lrc_checked 为空时也要补一次）----
+                var sidecars = LrcReader.Find(file);
+                var sidecarState = (LrcMtime: sidecars.Mtime, LrcSize: sidecars.Size);
+                var lrcUnchanged = false;
+
+                // 增量扫描：从内存快照 TryRemove，媒体与侧车都没变才跳过
+                bool shouldSkip = false;
+                TrackSnapshot cached = default;
                 if (trackSnapshot != null && fi != null && fi.Exists)
                 {
-                    if (trackSnapshot.TryRemove(file, out var cached))
+                    if (trackSnapshot.TryRemove(file, out cached))
                     {
                         var unchanged = cached.Mtime > 0
                             && cached.Mtime == ToUnixMs(fi.LastWriteTimeUtc)
                             && cached.Size == fi.Length;
-                        if (unchanged) shouldSkip = true;
+                        lrcUnchanged = cached.LrcChecked
+                            && cached.LrcMtime == sidecarState.LrcMtime
+                            && cached.LrcSize == sidecarState.LrcSize;
+                        if (unchanged && lrcUnchanged) shouldSkip = true;
                     }
                 }
                 if (shouldSkip)
                 {
                     Interlocked.Increment(ref counters.Scanned);
+                    TryEmitProgress(ref lastEmit, progress, counters, Volatile.Read(ref currentPath));
+                    return;
+                }
+
+                // 媒体未变、只有侧车要补：只更新侧车列（不重解析标签、不覆盖元数据）。
+                var fiUnchanged = fi != null && fi.Exists && cached.Mtime > 0
+                    && cached.Mtime == ToUnixMs(fi.LastWriteTimeUtc) && cached.Size == fi.Length;
+                if (fiUnchanged)
+                {
+                    var sidecarOnly = new TrackMetadata
+                    {
+                        Id = Md5Hex(file),
+                        Path = file,
+                        SidecarOnly = true,
+                    };
+                    ApplySidecarTexts(sidecarOnly, sidecars);
+                    if (_incremental && !cached.LrcChecked)
+                        Interlocked.Increment(ref counters.LrcBackfilled);
+                    queue.Add(sidecarOnly, ct);
+                    Interlocked.Increment(ref counters.Scanned);
+                    Interlocked.Increment(ref counters.Upserted);
                     TryEmitProgress(ref lastEmit, progress, counters, Volatile.Read(ref currentPath));
                     return;
                 }
@@ -277,6 +323,15 @@ public sealed class ScannerEngine
                 var track = ParseFile(file, out var parseReason);
                 if (track != null)
                 {
+                    // 侧车变了（或首轮补齐）才读文件：未变时留空 → merge 的 COALESCE 保留既有值，
+                    // 避免每次媒体变更都重读一遍 .lrc。
+                    if (!lrcUnchanged)
+                    {
+                        ApplySidecarTexts(track, sidecars);
+                        if (_incremental && !cached.LrcChecked)
+                            Interlocked.Increment(ref counters.LrcBackfilled);
+                    }
+
                     if (errorSnapshot.ContainsKey(file))
                     {
                         try { _db.ClearParseErrorAsync(file, ct).GetAwaiter().GetResult(); }
@@ -388,7 +443,9 @@ public sealed class ScannerEngine
         result.Total = files.Count;
         result.Canceled = ct.IsCancellationRequested;
         sw.Stop();
-        LogInfo($"扫描完成: {result.Scanned}/{result.Total}（upsert={result.Upserted}, delete={result.Deleted}, trained={result.Trained}, errors={result.Errors}, {sw.ElapsedMilliseconds}ms）");
+        var lrcBackfilled = Volatile.Read(ref counters.LrcBackfilled);
+        var lrcNote = lrcBackfilled > 0 ? $", 侧车首次探测={lrcBackfilled}" : "";
+        LogInfo($"扫描完成: {result.Scanned}/{result.Total}（upsert={result.Upserted}, delete={result.Deleted}, trained={result.Trained}, errors={result.Errors}{lrcNote}, {sw.ElapsedMilliseconds}ms）");
         return result;
     }
 
@@ -513,6 +570,24 @@ public sealed class ScannerEngine
             batch.Clear();
         }
         return sw.Elapsed.TotalMilliseconds;
+    }
+
+    /// <summary>
+    /// 把 <c>.lrc</c> 侧车**原始文本** + 锚点写入 <see cref="TrackMetadata"/>。
+    ///
+    /// 存原始文本（含时间轴 / 标签）：播放侧可直接按 LRC 解析，索引器经共享
+    /// <see cref="LrcReader.FromRawTexts"/> 拆「原文 / 译文 / 音译」三层——两侧同一份实现。
+    /// 无侧车时三层为 <c>null</c>，但 <c>LrcChecked=1</c> 表示「已探测且确实没有」，
+    /// 存量库据此区分「没探过」与「探过没有」。
+    /// </summary>
+    private static void ApplySidecarTexts(TrackMetadata track, LrcReader.Sidecars sidecars)
+    {
+        track.LyricsLrc = sidecars.Main is null ? null : LrcReader.TryDecode(sidecars.Main);
+        track.LyricsLrcTrans = sidecars.Trans is null ? null : LrcReader.TryDecode(sidecars.Trans);
+        track.LyricsLrcRomaji = sidecars.Romaji is null ? null : LrcReader.TryDecode(sidecars.Romaji);
+        track.LrcMtime = sidecars.Mtime;
+        track.LrcSize = sidecars.Size;
+        track.LrcChecked = 1;
     }
 
     /// <summary>

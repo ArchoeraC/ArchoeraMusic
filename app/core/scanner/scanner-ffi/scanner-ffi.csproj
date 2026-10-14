@@ -26,6 +26,8 @@
          通配链接项目目录外的文件时，部分 IDE/设计时构建不会把其纳入编译与
          System.Text.Json 源生成，导致 ScannerJsonContext 未生成（缺 Default /
          未实现抽象成员）的假错。逐文件显式列出并 Link 可稳定解决。 -->
+    <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
+    <Compile Include="../../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
     <Compile Include="../Models.cs" Link="Models.cs" />
     <Compile Include="../Log.cs" Link="Log.cs" />
     <Compile Include="../IScannerDatabase.cs" Link="IScannerDatabase.cs" />
@@ -36,6 +38,8 @@
     <Compile Include="../AdaptiveBatchSize.cs" Link="AdaptiveBatchSize.cs" />
     <Compile Include="../AdaptiveConcurrency.cs" Link="AdaptiveConcurrency.cs" />
     <Compile Include="../SystemMemoryInfo.cs" Link="SystemMemoryInfo.cs" />
+    <!-- 侧车歌词读取：与 indexer / scanner CLI **共用同一源文件**（§4.4：扫描器解析 .lrc 入库） -->
+    <Compile Include="../../shared/lyrics/LrcReader.cs" Link="shared/lyrics/LrcReader.cs" />
   </ItemGroup>
 
   <ItemGroup>

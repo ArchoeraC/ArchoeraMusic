@@ -5,6 +5,8 @@
 using System.Text;
 using ToolGood.Words;
 
+using Archoera.Text;
+
 namespace Archoera.Indexer;
 
 /// <summary>
@@ -28,13 +30,21 @@ public sealed class AnalysisResult
 
     public string Pinyin { get; }
 
+    /// <summary>
+    /// 日文读音列（字母 bigram；见 <see cref="Japanese.ReadingBigrams"/>）。
+    /// 仅当该源含假名、或调用方标记整首为日文（<c>includeReadings</c>）时非空——
+    /// 纯中文曲库不产出，既不增体积也无跨语言噪声。
+    /// </summary>
+    public string Readings { get; }
+
     public string PinyinInitials { get; }
 
-    public AnalysisResult(string tokens, string pinyin, string pinyinInitials)
+    public AnalysisResult(string tokens, string pinyin, string pinyinInitials, string readings)
     {
         Tokens = tokens;
         Pinyin = pinyin;
         PinyinInitials = pinyinInitials;
+        Readings = readings;
     }
 }
 
@@ -85,7 +95,7 @@ public static class Analyzer
     /// （T0 多语言层入库）。译文 / 音译层此前恒空，现被填充，输出变化，故递增触发全量重建。
     /// （T1 的查询侧跨语言候选只改 <see cref="AnalyzeQuery"/>，不影响索引侧词元输出。）
     /// </summary>
-    public const int AnalyzerVersion = 5;
+    public const int AnalyzerVersion = 6;
 
     /// <summary>查询侧跨语言候选（<see cref="QueryTokens.CrossLingual"/>）合并去重后的总预算。</summary>
     public const int CrossLingualBudget = 32;
@@ -94,6 +104,13 @@ public static class Analyzer
     {
         None,
         Cjk,
+
+        /// <summary>
+        /// 需要子串索引的脚本（假名 / 谚文，见 <see cref="ScriptRanges.IsSubstringScript"/>）：
+        /// 与 CJK 同样 <c>bigram + unigram</c> 入索引，但**不进拼音 / 首字母列**
+        /// （假名 / 谚文没有拼音读音，镜像只会是噪声与体积；实测假名占真实歌词 9.6%）。
+        /// </summary>
+        Substring,
         Latin,
         Digit,
     }
@@ -105,19 +122,22 @@ public static class Analyzer
     /// + 兼容表意区（U+F900–U+FAFF）。
     /// 注意：BMP 之外（扩展 B 起）为代理对，本 API 基于 <see cref="char"/>，不覆盖（见报告风险项）。
     /// </summary>
-    public static bool IsCjk(char c)
-        => (c >= '\u3400' && c <= '\u4DBF')
-        || (c >= '\u4E00' && c <= '\u9FFF')
-        || (c >= '\uF900' && c <= '\uFAFF');
+    public static bool IsCjk(char c) => ScriptRanges.IsCjk(c);
 
-    /// <summary>索引侧分析：归一化 + 分词 + 拼音列。</summary>
-    public static AnalysisResult Analyze(string text)
+    /// <summary>
+    /// 索引侧分析：归一化 + 分词 + 拼音列 + 日文读音列。
+    ///
+    /// [includeReadings] 为真表示调用方判定**整首曲目是日文**（任一源含假名）——此时连
+    /// 纯汉字段（如纯汉字歌手名 米津玄師）也查 Unihan 读音表；为假时只有含假名的源才产出读音。
+    /// </summary>
+    public static AnalysisResult Analyze(string text, bool includeReadings = false)
     {
         var parts = AnalyzeCore(text);
         return new AnalysisResult(
             string.Join(' ', parts.Tokens),
             string.Join(' ', parts.Pinyin),
-            string.Join(' ', parts.Initials));
+            string.Join(' ', parts.Initials),
+            Japanese.ReadingBigrams(text, includeReadings));
     }
 
     /// <summary>
@@ -230,6 +250,11 @@ public static class Analyzer
                 parts.HasCjk = true;
                 AddCjkSegment(segment.Text, parts);
             }
+            else if (segment.Kind == ScriptKind.Substring)
+            {
+                // 假名 / 谚文：只做子串索引（bigram + unigram），不进拼音 / 首字母列。
+                AddSubstringSegment(segment.Text, parts);
+            }
             else
             {
                 // 拉丁 / 数字段：整词原样进入三列。
@@ -259,6 +284,25 @@ public static class Analyzer
         parts.Pinyin.AddRange(Pinyin.FromCjkRun(segment));
         var initials = Pinyin.Initials(segment);
         if (initials.Length > 0) parts.Initials.Add(initials);
+    }
+
+    /// <summary>
+    /// 假名 / 谚文段分词：<c>bigram + unigram</c>（与 CJK 同构，故子串 / 前缀 / 词组查询都能命中），
+    /// **不产出拼音 / 首字母**。
+    ///
+    /// 旧实现把假名 / 谚文归入「拉丁」分支 → 整段一个 token，子串查询必然落空
+    /// （真实库实测：`くらりん` ⊂ `きゅうくらりん`，命中 0）。N-gram 取 2 与汉字一致，
+    /// 查询侧同一套 <c>bigram</c> 组合即可（见 Dart <c>_isCjkBigram</c> 的对应实现）。
+    /// </summary>
+    private static void AddSubstringSegment(string segment, Parts parts)
+    {
+        if (segment.Length >= 2)
+        {
+            for (int i = 0; i + 1 < segment.Length; i++)
+                parts.Tokens.Add(segment.Substring(i, 2));
+        }
+        foreach (var ch in segment)
+            parts.Tokens.Add(ch.ToString());
     }
 
     /// <summary>
@@ -331,6 +375,7 @@ public static class Analyzer
     private static ScriptKind Classify(char c)
     {
         if (IsCjk(c)) return ScriptKind.Cjk;
+        if (ScriptRanges.IsSubstringScript(c)) return ScriptKind.Substring;
         if (char.IsDigit(c)) return ScriptKind.Digit;
         if (char.IsLetter(c)) return ScriptKind.Latin;
         return ScriptKind.None;

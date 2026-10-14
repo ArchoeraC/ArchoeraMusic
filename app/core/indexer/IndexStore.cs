@@ -21,7 +21,34 @@ public sealed class DocTokens
     public string LyricsTok { get; init; } = "";
     public string LyricsTrTok { get; init; } = "";
     public string LyricsRomTok { get; init; } = "";
-    public string PinyinTok { get; init; } = "";
+    /// <summary>
+    /// 拼音列（**元数据段**，v4 起与歌词段分列）：title/artist/album/filename 的全拼音节。
+    /// 拆列动机见 <see cref="PinyinLyricsTok"/>——这四列才是「元数据」查询该扫的范围。
+    /// </summary>
+    public string PinyinMetaTok { get; init; } = "";
+
+    /// <summary>
+    /// 拼音列（**歌词段**）：合并后的歌词（原文层）全拼音节。
+    ///
+    /// 为什么与元数据分列（P5 实测）：v3 把两者混在一列，于是 `scope=metadata`（列过滤白名单）
+    /// 根本收不住拼音查询——词元本身就在同一列里。分列后元数据查询只扫 `<see cref="PinyinMetaTok"/>`，
+    /// 「只搜标题 / 歌手」才真正成立（也顺带缩小该路径的命中集）。
+    /// </summary>
+    public string PinyinLyricsTok { get; init; } = "";
+
+    /// <summary>首字母列（**元数据段**）：title/artist/album/filename 的拼音首字母串。</summary>
+    public string InitialsMetaTok { get; init; } = "";
+
+    /// <summary>首字母列（**歌词段**）：歌词原文层的拼音首字母串。</summary>
+    public string InitialsLyricsTok { get; init; } = "";
+
+    /// <summary>
+    /// 日文读音列（**元数据段**，v5）：title/artist/album/filename 的假名 / 汉字读音罗马字 bigram。
+    ///
+    /// **只索引元数据**：歌词的罗马字检索是伪需求（用户按假名 / 汉字搜歌词），而整段歌词的读音
+    /// bigram 会把索引推高约 2×（真实 165 首日文库实测 2.42MB → 4.53MB），故不索引歌词读音。
+    /// </summary>
+    public string ReadingMetaTok { get; init; } = "";
     public string FilenameTok { get; init; } = "";
 
     /// <summary>索引时的 <c>tracks.file_mtime</c>（脏集判定的版本锚）。</summary>
@@ -89,7 +116,15 @@ public interface IIndexStore : IDisposable
 
     /// <summary>按 <paramref name="matchExpr"/>（FTS5 MATCH 表达式）检索，返回 (docId, score)，
     /// score 越小越相关（bm25 语义）。</summary>
-    List<(long DocId, double Score)> Search(string matchExpr, int limit, int offset);
+    /// <summary>
+    /// 执行 `MATCH` 查询并返回 BM25 升序命中（<c>limit</c> ≤ 0 = 不限）。
+    ///
+    /// <paramref name="candidateCap"/>：**候选集上限**（0 = 不限）——`ORDER BY bm25` 必须给全部命中
+    /// 打分，宽命中查询（常见拼音 / 首字母 / 高频英文词）成本会随库线性增长；先按 rowid 顺序取
+    /// 有界候选（无排序、可提前退出）再排序，把单条延迟钉在上界内。生产默认
+    /// <c>FtsStore.DefaultCandidateCap</c>（与 Dart `SearchIndex.defaultCandidateCap` 同值）。
+    /// </summary>
+    List<(long DocId, double Score)> Search(string matchExpr, int limit, int offset, int candidateCap);
 
     /// <summary>离线优化（<c>PRAGMA optimize</c> + FTS <c>optimize</c>）。</summary>
     void Optimize();

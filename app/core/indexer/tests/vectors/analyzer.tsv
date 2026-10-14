@@ -40,3 +40,6 @@ zjl	zjl	zjl	zjl
 重庆	重庆 重 庆	chong qing	cq
 银行	银行 银 行	yin hang	yh
 单田芳	单田 田芳 单 田 芳	dan tian fang	dtf
+# 5) 假名 / 谚文：子串分词（bigram+unigram），**不进拼音 / 首字母列**（真实日文曲库实测修订）
+きゅうくらりん	きゅ ゅう うく くら らり りん き ゅ う く ら り ん		
+한국어노래	한국 국어 어노 노래 한 국 어 노 래		

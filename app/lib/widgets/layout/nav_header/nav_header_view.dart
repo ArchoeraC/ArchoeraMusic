@@ -15,6 +15,7 @@ class _NavHeaderSearchField extends StatelessWidget {
     required this.hintText,
     required this.onChanged,
     required this.onSubmitted,
+    this.onTapOutside,
   });
 
   final LayerLink layerLink;
@@ -26,6 +27,9 @@ class _NavHeaderSearchField extends StatelessWidget {
   final String hintText;
   final ValueChanged<String> onChanged;
   final ValueChanged<String> onSubmitted;
+
+  /// 透传 [SInput.onTapOutside]（搜索栏用空实现：收起由外层 TapRegion 按组判定）。
+  final ValueChanged<PointerDownEvent>? onTapOutside;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +63,7 @@ class _NavHeaderSearchField extends StatelessWidget {
             textInputAction: TextInputAction.search,
             onChanged: onChanged,
             onSubmitted: onSubmitted,
+            onTapOutside: onTapOutside,
           ),
         ),
       ),

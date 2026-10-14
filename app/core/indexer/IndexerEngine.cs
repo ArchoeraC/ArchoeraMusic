@@ -4,6 +4,7 @@
 
 using System.Diagnostics;
 using System.Text.Json;
+using Archoera.Lyrics;
 using Microsoft.Data.Sqlite;
 
 namespace Archoera.Indexer;
@@ -14,6 +15,12 @@ internal sealed class TrackProbe
     public string Id { get; init; } = "";
     public string Path { get; init; } = "";
     public long Mtime { get; init; }
+
+    /// <summary><c>tracks.lrc_mtime</c>（scanner 写入的侧车 mtime；0 = 无侧车 / 未探测）。</summary>
+    public long LrcMtime { get; init; }
+
+    /// <summary><c>tracks.lrc_size</c>（scanner 写入的侧车聚合字节；0 = 无侧车 / 未探测）。</summary>
+    public long LrcSize { get; init; }
 }
 
 /// <summary>曲库 <c>tracks</c> 行的分析期只读投影（阶段二按脏 id 取内容）。</summary>
@@ -26,6 +33,21 @@ internal sealed class TrackRecord
     public string AlbumText { get; init; } = "";
     public string Lyrics { get; init; } = "";
     public long Mtime { get; init; }
+
+    /// <summary>主 <c>.lrc</c> 侧车**原始文本**（scanner 写入；空 = 无侧车）。</summary>
+    public string LrcText { get; init; } = "";
+
+    /// <summary>显式译文侧车 <c>&lt;name&gt;.trans.lrc</c> 原始文本（可空）。</summary>
+    public string LrcTransText { get; init; } = "";
+
+    /// <summary>显式音译侧车 <c>&lt;name&gt;.romaji.lrc</c> 原始文本（可空）。</summary>
+    public string LrcRomajiText { get; init; } = "";
+
+    /// <summary>侧车聚合 mtime（scanner 写入；与阶段一脏集判定同源）。</summary>
+    public long LrcMtime { get; init; }
+
+    /// <summary>侧车聚合字节大小（scanner 写入）。</summary>
+    public long LrcSize { get; init; }
 }
 
 /// <summary>
@@ -87,6 +109,15 @@ public sealed class IndexerEngine
         var stopwatch = Stopwatch.StartNew();
         var builtAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
+        // 侧车由扫描器写库（见 ReadTrackProbes）；索引器**不再触碰文件系统**，故无需目录缓存。
+        // 缺列时给出可操作提示：`.lrc` 子开关开着却没侧车列，通常是「装完新版还没扫描过」。
+        if (options.IndexLrc && !LibraryHasLrcColumns(libraryPath))
+        {
+            Log.LogWarn("indexer",
+                "library.db 无 .lrc 侧车列（lyrics_lrc/lrc_mtime）：本次按「无侧车」构建。"
+                + "请先运行一次媒体扫描（扫描器会把侧车解析入库），再重跑索引。");
+        }
+
         if (!File.Exists(libraryPath))
             throw new FileNotFoundException("源曲库不存在", libraryPath);
 
@@ -123,7 +154,9 @@ public sealed class IndexerEngine
 
         Fire("collect", needFull ? "full" : "incremental");
 
-        // ---- 阶段一：轻量脏集探测（仅 id/path/file_mtime + .lrc stat） ----
+        // ---- 阶段一：轻量脏集探测（仅 id/path/file_mtime + **DB 里的** 侧车 mtime/size） ----
+        // 侧车状态全部来自 library.db（扫描器写入）：索引器**零文件系统访问**，
+        // 旧实现逐曲整目录枚举，单目录 30k 曲实测全量 +lrc 393s / 零脏曲增量 161s。
         var dirty = new List<DirtyTrack>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var probe in ReadTrackProbes(libraryPath, cancellationToken))
@@ -132,10 +165,8 @@ public sealed class IndexerEngine
             processed++;
             seen.Add(probe.Id);
 
-            // .lrc 只 stat（不读内容）
-            var lrc = options.IndexLrc ? LrcReader.Probe(probe.Path) : LrcReader.LrcProbe.None;
-            long curLrcM = lrc.Exists ? lrc.Mtime : 0;
-            long curLrcS = lrc.Exists ? lrc.Size : 0;
+            long curLrcM = probe.LrcMtime;
+            long curLrcS = probe.LrcSize;
 
             var isDirty = needFull;
             if (!isDirty)
@@ -154,7 +185,7 @@ public sealed class IndexerEngine
             }
 
             if (isDirty)
-                dirty.Add(new DirtyTrack { Id = probe.Id, Path = probe.Path, Lrc = lrc });
+                dirty.Add(new DirtyTrack { Id = probe.Id, Path = probe.Path });
 
             if (processed % ProgressEvery == 0) Fire("collect", probe.Path);
         }
@@ -181,7 +212,7 @@ public sealed class IndexerEngine
                     }
 
                     var docId = state.TryGetValue(item.Id, out var st) ? st.DocId : nextDocId++;
-                    _store.Put(docId, BuildTokens(track, item.Lrc, options, generation));
+                    _store.Put(docId, BuildTokens(track, options, generation));
                     indexed++;
 
                     if (indexed % ProgressEvery == 0) Fire("index", item.Path);
@@ -238,33 +269,41 @@ public sealed class IndexerEngine
     {
         public string Id { get; init; } = "";
         public string Path { get; init; } = "";
-        public LrcReader.LrcProbe Lrc { get; init; }
     }
 
     /* ------------------------------------------------------------------ */
     /* 分层分析                                                            */
     /* ------------------------------------------------------------------ */
 
-    private static DocTokens BuildTokens(TrackRecord track, LrcReader.LrcProbe probe, IndexerOptions options, long generation)
+    private static DocTokens BuildTokens(TrackRecord track, IndexerOptions options, long generation)
     {
-        var title = Analyzer.Analyze(track.Title);
-        var artist = Analyzer.Analyze(track.ArtistText);
-        var album = Analyzer.Analyze(track.AlbumText);
+        // 「整首是否日文」由任一源含假名判定：真实日文曲库里歌手 / 专辑常是**纯汉字**
+        // （米津玄師 / ヨルシカ），需借书目标题里的假名把整首标记为日文，才给这些纯汉字段查读音表。
+        var japanese = options.Pinyin &&
+            (Japanese.ContainsKana(track.Title) || Japanese.ContainsKana(track.ArtistText)
+             || Japanese.ContainsKana(track.AlbumText) || Japanese.ContainsKana(track.Lyrics)
+             || Japanese.ContainsKana(Path.GetFileNameWithoutExtension(track.Path)))
+            ;
+
+        var title = Analyzer.Analyze(track.Title, japanese);
+        var artist = Analyzer.Analyze(track.ArtistText, japanese);
+        var album = Analyzer.Analyze(track.AlbumText, japanese);
 
         // 内嵌歌词可能本身是 LRC（含时间轴 / 多语言同时间戳行），与 .lrc 侧车**一致**
-        // 走同一分层启发式（LrcReader.SplitText）：原文 / 译文 / 音译分别入库。
+        // 走同一分层启发式（LrcReader.FromRawTexts）：原文 / 译文 / 音译分别入库。
+        // 侧车文本来自 **library.db**（扫描器写入的原始文本，保时间轴），索引器不碰文件系统。
+        var hasSidecar = options.IndexLrc &&
+            (track.LrcText.Length > 0 || track.LrcTransText.Length > 0 || track.LrcRomajiText.Length > 0);
+        var sidecar = hasSidecar
+            ? LrcReader.FromRawTexts(track.LrcText, track.LrcTransText.Length > 0 ? track.LrcTransText : null,
+                                     track.LrcRomajiText.Length > 0 ? track.LrcRomajiText : null)
+            : LrcReader.LrcLayers.Empty;
         var embedded = LrcReader.SplitText(track.Lyrics);
-        var sidecar = LrcReader.LrcLayers.Empty;
-        if (options.IndexLrc && probe.Exists)
-        {
-            var lrc = LrcReader.Read(track.Path);
-            if (lrc.Exists) sidecar = new LrcReader.LrcLayers(lrc.Original, lrc.Translation, lrc.Romaji);
-        }
 
-        var lyrics = Analyzer.Analyze(JoinLayers(embedded.Original, sidecar.Original));
+        var lyrics = Analyzer.Analyze(JoinLayers(embedded.Original, sidecar.Original), japanese);
         var translation = Analyzer.Analyze(JoinLayers(embedded.Translation, sidecar.Translation));
         var romaji = Analyzer.Analyze(JoinLayers(embedded.Romaji, sidecar.Romaji));
-        var filename = Analyzer.Analyze(Path.GetFileNameWithoutExtension(track.Path));
+        var filename = Analyzer.Analyze(Path.GetFileNameWithoutExtension(track.Path), japanese);
 
         return new DocTokens
         {
@@ -275,23 +314,57 @@ public sealed class IndexerEngine
             LyricsTok = lyrics.Tokens,
             LyricsTrTok = translation.Tokens,
             LyricsRomTok = romaji.Tokens,
-            PinyinTok = options.Pinyin
-                ? CombinePinyin(title, artist, album, lyrics, filename)
+            // 拼音 / 首字母**按元数据段与歌词段分列**（v4）：元数据查询（列过滤）才收得住。
+            PinyinMetaTok = options.Pinyin
+                ? CombinePinyin(title, artist, album, filename)
+                : "",
+            PinyinLyricsTok = options.Pinyin ? CombinePinyin(lyrics) : "",
+            InitialsMetaTok = options.Pinyin
+                ? CombineInitials(title, artist, album, filename)
+                : "",
+            InitialsLyricsTok = options.Pinyin ? CombineInitials(lyrics) : "",
+            // 日文读音只索引元数据段（歌词读音不索引，见 DocTokens.ReadingMetaTok 说明）。
+            ReadingMetaTok = options.Pinyin
+                ? CombineReadings(title, artist, album, filename)
                 : "",
             FilenameTok = filename.Tokens,
             IndexedMtime = track.Mtime,
-            IndexedLrcMtime = probe.Exists ? probe.Mtime : 0,
-            IndexedLrcSize = probe.Exists ? probe.Size : 0,
+            // 侧车锚点取 **DB 里的聚合值**（与阶段一脏集判定同源，避免索引侧与扫描侧各算一套）。
+            IndexedLrcMtime = hasSidecar ? track.LrcMtime : 0,
+            IndexedLrcSize = hasSidecar ? track.LrcSize : 0,
             IndexedGeneration = generation,
         };
     }
 
-    /// <summary>拼接内嵌层与侧车层文本（非空者以 <c>\n</c> 连接）；两者皆空返回空串。</summary>
+    /// <summary>
+    /// 拼接内嵌层与侧车层文本（非空者以 <c>\n</c> 连接）；两者皆空返回空串。
+    ///
+    /// **归一后相同则只取一份**：真实曲库里内嵌歌词与同名 <c>.lrc</c> 常是同一份内容
+    /// （实测 126/151 首归一后逐字相同），重复并入会让同一段文本在倒排里存两遍
+    /// （体积 + bm25 词频翻倍）。只有**完全相同**才去重；部分重叠（例如侧车另带
+    /// 「作词/作曲」行）仍按并集处理，不丢信息。
+    /// </summary>
     private static string JoinLayers(string embedded, string sidecar)
     {
         if (embedded.Length == 0) return sidecar;
         if (sidecar.Length == 0) return embedded;
+        if (SameTextIgnoringWhitespace(embedded, sidecar)) return embedded;
         return embedded + "\n" + sidecar;
+    }
+
+    /// <summary>忽略空白（含换行 / 全角空格）的逐字符相等判定；不分配。</summary>
+    private static bool SameTextIgnoringWhitespace(string a, string b)
+    {
+        int i = 0, j = 0;
+        while (true)
+        {
+            while (i < a.Length && char.IsWhiteSpace(a[i])) i++;
+            while (j < b.Length && char.IsWhiteSpace(b[j])) j++;
+            if (i >= a.Length || j >= b.Length) return i >= a.Length && j >= b.Length;
+            if (a[i] != b[j]) return false;
+            i++;
+            j++;
+        }
     }
 
     /// <summary>
@@ -304,6 +377,36 @@ public sealed class IndexerEngine
         foreach (var source in sources)
         {
             if (source.Pinyin.Length > 0) parts.Add(source.Pinyin);
+        }
+        return string.Join(' ', parts);
+    }
+
+    /// <summary>
+    /// 读音列（**日文**）= 各源的读音罗马字 bigram（空格连接）。
+    /// 空源自动跳过（纯中文曲库全部为空 → 列留空，零体积 / 零噪声）。
+    /// </summary>
+    private static string CombineReadings(params AnalysisResult[] sources)
+    {
+        var parts = new List<string>();
+        foreach (var source in sources)
+        {
+            if (source.Readings.Length > 0) parts.Add(source.Readings);
+        }
+        return string.Join(' ', parts);
+    }
+
+    /// <summary>
+    /// 首字母列 = 各源（title/artist/album/lyrics/filename）的拼音首字母串（空格连接）。
+    ///
+    /// v3 起**独立列**：v2 把首字母串与全拼音节混在 <c>pinyin_tok</c>，导致首字母查询
+    /// （`"wan"*`）命中拼音音节（完 / 万 / 晚…）——30k 语料实测命中 29985/30000、单条 56ms。
+    /// 拆列后首字母只与首字母互比，命中集回归「真正以该首字母串开头的短语」。
+    /// </summary>
+    private static string CombineInitials(params AnalysisResult[] sources)
+    {
+        var parts = new List<string>();
+        foreach (var source in sources)
+        {
             if (source.PinyinInitials.Length > 0) parts.Add(source.PinyinInitials);
         }
         return string.Join(' ', parts);
@@ -347,7 +450,14 @@ public sealed class IndexerEngine
     {
         using var conn = OpenLibraryReadOnly(libraryPath);
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, path, file_mtime FROM tracks ORDER BY id";
+        // .lrc 侧车由**扫描器**解析写入 library.db（v3 起）：
+        //   lyrics_lrc / lyrics_lrc_trans / lyrics_lrc_romaji 存**原始文本**（保时间轴给播放侧），
+        //   lrc_mtime / lrc_size 供脏集判定，lrc_checked 标识「本轮扫描已探测过侧车」。
+        // 旧库（无这些列）自动降级为「无侧车」，不报错。
+        var hasLrc = HasLrcColumns(conn);
+        cmd.CommandText = hasLrc
+            ? "SELECT id, path, file_mtime, lrc_mtime, lrc_size FROM tracks ORDER BY id"
+            : "SELECT id, path, file_mtime FROM tracks ORDER BY id";
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
@@ -357,7 +467,39 @@ public sealed class IndexerEngine
                 Id = reader.IsDBNull(0) ? "" : reader.GetString(0),
                 Path = reader.IsDBNull(1) ? "" : reader.GetString(1),
                 Mtime = reader.IsDBNull(2) ? 0 : reader.GetInt64(2),
+                LrcMtime = hasLrc && !reader.IsDBNull(3) ? reader.GetInt64(3) : 0,
+                LrcSize = hasLrc && !reader.IsDBNull(4) ? reader.GetInt64(4) : 0,
             };
+        }
+    }
+
+    /// <summary>library.db 是否带 .lrc 侧车列（旧库 / 未扫描过的新库为 false → 降级无侧车）。</summary>
+    private static bool LibraryHasLrcColumns(string libraryPath)
+    {
+        try
+        {
+            using var conn = OpenLibraryReadOnly(libraryPath);
+            return HasLrcColumns(conn);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>打开的连接上判断 <c>tracks</c> 是否带 <c>.lrc</c> 侧车列（两者都在才算）。</summary>
+    private static bool HasLrcColumns(SqliteConnection conn)
+    {
+        try
+        {
+            using var probe = conn.CreateCommand();
+            probe.CommandText =
+                "SELECT COUNT(*) FROM pragma_table_info('tracks') WHERE name IN ('lyrics_lrc','lrc_mtime')";
+            return Convert.ToInt64(probe.ExecuteScalar() ?? 0L) >= 2;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -378,8 +520,12 @@ public sealed class IndexerEngine
             placeholders[i] = "@p" + i;
             cmd.Parameters.AddWithValue(placeholders[i], chunk[i].Id);
         }
-        cmd.CommandText =
-            $"SELECT id, path, title, artists, album, lyrics, file_mtime FROM tracks WHERE id IN ({string.Join(',', placeholders)})";
+        var hasLrc = HasLrcColumns(conn);
+        cmd.CommandText = hasLrc
+            ? $"SELECT id, path, title, artists, album, lyrics, file_mtime, " +
+              $"lyrics_lrc, lyrics_lrc_trans, lyrics_lrc_romaji, lrc_mtime, lrc_size " +
+              $"FROM tracks WHERE id IN ({string.Join(',', placeholders)})"
+            : $"SELECT id, path, title, artists, album, lyrics, file_mtime FROM tracks WHERE id IN ({string.Join(',', placeholders)})";
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
@@ -394,6 +540,11 @@ public sealed class IndexerEngine
                 AlbumText = ParseAlbum(reader.IsDBNull(4) ? null : reader.GetString(4)),
                 Lyrics = reader.IsDBNull(5) ? "" : reader.GetString(5),
                 Mtime = reader.IsDBNull(6) ? 0 : reader.GetInt64(6),
+                LrcText = hasLrc && !reader.IsDBNull(7) ? reader.GetString(7) : "",
+                LrcTransText = hasLrc && !reader.IsDBNull(8) ? reader.GetString(8) : "",
+                LrcRomajiText = hasLrc && !reader.IsDBNull(9) ? reader.GetString(9) : "",
+                LrcMtime = hasLrc && !reader.IsDBNull(10) ? reader.GetInt64(10) : 0,
+                LrcSize = hasLrc && !reader.IsDBNull(11) ? reader.GetInt64(11) : 0,
             };
             map[record.Id] = record;
         }

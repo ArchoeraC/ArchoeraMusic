@@ -64,7 +64,8 @@ MPL-1.1 / 公有领域）。
 | indexer（C#） | `SQLitePCLRaw.lib.e_sqlite3` 3.53.3 | **Apache-2.0** | 原生 SQLite（含 FTS5，公有领域），随 FFI 分发 |
 
 > 本地曲库搜索索引器另内嵌由 Unicode 数据离线生成的查询表（`data/nfkc.tsv`、
-> `data/def_en2hanzi.tsv`、`data/def_hanzi2en.tsv`，派生自 **Unihan `kDefinition`** 等），
+> `data/def_en2hanzi.tsv`、`data/def_hanzi2en.tsv`、`data/ja_readings.tsv`，派生自
+> **Unihan `kDefinition` / `kJapanese`** 等；`data/kana_romaji.tsv` 为自研表），
 > 受 [Unicode License](https://www.unicode.org/license.txt) 约束——详见
 > `app/core/indexer/THIRD-PARTY-LICENSES.md`。
 

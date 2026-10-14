@@ -17,9 +17,12 @@
 #   data/nfkc.tsv         HEXCODE<TAB>HEXOUT1 HEXOUT2 ...（输入/输出均为码点十六进制、空格分隔）
 #   data/def_en2hanzi.tsv WORD<TAB>HEX1 HEX2 ...（英文词 → 候选汉字码点，去重、按码点序、≤ 8）
 #   data/def_hanzi2en.tsv HEXCODE<TAB>WORD1 WORD2 ...（汉字码点 → 英文词，去重、字典序）
+#   data/ja_readings.tsv   HEXCODE<TAB>KANA1 KANA2 ...（汉字码点 → 日文音读 / 训读，kana 原样；
+#                          运行时经 indexer/Japanese.cs + data/kana_romaji.tsv 转罗马字）
 #
 # 许可：nfkc.tsv 派生自 Python 标准库 unicodedata（Unicode License）；
-#   def_*.tsv 派生自 Unicode Unihan 数据库 kDefinition 字段（Unicode License）。
+#   def_*.tsv 派生自 Unicode Unihan 数据库 kDefinition 字段（Unicode License）；
+#   ja_readings.tsv 派生自 Unicode Unihan 数据库 kJapanese 字段（假名音读 + 训读，Unicode License）。
 #   详见同目录 THIRD-PARTY-LICENSES.md。
 #
 # 输入：nfkc 无需外部输入；defs 需要 reference/unihan/Unihan.zip（仓库级 .gitignore 忽略）。
@@ -130,6 +133,60 @@ def parse_definition(value: str) -> set[str]:
     return words
 
 
+def _clean_reading(value: str) -> list[str]:
+    """Unihan kJapanese 值 → 有序假名读音列表。
+
+    - `kJapanese` 字段（假名，音读 + 训读合并）用空格分隔多个读音；
+    - 去重保序；索引侧不区分音读 / 训读，统一转罗马字。
+    注：**不用** `kJapaneseOn` / `kJapaneseKun`——那两个字段是**大写罗马字**（且拼写约定与
+    `kana_romaji.tsv` 不同），混用会出现两套罗马字口径；`kJapanese` 是假名，可走同一转换路径。
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in value.split():
+        kana = raw.replace(".", "").replace("-", "")
+        if not kana or kana in seen:
+            continue
+        seen.add(kana)
+        out.append(kana)
+    return out
+
+
+def gen_ja_readings(zip_path: Path) -> dict[int, list[str]]:
+    """解析 Unihan_Readings.txt 的 kJapanese → 码点 → 假名读音列表。
+
+    **不做**读音→罗马字转换（那一步在运行时 `indexer/Japanese.cs` 用
+    `data/kana_romaji.tsv` 统一完成，避免 Python / C# 两份转换算法漂移）。
+    仅收录 CJK 统一表意主区 + 扩展 A + 兼容表意区（与索引侧汉字范围一致）。
+    """
+    readings: dict[int, list[str]] = {}
+    with zipfile.ZipFile(zip_path) as archive, archive.open("Unihan_Readings.txt") as raw:
+        for line in raw:
+            text = line.decode("utf-8").rstrip("\n")
+            if not text or text.startswith("#"):
+                continue
+            cols = text.split("\t")
+            if len(cols) != 3 or cols[1] != "kJapanese":
+                continue
+            token = cols[0]
+            if not token.startswith("U+"):
+                continue
+            try:
+                cp = int(token[2:], 16)
+            except ValueError:
+                continue
+            if not (0x3400 <= cp <= 0x4DBF or 0x4E00 <= cp <= 0x9FFF or 0xF900 <= cp <= 0xFAFF):
+                continue
+            kana = _clean_reading(cols[2])
+            if not kana:
+                continue
+            slot = readings.setdefault(cp, [])
+            for k in kana:
+                if k not in slot:
+                    slot.append(k)
+    return readings
+
+
 def gen_hanzi_defs(zip_path: Path) -> tuple[dict[str, list[int]], dict[int, list[str]]]:
     """解析 Unihan_Readings.txt 的 kDefinition，生成双向释义表。
 
@@ -197,6 +254,19 @@ def main() -> int:
 
     zip_path = ensure_unihan()
     en2hanzi, hanzi2en = gen_hanzi_defs(zip_path)
+    write_table(
+        OUT / "ja_readings.tsv",
+        [
+            "Archoera indexer 日文读音表（生成，勿手改）：汉字码点 → 假名读音（音读 / 训读）",
+            "来源: Unicode Unihan kJapanese（Unicode License，https://www.unicode.org/license.txt）",
+            "字段: HEXCODE<TAB>KANA1 KANA2 ...（假名原样；送假名标记 . / - 已去）",
+            "生成: tools/gen_hanzi_data.py gen_ja_readings()（确定、可重跑）",
+            "用途: 索引期把读音转罗马字写入 reading_* 列（运行时用 data/kana_romaji.tsv 转换，"
+            "避免 Python / C# 两份转换算法漂移）",
+            "范围: 仅 CJK 统一表意主区 + 扩展 A + 兼容表意区（与索引侧汉字范围一致）",
+        ],
+        [(cp, " ".join(kana)) for cp, kana in sorted(gen_ja_readings(zip_path).items())],
+    )
     # en2hanzi 的键是字符串（英文词），用专用写出；hanzi2en 的键是码点，复用 write_table。
     _write_en2hanzi(OUT / "def_en2hanzi.tsv", en2hanzi)
     # hanzi2en 的值为词列表：写出前空格连接为单字段（与注释头 HEXCODE<TAB>WORD1 WORD2 …

@@ -148,29 +148,31 @@ void main() {
     expect(index.fuzzyQueries, 1, reason: '精确为空应触发一次模糊查询');
   }, skip: skip);
 
-  test('CJK 容错：拼音覆盖漏字 / 换位；第三趟兜底非同音错字', () async {
+  test('CJK 容错：短语趟 → 拼音宽松兜底（漏字 / 换位）；第三趟兜底非同音错字', () async {
     final lib = IndexerLibrary.load(soPath: soPath);
     final index = await _buildIndex(lib, const [('t1', '周杰伦'), ('t2', '我爱你')]);
 
-    // 漏字（周伦 ← 周杰伦）/ 换位（爱我 ← 我爱）：音节集合不变，拼音分支
-    // （音节 AND、与位置无关）已覆盖 → 精确即命中，不触发第三趟。
+    // 漏字（周伦 ← 周杰伦）/ 换位（爱我 ← 我爱）：音节齐全但**不相邻** → 短语趟 0 命中，
+    // 由**拼音宽松兜底趟**（位置无关 AND）召回；不触发 CJK 变体趟。
     expect(index.search('周伦').map((h) => h.trackId), contains('t1'));
+    expect(index.pinyinLooseQueries, 1, reason: '短语趟不足 → 跑一次宽松兜底');
     expect(index.search('爱我').map((h) => h.trackId), contains('t2'));
-    expect(index.cjkFuzzyQueries, 0, reason: '拼音分支覆盖漏字 / 换位，无需第三趟');
+    expect(index.cjkFuzzyQueries, 0, reason: '拼音兜底覆盖漏字 / 换位，无需 CJK 变体趟');
 
-    // 非同音错字（周杰美：美「mei」不在文档）：精确为空 → 第三趟删除变体
-    // （周杰）命中 t1。
-    expect(index.search('周杰美').map((h) => h.trackId), isEmpty);
-    final cjk = index.search('周杰美', fuzzy: true);
-    expect(cjk.map((h) => h.trackId), contains('t1'));
-    expect(index.cjkFuzzyQueries, 1, reason: '精确为空应触发一次 CJK 容错查询');
+    // 相邻短语直接命中时不跑兜底趟（渐进：不为每次查询付宽命中集代价）。
+    index.search('周杰伦');
+    expect(index.pinyinLooseQueries, 2, reason: '相邻短语命中 → 不再跑宽松兜底');
 
-    // 多打一字（我爱美：美不在文档）：第三趟命中 t2。
-    expect(index.search('我爱美').map((h) => h.trackId), isEmpty);
+    // 非同音错字（周杰美：美「mei」不在文档）：精确 + 拼音兜底皆空 → CJK 变体趟
+    // （删除变体「周杰」）命中 t1。
+    expect(index.search('周杰美', fuzzy: true).map((h) => h.trackId), contains('t1'));
+    expect(index.cjkFuzzyQueries, 1, reason: '精确 / 拼音皆空应触发一次 CJK 容错查询');
+
+    // 多打一字（我爱美：美不在文档）：CJK 变体趟命中 t2。
     expect(index.search('我爱美', fuzzy: true).map((h) => h.trackId),
         contains('t2'));
 
-    // metadata 范围：第三趟对整条 OR 表达式施加列过滤，标题命中仍生效。
+    // metadata 范围：兜底趟同样对整条表达式施加列过滤，标题命中仍生效。
     final meta = index.search(
       '周杰美',
       scope: LocalSearchScope.metadata,
@@ -216,18 +218,63 @@ void main() {
     expect(lib.analyze('zzzznotaword')!.crossLingual, isEmpty);
   }, skip: skip);
 
-  test('T1 跨语言召回：英文查询命中含「爱」的中文歌；中文查询命中含 love 的英文内容',
-      () async {
+  test('T1 跨语言召回：渐进兜底——词法已命中则不付跨语言代价', () async {
     final lib = IndexerLibrary.load(soPath: soPath);
     final index = await _buildIndex(lib, const [
       ('t1', '爱'), // 中文标题含 爱
       ('t2', 'Love Story'), // 英文标题含 love
     ]);
 
-    // 英文 → 候选汉字 爱 → 命中中文 t1。
-    expect(index.search('love').map((h) => h.trackId), contains('t1'));
-    // 中文 → 候选英文 love → 命中英文 t2。
-    expect(index.search('爱').map((h) => h.trackId), contains('t2'));
+    // ① 词法支（`"love"*`）已命中 t2 → **不**跑跨语言兜底（渐进：命中断路）。
+    expect(index.search('love').map((h) => h.trackId), contains('t2'));
+    expect(index.crossLingualQueries, 0, reason: '词法命中即短路，不付跨语言代价');
+
+    // ② 英文 → 候选汉字：`fond` 在语料里没有词法命中（unihan: fond → 爱）→ 兜底趟命中 t1。
+    final en2cjk = index.search('fond');
+    expect(en2cjk.map((h) => h.trackId), contains('t1'));
+    expect(index.crossLingualQueries, 1, reason: '精确 / 拼音皆空 → 跑一次跨语言兜底');
+
+    // ③ 中文 → 英文：`恋`（unihan: 恋 → love）在语料里不存在 → 兜底趟命中 t2。
+    final cjk2en = index.search('恋');
+    expect(cjk2en.map((h) => h.trackId), contains('t2'));
+    expect(index.crossLingualQueries, 2);
+  }, skip: skip);
+
+  test('日文读音检索（v5）：假名标题可被罗马字命中；纯中文不受影响', () async {
+    final lib = IndexerLibrary.load(soPath: soPath);
+    final index = await _buildIndex(lib, const [
+      ('t1', 'きゅうくらりん'),
+      ('t2', '晴天'),
+    ]);
+
+    // 子串罗马字：ku-ra-ri-n 的字母 bigram 命中假名读音 きゅうくらりん
+    final hits = index.search('kurarin').map((h) => h.trackId).toList();
+    expect(hits, contains('t1'));
+    expect(index.readingQueries, 1, reason: '主趟未命中 → 走一次读音兜底趟');
+
+    // 全拼罗马字同样命中
+    expect(index.search('kyuukurarin').map((h) => h.trackId), contains('t1'));
+
+    // 纯中文曲目没有读音列 → 不会被罗马字查询误命中
+    expect(index.search('kurarin').map((h) => h.trackId), isNot(contains('t2')));
+  }, skip: skip);
+
+  test('候选上限：宽命中查询只对有界候选排序（candidateCap）', () async {
+    final lib = IndexerLibrary.load(soPath: soPath);
+    final index = await _buildIndex(lib, const [
+      ('t1', '共同词元 一'),
+      ('t2', '共同词元 二'),
+      ('t3', '共同词元 三'),
+    ]);
+    const query = '共同';
+    // cap = 0：无限候选 → 三首都参与排序（原路径）
+    expect(index.search(query, limit: 10, candidateCap: 0).length, 3);
+    // cap = 2：只取有界候选（rowid 顺序前 2）→ 最多 2 条
+    expect(index.search(query, limit: 10, candidateCap: 2).length, 2);
+    // cap = 1：1 条
+    expect(index.search(query, limit: 10, candidateCap: 1).length, 1);
+    // 默认（生产值）远大于命中集 → 与不限等价（窄命中不受影响）
+    expect(index.search(query, limit: 10).length, 3);
   }, skip: skip);
 
   test('T0 双语 .lrc：英文译文可被英文查询命中、罗马音命中音译行', () async {
@@ -238,23 +285,27 @@ void main() {
     final libraryDb = '${tmp.path}/library.db';
     final searchDb = '${tmp.path}/search.db';
     final db = sqlite3.open(libraryDb);
+    // 与 scanner 的 tracks 同形：`.lrc` 侧车列由**扫描器**写入（索引器只读 DB，不碰文件系统）。
     db.execute('''
       CREATE TABLE tracks (
         id TEXT PRIMARY KEY, path TEXT, title TEXT, artists TEXT,
-        album TEXT, lyrics TEXT, file_mtime INTEGER
+        album TEXT, lyrics TEXT, file_mtime INTEGER,
+        lyrics_lrc TEXT, lyrics_lrc_trans TEXT, lyrics_lrc_romaji TEXT,
+        lrc_mtime INTEGER, lrc_size INTEGER, lrc_checked INTEGER
       )
     ''');
     db.execute('CREATE TABLE _scanner_meta (generation INTEGER)');
     db.execute('INSERT INTO _scanner_meta (generation) VALUES (1)');
+    // 同时间戳 3 行：原文 / 英文译文 / 罗马音（**原始文本**，保时间轴）。
+    const raw = '[00:01.00]你好世界\n[00:01.00]hello world\n[00:01.00]ni hao shi jie\n';
     db.execute(
-      'INSERT INTO tracks (id, path, title, artists, album, lyrics, file_mtime) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?)',
-      ['tL', '${tmp.path}/dual.mp3', '中文歌', '[]', null, null, 1],
+      'INSERT INTO tracks (id, path, title, artists, album, lyrics, file_mtime, '
+      'lyrics_lrc, lrc_mtime, lrc_size, lrc_checked) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      ['tL', '${tmp.path}/dual.mp3', '中文歌', '[]', null, null, 1,
+       raw, 100, raw.length, 1],
     );
     db.close();
-    // 同时间戳 3 行：原文 / 英文译文 / 罗马音。
-    File('${tmp.path}/dual.lrc').writeAsStringSync(
-        '[00:01.00]你好世界\n[00:01.00]hello world\n[00:01.00]ni hao shi jie\n');
 
     final (code, text) = lib.runBlocking(
       dbPath: libraryDb,
