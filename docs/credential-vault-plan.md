@@ -320,7 +320,10 @@ vault：  校验父进程身份（OS 提供 pid + 可执行文件路径）→ �
 1. ✅ 磁盘无凭据明文：test.sh「磁盘无明文」+ Dart 测试全盘 grep（vault 文件 + 份额文件均不含明文串）；
 2. ✅ 正常流程回归：vault 测试全链路 + 真实凭据端到端（网易 VIP FLAC / 酷狗 flac24bit 解锁，匿名对照被拒）；
 3. ✅ 销毁后不可恢复：destroy 删 OS 份额 + vault 文件 + 本地锚点/标记，status 未初始化；
-4. ✅ 三平台 keyring：Win DPAPI / macOS Keychain 真机验证；Linux 无头经**生产 `FileStore`**（`ARCHOERA_VAULT_BACKEND=file`）等价路径验证（SEC-19 后不再有测试明文后端）；libsecret 真机待有桌面会话时补验；
+4. ✅ 三平台 keyring：Win DPAPI / macOS Keychain / **Linux libsecret 真机验证**
+   （2026-10-14 补实现 + KDE ksecretd 实跑；`ARCHOERA_SECRET_SERVICE_E2E=1 cargo test
+   --bin archoera-vault e2e`，无桌面钥匙串时自动跳过）；headless 经**生产 `FileStore`**
+   （`ARCHOERA_VAULT_BACKEND=file`）等价路径验证（SEC-19 后不再有测试明文后端）；
 5. ✅ `flutter analyze` + `cargo test` + test.sh 全绿（2026-08-12：analyze 无问题、cargo 11 项、flutter 35+ 项、test.sh 12 项）；
 6. ⏳ 运行时保护细项：swap 无明文 / core dump 不含敏感区 / 无法经 `/proc/pid/mem` 读取（RLIMIT_CORE=0 已断言，DUMPABLE 尽力保护）；
 7. ✅ 崩溃联动：SIGKILL serve 会话 → 父进程感知信号退出 → crash 标记契约（写→消费→删除）✅；**注意**：kill -SEGV 不适用——NativeAOT 接管 SIGSEGV 进入挂起诊断态不退出（§8.4 注意事项）；
@@ -374,7 +377,7 @@ vault：  校验父进程身份（OS 提供 pid + 可执行文件路径）→ �
   vault → 主进程:    ok <payload> | err <message>   （set 的 base64 负载走下一行）
   ```
   - **握手前置**：握手完成前不加载/不解密任何凭据（首个凭据访问发生在解锁主密钥的握手应答时刻）；
-  - 双因子：进程血缘 + 主密钥持有（解锁成功 + 锚点回读）；会话密钥一次性防重放；
+  - 两层**纵深**（**不是双因子**）：① 进程血缘校验（`getppid` + 父进程可执行文件路径比对）——**定位＝防误用/自动化，非安全边界**（实测：把 vault 二进制复制出 `native/` 目录即按 dev 布局跳过校验；见 security-review §8.6 第二轮复验）；② **真正的门**＝主密钥持有（口令/恢复码 + `device.key`，Argon2id 派生）；会话密钥一次性防重放；
   - **握手版本指纹**：应答尾部携带 `BuildInfo.Marker`，主进程据此在协议内识别 vault 构建（默认路径须 PROD，见 Dart 侧）；**仅防误用测试构建，非二进制完整性防护**（定性见 §3.8）；
   - 空闲 30s 自退 / 握手超时 10s / 父死自退（事件驱动，无轮询）；
 - `Program.cs`：`init` 返回锚点 `ok <b64T>`；错误输出 `err <message>` 且退出码 1（信息不含明文/密文片段）。

@@ -167,6 +167,52 @@ class TracksDb {
     return _db.select(sql, params).map(TrackRow.fromRow).toList();
   }
 
+  /// 按 id 列表取行（**保持 [ids] 的顺序**；不含 lyrics）。
+  ///
+  /// 供本地索引排行分页按排名切片取行（`search.db` 的 trackId 顺序 →
+  /// `library.db` 行）。缺失的 id 被跳过（索引是派生数据，可能短暂落后）；
+  /// 分批查询避免 SQL 变量数上限。
+  List<TrackRow> listTracksByIds(List<String> ids) {
+    if (ids.isEmpty) return const [];
+    final byId = <String, TrackRow>{};
+    const chunk = 400;
+    for (var i = 0; i < ids.length; i += chunk) {
+      final slice = ids.sublist(i, min(i + chunk, ids.length));
+      final placeholders = List.filled(slice.length, '?').join(', ');
+      final rows = _db.select(
+        'SELECT $_trackColumns FROM tracks WHERE id IN ($placeholders)',
+        slice,
+      );
+      for (final row in rows) {
+        final track = TrackRow.fromRow(row);
+        byId[track.id] = track;
+      }
+    }
+    return [for (final id in ids) if (byId[id] != null) byId[id]!];
+  }
+
+  /// 返回 [ids] 中在 tracks 表里**实际存在**的子集（保持输入顺序）。
+  ///
+  /// 用于索引排行分页前的清洗：剔除 `search.db` 中残留的已删除 id，
+  /// 保证「按排名切片取行」每页行数与排名窗口对齐。
+  List<String> existingTrackIds(List<String> ids) {
+    if (ids.isEmpty) return const [];
+    final existing = <String>{};
+    const chunk = 900;
+    for (var i = 0; i < ids.length; i += chunk) {
+      final slice = ids.sublist(i, min(i + chunk, ids.length));
+      final placeholders = List.filled(slice.length, '?').join(', ');
+      final rows = _db.select(
+        'SELECT id FROM tracks WHERE id IN ($placeholders)',
+        slice,
+      );
+      for (final row in rows) {
+        existing.add(row['id'] as String);
+      }
+    }
+    return [for (final id in ids) if (existing.contains(id)) id];
+  }
+
   /// 全量曲目（**不含 lyrics**，供「播放全部」建队列一次性取全）。
   List<TrackRow> allTracks({String? query}) {
     final hasQuery = query != null && query.isNotEmpty;
@@ -226,14 +272,64 @@ class TracksDb {
   }
 
   /// 按 id 懒查内嵌歌词（列表查询不再携带；仅在需要歌词时调用）。
+  /// 歌词选择表达式：优先内嵌 `tracks.lyrics`；为空则回退 **scanner 写入的 `.lrc` 侧车原始文本**
+  /// （`lyrics_lrc`，v3 起由扫描器写库）——播放侧因此也能拿到 `.lrc` 歌词（此前只有索引器读侧车，
+  /// 导致「搜索得到、播放没词」）。旧库无该列时退回只读 `lyrics`（列探测一次后缓存）。
+  String get _lyricsExpr => _hasLrcColumn
+      ? "COALESCE(NULLIF(TRIM(lyrics), ''), lyrics_lrc) AS lyrics"
+      : 'lyrics';
+
+  bool? _hasLrcColumnCache;
+
+  /// `tracks.lyrics_lrc` 是否存在（旧库 / 未扫描过的新库为 false）。
+  bool get _hasLrcColumn {
+    final cached = _hasLrcColumnCache;
+    if (cached != null) return cached;
+    bool has;
+    try {
+      final c = _db.select(
+        "SELECT COUNT(*) AS c FROM pragma_table_info('tracks') WHERE name = 'lyrics_lrc'",
+      );
+      has = ((c.first['c'] as int?) ?? 0) > 0;
+    } catch (_) {
+      has = false;
+    }
+    return _hasLrcColumnCache = has;
+  }
+
   String? lyricsById(String id) {
-    final rows = _db.select('SELECT lyrics FROM tracks WHERE id = ?', [id]);
+    final rows = _db.select('SELECT $_lyricsExpr FROM tracks WHERE id = ?', [id]);
     return rows.isEmpty ? null : rows.first['lyrics'] as String?;
+  }
+
+  /// 按 id 批量懒查内嵌歌词（仅返回**非空**歌词的 id）。
+  ///
+  /// 供搜索结果「歌词命中片段」在**页加载**时一次性取回整页歌词，避免逐行
+  /// N 次查询；分批以规避 SQL 变量数上限。无歌词 / 已删除的 id 不出现在结果中。
+  Map<String, String> lyricsByIds(List<String> ids) {
+    if (ids.isEmpty) return const {};
+    final out = <String, String>{};
+    const chunk = 400;
+    for (var i = 0; i < ids.length; i += chunk) {
+      final slice = ids.sublist(i, min(i + chunk, ids.length));
+      final placeholders = List.filled(slice.length, '?').join(', ');
+      final rows = _db.select(
+        'SELECT id, $_lyricsExpr FROM tracks WHERE id IN ($placeholders)',
+        slice,
+      );
+      for (final row in rows) {
+        final lyrics = row['lyrics'] as String?;
+        if (lyrics != null && lyrics.isNotEmpty) {
+          out[row['id'] as String] = lyrics;
+        }
+      }
+    }
+    return out;
   }
 
   /// 按路径懒查内嵌歌词。
   String? lyricsByPath(String path) {
-    final rows = _db.select('SELECT lyrics FROM tracks WHERE path = ?', [path]);
+    final rows = _db.select('SELECT $_lyricsExpr FROM tracks WHERE path = ?', [path]);
     return rows.isEmpty ? null : rows.first['lyrics'] as String?;
   }
 

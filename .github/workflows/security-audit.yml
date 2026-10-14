@@ -59,7 +59,7 @@ jobs:
           repo-checkout: false
 
   dotnet-audit:
-    name: dotnet vulnerable packages (scanner)
+    name: dotnet vulnerable packages (scanner / indexer)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -70,4 +70,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          dotnet list app/core/scanner/scanner.csproj package --vulnerable --include-transitive
+          # scanner / indexer 同 NuGet 栈（Microsoft.Data.Sqlite + SQLitePCLRaw，
+          # 同 CVE-2025-6965 pin），二者一并审计。
+          for proj in app/core/scanner/scanner.csproj app/core/indexer/indexer.csproj; do
+            echo "== $proj =="
+            dotnet list "$proj" package --vulnerable --include-transitive
+          done

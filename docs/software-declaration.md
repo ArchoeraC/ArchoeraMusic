@@ -76,4 +76,12 @@
 
 ---
 
+## 附：第三方开源许可
+
+随包内嵌的原生 / 托管依赖与 Dart/Flutter pub 依赖的完整许可正文随包 `licenses/`
+分发（同源文件见 `app/assets/licenses/`），可在「设置 → 关于 → 第三方开源许可」中
+按许可正文分组查看；逐项清单见 [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md)。
+
+---
+
 本软件仅用于技术探索与研究。如相关平台认为本软件不妥，可随时联系开发者进行调整或移除。

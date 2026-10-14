@@ -1,0 +1,317 @@
+# ArchoeraMusic 日文假名 → 罗马字（索引期读音映射；自研表，非第三方数据）
+# 字段: KANA<TAB>ROMAJI[ ROMAJI2 ...]；KANA 为 1–2 个假名字符，取**最长匹配**。
+# 发音风格: Hepburn 为主，并给出常见 Kunrei 变体（同一条目空格分隔）以提高键入召回。
+#   - 长音以重复元音表示（きゅう → kyuu），不使用 macron；「ー」按前一元音延长；
+#   - 「っ」为促音：重复后一音节的首辅音（まって → matte）；
+#   - 「ん」→ n（不区分 m/n 同化）。
+# 生成：本表由 Archoera 自研（标准罗马字事实，无第三方数据版权）；运行时经
+#   indexer/Japanese.cs 做最长匹配转换（与 data/ja_readings.tsv 的 kana 读音共用同一转换）。
+#
+# --- 2 字符（拗音 / 拗长音 / 外来语组合）---
+きゃ	kya
+きゅ	kyu
+きょ	kyo
+しゃ	sha sya
+しゅ	shu syu
+しょ	sho syo
+ちゃ	cha tya
+ちゅ	chu tyu
+ちょ	cho tyo
+にゃ	nya
+にゅ	nyu
+にょ	nyo
+ひゃ	hya
+ひゅ	hyu
+ひょ	hyo
+みゃ	mya
+みゅ	myu
+みょ	myo
+りゃ	rya
+りゅ	ryu
+りょ	ryo
+ぎゃ	gya
+ぎゅ	gyu
+ぎょ	gyo
+じゃ	ja zya jya
+じゅ	ju zyu jyu
+じょ	jo zyo jyo
+びゃ	bya
+びゅ	byu
+びょ	byo
+ぴゃ	pya
+ぴゅ	pyu
+ぴょ	pyo
+ふぁ	fa
+ふぃ	fi
+ふぇ	fe
+ふぉ	fo
+てぃ	ti
+でぃ	di
+とぅ	tu
+どぅ	du
+うぇ	we
+うぃ	wi
+ゔぁ	va
+ゔぃ	vi
+ゔぇ	ve
+ゔぉ	vo
+# --- 2 字符（片假名同上）---
+キャ	kya
+キュ	kyu
+キョ	kyo
+シャ	sha sya
+シュ	shu syu
+ショ	sho syo
+チャ	cha tya
+チュ	chu tyu
+チョ	cho tyo
+ニャ	nya
+ニュ	nyu
+ニョ	nyo
+ヒャ	hya
+ヒュ	hyu
+ヒョ	hyo
+ミャ	mya
+ミュ	myu
+ミョ	myo
+リャ	rya
+リュ	ryu
+リョ	ryo
+ギャ	gya
+ギュ	gyu
+ギョ	gyo
+ジャ	ja zya jya
+ジュ	ju zyu jyu
+ジョ	jo zyo jyo
+ビャ	bya
+ビュ	byu
+ビョ	byo
+ピャ	pya
+ピュ	pyu
+ピョ	pyo
+ファ	fa
+フィ	fi
+フェ	fe
+フォ	fo
+ティ	ti
+ディ	di
+トゥ	tu
+ドゥ	du
+ウェ	we
+ウィ	wi
+ヴァ	va
+ヴィ	vi
+ヴェ	ve
+ヴォ	vo
+# --- 1 字符：平假名 ---
+あ	a
+い	i
+う	u
+え	e
+お	o
+か	ka
+き	ki
+く	ku
+け	ke
+こ	ko
+が	ga
+ぎ	gi
+ぐ	gu
+げ	ge
+ご	go
+さ	sa
+し	shi si
+す	su
+せ	se
+そ	so
+ざ	za
+じ	ji zi
+ず	zu
+ぜ	ze
+ぞ	zo
+た	ta
+ち	chi ti
+つ	tsu tu
+て	te
+と	to
+だ	da
+ぢ	ji zi di
+づ	zu du
+で	de
+ど	do
+な	na
+に	ni
+ぬ	nu
+ね	ne
+の	no
+は	ha
+ひ	hi
+ふ	fu hu
+へ	he
+ほ	ho
+ば	ba
+び	bi
+ぶ	bu
+べ	be
+ぼ	bo
+ぱ	pa
+ぴ	pi
+ぷ	pu
+ぺ	pe
+ぽ	po
+ま	ma
+み	mi
+む	mu
+め	me
+も	mo
+や	ya
+ゆ	yu
+よ	yo
+ら	ra
+り	ri
+る	ru
+れ	re
+ろ	ro
+わ	wa
+ゐ	wi
+ゑ	we
+を	wo o
+ん	n
+ゔ	vu
+ゕ	ka
+ゖ	ke
+# 小写假名（単独出現時は親字と同じ音）
+ぁ	a
+ぃ	i
+ぅ	u
+ぇ	e
+ぉ	o
+ゃ	ya
+ゅ	yu
+ょ	yo
+ゎ	wa
+っ	(geminate)
+ー	(long)
+# --- 1 字符：片假名 ---
+ア	a
+イ	i
+ウ	u
+エ	e
+オ	o
+カ	ka
+キ	ki
+ク	ku
+ケ	ke
+コ	ko
+ガ	ga
+ギ	gi
+グ	gu
+ゲ	ge
+ゴ	go
+サ	sa
+シ	shi si
+ス	su
+セ	se
+ソ	so
+ザ	za
+ジ	ji zi
+ズ	zu
+ゼ	ze
+ゾ	zo
+タ	ta
+チ	chi ti
+ツ	tsu tu
+テ	te
+ト	to
+ダ	da
+ヂ	ji zi di
+ヅ	zu du
+デ	de
+ド	do
+ナ	na
+ニ	ni
+ヌ	nu
+ネ	ne
+ノ	no
+ハ	ha
+ヒ	hi
+フ	fu hu
+ヘ	he
+ホ	ho
+バ	ba
+ビ	bi
+ブ	bu
+ベ	be
+ボ	bo
+パ	pa
+ピ	pi
+プ	pu
+ペ	pe
+ポ	po
+マ	ma
+ミ	mi
+ム	mu
+メ	me
+モ	mo
+ヤ	ya
+ユ	yu
+ヨ	yo
+ラ	ra
+リ	ri
+ル	ru
+レ	re
+ロ	ro
+ワ	wa
+ヰ	wi
+ヱ	we
+ヲ	wo o
+ン	n
+ヴ	vu
+ヵ	ka
+ヶ	ke
+# 半角片假名（NFKC 会折叠成全角；此处兜底）
+ｱ	a
+ｲ	i
+ｳ	u
+ｴ	e
+ｵ	o
+ｶ	ka
+ｷ	ki
+ｸ	ku
+ｹ	ke
+ｺ	ko
+ｻ	sa
+ｼ	shi si
+ｽ	su
+ｾ	se
+ｿ	so
+ﾀ	ta
+ﾁ	chi ti
+ﾂ	tsu tu
+ﾃ	te
+ﾄ	to
+ﾅ	na
+ﾆ	ni
+ﾇ	nu
+ﾈ	ne
+ﾉ	no
+ﾊ	ha
+ﾋ	hi
+ﾌ	fu hu
+ﾍ	he
+ﾎ	ho
+ﾏ	ma
+ﾐ	mi
+ﾑ	mu
+ﾒ	me
+ﾓ	mo
+ﾔ	ya
+ﾕ	yu
+ﾖ	yo
+ﾗ	ra
+ﾘ	ri
+ﾙ	ru
+ﾚ	re
+ﾛ	ro
+ﾜ	wa
+ﾝ	n

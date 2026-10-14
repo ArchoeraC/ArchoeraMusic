@@ -3263,6 +3263,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Vault est expérimental : des cookies peuvent être perdus après le changement.';
 
   @override
+  String get settingsSchemeUnsupportedLegacy =>
+      'Cet hôte na pas de trousseau système utilisable (Linux nécessite Secret Service / libsecret) : LEGACY ne peut donc pas être activé. Rien na été modifié — choisissez FILK (clé en fichier) ou Vault.';
+
+  @override
   String get settingsSchemeSwitchToFileWarning =>
       'Le mode FILK est un repli de compatibilité : la clé maîtresse vit dans un fichier local. S\'il fuit, tous les identifiants sont exposés. Réservé aux environnements headless/Docker sans trousseau OS.';
 
@@ -3279,6 +3283,10 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get toastSchemeSwitched =>
       'Méthode de chiffrement changée ; effective après redémarrage';
+
+  @override
+  String get toastSchemeSwitchFailedKept =>
+      'Échec du changement ; le schéma de chiffrement précédent est conservé (aucun identifiant perdu).';
 
   @override
   String get settingsVaultModeV1 => 'v1 Protection système';
@@ -3697,6 +3705,23 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsFontCreditsText =>
       'Ce logiciel intègre les polices suivantes :\n· MiSans (© Xiaomi, selon l\'accord de licence de propriété intellectuelle de la police MiSans)\n· Manrope (© The Manrope Project Authors, SIL Open Font License 1.1)\n· EtaIcons (police d\'icônes maison ; glyphes de MingCute / Tabler / Lucide)\n· EtaMark (police de marque maison)\n\nLes textes officiels complets des licences figurent ci-dessous.';
+
+  @override
+  String get settingsSectionThirdPartyLicenses => 'Licences tierces';
+
+  @override
+  String get settingsThirdPartyNative => 'Dépendances natives intégrées';
+
+  @override
+  String get settingsThirdPartyPackages => 'Paquets Dart / Flutter';
+
+  @override
+  String get settingsThirdPartyLicensesText =>
+      'Ce logiciel intègre ou lie les composants open source tiers suivants. Ils sont regroupés ci-dessous par **texte de licence**, avec la licence complète de chaque composant (les textes juridiques ne sont pas traduits) :\n· Dépendances natives intégrées : bibliothèques tierces compilées dans les modules natifs ou liées dynamiquement ;\n· Paquets Dart / Flutter : dépendances `pub`, agrégées à l\'exécution à partir des licences enregistrées par chaque paquet.\n\nConsultez le répertoire fourni `licenses/` et `THIRD-PARTY-NOTICES.md` pour la liste complète et les notes par composant.';
+
+  @override
+  String get settingsThirdPartyLicensesEntryDesc =>
+      'Voir les licences des dépendances intégrées et des composants open source';
 
   @override
   String get commonNoLyrics => 'Pas de paroles';
@@ -4641,6 +4666,104 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get settingsScanQuarantineClearAllConfirm =>
       'Supprimer tous les fichiers du dossier de quarantaine ? Cette action est irréversible.';
+
+  @override
+  String get settingsCatSearchIndex => 'Recherche locale';
+
+  @override
+  String get settingsSearchIndexSubtitle =>
+      'Index de recherche de la bibliothèque locale · désactivé par défaut · une fois activé, tri par pertinence des paroles et métadonnées';
+
+  @override
+  String get settingsSectionSearchIndex =>
+      'Index de recherche de la bibliothèque locale';
+
+  @override
+  String get settingsSearchIndexEnable =>
+      'Activer l\'index de recherche de la bibliothèque locale';
+
+  @override
+  String get settingsSearchIndexEnableOn =>
+      'Activé : l\'index est construit en arrière-plan, recherche triée par pertinence (paroles / pinyin)';
+
+  @override
+  String get settingsSearchIndexEnableOff =>
+      'Désactivé : recherche de base uniquement (titre / artiste / album), sans index ni espace disque';
+
+  @override
+  String get settingsSearchIndexLrc => 'Indexer les paroles .lrc adjacentes';
+
+  @override
+  String get settingsSearchIndexLrcDesc =>
+      'Indexer aussi les paroles .lrc du même nom que l\'audio (nécessite l\'interrupteur principal)';
+
+  @override
+  String get settingsSearchIndexNote =>
+      'L\'index est une donnée dérivée : désactivé par défaut et gratuit ; son activation consomme du temps et du disque en arrière-plan (quelques centaines de Mo pour 10 000 titres) ; en cas d\'échec, retour automatique à la recherche de base.';
+
+  @override
+  String get settingsSectionSearchIndexStatus => 'État et maintenance';
+
+  @override
+  String get settingsSearchIndexStatusDisabled => 'Désactivé';
+
+  @override
+  String get settingsSearchIndexStatusReady => 'Index prêt';
+
+  @override
+  String get settingsSearchIndexStatusBuilding => 'Construction de l\'index…';
+
+  @override
+  String get settingsSearchIndexStatusPending =>
+      'Non prêt (construit à la première recherche ou lors d\'une reconstruction)';
+
+  @override
+  String settingsSearchIndexStatusError({required String reason}) {
+    return 'Index indisponible : $reason (retour à la recherche de base)';
+  }
+
+  @override
+  String settingsSearchIndexProgress({
+    required String phase,
+    required int processed,
+    required int total,
+  }) {
+    return 'Construction : $phase　$processed/$total';
+  }
+
+  @override
+  String settingsSearchIndexLastResult({
+    required int indexed,
+    required int duration,
+  }) {
+    return 'Dernière construction : $indexed titres en ${duration}s';
+  }
+
+  @override
+  String settingsSearchIndexSize({required String size}) {
+    return 'Taille de l\'index : $size';
+  }
+
+  @override
+  String get settingsSearchIndexRebuild => 'Reconstruire l\'index';
+
+  @override
+  String get settingsSearchIndexDelete => 'Supprimer l\'index';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmTitle =>
+      'Supprimer l\'index de recherche ?';
+
+  @override
+  String get settingsSearchIndexDeleteConfirmBody =>
+      'Libère l\'espace disque utilisé par l\'index ; il sera reconstruit à la prochaine recherche. La bibliothèque et les fichiers source ne sont pas affectés.';
+
+  @override
+  String get settingsSearchIndexDeleted => 'Index de recherche supprimé';
+
+  @override
+  String get settingsSearchIndexRebuildStarted =>
+      'Reconstruction de l\'index lancée';
 
   @override
   String get libraryFullScan => 'Analyse complète';

@@ -16,6 +16,12 @@ abstract class SessionStore {
   Map<String, String> get(String platform);
   void save(String platform, Map<String, String> cookies);
   void clear(String platform);
+
+  /// 凭据库是否处于**未解锁/不可用**态（锁定）。
+  ///
+  /// 消费方据此**不得缓存空结果**：库锁定期间读到的空会话不代表「真的没登录」，
+  /// 解锁后必须重新读（否则登录态永远恢复不了——2026-10-14 实录）。
+  bool get isLocked => false;
 }
 
 /// 歌词接口返回缓存
@@ -112,6 +118,9 @@ class _MemSessionStore implements SessionStore {
 
   @override
   void clear(String platform) => _map[platform] = {};
+
+  @override
+  bool get isLocked => false; // 纯内存实现：无凭据库，永不「锁定」
 }
 
 class _MemLyricCacheStore implements LyricCacheStore {

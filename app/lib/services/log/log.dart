@@ -123,6 +123,15 @@ class Log {
     } catch (_) {
       _binding = null;
     }
+    _initFinished = true;
+    // 补发初始化前的日志（此刻原生核心已就绪 → 与其余行同样按级别着色）。
+    if (_preInitLogs.isNotEmpty) {
+      final pending = List.of(_preInitLogs);
+      _preInitLogs.clear();
+      for (final p in pending) {
+        _emit(p.level, p.tag, p.text);
+      }
+    }
     _hookDebugPrint();
   }
 
@@ -214,9 +223,26 @@ class Log {
     }).join('\n');
   }
 
+  /// 原生核心就绪**前**产生的日志暂存（在 [init] 收尾统一发射）。
+  ///
+  /// 为什么需要：`Log.init` 内部先做**原生库完整性校验**，而它的告警
+  /// （`[ffi] 完整性清单缺少 .sig1 签名…`）就发生在初始化**之前** —— 此时既无
+  /// 原生核心、Dart 侧 `stderr.hasTerminal` 也尚未就绪（Flutter 引擎还没接管
+  /// stdio），着色判断失败 → **该行无色**（2026-10-14 实录：PTY 下仅此行为无色）。
+  /// 暂存到 init 结束后再发射即可与其余行一致（走原生核心按级别着色）。
+  static final List<({LogLevel level, String? tag, String text})> _preInitLogs = [];
+  static bool _initFinished = false;
+
   static void _emit(LogLevel level, String? tag, Object? message) {
     if (level.value < minLevel.value) return;
     final text = scrub('${message ?? ''}');
+    // 初始化前：暂存（上限 64 条，避免异常路径无限堆积）。
+    if (!_initFinished && _binding == null) {
+      if (_preInitLogs.length < 64) {
+        _preInitLogs.add((level: level, tag: tag, text: text));
+      }
+      return;
+    }
     final binding = _binding;
     if (binding != null) {
       try {

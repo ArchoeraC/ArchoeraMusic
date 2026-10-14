@@ -8,6 +8,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:archoera_music/services/security/vault_process.dart';
+import 'package:archoera_music/services/security/vault_switch_snapshot.dart';
 
 /// vault 会话（credential-vault-plan §3.7/§3.8）端到端测试（真实二进制）：
 ///   1. crypto/file 正常会话：set/get 中文往返 + 正常收尾 marker=ok
@@ -48,6 +49,36 @@ void main() {
     return tmp;
   }
 
+  // 切换方案预检（`canInitCrypto`）：契约是「返回布尔、不抛、**不触碰数据目录**」。
+  // 本机是否支持 LEGACY（系统钥匙串）因平台而异（Linux 无 Secret Service → false），
+  // 故这里只断言契约与数据目录安全，不硬编码平台结论。
+  // 需要真实 vault 二进制；未设置 ARCHOERA_VAULT_BIN 时用 dev 兜底解析（可能失败 → 跳过）。
+  test('canInitCrypto：返回布尔且不触碰数据目录（预检不得破坏现有容器）', () async {
+    if (!VaultProcess.available) {
+      markTestSkipped('vault 二进制不可用，跳过');
+      return;
+    }
+    final tmp = await makeTmp('vault_probe');
+    final sentinel = File('${tmp.path}/credentials.vault');
+    sentinel.writeAsStringSync('SENTINEL-CONTAINER', flush: true);
+    final before = sentinel.readAsStringSync();
+
+    final ok = await VaultProcess.canInitCrypto();
+
+    expect(ok, isA<bool>(), reason: '预检必须给出布尔结论（不抛异常）');
+    expect(sentinel.existsSync(), isTrue, reason: '预检不得删除现有容器');
+    expect(sentinel.readAsStringSync(), before, reason: '预检不得改动现有容器内容');
+    // 预检也不得在数据目录里留下锚点 / 标记 / 备份等痕迹
+    for (final name in [
+      'vault.auth',
+      'vault.marker',
+      'device.key',
+      VaultSwitchSnapshot.dirName,
+    ]) {
+      expect(File('${tmp.path}/$name').existsSync(), isFalse, reason: '$name 不该出现');
+    }
+  });
+
   // 读取 'S'（slots）文件头首个口令槽的 Argon2id 参数（m/t/p，u32 小端）。
   // 布局：magic(4)+version(1)+vaultId(16)+createdAt(8)+alg(1)+slotCount(1)
   //       +slot[0].kind(1) → m@32 / t@36 / p@40。
@@ -59,6 +90,25 @@ void main() {
     expect(b[4], 'S'.codeUnitAt(0), reason: '应为 slots（S）模式文件头');
     return (m: u32(b, 32), t: u32(b, 36), p: u32(b, 40));
   }
+
+  test('verifyUnlock 自验证：正确口令通过 / 错误口令抛错（防「新库口令对不上」丢库）', () async {
+    final tmp = await makeTmp('vault_v4_verify');
+    if (!VaultProcess.available) {
+      markTestSkipped('vault 不可用，跳过');
+      return;
+    }
+    const pw = 'correct-horse-battery';
+    await VaultProcess.initM2a(tmp.path, pw, kdfM: 8192, kdfT: 1, kdfP: 1);
+
+    // 正确口令：自验证通过（切换流程据此才敢丢弃旧容器）
+    await VaultProcess.verifyUnlock(tmp.path, password: pw);
+
+    // 错误口令：必须抛（否则切换会把旧库丢掉、新库又打不开）
+    await expectLater(
+      VaultProcess.verifyUnlock(tmp.path, password: 'wrong-password'),
+      throwsA(isA<VaultException>()),
+    );
+  }, skip: skipNoTestBin);
 
   test('crypto/file 正常会话：set/get 中文往返 + marker=ok', () async {
     final tmp = await makeTmp('vault_v4_normal');

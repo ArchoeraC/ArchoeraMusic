@@ -253,20 +253,22 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
 endif()
 
 # === ArchoeraMusic 原生产物打包（FFI 直连，降低运行时依赖）===
-# 引擎模块位于 app/core/{audio-engine,scanner,scraper,subsonic}（app 内部，路径关系固定，
-# 可随 app 独立部署），产物统一安装进 bundle/native/ 平铺（对齐 ffi-libs-layout 计划；
-# NativeLibPaths 祖先链优先查 native/，随后回退旧 <module>/build 布局）：
+# 引擎模块位于 app/core/{audio-engine,scanner,indexer,scraper,subsonic}（app 内部，
+# 路径关系固定，可随 app 独立部署），产物统一安装进 bundle/native/ 平铺（对齐
+# ffi-libs-layout 计划；NativeLibPaths 祖先链优先查 native/，随后回退旧 <module>/build 布局）：
 #   bundle/native/{archoera-audio-engine,libarchoera_mediaengine.so,libfft.so}
 #   bundle/native/{scanner-ffi.so,libe_sqlite3.so}
+#   bundle/native/{indexer-ffi.so}（libe_sqlite3.so 已由 scanner 提供，indexer 仅兜底）
 #   bundle/native/{libarchoera_scraper.so}
 #   bundle/native/{libarchoera_subsonic.so,libarchoera_transcoder.so}
 #   bundle/native/{archoera-vault}
 #   bundle/native/libarchoera_downloader.so
-# 产物由独立构建链产出（audio-engine/scraper: cmake; scanner: dotnet publish;
+# 产物由独立构建链产出（audio-engine/scraper: cmake; scanner/indexer: dotnet publish;
 # subsonic: build.sh 即 cargo + go; downloader: cargo; vault(Linux): cargo vault-rs）。
 # OPTIONAL：源产物缺失时跳过（如未构建 subsonic 仍可跑 Flutter 构建）。
 set(ENGINE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/audio-engine/build")
 set(SCANNER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scanner/build")
+set(INDEXER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/indexer/build")
 set(SCRAPER_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/scraper/build")
 set(SUBSONIC_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/subsonic/build")
 
@@ -288,6 +290,16 @@ install(FILES "${SCANNER_SRC_DIR}/libarchoera_kernel.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/libe_sqlite3.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# 本地曲库搜索索引库（indexer-ffi，.NET NativeAOT；NativeModule.indexer 按需加载，
+# 总开关默认关）。源产物由 core/indexer/build.sh 产出（独立构建链）。
+install(FILES "${INDEXER_SRC_DIR}/indexer-ffi.so"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+# libe_sqlite3 兜底：indexer 亦随包分发同版本（与 scanner 同 NuGet 包）；
+# 仅当 scanner 目录缺失时由 indexer 补齐，避免与上方同名产物重复安装。
+if(NOT EXISTS "${SCANNER_SRC_DIR}/libe_sqlite3.so")
+  install(FILES "${INDEXER_SRC_DIR}/libe_sqlite3.so"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
+endif()
 install(FILES "${SCRAPER_SRC_DIR}/libarchoera_scraper.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SUBSONIC_SRC_DIR}/libarchoera_subsonic.so"

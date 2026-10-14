@@ -78,9 +78,12 @@ KDF 参数有**上限与下限**（[VaultLimits.ValidateKdf]：`m∈[8192 KiB, 2
   **免疫加载器注入**：静态二进制不依赖 `ld.so`，`LD_PRELOAD` / `LD_AUDIT` /
   `LD_LIBRARY_PATH` 对其**完全失效**——这是 [vault-enhanced-scheme.md §13-A](vault-enhanced-scheme.md)
   「LD_PRELOAD 曾经完全失守」的**根治**；C# NativeAOT 因链接器限制无法静态化（§13-E）。
-  Linux 上 crypto 模式走 **`file` 后端**（`secret.key`，0600；单因子降级，选用须知悉），
-  slots（m1/m2a/m2b）本就自包含、不依赖 OS store；**不使用 libsecret**（Rust 侧
-  libsecret 仍为桩）。
+  Linux 上 crypto 模式走 **`libsecret`（Secret Service / `org.freedesktop.Secret`）**——
+  纯 Rust 直连 D-Bus（`src/secret_service.rs`，无新依赖；沙箱已放行 `AF_UNIX`），
+  schema `archoera.vault` + 数据目录作用域 account（与 C# 时代逐字一致 → 老条目可读）；
+  **无 D-Bus / 钥匙串锁定时明确报错（fail-closed），不静默降级**；headless 环境可显式
+  选用 `file` 后端（`secret.key`，0600；单因子降级，选用须知悉）。slots（m1/m2a/m2b）
+  本就自包含、不依赖 OS store。
 - **Windows**：crypto 模式走 **DPAPI**（`CryptProtectData` / `CryptUnprotectData`，
   `CRYPTPROTECT_UI_FORBIDDEN`，密文落 `<dataDir>/sshare.bin`，后端指纹 `dpapi`）；
   以 `cargo build --release --target x86_64-pc-windows-msvc -C target-feature=+crt-static`

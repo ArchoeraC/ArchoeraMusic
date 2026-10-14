@@ -22,6 +22,15 @@ extension _SongRowView on _SongRowState {
               .watch(maxAsync)
               .maybeWhen(data: (v) => v, orElse: () => null);
     final bestQuality = _bestQuality(item, l10n, maxQuality: maxQuality);
+    // 搜索结果高亮（关闭态 / 非搜索态 highlightOf == null → 零调用、零成本）。
+    final highlightOf = widget.highlightOf;
+    final subtitle = _subtitleText(prefs, l10n);
+    final titleRanges = highlightOf?.call(item.title);
+    final subtitleRanges = highlightOf?.call(subtitle);
+    final hasAlbumName = item.album?.name.isNotEmpty == true;
+    final albumText = hasAlbumName ? item.album!.name : l10n.commonUnknownAlbum;
+    // 占位「未知专辑」不做高亮（无意义命中）。
+    final albumRanges = hasAlbumName ? highlightOf?.call(albumText) : null;
 
     return Listener(
       // 右键 → 自绘上下文菜单（PointerEvent.position 为全局坐标）；
@@ -122,8 +131,10 @@ extension _SongRowView on _SongRowState {
                                       child: _SourceBadge(source: item.source),
                                     ),
                                   Flexible(
-                                    child: Text(
+                                    child: _highlightedText(
+                                      context,
                                       item.title,
+                                      titleRanges,
                                       style: theme.textTheme.bodyLarge
                                           ?.copyWith(
                                             fontWeight: FontWeight.w500,
@@ -142,9 +153,11 @@ extension _SongRowView on _SongRowState {
                               Row(
                                 children: [
                                   Flexible(
-                                    child: Text(
+                                    child: _highlightedText(
+                                      context,
                                       // 副标题：歌手 + 可选别名（强迫症预设控制）
-                                      _subtitleText(prefs, l10n),
+                                      subtitle,
+                                      subtitleRanges,
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
                                             color: isPlaying
@@ -207,6 +220,24 @@ extension _SongRowView on _SongRowState {
                                     ),
                                 ],
                               ),
+                              // 歌词命中行内片段：仅当片段非空时新增一行（次要
+                              // 样式、单行省略）；为 null 时布局与现状逐像素一致。
+                              if (widget.lyricSnippet != null &&
+                                  widget.lyricSnippet!.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.lyricSnippet!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontSize: 11,
+                                    height: 1.2,
+                                    fontStyle: FontStyle.italic,
+                                    color: theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.85),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -218,10 +249,10 @@ extension _SongRowView on _SongRowState {
                   if (widget.showAlbum) ...[
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Text(
-                        item.album?.name.isNotEmpty == true
-                            ? item.album!.name
-                            : l10n.commonUnknownAlbum,
+                      child: _highlightedText(
+                        context,
+                        albumText,
+                        albumRanges,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: isPlaying
                               ? primary.withValues(alpha: 0.7)
@@ -264,6 +295,61 @@ extension _SongRowView on _SongRowState {
       ),
     );
   }
+}
+
+/// 按命中区间渲染文本（搜索结果高亮）。
+///
+/// [ranges] 为空（含 [SongRow.highlightOf] 未传）时返回与旧实现**逐像素一致**的
+/// 普通 [Text]（同 style / maxLines / overflow / textAlign）；有命中时改用
+/// [Text.rich]——**不改变字号 / 行高 / 字重**，仅在命中段叠加 `primary` 颜色 +
+/// 轻背景，故不引起布局跳动。
+Widget _highlightedText(
+  BuildContext context,
+  String text,
+  List<MatchRange>? ranges, {
+  TextStyle? style,
+  int? maxLines,
+  TextOverflow? overflow,
+  TextAlign? textAlign,
+}) {
+  if (ranges == null || ranges.isEmpty) {
+    return Text(
+      text,
+      style: style,
+      maxLines: maxLines,
+      overflow: overflow,
+      textAlign: textAlign,
+    );
+  }
+  final primary = Theme.of(context).colorScheme.primary;
+  final highlightStyle = TextStyle(
+    color: primary,
+    backgroundColor: primary.withValues(alpha: 0.16),
+  );
+  final spans = <TextSpan>[];
+  var cursor = 0;
+  for (final range in ranges) {
+    final start = range.start.clamp(0, text.length);
+    final end = range.end.clamp(start, text.length);
+    if (start > cursor) {
+      spans.add(TextSpan(text: text.substring(cursor, start)));
+    }
+    if (end > start) {
+      spans.add(
+        TextSpan(text: text.substring(start, end), style: highlightStyle),
+      );
+    }
+    cursor = end;
+  }
+  if (cursor < text.length) {
+    spans.add(TextSpan(text: text.substring(cursor)));
+  }
+  return Text.rich(
+    TextSpan(style: style, children: spans),
+    maxLines: maxLines,
+    overflow: overflow,
+    textAlign: textAlign,
+  );
 }
 
 /// 行内红心切换按钮（填充红 = 已喜欢；点击不冒泡到行播放）。

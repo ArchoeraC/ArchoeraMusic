@@ -44,17 +44,48 @@ mixin _LibraryStorePager on Notifier<LibraryState> {
   bool get _hasInFlight => _inFlight.containsValue(_pagerEpoch);
 
   /// 清空页缓存 + 载入第一页（含当前搜索条件）+ 曲库聚合统计。
+  ///
+  /// 搜索路径二选一（设计文档 §2.4 / §9.3）：
+  /// - **总开关关闭 / 查询为空 / 失败**：既有 `LIKE`（`db.listTracks`）——等价现状；
+  /// - **总开关开启 + 查询非空 + 索引就绪**：`SearchService` 命中的**有序 id**
+  ///   → 按排行切片取行（`db.listTracksByIds`），`totalCount` = 命中的 id 数。
   Future<void> _reloadTracks() async {
     _pagerEpoch++;
     _pageRecency.clear();
     _failedPages.clear();
     final epoch = _pagerEpoch;
+    final query = state.searchQuery;
+    // 索引排行：仅总开关开启 + 查询非空才触碰 SearchService（关闭时零成本）。
+    List<String>? ranked;
+    if (shouldUseSearchIndex(
+      query,
+      appPrefsSnapshot?.enableLocalSearchIndex == true,
+    )) {
+      ranked = await resolveRankedSearch(query, SearchService.instance.search);
+      if (epoch != _pagerEpoch) return; // 期间又发生一次 reload：本次作废
+    }
     try {
       final db = TracksDb.open();
-      final query = state.searchQuery;
-      final tracks = db.listTracks(limit: pageSize, query: query);
-      final count = db.countTracks(query: query);
+      final List<TrackRow> tracks;
+      final int count;
+      if (ranked != null) {
+        // 以排行顺序为准；剔除已不在 library.db 的陈旧 id，保持分页切片对齐。
+        final ids = db.existingTrackIds(ranked);
+        ranked = ids;
+        count = ids.length;
+        tracks = ids.isEmpty
+            ? const []
+            : db.listTracksByIds(ids.take(pageSize).toList());
+      } else {
+        tracks = db.listTracks(limit: pageSize, query: query);
+        count = db.countTracks(query: query);
+      }
       final stats = db.stats();
+      // 歌词命中片段：仅索引排行路径 + 查询非空时计算（查询空 / LIKE 路径零成本）。
+      // 在页加载异步路径用同一连接批量取歌词（见 search_lyric_snippet.dart）。
+      final snippets = ranked != null
+          ? buildLyricSnippets(tracks, query, loadLyrics: db.lyricsByIds)
+          : const <String, String>{};
       db.close();
       if (epoch != _pagerEpoch) return; // 期间又发生一次 reload：本次作废
       final pages = <int, List<TrackRow>>{};
@@ -65,6 +96,9 @@ mixin _LibraryStorePager on Notifier<LibraryState> {
       state = state.copyWith(
         trackPages: pages,
         totalCount: count,
+        rankedIds: ranked ?? const [],
+        searchIndexActive: ranked != null,
+        lyricSnippets: snippets,
         totalSizeBytes: stats.totalSize,
         totalDurationMs: stats.totalDurationMs,
         hasMore: pages.length < _pageCount(count),
@@ -76,6 +110,9 @@ mixin _LibraryStorePager on Notifier<LibraryState> {
       state = state.copyWith(
         trackPages: const {},
         totalCount: 0,
+        rankedIds: const [],
+        searchIndexActive: false,
+        lyricSnippets: const {},
         totalSizeBytes: 0,
         totalDurationMs: 0,
         hasMore: false,
@@ -152,16 +189,39 @@ mixin _LibraryStorePager on Notifier<LibraryState> {
     // 微任务/直接调用时已离开 build：可安全置加载态（尾部加载指示用）。
     if (!state.loadingMore) state = state.copyWith(loadingMore: true);
     List<TrackRow>? rows;
+    Map<String, String> snippets = const {};
     try {
       final db = TracksDb.open();
-      rows = db.listTracks(
-        limit: pageSize,
-        offset: page * pageSize,
-        query: state.searchQuery,
-      );
+      if (state.searchIndexActive) {
+        // 索引排行路径：按排名切片（[rankedIds] 为已剔重 / 已存在的有序 id）。
+        final ids = state.rankedIds;
+        final start = page * pageSize;
+        final List<TrackRow> pageRows;
+        if (start >= ids.length) {
+          pageRows = const [];
+        } else {
+          pageRows = db.listTracksByIds(
+            ids.sublist(start, min(start + pageSize, ids.length)),
+          );
+        }
+        rows = pageRows;
+        // 歌词命中片段：同一只读连接批量取歌词（仅排行路径；非排行路径不计算）。
+        snippets = buildLyricSnippets(
+          pageRows,
+          state.searchQuery,
+          loadLyrics: db.lyricsByIds,
+        );
+      } else {
+        rows = db.listTracks(
+          limit: pageSize,
+          offset: page * pageSize,
+          query: state.searchQuery,
+        );
+      }
       db.close();
     } catch (_) {
       rows = null;
+      snippets = const {};
     }
     if (_inFlight[page] == epoch) _inFlight.remove(page);
     // 期间 searchQuery / 曲库已变（epoch 自增）：丢弃过期结果。
@@ -174,11 +234,18 @@ mixin _LibraryStorePager on Notifier<LibraryState> {
       state = state.copyWith(loadingMore: _hasInFlight);
       return;
     }
-    _insertPage(page, rows);
+    _insertPage(page, rows, snippets);
   }
 
   /// 插入一页；驻留超限时按 LRU 淘汰最久未用页（刚插入页不参与淘汰）。
-  void _insertPage(int page, List<TrackRow> rows) {
+  ///
+  /// [snippets] 为本页的歌词命中片段（非排行路径为空）；与既有片段合并后**裁剪
+  /// 到仍在驻留页的行**，避免随滚动无界增长。
+  void _insertPage(
+    int page,
+    List<TrackRow> rows,
+    Map<String, String> snippets,
+  ) {
     final next = Map<int, List<TrackRow>>.of(state.trackPages);
     _failedPages.remove(page);
     next[page] = rows;
@@ -198,11 +265,33 @@ mixin _LibraryStorePager on Notifier<LibraryState> {
       next.remove(victim);
       _pageRecency.remove(victim);
     }
+    final mergedSnippets = _mergeSnippets(next, snippets);
     state = state.copyWith(
       trackPages: next,
+      lyricSnippets: mergedSnippets,
       hasMore: next.length < _pageCount(state.totalCount),
       loadingMore: _hasInFlight,
       error: null,
     );
+  }
+
+  /// 合并本页片段并裁剪到驻留页行（无片段且既有为空时零分配）。
+  Map<String, String> _mergeSnippets(
+    Map<int, List<TrackRow>> pages,
+    Map<String, String> snippets,
+  ) {
+    final existing = state.lyricSnippets;
+    if (existing.isEmpty && snippets.isEmpty) return const {};
+    final resident = <String>{};
+    for (final rows in pages.values) {
+      for (final row in rows) {
+        resident.add(row.id);
+      }
+    }
+    return {
+      for (final entry in existing.entries)
+        if (resident.contains(entry.key)) entry.key: entry.value,
+      ...snippets,
+    };
   }
 }

@@ -193,8 +193,8 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
           ],
         ),
         const SizedBox(height: 12),
-        // ── 法律与声明（软件声明 / 隐私政策 / 字体署名；长文收进弹窗）──
-        // 一行内以引导语衔接三个文字链接，点击打开对应弹窗，避免撑开关于页；
+        // ── 法律与声明（软件声明 / 隐私政策 / 字体署名 / 第三方开源许可；长文收进弹窗）──
+        // 一行内以引导语衔接若干文字链接，点击打开对应弹窗，避免撑开关于页；
         // 空间不足时 Wrap 自动折行。
         SettingSection(
           title: l10n.settingsSectionLegal,
@@ -226,6 +226,11 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
                   _legalLink(
                     l10n.settingsSectionFontCredits,
                     () => showFontCreditsDialog(context),
+                    separated: true,
+                  ),
+                  _legalLink(
+                    l10n.settingsSectionThirdPartyLicenses,
+                    () => showThirdPartyLicensesDialog(context),
                     separated: true,
                   ),
                 ],

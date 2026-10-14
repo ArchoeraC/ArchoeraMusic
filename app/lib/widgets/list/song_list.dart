@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
+import '../../services/search/search_highlight.dart';
 import '../../stores/app_prefs.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
@@ -55,6 +56,8 @@ class SongList extends ConsumerStatefulWidget {
     this.loadAllItems,
     this.onBatchEditMetadata,
     this.onBatchAddToPlaylist,
+    this.highlightOf,
+    this.lyricSnippetOf,
   });
 
   final List<Track> items;
@@ -120,6 +123,21 @@ class SongList extends ConsumerStatefulWidget {
   ///
   /// 仅网易云曲目场景由宿主接入（目标为 NT 自建歌单）；其余来源不传。
   final Future<void> Function(List<Track> tracks)? onBatchAddToPlaylist;
+
+  /// 可选搜索结果高亮（给定展示文本 → 命中区间），默认 `null`。
+  ///
+  /// 为 `null` 时列表渲染与不传该参数时**逐像素一致**（关闭态 / 非搜索态零成本）；
+  /// 打开态由宿主传入 `SearchHighlighter`（记忆化，见
+  /// `services/search/search_highlight.dart`）。
+  final List<MatchRange> Function(String text)? highlightOf;
+
+  /// 可选歌词命中**行内片段**（`trackId → 命中窗口文本`）。
+  ///
+  /// 为 `null`（默认）时行渲染与不传该参数时**逐像素一致**（关闭态 / 非搜索态
+  /// 零成本）；打开态由宿主传入 `LibraryState.lyricSnippets` 的查表回调。片段在
+  /// **页加载异步路径**算好并缓存，本回调只做 O(1) 查表（见
+  /// `services/search/search_lyric_snippet.dart`）。
+  final String? Function(Track track)? lyricSnippetOf;
 
   @override
   ConsumerState<SongList> createState() => _SongListState();

@@ -1,0 +1,81 @@
+<Project>
+
+  <!-- 关键：中间/输出产物移出 indexer 目录树，且必须在 Sdk.props 导入前设置。
+       否则本嵌套项目 obj/ 下生成的 *.AssemblyInfo.cs / *.GlobalUsings.g.cs 会被父
+       `app/core/indexer/indexer.csproj` 的 `**/*.cs` 默认通配吸入 → 「特性重复」等编译
+       错误（与 tests/ 需在其 csproj 显式 Remove 同理；但 bench 不改生产 csproj，只能把
+       自己的 obj/bin 挪到系统临时目录）。用显式 Sdk.props/targets 导入以满足该顺序。 -->
+  <PropertyGroup>
+    <BenchArtifactsRoot>$([System.IO.Path]::GetTempPath())archoera-indexer-bench/</BenchArtifactsRoot>
+    <BaseIntermediateOutputPath>$(BenchArtifactsRoot)obj/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(BenchArtifactsRoot)bin/</BaseOutputPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>archoera-indexer-qbench</AssemblyName>
+    <RootNamespace>Archoera.Indexer.Bench</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <!-- 关闭默认 Compile 通配：harness 源码以 .cs.txt 明文保存（避免被 CLI 的 `**/*.cs`
+         吸入产生第二个 Main），此处显式 Include 编译。 -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- harness 源码（.cs.txt：内容为 C#，显式编译，不被 CLI 通配命中） -->
+    <Compile Include="QueryBench.cs.txt" />
+
+    <!-- 与 tests/ 同源共享生产分析器 / 存储（显式 Link，不复制逻辑）：
+         只取查询路径所需的最小闭包，不含 Program / IndexerEngine / LrcReader。 -->
+    <Compile Include="../../Analyzer.cs" Link="Analyzer.cs" />
+    <Compile Include="../../Japanese.cs" Link="Japanese.cs" />
+    <Compile Include="../../Pinyin.cs" Link="Pinyin.cs" />
+    <Compile Include="../../PinyinSegmenter.cs" Link="PinyinSegmenter.cs" />
+    <Compile Include="../../HanziData.cs" Link="HanziData.cs" />
+    <Compile Include="../../Log.cs" Link="Log.cs" />
+    <Compile Include="../../IndexStore.cs" Link="IndexStore.cs" />
+    <Compile Include="../../FtsStore.cs" Link="FtsStore.cs" />
+    <Compile Include="../../../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 与 CLI 相同的数据表版本（EmbeddedResource 固定 LogicalName，供 HanziData 按名查找）。
+         nfkc：兼容折叠；def_*：Unihan 释义查询扩展（T1 查询侧跨语言候选）。
+         拼音/繁简/全角走 ToolGood.Words，GB18030 走框架 CodePages。 -->
+    <EmbeddedResource Include="../../data/kana_romaji.tsv" Link="data/kana_romaji.tsv">
+      <LogicalName>Archoera.Indexer.data.kana_romaji.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../data/ja_readings.tsv" Link="data/ja_readings.tsv">
+      <LogicalName>Archoera.Indexer.data.ja_readings.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../data/nfkc.tsv" Link="data/nfkc.tsv">
+      <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../data/def_en2hanzi.tsv" Link="data/def_en2hanzi.tsv">
+      <LogicalName>Archoera.Indexer.data.def_en2hanzi.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../data/def_hanzi2en.tsv" Link="data/def_hanzi2en.tsv">
+      <LogicalName>Archoera.Indexer.data.def_hanzi2en.tsv</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 与 CLI 同栈同版本（复用既有包，不新增依赖）。 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <!-- 拼音（含词级多音字消歧）/ 繁简 / 全角半角：ToolGood.Words（Apache-2.0）。 -->
+    <PackageReference Include="ToolGood.Words" Version="3.1.0.3" />
+    <TrimmerRootAssembly Include="ToolGood.Words" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+</Project>

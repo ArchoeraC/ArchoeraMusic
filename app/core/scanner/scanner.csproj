@@ -22,6 +22,11 @@
   <ItemGroup>
     <!-- 子项目 scanner-ffi 是独立 AOT 库，不得编入 CLI -->
     <Compile Remove="scanner-ffi/**" />
+    <!-- 侧车歌词读取：与 indexer **共用同一源文件**。扫描器在遍历目录时解析 .lrc 并写入
+         library.db（lyrics_lrc* + lrc_mtime/size/checked），索引器 / 播放侧只读 DB。 -->
+    <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
+    <Compile Include="../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
+    <Compile Include="../shared/lyrics/LrcReader.cs" Link="shared/lyrics/LrcReader.cs" />
   </ItemGroup>
 
   <ItemGroup>
