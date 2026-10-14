@@ -5,14 +5,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show min;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'library_scanner.dart';
+import 'library_search_rank.dart';
 import 'local_track.dart';
 import 'tracks_db.dart';
 import '../../stores/app_prefs.dart';
 import '../netease/track.dart';
+import '../search/search_lyric_snippet.dart';
+import '../search/search_service.dart';
 import '../../utils/safe_file.dart';
 
 part 'library_store/library_store_core.dart';
@@ -38,6 +42,9 @@ class LibraryState {
     this.hasMore = false,
     this.loadingMore = false,
     this.searchQuery = '',
+    this.rankedIds = const [],
+    this.searchIndexActive = false,
+    this.lyricSnippets = const {},
     this.error,
   });
 
@@ -85,6 +92,22 @@ class LibraryState {
 
   final String searchQuery;
 
+  /// 索引搜索命中的**有序** `trackId`（按相关度；仅 [searchIndexActive] 时有效）。
+  ///
+  /// 分页按本列表切片取行（[TracksDb.listTracksByIds]），保持排行顺序；
+  /// 总开关关闭 / 回退 `LIKE` 时为空。
+  final List<String> rankedIds;
+
+  /// 当前列表是否走索引排行路径（false = 既有 `LIKE`，等价现状）。
+  final bool searchIndexActive;
+
+  /// 歌词命中**行内片段**：trackId → 命中窗口文本。
+  ///
+  /// 仅索引排行路径 + 查询非空时非空；在**页加载异步路径**（取页 / 重载）计算
+  /// 并缓存，行渲染只同步查表（不经 build 每帧读歌词 / 算 snippet，见
+  /// `services/search/search_lyric_snippet.dart`）。关闭态 / 元数据命中行为空。
+  final Map<String, String> lyricSnippets;
+
   final String? error;
 
   LibraryState copyWith({
@@ -104,6 +127,9 @@ class LibraryState {
     bool? hasMore,
     bool? loadingMore,
     String? searchQuery,
+    List<String>? rankedIds,
+    bool? searchIndexActive,
+    Map<String, String>? lyricSnippets,
     String? error,
   }) {
     return LibraryState(
@@ -123,6 +149,9 @@ class LibraryState {
       hasMore: hasMore ?? this.hasMore,
       loadingMore: loadingMore ?? this.loadingMore,
       searchQuery: searchQuery ?? this.searchQuery,
+      rankedIds: rankedIds ?? this.rankedIds,
+      searchIndexActive: searchIndexActive ?? this.searchIndexActive,
+      lyricSnippets: lyricSnippets ?? this.lyricSnippets,
       error: error ?? this.error,
     );
   }

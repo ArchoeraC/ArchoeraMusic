@@ -10,6 +10,8 @@ library;
 
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import '../runtime.dart';
 import 'core/cache.dart';
 import 'core/cookie.dart';
@@ -113,12 +115,28 @@ void _syncDeviceState(Map<String, String> session) {
 }
 
 Map<String, String> _loadSession() {
-  if (_sessionCache == null) {
-    _sessionCache = getRuntime().sessionStore.get('netease');
-    _syncDeviceState(_sessionCache!);
+  if (_sessionCache != null) return _sessionCache!;
+  final store = getRuntime().sessionStore;
+  final loaded = store.get('netease');
+  // **凭据库锁定期间读到的空会话不得缓存**（2026-10-14 实录）：m2a 每次启动都
+  // 处于「待解锁」态，而启动阶段就已有人调用本函数（匿名注册 / 登录态查询）——
+  // 若把空结果固化进 `_sessionCache`，用户用口令/恢复码解锁后 `loginStatus()`
+  // 仍读旧缓存 → 登录态永远恢复不了（LEGACY 免密自动解锁故从未暴露）。
+  if (loaded.isNotEmpty || !store.isLocked) {
+    _sessionCache = loaded;
+    _syncDeviceState(loaded);
   }
-  return _sessionCache!;
+  return loaded;
 }
+
+/// 丢弃会话内存缓存（解锁成功后调用，配合 [NeteaseAuthNotifier.init] 重读登录态）。
+void invalidateNeteaseSessionCache() {
+  _sessionCache = null;
+}
+
+/// 供回归测试观察 [loadSession] 的缓存行为。
+@visibleForTesting
+Map<String, String> debugLoadNeteaseSession() => _loadSession();
 
 void _persistSession(Map<String, String> cookies) {
   _sessionCache = cookies;
@@ -152,7 +170,9 @@ Future<void> _registerAnonymous() async {
   final fn = modules['register_anonimous'];
   if (fn == null) throw StateError('unknown netease api: register_anonimous');
   final session = _loadSession();
-  final result = await fn({'cookie': {...session}}, createRequest);
+  final result = await fn({
+    'cookie': {...session},
+  }, createRequest);
   final body = result.body;
   final patch = _parseSetCookie(result.cookie);
   final token = body['token'] is String
@@ -218,7 +238,8 @@ Future<({int status, Map<String, dynamic> body})> nmCallNetease(
 
   // 非登录/会话接口：确保未登录时已有匿名态（MUSIC_A）——否则搜索/曲库类
   // 接口可能返回空（对齐 index.ts ensureNeteaseAnonymousSession）。
-  final isSessionEndpoint = name.startsWith('login') ||
+  final isSessionEndpoint =
+      name.startsWith('login') ||
       name.startsWith('captcha') ||
       name == 'logout' ||
       name == 'register_anonimous';
@@ -249,7 +270,8 @@ Future<({int status, Map<String, dynamic> body})> nmCallNetease(
   };
 
   // 注入国内 IP
-  if (getRuntime().getSetting('system.neteaseRealIp') == true && query['realIP'] == null) {
+  if (getRuntime().getSetting('system.neteaseRealIp') == true &&
+      query['realIP'] == null) {
     query['realIP'] = _sessionRealIp();
   }
 

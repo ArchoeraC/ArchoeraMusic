@@ -48,7 +48,9 @@
 
 ### vault crypto（OS 安全存储 / 文件密钥，默认，单因子）
 - **优势**：稳定性最高——无份额配对、无口令、无设备熵，不存在「份额丢失导致凭据整体丢失」（旧 v1 的痛点）；OS 模式下 vault 文件不含密钥材料，窃取文件无法解密；解锁零摩擦；OS store 键按数据目录作用域，修复跨目录覆盖。
-- **问题**：**单因子**——OS 钥匙串被攻破 / `file` 后端 `secret.key` 泄露即凭据全泄露（弱于旧 v1 的 2-of-2）；依赖三平台 keyring ABI 行为差异；`file` 后端为显式降级（headless / Docker）。
+- **问题**：**单因子**——OS 钥匙串被攻破 / `file` 后端 `secret.key` 泄露即凭据全泄露（弱于旧 v1 的 2-of-2）；依赖三平台 keyring ABI 行为差异（Linux 已按 gnome-keyring / KDE 两种 `CreateItem` 形态兼容，见下）；`file` 后端为显式降级（headless / Docker）。
+- **Linux 后端（2026-10-14 补实现）**：`crypto` 的 OS 后端在 Linux 走 **Secret Service（libsecret / `org.freedesktop.Secret`）**，由 vault-rs **纯 Rust 直连 D-Bus** 实现（`app/core/vault-rs/src/secret_service.rs`，无新依赖；seccomp 沙箱本就按地址族放行 `AF_UNIX`，未改沙箱）。条目 `xdg:schema = archoera.vault` + `account = "{key}|{dataDir}"` 与 C# 时代**逐字一致**（老条目可读、不产生「新老各一份」）；兼容 KDE ksecretd/kwalletd 偏离规范的 `CreateItem(a{sv} properties, (oayays) secret, b replace)`（先按规范签名调用，`UnknownMethod`/`InvalidArgs` 时回退——libsecret 亦做同层兼容）；`prompt = "/"` 按规范视为「无需交互」。无 D-Bus、钥匙串锁定需交互、服务拒绝 → 一律 **fail-closed 报错，不静默降级为 `file`**。真机端到端：`ARCHOERA_SECRET_SERVICE_E2E=1 cargo test --bin archoera-vault e2e`（无桌面钥匙串自动跳过）。
+- **残余（SEC-15）**：Secret Service 对**同会话内的应用没有客户端侧 ACL**——任何同会话应用都能经 D-Bus 读/写该集合（除非钥匙串守护进程自身要求解锁/授权）。这是平台边界，客户端无法收紧；故 Linux 上 `crypto` 的 OS 存储同样**只算纵深防御的一层**，不能对抗同用户恶意进程。
 
 ### vault slots-m1（口令模式）
 - **优势**：纯 BCL 零外部依赖、跨平台一致、**自包含**（换机复制文件 + 口令即可解）；口令不落盘不落 argv（stdin 握手）；Argon2id 抗 GPU 爆破且 KDF 参数有上下限；尾部 HMAC verify-before-decrypt；锁定退避阻断在线爆破。

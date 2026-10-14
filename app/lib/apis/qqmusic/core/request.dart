@@ -117,10 +117,23 @@ int _codeOf(Object? v) =>
     v is num ? v.toInt() : (int.tryParse('$v') ?? 0);
 
 /// 读取内存或宿主存储中的 QM cookies。
+///
+/// **凭据库锁定期间读到的空值不缓存**：m2a 每次启动库必为锁定，若把空 cookie
+/// 固化进 `_userCookies`，解锁后仍读到空 → QQ 登录态永远恢复不了
+/// （2026-10-14 实录，与 NetEase `_sessionCache` 同源）。解锁流程会调用
+/// [qmReloadQQMusicCookies] 显式失效。
 Map<String, String> qmGetQQMusicCookies() {
   if (_userCookies != null) return _userCookies!;
-  _userCookies = Map<String, String>.of(getRuntime().sessionStore.get('qqmusic'));
-  return _userCookies!;
+  final store = getRuntime().sessionStore;
+  final loaded = Map<String, String>.of(store.get('qqmusic'));
+  if (loaded.isNotEmpty || !store.isLocked) _userCookies = loaded;
+  return loaded;
+}
+
+/// 丢弃 cookies 内存缓存（**解锁成功后调用**）：下次读取即从宿主存储重取。
+void qmReloadQQMusicCookies() {
+  _userCookies = null;
+  _invalidateSession();
 }
 
 /// 更新 QM cookies 并落盘（登录 / 凭据刷新成功后调用）。

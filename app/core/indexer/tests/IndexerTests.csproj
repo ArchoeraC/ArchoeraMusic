@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>archoera-indexer-tests</AssemblyName>
+    <RootNamespace>Archoera.Indexer.Tests</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 共享索引器源码（与 CLI 同源；显式 Link 而非通配 "../*.cs"，
+         避免把 CLI 的 Program.cs 也编入测试程序集导致入口冲突）。 -->
+    <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
+    <Compile Include="../../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
+    <Compile Include="../Analyzer.cs" Link="Analyzer.cs" />
+    <Compile Include="../Japanese.cs" Link="Japanese.cs" />
+    <Compile Include="../Pinyin.cs" Link="Pinyin.cs" />
+    <Compile Include="../PinyinSegmenter.cs" Link="PinyinSegmenter.cs" />
+    <Compile Include="../HanziData.cs" Link="HanziData.cs" />
+    <Compile Include="../Log.cs" Link="Log.cs" />
+    <Compile Include="../IndexStore.cs" Link="IndexStore.cs" />
+    <Compile Include="../FtsStore.cs" Link="FtsStore.cs" />
+    <Compile Include="../IndexerEngine.cs" Link="IndexerEngine.cs" />
+    <Compile Include="../IndexerJson.cs" Link="IndexerJson.cs" />
+    <Compile Include="../../shared/lyrics/LrcReader.cs" Link="shared/lyrics/LrcReader.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 与 CLI 相同的数据表，LogicalName 固定供 HanziData 按名查找。
+         nfkc：兼容折叠；def_*：Unihan 释义查询扩展（T1 查询侧跨语言候选）。
+         拼音/繁简/全角走 ToolGood.Words，GB18030 走框架 CodePages。 -->
+    <EmbeddedResource Include="../data/kana_romaji.tsv" Link="data/kana_romaji.tsv">
+      <LogicalName>Archoera.Indexer.data.kana_romaji.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../data/ja_readings.tsv" Link="data/ja_readings.tsv">
+      <LogicalName>Archoera.Indexer.data.ja_readings.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../data/nfkc.tsv" Link="data/nfkc.tsv">
+      <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../data/def_en2hanzi.tsv" Link="data/def_en2hanzi.tsv">
+      <LogicalName>Archoera.Indexer.data.def_en2hanzi.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../data/def_hanzi2en.tsv" Link="data/def_hanzi2en.tsv">
+      <LogicalName>Archoera.Indexer.data.def_hanzi2en.tsv</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 测试向量随输出复制（运行器优先在输出目录旁查找）。 -->
+    <None Include="vectors/*.tsv" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 端到端 round-trip：用与 scanner 同栈的 Microsoft.Data.Sqlite 建 fixture 库。 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <!-- 拼音（含词级多音字消歧）/ 繁简 / 全角半角：ToolGood.Words（Apache-2.0）。
+         NativeAOT 需 TrimmerRootAssembly 保根。 -->
+    <PackageReference Include="ToolGood.Words" Version="3.1.0.3" />
+    <TrimmerRootAssembly Include="ToolGood.Words" />
+  </ItemGroup>
+
+</Project>

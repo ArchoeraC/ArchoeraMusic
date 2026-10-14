@@ -293,6 +293,7 @@ class _SchemeCard extends StatelessWidget {
   const _SchemeCard({
     required this.value,
     required this.selected,
+    this.selectedOverride,
     required this.busy,
     required this.title,
     required this.badge,
@@ -304,6 +305,9 @@ class _SchemeCard extends StatelessWidget {
 
   final String value;
   final String selected;
+
+  /// 覆盖选中态（用于「一组多档」的合并卡：组内任一档都算选中）；null = 按 [value] 比对。
+  final bool? selectedOverride;
   final bool busy;
   final String title;
   final String badge;
@@ -315,7 +319,7 @@ class _SchemeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isSelected = value == selected;
+    final isSelected = selectedOverride ?? (value == selected);
     final fg = isSelected ? badgeColor : scheme.onSurface;
     return MouseRegion(
       cursor: busy ? SystemMouseCursors.basic : SystemMouseCursors.click,

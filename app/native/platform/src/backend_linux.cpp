@@ -19,6 +19,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -1921,6 +1922,26 @@ uint32_t caps() {
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
     return c;
+}
+
+int32_t hardenProcess() {
+#ifdef NDEBUG
+    // 仅禁 core：core dump 会把宿主内存中的明文凭据**落盘**（SEC-48 实测：
+    // `kill -SEGV` → systemd-coredump 落盘并对属主附加可读 ACL → 明文 cookie 直接可取，
+    // 且泄露超出进程生命周期）。core 限制由子进程继承。
+    //
+    // **刻意不设 `PR_SET_DUMPABLE=0`**：它会让「子进程读父进程 `/proc/<ppid>/exe`」被内核
+    // 拒绝，**直接打断 vault 的父进程血缘校验**（实测报错：独立运行被拒：无法读取父进程
+    // 可执行文件路径），导致凭据库整体不可用——安全机制之间不能互相拆台。
+    // 等价的内存读取路径（ptrace / process_vm_readv / /proc/pid/mem）由内核
+    // `kernel.yama.ptrace_scope=1` 阻断（同用户**非父**进程不可 attach；本机即为 1）；
+    // 这是已声明的 L2 残余（SEC-25），不以牺牲可用性换取。
+    struct rlimit rl;
+    rl.rlim_cur = 0;
+    rl.rlim_max = 0;
+    setrlimit(RLIMIT_CORE, &rl);
+#endif
+    return OK;
 }
 
 int32_t init() {

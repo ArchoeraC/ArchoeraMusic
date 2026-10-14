@@ -166,6 +166,10 @@ class StreamingStore {
   static Future<void> flush() => _queue;
 
   static void _enqueue(Future<bool> Function() op) {
+    // **锁定态（m1/m2a 本会话未解锁）不排持久化任务**：启动时库必为锁定，
+    // 此时写入必失败 → 只会刷"持久化失败"噪音（易被误读为故障）。
+    // 凭据仍在本进程内存缓存中；解锁后以库内权威值为准（不做锁定期的回写）。
+    if (_needsPassword) return;
     _queue = _queue.then((_) => op()).catchError((Object e) {
       stderr.writeln('[vault] 流媒体凭据持久化失败：$e');
       return false;
@@ -202,9 +206,13 @@ class StreamingStore {
     try {
       if (!VaultProcess.available) return;
       if (!await VaultProcess.isInitialized(_dir())) {
-        // 惰性初始化：默认 crypto（LEGACY 单因子推荐）；defaultScheme='file'
-        // 走文件密钥模式（免 OS 钥匙串）——设置页选择后冷切重启生效。
-        // 历史 'vault'（2-of-2，已移除）回落 crypto。
+        // 惰性初始化**仅限免密方案**（crypto / file）；m1/m2a/m2b 需要用户因子，
+        // 库缺失时**不静默降级为单因子 crypto**（安全降级 + pref/容器不一致），
+        // 交给 UI 初始化门显式选择。
+        if (!VaultProcess.isPasswordlessScheme(defaultScheme)) {
+          stderr.writeln('[vault] 库缺失且方案 $defaultScheme 需要用户因子：等待显式初始化');
+          return;
+        }
         if (defaultScheme == 'file') {
           await VaultProcess.initFile(_dir());
         } else {
@@ -483,7 +491,8 @@ class StreamingStore {
     try {
       if (!VaultProcess.available) return false;
       if (!await VaultProcess.isInitialized(_dir())) {
-        // 惰性重建（销毁后自动重建）：按默认方案初始化
+        // 惰性重建**仅限免密方案**；m1/m2a/m2b 需要用户因子 → 不静默降级（同 preloadSecrets）。
+        if (!VaultProcess.isPasswordlessScheme(defaultScheme)) return false;
         if (defaultScheme == 'file') {
           await VaultProcess.initFile(_dir());
         } else {

@@ -6,11 +6,12 @@
 #    1. audio-engine : CMake（FFmpeg 解码/EQ/FFT + Rust tempo）
 #    2. scraper      : CMake（openssl keg-only 需 CMAKE_PREFIX_PATH）
 #    3. scanner      : dotnet publish (NativeAOT) + libe_sqlite3
-#    4. vault        : cargo build（vault-rs，Rust 凭据保险库，universal）
-#    5. downloader   : cargo build --release (cdylib)
-#    6. subsonic     : cargo transcoder + go c-shared + go standalone
-#    7. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
-#    8. shell        : cargo staticlib（内嵌原生 CLI archoerashell，链入 macOS Runner）
+#    4. indexer      : dotnet publish (NativeAOT, indexer-ffi) + libe_sqlite3
+#    5. vault        : cargo build（vault-rs，Rust 凭据保险库，universal）
+#    6. downloader   : cargo build --release (cdylib)
+#    7. subsonic     : cargo transcoder + go c-shared + go standalone
+#    8. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
+#    9. shell        : cargo staticlib（内嵌原生 CLI archoerashell，链入 macOS Runner）
 #
 #  依赖（Homebrew FFmpeg/taglib/openssl、CMake、Rust、Go、.NET）由 CI
 #  workflow 提前安装或由本地开发环境提供，本脚本只做编译引导（幂等）。
@@ -58,6 +59,13 @@ cmake --build "$ROOT/scraper/build" -j"$JOBS"
 
 echo "[build-macos] ===== scanner (NativeAOT, RID=$RID) ====="
 bash "$ROOT/scanner/build.sh" "$RID"
+
+# 本地曲库搜索索引器（indexer-ffi，.NET NativeAOT，与 scanner 同栈）：
+# 产出 indexer/build/{indexer-ffi.dylib, libe_sqlite3.dylib}，由 Runner.xcodeproj
+# 的 “Copy Native Modules” 阶段装进 .app/Contents/native/（总开关默认关时
+# Dart 侧不加载，见 lib/services/search/）。
+echo "[build-macos] ===== indexer (NativeAOT, RID=$RID) ====="
+bash "$ROOT/indexer/build.sh" "$RID"
 
 echo "[build-macos] ===== vault (Rust 静态链接, vault-rs, universal) ====="
 # vault-rs：Rust 实现（OS 授权份额存 Keychain；容器格式由 testdata/ 黄金夹具锚定字节兼容）。

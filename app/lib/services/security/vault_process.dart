@@ -214,6 +214,62 @@ class VaultProcess {
   /// 无份额配对、无口令、无设备熵，稳定性高于 2-of-2（不存在份额丢失
   /// 导致的凭据整体丢失）；安全性降为单点（OS 钥匙串被攻破 = 凭据全泄露）。
   /// 返回并保存会话锚点 T（`vault.auth`）。
+  /// **LEGACY（`crypto`，依赖系统钥匙串）在*本机*是否真的可用**（切换前预检）。
+  ///
+  /// 判据只能是「真的建一次库」：`status` 不反映后端能力，而某些平台/环境直接拒绝
+  /// （Linux 无 Secret Service 时 `init-crypto` 报 "Secret Service 后端在 V1 中未实现
+  /// （请使用 file 后端）"）。因此在**临时目录**里跑一次 `init-crypto` + `destroy`：
+  /// 不触碰现有容器，也不会把用户数据留在半初始化状态。
+  ///
+  /// 为什么必须预检而不能「失败再回滚」：`destroy` 会连**系统钥匙串里的份额**一并删除，
+  /// 那是进程外的状态、无法快照恢复——切到 LEGACY 失败后旧方案也回不去了。
+  static Future<bool> canInitCrypto() async {
+    if (!available) return false;
+    final tmp = Directory.systemTemp.createTempSync('archoera-vault-probe');
+    try {
+      await initCrypto(tmp.path);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      try {
+        destroy(tmp.path);
+      } catch (_) {}
+      try {
+        tmp.deleteSync(recursive: true);
+      } catch (_) {}
+    }
+  }
+
+  /// 是否**免密**方案——只有它们可以在「库缺失」时被**惰性自动初始化**。
+  ///
+  /// m1 / m2a / m2b 需要用户因子（口令 / `device.key` / 恢复码）：库缺失时**绝不能**
+  /// 静默 auto-init 成单因子 `crypto`——那既是**安全降级**（用户选了双因子却得到单因子），
+  /// 又会造成「pref 说 m2a、容器是 crypto」的不一致。此类方案交给 UI 的初始化/解锁门
+  /// 提示用户显式选择并设置因子。
+  static bool isPasswordlessScheme(String scheme) =>
+      scheme == 'crypto' || scheme == 'file';
+
+  /// 初始化后**自验证**：用刚设置的口令（m2b/crypto 传 null=免密）真实走一次解锁握手。
+  ///
+  /// **为什么必须有**：方案切换会先销毁旧库再初始化新方案；若新库初始化「成功」
+  /// 但用户输入的口令与写入的因子不一致（臆造/输入法差异/交互流程异常），
+  /// 就会出现「新库自己的口令打不开 + 旧库已销毁」＝丢库（真实事故 2026-10-14：
+  /// m2a 切换后只能靠恢复码救）。自验证失败 → 调用方回滚快照，旧库原封不动。
+  /// 凭据用后即弃，不缓存。
+  static Future<void> verifyUnlock(String dataDir, {String? password}) async {
+    final _VaultSession s;
+    try {
+      s = await _VaultSession.open(dataDir, password: password);
+    } on VaultVersionException {
+      rethrow; // 版本异常有独立 fatal 语义（删副本 + 仅可退出），不包装
+    } catch (e) {
+      throw VaultException(
+          '新库自验证失败：初始化写入的因子无法用刚输入的口令解锁（$e）；已回滚，旧库未动');
+    }
+    await s.close();
+  }
+
   static Future<String> initCrypto(String dataDir) async {
     final r = Process.runSync(binary, ['init-crypto', dataDir],
         stdoutEncoding: utf8,

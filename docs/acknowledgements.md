@@ -51,6 +51,13 @@
 
 > 特别说明：以上分别表达对相关项目设计思路的认可、采纳与致谢，以及对所依赖/参考第三方组件作者的感谢；完整的许可义务与声明以仓库及各模块的 `LICENSE` / `THIRD-PARTY-LICENSES.md` 为准。
 
+**本地曲库搜索索引（indexer）依赖与设计参考**（许可逐项见 `app/core/indexer/THIRD-PARTY-LICENSES.md`）：
+
+- **[ToolGood.Words](https://github.com/toolgood/ToolGood.Words)（Apache-2.0）** —— 汉字转拼音（含**词级多音字消歧**）、繁简互换、全角半角互换；索引器**直接依赖**
+- **Unicode [Unihan](https://www.unicode.org/reports/tr38/) 数据库 `kDefinition`（Unicode License）** —— 跨语言检索「汉字 ↔ 英文释义」查询扩展的数据来源
+- **[SQLite FTS5](https://www.sqlite.org/fts5.html)（公有领域）** —— 全文索引 / `bm25()` 排序的存储引擎
+- 分析器 / 分词 / 排序的**设计对照参考**：[KDE Baloo](https://invent.kde.org/frameworks/baloo) + [KFileMetaData](https://invent.kde.org/frameworks/kfilemetadata)（LGPL-2.1+）、[Groonga](https://groonga.org)（LGPL-2.1）`TokenBigram`、[Apache Lucene](https://lucene.apache.org)（Apache-2.0）`CJKBigramFilter`、[Xapian](https://xapian.org)（GPL-2.0+）`CJK_NGRAM`、以及 [SPlayer-Next](https://github.com/SPlayer-Dev/SPlayer-Next) 的 KDE Searcher 用法 —— **仅对照其思路**，本项目分析器为**自研实现，未复制其代码**（标注 GPL/LGPL 者只作理念参考，不引入其源码）
+
 **图标资源致谢（UI 图标为二改后自建字体打包）**：
 
 - **[MingCute Icons](https://github.com/mingcute-design/mingcute-icons)（Apache-2.0）** —— 本项目界面图标的**主体字形来源**（regular / filled 双风格）。本项目将所需图标自源 SVG 中挑选并按「Material 语义」映射后，对描边风格 SVG 做**描边转轮廓（stroke→outline）改作**，与实心字形一同重打包为自建字体 `EtaIcons`；定稿子集、映射表与生成脚本见 `app/eta-tools/eta_icons/`
@@ -58,3 +65,5 @@
 - **[Lucide](https://lucide.dev)（ISC）** —— 少量 mingcute/Tabler 均缺失语义图标的补入来源（`EtaIcons` 内 `memoryStickOutline` 等，见 `app/eta-tools/eta_icons/source/added/`），同按 24×24 / 2px 描边规格归一化
 
 > 上述图标的再分发/改作均依据各自许可条款执行；mingcute Apache-2.0 与 Tabler MIT、Lucide ISC 均允许随本项目（AGPL-3.0）以二进制字体形式分发并保留本声明。
+
+> 完整第三方依赖与许可正文随包 `licenses/` 分发，并在应用内「设置 → 关于 → 第三方开源许可」中按许可正文分组查看。

@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 关于页的三份长文弹窗：软件声明 / 隐私政策 / 字体署名。
+/// 关于页的长文弹窗：软件声明 / 隐私政策 / 字体署名 / 第三方开源许可。
 ///
-/// 三者原本直接内联在关于页，篇幅很长会撑开页面；改为「点按钮才展开」的
+/// 它们原本直接内联在关于页，篇幅很长会撑开页面；改为「点按钮才展开」的
 /// 弹窗（复用 [SDialog] 的可滚动内容区）。文案来自 ARB，目前仅 zh_CN 为
 /// 最新版本，其余语言待维护者补齐（缺失键会回退模板文案）。
 library;
@@ -13,6 +13,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/l10n.dart';
 import '../../licenses/bundled_font_licenses.dart';
+import '../../licenses/bundled_third_party_licenses.dart';
 import 's_dialog.dart';
 
 /// 打开「软件声明」弹窗。
@@ -71,6 +72,33 @@ Future<void> showFontCreditsDialog(BuildContext context) async {
     context,
     title: l10n.settingsSectionFontCredits,
     intro: l10n.settingsFontCreditsText,
+    sections: sections,
+  );
+}
+
+/// 打开「第三方开源许可」弹窗（本地化简介 + 随包原生依赖与 pub 依赖的许可正文）。
+///
+/// 两组正文在打开时才加载（`Future.wait` 并发）：随包原生依赖静态登记并按许可
+/// 分组；pub 依赖则运行时聚合 Flutter 的 [LicenseRegistry]。法定文本不翻译。
+Future<void> showThirdPartyLicensesDialog(BuildContext context) async {
+  final l10n = context.l10n;
+  final results = await Future.wait([
+    loadBundledThirdPartyLicenseSections(),
+    loadFlutterPackageLicenseSections(),
+  ]);
+  if (!context.mounted) return;
+  final native = results[0];
+  final packages = results[1];
+  final sections = <(String, String)>[
+    if (native.isNotEmpty) (l10n.settingsThirdPartyNative, ''),
+    ...native,
+    if (packages.isNotEmpty) (l10n.settingsThirdPartyPackages, ''),
+    ...packages,
+  ];
+  return _showDocument(
+    context,
+    title: l10n.settingsSectionThirdPartyLicenses,
+    intro: l10n.settingsThirdPartyLicensesText,
     sections: sections,
   );
 }

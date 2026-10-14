@@ -11,6 +11,8 @@ import '../services/platform/platform_bindings.dart' show aplOk;
 import '../services/platform/platform_capabilities.dart';
 import '../services/scanner/library_store.dart';
 import '../services/scanner/local_track.dart';
+import '../services/search/search_highlight.dart';
+import '../services/search/search_service.dart';
 import '../services/source/source_platform.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/dialogs/batch_tag_editor_dialog.dart';
@@ -42,6 +44,10 @@ class LibraryPage extends ConsumerStatefulWidget {
 }
 
 class _LibraryPageState extends ConsumerState<LibraryPage> {
+  /// 搜索结果高亮记忆化器（查询不变时跨 rebuild 复用；关闭态 / 非搜索态为
+  /// null，列表外观与性能均与现状一致）。
+  SearchHighlighter? _highlighter;
+
   @override
   void initState() {
     super.initState();
