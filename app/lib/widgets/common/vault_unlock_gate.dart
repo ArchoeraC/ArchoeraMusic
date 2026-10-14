@@ -9,9 +9,11 @@ import '../../apis/runtime.dart';
 import '../../l10n/l10n.dart';
 import '../../services/downloader/download_controller.dart';
 import '../../services/log/log.dart';
+import '../common/overlay_host.dart';
 import '../../services/streaming/streaming_store.dart';
 import '../../stores/providers.dart';
 import '../../stores/vault_session_store.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'vault_unlock_gate/vault_unlock_gate_view.dart';
@@ -62,9 +64,11 @@ class _VaultUnlockGateState extends ConsumerState<VaultUnlockGate> {
       final s = getRuntime().sessionStore;
       final sessionStore = s is VaultSessionStore ? s : null;
       _needsUnlock =
-          (sessionStore?.needsPassword ?? false) || StreamingStore.needsPassword;
+          (sessionStore?.needsPassword ?? false) ||
+          StreamingStore.needsPassword;
       _mode = sessionStore?.mode ?? StreamingStore.mode;
-      _needsRecovery = (sessionStore?.needsRecovery ?? false) ||
+      _needsRecovery =
+          (sessionStore?.needsRecovery ?? false) ||
           StreamingStore.needsRecovery;
       // 设备密钥缺失：直接进入恢复码通道（口令路径必然 NEED_RECOVERY）。
       if (_needsRecovery) _useRecovery = true;
@@ -123,8 +127,8 @@ class _VaultUnlockGateState extends ConsumerState<VaultUnlockGate> {
           _error = needsRecovery
               ? context.l10n.vaultUnlockNeedRecovery
               : (_useRecovery
-                  ? context.l10n.vaultUnlockRecoveryFailed
-                  : context.l10n.vaultUnlockFailed);
+                    ? context.l10n.vaultUnlockRecoveryFailed
+                    : context.l10n.vaultUnlockFailed);
         });
         return;
       }
