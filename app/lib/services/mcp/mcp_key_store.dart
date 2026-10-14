@@ -60,7 +60,9 @@ class McpKeyStore {
     try {
       fromVault = await VaultProcess.get(dataDir, uidFor);
     } catch (e) {
-      Log.w('mcp', '读取凭据保险库中的 MCP 密钥失败，回退历史值：$e');
+      // 启动期库必为锁定（m2a 正常态）→ 读取失败属**预期**，不是故障：
+      // 按 debug 记录并回退历史值，避免把正常启动刷成 WARN（2026-10-14 实录）。
+      Log.d('mcp', '凭据库暂不可读（未解锁/锁定，启动期预期），回退历史值：$e');
     }
     final vaultKey = _decode(fromVault);
     if (vaultKey != null && vaultKey.isNotEmpty) {
@@ -75,7 +77,8 @@ class McpKeyStore {
         await VaultProcess.set(dataDir, uidFor, legacy);
         clearLegacy(dataDir); // 迁移成功：移除 prefs.json 明文
       } catch (e) {
-        Log.w('mcp', 'MCP 密钥迁移入凭据保险库失败（保留库外历史值）：$e');
+        // 同上：锁定期的迁移写入必然失败，属预期（解锁后仍可由 load 重试）。
+        Log.d('mcp', 'MCP 密钥迁移暂未完成（库未解锁），保留库外历史值：$e');
       }
       return;
     }
@@ -92,7 +95,8 @@ class McpKeyStore {
     try {
       await VaultProcess.set(dataDir, uidFor, value);
     } catch (e) {
-      Log.w('mcp', 'MCP 密钥写入凭据保险库失败（仅内存生效）：$e');
+      // 锁定期写入失败属预期（值在内存缓存中，解锁后再 persist 即可落盘）。
+      Log.d('mcp', 'MCP 密钥暂未落盘（库未解锁，仅内存生效）：$e');
     }
   }
 
