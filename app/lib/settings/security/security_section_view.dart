@@ -107,14 +107,21 @@ extension _SecuritySectionView on _SecuritySectionState {
       title: l10n.settingsSchemeSection,
       note: l10n.settingsSchemeNote,
       children: [
-        if (_needsRecovery)
+        // 恢复码解锁入口：设备因子缺失（needsRecovery）**或**本会话未解锁
+        // （needsUnlock，例如口令记不得）时都要可用 —— 否则只给了口令一条路，
+        // 用户会被卡住（2026-10-14 反馈：设置里解锁用不了恢复码）。
+        if (_needsRecovery || _needsUnlock)
           _SecurityBanner(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
-            icon: EtaIcons.lockOutline,
-            text: l10n.settingsDeviceBindRecoveryBanner,
+            icon: EtaIcons.keyOutline,
+            text: _needsRecovery
+                ? l10n.settingsDeviceBindRecoveryBanner
+                : l10n.vaultUnlockRecoveryDesc,
             scheme: scheme,
             button: SButton(
-              label: l10n.settingsDeviceBindRecover,
+              label: _needsRecovery
+                  ? l10n.settingsDeviceBindRecover
+                  : l10n.vaultUnlockRecoveryTitle,
               variant: SButtonVariant.secondary,
               size: SButtonSize.small,
               onPressed: _deviceBusy ? null : _recoverVault,
