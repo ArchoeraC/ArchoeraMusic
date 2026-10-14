@@ -64,7 +64,7 @@ app/native/platform/
 │   ├── backend_linux.cpp        # C++ + libdbus：MPRIS2/Inhibit/熄屏/主题色 + dlopen GTK
 │   ├── backend_macos.mm         # ObjC++：AppKit/MediaPlayer
 │   └── backend_stub.cpp         # 未覆盖平台兜底（能力位图 0）
-└── （无 test/：C ABI 由 Dart 侧 platform_bindings 与冒烟程序验证）
+└── （后端契约的无条件性由 app/test/native_platform_abi_test.dart 静态守护）
 ```
 
 | 平台 | 产物 | 打包 |
@@ -78,6 +78,26 @@ app/native/platform/
 （`build-linux.sh` / `build-macos.sh` / Flutter 的 windows/linux CMake 内嵌 target）
 在打包前调用。Windows 需 C++/WinRT 头（`-DCPPWINRT_INCLUDE=` 或 vcpkg cppwinrt），
 缺失时自动降级（SMTC 禁用、Toast 走 MessageBox）。
+
+#### 契约符号的无条件性（`backend.h` ↔ 各后端）
+
+`src/backend.h` 声明的是一组**跨平台无条件契约**：`src/apl.cpp` 无条件引用它们，
+因此**每个后端源文件**都必须在**预处理深度 0** 且**直接位于 `namespace archoera`**
+处给出定义。把实现写进条件编译区（如 `#ifdef ARCHOERA_WINRT`）或嵌进别的
+`namespace`，只会在**链接期**炸（MSVC `LNK2019` / `undefined reference`），而且
+Linux 本机与 Dart 测试都看不见——对应后端在 Linux 上根本不参与编译，`dart analyze`
+/ `flutter test` 也不链接该库，只能烧掉一次全平台 CI 才发现。
+
+- 实录（2026-10-14）：`hardenProcess()` 被插进 `#ifdef ARCHOERA_WINRT` +
+  `namespace winrt_smtc`，三处契约（声明 / `apl.cpp` 引用 / 实现）只在 Windows
+  链接期对不上，全平台 run 的 Windows job 因 `LNK2019` 失败。
+- 守卫：`app/test/native_platform_abi_test.dart` —— 纯文本静态分析（不需任何原生
+  产物，三端 `flutter test` 均可跑），逐个契约函数检查每个后端是否存在合规定义。
+  改桥接后本地先跑：
+
+  ```bash
+  cd app && flutter test test/native_platform_abi_test.dart
+  ```
 
 ### 平台与架构支持（2026-09-12 决策）
 

@@ -33,6 +33,7 @@ cd build && ctest
 ```bash
 cmake -S app/native/platform -B app/native/platform/build -DCMAKE_BUILD_TYPE=Release
 cmake --build app/native/platform/build -j
+cd app && flutter test test/native_platform_abi_test.dart   # 契约符号无条件性守卫（三端纯文本，防链接期 LNK2019/undefined reference 复发）
 ```
 改动内嵌原生 CLI（`app/core/shell`，Rust `staticlib`，三端 `archoerashell`）时另跑：
 ```bash
