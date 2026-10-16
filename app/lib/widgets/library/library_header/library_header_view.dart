@@ -91,12 +91,10 @@ extension _LibraryHeaderView on LibraryHeader {
               const SizedBox(width: 8),
               _buildMoreMenu(context, ref, state, scrape.scraping, l10n),
               const Spacer(),
-              SInput(
-                width: 190,
+              LibrarySearchField(
+                query: state.searchQuery,
                 hintText: l10n.librarySearchHint,
-                prefixIcon: EtaIcons.search2,
-                clearable: true,
-                onChanged: (q) => notifier.setSearchQuery(q),
+                onChanged: notifier.setSearchQuery,
               ),
             ],
           ),
