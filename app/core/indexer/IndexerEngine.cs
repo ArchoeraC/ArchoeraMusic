@@ -418,7 +418,7 @@ public sealed class IndexerEngine
 
     private static SqliteConnection OpenLibraryReadOnly(string libraryPath)
     {
-        var conn = new SqliteConnection($"Data Source={libraryPath};Mode=ReadOnly");
+        var conn = new SqliteConnection(FtsStore.ConnectionString(libraryPath, readOnly: true));
         conn.Open();
         return conn;
     }
