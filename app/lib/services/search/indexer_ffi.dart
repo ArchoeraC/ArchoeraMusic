@@ -5,6 +5,7 @@
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 
@@ -137,6 +138,41 @@ class IndexerLibrary {
       calloc.free(out);
       calloc.free(outLen);
     }
+  }
+
+  /// 在**子 isolate** 内加载本库并执行 [runBlocking]（阻塞调用，须离开 UI 线程）。
+  ///
+  /// 参数与返回值和 [runBlocking] 一致（`(exitCode, resultText)`），全部为可跨
+  /// isolate 发送的值（字符串 / bool / 原生函数指针）；子 isolate 内**重新
+  /// load** 同一共享库（句柄进程共享，指针可跨 isolate 传递）。加载 / 执行异常
+  /// 经 [Isolate.run] 回传，调用方按普通异常处理。
+  ///
+  /// **必须是静态方法**（关键约束，勿改成实例方法，也勿把 `Isolate.run` 的闭包
+  /// 内联回调用方）：`Isolate.run` 会把闭包连同其**上下文**深拷贝后发送，闭包所
+  /// 在函数里只要出现任何需要 `this` 的表达式——例如
+  /// `NativeCallable.listener(某实例方法)` 这种 tear-off，或直接引用实例字段——
+  /// `this` 就会被放进该上下文一并发送；调用方（服务编排器）通常持有 `Future` /
+  /// `DynamicLibrary` / `NativeCallable` 等**不可发送**对象，发送随即失败：
+  /// `Illegal argument in isolate message: object is unsendable`。症状是构建永远
+  /// 起不来，日志里反复刷这条异常（见 `test/search_isolate_send_test.dart`）。
+  static Future<(int, String)> runInIsolate({
+    required String soPath,
+    required String dbPath,
+    required String indexPath,
+    required bool full,
+    String optionsJson = '',
+    required Pointer<Void> onProgress,
+  }) {
+    return Isolate.run(() {
+      final lib = IndexerLibrary.load(soPath: soPath);
+      return lib.runBlocking(
+        dbPath: dbPath,
+        indexPath: indexPath,
+        full: full,
+        optionsJson: optionsJson,
+        onProgress: onProgress,
+      );
+    });
   }
 
   /// 请求取消进行中的构建（任意线程/isolate 可调）。返回 false 表示无进行中构建。

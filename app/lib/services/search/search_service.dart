@@ -6,7 +6,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
@@ -55,6 +54,13 @@ class SearchService {
   /// 测试接缝：非空时覆盖 [defaultSearchDbPath]（让单测不触碰真实数据目录）。
   @visibleForTesting
   static String? debugSearchDbPathOverride;
+
+  /// 测试接缝：非空时覆盖**源曲库**（`library.db`）路径（见 [LibraryScanner.defaultDbPath]）。
+  ///
+  /// 「真实构建路径」的单测需要它，否则会去索引用户真实曲库（慢且会写真实
+  /// `search.db`）。生产恒为 null。
+  @visibleForTesting
+  static String? debugLibraryDbPathOverride;
 
   /// 构建进度（主 isolate 消费；无进行中构建时为 null）。
   ///
@@ -120,6 +126,13 @@ class SearchService {
 
   /// 最近一次构建结果摘要（诊断 / 设置页展示用）。
   IndexerRunResult? lastResult;
+
+  /// 最近一次构建失败的**具体**原因（`indexer_run` 退出信息 / isolate 异常文本）；
+  /// 未构建或成功时为 null。
+  ///
+  /// 由 [_buildAndOpenLocked] 转述进 [status]（error 态的 `message`），使设置页
+  /// 显示具体原因（如「源曲库不存在: …」）而非通用文案。
+  String? _buildFailure;
 
   /// 总开关是否开启（默认 false；关闭时整套能力零成本）。
   bool get enabled => appPrefsSnapshot?.enableLocalSearchIndex ?? false;
@@ -360,9 +373,12 @@ class SearchService {
     _gateOccupancy = 0;
     _status = LocalSearchStatus.disabled;
     lastResult = null;
+    _buildFailure = null;
     debugReindexOverride = null;
     debugBuildExecutor = null;
     debugCancelOverride = null;
+    debugSearchDbPathOverride = null;
+    debugLibraryDbPathOverride = null;
     _startupWarmUpTriggered = false;
     progress = ValueNotifier<IndexerProgress?>(null);
   }
@@ -423,7 +439,7 @@ class SearchService {
       return null;
     }
     if (!built) {
-      _status = LocalSearchStatus.error(failMessage);
+      _status = LocalSearchStatus.error(_buildFailure ?? failMessage);
       return null;
     }
     return _openIndexLocked();
@@ -466,12 +482,22 @@ class SearchService {
   }
 
   /// 在后台 isolate 跑 `indexer_run`；进度经 [progress] 暴露（不阻塞 UI）。
+  ///
+  /// isolate 入口是 [IndexerLibrary.runInIsolate]（**静态**）：`Isolate.run` 的闭包
+  /// 若留在本实例方法内，会经上下文链连带捕获本服务（持有 `_gateTail`（Future）等
+  /// 不可发送对象），发送必然失败——注释与成因见该方法。
+  ///
+  /// 失败原因写入 [_buildFailure]（供 [status] 展示具体原因，而非通用文案）。
   Future<bool> _runBuild({required bool full}) async {
     final lib = _lib;
     final soPath = _soPath;
-    if (lib == null || soPath == null) return false;
+    if (lib == null || soPath == null) {
+      _buildFailure = '索引器模块未加载';
+      return false;
+    }
 
-    final libraryDb = LibraryScanner.defaultDbPath();
+    final libraryDb =
+        debugLibraryDbPathOverride ?? LibraryScanner.defaultDbPath();
     final searchDb = defaultSearchDbPath();
     File(searchDb).parent.createSync(recursive: true);
     final optionsJson =
@@ -480,21 +506,20 @@ class SearchService {
     final callable =
         NativeCallable<Void Function(Pointer<Void>)>.listener(_handleProgress);
     _setProgress(null);
+    _buildFailure = null;
     try {
       final cb = callable.nativeFunction.cast<Void>();
-      final (code, text) = await Isolate.run(() {
-        // 子 isolate 重新加载库（句柄进程共享）；指针可跨 isolate 传递。
-        final lib = IndexerLibrary.load(soPath: soPath);
-        return lib.runBlocking(
-          dbPath: libraryDb,
-          indexPath: searchDb,
-          full: full,
-          optionsJson: optionsJson,
-          onProgress: cb,
-        );
-      });
+      final (code, text) = await IndexerLibrary.runInIsolate(
+        soPath: soPath,
+        dbPath: libraryDb,
+        indexPath: searchDb,
+        full: full,
+        optionsJson: optionsJson,
+        onProgress: cb,
+      );
       if (_disposed) return false;
       if (code != 0) {
+        _buildFailure = text.isEmpty ? 'indexer_run 退出码 $code' : text;
         Log.w('search', '索引构建失败（exit=$code）: $text');
         return false;
       }
@@ -502,6 +527,7 @@ class SearchService {
           IndexerRunResult.fromJson(jsonDecode(text) as Map<String, dynamic>);
       return true;
     } catch (err) {
+      _buildFailure = '$err';
       Log.w('search', '索引构建异常: $err');
       return false;
     } finally {
