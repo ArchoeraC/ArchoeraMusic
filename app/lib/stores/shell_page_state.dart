@@ -36,6 +36,21 @@ final searchTabIndexProvider = NotifierProvider<ShellPageSelection<int>, int?>(
   ShellPageSelection<int>.new,
 );
 
+/// 顶栏**全局搜索框**的当前文本（跨壳内容卸载/重挂载保留；null = 空）。
+///
+/// 顶栏也在壳内容之内，同样会被 [ShellExpandTransition] 卸载重建。若文本只存在
+/// 组件内部的 `TextEditingController`，关掉播放页回来就会丢；而 `/search` 页的
+/// 查询来自路由 `?q=`（重建后按路由恢复并重新拉取）——于是出现「结果仍按旧关键词
+/// 筛选，搜索框却空了」的不一致（与音乐库搜索框同一类问题）。
+///
+/// 与 [searchPlatformProvider] 同法：把文本上提到应用级 provider，输入时写入、
+/// 重建时回填，使其始终与搜索页展示的查询一致（深链 `/search?q=` 也由搜索页
+/// 回写，见 `pages/search_page.dart`）。
+final navSearchQueryProvider =
+    NotifierProvider<ShellPageSelection<String>, String?>(
+      ShellPageSelection<String>.new,
+    );
+
 /// 「我喜欢」页当前来源平台：'netease' / 'kugou' / 'qqmusic' / 'neko'。
 final likedPlatformProvider =
     NotifierProvider<ShellPageSelection<String>, String?>(
