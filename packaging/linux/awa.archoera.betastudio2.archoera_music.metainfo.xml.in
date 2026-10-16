@@ -12,7 +12,7 @@
   <url type="homepage">https://github.com/BetaStudio2/ArchoeraMusic</url>
   <url type="bugtracker">https://github.com/BetaStudio2/ArchoeraMusic/issues</url>
   <releases>
-    <release version="@VERSION@" date="2026-10-15"/>
+    <release version="@VERSION@" date="2026-10-16"/>
   </releases>
   <content_rating type="oars-1.1"/>
 </component>
