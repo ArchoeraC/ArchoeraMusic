@@ -4,6 +4,26 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [1.0.1+0] - 2026-10-15
+
+> [!NOTE]
+> 安全与性能优化，建议更新
+
+你好喵～
+
+本次带来了以下的更新喵：
+
+1、凭据保险库重构
+2、登录态稳定性加强
+3、安全系数进一步增强
+4、添加本地曲库搜索索引
+5、下载器增强续杯能力
+6、新增原生 `open(2)` 安全文件 ABI，EraAudio 支持 `file://`，修复切档 / seek 的几处缺陷
+7、停用 Dependabot，改为定期手动同步；升级 rustls / quinn-proto / chacha20 清掉 audit 红；补 Nix 静态链接与 Windows 链接失败（LNK2019）修复
+8、测试与 CI：补齐 vault 与平台契约符号回归
+
+我喜欢你！
+
 ## [1.0.0+0] - 2026-10-11
 
 > [!NOTE]
