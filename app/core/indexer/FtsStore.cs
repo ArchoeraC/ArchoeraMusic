@@ -103,7 +103,7 @@ public sealed class FtsStore : IIndexStoreAdmin
             _tmpPath = _path + ".tmp";
             // 清掉上次未完成的临时世代（含 WAL 侧车）；旧正式库保留到原子替换为止
             DeleteFileAndSidecars(_tmpPath);
-            _conn = new SqliteConnection($"Data Source={_tmpPath}");
+            _conn = new SqliteConnection(ConnectionString(_tmpPath));
             _conn.Open();
             Exec("PRAGMA journal_mode = WAL");
             Exec("PRAGMA synchronous = FULL");
@@ -111,7 +111,7 @@ public sealed class FtsStore : IIndexStoreAdmin
         else
         {
             _tmpPath = _path;
-            _conn = new SqliteConnection($"Data Source={_path}");
+            _conn = new SqliteConnection(ConnectionString(_path));
             _conn.Open();
             Exec("PRAGMA journal_mode = WAL");
             Exec("PRAGMA synchronous = NORMAL");
@@ -418,7 +418,7 @@ public sealed class FtsStore : IIndexStoreAdmin
         try
         {
             if (!File.Exists(path)) return null;
-            using var conn = new SqliteConnection($"Data Source={path};Mode=ReadOnly");
+            using var conn = new SqliteConnection(ConnectionString(path, readOnly: true));
             conn.Open();
             if (!TableExists(conn, "search_meta")) return null;
 
@@ -573,6 +573,30 @@ public sealed class FtsStore : IIndexStoreAdmin
         cmd.Parameters.AddWithValue("@name", table);
         return cmd.ExecuteScalar() != null;
     }
+
+    /// <summary>
+    /// 本模块的 SQLite 连接串：**一律 <c>Pooling=False</c>，勿绕开本方法自拼连接串**。
+    ///
+    /// 原因（实测回归，见 `tests/EndToEnd.cs` 的 `RepeatedFullBuild`）：世代化替换
+    /// （<see cref="Seal"/>）把临时世代 <c>&lt;path&gt;.tmp</c> 用
+    /// <see cref="File.Move(string,string,bool)"/> **改名**成正式库，而
+    /// Microsoft.Data.Sqlite 默认启用**连接池**——`Close()` 后底层 sqlite3 句柄
+    /// （持有文件描述符）仍留在线程池里按连接串复用。于是同一进程内的下一次构建会
+    /// 拿到**指向已改名/已 unlink 的 inode** 的陈旧句柄：
+    /// <list type="bullet">
+    ///   <item>全量构建：写入落到正式库（**绕过了世代化原子替换**），随后
+    ///         <c>Fsync(_tmpPath)</c> / <c>File.Move(_tmpPath, …)</c> 找不到 tmp →
+    ///         <c>Could not find file '&lt;…&gt;.tmp'</c>，即「同一进程内第二次全量构建
+    ///         必然失败」；</item>
+    ///   <item>增量构建：写进已 unlink 的旧 inode → **静默丢失更新**（曲库变更后
+    ///         新曲目搜不到，直到重启进程）。</item>
+    /// </list>
+    /// 索引器的连接都是「一次运行一开一关」的短命连接，池化毫无收益，故全部关闭。
+    /// </summary>
+    internal static string ConnectionString(string path, bool readOnly = false)
+        => readOnly
+            ? $"Data Source={path};Mode=ReadOnly;Pooling=False"
+            : $"Data Source={path};Pooling=False";
 
     private static void Fsync(string path)
     {

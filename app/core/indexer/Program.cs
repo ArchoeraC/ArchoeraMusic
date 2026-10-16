@@ -168,7 +168,7 @@ public static class Program
         if (docIds.Count == 0) return map;
         try
         {
-            using var conn = new SqliteConnection($"Data Source={indexPath};Mode=ReadOnly");
+            using var conn = new SqliteConnection(FtsStore.ConnectionString(indexPath, readOnly: true));
             conn.Open();
             using var cmd = conn.CreateCommand();
             var names = new List<string>();
