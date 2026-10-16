@@ -18,6 +18,7 @@ import '../../services/weather/weather_notifier.dart';
 import '../../settings/settings_dialog.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
+import '../../stores/shell_page_state.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../dialogs/kugou_login_button.dart';
@@ -103,7 +104,12 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   @override
   void initState() {
     super.initState();
-    _searchCtrl = TextEditingController();
+    // 文本取自 [navSearchQueryProvider]（真值）：壳内容被卸载（播放页完全展开）后
+    // 重建时，由 provider 回填——否则搜索框会空，而 `/search` 页仍按路由 `?q=`
+    // 展示旧查询的结果（不一致）。
+    _searchCtrl = TextEditingController(
+      text: ref.read(navSearchQueryProvider) ?? '',
+    );
     _searchFocus.addListener(_onSearchFocusChanged);
     _panelCtrl = AnimationController(
       vsync: this,
@@ -214,6 +220,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
 
   /// 搜索框输入变化：空 → 热搜；非空 → 300ms debounce 拉建议。
   void _onSearchChanged(String text) {
+    // 文本先写回 provider（真值）：跨壳内容卸载保留，且与搜索页展示的查询一致。
+    ref.read(navSearchQueryProvider.notifier).set(text);
     _suggestDebounce?.cancel();
     final query = text.trim();
     if (query.isEmpty) {
@@ -390,6 +398,16 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    // provider（真值）→ 输入框：仅在文本不一致时回灌（正常输入不打断光标 /
+    // 输入法组词；搜索页按路由 `?q=` 回写时跟随）。
+    ref.listen(navSearchQueryProvider, (_, next) {
+      final value = next ?? '';
+      if (_searchCtrl.text == value) return;
+      _searchCtrl.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    });
     return SizedBox(
       height: 64,
       child: Padding(
