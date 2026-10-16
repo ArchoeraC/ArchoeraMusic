@@ -32,6 +32,7 @@ internal static class EndToEnd
             LrcReading(root);
             SidecarDirectoryCache(root);
             MultilingualLayers(root);
+            RepeatedFullBuild(root);
         }
         finally
         {
@@ -199,6 +200,77 @@ internal static class EndToEnd
         Program.Check("无变更: indexed==0 && deleted==0", idle.Indexed == 0 && idle.Deleted == 0,
             $"indexed={idle.Indexed} deleted={idle.Deleted}");
         Program.Check("无变更: 零内容查询（未全库读歌词）", idleQueries == 0, idleQueries.ToString());
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 世代化替换的**连接池**回归：同一进程内多次全量 + 替换后增量         */
+    /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 回归（实测已修）：同一进程内**连续两次全量构建**都必须能完成，且全量替换后的
+    /// 增量收敛必须真的落进**新**世代。
+    ///
+    /// 成因见 <see cref="FtsStore.ConnectionString"/>：Microsoft.Data.Sqlite 默认连接池
+    /// 在 <c>Close()</c> 后仍保留底层 sqlite3 句柄（按连接串复用），而世代化替换把
+    /// <c>search.db.tmp</c> 改名成 <c>search.db</c>，池里残留的句柄便指向旧 inode：
+    /// <list type="bullet">
+    ///   <item>第二次全量：写入落进正式库（绕过原子替换），随后
+    ///         <c>Fsync(_tmpPath)</c> / <c>File.Move(_tmpPath, …)</c> 找不到 tmp →
+    ///         <c>Could not find file '&lt;…&gt;.tmp'</c>。用户侧表现：设置页「重建索引」
+    ///         只成功一次，之后再点必失败（同一进程内）。</item>
+    ///   <item>替换后的增量：写进已 unlink 的旧 inode → **静默丢失更新**（曲库变更后
+    ///         新曲目搜不到，直到重启进程）。</item>
+    /// </list>
+    /// 本用例按「全量 → 增量 → 全量 → 增量」覆盖两条路径（旧实现第 ③ 步必抛异常）。
+    /// </summary>
+    private static void RepeatedFullBuild(string root)
+    {
+        var work = Path.Combine(root, "repeated");
+        Directory.CreateDirectory(work);
+        var db = Path.Combine(work, "library.db");
+        var index = Path.Combine(work, "search.db");
+        var dir = Path.Combine(work, "m");
+        Directory.CreateDirectory(dir);
+
+        CreateLibrary(db, generation: 1);
+        using (var conn = Open(db))
+            InsertTrack(conn, "r1", Path.Combine(dir, "r1.mp3"), "第一首", "[]", null, "最爱", 1000);
+
+        // ① 全量：建立第 1 个世代
+        var first = RunEngine(db, index, full: true, lrc: false);
+        Program.Check("连续全量: 第 1 次 indexed==1", first.Indexed == 1, first.Indexed.ToString());
+
+        // ② 增量：进程内首次建立 `search.db` 连接串的池项（修复前正是它后来变成陈旧句柄）
+        using (var conn = Open(db))
+            InsertTrack(conn, "r2", Path.Combine(dir, "r2.mp3"), "第二首", "[]", null, "海边", 2000);
+        var inc1 = RunEngine(db, index, full: false, lrc: false);
+        Program.Check("连续全量: 替换前增量 indexed==1", inc1.Indexed == 1, inc1.Indexed.ToString());
+        Program.Check("连续全量: 替换前增量可搜到 r2",
+            MatchContainsTrack(index, Analyzed("第二首"), "r2"));
+
+        // ③ 第二次全量：修复前必抛 FileNotFoundException（tmp 已被上一次替换吃掉）
+        IndexerResult? second = null;
+        string? error = null;
+        try { second = RunEngine(db, index, full: true, lrc: false); }
+        catch (Exception ex) { error = ex.Message; }
+        Program.Check("连续全量: 同一进程内第 2 次全量可完成（不得复用旧 inode 的连接）",
+            error is null, error);
+        if (second is null) return;
+
+        Program.Check("连续全量: 第 2 次 indexed==2", second.Indexed == 2, second.Indexed.ToString());
+        Program.Check("连续全量: 第 2 次后无 search.db.tmp", !File.Exists(index + ".tmp"));
+        Program.Check("连续全量: 第 2 次后无 search.db.tmp-wal", !File.Exists(index + ".tmp-wal"));
+
+        // ④ 替换后的增量：必须写进**新**世代（旧池句柄指向已 unlink 的旧 inode → 静默丢失）
+        using (var conn = Open(db))
+            InsertTrack(conn, "r3", Path.Combine(dir, "r3.mp3"), "第三首", "[]", null, "星空", 3000);
+        var inc2 = RunEngine(db, index, full: false, lrc: false);
+        Program.Check("连续全量: 替换后增量 indexed==1", inc2.Indexed == 1, inc2.Indexed.ToString());
+        Program.Check("连续全量: 替换后增量落库（r3 可搜到）",
+            MatchContainsTrack(index, Analyzed("第三首"), "r3"));
+        Program.Check("连续全量: 三首齐备",
+            Scalar(index, "SELECT COUNT(*) FROM search_docs") == 3,
+            Scalar(index, "SELECT COUNT(*) FROM search_docs").ToString());
     }
 
     /* ------------------------------------------------------------------ */
@@ -567,7 +639,10 @@ internal static class EndToEnd
 
     private static SqliteConnection Open(string path)
     {
-        var conn = new SqliteConnection($"Data Source={path}");
+        // 走 FtsStore.ConnectionString（Pooling=False）：断言必须读**当前**文件。
+        // 若沿用连接池，世代化替换（tmp → search.db 改名）后池里仍留着指向旧 inode
+        // 的句柄，断言会静默读到替换前的旧世代。
+        var conn = new SqliteConnection(FtsStore.ConnectionString(path));
         conn.Open();
         return conn;
     }
@@ -587,7 +662,7 @@ internal static class EndToEnd
 
     private static string? Meta(string index, string key)
     {
-        using var conn = new SqliteConnection($"Data Source={index};Mode=ReadOnly");
+        using var conn = new SqliteConnection(FtsStore.ConnectionString(index, readOnly: true));
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT value FROM search_meta WHERE key = @k";
@@ -597,7 +672,7 @@ internal static class EndToEnd
 
     private static long Scalar(string index, string sql)
     {
-        using var conn = new SqliteConnection($"Data Source={index};Mode=ReadOnly");
+        using var conn = new SqliteConnection(FtsStore.ConnectionString(index, readOnly: true));
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
@@ -607,7 +682,7 @@ internal static class EndToEnd
 
     private static long DocScalar(string index, string trackId, string column)
     {
-        using var conn = new SqliteConnection($"Data Source={index};Mode=ReadOnly");
+        using var conn = new SqliteConnection(FtsStore.ConnectionString(index, readOnly: true));
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = $"SELECT {column} FROM search_docs WHERE track_id = @t";
@@ -618,7 +693,7 @@ internal static class EndToEnd
 
     private static int MatchCount(string index, string matchExpr)
     {
-        using var conn = new SqliteConnection($"Data Source={index};Mode=ReadOnly");
+        using var conn = new SqliteConnection(FtsStore.ConnectionString(index, readOnly: true));
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT COUNT(*) FROM search_fts WHERE search_fts MATCH @q";
@@ -629,7 +704,7 @@ internal static class EndToEnd
 
     private static bool MatchContainsTrack(string index, string matchExpr, string trackId)
     {
-        using var conn = new SqliteConnection($"Data Source={index};Mode=ReadOnly");
+        using var conn = new SqliteConnection(FtsStore.ConnectionString(index, readOnly: true));
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -647,7 +722,7 @@ internal static class EndToEnd
     /// <summary>FTS 逐列 token 数（`search_fts_docsize.size` 的十六进制），用于判「是否重复索引」。</summary>
     private static string DocSizeHex(string index, string trackId)
     {
-        using var conn = new SqliteConnection($"Data Source={index};Mode=ReadOnly");
+        using var conn = new SqliteConnection(FtsStore.ConnectionString(index, readOnly: true));
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText =
