@@ -96,6 +96,13 @@ class _SearchPageState extends ConsumerState<SearchPage>
   void initState() {
     super.initState();
     _query = widget.initialQuery.trim();
+    // 顶栏搜索框（[navSearchQueryProvider]）与本页展示的查询保持同一真值：
+    // 深链 `/search?q=` 进来时也要让框里显示当前查询，避免「结果按 q 筛选、
+    // 顶栏框却空着」。postFrame：避免在 build 期改动 provider 触发祖先重建。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(navSearchQueryProvider.notifier).set(_query);
+    });
     // 恢复上次的平台 / Tab 选择（壳内容因播放页展开被卸载后重建）。
     final restored = ref.read(searchPlatformProvider) ?? 'netease';
     // 已关闭的音源不保留选择（避免对其发请求）。
@@ -119,6 +126,11 @@ class _SearchPageState extends ConsumerState<SearchPage>
     if (q != oldWidget.initialQuery.trim() && q != _query) {
       _query = q;
       _resetAll();
+      // 同步顶栏搜索框（同一真值，同 initState）。
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(navSearchQueryProvider.notifier).set(_query);
+      });
       if (_query.isNotEmpty) unawaited(_fetch(append: false));
     }
   }
