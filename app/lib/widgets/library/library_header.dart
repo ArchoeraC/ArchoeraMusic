@@ -18,6 +18,7 @@ import '../common/toast.dart';
 import '../dialogs/folder_manager.dart';
 import '../dialogs/s_dialog.dart';
 import '../player/s_controls.dart';
+import 'library_search_field.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'library_header/library_header_actions.dart';
