@@ -3290,7 +3290,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsDecline1Body =>
-      '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n';
+      '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或赞助内容注入，仅接受不附带任何额外许可权利的自愿打赏（不影响功能与授权条款；代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n';
 
   @override
   String get settingsDeclineLicenseTitle => '二、开源许可与源代码\n';
@@ -9215,7 +9215,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsDecline1Body =>
-      '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。本软件按现状提供，作者不保证其适用性、稳定性或适法性，请您在遵守所在地法律法规的前提下自行决定是否使用。\n\n';
+      '本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或赞助内容注入，仅接受不附带任何额外许可权利的自愿打赏（不影响功能与授权条款；代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。本软件按现状提供，作者不保证其适用性、稳定性或适法性，请您在遵守所在地法律法规的前提下自行决定是否使用。\n\n';
 
   @override
   String get settingsDeclineLicenseTitle => '二、开源许可与源代码\n';
@@ -15140,7 +15140,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsDecline1Body =>
-      '本軟體為第三方用戶端，與各音樂平台及其官方用戶端無任何關聯、合作或授權關係；不以營利為目的，不接受任何商業合作、廣告或捐贈。如需更完善的功能，請下載官方用戶端體驗。\n\n';
+      '本軟體為第三方用戶端，與各音樂平台及其官方用戶端無任何關聯、合作或授權關係；不以營利為目的，不接受任何商業合作、廣告或贊助內容置入，僅接受不附帶任何額外授權權利的自願打賞（不影響功能與授權條款）。如需更完善的功能，請下載官方用戶端體驗。\n\n';
 
   @override
   String get settingsDeclineLicenseTitle => '二、開源授權與原始碼\n';
