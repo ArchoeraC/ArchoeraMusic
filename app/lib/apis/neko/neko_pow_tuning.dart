@@ -34,7 +34,11 @@
 /// 后端比较择优即可——本类是唯一的决策点。
 library;
 
+import 'dart:convert';
 import 'dart:io';
+
+import '../../stores/data_dir.dart';
+import '../../utils/safe_file.dart';
 
 /// 低于该难度不启用多 isolate：`2^16 = 65536` 次哈希在单核上是毫秒级，
 /// 开 worker 的 spawn / 消息开销反而更大。
@@ -78,6 +82,74 @@ const double _kFeedbackRatio = 0.75;
 /// 每多少次解题做一次相邻档探测。
 const int _kProbeEvery = 8;
 
+/// 调优结果文件名（落在应用数据目录；只存档位 + 设备指纹）。
+const String _kCacheFileName = 'neko_pow_workers.json';
+
+/// 设备能力缓存：**只记档位与设备指纹**，不记任何惩罚 / 降档历史。
+class NekoPowSaved {
+  const NekoPowSaved({
+    required this.workers,
+    required this.cores,
+    required this.os,
+  });
+
+  final int workers;
+  final int cores;
+  final String os;
+}
+
+/// 调优结果持久化后端（默认落盘到数据目录；测试可注入内存实现）。
+abstract class NekoPowStore {
+  NekoPowSaved? read();
+  void write(NekoPowSaved value);
+}
+
+/// 默认实现：`<数据目录>/neko_pow_workers.json`，安全读 + 原子写。
+///
+/// 读失败 / 字段缺失 / 版本不符一律当作「无缓存」（不阻断解题）。
+class FileNekoPowStore implements NekoPowStore {
+  const FileNekoPowStore();
+
+  static const int _version = 1;
+
+  String get _path => '${resolveDataDir()}/$_kCacheFileName';
+
+  @override
+  NekoPowSaved? read() {
+    try {
+      final text = SafeFile.readString(_path);
+      if (text == null) return null;
+      final decoded = jsonDecode(text);
+      if (decoded is! Map) return null;
+      if (decoded['version'] != _version) return null;
+      final workers = decoded['workers'];
+      final cores = decoded['cores'];
+      final os = decoded['os'];
+      if (workers is! int || cores is! int || os is! String) return null;
+      return NekoPowSaved(workers: workers, cores: cores, os: os);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  void write(NekoPowSaved value) {
+    try {
+      SafeFile.writeAtomicString(
+        _path,
+        jsonEncode({
+          'version': _version,
+          'workers': value.workers,
+          'cores': value.cores,
+          'os': value.os,
+        }),
+      );
+    } catch (_) {
+      // 写失败不影响本进程的调优（只丢缓存）。
+    }
+  }
+}
+
 /// 设备解题能力自适应器（进程内单例）。
 class NekoPowTuning {
   NekoPowTuning._();
@@ -115,9 +187,16 @@ class NekoPowTuning {
   /// 测试接缝：覆盖梯度（默认按核数裁剪）。
   List<int>? debugLadder;
 
+  /// 测试接缝：注入持久化后端（默认落盘到数据目录）。
+  NekoPowStore? debugStore;
+
+  /// 是否已尝试从缓存恢复初始档位（进程内只做一次）。
+  bool _restored = false;
+
   /// 测试接缝：直接指定当前档位并清空探测 / 试用状态。
   void debugSetWorkers(int? workers) {
     _workers = workers;
+    _restored = true;
     _probe = null;
     _probeFrom = null;
     _trial = null;
@@ -133,12 +212,62 @@ class NekoPowTuning {
     _ema.clear();
     _demotions.clear();
     _solves = 0;
-    debugSetWorkers(null);
+    _workers = null;
+    _restored = false;
+    _probe = null;
+    _probeFrom = null;
+    _trial = null;
+    _trialFrom = null;
+    _trialSamples = 0;
+    _trialSum = 0;
+    _consecutiveUp = 0;
+    _lastProbeAt = 0;
     debugLadder = null;
   }
 
-  /// 当前采用的并发数（未学习时为启发式上限）。
-  int get workers => _workers ??= _ladder().last;
+  /// 当前采用的并发数：优先用上次落盘的「已测最优档」，否则启发式上限。
+  ///
+  /// 缓存只含档位与设备指纹（核数 / OS）；指纹不符（换机器 / 虚拟机改配额）视为
+  /// 无缓存，直接按启发式重新收敛。**惩罚 / 降档历史不落盘**，每次启动都是干净的。
+  int get workers {
+    if (_workers != null) return _workers!;
+    _restore();
+    return _workers ??= _ladder().last;
+  }
+
+  void _restore() {
+    if (_restored) return;
+    _restored = true;
+    final saved = (debugStore ?? const FileNekoPowStore()).read();
+    if (saved == null) return;
+    if (saved.cores != Platform.numberOfProcessors ||
+        saved.os != Platform.operatingSystem) {
+      return; // 设备指纹不符：不沿用旧档位
+    }
+    final ladder = _ladder();
+    _workers = _nearest(ladder, saved.workers.clamp(ladder.first, ladder.last));
+  }
+
+  /// 切换当前档位并落盘。
+  ///
+  /// [persistIfSame] 用于「试用期已临时切到该档」的情形：采纳时档位没变，但
+  /// **必须**落盘（试用期不落盘，只有确认通过才算「已测最优」）。
+  void _setWorkers(int value, {bool persistIfSame = false}) {
+    final changed = _workers != value;
+    _workers = value;
+    if (!changed && !persistIfSame) return;
+    try {
+      (debugStore ?? const FileNekoPowStore()).write(
+        NekoPowSaved(
+          workers: value,
+          cores: Platform.numberOfProcessors,
+          os: Platform.operatingSystem,
+        ),
+      );
+    } catch (_) {
+      // 落盘失败不影响本进程调优。
+    }
+  }
 
   /// 下一轮将使用的并发数（探测 / 试用中 = 对应档位；诊断 / 基准用）。
   int get plannedWorkers => _probe ?? workers;
@@ -210,11 +339,11 @@ class NekoPowTuning {
         final average = _trialSum / _trialSamples;
         if (average > _trialBaseline * (1 + _trialGainFor(trial))) {
           // 二次确认通过：正式采纳，连续升档计数 +1（下次门槛更高）。
-          _workers = trial;
+          _setWorkers(trial, persistIfSame: true);
           _consecutiveUp++;
         } else {
           // 只是短时爆发 / 噪声：回退（不计入「负反馈降档」）。
-          _workers = _trialFrom ?? _workers;
+          _setWorkers(_trialFrom ?? workers);
         }
         _trial = null;
         _trialFrom = null;
@@ -238,9 +367,9 @@ class NekoPowTuning {
         _trialBaseline = fromRate;
         _trialSamples = 0;
         _trialSum = 0;
-        _workers = probe; // 试用期直接用它跑（样本即试用数据）
+        _workers = probe; // 试用期直接用它跑（样本即试用数据），落盘等确认通过后
       } else {
-        _workers = _probeFrom ?? workers;
+        _setWorkers(_probeFrom ?? workers);
       }
       _probe = null;
       _probeFrom = null;
@@ -264,7 +393,7 @@ class NekoPowTuning {
       } else {
         _consecutiveUp = 0;
       }
-      _workers = best;
+      _setWorkers(best);
       _lastProbeAt = _solves;
       return;
     }
