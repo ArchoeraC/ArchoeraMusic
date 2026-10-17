@@ -79,6 +79,21 @@ Accept-Language: zh-CN,zh;q=0.9,en;q=0.8
 直接领取。挑战解题是 `2^difficulty` 量级的哈希计算，放在后台 isolate，不阻塞 UI；
 `nekoSolveProofSync` / `nekoMeetsDifficulty` 为纯函数，便于单测。
 
+**本地加速（不改协议、不改 proof 形态）**，见 `apis/neko/neko_pow_sha256.dart`：
+
+- **前缀哈希**：`seed + ":"` 是固定前缀，其完整 64 字节块只压缩一次（midstate）；
+  逐候选只压「前缀尾部 + 计数器 + pad + 长度」（≤ 2 块），且全程零分配
+  （计数器用十进制进位维护，不 `toString`、不建消息 / 摘要对象）；
+- **多 isolate 并行**：按 `counter ≡ i (mod N)` 切分候选空间（各 worker 的候选互不
+  重叠、合起来覆盖全部自然数），先解出者胜并 `kill` 其余 worker；
+  `N = min(核数 - 1, 16)`，难度低于 16 bit 时不开 worker（spawn 开销不划算）。
+- 语义不变：服务端只验一次哈希，**任何达标计数器都是合法 proof**。同步路径仍从 0
+  起逐个试（与官方实现一致、返回最小解）；并行路径可能返回更大的计数器，同样有效。
+
+实测（32 核、AOT、`dart run tool/neko_pow_bench.dart`）：单核哈希吞吐
+531 ns/次 → 400 ns/次；`difficulty=20` 解题 250 ms → 20 ms（约 12×），
+`difficulty=18` 167 ms → 3 ms。
+
 换题 / 兑换本身也是动态接口，同样经防爬过滤器，与业务请求共用同一套身份头。
 
 ## 不变量
