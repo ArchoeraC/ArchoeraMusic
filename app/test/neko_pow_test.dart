@@ -33,81 +33,105 @@ void main() {
   setUp(tuning.debugReset);
   tearDown(tuning.debugReset);
 
-  group('设备能力自适应（按真实解题样本热切，不靠合成基准）', () {
-    /// 注入一次样本：聚合吞吐 = per-worker 速率 × 并发（candidates/elapsed 为
-    /// 胜出 worker 自身的速率）。
-    void sample(int workers, double ratePerSecond) {
+  group('设备能力负反馈自适应（真实样本驱动，升档永久保留）', () {
+    /// 注入一次样本：`rate` 为**胜出 worker 自身**的速率，聚合 = rate × workers。
+    void sample(int workers, double rate) {
       tuning.record(
         workers: workers,
-        candidates: (ratePerSecond / 1000).round(),
+        candidates: (rate / 1000).round(),
         elapsed: const Duration(milliseconds: 1),
       );
     }
 
-    test('健康机器：低档聚合吞吐更低 → 回退并收敛（只多一次解题）', () {
+    test('负反馈：当前档吞吐坍塌 → 立即切到已知最佳档（不等周期）', () {
       tuning
-        ..debugLadder = [4, 8, 16]
+        ..debugLadder = [8, 16]
         ..debugSetWorkers(16);
-      sample(16, 2.5e6); // 当前档采样 → 安排试探 8
+      // 健康期：16 档聚合 30M/s
+      for (var i = 0; i < 8; i++) {
+        sample(16, 30e6 / 16);
+      }
+      // 第 8 次后触发一次降档试探（16 无更高档 → 试 8），8 档没有更快 → 回退冷却
       expect(tuning.plannedWorkers, 8);
-      sample(8, 2.5e6); // 单 worker 速率相同 → 聚合只有一半 → 不该降
+      sample(8, 20e6 / 8);
       expect(tuning.workers, 16);
-      expect(tuning.settled, isTrue);
+      expect(tuning.cooldownRemaining[8], greaterThan(0));
+
+      // 热限制：16 档每 worker 速率跌到 1/4 → EMA 衰减后负反馈立即切到 8
+      for (var i = 0; i < 4; i++) {
+        sample(16, 30e6 / 16 / 4);
+      }
+      expect(tuning.workers, 8);
     });
 
-    test('配额受限/降频：低档聚合吞吐更高 → 降并发；再没有收益则收敛', () {
+    test('升档永久保留：冷却后仍会再试，能力恢复即爬回更高档', () {
       tuning
-        ..debugLadder = [4, 8, 16]
-        ..debugSetWorkers(16);
-      sample(16, 1.0e6); // 超订：每 worker 变慢
-      expect(tuning.plannedWorkers, 8);
-      sample(8, 2.6e6); // 8 档每 worker 明显更快 → 采纳并继续探 4
-      expect(tuning.workers, 8);
-      expect(tuning.plannedWorkers, 4);
-      sample(4, 2.6e6); // 4 档没有更快 → 回退收敛在 8
-      expect(tuning.workers, 8);
-      expect(tuning.settled, isTrue);
-    });
-
-    test('收敛后定期向上复核：状态恢复时能爬回去', () {
-      tuning
-        ..debugLadder = [4, 8, 16]
+        ..debugLadder = [8, 16]
         ..debugSetWorkers(8);
-      sample(8, 2.0e6); // 当前档 → 向下试 4
-      sample(4, 2.0e6); // 4 不更快 → 收敛在 8
+      // 8 档跑满一个试探周期 → 计划向上试探 16
+      for (var i = 0; i < 8; i++) {
+        sample(8, 20e6 / 8); // 8 档 20M/s
+      }
+      expect(tuning.plannedWorkers, 16);
+      sample(16, 10e6 / 16); // 16 档当时更差 → 回退并冷却
       expect(tuning.workers, 8);
-      expect(tuning.settled, isTrue);
+      final cooled = tuning.cooldownRemaining[16]!;
+      expect(cooled, greaterThan(0), reason: '试探失败应进入冷却而不是永久拉黑');
 
-      // 收敛后 15 次解题保持 8，第 16 次触发向上复核
-      for (var i = 0; i < 15; i++) {
-        sample(8, 2.0e6);
+      // 冷却期内反复采样 8 档：不应再试探 16
+      for (var i = 0; i < cooled - 1; i++) {
+        sample(8, 20e6 / 8);
         expect(tuning.plannedWorkers, 8);
       }
-      sample(8, 2.0e6);
-      expect(tuning.plannedWorkers, 16);
 
-      // 16 档聚合吞吐明显更高（48M/s vs 16M/s）→ 采纳
-      sample(16, 3.0e6);
+      // 冷却结束后（设备可能已更换/变快）应再次向上试探 → 16 恢复 40M/s → 采纳
+      var probedUp = false;
+      for (var i = 0; i < 14 && !probedUp; i++) {
+        if (tuning.plannedWorkers == 16) {
+          probedUp = true;
+          sample(16, 40e6 / 16);
+        } else {
+          sample(8, 20e6 / 8);
+        }
+      }
+      expect(probedUp, isTrue, reason: '升档能力不得被永久关掉');
       expect(tuning.workers, 16);
+    });
+
+    test('向下试探只做一次（建立对照），之后降档由负反馈用已有数据触发', () {
+      tuning
+        ..debugLadder = [8, 16]
+        ..debugSetWorkers(16);
+      // 16 档为最高档且从未测过更低档 → 第 8 次解题后向下探一次
+      for (var i = 0; i < 8; i++) {
+        sample(16, 30e6 / 16);
+      }
+      expect(tuning.plannedWorkers, 8);
+      sample(8, 10e6 / 8); // 8 更差 → 回退并冷却
+      expect(tuning.workers, 16);
+
+      // 8 已有数据：此后不再周期性向下试探（零额外开销），只保留向上能力
+      for (var i = 0; i < 40; i++) {
+        sample(16, 30e6 / 16);
+        expect(tuning.plannedWorkers, 16);
+      }
     });
 
     test('低难度不 spawn；并发受难度工作量约束', () {
       tuning
-        ..debugLadder = [4, 8, 16]
+        ..debugLadder = [8, 16]
         ..debugSetWorkers(16);
       expect(tuning.workersFor(kNekoPowParallelMinBits - 1), 1);
       expect(tuning.workersFor(0), 1);
-      // 难度 16：期望 2^16 / 每 worker 预算 8192 = 8
-      expect(tuning.workersFor(16), 8);
-      // 难度 20：期望 2^20 → 128，但封顶 16
-      expect(tuning.workersFor(20), 16);
+      expect(tuning.workersFor(16), 8); // 2^16 / 8192 = 8
+      expect(tuning.workersFor(20), 16); // 2^20 / 8192 = 128 → 封顶 16
     });
 
     test('梯度上限不超过 16（更高只会超订塌陷）', () {
-      final ladder = NekoPowTuning.instance..debugReset();
-      expect(ladder.workers, lessThanOrEqualTo(16));
-      expect(ladder.workers, greaterThanOrEqualTo(1));
-      expect(ladder.workersFor(64), lessThanOrEqualTo(ladder.workers));
+      tuning.debugReset();
+      expect(tuning.workers, lessThanOrEqualTo(16));
+      expect(tuning.workers, greaterThanOrEqualTo(1));
+      expect(tuning.workersFor(64), lessThanOrEqualTo(tuning.workers));
     });
   });
 
