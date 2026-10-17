@@ -75,7 +75,7 @@ Future<void> main() async {
       .map((e) => '${e.key}w=${(e.value / 1e6).toStringAsFixed(2)}M/s')
       .join('  ');
   print('  学到聚合吞吐：$rateText');
-  print('  当前并发=${tuning.workers}  冷却中=${tuning.cooldownRemaining}');
+  print('  当前并发=${tuning.workers}  被负反馈降档次数=${tuning.demotions}');
   print('  '
       '（d16→${tuning.workersFor(16)} / d20→${tuning.workersFor(20)} / '
       'd22→${tuning.workersFor(22)}）');
