@@ -21,6 +21,17 @@ import 'package:archoera_music/apis/neko/neko_pow_sha256.dart';
 import 'package:archoera_music/apis/neko/neko_pow_tuning.dart';
 import 'package:archoera_music/apis/neko/neko_replay.dart';
 
+/// 内存版持久化后端（单测绝不碰真实数据目录）。
+class _MemoryNekoPowStore implements NekoPowStore {
+  NekoPowSaved? saved;
+
+  @override
+  NekoPowSaved? read() => saved;
+
+  @override
+  void write(NekoPowSaved value) => saved = value;
+}
+
 List<int> _referenceDigest(String seed, int counter) =>
     sha256.convert(utf8.encode('$seed:$counter')).bytes;
 
@@ -30,8 +41,16 @@ bool _meets(String seed, int counter, int difficulty) =>
 void main() {
   final tuning = NekoPowTuning.instance;
 
-  setUp(tuning.debugReset);
-  tearDown(tuning.debugReset);
+  setUp(() {
+    tuning
+      ..debugStore = _MemoryNekoPowStore()
+      ..debugReset();
+  });
+  tearDown(() {
+    tuning
+      ..debugReset()
+      ..debugStore = null;
+  });
 
   group('设备能力负反馈自适应（真实样本驱动，升档永久保留）', () {
     /// 注入一次样本：`rate` 为**胜出 worker 自身**的速率，聚合 = rate × workers。
@@ -174,6 +193,64 @@ void main() {
       expect(tuning.workersFor(0), 1);
       expect(tuning.workersFor(16), 8); // 2^16 / 8192 = 8
       expect(tuning.workersFor(20), 16); // 2^20 / 8192 = 128 → 封顶 16
+    });
+
+    test('恢复上次落盘的最优档（同设备指纹）', () {
+      final store = _MemoryNekoPowStore()
+        ..saved = NekoPowSaved(
+          workers: 12,
+          cores: Platform.numberOfProcessors,
+          os: Platform.operatingSystem,
+        );
+      tuning
+        ..debugStore = store
+        ..debugReset()
+        ..debugLadder = [8, 12, 16];
+      expect(tuning.workers, 12);
+      expect(tuning.demotions, isEmpty, reason: '惩罚历史不落盘，重启后应为空');
+    });
+
+    test('设备指纹不符（换机 / 改配额）→ 忽略缓存', () {
+      final store = _MemoryNekoPowStore()
+        ..saved = NekoPowSaved(
+          workers: 12,
+          cores: Platform.numberOfProcessors + 8,
+          os: Platform.operatingSystem,
+        );
+      tuning
+        ..debugStore = store
+        ..debugReset()
+        ..debugLadder = [8, 12, 16];
+      expect(tuning.workers, 16, reason: '指纹不符应按启发式重新收敛');
+    });
+
+    test('只持久化档位：降档后落盘当前档，惩罚不落盘', () {
+      final store = _MemoryNekoPowStore();
+      tuning
+        ..debugStore = store
+        ..debugReset()
+        ..debugLadder = [8, 12]
+        ..debugSetWorkers(8);
+      // 升到 12 再撑不住降回 8
+      for (var i = 0; i < 8; i++) {
+        sample(8, 20e6 / 8);
+      }
+      sample(12, 30e6 / 12);
+      sample(12, 30e6 / 12);
+      sample(12, 30e6 / 12);
+      expect(tuning.workers, 12);
+      expect(store.saved?.workers, 12, reason: '采纳后应落盘新档位');
+      for (var i = 0; i < 5; i++) {
+        sample(12, 8e6 / 12);
+      }
+      expect(tuning.workers, 8);
+      expect(store.saved?.workers, 8, reason: '降档后应落盘当前档位');
+      expect(tuning.demotions[12], 1);
+
+      // 「重启」：只恢复档位，惩罚清零
+      tuning.debugReset();
+      expect(tuning.demotions, isEmpty);
+      expect(tuning.workers, 8);
     });
 
     test('梯度上限不超过 16（更高只会超订塌陷）', () {
