@@ -87,6 +87,9 @@ Accept-Language: zh-CN,zh;q=0.9,en;q=0.8
 - **多 isolate 并行**：按 `counter ≡ i (mod N)` 切分候选空间（各 worker 的候选互不
   重叠、合起来覆盖全部自然数），先解出者胜并 `kill` 其余 worker；
   `N = min(核数 - 1, 16)`，难度低于 16 bit 时不开 worker（spawn 开销不划算）。
+  **上限 16 有实测依据**：本机（i9-13980HX，24 物理核 / 32 线程）difficulty=20 的
+  中位耗时 —— 8 worker 48 ms、16 worker 28 ms，而 20 worker 148 ms、24 worker
+  224 ms：功耗/热限制下超订反而塌陷 5–8 倍。
 - 语义不变：服务端只验一次哈希，**任何达标计数器都是合法 proof**。同步路径仍从 0
   起逐个试（与官方实现一致、返回最小解）；并行路径可能返回更大的计数器，同样有效。
 

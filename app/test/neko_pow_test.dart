@@ -156,6 +156,16 @@ void main() {
       expect(_meets('low', int.parse(proof!), 4), isTrue);
     });
 
+    test('workerCount 覆盖策略（1 = 单 isolate）且 proof 有效', () async {
+      const seed = 'override-seed';
+      final proof = await nekoSolveProof(seed, 18, workerCount: 1);
+      expect(proof, isNotNull);
+      expect(_meets(seed, int.parse(proof!), 18), isTrue);
+      final multi = await nekoSolveProof(seed, 18, workerCount: 4);
+      expect(multi, isNotNull);
+      expect(_meets(seed, int.parse(multi!), 18), isTrue);
+    });
+
     test('worker 数策略：低难度=1，高难度按核数封顶', () {
       expect(nekoPowWorkerCount(0), 1);
       expect(nekoPowWorkerCount(kNekoPowParallelMinBits - 1), 1);

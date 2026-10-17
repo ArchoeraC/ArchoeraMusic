@@ -39,8 +39,12 @@ const int kNekoMaxDifficultyBits = 64;
 /// 开 worker 的 spawn / 消息开销反而更大。
 const int kNekoPowParallelMinBits = 16;
 
-/// 并行 worker 上限（核数再多也不无限开：解题是短促突发的 CPU 密集段，
-/// 封顶 16 既能把延迟压到几十毫秒，又不至于把整机占满、影响音频解码/UI）。
+/// 并行 worker 上限。
+///
+/// 不是「越多越快」：本机（i9-13980HX，24 物理核 / 32 线程，P+E 混合）实测
+/// difficulty=20 的中位耗时 —— 8 worker 48ms、16 worker 28ms、**20 worker 148ms、
+/// 24 worker 224ms**（功耗/热限制下超订反而塌陷 5–8 倍）。封顶 16 既能拿到近线性
+/// 加速，又给音频解码/UI 留出余量。
 const int kNekoPowMaxWorkers = 16;
 
 /// 摘要的前导零比特数是否达到 [bits]。
@@ -116,13 +120,19 @@ void nekoPowWorkerMain(NekoPowJob job) {
 
 /// 在后台解出 [seed]/[difficulty] 对应的 `proof`；难度非法返回 null。
 ///
-/// 高难度时按 [nekoPowWorkerCount] 开并行 worker（各试互不重叠的计数器同余类），
-/// 任一 worker 解出即返回并 kill 其余 worker；低难度仍走单个临时 isolate。
-/// 全程不阻塞 UI isolate。
-Future<String?> nekoSolveProof(String seed, int difficulty) async {
+/// 高难度时开并行 worker（各试互不重叠的计数器同余类），任一 worker 解出即返回并
+/// kill 其余 worker；低难度仍走单个临时 isolate。全程不阻塞 UI isolate。
+///
+/// [workerCount] 覆盖默认策略（[nekoPowWorkerCount]），供基准测试 / 未来「限制
+/// 解题占用 CPU」的设置项使用；传 1 即退化为单 isolate。
+Future<String?> nekoSolveProof(
+  String seed,
+  int difficulty, {
+  int? workerCount,
+}) async {
   if (difficulty < 0 || difficulty > kNekoMaxDifficultyBits) return null;
 
-  final workers = nekoPowWorkerCount(difficulty);
+  final workers = workerCount ?? nekoPowWorkerCount(difficulty);
   if (workers <= 1) {
     return Isolate.run(() => nekoSolveProofSync(seed, difficulty));
   }

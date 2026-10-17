@@ -98,5 +98,23 @@ Future<void> main() async {
         '(proof=${syncProof ?? '-'})   并行 ${_fmt(parMs).padLeft(9)} '
         '(proof=${parProof ?? '-'})   ${(syncMs / parMs).toStringAsFixed(2)}×');
   }
-  print('\n（并行 worker 见 nekoPowWorkerCount：低难度不 spawn）');
+  // ── worker 数扫描（并行甜点；超订会因功耗/热限制反而变慢）─────────────
+  print('\n== worker 数扫描（difficulty=20，每档 3 次取中位）==');
+  for (final workers in [1, 4, 8, 16, 20, 24]) {
+    final times = <double>[];
+    for (var i = 0; i < 3; i++) {
+      final sw = Stopwatch()..start();
+      final proof = await nekoSolveProof(_seed, 20, workerCount: workers);
+      sw.stop();
+      if (proof == null) {
+        print('  workers=$workers 解算失败');
+        return;
+      }
+      times.add(sw.elapsedMicroseconds / 1000.0);
+    }
+    times.sort();
+    print('  workers=${workers.toString().padLeft(2)}  中位 '
+        '${_fmt(times[1]).padLeft(10)}');
+  }
+  print('\n（并行 worker 默认见 nekoPowWorkerCount：低难度不 spawn）');
 }
