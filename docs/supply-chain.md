@@ -12,7 +12,7 @@
 | SEC-22 | `protect-main` 开启 **Require review from Code Owners**：CI/签名/打包/水印等关键路径改动无法被非 owner 自合并（owner 为 bypass actor，可自建 PR 自合并） | GitHub ruleset + `.github/CODEOWNERS` |
 | SEC-23 | `release` 作业在签名前**校验发版 tag 指向受保护长分支**（`main` 或 `ArchoeraOS`）的祖先提交，否则拒绝构建/签名 | `build-all.yml` release 作业 |
 | SEC-24 | tag 名经 **`$GITHUB_REF_NAME` 环境变量**注入，`run:` 内不再内插 `${{ github.ref_name }}` | `build-all.yml` |
-| SEC-25 | release 作业生成 **CycloneDX SBOM** 并写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业 |
+| SEC-25 | release 作业生成 **CycloneDX SBOM**：产物侧（FFmpeg / OpenSSL / opus / taglib 等原生库、自家二进制、Go 模块）+ 各生态锁文件（Rust 5× `Cargo.lock`、Dart `pubspec.lock`、Go `go.mod`+`go.sum`、.NET `packages.lock.json`）合并为一份；与**全部**资产一并签 `.sig1` 并列入 `SHA256SUMS`。另写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业、`app/tool/gen_sbom.sh` |
 | SEC-26 | **各生态漏洞扫描**工作流（`cargo audit` / `govulncheck` / `dotnet list package --vulnerable`）；Dependabot 配置保留但**版本更新已停用**（依赖改为定期手动同步，见 §3） | `.github/dependabot.yml`、`security-audit.yml` |
 | SEC-27 | CI 跑**完整 `flutter test`**（不再只跑 widget 冒烟）+ vault 用例（指向测试二进制）+ downloader/subsonic 的 `cargo test` / `go test` | `actions/build-linux/action.yml` |
 | SEC-08 | release 作业对目录型产物的 `ARCHOERA-NATIVE-MANIFEST.txt` 做 **key1 ECDSA/SHA-256 分离签名**（`.sig1`），运行期内嵌公钥验签 + 摘要 | `build-all.yml` release 作业 + `app/tool/sign_native_manifest.sh` |
@@ -65,6 +65,16 @@
   需要恢复自动化时，把对应生态的 `open-pull-requests-limit` 改回正整数即可。
 - `dtolnay/rust-toolchain` 因 pin 到 SHA，工具链经 `with: toolchain: stable` 指定（ref 不再是工具链名）。
 - 新增任何 `uses:` 一律 pin SHA；`run:` 内**禁止**内插 `${{ github.* }}`（用环境变量）。
+- **SBOM（SEC-25）**：`bash app/tool/gen_sbom.sh <artifacts_dir> <repo_root> <version> <out>`
+  用 pin 版本的 syft（CI 内下载后按官方 `*_checksums.txt` 校验 sha256）扫「产物 + 锁文件」，
+  再由 `app/tool/sbom_normalize.py` 归一化（主体标为 `ArchoeraMusic <版本>`、去掉
+  `type: file` 条目与绝对路径、按 purl 去重、根节点展开全部组件）。
+  **新增依赖生态时必须同步往脚本里加锁文件**，否则该生态会从 SBOM 里消失
+  （脚本会打印「缺少依赖清单」提示）。已知边界：`licenses` 目前只有产物侧二进制
+  自带的少量信息——锁文件不含许可字段，syft 的 `--enrich` 也只覆盖 Go/Java/JS/Python/vcpkg。
+- **.NET 依赖清单**：`app/core/{scanner,indexer}/packages.lock.json`（`dotnet restore
+  --use-lock-file` 生成，已入库）——SBOM 的 .NET 覆盖与 `dotnet list package --vulnerable`
+  都以它为准；依赖变更后随 PR 一起更新。
 - `release` 作业的 Environment 人工审批（`release`）是签名的最后一道人工门；SEC-23 的
   tag 祖先校验在其之前拦截「tag 指向未评审提交」。
 - **漏洞处置**：`security-audit.yml` 首次运行即发现 downloader 的
