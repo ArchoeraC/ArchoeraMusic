@@ -3332,7 +3332,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsDecline1Body =>
-      '이 소프트웨어는 서드파티 클라이언트로, 각 음악 플랫폼 및 공식 클라이언트와 어떠한 관련, 협력 또는 권한 관계가 없습니다.\n\n';
+      '이 소프트웨어는 서드파티 클라이언트로, 각 음악 플랫폼 및 공식 클라이언트와 어떠한 관련, 협력 또는 권한 관계가 없습니다. 이 프로젝트 자체는 영리 목적이 없으며 상업적 제휴, 광고, 후원 콘텐츠 삽입을 받지 않습니다. 추가 라이선스 권리를 부여하지 않는 자발적 기부만 받습니다(기부는 AGPL-3.0 조건이나 기능에 영향을 주지 않습니다). 더 나은 기능이 필요하면 공식 클라이언트를 사용하세요.\n\n';
 
   @override
   String get settingsDeclineLicenseTitle => '2. 오픈 소스 라이선스 및 소스 코드\n';

@@ -15140,7 +15140,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsDecline1Body =>
-      '本軟體為第三方用戶端，與各音樂平台及其官方用戶端無任何關聯、合作或授權關係；不以營利為目的，不接受任何商業合作、廣告或贊助內容置入，僅接受不附帶任何額外授權權利的自願打賞（不影響功能與授權條款）。如需更完善的功能，請下載官方用戶端體驗。\n\n';
+      '本軟體為第三方用戶端，與各音樂平台及其官方用戶端無任何關聯、合作或授權關係；不以營利為目的，不接受任何商業合作、廣告或贊助內容置入，僅接受不附帶任何額外授權權利的自願打賞（不影響功能與授權條款；程式碼層面的商業使用仍以 AGPL-3.0 條款為準）。如需更完善的功能，請下載官方用戶端體驗。\n\n';
 
   @override
   String get settingsDeclineLicenseTitle => '二、開源授權與原始碼\n';
