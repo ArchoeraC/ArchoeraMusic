@@ -109,14 +109,14 @@ class NekoPowHasher {
     return _hashCurrent(difficulty);
   }
 
-  /// 从 [start] 起按 [stride] 步进找第一个达标计数器；找不到（理论上不会）返回 null。
+  /// 从 [start] 起按 [stride] 步进找第一个达标计数器（必然存在：期望 2^difficulty）。
   ///
   /// 并行解题时每个 worker 用不同的 `(start, stride)`：`counter ≡ start (mod stride)`，
   /// 各 worker 的候选**互不重叠**，合起来覆盖全部自然数。
   ///
   /// 计数器是 64 位有符号整数：要走到溢出需 `2^63` 次试探（远超实际难度对应的
   /// `2^difficulty`），故不做回绕处理。
-  int? solve(int start, int stride, int difficulty) {
+  int solve(int start, int stride, int difficulty) {
     _setCounter(start);
     var counter = start;
     while (true) {
@@ -124,6 +124,18 @@ class NekoPowHasher {
       counter += stride;
       _advanceCounter(stride);
     }
+  }
+
+  /// 同 [solve]，但额外回报**本次搜索自身耗时**（供 [NekoPowTuning] 采样）。
+  ({int counter, int elapsedMicros}) solveTimed(
+    int start,
+    int stride,
+    int difficulty,
+  ) {
+    final stopwatch = Stopwatch()..start();
+    final counter = solve(start, stride, difficulty);
+    stopwatch.stop();
+    return (counter: counter, elapsedMicros: stopwatch.elapsedMicroseconds);
   }
 
   /// 从 [start] 起连续试 [count] 个候选（步进 [stride]），返回**命中数**。

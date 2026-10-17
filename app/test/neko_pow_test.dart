@@ -18,6 +18,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/neko/neko_pow_sha256.dart';
+import 'package:archoera_music/apis/neko/neko_pow_tuning.dart';
 import 'package:archoera_music/apis/neko/neko_replay.dart';
 
 List<int> _referenceDigest(String seed, int counter) =>
@@ -27,6 +28,89 @@ bool _meets(String seed, int counter, int difficulty) =>
     nekoMeetsDifficulty(_referenceDigest(seed, counter), difficulty);
 
 void main() {
+  final tuning = NekoPowTuning.instance;
+
+  setUp(tuning.debugReset);
+  tearDown(tuning.debugReset);
+
+  group('设备能力自适应（按真实解题样本热切，不靠合成基准）', () {
+    /// 注入一次样本：聚合吞吐 = per-worker 速率 × 并发（candidates/elapsed 为
+    /// 胜出 worker 自身的速率）。
+    void sample(int workers, double ratePerSecond) {
+      tuning.record(
+        workers: workers,
+        candidates: (ratePerSecond / 1000).round(),
+        elapsed: const Duration(milliseconds: 1),
+      );
+    }
+
+    test('健康机器：低档聚合吞吐更低 → 回退并收敛（只多一次解题）', () {
+      tuning
+        ..debugLadder = [4, 8, 16]
+        ..debugSetWorkers(16);
+      sample(16, 2.5e6); // 当前档采样 → 安排试探 8
+      expect(tuning.plannedWorkers, 8);
+      sample(8, 2.5e6); // 单 worker 速率相同 → 聚合只有一半 → 不该降
+      expect(tuning.workers, 16);
+      expect(tuning.settled, isTrue);
+    });
+
+    test('配额受限/降频：低档聚合吞吐更高 → 降并发；再没有收益则收敛', () {
+      tuning
+        ..debugLadder = [4, 8, 16]
+        ..debugSetWorkers(16);
+      sample(16, 1.0e6); // 超订：每 worker 变慢
+      expect(tuning.plannedWorkers, 8);
+      sample(8, 2.6e6); // 8 档每 worker 明显更快 → 采纳并继续探 4
+      expect(tuning.workers, 8);
+      expect(tuning.plannedWorkers, 4);
+      sample(4, 2.6e6); // 4 档没有更快 → 回退收敛在 8
+      expect(tuning.workers, 8);
+      expect(tuning.settled, isTrue);
+    });
+
+    test('收敛后定期向上复核：状态恢复时能爬回去', () {
+      tuning
+        ..debugLadder = [4, 8, 16]
+        ..debugSetWorkers(8);
+      sample(8, 2.0e6); // 当前档 → 向下试 4
+      sample(4, 2.0e6); // 4 不更快 → 收敛在 8
+      expect(tuning.workers, 8);
+      expect(tuning.settled, isTrue);
+
+      // 收敛后 15 次解题保持 8，第 16 次触发向上复核
+      for (var i = 0; i < 15; i++) {
+        sample(8, 2.0e6);
+        expect(tuning.plannedWorkers, 8);
+      }
+      sample(8, 2.0e6);
+      expect(tuning.plannedWorkers, 16);
+
+      // 16 档聚合吞吐明显更高（48M/s vs 16M/s）→ 采纳
+      sample(16, 3.0e6);
+      expect(tuning.workers, 16);
+    });
+
+    test('低难度不 spawn；并发受难度工作量约束', () {
+      tuning
+        ..debugLadder = [4, 8, 16]
+        ..debugSetWorkers(16);
+      expect(tuning.workersFor(kNekoPowParallelMinBits - 1), 1);
+      expect(tuning.workersFor(0), 1);
+      // 难度 16：期望 2^16 / 每 worker 预算 8192 = 8
+      expect(tuning.workersFor(16), 8);
+      // 难度 20：期望 2^20 → 128，但封顶 16
+      expect(tuning.workersFor(20), 16);
+    });
+
+    test('梯度上限不超过 16（更高只会超订塌陷）', () {
+      final ladder = NekoPowTuning.instance..debugReset();
+      expect(ladder.workers, lessThanOrEqualTo(16));
+      expect(ladder.workers, greaterThanOrEqualTo(1));
+      expect(ladder.workersFor(64), lessThanOrEqualTo(ladder.workers));
+    });
+  });
+
   group('前缀 SHA-256 与 package:crypto 逐字节一致', () {
     // seed 长度刻意覆盖：前缀尾部 0 / 55 / 56 / 63 字节（单块上限）与多块前端。
     final seeds = <String>[
@@ -121,8 +205,7 @@ void main() {
       for (final stride in [1, 2, 3, 8, 9, 10, 16, 23, 100]) {
         for (var offset = 0; offset < stride; offset += stride > 8 ? 7 : 1) {
           final counter = NekoPowHasher(seed).solve(offset, stride, difficulty);
-          expect(counter, isNotNull);
-          expect(counter! % stride, offset, reason: 'stride=$stride offset=$offset');
+          expect(counter % stride, offset, reason: 'stride=$stride offset=$offset');
           expect(_meets(seed, counter, difficulty), isTrue);
         }
       }
@@ -166,14 +249,12 @@ void main() {
       expect(_meets(seed, int.parse(multi!), 18), isTrue);
     });
 
-    test('worker 数策略：低难度=1，高难度按核数封顶', () {
+    test('worker 数策略：低难度=1，其余在 [1, 32] 内且不超过核数', () {
       expect(nekoPowWorkerCount(0), 1);
       expect(nekoPowWorkerCount(kNekoPowParallelMinBits - 1), 1);
-      final workers = nekoPowWorkerCount(kNekoPowParallelMinBits);
-      expect(workers, inInclusiveRange(1, kNekoPowMaxWorkers));
-      if (Platform.numberOfProcessors > 2) {
-        expect(workers, greaterThan(1), reason: '多核机器应启用并行');
-      }
+      final workers = nekoPowWorkerCount(24);
+      expect(workers, inInclusiveRange(1, 32));
+      expect(workers, lessThanOrEqualTo(Platform.numberOfProcessors));
     });
   });
 }

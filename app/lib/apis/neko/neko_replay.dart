@@ -24,10 +24,12 @@
 /// `tool/neko_pow_bench.dart`）。
 library;
 
-import 'dart:io';
 import 'dart:isolate';
 
 import 'neko_pow_sha256.dart';
+import 'neko_pow_tuning.dart';
+
+export 'neko_pow_tuning.dart' show kNekoPowParallelMinBits;
 
 /// 已支持的解题算法标识；换题响应里的 `algorithm` 必须与之一致，否则不盲解。
 const String kNekoPowAlgorithm = 'sha256-leading-zero-bits';
@@ -35,16 +37,12 @@ const String kNekoPowAlgorithm = 'sha256-leading-zero-bits';
 /// 难度上限：服务端远低于此值，仅防止异常输入把后台 isolate 空转卡死。
 const int kNekoMaxDifficultyBits = 64;
 
-/// 低于该难度不启用多 isolate：`2^16 = 65536` 次哈希在单核上是毫秒级，
-/// 开 worker 的 spawn / 消息开销反而更大。
-const int kNekoPowParallelMinBits = 16;
-
-/// 并行 worker 上限。
+/// 并行 worker 的**启发式**上限（未完成设备标定前的兜底）。
 ///
-/// 不是「越多越快」：本机（i9-13980HX，24 物理核 / 32 线程，P+E 混合）实测
-/// difficulty=20 的中位耗时 —— 8 worker 48ms、16 worker 28ms、**20 worker 148ms、
-/// 24 worker 224ms**（功耗/热限制下超订反而塌陷 5–8 倍）。封顶 16 既能拿到近线性
-/// 加速，又给音频解码/UI 留出余量。
+/// 实际并发数由 [NekoPowTuning] 按**设备实测吞吐**决定：老机器/无 SIMD 加速、
+/// P+E 混合核、功耗/热限制、虚拟机配额都会影响结果，写死核数一定不对。
+/// 本机（i9-13980HX，24 物理核 / 32 线程）实测 difficulty=20：16 worker 22 ms、
+/// 20 worker 52 ms、24 worker 237 ms —— 超订会塌陷，故兜底取 `min(核数-1, 16)`。
 const int kNekoPowMaxWorkers = 16;
 
 /// 摘要的前导零比特数是否达到 [bits]。
@@ -71,20 +69,15 @@ bool nekoMeetsDifficulty(List<int> digest, int bits) {
 /// 从 0 起逐个试（与官方实现一致，便于对照）。
 String? nekoSolveProofSync(String seed, int difficulty) {
   if (difficulty < 0 || difficulty > kNekoMaxDifficultyBits) return null;
-  final counter = NekoPowHasher(seed).solve(0, 1, difficulty);
-  return counter?.toString();
+  return NekoPowHasher(seed).solve(0, 1, difficulty).toString();
 }
 
-/// 并行 worker 数（`difficulty` → worker 数）；纯函数，便于单测。
+/// 并行 worker 数（`difficulty` → worker 数）：委托设备自适应器。
 ///
-/// 低难度返回 1（不 spawn）；否则 `核数 - 1`（给音频/UI 留一个核）并封顶
-/// [kNekoPowMaxWorkers]。
-int nekoPowWorkerCount(int difficulty) {
-  if (difficulty < kNekoPowParallelMinBits) return 1;
-  final cores = Platform.numberOfProcessors;
-  if (cores <= 2) return 1;
-  return (cores - 1).clamp(1, kNekoPowMaxWorkers);
-}
+/// 初始为启发式 `min(核数-1, 16)`；之后按**真实解题样本**的 per-worker 速率
+/// 向下爬坡收敛（配额受限 / 降频机器会自动减少并发），并按难度分摊工作量。
+int nekoPowWorkerCount(int difficulty) =>
+    NekoPowTuning.instance.workersFor(difficulty);
 
 /// 子 isolate 的搜索作业（字段都可跨 isolate 发送：字符串 / 整数 / SendPort）。
 class NekoPowJob {
@@ -109,13 +102,16 @@ class NekoPowJob {
 
 /// 子 isolate 入口（**顶层函数**：`Isolate.spawn` 只接受可发送的顶层入口，
 /// 且不能捕获调用方实例——否则会重演「isolate 消息不可发送」那类问题）。
+///
+/// 回传 `[offset, counter, elapsedMicros]`：offset 用于反推该 worker 试了多少
+/// 候选（供设备自适应采样），elapsed 是该 worker 自身的搜索耗时（不含 spawn）。
 void nekoPowWorkerMain(NekoPowJob job) {
-  final counter = NekoPowHasher(job.seed).solve(
+  final result = NekoPowHasher(job.seed).solveTimed(
     job.offset,
     job.stride,
     job.difficulty,
   );
-  job.port.send('$counter');
+  job.port.send(<int>[job.offset, result.counter, result.elapsedMicros]);
 }
 
 /// 在后台解出 [seed]/[difficulty] 对应的 `proof`；难度非法返回 null。
@@ -132,7 +128,8 @@ Future<String?> nekoSolveProof(
 }) async {
   if (difficulty < 0 || difficulty > kNekoMaxDifficultyBits) return null;
 
-  final workers = workerCount ?? nekoPowWorkerCount(difficulty);
+  final tuning = NekoPowTuning.instance;
+  final workers = workerCount ?? tuning.workersFor(difficulty);
   if (workers <= 1) {
     return Isolate.run(() => nekoSolveProofSync(seed, difficulty));
   }
@@ -158,7 +155,21 @@ Future<String?> nekoSolveProof(
       );
     }
     await for (final message in port) {
-      if (message is String) return message; // 任一 worker 解出即胜
+      if (message is List && message.length == 3) {
+        final offset = message[0] as int;
+        final counter = message[1] as int;
+        final micros = message[2] as int;
+        // 显式指定 workerCount（基准扫描）时不喂样本，避免污染自适应状态。
+        if (workerCount == null && micros > 0) {
+          final tried = (counter - offset) ~/ workers + 1;
+          tuning.record(
+            workers: workers,
+            candidates: tried,
+            elapsed: Duration(microseconds: micros),
+          );
+        }
+        return '$counter'; // 任一 worker 解出即胜
+      }
       if (message == null) {
         // worker 正常退出（仅可能因异常提前结束）：全部退出且无人解出才放弃。
         if (++exited >= workers) return null;

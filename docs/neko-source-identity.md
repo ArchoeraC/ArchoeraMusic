@@ -79,23 +79,29 @@ Accept-Language: zh-CN,zh;q=0.9,en;q=0.8
 直接领取。挑战解题是 `2^difficulty` 量级的哈希计算，放在后台 isolate，不阻塞 UI；
 `nekoSolveProofSync` / `nekoMeetsDifficulty` 为纯函数，便于单测。
 
-**本地加速（不改协议、不改 proof 形态）**，见 `apis/neko/neko_pow_sha256.dart`：
+**本地加速（不改协议、不改 proof 形态，纯 Dart）**：
 
-- **前缀哈希**：`seed + ":"` 是固定前缀，其完整 64 字节块只压缩一次（midstate）；
-  逐候选只压「前缀尾部 + 计数器 + pad + 长度」（≤ 2 块），且全程零分配
-  （计数器用十进制进位维护，不 `toString`、不建消息 / 摘要对象）；
-- **多 isolate 并行**：按 `counter ≡ i (mod N)` 切分候选空间（各 worker 的候选互不
-  重叠、合起来覆盖全部自然数），先解出者胜并 `kill` 其余 worker；
-  `N = min(核数 - 1, 16)`，难度低于 16 bit 时不开 worker（spawn 开销不划算）。
-  **上限 16 有实测依据**：本机（i9-13980HX，24 物理核 / 32 线程）difficulty=20 的
-  中位耗时 —— 8 worker 48 ms、16 worker 28 ms，而 20 worker 148 ms、24 worker
-  224 ms：功耗/热限制下超订反而塌陷 5–8 倍。
+- **前缀哈希**（`apis/neko/neko_pow_sha256.dart`）：`seed + ":"` 是固定前缀，其完整
+  64 字节块只压缩一次（midstate）；逐候选只压「前缀尾部 + 计数器 + pad + 长度」
+  （≤ 2 块），全程零分配（计数器用十进制进位维护，不 `toString`、不建消息 / 摘要对象）。
+- **多 isolate 并行 + 设备自适应**（`neko_pow_tuning.dart`）：按
+  `counter ≡ i (mod N)` 切分候选空间（各 worker 互不重叠、合起来覆盖全部自然数），
+  先解出者胜并 `kill` 其余 worker。并发数**不写死**：
+  - 初始取 `min(核数 - 1, 16)`（上限 16：实测 20/24 worker 因功耗/热限制反而慢 5–8 倍）；
+  - 之后用**真实解题样本**自适应：胜出 worker 回报「试了多少候选 / 自身耗时」，折算
+    该档位的**聚合吞吐**（per-worker 速率 × 并发），相邻档高出 15% 才切换；
+  - 先向下试（配额受限 / 混合核 / 降频的机器会自动减并发），收敛后每 16 次解题
+    向上复核一次（热状态恢复时能爬回去），明显更差的向上档位拉黑不再试；
+  - **不用合成 benchmark**：实测短时爆发测不出降频（31 worker 在 8k 次/worker 的
+    基准里最优，真实解题却慢 50 倍），只有真实样本代表真实算力；
+  - 难度低于 16 bit 不 spawn（`2^16` 次哈希在单核是毫秒级，spawn 不划算）。
 - 语义不变：服务端只验一次哈希，**任何达标计数器都是合法 proof**。同步路径仍从 0
   起逐个试（与官方实现一致、返回最小解）；并行路径可能返回更大的计数器，同样有效。
 
-实测（32 核、AOT、`dart run tool/neko_pow_bench.dart`）：单核哈希吞吐
-531 ns/次 → 400 ns/次；`difficulty=20` 解题 250 ms → 20 ms（约 12×），
-`difficulty=18` 167 ms → 3 ms。
+实测（32 核、AOT、`tool/neko_pow_bench.dart`）：单核哈希吞吐 525 ns/次 → 428 ns/次；
+`difficulty=16` 55 ms → 8.6 ms（6.4×）、`difficulty=18` 162 ms → 15.5 ms（10.4×）、
+`difficulty=20` 247 ms → 28 ms（8.7×）、`difficulty=22` 255 ms → 28 ms（9.1×）。
+自适应在真实设备上通常 2–3 次解题内收敛（健康机器只多花一次解题）。
 
 换题 / 兑换本身也是动态接口，同样经防爬过滤器，与业务请求共用同一套身份头。
 
