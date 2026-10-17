@@ -60,21 +60,22 @@ Future<void> main() async {
 
   // ── 1) 设备自适应轨迹：真实解题样本驱动 ──────────────────────────────
   print('\n== 自适应轨迹（difficulty=20，真实解题，每行一次）==');
-  for (var i = 1; i <= 8; i++) {
+  for (var i = 1; i <= 12; i++) {
     final planned = tuning.plannedWorkers;
     final stopwatch = Stopwatch()..start();
     final proof = await nekoSolveProof(_seed, 20);
     stopwatch.stop();
-    print('  #$i 并发=$planned  ${_ms(stopwatch.elapsedMicroseconds).padLeft(9)}  '
-        'proof=$proof  收敛=${tuning.settled}');
-    if (tuning.settled) break;
+    print('  #$i 计划并发=$planned  ${_ms(stopwatch.elapsedMicroseconds).padLeft(9)}  '
+        'proof=$proof  当前档=${tuning.workers}  试探中=${tuning.probing}');
+    if (tuning.learnedRates.length >= 3 && !tuning.probing) break;
   }
   final rates = tuning.learnedRates;
   final rateText = rates.entries
       .map((e) => '${e.key}w=${(e.value / 1e6).toStringAsFixed(2)}M/s')
       .join('  ');
   print('  学到聚合吞吐：$rateText');
-  print('  收敛并发=${tuning.workers}  '
+  print('  当前并发=${tuning.workers}  冷却中=${tuning.cooldownRemaining}');
+  print('  '
       '（d16→${tuning.workersFor(16)} / d20→${tuning.workersFor(20)} / '
       'd22→${tuning.workersFor(22)}）');
 

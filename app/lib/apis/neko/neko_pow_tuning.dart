@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// NekoMusic 挑战解题的**设备能力自适应**（纯 Dart，按真实解题样本热切）。
+/// NekoMusic 挑战解题的**设备能力负反馈自适应**（纯 Dart，按真实解题样本热切）。
 ///
 /// 为什么不用「合成基准」：实测证明短时爆发式 benchmark **测不出真实算力**。
 /// 本机（i9-13980HX，24 物理核 / 32 线程，P+E 混合）用 8k 次/worker 的基准时，
@@ -11,19 +11,24 @@
 /// SHA-NI / NEON、虚拟机有 CPU 配额、笔记本有功耗墙——**只有真实解题样本才代表
 /// 真实算力**。
 ///
-/// 做法（零额外 CPU：不复用解题之外的 benchmark）：
-///  - 初始并发取 `min(核数 - 1, 16)`（保守上限，避免超订塌陷）；
-///  - 每次真实解题由**胜出的 worker** 回报「试了多少候选 / 自身耗时」，折算成
-///    该档位的**聚合吞吐**样本（per-worker 速率 × 并发数）；
-///  - 判据必须是聚合吞吐而不是单 worker 速率：并发越低，单 worker 争用越少、
-///    速率天然越高（实测 12w 的单 worker 速率比 16w 高 14%，但总吞吐仍低），
-///    只比单 worker 速率会一路降到 1；
-///  - 策略是**双向爬坡**：先用当前档采样，再试相邻档（先向下，收敛后周期性向上
-///    复核）；相邻档的聚合吞吐高出 15% 才切换。健康机器只多花 1 次解题，之后每
-///    16 次解题才复核一次；明显更差的向上档位会被拉黑，不再反复试探。
+/// 控制环（**负反馈 + 双向试探**，不做永久拉黑）：
 ///
-/// 未来引入原生 SHA-NI / NEON 后端（混合模块）时，在同一处用同一套 per-worker
-/// 速率样本与 Dart 后端比较择优即可——本类是唯一的决策点。
+///  1. **误差驱动（负反馈）**：每次真实解题由胜出 worker 回报「试了多少候选 /
+///     自身耗时」，折算该档位的**聚合吞吐**（per-worker 速率 × 并发）。当前档位的
+///     EMA 掉到「已知最佳档」的 75% 以下 → **立即**切到最佳档，不等周期。
+///     降档、以及「能力恢复后立刻抓住」都靠这条误差项。
+///  2. **周期试探（探索）**：每 [ _kProbeEvery ] 次解题试一次相邻档（优先升档，
+///     升档在冷却中则试降档）；相邻档聚合吞吐高出 15% 才采纳，否则回退。
+///  3. **冷却而非拉黑**：试探失败只让该档位冷却若干次解题（失败次数越多冷却越久，
+///     上限 128 次）——**设备更换 / 换电源 / 散热恢复后仍会再试**，不会永久锁在
+///     低档位。
+///  4. **升档永远保留**：误差项与周期试探都会向上；只要设备真的变快，就会爬回去。
+///
+/// 判据必须是**聚合吞吐**：并发越低争用越少、单 worker 速率天然更高（实测 12w 的
+/// 单 worker 速率比 16w 高 14%，但总吞吐更低），只比单 worker 速率会一路降到 1。
+///
+/// 未来引入原生 SHA-NI / NEON 后端（混合模块）时，在同一处用同一套样本与 Dart
+/// 后端比较择优即可——本类是唯一的决策点。
 library;
 
 import 'dart:io';
@@ -38,14 +43,25 @@ const int _kHashesPerWorkerBudget = 8192;
 /// 并发候选梯度（按核数裁剪；上限 16 —— 更高只会触发功耗/热塌陷）。
 const List<int> _kLadder = [1, 2, 3, 4, 6, 8, 12, 16];
 
-/// per-worker 速率的指数滑动平均系数（命中位置是几何分布，单样本噪声大）。
-const double _kEmaAlpha = 0.4;
+/// 聚合吞吐的 EMA 系数：上升快抓（能力恢复立刻反映），下降慢判（避免被单个
+/// 慢样本带偏）。命中位置是几何分布，单样本噪声大。
+const double _kEmaAlphaUp = 0.7;
+const double _kEmaAlphaDown = 0.3;
 
-/// 相邻档的聚合吞吐高出该比例才切换（避免在噪声里来回跳）。
+/// 试探档聚合吞吐高出当前该比例才采纳。
 const double _kSwitchMargin = 1.15;
 
-/// 已收敛后每隔多少次解题向上复核一次（跟踪热状态恢复 / 负载下降）。
-const int _kReProbeEvery = 16;
+/// 负反馈阈值：当前档 EMA 低于「最佳档」该比例 → 立即切换到最佳档。
+const double _kFeedbackRatio = 0.75;
+
+/// 每多少次解题做一次相邻档试探。
+const int _kProbeEvery = 8;
+
+/// 试探失败的冷却基数（第 1 次失败冷却 8 次解题，之后翻倍）。
+const int _kCooldownBase = 8;
+
+/// 冷却上限（再长的冷却对「设备变化」就不够灵敏了）。
+const int _kCooldownMax = 128;
 
 /// 设备解题能力自适应器（进程内单例）。
 class NekoPowTuning {
@@ -53,70 +69,63 @@ class NekoPowTuning {
 
   static final NekoPowTuning instance = NekoPowTuning._();
 
-  /// 各档**聚合吞吐**的 EMA（candidates/s = per-worker 速率 × 并发数）。
-  final Map<int, double> _rate = {};
+  /// 各档聚合吞吐 EMA（candidates/s）。
+  final Map<int, double> _ema = {};
 
-  /// 各档样本数。
-  final Map<int, int> _samples = {};
+  /// 已完成的解题次数（冷却 / 试探计时用）。
+  int _solves = 0;
 
   int? _workers;
 
-  /// 正在试探的相邻档；null = 无（已收敛或尚无样本）。
+  /// 正在试探的档位与试探前的档位（-1 = 向下，+1 = 向上）。
   int? _probe;
+  int? _probeFrom;
 
-  /// 试探前的当前档（回退用）。
-  int? _previous;
+  /// 上次试探结束时的解题计数。
+  int _lastProbeAt = 0;
 
-  /// 试探方向：-1 向下（减少并发）/ +1 向上（复核）。
-  int _direction = -1;
-
-  /// 是否已收敛（等待下一次向上复核）。
-  bool _settled = false;
-
-  /// 收敛后已过的解题次数（到 [_kReProbeEvery] 复核一次向上档位）。
-  int _sinceSettle = 0;
-
-  /// 拉黑的档位（向上试探明显更差，不再反复试）。
-  final Set<int> _blocked = {};
+  /// 各档试探失败次数与冷却截止计数。
+  final Map<int, int> _failures = {};
+  final Map<int, int> _cooldownUntil = {};
 
   /// 测试接缝：覆盖梯度（默认按核数裁剪）。
   List<int>? debugLadder;
 
-  /// 测试接缝：直接指定当前档位。
+  /// 测试接缝：直接指定当前档位并清空试探状态。
   void debugSetWorkers(int? workers) {
     _workers = workers;
     _probe = null;
-    _previous = null;
-    _direction = -1;
-    _settled = false;
-    _sinceSettle = 0;
+    _probeFrom = null;
+    _lastProbeAt = 0;
   }
 
-  /// 测试接缝：清空学习状态。
+  /// 测试接缝：清空全部学习状态。
   void debugReset() {
-    _rate.clear();
-    _samples.clear();
-    _blocked.clear();
-    _workers = null;
-    _probe = null;
-    _previous = null;
-    _direction = -1;
-    _settled = false;
-    _sinceSettle = 0;
+    _ema.clear();
+    _failures.clear();
+    _cooldownUntil.clear();
+    _solves = 0;
+    debugSetWorkers(null);
     debugLadder = null;
   }
 
   /// 当前采用的并发数（未学习时为启发式上限）。
   int get workers => _workers ??= _ladder().last;
 
-  /// 是否已收敛（不再试探）。
-  bool get settled => _settled;
-
-  /// 下一轮将使用的并发数（= 当前档，或正在试探的低档；诊断 / 基准用）。
+  /// 下一轮将使用的并发数（正在试探时 = 试探档；诊断 / 基准用）。
   int get plannedWorkers => _probe ?? workers;
 
-  /// 已学习的档位聚合吞吐（诊断）。
-  Map<int, double> get learnedRates => Map.unmodifiable(_rate);
+  /// 是否正在试探相邻档。
+  bool get probing => _probe != null;
+
+  /// 已学习的聚合吞吐（诊断）。
+  Map<int, double> get learnedRates => Map.unmodifiable(_ema);
+
+  /// 各档冷却剩余解题次数（诊断）。
+  Map<int, int> get cooldownRemaining => {
+    for (final entry in _cooldownUntil.entries)
+      if (entry.value > _solves) entry.key: entry.value - _solves,
+  };
 
   /// 按难度选择本次解题的 worker 数。
   int workersFor(int difficulty) {
@@ -132,8 +141,7 @@ class NekoPowTuning {
   /// 记录一次**真实解题**样本：该并发档下，胜出 worker 试了 [candidates] 个候选、
   /// 自身耗时 [elapsed]（不含 spawn）。
   ///
-  /// 记账用**聚合吞吐**（`胜出 worker 速率 × 并发数`）：解题期望耗时 ∝ 聚合吞吐，
-  /// 而单 worker 速率会随并发降低（争用少），不能单独用来比档位。
+  /// 记账用**聚合吞吐**（`胜出 worker 速率 × 并发数`）：解题期望耗时 ∝ 聚合吞吐。
   void record({
     required int workers,
     required int candidates,
@@ -141,95 +149,114 @@ class NekoPowTuning {
   }) {
     final micros = elapsed.inMicroseconds;
     if (workers <= 1 || candidates <= 0 || micros <= 0) return;
-    final rate = candidates / (micros / 1e6) * workers;
-    final previous = _rate[workers];
-    _rate[workers] = previous == null
-        ? rate
-        : previous + (rate - previous) * _kEmaAlpha;
-    _samples[workers] = (_samples[workers] ?? 0) + 1;
-    _advance(workers);
+    final sample = candidates / (micros / 1e6) * workers;
+    final previous = _ema[workers];
+    final alpha = previous == null || sample > previous
+        ? _kEmaAlphaUp
+        : _kEmaAlphaDown;
+    _ema[workers] = previous == null
+        ? sample
+        : previous + (sample - previous) * alpha;
+    _solves++;
+    _control(workers);
   }
 
   // ── 内部 ────────────────────────────────────────────────────────────
 
-  void _advance(int sampled) {
+  void _control(int sampled) {
     final ladder = _ladder();
     if (!ladder.contains(workers)) {
       _workers = _nearest(ladder, workers);
       _probe = null;
-      _previous = null;
+      _probeFrom = null;
     }
 
-    // 1) 试探样本到齐：比较聚合吞吐，决定采纳 / 回退并收敛。
+    // 1) 试探样本到齐：判胜（采纳）或回退（冷却该档）。
     final probe = _probe;
     if (probe != null && sampled == probe) {
-      final probeRate = _rate[probe];
-      final previousRate = _rate[_previous ?? workers];
+      final probeRate = _ema[probe];
+      final fromRate = _ema[_probeFrom ?? workers];
       if (probeRate != null &&
-          previousRate != null &&
-          probeRate > previousRate * _kSwitchMargin) {
-        // 更快 → 采纳，沿同方向继续探下一档。
+          fromRate != null &&
+          probeRate > fromRate * _kSwitchMargin) {
         _workers = probe;
-        _previous = probe;
-        final next = _rung(ladder, probe, _direction);
-        if (next == null || _blocked.contains(next)) {
-          _probe = null;
-          _settled = true;
-          _sinceSettle = 0;
-        } else {
-          _probe = next;
-        }
-        return;
+        _failures.remove(probe);
+        _cooldownUntil.remove(probe);
+      } else {
+        _workers = _probeFrom ?? workers;
+        _failures[probe] = (_failures[probe] ?? 0) + 1;
+        final cooldown = (_kCooldownBase << (_failures[probe]! - 1))
+            .clamp(_kCooldownBase, _kCooldownMax);
+        _cooldownUntil[probe] = _solves + cooldown;
       }
-      // 没有更快 → 回退收敛；向上试探明显更差的档位拉黑（避免反复试探）。
-      if (_direction > 0 &&
-          probeRate != null &&
-          previousRate != null &&
-          probeRate < previousRate * 0.5) {
-        _blocked.add(probe);
-      }
-      _workers = _previous ?? workers;
       _probe = null;
-      _previous = null;
-      _settled = true;
-      _sinceSettle = 0;
+      _probeFrom = null;
+      _lastProbeAt = _solves;
+      return;
+    }
+    if (_probe != null) return; // 还在等试探样本
+
+    // 2) 负反馈：当前档掉到「最佳档」的 75% 以下 → 立即切过去（不等周期）。
+    final best = _bestRung(ladder);
+    final currentRate = _ema[workers];
+    // 注意：这里**不看冷却**——冷却是「试探节流」，而这是基于已有 EMA 的纠偏，
+    // 该切就切（否则热塌陷时要白等冷却结束才能降档）。
+    if (best != null &&
+        best != workers &&
+        currentRate != null &&
+        _ema[best]! > currentRate / _kFeedbackRatio) {
+      _workers = best;
+      _lastProbeAt = _solves;
       return;
     }
 
-    if (_probe != null) return; // 等试探样本
-
-    // 2) 尚未收敛且当前档已有样本 → 先向下试一档。
-    if (!_settled) {
-      if (!_rate.containsKey(workers)) return;
-      final lower = _rung(ladder, workers, -1);
-      if (lower == null) {
-        _settled = true;
-        return;
-      }
-      _direction = -1;
-      _previous = workers;
-      _probe = lower;
-      return;
-    }
-
-    // 3) 已收敛 → 每 [_kReProbeEvery] 次解题向上复核一次（热状态可能恢复）。
-    _sinceSettle++;
-    if (_sinceSettle < _kReProbeEvery) return;
-    _sinceSettle = 0;
-    final higher = _rung(ladder, workers, 1);
-    if (higher == null || _blocked.contains(higher)) return;
-    _direction = 1;
-    _previous = workers;
-    _probe = higher;
-    _settled = false;
+    // 3) 周期试探：优先升档（升档是永久保留的能力），升档冷却则试降档。
+    if (_solves - _lastProbeAt < _kProbeEvery) return;
+    final target = _probeTarget(ladder);
+    if (target == null) return;
+    _probe = target;
+    _probeFrom = workers;
+    _lastProbeAt = _solves;
   }
 
-  int? _rung(List<int> ladder, int current, int direction) {
-    final index = ladder.indexOf(current);
+  /// 试探目标：**优先升档**（升档能力永久保留，热恢复/换机后可爬回）；
+  /// 只有「当前档是已测最高档、且从未测过更低档」时才向下探一次以建立对照
+  /// （之后的降档由负反馈用已有数据触发，不必反复试探、零额外开销）。
+  int? _probeTarget(List<int> ladder) {
+    final index = ladder.indexOf(workers);
     if (index < 0) return null;
-    final next = index + direction;
-    if (next < 0 || next >= ladder.length) return null;
-    return ladder[next];
+    if (index + 1 < ladder.length) {
+      final up = ladder[index + 1];
+      if (!_coolingDown(up)) return up;
+    }
+    if (!_hasLowerMeasurement(ladder, index)) {
+      final down = ladder[index - 1];
+      if (!_coolingDown(down)) return down;
+    }
+    return null;
+  }
+
+  /// 当前档以下是否已有测量数据（决定还要不要向下探一次）。
+  bool _hasLowerMeasurement(List<int> ladder, int index) {
+    for (var i = 0; i < index; i++) {
+      if (_ema.containsKey(ladder[i])) return true;
+    }
+    return false;
+  }
+
+  bool _coolingDown(int rung) => (_cooldownUntil[rung] ?? 0) > _solves;
+
+  int? _bestRung(List<int> ladder) {
+    int? best;
+    var bestRate = 0.0;
+    for (final rung in ladder) {
+      final rate = _ema[rung];
+      if (rate != null && rate > bestRate) {
+        bestRate = rate;
+        best = rung;
+      }
+    }
+    return best;
   }
 
   /// 可用并发梯度：按核数裁剪，**上限 16**（更高只会超订塌陷）。
