@@ -19,7 +19,7 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，桌面为主（Li
 - 内置统一 C 音频引擎：EQ / 响度归一化 / 限幅器 / FFT 频谱 / 变速变调 / Opus 转码管线
 - 可选 Subsonic 兼容服务端，并支持 Subsonic / Jellyfin 流媒体服务器聚合
 
-> 本项目以 **AGPL-3.0-or-later** 开源（认可开源商业化，不提供闭源商业授权）。
+> 本项目以 **AGPL-3.0-or-later** 开源（认可开源商业化，接受自愿打赏，不提供闭源商业授权）。
 > 授权边界见 [docs/licensing.md](docs/licensing.md)，用户可读声明见 [docs/software-declaration.md](docs/software-declaration.md)。
 
 ## 快速开始
@@ -55,7 +55,20 @@ flutter run -d linux      # 或 windows / macos
 
 本项目整体以 **GNU Affero General Public License v3** 发布（**AGPL-3.0-or-later**，正文见 [LICENSE](LICENSE)）。
 在遵守 AGPL 义务（分发或提供网络服务时开放源码、保留声明并标注修改）的前提下，自由使用、学习、修改与再分发（含商业用途）均被许可；本项目不提供闭源商业授权。
-贡献者授权与未来许可升级策略见 [docs/licensing.md](docs/licensing.md)。
+
+> 「不提供闭源商业授权」是**作者的意向声明**，不构成对 AGPL 的附加限制：任何人仍可依 AGPL 将本项目用于闭源产品，但须完整履行 AGPL 义务（开放源码、保留声明、标注修改）。
+> 贡献者授权与未来许可升级策略见 [docs/licensing.md](docs/licensing.md)。
+
+## 支持项目
+
+本项目由个人维护，欢迎通过**自愿打赏**（爱发电等渠道）支持持续开发：
+
+- 打赏为**无偿赠与**，不附带任何额外许可权利，不改变 AGPL-3.0-or-later 的条款，也不影响任何功能；
+- 打赏**不构成**购买闭源授权、版权转让或商业合作——作者不提供此类授权（见 [docs/licensing.md](docs/licensing.md)）；
+- 打赏**不构成**技术支持合同，issue / PR 仍按公开流程处理；
+- 项目不接受广告、推广位与赞助内容注入（见 [CONTRIBUTING.md](CONTRIBUTING.md)）。
+
+打赏渠道以本页更新或项目主页公告为准，不接受任何以「换取功能 / 授权 / 优先级」为条件的付款。
 
 ## 第三方与致谢
 

@@ -3439,7 +3439,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDecline1Body =>
-      'This software is a third-party open-source client, not affiliated with, authorized by, or cooperating with any music platform or its official client. The project itself is not run for profit and accepts no commercial partnerships, ads or donations (commercial use of the code remains governed by AGPL-3.0). For richer features, please use the official client.\n\n';
+      'This software is a third-party open-source client, not affiliated with, authorized by, or cooperating with any music platform or its official client. The project itself is not run for profit and accepts no commercial partnerships, ads or sponsored content; it only accepts voluntary donations that carry no additional license rights (donations do not change the AGPL-3.0 terms or affect any feature; commercial use of the code remains governed by AGPL-3.0). For richer features, please use the official client.\n\n';
 
   @override
   String get settingsDeclineLicenseTitle =>
