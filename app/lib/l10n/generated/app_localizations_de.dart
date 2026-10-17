@@ -3478,7 +3478,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsDecline1Body =>
-      'Diese Software ist ein Drittanbieter-Client ohne Zugehörigkeit, Zusammenarbeit oder Autorisierung mit irgendeiner Musikplattform.\n\n';
+      'Diese Software ist ein Drittanbieter-Client ohne Zugehörigkeit, Zusammenarbeit oder Autorisierung mit irgendeiner Musikplattform. Das Projekt selbst ist nicht auf Gewinn ausgerichtet und akzeptiert keine kommerziellen Partnerschaften, Werbung oder eingebettete Sponsorinhalte; es akzeptiert ausschließlich freiwillige Spenden, die keine zusätzlichen Lizenzrechte verleihen (Spenden ändern weder die Bedingungen der AGPL-3.0 noch einzelne Funktionen). Für einen größeren Funktionsumfang nutze bitte den offiziellen Client.\n\n';
 
   @override
   String get settingsDeclineLicenseTitle =>
