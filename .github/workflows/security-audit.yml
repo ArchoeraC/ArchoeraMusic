@@ -76,3 +76,40 @@ jobs:
             echo "== $proj =="
             dotnet list "$proj" package --vulnerable --include-transitive
           done
+
+  # Workflow 语法检查：workflow 文件写错时 GitHub 只会给 startup_failure（状态
+  # 页一个红叉 + 邮件），本地没有任何拦截。这里在 PR 上直接 lint 全部 workflow，
+  # 顺带 `bash -n` / `py_compile` 一遍工具脚本（发布脚本改错同样只会在 tag 时炸）。
+  workflow-lint:
+    name: Workflow syntax (actionlint) + script syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: 安装 actionlint（pin 版本 + sha256 校验）
+        shell: bash
+        env:
+          # 升级时同步改版本号（下载按官方 *_checksums.txt 校验，防截断/篡改）。
+          ACTIONLINT_VERSION: v1.7.12
+        run: |
+          set -euo pipefail
+          V="${ACTIONLINT_VERSION#v}"
+          base="https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}"
+          curl -sSfL -o /tmp/actionlint.tar.gz "${base}/actionlint_${V}_linux_amd64.tar.gz"
+          curl -sSfL -o /tmp/actionlint_checksums.txt "${base}/actionlint_${V}_checksums.txt"
+          (cd /tmp && grep " actionlint_${V}_linux_amd64.tar.gz$" actionlint_checksums.txt | sha256sum -c -)
+          tar -C /tmp -xzf /tmp/actionlint.tar.gz actionlint
+          /tmp/actionlint -version
+      - name: Lint 全部 workflow（YAML / 表达式 / uses 输入 / needs 图 / 注入）
+        shell: bash
+        run: |
+          set -euo pipefail
+          /tmp/actionlint .github/workflows/*.yml
+      - name: 脚本语法（bash -n / py_compile）
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in app/tool/*.sh app/core/*/*.sh; do
+            [ -f "$f" ] || continue
+            bash -n "$f"
+          done
+          python3 -m py_compile app/tool/*.py
