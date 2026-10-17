@@ -1005,7 +1005,7 @@
   "settingsSectionDeclaration": "软件声明",
   "settingsDeclineText": "本软件（ArchoeraMusic）以 **AGPL-3.0** 开源：遵守其条款即可自由使用、学习、修改与再分发，**合规的开源商业使用同样被许可**；本项目不提供脱离 AGPL 义务的闭源商业授权。使用前请阅读以下声明：\n\n",
   "settingsDecline1Title": "一、软件性质\n",
-  "settingsDecline1Body": "本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或捐赠（代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n",
+  "settingsDecline1Body": "本软件为第三方开源客户端，与各音乐平台及其官方客户端无任何关联、合作或授权关系；项目本身不以营利为目的，不接受任何商业合作、广告或赞助内容注入，仅接受不附带任何额外许可权利的自愿打赏（不影响功能与授权条款；代码层面的商业使用仍以 AGPL-3.0 条款为准）。如需更完善的功能，请下载官方客户端体验。\n\n",
   "settingsDeclineLicenseTitle": "二、开源许可与源代码\n",
   "settingsDeclineLicenseBody": "本软件以 GNU Affero 通用公共许可证第 3 版（AGPL-3.0）发布。在该许可证范围内，您可以自由运行、研究、修改与再分发本软件，但须一并遵守：保留版权与许可声明；以同一许可证发布您的衍生作品；若通过网络向用户提供本软件（含修改版）的功能，须向这些用户提供对应的完整源代码。本项目不提供任何脱离 AGPL 义务的闭源商业授权。完整条款以随附的 LICENSE 文件及 https://www.gnu.org/licenses/agpl-3.0.html 为准。\n\n",
   "settingsDecline2Title": "二、内容来源与版权\n",

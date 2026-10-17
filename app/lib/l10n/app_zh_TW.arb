@@ -974,7 +974,7 @@
   "settingsSectionDeclaration": "軟體聲明",
   "settingsDeclineText": "本軟體（ArchoeraMusic）是一款免費、開源的桌面音樂播放器，為個人學習研究用途，非商業軟體。使用前請閱讀以下聲明：\n\n",
   "settingsDecline1Title": "一、軟體性質\n",
-  "settingsDecline1Body": "本軟體為第三方用戶端，與各音樂平台及其官方用戶端無任何關聯、合作或授權關係；不以營利為目的，不接受任何商業合作、廣告或捐贈。如需更完善的功能，請下載官方用戶端體驗。\n\n",
+  "settingsDecline1Body": "本軟體為第三方用戶端，與各音樂平台及其官方用戶端無任何關聯、合作或授權關係；不以營利為目的，不接受任何商業合作、廣告或贊助內容置入，僅接受不附帶任何額外授權權利的自願打賞（不影響功能與授權條款）。如需更完善的功能，請下載官方用戶端體驗。\n\n",
   "settingsDeclineLicenseTitle": "二、開源授權與原始碼\n",
   "settingsDeclineLicenseBody": "本軟體以 GNU Affero 通用公共授權條款第 3 版（AGPL-3.0）發布。在該授權條款範圍內，您可以自由執行、研究、修改與再散布本軟體，但須一併遵守：保留著作權與授權聲明；以同一授權條款發布您的衍生作品；若透過網路向使用者提供本軟體（含修改版）的功能，須向這些使用者提供對應的完整原始碼。本專案不提供任何脫離 AGPL 義務的閉源商業授權。完整條款以隨附的 LICENSE 檔案及 https://www.gnu.org/licenses/agpl-3.0.html 為準。\n\n",
   "settingsDecline2Title": "二、內容來源與版權\n",
