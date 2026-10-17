@@ -94,10 +94,12 @@ jobs:
           set -euo pipefail
           V="${ACTIONLINT_VERSION#v}"
           base="https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}"
-          curl -sSfL -o /tmp/actionlint.tar.gz "${base}/actionlint_${V}_linux_amd64.tar.gz"
+          # 用官方资产名保存：checksums 里就是这个名字，sha256sum -c 按名查找。
+          asset="actionlint_${V}_linux_amd64.tar.gz"
+          curl -sSfL -o "/tmp/${asset}" "${base}/${asset}"
           curl -sSfL -o /tmp/actionlint_checksums.txt "${base}/actionlint_${V}_checksums.txt"
-          (cd /tmp && grep " actionlint_${V}_linux_amd64.tar.gz$" actionlint_checksums.txt | sha256sum -c -)
-          tar -C /tmp -xzf /tmp/actionlint.tar.gz actionlint
+          (cd /tmp && grep " ${asset}$" actionlint_checksums.txt | sha256sum -c -)
+          tar -C /tmp -xzf "/tmp/${asset}" actionlint
           /tmp/actionlint -version
       - name: Lint 全部 workflow（YAML / 表达式 / uses 输入 / needs 图 / 注入）
         shell: bash
