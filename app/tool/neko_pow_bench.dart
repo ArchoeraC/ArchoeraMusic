@@ -66,7 +66,8 @@ Future<void> main() async {
     final proof = await nekoSolveProof(_seed, 20);
     stopwatch.stop();
     print('  #$i 计划并发=$planned  ${_ms(stopwatch.elapsedMicroseconds).padLeft(9)}  '
-        'proof=$proof  当前档=${tuning.workers}  试探中=${tuning.probing}');
+        'proof=$proof  当前档=${tuning.workers}  '
+        '试探中=${tuning.probing}  试用中=${tuning.trialing}');
     if (tuning.learnedRates.length >= 3 && !tuning.probing) break;
   }
   final rates = tuning.learnedRates;

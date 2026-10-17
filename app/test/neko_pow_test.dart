@@ -64,37 +64,71 @@ void main() {
       expect(tuning.workers, 8);
     });
 
-    test('升档永久保留：冷却后仍会再试，能力恢复即爬回更高档', () {
+    test('升档需二次确认：单次「看起来更快」不直接采纳', () {
       tuning
-        ..debugLadder = [8, 16]
+        ..debugLadder = [8, 12]
         ..debugSetWorkers(8);
-      // 8 档跑满一个试探周期 → 计划向上试探 16
       for (var i = 0; i < 8; i++) {
-        sample(8, 20e6 / 8); // 8 档 20M/s
+        sample(8, 20e6 / 8); // 8 档 20M/s，跑满试探周期
       }
-      expect(tuning.plannedWorkers, 16);
-      sample(16, 10e6 / 16); // 16 档当时更差 → 回退并冷却
+      expect(tuning.plannedWorkers, 12);
+      sample(12, 26e6 / 12); // 26M > 20M×1.15 → 进入试用（不直接采纳）
+      expect(tuning.trialing, isTrue);
+      expect(tuning.workers, 12);
+      // 试用期两次样本只有 21M：低于 20M×1.10 → 回退并惩罚
+      sample(12, 21e6 / 12);
+      sample(12, 21e6 / 12);
+      expect(tuning.trialing, isFalse);
       expect(tuning.workers, 8);
-      final cooled = tuning.cooldownRemaining[16]!;
-      expect(cooled, greaterThan(0), reason: '试探失败应进入冷却而不是永久拉黑');
+      expect(tuning.cooldownRemaining[12]!, greaterThan(0));
+    });
 
-      // 冷却期内反复采样 8 档：不应再试探 16
-      for (var i = 0; i < cooled - 1; i++) {
+    test('试用通过才采纳；采纳后不可持续 → 降档并惩罚该档（不反复踩断崖）', () {
+      tuning
+        ..debugLadder = [8, 12]
+        ..debugSetWorkers(8);
+      for (var i = 0; i < 8; i++) {
         sample(8, 20e6 / 8);
-        expect(tuning.plannedWorkers, 8);
       }
+      sample(12, 30e6 / 12);
+      sample(12, 30e6 / 12); // 试用两次都 30M > 22M → 采纳
+      sample(12, 30e6 / 12);
+      expect(tuning.workers, 12);
+      expect(tuning.trialing, isFalse);
 
-      // 冷却结束后（设备可能已更换/变快）应再次向上试探 → 16 恢复 40M/s → 采纳
+      // 12 档不可持续（例如热限制）：5 次样本掉到 10M → 负反馈降回 8
+      for (var i = 0; i < 5; i++) {
+        sample(12, 10e6 / 12);
+      }
+      expect(tuning.workers, 8);
+      expect(tuning.cooldownRemaining[12]!, greaterThan(0),
+          reason: '不可持续的档位要被惩罚（冷却），否则会反复升上去再掉下来');
+    });
+
+    test('连续升档仍可行（门槛逐次抬高）', () {
+      tuning
+        ..debugLadder = [8, 12, 16]
+        ..debugSetWorkers(8);
+      for (var i = 0; i < 8; i++) {
+        sample(8, 20e6 / 8);
+      }
+      sample(12, 30e6 / 12);
+      sample(12, 30e6 / 12);
+      sample(12, 30e6 / 12);
+      expect(tuning.workers, 12);
+
       var probedUp = false;
-      for (var i = 0; i < 14 && !probedUp; i++) {
+      for (var i = 0; i < 12 && !probedUp; i++) {
         if (tuning.plannedWorkers == 16) {
           probedUp = true;
-          sample(16, 40e6 / 16);
+          sample(16, 45e6 / 16); // 45M > 30M×1.25（连续升档后门槛抬高）→ 试用
         } else {
-          sample(8, 20e6 / 8);
+          sample(12, 30e6 / 12);
         }
       }
-      expect(probedUp, isTrue, reason: '升档能力不得被永久关掉');
+      expect(probedUp, isTrue);
+      sample(16, 45e6 / 16);
+      sample(16, 45e6 / 16); // 平均 45M > 33M → 采纳
       expect(tuning.workers, 16);
     });
 
