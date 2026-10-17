@@ -11,18 +11,21 @@
 /// SHA-NI / NEON、虚拟机有 CPU 配额、笔记本有功耗墙——**只有真实解题样本才代表
 /// 真实算力**。
 ///
-/// 控制环（**负反馈 + 双向试探**，不做永久拉黑）：
+/// 控制策略（**负反馈 + 门槛惩罚，无冷却/无拉黑**）：
 ///
 ///  1. **误差驱动（负反馈）**：每次真实解题由胜出 worker 回报「试了多少候选 /
-///     自身耗时」，折算该档位的**聚合吞吐**（per-worker 速率 × 并发）。当前档位的
-///     EMA 掉到「已知最佳档」的 75% 以下 → **立即**切到最佳档，不等周期。
-///     降档、以及「能力恢复后立刻抓住」都靠这条误差项。
-///  2. **周期试探（探索）**：每 [ _kProbeEvery ] 次解题试一次相邻档（优先升档，
-///     升档在冷却中则试降档）；相邻档聚合吞吐高出 15% 才采纳，否则回退。
-///  3. **冷却而非拉黑**：试探失败只让该档位冷却若干次解题（失败次数越多冷却越久，
-///     上限 128 次）——**设备更换 / 换电源 / 散热恢复后仍会再试**，不会永久锁在
-///     低档位。
-///  4. **升档永远保留**：误差项与周期试探都会向上；只要设备真的变快，就会爬回去。
+///     自身耗时」，折算该档位的**聚合吞吐**（per-worker 速率 × 并发）。当前档位
+///     掉到「已知最佳档」的 75% 以下 → **立即**切到最佳档。
+///  2. **升档二次确认**：单次探测「看起来更快」只进入**试用**（切过去跑 2 次真实
+///     解题），试用平均吞吐仍高出升档前档位 10% 才正式采纳；否则回退。
+///  3. **门槛惩罚（唯一的"记住"机制）**：某档位**被负反馈降过 2 次**（说明升上去
+///     也撑不住，典型是峰值后的断崖：P 核→E 核 / 功耗墙），之后**升回该档的门槛
+///     提高 50%**（15% → 22.5%）；不设冷却、不拉黑——设备更换 / 换电源 / 散热恢复
+///     后只要涨得足够多，随时能再升回去。
+///  4. **连续升档递增**：每连续成功升一档，下一次升档门槛 +10 个百分点（上限 100%），
+///     越接近峰值越难继续爬。
+///  5. **周期探测**：每 8 次解题探测一次相邻升档（升档能力永久保留）；只有「当前已
+///     是已测最高档、且从未测过更低档」时才向下探一次以建立对照。
 ///
 /// 判据必须是**聚合吞吐**：并发越低争用越少、单 worker 速率天然更高（实测 12w 的
 /// 单 worker 速率比 16w 高 14%，但总吞吐更低），只比单 worker 速率会一路降到 1。
@@ -48,29 +51,32 @@ const List<int> _kLadder = [1, 2, 3, 4, 6, 8, 12, 16];
 const double _kEmaAlphaUp = 0.7;
 const double _kEmaAlphaDown = 0.3;
 
-/// 试探档聚合吞吐高出当前该比例才**进入试用**。
-///
-/// 每成功升一档，门槛再抬高 10%（上限 1.5）——越接近峰值，边际收益越小、
-/// 断崖风险越大（P 核→E 核、功耗墙），涨得不够多就不该继续往上爬。
-const double _kSwitchMargin = 1.15;
+/// 升档基础门槛：探测档聚合吞吐需高出当前档 15%。
+const double _kBaseGain = 0.15;
+
+/// 连续成功升档时，每次额外提高的门槛（百分点）。
+const double _kUpGainStep = 0.10;
+
+/// 升档门槛上限（100%：涨一倍才值得继续爬）。
+const double _kMaxGain = 1.0;
+
+/// 「被负反馈降档」达到该次数后，升回该档的门槛按 [_kPenaltyScale] 抬高。
+const int _kDemotionsForPenalty = 2;
+
+/// 门槛抬高倍数（用户要求：提升 50%）。
+const double _kPenaltyScale = 1.5;
 
 /// 试用期样本数：进入试用后连续采样这么多次再裁决（单次样本不可信）。
 const int _kTrialSolves = 2;
 
-/// 试用期平均吞吐高出「升档前档位」该比例才正式采纳（否则回退并惩罚该档）。
-const double _kTrialMargin = 1.10;
+/// 试用期平均吞吐需高出升档前档位的比例（正式采纳门槛）。
+const double _kTrialGain = 0.10;
 
 /// 负反馈阈值：当前档 EMA 低于「最佳档」该比例 → 立即切换到最佳档。
 const double _kFeedbackRatio = 0.75;
 
-/// 每多少次解题做一次相邻档试探。
+/// 每多少次解题做一次相邻档探测。
 const int _kProbeEvery = 8;
-
-/// 试探失败的冷却基数（第 1 次失败冷却 8 次解题，之后翻倍）。
-const int _kCooldownBase = 8;
-
-/// 冷却上限（再长的冷却对「设备变化」就不够灵敏了）。
-const int _kCooldownMax = 128;
 
 /// 设备解题能力自适应器（进程内单例）。
 class NekoPowTuning {
@@ -81,21 +87,20 @@ class NekoPowTuning {
   /// 各档聚合吞吐 EMA（candidates/s）。
   final Map<int, double> _ema = {};
 
-  /// 已完成的解题次数（冷却 / 试探计时用）。
+  /// 各档「被负反馈降档」的次数（≥ [_kDemotionsForPenalty] 后升回门槛 ×1.5）。
+  final Map<int, int> _demotions = {};
+
+  /// 已完成的解题次数（探测节奏用）。
   int _solves = 0;
 
   int? _workers;
 
-  /// 正在试探的档位与试探前的档位（-1 = 向下，+1 = 向上）。
+  /// 正在探测的档位与探测前的档位。
   int? _probe;
   int? _probeFrom;
 
-  /// 上次试探结束时的解题计数。
+  /// 上次探测结束时的解题计数。
   int _lastProbeAt = 0;
-
-  /// 各档试探失败次数与冷却截止计数。
-  final Map<int, int> _failures = {};
-  final Map<int, int> _cooldownUntil = {};
 
   /// 试用期：进入试用后先用 [_kTrialSolves] 次真实解题确认，再决定采纳 / 回退。
   int? _trial;
@@ -104,13 +109,13 @@ class NekoPowTuning {
   double _trialSum = 0;
   int _trialSamples = 0;
 
-  /// 连续成功升档次数（每多一次，下一次升档门槛抬高 10%）。
+  /// 连续成功升档次数（每多一次，下一次升档门槛提高 10 个百分点）。
   int _consecutiveUp = 0;
 
   /// 测试接缝：覆盖梯度（默认按核数裁剪）。
   List<int>? debugLadder;
 
-  /// 测试接缝：直接指定当前档位并清空试探状态。
+  /// 测试接缝：直接指定当前档位并清空探测 / 试用状态。
   void debugSetWorkers(int? workers) {
     _workers = workers;
     _probe = null;
@@ -126,13 +131,7 @@ class NekoPowTuning {
   /// 测试接缝：清空全部学习状态。
   void debugReset() {
     _ema.clear();
-    _failures.clear();
-    _cooldownUntil.clear();
-    _trial = null;
-    _trialFrom = null;
-    _trialSamples = 0;
-    _trialSum = 0;
-    _consecutiveUp = 0;
+    _demotions.clear();
     _solves = 0;
     debugSetWorkers(null);
     debugLadder = null;
@@ -141,10 +140,10 @@ class NekoPowTuning {
   /// 当前采用的并发数（未学习时为启发式上限）。
   int get workers => _workers ??= _ladder().last;
 
-  /// 下一轮将使用的并发数（正在试探时 = 试探档；诊断 / 基准用）。
+  /// 下一轮将使用的并发数（探测 / 试用中 = 对应档位；诊断 / 基准用）。
   int get plannedWorkers => _probe ?? workers;
 
-  /// 是否正在试探相邻档（单次采样）。
+  /// 是否正在探测相邻档。
   bool get probing => _probe != null;
 
   /// 是否处于试用期（已切到候选档，正在二次确认）。
@@ -153,11 +152,8 @@ class NekoPowTuning {
   /// 已学习的聚合吞吐（诊断）。
   Map<int, double> get learnedRates => Map.unmodifiable(_ema);
 
-  /// 各档冷却剩余解题次数（诊断）。
-  Map<int, int> get cooldownRemaining => {
-    for (final entry in _cooldownUntil.entries)
-      if (entry.value > _solves) entry.key: entry.value - _solves,
-  };
+  /// 各档被负反馈降档的次数（诊断）。
+  Map<int, int> get demotions => Map.unmodifiable(_demotions);
 
   /// 按难度选择本次解题的 worker 数。
   int workersFor(int difficulty) {
@@ -212,16 +208,13 @@ class NekoPowTuning {
       }
       if (_trialSamples >= _kTrialSolves) {
         final average = _trialSum / _trialSamples;
-        if (average > _trialBaseline * _kTrialMargin) {
+        if (average > _trialBaseline * (1 + _trialGainFor(trial))) {
           // 二次确认通过：正式采纳，连续升档计数 +1（下次门槛更高）。
           _workers = trial;
           _consecutiveUp++;
-          _failures.remove(trial);
-          _cooldownUntil.remove(trial);
         } else {
-          // 只是短时爆发（或样本噪声）：回退并惩罚该档，避免反复爬上来。
+          // 只是短时爆发 / 噪声：回退（不计入「负反馈降档」）。
           _workers = _trialFrom ?? _workers;
-          _penalize(trial);
         }
         _trial = null;
         _trialFrom = null;
@@ -232,14 +225,14 @@ class NekoPowTuning {
       return;
     }
 
-    // 2) 单次探测样本到齐：过了门槛就**进入试用**（不直接采纳）。
+    // 2) 单次探测样本到齐：过了该档门槛就进入试用（不直接采纳）。
     final probe = _probe;
     if (probe != null && sampled == probe) {
-      final probeRate = _ema[probe];
+      // 用**本次原始样本**判断该档「现在」是否值得试：EMA 在塌陷/恢复时有滞后，
+      // 拿它当探针值会过度保守（恢复后要很多次才爬得回去）。
       final fromRate = _ema[_probeFrom ?? workers];
-      if (probeRate != null &&
-          fromRate != null &&
-          probeRate > fromRate * _requiredMargin) {
+      if (fromRate != null &&
+          sample > fromRate * (1 + _requiredGainFor(probe))) {
         _trial = probe;
         _trialFrom = _probeFrom ?? workers;
         _trialBaseline = fromRate;
@@ -248,18 +241,17 @@ class NekoPowTuning {
         _workers = probe; // 试用期直接用它跑（样本即试用数据）
       } else {
         _workers = _probeFrom ?? workers;
-        _penalize(probe);
-        _lastProbeAt = _solves;
       }
       _probe = null;
       _probeFrom = null;
+      _lastProbeAt = _solves;
       return;
     }
     if (_probe != null) return; // 还在等探测样本
 
     // 3) 负反馈：当前档掉到「最佳档」的 75% 以下 → 立即切过去。
-    //    若是**向下**切，说明当前档不可持续 → 惩罚它（冷却 + 清零连续升档计数），
-    //    否则「升档成功 → 撑不住 → 降档 → 又爬上去」会反复踩断崖。
+    //    若是**向下**切，说明当前档不可持续 → 记一次「被负反馈降档」，
+    //    达到 2 次后升回该档的门槛提高 50%（不设冷却 / 不拉黑）。
     final best = _bestRung(ladder);
     final currentRate = _ema[workers];
     if (best != null &&
@@ -267,7 +259,8 @@ class NekoPowTuning {
         currentRate != null &&
         _ema[best]! > currentRate / _kFeedbackRatio) {
       if (best < workers) {
-        _penalize(workers);
+        _demotions[workers] = (_demotions[workers] ?? 0) + 1;
+        _consecutiveUp = 0;
       } else {
         _consecutiveUp = 0;
       }
@@ -276,7 +269,7 @@ class NekoPowTuning {
       return;
     }
 
-    // 4) 周期试探：优先升档（升档能力永久保留，热恢复/换机后可爬回）；
+    // 4) 周期探测：优先升档（升档能力永久保留，热恢复 / 换机后可爬回）；
     //    只有「当前档是已测最高档、且从未测过更低档」时才向下探一次建立对照。
     if (_solves - _lastProbeAt < _kProbeEvery) return;
     final target = _probeTarget(ladder);
@@ -286,32 +279,33 @@ class NekoPowTuning {
     _lastProbeAt = _solves;
   }
 
-  /// 下一个升档所需门槛：越接近峰值要求越高（连续成功升档时逐次 +10%，上限 1.5）。
-  double get _requiredMargin =>
-      (_kSwitchMargin + 0.10 * _consecutiveUp).clamp(_kSwitchMargin, 1.5);
-
-  /// 惩罚某档（试探失败 / 试用不达标 / 降档时发现不可持续）：冷却 + 清零升档计数。
-  void _penalize(int rung) {
-    _failures[rung] = (_failures[rung] ?? 0) + 1;
-    final cooldown = (_kCooldownBase << (_failures[rung]! - 1))
-        .clamp(_kCooldownBase, _kCooldownMax);
-    _cooldownUntil[rung] = _solves + cooldown;
-    _consecutiveUp = 0;
+  /// 目标档的升档门槛（超出当前档的比例，0.15 = 15%）。
+  ///
+  /// 基础 15%；每连续成功升一档 +10 个百分点；该档被负反馈降过 2 次则再 ×1.5
+  /// （用户要求：门槛提升 50%）；上限 100%。
+  double _requiredGainFor(int rung) {
+    var gain = _kBaseGain + _kUpGainStep * _consecutiveUp;
+    if ((_demotions[rung] ?? 0) >= _kDemotionsForPenalty) {
+      gain *= _kPenaltyScale;
+    }
+    return gain.clamp(_kBaseGain, _kMaxGain);
   }
 
-  /// 试探目标：**优先升档**（升档能力永久保留，热恢复/换机后可爬回）；
-  /// 只有「当前档是已测最高档、且从未测过更低档」时才向下探一次以建立对照
-  /// （之后的降档由负反馈用已有数据触发，不必反复试探、零额外开销）。
+  /// 试用期采纳门槛（同样对「被降过 2 次」的档位抬高）。
+  double _trialGainFor(int rung) {
+    final gain = _kTrialGain *
+        ((_demotions[rung] ?? 0) >= _kDemotionsForPenalty ? _kPenaltyScale : 1);
+    return gain.clamp(_kTrialGain, _kMaxGain);
+  }
+
+  /// 探测目标：**优先升档**；只有「当前档是已测最高档、且从未测过更低档」时
+  /// 才向下探一次以建立对照（之后的降档由负反馈用已有数据触发）。
   int? _probeTarget(List<int> ladder) {
     final index = ladder.indexOf(workers);
     if (index < 0) return null;
-    if (index + 1 < ladder.length) {
-      final up = ladder[index + 1];
-      if (!_coolingDown(up)) return up;
-    }
+    if (index + 1 < ladder.length) return ladder[index + 1];
     if (!_hasLowerMeasurement(ladder, index)) {
-      final down = ladder[index - 1];
-      if (!_coolingDown(down)) return down;
+      return index - 1 >= 0 ? ladder[index - 1] : null;
     }
     return null;
   }
@@ -323,8 +317,6 @@ class NekoPowTuning {
     }
     return false;
   }
-
-  bool _coolingDown(int rung) => (_cooldownUntil[rung] ?? 0) > _solves;
 
   int? _bestRung(List<int> ladder) {
     int? best;

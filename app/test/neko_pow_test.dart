@@ -51,17 +51,17 @@ void main() {
       for (var i = 0; i < 8; i++) {
         sample(16, 30e6 / 16);
       }
-      // 第 8 次后触发一次降档试探（16 无更高档 → 试 8），8 档没有更快 → 回退冷却
+      // 第 8 次后触发一次向下探测（16 无更高档 → 试 8）；8 档没有更快 → 回退
       expect(tuning.plannedWorkers, 8);
       sample(8, 20e6 / 8);
       expect(tuning.workers, 16);
-      expect(tuning.cooldownRemaining[8], greaterThan(0));
 
-      // 热限制：16 档每 worker 速率跌到 1/4 → EMA 衰减后负反馈立即切到 8
+      // 热限制：16 档每 worker 速率跌到 1/4 → 负反馈立即切到 8，并给 16 记一次降档
       for (var i = 0; i < 4; i++) {
         sample(16, 30e6 / 16 / 4);
       }
       expect(tuning.workers, 8);
+      expect(tuning.demotions[16], 1);
     });
 
     test('升档需二次确认：单次「看起来更快」不直接采纳', () {
@@ -69,21 +69,20 @@ void main() {
         ..debugLadder = [8, 12]
         ..debugSetWorkers(8);
       for (var i = 0; i < 8; i++) {
-        sample(8, 20e6 / 8); // 8 档 20M/s，跑满试探周期
+        sample(8, 20e6 / 8); // 8 档 20M/s，跑满探测周期
       }
       expect(tuning.plannedWorkers, 12);
       sample(12, 26e6 / 12); // 26M > 20M×1.15 → 进入试用（不直接采纳）
       expect(tuning.trialing, isTrue);
       expect(tuning.workers, 12);
-      // 试用期两次样本只有 21M：低于 20M×1.10 → 回退并惩罚
+      // 试用两次只有 21M：低于 20M×1.10 → 回退
       sample(12, 21e6 / 12);
       sample(12, 21e6 / 12);
       expect(tuning.trialing, isFalse);
       expect(tuning.workers, 8);
-      expect(tuning.cooldownRemaining[12]!, greaterThan(0));
     });
 
-    test('试用通过才采纳；采纳后不可持续 → 降档并惩罚该档（不反复踩断崖）', () {
+    test('试用通过才采纳；采纳后不可持续 → 负反馈降档计数 +1', () {
       tuning
         ..debugLadder = [8, 12]
         ..debugSetWorkers(8);
@@ -91,45 +90,61 @@ void main() {
         sample(8, 20e6 / 8);
       }
       sample(12, 30e6 / 12);
-      sample(12, 30e6 / 12); // 试用两次都 30M > 22M → 采纳
+      sample(12, 30e6 / 12);
       sample(12, 30e6 / 12);
       expect(tuning.workers, 12);
-      expect(tuning.trialing, isFalse);
-
-      // 12 档不可持续（例如热限制）：5 次样本掉到 10M → 负反馈降回 8
+      // 12 档不可持续 → 负反馈降档并记账（不设冷却）
       for (var i = 0; i < 5; i++) {
-        sample(12, 10e6 / 12);
+        sample(12, 8e6 / 12);
       }
       expect(tuning.workers, 8);
-      expect(tuning.cooldownRemaining[12]!, greaterThan(0),
-          reason: '不可持续的档位要被惩罚（冷却），否则会反复升上去再掉下来');
+      expect(tuning.demotions[12], 1);
     });
 
-    test('连续升档仍可行（门槛逐次抬高）', () {
+    test('被负反馈降档 2 次后，升回该档的门槛提升 50%（15% → 22.5%）', () {
       tuning
-        ..debugLadder = [8, 12, 16]
+        ..debugLadder = [8, 12]
         ..debugSetWorkers(8);
+
+      Future<void> climbAndCollapse() async {
+        // 跑满探测周期 → 探测 12 → 试用通过（+50% 增益）→ 采纳
+        for (var i = 0; i < 8; i++) {
+          sample(8, 20e6 / 8);
+        }
+        expect(tuning.plannedWorkers, 12);
+        sample(12, 30e6 / 12);
+        sample(12, 30e6 / 12);
+        sample(12, 30e6 / 12);
+        expect(tuning.workers, 12);
+        // 12 撑不住 → 负反馈降回 8
+        for (var i = 0; i < 5; i++) {
+          sample(12, 8e6 / 12);
+        }
+        expect(tuning.workers, 8);
+      }
+
+      // 第 1、2 次「升上去 → 撑不住」
+      climbAndCollapse();
+      expect(tuning.demotions[12], 1);
+      climbAndCollapse();
+      expect(tuning.demotions[12], 2);
+
+      // 门槛已抬高到 22.5%：+20% 不足以进入试用
       for (var i = 0; i < 8; i++) {
         sample(8, 20e6 / 8);
       }
-      sample(12, 30e6 / 12);
-      sample(12, 30e6 / 12);
-      sample(12, 30e6 / 12);
-      expect(tuning.workers, 12);
+      expect(tuning.plannedWorkers, 12);
+      sample(12, 24e6 / 12); // +20% < 22.5%
+      expect(tuning.trialing, isFalse);
+      expect(tuning.workers, 8);
 
-      var probedUp = false;
-      for (var i = 0; i < 12 && !probedUp; i++) {
-        if (tuning.plannedWorkers == 16) {
-          probedUp = true;
-          sample(16, 45e6 / 16); // 45M > 30M×1.25（连续升档后门槛抬高）→ 试用
-        } else {
-          sample(12, 30e6 / 12);
-        }
+      // +25% > 22.5% → 允许进入试用（升档能力仍在）
+      for (var i = 0; i < 8; i++) {
+        sample(8, 20e6 / 8);
       }
-      expect(probedUp, isTrue);
-      sample(16, 45e6 / 16);
-      sample(16, 45e6 / 16); // 平均 45M > 33M → 采纳
-      expect(tuning.workers, 16);
+      expect(tuning.plannedWorkers, 12);
+      sample(12, 25e6 / 12);
+      expect(tuning.trialing, isTrue);
     });
 
     test('向下试探只做一次（建立对照），之后降档由负反馈用已有数据触发', () {
