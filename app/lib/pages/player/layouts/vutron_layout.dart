@@ -320,23 +320,127 @@ class _VutronVolume extends ConsumerWidget {
         ),
         const SizedBox(width: 4),
         Expanded(
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 3,
-              activeTrackColor: scheme.onSurface.withValues(alpha: 0.80),
-              inactiveTrackColor: scheme.onSurface.withValues(alpha: 0.18),
-              thumbColor: scheme.onSurface.withValues(alpha: 0.90),
-              overlayShape: SliderComponentShape.noOverlay,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-            ),
-            child: Slider(
-              value: volume.clamp(0.0, 1.0),
-              onChanged: notifier.previewVolume,
-              onChangeEnd: (v) => unawaited(notifier.setVolume(v)),
-            ),
+          child: _VutronVolumeBar(
+            value: volume.clamp(0.0, 1.0),
+            onChanged: notifier.previewVolume,
+            onChangeEnd: (v) => unawaited(notifier.setVolume(v)),
           ),
         ),
       ],
     );
   }
+}
+
+/// 精简音量条：2px 圆角轨道 + 6px 圆点，20px 高命中区。
+///
+/// Vutron 的音量条是一条细线，Material [Slider]（3px 轨道 + 10px 圆点 +
+/// 56px 高命中区）在左栏里显得过粗，因此这里自绘一条更轻的轨道；拖动时
+/// 只预览（引擎命令合并），松手落盘，与页面其它音量控件语义一致。
+class _VutronVolumeBar extends StatelessWidget {
+  const _VutronVolumeBar({
+    required this.value,
+    required this.onChanged,
+    required this.onChangeEnd,
+  });
+
+  final double value;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeEnd;
+
+  static const double _trackInset = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, box) {
+        double valueAt(Offset local) {
+          final usable = (box.maxWidth - _trackInset * 2).clamp(
+            1.0,
+            double.infinity,
+          );
+          return ((local.dx - _trackInset) / usable).clamp(0.0, 1.0);
+        }
+
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (d) {
+              final v = valueAt(d.localPosition);
+              onChanged(v);
+              onChangeEnd(v);
+            },
+            onHorizontalDragStart: (d) => onChanged(valueAt(d.localPosition)),
+            onHorizontalDragUpdate: (d) => onChanged(valueAt(d.localPosition)),
+            // 拖动期间父层已通过 previewVolume 更新 value，松手落盘当前值。
+            onHorizontalDragEnd: (_) => onChangeEnd(value),
+            child: SizedBox(
+              height: 20,
+              child: CustomPaint(
+                painter: _VutronVolumeBarPainter(
+                  value: value.clamp(0.0, 1.0),
+                  active: scheme.onSurface.withValues(alpha: 0.80),
+                  inactive: scheme.onSurface.withValues(alpha: 0.18),
+                  thumb: scheme.onSurface.withValues(alpha: 0.90),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _VutronVolumeBarPainter extends CustomPainter {
+  const _VutronVolumeBarPainter({
+    required this.value,
+    required this.active,
+    required this.inactive,
+    required this.thumb,
+  });
+
+  final double value;
+  final Color active;
+  final Color inactive;
+  final Color thumb;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const inset = _VutronVolumeBar._trackInset;
+    const trackHeight = 2.0;
+    final left = inset;
+    final width = (size.width - inset * 2).clamp(0.0, double.infinity);
+    final cy = size.height / 2;
+    final track = RRect.fromLTRBR(
+      left,
+      cy - trackHeight / 2,
+      left + width,
+      cy + trackHeight / 2,
+      const Radius.circular(trackHeight / 2),
+    );
+    canvas.drawRRect(track, Paint()..color = inactive);
+    final filled = width * value;
+    if (filled > 0) {
+      canvas.drawRRect(
+        RRect.fromLTRBR(
+          left,
+          cy - trackHeight / 2,
+          left + filled,
+          cy + trackHeight / 2,
+          const Radius.circular(trackHeight / 2),
+        ),
+        Paint()..color = active,
+      );
+    }
+    canvas.drawCircle(Offset(left + filled, cy), 3, Paint()..color = thumb);
+  }
+
+  @override
+  bool shouldRepaint(_VutronVolumeBarPainter old) =>
+      old.value != value ||
+      old.active != active ||
+      old.inactive != inactive ||
+      old.thumb != thumb;
 }
