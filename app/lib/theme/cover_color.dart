@@ -264,3 +264,84 @@ class CoverColorNotifier extends Notifier<Color?> {
     if (token == _token) state = color;
   }
 }
+
+/// 播放页「封面主色」背景（`coverTone`）专用取色。
+///
+/// 与 [coverColorProvider] 的分工：
+/// - [coverColorProvider] 服务于全局主题 / 歌词跟随，受
+///   `themeSource == 'cover' || followCoverColor` 门控；
+/// - 本 provider 只服务背景样式，**不能沿用**上述门控——否则默认主题下
+///   `coverTone` 将永远取不到色、只剩兜底渐变。
+///
+/// 为避免用户不用该样式时白白下载/解码封面，仅在背景样式为 `coverTone`
+/// 时取色（这是「是否使用」判断，不是主题来源门控）；切走时清空颜色但保留
+/// 缓存，切回可直接命中。
+final playerCoverToneProvider =
+    NotifierProvider<PlayerCoverToneNotifier, Color?>(
+      PlayerCoverToneNotifier.new,
+    );
+
+class PlayerCoverToneNotifier extends Notifier<Color?> {
+  /// 竞态 token：只认最后一次取色的结果（快速切歌时旧请求不得覆盖新颜色）。
+  int _token = 0;
+
+  /// 封面 → 主色缓存（含 null 负结果）。与 [CoverColorNotifier] 各自持有：
+  /// 两边门控/生命周期不同，共用会让其中一方的清空影响另一方。
+  /// LRU 近似：超限删最旧。
+  static const int _cacheMax = 64;
+  final Map<String, Color?> _cache = <String, Color?>{};
+
+  /// 清空取色缓存（应用进入后台时释放）。
+  void clearCache() => _cache.clear();
+
+  @override
+  Color? build() {
+    // 切歌 → 重新提取（仅背景在用 coverTone 时才真正发请求，见 [_extract]）。
+    ref.listen(playbackProvider.select((s) => s.track), (_, track) {
+      _extract(track?.cover);
+    });
+    // 背景样式切换：切到 coverTone 立即按当前曲目取色；切走则清空颜色。
+    ref.listen(
+      appPrefsProvider.select((p) => p.playerBgType),
+      (_, _) => _extract(ref.read(playbackProvider).track?.cover),
+    );
+    // 首次挂载：build 内不写 state（初始值本就是 null），只发起取色。
+    if (ref.read(appPrefsProvider).playerBgType == 'coverTone') {
+      _extract(ref.read(playbackProvider).track?.cover);
+    }
+    return null;
+  }
+
+  Future<void> _extract(String? cover) async {
+    // 递增 token 必须在所有分支之前：切走/清空同样要作废在途请求。
+    final token = ++_token;
+    if (ref.read(appPrefsProvider).playerBgType != 'coverTone' ||
+        cover == null ||
+        cover.isEmpty) {
+      _clear();
+      return;
+    }
+    if (_cache.containsKey(cover)) {
+      final hit = _cache.remove(cover); // 值可能为 null（负结果）
+      _cache[cover] = hit; // LRU 保活
+      if (token == _token) _publish(hit);
+      return;
+    }
+    final color = await extractDominantColor(cover);
+    // 缓存即使被更新的请求取代也保留，方便来回切歌命中。
+    if (_cache.length >= _cacheMax) _cache.remove(_cache.keys.first);
+    _cache[cover] = color;
+    if (token == _token) _publish(color);
+  }
+
+  /// 写入颜色；`ref.mounted` 防御容器/测试提前销毁后的迟到回调。
+  void _publish(Color? color) {
+    if (ref.mounted) state = color;
+  }
+
+  /// 清空当前颜色（保留缓存）。build 期间也安全：`stateOrNull` 未初始化时为 null。
+  void _clear() {
+    if (!ref.mounted) return;
+    if (stateOrNull != null) state = null;
+  }
+}

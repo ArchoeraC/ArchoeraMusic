@@ -78,7 +78,11 @@ class _Painter extends CustomPainter {
     final size = fs * 0.3;
     final gap = fs * 0.18;
     final maxWidth = math.max(40.0, c.w - _widthPad);
-    final left = c.w / 2 - maxWidth / 2 + fs * 0.4;
+    final textLeft = (c.w - maxWidth) / 2;
+    final groupWidth = 3 * size + 2 * gap;
+    final left = c.textAlign == ui.TextAlign.right
+        ? textLeft + maxWidth - groupWidth - fs * 0.4
+        : textLeft + fs * 0.4;
     final anchor = c.anchor;
     final offset = (anchor >= 0 && anchor < c.centers.length)
         ? (c.centers[anchor] - c.h * c.align)
@@ -475,6 +479,7 @@ class _Painter extends CustomPainter {
       c.played.toARGB32(),
       _unsungAlpha,
       _litAlpha,
+      c.textAlign,
     );
     return c.fragCache.obtain(
       index,
@@ -489,6 +494,7 @@ class _Painter extends CustomPainter {
         played: c.played,
         unsungAlpha: _unsungAlpha,
         litAlpha: _litAlpha,
+        textAlign: c.textAlign,
       ),
     );
   }
@@ -512,9 +518,12 @@ class _Painter extends CustomPainter {
       weight.value,
       color.toARGB32(),
       maxWidth,
+      c.textAlign,
     );
     return c.cache.obtainMain(index, key, () {
-      final b = ui.ParagraphBuilder(_pStyle(c.fontFamily, fs, weight));
+      final b = ui.ParagraphBuilder(
+        _pStyle(c.fontFamily, fs, weight, textAlign: c.textAlign),
+      );
       b.pushStyle(_uiStyle(c.fontFamily, fs, weight, color));
       b.addText(g.original.text);
       b.pop();
@@ -619,6 +628,7 @@ class _Painter extends CustomPainter {
       c.played.toARGB32(),
       unsungAlpha,
       litAlpha,
+      c.textAlign,
     );
     return cache.obtain(
       index,
@@ -634,6 +644,7 @@ class _Painter extends CustomPainter {
         unsungAlpha: unsungAlpha,
         litAlpha: litAlpha,
         lineHeightEm: kLyricTranslationLineHeightEm,
+        textAlign: c.textAlign,
       ),
     );
   }
@@ -651,7 +662,14 @@ class _Painter extends CustomPainter {
         ? c.played.withValues(alpha: 0.65)
         : c.unplayed.withValues(alpha: alpha * 0.85);
     final subFs = lyricTranslationFontSize(fs);
-    final key = (text, c.fontFamily, subFs, color.toARGB32(), maxWidth);
+    final key = (
+      text,
+      c.fontFamily,
+      subFs,
+      color.toARGB32(),
+      maxWidth,
+      c.textAlign,
+    );
     return c.cache.obtainRomanization(index, key, () {
       final b = ui.ParagraphBuilder(
         _pStyle(
@@ -659,6 +677,7 @@ class _Painter extends CustomPainter {
           subFs,
           FontWeight.w400,
           height: kLyricTranslationLineHeightEm,
+          textAlign: c.textAlign,
         ),
       );
       b.pushStyle(
@@ -688,7 +707,14 @@ class _Painter extends CustomPainter {
         ? c.played.withValues(alpha: 0.8)
         : c.unplayed.withValues(alpha: alpha);
     final subFs = lyricTranslationFontSize(fs);
-    final key = (text, c.fontFamily, subFs, color.toARGB32(), maxWidth);
+    final key = (
+      text,
+      c.fontFamily,
+      subFs,
+      color.toARGB32(),
+      maxWidth,
+      c.textAlign,
+    );
     return c.cache.obtainTranslation(index, key, () {
       final b = ui.ParagraphBuilder(
         _pStyle(
@@ -696,6 +722,7 @@ class _Painter extends CustomPainter {
           subFs,
           FontWeight.w400,
           height: kLyricTranslationLineHeightEm,
+          textAlign: c.textAlign,
         ),
       );
       b.pushStyle(
@@ -720,8 +747,9 @@ class _Painter extends CustomPainter {
     double fs,
     FontWeight w, {
     double height = kLyricLineHeightEm,
+    ui.TextAlign textAlign = ui.TextAlign.center,
   }) => ui.ParagraphStyle(
-    textAlign: ui.TextAlign.center,
+    textAlign: textAlign,
     textDirection: ui.TextDirection.ltr,
     fontFamily: family,
     fontSize: fs,

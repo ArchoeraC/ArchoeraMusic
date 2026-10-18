@@ -21,7 +21,9 @@ import 'package:material_ui/material_ui.dart';
 import '../../services/lyrics/lyric_line.dart';
 import 'lyrics_v7/lyrics_layout.dart';
 import '../../l10n/l10n.dart';
+import 'lyrics_edge_fade.dart';
 import '../common/anim.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'lyrics_view/lyrics_view_widgets.dart';
@@ -40,6 +42,12 @@ class LyricsView extends StatefulWidget {
     this.showTranslation = true,
     this.showRomanization = false,
     this.fontWeight = FontWeight.w600,
+    this.currentFontSize,
+    this.inactiveFontWeight = FontWeight.w400,
+    this.inactiveScale = 1.0,
+    this.unplayedAlpha = 0.55,
+    this.textAlign = TextAlign.center,
+    this.fadeEdges = false,
   });
 
   final List<LyricGroup> groups;
@@ -70,6 +78,26 @@ class LyricsView extends StatefulWidget {
 
   /// 当前行字重（设置「歌词字重」，默认半粗）。
   final FontWeight fontWeight;
+
+  /// 当前行字号（null = [fontSize] + 3，保持旧行为）。
+  ///
+  /// Vutron 经典布局当前行与普通行同字号（视觉缩放由 [inactiveScale] 表达）。
+  final double? currentFontSize;
+
+  /// 非当前行字重（默认 w400；Vutron 布局用 w600）。
+  final FontWeight inactiveFontWeight;
+
+  /// 非当前行视觉缩放（仅变换，不影响行高；默认 1.0）。
+  final double inactiveScale;
+
+  /// 非当前行透明度（默认 0.55，乘在颜色上）。
+  final double unplayedAlpha;
+
+  /// 文本对齐（默认居中；Vutron 布局左对齐）。
+  final TextAlign textAlign;
+
+  /// 上下 25% 渐隐遮罩（Vutron 的 `mask:true` 观感）。
+  final bool fadeEdges;
 
   /// 行高默认值（含间距）。
   static const double defaultLineHeight = 44;

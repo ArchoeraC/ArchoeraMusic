@@ -164,6 +164,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _c.showRomanization = widget.showRomanization;
     _c.fontWeight = widget.fontWeight;
     _c.enableScale = widget.enableScale;
+    _c.textAlign = widget.textAlign;
     _syncBlurMode();
     _c.wordFadeWidth = widget.wordFadeWidth;
   }

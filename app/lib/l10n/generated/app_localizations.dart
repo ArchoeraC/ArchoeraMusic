@@ -4246,6 +4246,12 @@ abstract class AppLocalizations {
   /// **'流体'**
   String get settingsPlayerBgFluid;
 
+  /// No description provided for @settingsPlayerBgCoverTone.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'封面主色'**
+  String get settingsPlayerBgCoverTone;
+
   /// No description provided for @settingsPlayerBgFlowSpeed.
   ///
   /// In zh_CN, this message translates to:
@@ -8850,7 +8856,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsCoverLayoutDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'全屏播放器封面的呈现方式'**
+  /// **'全屏播放器的主体排版（封面 / 歌词）'**
   String get settingsCoverLayoutDesc;
 
   /// No description provided for @settingsCoverLayoutDefault.
@@ -8864,6 +8870,12 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'全屏封面'**
   String get settingsCoverLayoutFullscreen;
+
+  /// No description provided for @settingsCoverLayoutVutron.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Vutron 经典'**
+  String get settingsCoverLayoutVutron;
 
   /// No description provided for @settingsCoverLyricRatio.
   ///

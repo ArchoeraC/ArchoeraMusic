@@ -105,6 +105,7 @@ flutter:
   shaders:
     - shaders/ripple.frag
     - shaders/fluid.frag
+    - shaders/cover_mask.frag
 
   # 自带字体（统一中英混排度量，消除系统兜底字体的错位）：
   #   MiSans（唯一内置界面字体；© Xiaomi，MiSans 字体知识产权许可协议）。
