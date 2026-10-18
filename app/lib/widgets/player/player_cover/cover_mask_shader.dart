@@ -4,8 +4,8 @@
 
 /// 全屏封面右缘渐隐遮罩的 GLSL 加载器。
 ///
-/// 着色器用低频噪声扰动椭圆距离场，让渐隐边界不是一条过于规则的弧线；
-/// 加载失败 / 测试环境回退到 `RadialGradient`（见
+/// 着色器以横向直线距离为基础，用低频噪声做轻微扰动，让渐隐边界不是一条
+/// 过于笔直的竖线；加载失败 / 测试环境回退到 `LinearGradient`（见
 /// `player_cover/fullscreen_cover_view.dart`）。
 library;
 
