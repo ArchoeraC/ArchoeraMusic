@@ -8,8 +8,8 @@ part of '../player_cover.dart';
 ///
 /// 对齐原项目 FullPlayer 的全屏封面：封面铺满左侧整列（无圆角/阴影，
 /// 播放暂停不做缩放），右缘渐隐融入背景。渐隐边界优先使用带低频噪声的
-/// 片元着色器（`cover_mask.frag`），避免过于规则的椭圆；着色器不可用时
-/// 回退到同形状的 `RadialGradient`。
+/// 片元着色器（`cover_mask.frag`），以横向直线为基础做轻微起伏，避免机械
+/// 的直线；着色器不可用时回退到同形状的 `LinearGradient`。
 class PlayerFullscreenCover extends StatefulWidget {
   const PlayerFullscreenCover({super.key, required this.cover});
 
@@ -62,20 +62,23 @@ class _PlayerFullscreenCoverState extends State<PlayerFullscreenCover> {
   Widget _mask(Widget child) {
     final program = _program;
     if (program == null) {
-      // 测试环境 / 着色器加载失败：回退到同形状的椭圆渐变。
+      // 测试环境 / 着色器加载失败：回退到同形状的横向直线渐变。
       return ShaderMask(
         blendMode: BlendMode.dstIn,
-        shaderCallback: (rect) => RadialGradient(
-          center: Alignment.centerLeft,
-          radius: 1.0,
+        shaderCallback: (rect) => LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
           colors: [
             Colors.white,
             Colors.white,
-            Colors.white.withValues(alpha: 0.60),
-            Colors.white.withValues(alpha: 0.20),
+            Colors.white.withValues(alpha: 0.92),
+            Colors.white.withValues(alpha: 0.65),
+            Colors.white.withValues(alpha: 0.30),
+            Colors.white.withValues(alpha: 0.10),
+            Colors.white.withValues(alpha: 0),
             Colors.white.withValues(alpha: 0),
           ],
-          stops: const [0, 0.65, 0.78, 0.85, 0.92],
+          stops: const [0, 0.45, 0.60, 0.72, 0.82, 0.88, 0.92, 1],
         ).createShader(rect),
         child: child,
       );
