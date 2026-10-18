@@ -67,22 +67,8 @@ extension _LyricsViewBuild on _LyricsViewState {
           ),
         );
         if (!widget.fadeEdges) return list;
-        return ShaderMask(
-          blendMode: BlendMode.dstIn,
-          // 上下各 25% 渐隐（对齐 Vutron `mask:true`）；静态渐变，无逐帧计算。
-          shaderCallback: (rect) => const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              Colors.white,
-              Colors.white,
-              Colors.transparent,
-            ],
-            stops: [0, 0.25, 0.75, 1],
-          ).createShader(rect),
-          child: list,
-        );
+        // 与 SPlayer `.lyric-area` 相同的 10% / 25% 非线性渐隐。
+        return LyricsEdgeFade(child: list);
       },
     );
   }

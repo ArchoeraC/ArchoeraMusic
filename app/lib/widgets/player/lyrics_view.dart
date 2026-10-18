@@ -21,6 +21,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../services/lyrics/lyric_line.dart';
 import 'lyrics_v7/lyrics_layout.dart';
 import '../../l10n/l10n.dart';
+import 'lyrics_edge_fade.dart';
 import '../common/anim.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';

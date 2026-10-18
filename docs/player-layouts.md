@@ -65,7 +65,9 @@ app/lib/pages/player/layouts/
 - **不新增渲染器**：`simple` 复用 `LyricsView`（行高实测缓存 + 懒加载列表），
   `amll` 复用 v7 物理墙；对齐作为段落属性 + 缓存键，不重算行高；
 - **不做重复模糊**：封面投影用一层 `BoxShadow`，不复制封面再做 blur；
-- **静态遮罩**：上下 25% 渐隐是一次静态 `ShaderMask`，无逐帧滤镜；
+- **静态遮罩**：歌词上下渐隐用 SPlayer `.lyric-area` 的 10%/25% 非线性
+  `ShaderMask`（0→60%→100%→100%→60%→0），整幅封面布局的顶/底遮罩用
+  SPlayer `cover-mask` 的 8 段非线性 alpha，避免色阶与硬边；
 - **控制局部订阅**：进度/控制/音量各自 `Consumer`，位置 50ms 更新不带动整页；
 - 需要模糊时优先「一次烘焙 + 复用」（见 `docs/runtime-resource-optimization.md`）。
 

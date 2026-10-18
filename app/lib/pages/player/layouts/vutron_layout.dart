@@ -94,6 +94,7 @@ class VutronPlayerLayout extends PlayerLayout {
                         lyricScale: 1,
                         presentation: PlayerLyricsPresentation.vutron,
                         textAlign: lyricsAlign,
+                        fadeEdges: true,
                         onSeek: c.onSeekLyric,
                         dragMs: c.dragMs,
                       ),

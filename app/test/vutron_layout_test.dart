@@ -20,6 +20,7 @@ import 'package:archoera_music/services/playback/playback_notifier.dart';
 import 'package:archoera_music/services/playback/playback_state.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
 import 'package:archoera_music/stores/lyrics_provider.dart';
+import 'package:archoera_music/widgets/player/lyrics_edge_fade.dart';
 import 'package:archoera_music/widgets/player/lyrics_view.dart';
 import 'package:archoera_music/widgets/player/lyrics_v7/lyrics_physics_wall.dart';
 import 'package:archoera_music/widgets/player/playback_progress_slider.dart';
@@ -140,8 +141,9 @@ void main() {
     expect(view.playedColor, const Color(_played));
     expect(view.unplayedColor, const Color(_unplayed));
     expect(view.textAlign, TextAlign.left);
-    expect(view.fadeEdges, isTrue);
     expect(view.inactiveScale, 0.95);
+    // 渐隐由共享歌词区遮罩承担（SPlayer 的 10%/25% 非线性 mask）。
+    expect(find.byType(LyricsEdgeFade), findsOneWidget);
     expect(view.currentFontSize, view.fontSize);
 
     // 播放键跟随主题色（与页面其它控制一致）。
@@ -167,6 +169,7 @@ void main() {
     expect(wall.unplayedColor, const Color(_unplayed));
     // 注册表声明的左对齐同样作用于 AMLL 物理墙。
     expect(wall.textAlign, TextAlign.left);
+    expect(find.byType(LyricsEdgeFade), findsOneWidget);
     expect(find.byType(LyricsView), findsNothing);
   });
 }
