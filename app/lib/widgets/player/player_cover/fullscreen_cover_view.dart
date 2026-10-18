@@ -26,22 +26,19 @@ class PlayerFullscreenCover extends StatelessWidget {
         return ShaderMask(
           // dstIn：用渐变 alpha 当遮罩，保留封面自身颜色，只让右缘渐隐。
           blendMode: BlendMode.dstIn,
-          shaderCallback: (rect) => LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            // 渐隐区延伸到文字栏下方（封面绘制宽度比文字起点多 8% 页宽），
-            // 收尾很轻：文字起点处 alpha 约 0.16，不会把歌词压灰。
+          // 以左缘中点为圆心的径向遮罩：渐隐边界是一条弧线而不是竖线。
+          // 半径按短边计，右侧刚好在 92% 半径处收尾；文字起点处 alpha 很低。
+          shaderCallback: (rect) => RadialGradient(
+            center: Alignment.centerLeft,
+            radius: 1.0,
             colors: [
               Colors.white,
               Colors.white,
-              Colors.white.withValues(alpha: 0.92),
-              Colors.white.withValues(alpha: 0.65),
-              Colors.white.withValues(alpha: 0.30),
-              Colors.white.withValues(alpha: 0.10),
-              Colors.white.withValues(alpha: 0),
+              Colors.white.withValues(alpha: 0.60),
+              Colors.white.withValues(alpha: 0.20),
               Colors.white.withValues(alpha: 0),
             ],
-            stops: const [0, 0.45, 0.60, 0.72, 0.82, 0.88, 0.92, 1],
+            stops: const [0, 0.65, 0.78, 0.85, 0.92],
           ).createShader(rect),
           child: CoverImage(
             cover: cover,
