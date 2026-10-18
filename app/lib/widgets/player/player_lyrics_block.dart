@@ -27,8 +27,10 @@ enum PlayerLyricsPresentation {
   /// 跟随偏好：`simple` 滚动列表或 `amll` 物理歌词墙。
   standard,
 
-  /// Vutron 经典布局：强制 `simple` 列表，左对齐、当前行不放大、非当前行
-  /// 0.95 缩放；颜色仍走统一的偏好/跟随逻辑（已唱色、未唱色、跟随主题/封面）。
+  /// Vutron 经典布局：字号按 720p=28px 起算；引擎仍跟随偏好——`simple`
+  /// 左对齐（原文/译文同为左对齐）、当前行不放大、非当前行 0.95 缩放；
+  /// `amll` 保持物理歌词墙自身的居中排版。颜色统一走偏好/跟随逻辑
+  /// （已唱色、未唱色、跟随主题/封面）。
   vutron,
 }
 
@@ -87,9 +89,9 @@ class PlayerLyricsBlock extends ConsumerWidget {
         ref.watch(currentLyricsProvider).value ?? const <LyricGroup>[];
     final prefs = ref.watch(appPrefsProvider);
     final vutron = presentation == PlayerLyricsPresentation.vutron;
-    // Vutron 经典布局：强制 simple 列表（列表形态是它的排版语义），字号按
-    // 720p=28px 起随窗口高度缩放；其余布局仍跟随偏好引擎与字号。
-    final engine = vutron ? 'simple' : prefs.lyricEngine;
+    // Vutron 经典布局：字号按 720p=28px 起随窗口高度缩放；引擎仍跟随偏好
+    // （simple 列表左对齐 / AMLL 物理墙按其自身居中排版）。
+    final engine = prefs.lyricEngine;
     final scale = prefs.lyricAdaptiveFontSize ? lyricScale : 1.0;
     final fontSize = vutron
         ? (28 * (MediaQuery.sizeOf(context).height / 720)).clamp(24.0, 44.0)

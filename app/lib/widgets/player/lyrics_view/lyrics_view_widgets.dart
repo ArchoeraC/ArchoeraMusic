@@ -385,6 +385,13 @@ class _Line extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
+                // TextAlign 只作用于单个 Text 内部；原文/音译/翻译跨行排列时
+                // 还要让 Column 的交叉轴跟随同一方向，否则译文仍会居中。
+                crossAxisAlignment: textAlign == TextAlign.left
+                    ? CrossAxisAlignment.start
+                    : textAlign == TextAlign.right
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.center,
                 children: [
                   original,
                   if (romanization != null) ...[
