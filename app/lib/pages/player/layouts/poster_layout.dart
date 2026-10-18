@@ -5,6 +5,10 @@
 /// 整幅封面布局（`fullscreen`）：左侧封面铺满整页高度、右缘横向渐隐，
 /// 曲目信息（标题/副标题）左对齐放在右侧歌词上方。
 ///
+/// 封面实际绘制宽度比文字栏起点多 [PosterPlayerLayout.coverFadeExtensionFraction]
+/// 页宽：渐隐区延伸到歌词区下方，不再被一条与文字对齐的竖线截断；文字
+/// 起点处的封面 alpha 已很低，不足以明显影响可读性。
+///
 /// 参考 SPlayer-Next 的全屏封面：封面画在**页面层**（顶栏/底栏背后），
 /// 主体只排右栏，避免与顶栏/底部控制互相挤压。
 library;
@@ -23,8 +27,14 @@ class PosterPlayerLayout extends PlayerLayout {
 
   static const String layoutId = 'fullscreen';
 
-  /// 左侧封面占整页宽度的比例（52%：整幅封面仍有分量，同时把右栏让宽）。
+  /// 封面占整页宽度的比例（文字栏从封面右缘开始）。
   static const double coverWidthFraction = 0.52;
+
+  /// 封面实际绘制宽度在文字栏起点之外**多出**的页宽比例。
+  ///
+  /// 多出的部分让封面右缘的渐隐延伸到文字区下方，渐变不再被一条固定
+  /// 竖线截断；文字仍从 [coverWidthFraction] 处开始。
+  static const double coverFadeExtensionFraction = 0.08;
 
   /// 右侧信息/歌词区的最小宽度（窗口过窄时收缩封面）。
   static const double lyricsMinWidth = 340;
@@ -37,11 +47,15 @@ class PosterPlayerLayout extends PlayerLayout {
     if (c.fullscreenCoverWidth <= 0) return null;
     return Stack(
       children: [
+        // 绘制宽度比文字栏起点多 6% 页宽：渐隐区延伸到歌词区下方。
         Positioned(
           left: 0,
           top: 0,
           bottom: 0,
-          width: c.fullscreenCoverWidth,
+          width:
+              (c.fullscreenCoverWidth +
+                      c.pageWidth * coverFadeExtensionFraction)
+                  .clamp(0.0, c.pageWidth),
           child: RepaintBoundary(
             child: CoverSwitcher(
               coverKey: c.coverKey,
