@@ -146,9 +146,7 @@ void main() {
     final translation = tester.widget<Text>(find.text('第一行翻译'));
     expect(translation.textAlign, TextAlign.left);
     final lineColumn = tester.widget<Column>(
-      find
-          .ancestor(of: find.text('第一行翻译'), matching: find.byType(Column))
-          .last,
+      find.ancestor(of: find.text('第一行翻译'), matching: find.byType(Column)).last,
     );
     expect(lineColumn.crossAxisAlignment, CrossAxisAlignment.start);
   });
@@ -158,6 +156,8 @@ void main() {
     final wall = tester.widget<AmllPhysicsWall>(find.byType(AmllPhysicsWall));
     expect(wall.playedColor, const Color(_played));
     expect(wall.unplayedColor, const Color(_unplayed));
+    // 注册表声明的左对齐同样作用于 AMLL 物理墙。
+    expect(wall.textAlign, TextAlign.left);
     expect(find.byType(LyricsView), findsNothing);
   });
 }

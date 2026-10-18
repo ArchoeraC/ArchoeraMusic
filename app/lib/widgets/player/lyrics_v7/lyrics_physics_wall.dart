@@ -248,6 +248,7 @@ class AmllPhysicsWall extends StatefulWidget {
     this.blurQuality = LyricsBlurQuality.auto,
     this.wordFadeWidth = 0.5,
     this.springPreset = 'default',
+    this.textAlign = TextAlign.center,
     this.animate = true,
   });
 
@@ -287,6 +288,13 @@ class AmllPhysicsWall extends StatefulWidget {
   final double wordFadeWidth;
 
   final String springPreset;
+
+  /// 水平对齐（居中 / 靠左 / 靠右）。由布局注册表决定；默认居中。
+  ///
+  /// 行高测量与弹簧定位只关心纵向，因此切换对齐不需要重算行高；段落与
+  /// 逐字盒会按该对齐重新生成（缓存键包含对齐值）。
+  final TextAlign textAlign;
+
   final bool animate;
 
   @override
@@ -315,6 +323,9 @@ class _PaintCtx {
   bool showRomanization = false;
   FontWeight fontWeight = FontWeight.w600;
   bool enableScale = true;
+
+  /// 水平对齐（见 [AmllPhysicsWall.textAlign]）。
+  TextAlign textAlign = TextAlign.center;
 
   /// 生效的失焦档位（见 [LyricsBlurMode]）：已含关闭开关、环境变量覆盖
   /// 与帧预算自动降级。

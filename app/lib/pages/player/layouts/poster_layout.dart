@@ -99,6 +99,7 @@ class PosterPlayerLayout extends PlayerLayout {
                             child: PlayerLyricsBlock(
                               hasLyrics: c.hasLyrics,
                               lyricScale: lyricScale,
+                              textAlign: lyricsAlign,
                               onSeek: c.onSeekLyric,
                               dragMs: c.dragMs,
                             ),

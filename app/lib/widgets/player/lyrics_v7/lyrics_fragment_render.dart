@@ -140,6 +140,7 @@ LyricsFragmentRender? buildLyricsFragmentRender({
   required double unsungAlpha,
   required double litAlpha,
   double lineHeightEm = kLyricLineHeightEm,
+  TextAlign textAlign = TextAlign.center,
 }) {
   if (maxWidth <= 0) return null;
   final joined = StringBuffer();
@@ -154,7 +155,7 @@ LyricsFragmentRender? buildLyricsFragmentRender({
   final lead = joinedText.length - joinedText.trimLeft().length;
 
   final layoutBuilder = ui.ParagraphBuilder(
-    _pStyleCenter(fontFamily, fontSize, weight, lineHeightEm),
+    _pStyleCenter(fontFamily, fontSize, weight, lineHeightEm, textAlign),
   )..pushStyle(_uStyle(fontFamily, fontSize, weight, played, height: lineHeightEm));
   layoutBuilder.addText(joinedText.trim());
   layoutBuilder.pop();
@@ -289,8 +290,9 @@ ui.ParagraphStyle _pStyleCenter(
   double fs,
   FontWeight w, [
   double height = kLyricLineHeightEm,
+  ui.TextAlign textAlign = ui.TextAlign.center,
 ]) => ui.ParagraphStyle(
-  textAlign: ui.TextAlign.center,
+  textAlign: textAlign,
   textDirection: ui.TextDirection.ltr,
   fontFamily: family,
   fontSize: fs,

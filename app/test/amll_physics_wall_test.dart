@@ -46,6 +46,30 @@ Future<void> settle(WidgetTester tester, {int frames = 90}) async {
 }
 
 void main() {
+  testWidgets('水平对齐（左 / 右）渲染无异常', (tester) async {
+    final groups = buildGroups(8);
+    for (final align in [TextAlign.left, TextAlign.right]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              height: 500,
+              child: AmllPhysicsWall(
+                groups: groups,
+                positionMs: 2000,
+                textAlign: align,
+                onSeek: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(tester.takeException(), isNull, reason: '对齐 $align 不应抛异常');
+    }
+  });
+
   testWidgets('前奏无覆盖时锚定首行而非越界', (tester) async {
     final groups = [
       LyricGroup(
