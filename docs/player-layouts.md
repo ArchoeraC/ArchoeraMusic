@@ -68,6 +68,9 @@ app/lib/pages/player/layouts/
 - **静态遮罩**：歌词上下渐隐用 SPlayer `.lyric-area` 的 10%/25% 非线性
   `ShaderMask`（0→60%→100%→100%→60%→0），整幅封面布局的顶/底遮罩用
   SPlayer `cover-mask` 的 8 段非线性 alpha，避免色阶与硬边；
+- **封面渐隐**：优先用 `shaders/cover_mask.frag` 的低频噪声扰动椭圆距离场
+  （每首封面用稳定 seed 改变弧线形状，避免机械的规则边界）；着色器不可用
+  时回退同形状的 `RadialGradient`，测试环境走回退路径；
 - **控制局部订阅**：进度/控制/音量各自 `Consumer`，位置 50ms 更新不带动整页；
 - 需要模糊时优先「一次烘焙 + 复用」（见 `docs/runtime-resource-optimization.md`）。
 
