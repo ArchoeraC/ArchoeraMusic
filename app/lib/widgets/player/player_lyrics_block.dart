@@ -18,6 +18,7 @@ import '../../../stores/app_prefs.dart';
 import '../../../stores/lyrics_provider.dart';
 import '../../../theme/cover_color.dart';
 import 'lyrics_v7/lyrics_physics_wall.dart';
+import 'lyrics_edge_fade.dart';
 import 'lyrics_view.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -44,6 +45,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
     this.dragMs,
     this.presentation = PlayerLyricsPresentation.standard,
     this.textAlign = TextAlign.center,
+    this.fadeEdges = false,
   });
 
   /// 是否有歌词（无歌词显示空态占位图标）。
@@ -67,6 +69,9 @@ class PlayerLyricsBlock extends ConsumerWidget {
 
   /// 水平对齐（由布局注册表声明；两种引擎都生效）。
   final TextAlign textAlign;
+
+  /// 上下渐隐（对齐 SPlayer `.lyric-area`）；两种引擎都生效。
+  final bool fadeEdges;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -156,9 +161,10 @@ class PlayerLyricsBlock extends ConsumerWidget {
             inactiveFontWeight: vutron ? FontWeight.w600 : FontWeight.w400,
             inactiveScale: vutron ? 0.95 : 1.0,
             textAlign: textAlign,
-            fadeEdges: vutron,
             onSeek: onSeek,
           );
-    return ClipRect(child: wall);
+    return ClipRect(
+      child: fadeEdges ? LyricsEdgeFade(child: wall) : wall,
+    );
   }
 }
