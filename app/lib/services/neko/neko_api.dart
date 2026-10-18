@@ -581,17 +581,45 @@ class NekoApi extends ChangeNotifier {
     }
   }
 
+  /// 音乐详情缓存（`GET /api/music/info/{id}`）。
+  ///
+  /// 服务端自 `fbd09154` 起把歌词并入详情响应（`data.lyrics`）、下线独立歌词
+  /// 接口，并把 `maxQuality` / `favoriteCount` 一起返回。列表逐行读取最高音质
+  /// 与播放页取歌词共用同一份详情，避免同一曲目重复请求（短 TTL + 条数上限，
+  /// 防止长列表把整站歌词汇聚在内存里）。
+  final Map<String, _NekoMusicInfo> _musicInfos = {};
+  static const Duration _musicInfoTtl = Duration(minutes: 10);
+  static const int _musicInfoCacheLimit = 64;
+
+  Future<_NekoMusicInfo?> _fetchMusicInfo(String id) async {
+    if (id.isEmpty) return null;
+    final cached = _musicInfos[id];
+    if (cached != null && DateTime.now().isBefore(cached.expiresAt)) {
+      return cached;
+    }
+    final body = await _client().getJson('/api/music/info/$id');
+    if (body['success'] != true) return null;
+    final data = body['data'];
+    if (data is! Map) return null;
+    final info = _NekoMusicInfo(
+      maxQuality: normalizeNekoQuality(data['maxQuality']?.toString()),
+      lyrics: data['lyrics']?.toString() ?? '',
+      expiresAt: DateTime.now().add(_musicInfoTtl),
+    );
+    if (_musicInfos.length >= _musicInfoCacheLimit) {
+      _musicInfos.remove(_musicInfos.keys.first);
+    }
+    _musicInfos[id] = info;
+    return info;
+  }
+
   /// 歌曲实际最高音质（`/api/music/info/{id}` 的 `maxQuality`）。
   ///
   /// 服务端自「可选音质流」起返回该字段；未升级 / 无字段 / 请求失败 / 离线
   /// 一律返回 null（调用方按全档位展示，实际取流时仍由服务端按原始最高封顶）。
   Future<String?> fetchMaxQuality(String id) async {
-    if (id.isEmpty) return null;
     try {
-      final body = await _client().getJson('/api/music/info/$id');
-      final data = body['data'];
-      final raw = data is Map ? data['maxQuality'] : null;
-      return normalizeNekoQuality(raw?.toString());
+      return (await _fetchMusicInfo(id))?.maxQuality;
     } catch (_) {
       return null;
     }
@@ -619,15 +647,13 @@ class NekoApi extends ChangeNotifier {
   }
 
   /// 歌词（LRC 文本；无歌词返回 null）。
+  ///
+  /// 后端已下线 `/api/music/lyrics/{id}`，歌词现在随音乐详情一起返回
+  /// （`data.lyrics`，服务端已把 `[mm:ss:xx]` 归一为 `[mm:ss.xx]`）。
   Future<String?> lyricText(String id) async {
-    if (id.isEmpty) return null;
     try {
-      final body = await _client().getJson('/api/music/lyrics/$id');
-      if (body['success'] == true) {
-        final data = body['data'];
-        if (data is String && data.trim().isNotEmpty) return data;
-      }
-      return null;
+      final lyrics = (await _fetchMusicInfo(id))?.lyrics ?? '';
+      return lyrics.trim().isEmpty ? null : lyrics;
     } catch (_) {
       return null;
     }
@@ -744,6 +770,23 @@ class _NekoMediaUrl {
   const _NekoMediaUrl(this.url, this.expiresAt);
 
   final String url;
+  final DateTime expiresAt;
+}
+
+/// 内部：音乐详情缓存项（`/api/music/info` 的 `maxQuality` + `lyrics`）。
+class _NekoMusicInfo {
+  const _NekoMusicInfo({
+    required this.maxQuality,
+    required this.lyrics,
+    required this.expiresAt,
+  });
+
+  /// 已归一化的服务端最高音质；无法识别为 null。
+  final String? maxQuality;
+
+  /// LRC 歌词原文；服务端无歌词时为空串。
+  final String lyrics;
+
   final DateTime expiresAt;
 }
 

@@ -724,6 +724,34 @@ void main() {
     });
   });
 
+  group('NekoApi 音乐详情（歌词并入 info）', () {
+    test('歌词从 /api/music/info 的 data.lyrics 取，且与最高音质共用缓存', () async {
+      final fake = _FakeNekoClient();
+      final api = NekoApi(clientFactory: (baseUrl, token) => fake);
+
+      expect(await api.lyricText('42'), '[00:01.00]晴天');
+      expect(fake.lastPath, '/api/music/info/42');
+      expect(fake.calls, 1);
+
+      // 同一曲目的最高音质复用同一份详情缓存，不再发第二次请求。
+      expect(await api.fetchMaxQuality('42'), 'sq');
+      expect(fake.calls, 1);
+      expect(await api.lyricText('42'), '[00:01.00]晴天');
+      expect(fake.calls, 1);
+    });
+
+    test('详情无歌词 → null；空 id 不发请求', () async {
+      final fake = _FakeNekoClient();
+      final api = NekoApi(clientFactory: (baseUrl, token) => fake);
+
+      expect(await api.lyricText('7'), isNull);
+      expect(fake.lastPath, '/api/music/info/7');
+      fake.calls = 0;
+      expect(await api.lyricText(''), isNull);
+      expect(fake.calls, 0);
+    });
+  });
+
   group('withPicSize 查询参数保护', () {
     test('无查询追加 param；已有查询（如 Neko 头像 ?v=）不再追加', () {
       expect(
@@ -759,6 +787,19 @@ class _FakeNekoClient extends NekoClient {
     calls++;
     lastPath = path;
     lastQuery = query;
+    if (path.startsWith('/api/music/info/')) {
+      final id = path.substring('/api/music/info/'.length);
+      return <String, dynamic>{
+        'success': true,
+        'data': id == '42'
+            ? const <String, dynamic>{
+                'maxQuality': 'sq',
+                'lyrics': '[00:01.00]晴天',
+                'favoriteCount': 3,
+              }
+            : const <String, dynamic>{},
+      };
+    }
     return <String, dynamic>{
       'success': true,
       'data': const <String, dynamic>{'url': '/media/music/42/sq.flac'},
