@@ -248,7 +248,12 @@ void main() {
       expect(tuning.demotions[12], 1);
 
       // 「重启」：只恢复档位，惩罚清零
-      tuning.debugReset();
+      // 注意：debugReset() 会清掉 debugLadder，恢复时会按**真实核数**裁剪档位；
+      // 这里重新注入同一梯度，保证断言与 CI 机器的核数无关（4 核 runner 的真实
+      // 梯度是 [1,2,3]，8 会被裁到 3）。
+      tuning
+        ..debugReset()
+        ..debugLadder = [8, 12];
       expect(tuning.demotions, isEmpty);
       expect(tuning.workers, 8);
     });
