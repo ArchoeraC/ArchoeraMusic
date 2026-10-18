@@ -133,6 +133,10 @@ abstract class PlayerLayout {
   /// 返回 false 的布局需要自己在主体里提供完整的播放控制（如 Vutron 经典
   /// 布局把控制放在封面下方）。
   bool get usesDefaultBottomBar => true;
+
+  /// 歌词水平对齐（居中 / 靠左 / 靠右）。布局注册表按需覆盖：
+  /// simple 列表与 AMLL 物理墙都会按此对齐。
+  TextAlign get lyricsAlign => TextAlign.center;
 }
 
 /// 内建布局列表（顺序仅用于注册表遍历；设置页的展示顺序单独维护）。
