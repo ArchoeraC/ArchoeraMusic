@@ -190,7 +190,7 @@ class _VutronLeftColumn extends StatelessWidget {
         const SizedBox(height: 10),
         _VutronControls(size: size),
         const SizedBox(height: 8),
-        _VutronVolume(size: size),
+        const _VutronVolume(),
       ],
     );
   }
@@ -296,9 +296,7 @@ class _VutronControls extends ConsumerWidget {
 
 /// 音量行：图标 + 轨道（对齐 Vutron 第二条 .progress-bar）。
 class _VutronVolume extends ConsumerWidget {
-  const _VutronVolume({required this.size});
-
-  final double size;
+  const _VutronVolume();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -331,11 +329,11 @@ class _VutronVolume extends ConsumerWidget {
   }
 }
 
-/// 精简音量条：2px 圆角轨道 + 6px 圆点，20px 高命中区。
+/// 精简音量条：2px 圆角细线（无圆点），铺满整条宽度。
 ///
 /// Vutron 的音量条是一条细线，Material [Slider]（3px 轨道 + 10px 圆点 +
-/// 56px 高命中区）在左栏里显得过粗，因此这里自绘一条更轻的轨道；拖动时
-/// 只预览（引擎命令合并），松手落盘，与页面其它音量控件语义一致。
+/// 56px 高命中区）在左栏里显得过粗，因此这里自绘一条更轻的轨道；去掉
+/// 圆点后可以使用完整宽度，拖动时只预览（引擎命令合并），松手落盘。
 class _VutronVolumeBar extends StatelessWidget {
   const _VutronVolumeBar({
     required this.value,
@@ -347,19 +345,14 @@ class _VutronVolumeBar extends StatelessWidget {
   final ValueChanged<double> onChanged;
   final ValueChanged<double> onChangeEnd;
 
-  static const double _trackInset = 4;
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, box) {
         double valueAt(Offset local) {
-          final usable = (box.maxWidth - _trackInset * 2).clamp(
-            1.0,
-            double.infinity,
-          );
-          return ((local.dx - _trackInset) / usable).clamp(0.0, 1.0);
+          final usable = box.maxWidth.clamp(1.0, double.infinity);
+          return (local.dx / usable).clamp(0.0, 1.0);
         }
 
         return MouseRegion(
@@ -382,7 +375,6 @@ class _VutronVolumeBar extends StatelessWidget {
                   value: value.clamp(0.0, 1.0),
                   active: scheme.onSurface.withValues(alpha: 0.80),
                   inactive: scheme.onSurface.withValues(alpha: 0.18),
-                  thumb: scheme.onSurface.withValues(alpha: 0.90),
                 ),
               ),
             ),
@@ -398,49 +390,45 @@ class _VutronVolumeBarPainter extends CustomPainter {
     required this.value,
     required this.active,
     required this.inactive,
-    required this.thumb,
   });
 
   final double value;
   final Color active;
   final Color inactive;
-  final Color thumb;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const inset = _VutronVolumeBar._trackInset;
     const trackHeight = 2.0;
-    final left = inset;
-    final width = (size.width - inset * 2).clamp(0.0, double.infinity);
+    final width = size.width;
+    if (width <= 0) return;
     final cy = size.height / 2;
-    final track = RRect.fromLTRBR(
-      left,
-      cy - trackHeight / 2,
-      left + width,
-      cy + trackHeight / 2,
-      const Radius.circular(trackHeight / 2),
+    final radius = Radius.circular(trackHeight / 2);
+    canvas.drawRRect(
+      RRect.fromLTRBR(
+        0,
+        cy - trackHeight / 2,
+        width,
+        cy + trackHeight / 2,
+        radius,
+      ),
+      Paint()..color = inactive,
     );
-    canvas.drawRRect(track, Paint()..color = inactive);
     final filled = width * value;
     if (filled > 0) {
       canvas.drawRRect(
         RRect.fromLTRBR(
-          left,
+          0,
           cy - trackHeight / 2,
-          left + filled,
+          filled,
           cy + trackHeight / 2,
-          const Radius.circular(trackHeight / 2),
+          radius,
         ),
         Paint()..color = active,
       );
     }
-    canvas.drawCircle(Offset(left + filled, cy), 3, Paint()..color = thumb);
   }
 
   @override
   bool shouldRepaint(_VutronVolumeBarPainter old) =>
-      old.value != value ||
-      old.active != active ||
-      old.inactive != inactive ||
-      old.thumb != thumb;
+      old.value != value || old.active != active || old.inactive != inactive;
 }
