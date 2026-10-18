@@ -23,8 +23,8 @@ class PosterPlayerLayout extends PlayerLayout {
 
   static const String layoutId = 'fullscreen';
 
-  /// 左侧封面占整页宽度的比例。
-  static const double coverWidthFraction = 0.56;
+  /// 左侧封面占整页宽度的比例（52%：整幅封面仍有分量，同时把右栏让宽）。
+  static const double coverWidthFraction = 0.52;
 
   /// 右侧信息/歌词区的最小宽度（窗口过窄时收缩封面）。
   static const double lyricsMinWidth = 340;
@@ -94,7 +94,8 @@ class PosterPlayerLayout extends PlayerLayout {
                         visible: c.showLyrics,
                         enabled: c.contentMounted && c.hasLyrics,
                         builder: (context) => Padding(
-                          padding: const EdgeInsets.only(right: 64),
+                          // 右栏原本留 64px，全屏封面模式下歌词偏窄；收到 24px。
+                          padding: const EdgeInsets.only(right: 24),
                           child: RepaintBoundary(
                             child: PlayerLyricsBlock(
                               hasLyrics: c.hasLyrics,
@@ -198,7 +199,7 @@ class _PosterTrackInfo extends StatelessWidget {
         : (title.isEmpty ? l10n.playerBarUntitled : title);
     final sub = hasContent ? subtitle : l10n.playerPageLoadHint;
     return Padding(
-      padding: const EdgeInsets.only(left: 4, right: 40),
+      padding: const EdgeInsets.only(left: 4, right: 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
