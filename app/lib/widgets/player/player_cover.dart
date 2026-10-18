@@ -14,12 +14,15 @@
 ///   横向渐隐融入背景（对齐原项目 FullPlayer 的全屏封面）。
 library;
 
+import 'dart:ui' as ui;
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../services/netease/track.dart';
 import '../common/anim.dart';
 import '../list/cover_image.dart';
+import 'player_cover/cover_mask_shader.dart';
 
 part 'player_cover/fullscreen_cover_view.dart';
 part 'player_cover/player_cover_view.dart';

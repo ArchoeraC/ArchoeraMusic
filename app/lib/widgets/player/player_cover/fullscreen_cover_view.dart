@@ -7,14 +7,37 @@ part of '../player_cover.dart';
 /// 全屏封面布局（`coverLayout: fullscreen`）的左侧整幅封面。
 ///
 /// 对齐原项目 FullPlayer 的全屏封面：封面铺满左侧整列（无圆角/阴影，
-/// 播放暂停不做缩放），右缘用横向渐隐融入背景，避免与右侧歌词区之间
-/// 出现生硬的分界线。曲目信息不再压在封面下方，由播放页放到歌词上方
-/// （见 `player_page_view.dart` 的 `_FullscreenTrackInfo`）。
-class PlayerFullscreenCover extends StatelessWidget {
+/// 播放暂停不做缩放），右缘渐隐融入背景。渐隐边界优先使用带低频噪声的
+/// 片元着色器（`cover_mask.frag`），避免过于规则的椭圆；着色器不可用时
+/// 回退到同形状的 `RadialGradient`。
+class PlayerFullscreenCover extends StatefulWidget {
   const PlayerFullscreenCover({super.key, required this.cover});
 
   /// 封面地址（同 [CoverImage]：URL / file:// / 磁盘路径；空则占位）。
   final String? cover;
+
+  @override
+  State<PlayerFullscreenCover> createState() => _PlayerFullscreenCoverState();
+}
+
+class _PlayerFullscreenCoverState extends State<PlayerFullscreenCover> {
+  ui.FragmentProgram? _program;
+  bool _loadRequested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureProgram();
+  }
+
+  void _ensureProgram() {
+    if (_loadRequested) return;
+    _loadRequested = true;
+    CoverMaskShader.load().then((program) {
+      if (!mounted || program == null) return;
+      setState(() => _program = program);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,25 +46,9 @@ class PlayerFullscreenCover extends StatelessWidget {
         final w = c.maxWidth;
         final h = c.maxHeight;
         final shortSide = w < h ? w : h;
-        return ShaderMask(
-          // dstIn：用渐变 alpha 当遮罩，保留封面自身颜色，只让右缘渐隐。
-          blendMode: BlendMode.dstIn,
-          // 以左缘中点为圆心的径向遮罩：渐隐边界是一条弧线而不是竖线。
-          // 半径按短边计，右侧刚好在 92% 半径处收尾；文字起点处 alpha 很低。
-          shaderCallback: (rect) => RadialGradient(
-            center: Alignment.centerLeft,
-            radius: 1.0,
-            colors: [
-              Colors.white,
-              Colors.white,
-              Colors.white.withValues(alpha: 0.60),
-              Colors.white.withValues(alpha: 0.20),
-              Colors.white.withValues(alpha: 0),
-            ],
-            stops: const [0, 0.65, 0.78, 0.85, 0.92],
-          ).createShader(rect),
-          child: CoverImage(
-            cover: cover,
+        return _mask(
+          CoverImage(
+            cover: widget.cover,
             width: w,
             height: h,
             radius: 0,
@@ -49,6 +56,43 @@ class PlayerFullscreenCover extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _mask(Widget child) {
+    final program = _program;
+    if (program == null) {
+      // 测试环境 / 着色器加载失败：回退到同形状的椭圆渐变。
+      return ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (rect) => RadialGradient(
+          center: Alignment.centerLeft,
+          radius: 1.0,
+          colors: [
+            Colors.white,
+            Colors.white,
+            Colors.white.withValues(alpha: 0.60),
+            Colors.white.withValues(alpha: 0.20),
+            Colors.white.withValues(alpha: 0),
+          ],
+          stops: const [0, 0.65, 0.78, 0.85, 0.92],
+        ).createShader(rect),
+        child: child,
+      );
+    }
+    // 每首封面一个稳定相位，让弧线的起伏各不相同（同一封面切回来仍一致）。
+    final seed = ((widget.cover?.hashCode ?? 0) & 0xFFFF) / 4096.0;
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) {
+        final shader = program.fragmentShader();
+        shader
+          ..setFloat(CoverMaskUniforms.size, rect.width)
+          ..setFloat(CoverMaskUniforms.size + 1, rect.height)
+          ..setFloat(CoverMaskUniforms.seed, seed);
+        return shader;
+      },
+      child: child,
     );
   }
 }
