@@ -30,7 +30,10 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
       err,
     ) {
       if (!mounted) return;
-      toast(context.l10n.settingsSinkChangedFailed(err: err), type: ToastType.error);
+      toast(
+        context.l10n.settingsSinkChangedFailed(err: err),
+        type: ToastType.error,
+      );
     });
   }
 
@@ -288,7 +291,10 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         return 0;
       });
     for (final d in sorted) {
-      final fmt = l10n.settingsOutputDeviceFormat(channels: d.channels, rate: d.rate);
+      final fmt = l10n.settingsOutputDeviceFormat(
+        channels: d.channels,
+        rate: d.rate,
+      );
       final desc = d.description.isNotEmpty ? '${d.description} · $fmt' : fmt;
       rows.add(
         _EngineOptionTile(
@@ -1038,19 +1044,36 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               icon: EtaIcons.square,
               title: l10n.settingsCoverLayout,
               subtitle: l10n.settingsCoverLayoutDesc,
-              trailing: SSegmented<String>(
-                options: [
-                  SSegmentedOption('default', l10n.settingsCoverLayoutDefault),
-                  SSegmentedOption(
-                    'fullscreen',
-                    l10n.settingsCoverLayoutFullscreen,
+              // 三种布局起分段控件会过宽，改为与「播放页背景」一致的紧凑下拉。
+              trailing: DropdownButton<String>(
+                value: prefs.coverLayout,
+                isDense: true,
+                underline: const SizedBox.shrink(),
+                borderRadius: BorderRadius.circular(10),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
+                icon: Icon(EtaIcons.downSmall, color: scheme.onSurfaceVariant),
+                onChanged: (v) {
+                  if (v == null) return;
+                  ref.read(appPrefsProvider.notifier).setCoverLayout(layout: v);
+                },
+                items: [
+                  DropdownMenuItem(
+                    value: 'default',
+                    child: Text(l10n.settingsCoverLayoutDefault),
                   ),
-                  SSegmentedOption('vutron', l10n.settingsCoverLayoutVutron),
+                  DropdownMenuItem(
+                    value: 'fullscreen',
+                    child: Text(l10n.settingsCoverLayoutFullscreen),
+                  ),
+                  DropdownMenuItem(
+                    value: 'vutron',
+                    child: Text(l10n.settingsCoverLayoutVutron),
+                  ),
                 ],
-                selected: prefs.coverLayout,
-                onChanged: (v) => ref
-                    .read(appPrefsProvider.notifier)
-                    .setCoverLayout(layout: v),
               ),
             ),
             SettingSliderTile(
