@@ -138,6 +138,7 @@ const Set<String> playerBgTypes = {
   'solid',
   'ripple',
   'fluid',
+  'coverTone',
 };
 
 /// 水纹流动速度（1~6，默认 3）。
@@ -189,9 +190,10 @@ const Set<String> timeFormats = {
 const bool defaultShowPlaybackSource = false;
 
 /// 播放页封面布局（`default` 左右分栏 / `fullscreen` 整幅封面：
-/// 左侧封面铺满整列并向右渐隐，曲目信息置于歌词上方）。
+/// 左侧封面铺满整列并向右渐隐，曲目信息置于歌词上方 / `vutron` 经典：
+/// 左封面 + 信息/进度/控制，右歌词，对齐 VutronMusic Classic 播放页）。
 const String defaultCoverLayout = 'default';
-const Set<String> coverLayouts = {'default', 'fullscreen'};
+const Set<String> coverLayouts = {'default', 'fullscreen', 'vutron'};
 
 /// 封面/歌词宽度比例（0.3~0.6，默认 0.45；对齐上游 player.coverLyricRatio）。
 const double defaultCoverLyricRatio = 0.45;

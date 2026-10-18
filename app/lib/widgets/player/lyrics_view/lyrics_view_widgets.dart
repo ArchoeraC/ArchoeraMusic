@@ -34,7 +34,7 @@ extension _LyricsViewBuild on _LyricsViewState {
         }
         final half = constraints.maxHeight / 2;
         final pad = half - widget.lineHeight / 2;
-        return ScrollConfiguration(
+        final list = ScrollConfiguration(
           behavior: const _NoScrollbarBehavior(),
           child: ListView.builder(
             controller: _controller,
@@ -54,12 +54,34 @@ extension _LyricsViewBuild on _LyricsViewState {
                 showTranslation: widget.showTranslation,
                 showRomanization: widget.showRomanization,
                 fontWeight: widget.fontWeight,
+                currentFontSize: widget.currentFontSize,
+                inactiveFontWeight: widget.inactiveFontWeight,
+                inactiveScale: widget.inactiveScale,
+                unplayedAlpha: widget.unplayedAlpha,
+                textAlign: widget.textAlign,
                 onTap: widget.onSeek == null
                     ? null
                     : () => widget.onSeek!(group.original.timeMs),
               );
             },
           ),
+        );
+        if (!widget.fadeEdges) return list;
+        return ShaderMask(
+          blendMode: BlendMode.dstIn,
+          // 上下各 25% 渐隐（对齐 Vutron `mask:true`）；静态渐变，无逐帧计算。
+          shaderCallback: (rect) => const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              Colors.white,
+              Colors.white,
+              Colors.transparent,
+            ],
+            stops: [0, 0.25, 0.75, 1],
+          ).createShader(rect),
+          child: list,
         );
       },
     );
@@ -86,6 +108,8 @@ extension _LyricsViewBuild on _LyricsViewState {
       showTranslation: widget.showTranslation,
       showRomanization: widget.showRomanization,
       fontWeight: widget.fontWeight,
+      currentFontSize: widget.currentFontSize,
+      inactiveFontWeight: widget.inactiveFontWeight,
       baseStyle: base,
       textScaler: textScaler,
     );
@@ -111,17 +135,19 @@ extension _LyricsViewBuild on _LyricsViewState {
     double maxWidth,
     TextStyle base,
   ) {
-    final fs = isCurrent ? widget.fontSize + 3 : widget.fontSize;
+    final fs = isCurrent
+        ? (widget.currentFontSize ?? widget.fontSize + 3)
+        : widget.fontSize;
     final main = TextPainter(
       text: TextSpan(
         text: g.original.text,
         style: base.copyWith(
           fontSize: fs,
-          fontWeight: isCurrent ? widget.fontWeight : FontWeight.w400,
+          fontWeight: isCurrent ? widget.fontWeight : widget.inactiveFontWeight,
         ),
       ),
       textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
+      textAlign: widget.textAlign,
     )..layout(maxWidth: maxWidth);
     var h = main.height;
     if (isCurrent &&
@@ -191,6 +217,8 @@ class _LyricsRowHeightKey {
     required this.showTranslation,
     required this.showRomanization,
     required this.fontWeight,
+    required this.currentFontSize,
+    required this.inactiveFontWeight,
     required this.baseStyle,
     required this.textScaler,
   });
@@ -205,6 +233,8 @@ class _LyricsRowHeightKey {
   final bool showTranslation;
   final bool showRomanization;
   final FontWeight fontWeight;
+  final double? currentFontSize;
+  final FontWeight inactiveFontWeight;
   final TextStyle baseStyle;
   final TextScaler textScaler;
 
@@ -222,6 +252,8 @@ class _LyricsRowHeightKey {
         other.showTranslation == showTranslation &&
         other.showRomanization == showRomanization &&
         other.fontWeight == fontWeight &&
+        other.currentFontSize == currentFontSize &&
+        other.inactiveFontWeight == inactiveFontWeight &&
         other.baseStyle == baseStyle &&
         other.textScaler == textScaler;
   }
@@ -238,6 +270,8 @@ class _LyricsRowHeightKey {
     showTranslation,
     showRomanization,
     fontWeight,
+    currentFontSize,
+    inactiveFontWeight,
     baseStyle,
     textScaler,
   );
@@ -255,6 +289,11 @@ class _Line extends StatelessWidget {
     this.showTranslation = true,
     this.showRomanization = false,
     this.fontWeight = FontWeight.w600,
+    this.currentFontSize,
+    this.inactiveFontWeight = FontWeight.w400,
+    this.inactiveScale = 1.0,
+    this.unplayedAlpha = 0.55,
+    this.textAlign = TextAlign.center,
     this.onTap,
   });
 
@@ -268,6 +307,11 @@ class _Line extends StatelessWidget {
   final bool showTranslation;
   final bool showRomanization;
   final FontWeight fontWeight;
+  final double? currentFontSize;
+  final FontWeight inactiveFontWeight;
+  final double inactiveScale;
+  final double unplayedAlpha;
+  final TextAlign textAlign;
   final VoidCallback? onTap;
 
   @override
@@ -276,17 +320,17 @@ class _Line extends StatelessWidget {
     final base = group.original;
     final lineColor = playedColor ?? scheme.primary;
     final dimColor = (unplayedColor ?? scheme.onSurfaceVariant).withValues(
-      alpha: 0.55,
+      alpha: unplayedAlpha,
     );
 
     final original = isCurrent
         ? _karaokeSpan(base, group.fragments, lineColor)
-        : Text(base.text, textAlign: TextAlign.center);
+        : Text(base.text, textAlign: textAlign);
     final translation =
         (isCurrent && showTranslation && group.translation != null)
         ? Text(
             group.translation!,
-            textAlign: TextAlign.center,
+            textAlign: textAlign,
             style: TextStyle(
               fontSize: math.max(9.0, fontSize * kTranslationFontScale),
               height: 1.2,
@@ -294,11 +338,10 @@ class _Line extends StatelessWidget {
             ),
           )
         : null;
-    final romanization =
-        (isCurrent && showRomanization && group.romaji != null)
+    final romanization = (isCurrent && showRomanization && group.romaji != null)
         ? Text(
             group.romaji!,
-            textAlign: TextAlign.center,
+            textAlign: textAlign,
             style: TextStyle(
               fontSize: math.max(9.0, fontSize * kTranslationFontScale),
               height: 1.2,
@@ -319,34 +362,45 @@ class _Line extends StatelessWidget {
           curve: Curves.easeOut,
           style: isCurrent
               ? TextStyle(
-                  fontSize: fontSize + 3,
+                  fontSize: currentFontSize ?? fontSize + 3,
                   fontWeight: fontWeight,
                   color: lineColor,
                 )
-              : TextStyle(fontSize: fontSize, color: dimColor),
-          child: Container(
-            alignment: Alignment.center,
-            // 固定行高改为最小行高：长行换行后可自然增高，不再截断。
-            constraints: BoxConstraints(minHeight: lineHeight),
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                original,
-                if (romanization != null) ...[
-                  SizedBox(
-                    height: math.max(2, fontSize * kMainTranslationGapEm),
-                  ),
-                  romanization,
+              : TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: inactiveFontWeight,
+                  color: dimColor,
+                ),
+          child: Transform.scale(
+            scale: isCurrent ? 1.0 : inactiveScale,
+            child: Container(
+              alignment: textAlign == TextAlign.left
+                  ? Alignment.centerLeft
+                  : textAlign == TextAlign.right
+                  ? Alignment.centerRight
+                  : Alignment.center,
+              // 固定行高改为最小行高：长行换行后可自然增高，不再截断。
+              constraints: BoxConstraints(minHeight: lineHeight),
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  original,
+                  if (romanization != null) ...[
+                    SizedBox(
+                      height: math.max(2, fontSize * kMainTranslationGapEm),
+                    ),
+                    romanization,
+                  ],
+                  if (translation != null) ...[
+                    SizedBox(
+                      height: math.max(2, fontSize * kMainTranslationGapEm),
+                    ),
+                    translation,
+                  ],
                 ],
-                if (translation != null) ...[
-                  SizedBox(
-                    height: math.max(2, fontSize * kMainTranslationGapEm),
-                  ),
-                  translation,
-                ],
-              ],
+              ),
             ),
           ),
         ),
@@ -360,7 +414,7 @@ class _Line extends StatelessWidget {
     Color played,
   ) {
     if (fragments == null || fragments.isEmpty) {
-      return Text(line.text, textAlign: TextAlign.center);
+      return Text(line.text, textAlign: textAlign);
     }
     return Text.rich(
       TextSpan(
@@ -376,7 +430,7 @@ class _Line extends StatelessWidget {
             ),
         ],
       ),
-      textAlign: TextAlign.center,
+      textAlign: textAlign,
     );
   }
 }

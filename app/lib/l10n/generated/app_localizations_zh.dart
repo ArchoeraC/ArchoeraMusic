@@ -2254,6 +2254,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPlayerBgFluid => '流体';
 
   @override
+  String get settingsPlayerBgCoverTone => '封面主色';
+
+  @override
   String get settingsPlayerBgFlowSpeed => '流动速度';
 
   @override
@@ -4763,13 +4766,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCoverLayout => '封面布局';
 
   @override
-  String get settingsCoverLayoutDesc => '全屏播放器封面的呈现方式';
+  String get settingsCoverLayoutDesc => '全屏播放器的主体排版（封面 / 歌词）';
 
   @override
   String get settingsCoverLayoutDefault => '默认';
 
   @override
   String get settingsCoverLayoutFullscreen => '全屏封面';
+
+  @override
+  String get settingsCoverLayoutVutron => 'Vutron 经典';
 
   @override
   String get settingsCoverLyricRatio => '封面/歌词占比';
@@ -8179,6 +8185,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsPlayerBgFluid => '流体';
 
   @override
+  String get settingsPlayerBgCoverTone => '封面主色';
+
+  @override
   String get settingsPlayerBgFlowSpeed => '流动速度';
 
   @override
@@ -10688,13 +10697,16 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsCoverLayout => '封面布局';
 
   @override
-  String get settingsCoverLayoutDesc => '全屏播放器封面的呈现方式';
+  String get settingsCoverLayoutDesc => '全屏播放器的主体排版（封面 / 歌词）';
 
   @override
   String get settingsCoverLayoutDefault => '默认';
 
   @override
   String get settingsCoverLayoutFullscreen => '全屏封面';
+
+  @override
+  String get settingsCoverLayoutVutron => 'Vutron 经典';
 
   @override
   String get settingsCoverLyricRatio => '封面/歌词占比';
@@ -14104,6 +14116,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsPlayerBgFluid => '流體';
 
   @override
+  String get settingsPlayerBgCoverTone => '封面主色';
+
+  @override
   String get settingsPlayerBgFlowSpeed => '流動速度';
 
   @override
@@ -16614,13 +16629,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsCoverLayout => '封面布局';
 
   @override
-  String get settingsCoverLayoutDesc => '全屏播放器封面的呈现方式';
+  String get settingsCoverLayoutDesc => '全屏播放器的主體排版（封面 / 歌詞）';
 
   @override
   String get settingsCoverLayoutDefault => '默认';
 
   @override
   String get settingsCoverLayoutFullscreen => '全屏封面';
+
+  @override
+  String get settingsCoverLayoutVutron => 'Vutron 經典';
 
   @override
   String get settingsCoverLyricRatio => '封面/歌词占比';
