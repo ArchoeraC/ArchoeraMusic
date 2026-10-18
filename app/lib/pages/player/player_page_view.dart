@@ -6,15 +6,6 @@
 
 part of '../player_page.dart';
 
-/// 全屏播放页横向内边距（顶栏 / 主体 / 底栏共用）。
-const double _kPageHorizontalPadding = 32;
-
-/// 全屏封面布局（`fullscreen`）左侧封面占整页宽度的比例。
-const double _kFullscreenCoverFraction = 0.56;
-
-/// 全屏封面布局下右侧信息/歌词区的最小宽度（窗口过窄时收缩封面）。
-const double _kFullscreenLyricsMinWidth = 340;
-
 extension _PlayerPageView on _PlayerPageState {
   Widget _buildPage(BuildContext context) {
     final theme = Theme.of(context);
@@ -59,18 +50,19 @@ extension _PlayerPageView on _PlayerPageState {
     final prefs = ref.watch(appPrefsProvider);
     final showLyrics = prefs.showLyricsInPlayer;
     final transitionStyle = prefs.transitionStyle;
-    final coverLayout = prefs.coverLayout;
+    final layout = playerLayoutFor(prefs.coverLayout);
     final coverLyricRatio = prefs.coverLyricRatio;
     final autoCenterCover = prefs.autoCenterCover;
     final autoImmersive = prefs.autoImmersive;
-    // 全屏封面布局：封面铺满整页高度（顶栏/底栏压在封面上），右缘渐隐；
-    // 右侧信息 + 歌词从封面右缘开始。窗口过窄时收缩封面保住歌词宽度。
-    final fullscreenCover = coverLayout == 'fullscreen';
-    final pageWidth = MediaQuery.sizeOf(context).width;
-    final fullscreenCoverWidth = fullscreenCover
-        ? (pageWidth * _kFullscreenCoverFraction).clamp(
+    // 整幅封面布局需要页面级封面面板宽度（其余布局为 0）。
+    final pageSize = MediaQuery.sizeOf(context);
+    final fullscreenCoverWidth = layout is PosterPlayerLayout
+        ? (pageSize.width * PosterPlayerLayout.coverWidthFraction).clamp(
             0.0,
-            (pageWidth - _kFullscreenLyricsMinWidth).clamp(0.0, pageWidth),
+            (pageSize.width - PosterPlayerLayout.lyricsMinWidth).clamp(
+              0.0,
+              pageSize.width,
+            ),
           )
         : 0.0;
     final coverKey = current != null
@@ -85,6 +77,39 @@ extension _PlayerPageView on _PlayerPageState {
     final hasLyrics =
         (ref.watch(currentLyricsProvider).value ?? const <LyricGroup>[])
             .isNotEmpty;
+    final chromeOpacity = (!autoImmersive || _controlsVisible) ? 1.0 : 0.0;
+    final layoutCtx = PlayerLayoutContext(
+      current: current,
+      coverKey: coverKey,
+      title: title,
+      subtitle: subtitle,
+      playing: playing,
+      hasContent: hasContent,
+      hasLyrics: hasLyrics,
+      showLyrics: showLyrics,
+      contentMounted: contentMounted,
+      transitionStyle: transitionStyle,
+      coverLyricRatio: coverLyricRatio,
+      autoCenterCover: autoCenterCover,
+      slideNext: _slideNext,
+      coverPulse: _coverPulse,
+      beatStrength: _lastBeatStrength,
+      pageWidth: pageSize.width,
+      pageHeight: pageSize.height,
+      fullscreenCoverWidth: fullscreenCoverWidth,
+      chromeOpacity: chromeOpacity,
+      buffering: buffering,
+      hasSource: hasSource,
+      onDragChanged: (v) => setState(() => _dragMs = v),
+      onSeekEnd: (_) => setState(() => _dragMs = null),
+      l10n: l10n,
+      onSeekLyric: hasSource
+          ? (ms) => notifier.seek(Duration(milliseconds: ms))
+          : null,
+      dragMs: _dragMs,
+    );
+    final backdrop = layout.buildBackdrop(context, layoutCtx);
+    final scrims = layout.buildScrims(context, layoutCtx);
 
     // 播放页常驻不透明底色：重内容（背景）延迟挂载期间也保证整页不透明，
     // 避免透出下方壳层（进入动画那 500ms 出现白/黑空档）。
@@ -134,42 +159,28 @@ extension _PlayerPageView on _PlayerPageState {
                       ),
                     ),
                   ),
-                // 全屏封面：整幅封面铺满左侧整页高度（含顶栏/底栏背后），
-                // 右缘渐隐融入背景；切歌沿用 scale/slide 过渡。
-                if (fullscreenCover)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: fullscreenCoverWidth,
-                    child: RepaintBoundary(
-                      child: CoverSwitcher(
-                        coverKey: coverKey,
-                        slide: transitionStyle == 'slide',
-                        next: _slideNext,
-                        child: PlayerFullscreenCover(cover: current?.cover),
-                      ),
-                    ),
-                  ),
-                if (fullscreenCover)
+                // 布局自己的页面级视觉（整幅封面等）。
+                if (backdrop != null)
+                  Positioned.fill(child: IgnorePointer(child: backdrop)),
+                // 布局自己的遮罩（自动沉浸时随 chrome 一起淡出）。
+                if (scrims != null)
                   Positioned.fill(
                     child: IgnorePointer(
                       child: AnimatedOpacity(
-                        // 自动沉浸隐藏控件时遮罩一并淡出（对齐原版 mask 的过渡）。
-                        opacity: (!autoImmersive || _controlsVisible) ? 1 : 0,
+                        opacity: chromeOpacity,
                         duration: animDuration(
                           context,
                           const Duration(milliseconds: 300),
                         ),
                         curve: Curves.easeOut,
-                        child: const _FullscreenCoverScrims(),
+                        child: scrims,
                       ),
                     ),
                   ),
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: _kPageHorizontalPadding,
+                      horizontal: kPlayerPageHorizontalPadding,
                     ),
                     child: Column(
                       children: [
@@ -203,64 +214,38 @@ extension _PlayerPageView on _PlayerPageState {
                             ),
                           ),
                         ),
-                        Expanded(
-                          child: _PlayerMainBody(
-                            current: current,
-                            coverKey: coverKey,
-                            fullscreenCoverWidth: fullscreenCoverWidth,
-                            title: title,
-                            subtitle: subtitle,
-                            playing: playing,
-                            hasContent: hasContent,
-                            hasLyrics: hasLyrics,
-                            hasSource: hasSource,
-                            showLyrics: showLyrics,
-                            contentMounted: contentMounted,
-                            transitionStyle: transitionStyle,
-                            coverLayout: coverLayout,
-                            coverLyricRatio: coverLyricRatio,
-                            autoCenterCover: autoCenterCover,
-                            slideNext: _slideNext,
-                            coverPulse: _coverPulse,
-                            beatStrength: _lastBeatStrength,
-                            l10n: l10n,
-                            dragMs: _dragMs,
-                            onSeekLyric: hasSource
-                                ? (ms) =>
-                                      notifier.seek(Duration(milliseconds: ms))
-                                : null,
-                          ),
-                        ),
+                        Expanded(child: layout.buildBody(context, layoutCtx)),
                         Text(
                           !hasContent
                               ? l10n.playerPageLoadHint
                               : (buffering ? l10n.playerBarBuffering : ''),
                           style: theme.textTheme.bodySmall,
                         ),
-                        _PlayerBottomOverlay(
-                          controlsVisible: _controlsVisible,
-                          theme: theme,
-                          dragMs: _dragMs,
-                          buffering: buffering,
-                          hasSource: hasSource,
-                          hasContent: hasContent,
-                          hasQueue: hasQueue,
-                          canLike: canLike,
-                          liked: liked,
-                          current: current,
-                          shuffle: shuffle,
-                          repeatMode: repeatMode,
-                          playing: playing,
-                          showProgressLyric: prefs.showProgressLyric,
-                          onDragChanged: (v) => setState(() => _dragMs = v),
-                          onSeekEnd: (_) => setState(() => _dragMs = null),
-                          onToggleLike: _toggleLike,
-                          onShowComments: () {
-                            if (current != null) {
-                              showCommentDialog(context, track: current);
-                            }
-                          },
-                        ),
+                        if (layout.usesDefaultBottomBar)
+                          _PlayerBottomOverlay(
+                            controlsVisible: _controlsVisible,
+                            theme: theme,
+                            dragMs: _dragMs,
+                            buffering: buffering,
+                            hasSource: hasSource,
+                            hasContent: hasContent,
+                            hasQueue: hasQueue,
+                            canLike: canLike,
+                            liked: liked,
+                            current: current,
+                            shuffle: shuffle,
+                            repeatMode: repeatMode,
+                            playing: playing,
+                            showProgressLyric: prefs.showProgressLyric,
+                            onDragChanged: (v) => setState(() => _dragMs = v),
+                            onSeekEnd: (_) => setState(() => _dragMs = null),
+                            onToggleLike: _toggleLike,
+                            onShowComments: () {
+                              if (current != null) {
+                                showCommentDialog(context, track: current);
+                              }
+                            },
+                          ),
                       ],
                     ),
                   ),
@@ -439,306 +424,6 @@ class _SleepTimerButton extends ConsumerWidget {
   }
 }
 
-class _PlayerMainBody extends StatelessWidget {
-  const _PlayerMainBody({
-    required this.current,
-    required this.coverKey,
-    required this.fullscreenCoverWidth,
-    required this.title,
-    required this.subtitle,
-    required this.playing,
-    required this.hasContent,
-    required this.hasLyrics,
-    required this.hasSource,
-    required this.showLyrics,
-    required this.contentMounted,
-    required this.transitionStyle,
-    required this.coverLayout,
-    required this.coverLyricRatio,
-    required this.autoCenterCover,
-    required this.slideNext,
-    required this.coverPulse,
-    required this.beatStrength,
-    required this.l10n,
-    required this.onSeekLyric,
-    this.dragMs,
-  });
-
-  final Track? current;
-
-  /// 当前封面身份（切歌触发 [CoverSwitcher] 动效）。
-  final Object coverKey;
-
-  /// 全屏封面布局下左侧封面面板宽度（整页坐标；其余布局为 0）。
-  final double fullscreenCoverWidth;
-
-  final String title;
-  final String subtitle;
-  final bool playing;
-  final bool hasContent;
-  final bool hasLyrics;
-  final bool hasSource;
-  final bool showLyrics;
-  final bool contentMounted;
-  final String transitionStyle;
-  final String coverLayout;
-  final double coverLyricRatio;
-  final bool autoCenterCover;
-  final bool slideNext;
-  final AnimationController coverPulse;
-  final double beatStrength;
-  final AppLocalizations l10n;
-  final ValueChanged<int>? onSeekLyric;
-
-  /// 拖动进度条中的目标位置（毫秒）；null = 未拖动。
-  final double? dragMs;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, c) {
-        final lyricScale = (MediaQuery.sizeOf(context).height / 1080).clamp(
-          0.85,
-          1.6,
-        );
-        // 全屏封面布局：封面由页面层铺满左侧整列（右缘渐隐），这里只排右侧
-        // 信息 + 歌词——曲目信息左对齐移到歌词上方（对齐原版 fullscreen 模式
-        // 下 PlayerData 的位置），不再出现封面下方的居中曲名块。
-        if (coverLayout == 'fullscreen') {
-          final coverInset = (fullscreenCoverWidth - _kPageHorizontalPadding)
-              .clamp(0.0, c.maxWidth);
-          return RepaintBoundary(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(width: coverInset),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 2),
-                      _FullscreenTrackInfo(
-                        hasContent: hasContent,
-                        title: title,
-                        subtitle: subtitle,
-                        l10n: l10n,
-                      ),
-                      const SizedBox(height: 22),
-                      Expanded(
-                        child: PlayerLyricsSlot(
-                          visible: showLyrics,
-                          enabled: contentMounted && hasLyrics,
-                          builder: (context) => Padding(
-                            padding: const EdgeInsets.only(right: 64),
-                            child: RepaintBoundary(
-                              child: PlayerLyricsBlock(
-                                hasLyrics: hasLyrics,
-                                lyricScale: lyricScale,
-                                onSeek: onSeekLyric,
-                                dragMs: dragMs,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-        // 默认布局：封面 + 歌词左右分栏（宽度按占比）。
-        final coverByWidth = c.maxWidth * coverLyricRatio * 0.85;
-        final coverByHeight = c.maxHeight * 0.5;
-        final size =
-            (coverByWidth < coverByHeight ? coverByWidth : coverByHeight).clamp(
-              180.0,
-              520.0,
-            );
-        // 无歌词时封面自动居中。
-        final coverCentered = autoCenterCover && !(showLyrics && hasLyrics);
-        final coverBlock = PlayerCoverBlock(
-          size: size,
-          current: current,
-          hasContent: hasContent,
-          title: title,
-          subtitle: subtitle,
-          playing: playing,
-          pulse: coverPulse,
-          beatStrength: beatStrength,
-          l10n: l10n,
-        );
-        // 歌词块由 _PlayerLyricsSlot 管理显隐/滑入滑出（进入动画结束后才挂载，
-        // 对齐原版 lyricMounted；关闭时向下滑出并在动画结束后卸载）。
-        return RepaintBoundary(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                top: 0,
-                bottom: 0,
-                left: 0,
-                width: c.maxWidth * coverLyricRatio,
-                child: AnimatedSlide(
-                  offset: coverCentered
-                      ? const Offset(11 / 18, 0)
-                      : Offset.zero,
-                  duration: animDuration(
-                    context,
-                    const Duration(milliseconds: 600),
-                  ),
-                  curve: Curves.easeOutCubic,
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: RepaintBoundary(
-                      child: CoverSwitcher(
-                        coverKey: coverKey,
-                        slide: transitionStyle == 'slide',
-                        next: slideNext,
-                        child: coverBlock,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 0,
-                bottom: 0,
-                right: 0,
-                width: c.maxWidth * (1 - coverLyricRatio),
-                child: PlayerLyricsSlot(
-                  visible: showLyrics,
-                  enabled: contentMounted && hasLyrics,
-                  builder: (context) => Padding(
-                    padding: const EdgeInsets.only(right: 64),
-                    child: RepaintBoundary(
-                      child: PlayerLyricsBlock(
-                        hasLyrics: hasLyrics,
-                        lyricScale: lyricScale,
-                        onSeek: onSeekLyric,
-                        dragMs: dragMs,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 全屏封面布局的顶/底渐变遮罩（对齐原版 cover-mask）。
-///
-/// 该布局下封面铺满整页，顶栏与底部控件直接压在封面上，用轻微黑色渐变
-/// 保证图标与文字在亮色封面上也可读；不拦截任何指针事件。
-class _FullscreenCoverScrims extends StatelessWidget {
-  const _FullscreenCoverScrims();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Column(
-        children: [
-          Container(
-            height: 104,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.45),
-                  Colors.black.withValues(alpha: 0),
-                ],
-              ),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            height: 220,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.55),
-                  Colors.black.withValues(alpha: 0),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 全屏封面布局下的曲目信息（右栏顶部，左对齐）。
-///
-/// 只保留标题与副标题，不附加来源/音质等额外信息；字号随窗口高度缩放，
-/// 让标题在整幅封面旁仍有接近原版 PlayerData 的层级感。
-class _FullscreenTrackInfo extends StatelessWidget {
-  const _FullscreenTrackInfo({
-    required this.hasContent,
-    required this.title,
-    required this.subtitle,
-    required this.l10n,
-  });
-
-  final bool hasContent;
-  final String title;
-  final String subtitle;
-  final AppLocalizations l10n;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final vh = MediaQuery.sizeOf(context).height;
-    final titleSize = (vh / 1080 * 30).clamp(22.0, 34.0);
-    final subSize = (vh / 1080 * 15).clamp(12.0, 17.0);
-    final heading = !hasContent
-        ? l10n.playerPageNotPlaying
-        : (title.isEmpty ? l10n.playerBarUntitled : title);
-    final sub = hasContent ? subtitle : l10n.playerPageLoadHint;
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, right: 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            heading,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontSize: titleSize,
-              height: 1.2,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.2,
-            ),
-          ),
-          if (sub.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              sub,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: subSize,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _PlayerBottomOverlay extends StatelessWidget {
   const _PlayerBottomOverlay({
     required this.controlsVisible,
@@ -762,6 +447,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
   });
 
   final bool controlsVisible;
+
   final ThemeData theme;
   final double? dragMs;
   final bool buffering;

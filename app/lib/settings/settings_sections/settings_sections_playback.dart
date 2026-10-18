@@ -919,6 +919,10 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                     value: 'fluid',
                     child: Text(l10n.settingsPlayerBgFluid),
                   ),
+                  DropdownMenuItem(
+                    value: 'coverTone',
+                    child: Text(l10n.settingsPlayerBgCoverTone),
+                  ),
                 ],
               ),
             ),
@@ -1041,6 +1045,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                     'fullscreen',
                     l10n.settingsCoverLayoutFullscreen,
                   ),
+                  SSegmentedOption('vutron', l10n.settingsCoverLayoutVutron),
                 ],
                 selected: prefs.coverLayout,
                 onChanged: (v) => ref

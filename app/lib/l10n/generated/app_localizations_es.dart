@@ -2383,6 +2383,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsPlayerBgFluid => 'Fluido';
 
   @override
+  String get settingsPlayerBgCoverTone => 'Color de portada';
+
+  @override
   String get settingsPlayerBgFlowSpeed => 'Velocidad de flujo';
 
   @override
@@ -5078,13 +5081,16 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsCoverLayoutDesc =>
-      'How the cover is presented in the full player';
+      'How the full player is laid out (cover / lyrics)';
 
   @override
   String get settingsCoverLayoutDefault => 'Default';
 
   @override
   String get settingsCoverLayoutFullscreen => 'Fullscreen cover';
+
+  @override
+  String get settingsCoverLayoutVutron => 'Vutron classic';
 
   @override
   String get settingsCoverLyricRatio => 'Cover / lyrics ratio';
