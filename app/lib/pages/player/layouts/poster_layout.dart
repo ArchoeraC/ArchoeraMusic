@@ -86,6 +86,13 @@ class PosterPlayerLayout extends PlayerLayout {
               0.0,
               box.maxWidth,
             );
+        final showLyrics = c.showLyrics && c.hasLyrics;
+        final info = _PosterTrackInfo(
+          hasContent: c.hasContent,
+          title: c.title,
+          subtitle: c.subtitle,
+          l10n: c.l10n,
+        );
         return RepaintBoundary(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -95,34 +102,44 @@ class PosterPlayerLayout extends PlayerLayout {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 2),
-                    _PosterTrackInfo(
-                      hasContent: c.hasContent,
-                      title: c.title,
-                      subtitle: c.subtitle,
-                      l10n: c.l10n,
-                    ),
-                    const SizedBox(height: 22),
-                    Expanded(
-                      child: PlayerLyricsSlot(
-                        visible: c.showLyrics,
-                        enabled: c.contentMounted && c.hasLyrics,
-                        builder: (context) => Padding(
-                          // 右栏原本留 64px，全屏封面模式下歌词偏窄；收到 24px。
-                          padding: const EdgeInsets.only(right: 24),
-                          child: RepaintBoundary(
-                            child: PlayerLyricsBlock(
-                              hasLyrics: c.hasLyrics,
-                              lyricScale: lyricScale,
-                              textAlign: lyricsAlign,
-                              fadeEdges: true,
-                              onSeek: c.onSeekLyric,
-                              dragMs: c.dragMs,
+                    if (showLyrics) ...[
+                      const SizedBox(height: 2),
+                      info,
+                      const SizedBox(height: 22),
+                      Expanded(
+                        child: PlayerLyricsSlot(
+                          visible: c.showLyrics,
+                          enabled: c.contentMounted && c.hasLyrics,
+                          builder: (context) => Padding(
+                            // 右栏原本留 64px，全屏封面模式下歌词偏窄；收到 24px。
+                            padding: const EdgeInsets.only(right: 24),
+                            child: RepaintBoundary(
+                              child: PlayerLyricsBlock(
+                                hasLyrics: c.hasLyrics,
+                                lyricScale: lyricScale,
+                                textAlign: lyricsAlign,
+                                fadeEdges: true,
+                                onSeek: c.onSeekLyric,
+                                dragMs: c.dragMs,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                    ] else if (c.autoCenterCover)
+                      // 关闭歌词：曲目信息移到右栏垂直居中，不留顶部孤零零一块。
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: info,
+                        ),
+                      )
+                    else ...[
+                      const SizedBox(height: 2),
+                      info,
+                      const SizedBox(height: 22),
+                      const Expanded(child: SizedBox.shrink()),
+                    ],
                   ],
                 ),
               ),

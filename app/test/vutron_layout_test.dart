@@ -69,6 +69,8 @@ Map<String, dynamic> _prefsData(String engine) => <String, dynamic>{
 Future<void> _pumpVutron(
   WidgetTester tester, {
   required Map<String, dynamic> prefs,
+  bool showLyrics = true,
+  bool autoCenterCover = true,
 }) async {
   final pulse = AnimationController(
     vsync: const TestVSync(),
@@ -83,11 +85,11 @@ Future<void> _pumpVutron(
     playing: false,
     hasContent: true,
     hasLyrics: true,
-    showLyrics: true,
+    showLyrics: showLyrics,
     contentMounted: true,
     transitionStyle: 'scale',
     coverLyricRatio: 0.45,
-    autoCenterCover: true,
+    autoCenterCover: autoCenterCover,
     slideNext: true,
     coverPulse: pulse,
     beatStrength: 1,
@@ -171,5 +173,13 @@ void main() {
     expect(wall.textAlign, TextAlign.left);
     expect(find.byType(LyricsEdgeFade), findsOneWidget);
     expect(find.byType(LyricsView), findsNothing);
+  });
+
+  testWidgets('关闭歌词：经典布局只保留居中的封面/控制区', (tester) async {
+    await _pumpVutron(tester, prefs: _prefsData('simple'), showLyrics: false);
+    expect(find.byType(LyricsView), findsNothing);
+    expect(find.byType(AmllPhysicsWall), findsNothing);
+    expect(find.byType(PlaybackProgressSlider), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

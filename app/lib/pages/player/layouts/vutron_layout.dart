@@ -66,6 +66,19 @@ class VutronPlayerLayout extends PlayerLayout {
           180.0,
           maxByWidth,
         );
+        // 关闭歌词（或没有歌词）时，右栏没有内容；开启自动居中时把
+        // 封面/控制区整体居中，避免留下半屏空白。
+        final showLyrics = c.showLyrics && c.hasLyrics;
+        if (!showLyrics && c.autoCenterCover) {
+          return RepaintBoundary(
+            child: Center(
+              child: SizedBox(
+                width: coverSize,
+                child: _VutronLeftColumn(size: coverSize, ctx: c),
+              ),
+            ),
+          );
+        }
         return RepaintBoundary(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
