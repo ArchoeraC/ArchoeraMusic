@@ -188,7 +188,8 @@ const Set<String> timeFormats = {
 /// 播放条显示来源平台（默认关）。
 const bool defaultShowPlaybackSource = false;
 
-/// 播放页封面布局（`default` 左右分栏 / `fullscreen` 全屏封面）。
+/// 播放页封面布局（`default` 左右分栏 / `fullscreen` 整幅封面：
+/// 左侧封面铺满整列并向右渐隐，曲目信息置于歌词上方）。
 const String defaultCoverLayout = 'default';
 const Set<String> coverLayouts = {'default', 'fullscreen'};
 
