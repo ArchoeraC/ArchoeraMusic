@@ -13,7 +13,8 @@
 /// - 不渲染页面共享底栏（控制已经在封面下方）。
 ///
 /// 低开销取舍：封面投影用 [BoxShadow]（不再复制一张封面做 blur）；歌词复用
-/// [LyricsView] 的滚动/行高缓存，只增加左对齐/缩放/遮罩参数；没有逐帧滤镜。
+/// [PlayerLyricsBlock] 的共享取色/引擎入口（Vutron 预设强制 simple 列表），
+/// 只增加左对齐/缩放/遮罩参数；没有逐帧滤镜。
 library;
 
 import 'dart:async';
@@ -22,12 +23,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/l10n.dart';
-import '../../../services/lyrics/lyric_line.dart';
 import '../../../services/playback/playback_notifier.dart';
-import '../../../stores/lyrics_provider.dart';
 import '../../../widgets/list/cover_image.dart';
-import '../../../widgets/player/lyrics_view.dart';
 import '../../../widgets/player/playback_progress_slider.dart';
+import '../../../widgets/player/player_lyrics_block.dart';
+import '../../../widgets/player/player_lyrics_slot.dart';
 import 'player_layout.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -80,7 +80,20 @@ class VutronPlayerLayout extends PlayerLayout {
                 child: FractionallySizedBox(
                   alignment: Alignment.centerRight,
                   widthFactor: 0.9,
-                  child: _VutronLyrics(ctx: c),
+                  child: PlayerLyricsSlot(
+                    visible: c.showLyrics,
+                    enabled: c.contentMounted && c.hasLyrics,
+                    builder: (_) => RepaintBoundary(
+                      child: PlayerLyricsBlock(
+                        hasLyrics: c.hasLyrics,
+                        // 字号由 vutron 预设接管（720p=28px 起随高度缩放）。
+                        lyricScale: 1,
+                        presentation: PlayerLyricsPresentation.vutron,
+                        onSeek: c.onSeekLyric,
+                        dragMs: c.dragMs,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -319,49 +332,6 @@ class _VutronVolume extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// 右栏歌词：复用 [LyricsView]，按 Vutron 的排版/配色/遮罩渲染。
-class _VutronLyrics extends ConsumerWidget {
-  const _VutronLyrics({required this.ctx});
-
-  final PlayerLayoutContext ctx;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final groups =
-        ref.watch(currentLyricsProvider).value ?? const <LyricGroup>[];
-    if (groups.isEmpty) return const SizedBox.shrink();
-    final pos = ref.watch(
-      playbackProvider.select((s) => s.position.inMilliseconds),
-    );
-    // 拖动进度条时用目标位置驱动高亮（与全屏歌词墙一致）。
-    final effPos = ctx.dragMs?.round() ?? pos;
-    // 28px @720p，随窗口高度温和缩放（上限 44）。
-    final fontSize = (28 * (MediaQuery.sizeOf(context).height / 720)).clamp(
-      24.0,
-      44.0,
-    );
-    return LyricsView(
-      groups: groups,
-      positionMs: effPos,
-      fontSize: fontSize,
-      currentFontSize: fontSize,
-      // 截图实测行中心距约 70px @28px（≈2.5em）。
-      lineHeight: fontSize * 2.5,
-      playedColor: scheme.onSurface.withValues(alpha: 0.95),
-      unplayedColor: scheme.onSurface,
-      unplayedAlpha: 0.28,
-      fontWeight: FontWeight.w600,
-      inactiveFontWeight: FontWeight.w600,
-      inactiveScale: 0.95,
-      textAlign: TextAlign.left,
-      fadeEdges: true,
-      showTranslation: true,
-      onSeek: ctx.onSeekLyric,
     );
   }
 }

@@ -20,11 +20,16 @@ import 'package:archoera_music/services/playback/playback_state.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
 import 'package:archoera_music/stores/lyrics_provider.dart';
 import 'package:archoera_music/widgets/player/lyrics_view.dart';
+import 'package:archoera_music/widgets/player/lyrics_v7/lyrics_physics_wall.dart';
 import 'package:archoera_music/widgets/player/playback_progress_slider.dart';
 
 class _StubPrefs extends AppPrefsNotifier {
+  _StubPrefs([this.data = const <String, dynamic>{}]);
+
+  final Map<String, dynamic> data;
+
   @override
-  AppPrefs build() => AppPrefs(initialData: {});
+  AppPrefs build() => AppPrefs(initialData: data);
 }
 
 class _StubPlayback extends PlaybackNotifier {
@@ -80,7 +85,17 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          appPrefsProvider.overrideWith(_StubPrefs.new),
+          appPrefsProvider.overrideWith(
+            () => _StubPrefs(const <String, dynamic>{
+              // 验证 Vutron 预设复用统一取色逻辑：即使偏好引擎是 AMLL，
+              // 也走 simple 列表并采用用户配置的已唱/未唱颜色。
+              lyricEngineKey: 'amll',
+              lyricPlayedColorKey: 0xFFFF0000,
+              lyricUnplayedColorKey: 0xFF00FF00,
+              lyricFollowAccentKey: false,
+              followCoverColorKey: false,
+            }),
+          ),
           playbackProvider.overrideWith(_StubPlayback.new),
           currentLyricsProvider.overrideWith((ref) async => _groups),
         ],
@@ -105,5 +120,22 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(PlaybackProgressSlider), findsOneWidget);
     expect(find.byType(LyricsView), findsOneWidget);
+
+    // 复用现有引擎的配色：已唱/未唱颜色来自偏好，而非布局里写死的颜色。
+    final view = tester.widget<LyricsView>(find.byType(LyricsView));
+    expect(view.playedColor, const Color(0xFFFF0000));
+    expect(view.unplayedColor, const Color(0xFF00FF00));
+    expect(view.textAlign, TextAlign.left);
+    expect(view.fadeEdges, isTrue);
+    expect(view.inactiveScale, 0.95);
+    expect(view.currentFontSize, view.fontSize);
+    expect(
+      find.descendant(
+        of: find.byType(LyricsView),
+        matching: find.byType(AmllPhysicsWall),
+      ),
+      findsNothing,
+      reason: 'Vutron 预设应强制 simple 列表，而不是 AMLL 物理墙',
+    );
   });
 }
