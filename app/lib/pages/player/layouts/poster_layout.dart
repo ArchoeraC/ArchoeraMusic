@@ -100,6 +100,7 @@ class PosterPlayerLayout extends PlayerLayout {
                               hasLyrics: c.hasLyrics,
                               lyricScale: lyricScale,
                               textAlign: lyricsAlign,
+                              fadeEdges: true,
                               onSeek: c.onSeekLyric,
                               dragMs: c.dragMs,
                             ),
@@ -127,33 +128,38 @@ class _PosterScrims extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 对齐 SPlayer-Next `.cover-mask-top/.cover-mask-bottom`：多段非线性
+    // alpha（不是 0.5→0 的线性渐变），避免暗色渐变出现色阶/硬边。
+    const stops = [0.0, 0.12, 0.25, 0.40, 0.55, 0.70, 0.85, 1.0];
+    const alphas = [0.50, 0.44, 0.36, 0.27, 0.18, 0.10, 0.04, 0.0];
+    List<Color> colorsOf() => [
+      for (final a in alphas) Colors.black.withValues(alpha: a),
+    ];
     return IgnorePointer(
       child: Column(
         children: [
+          // 80px（SPlayer `h-20`）。
           Container(
-            height: 104,
+            height: 80,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.45),
-                  Colors.black.withValues(alpha: 0),
-                ],
+                colors: colorsOf(),
+                stops: stops,
               ),
             ),
           ),
           const Spacer(),
+          // 192px（SPlayer `h-48`）。
           Container(
-            height: 220,
+            height: 192,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.55),
-                  Colors.black.withValues(alpha: 0),
-                ],
+                colors: colorsOf(),
+                stops: stops,
               ),
             ),
           ),
