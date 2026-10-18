@@ -24,18 +24,17 @@ import '../theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/dialogs/comment_dialog.dart';
 import '../widgets/dialogs/sleep_timer_dialogs.dart';
-import '../widgets/player/cover_switcher.dart';
 import '../widgets/player/playback_progress_slider.dart';
 import '../widgets/player/player_controls_row.dart';
 import '../widgets/player/background/player_background.dart';
-import '../widgets/player/player_cover.dart';
-import '../widgets/player/player_lyrics_block.dart';
-import '../widgets/player/player_lyrics_slot.dart';
 import '../widgets/player/quality_menu.dart';
 import '../widgets/player/spectrum_view.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/common/anim.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+
+import 'player/layouts/player_layout.dart';
+import 'player/layouts/poster_layout.dart';
 
 part 'player/player_page_view.dart';
 
@@ -44,6 +43,9 @@ part 'player/player_page_view.dart';
 /// 入口：点击底部播放条封面/标题区（`/player` 顶层路由，盖住整个壳）。
 /// 布局：顶部（关闭 + 曲名 + 音质）→ 主体（封面 + 歌词区左右分栏，
 /// §10.2 LyricsView）→ 频谱 → 进度条 → 控制。
+/// `coverLayout: fullscreen` 时封面改铺满左侧整页、曲目信息移到歌词上方；
+/// `coverLayout: vutron` 为 VutronMusic 经典布局（左封面 + 信息/进度/控制，
+/// 右歌词，控制不再使用共享底栏）。具体排版由 `player/layouts/` 的注册表实现。
 class PlayerPage extends ConsumerStatefulWidget {
   const PlayerPage({super.key});
 

@@ -4,15 +4,17 @@
 
 /// 全屏播放器背景。
 ///
-/// 支持五种样式（设置 → 播放 → 播放页背景）：
+/// 支持六种样式（设置 → 播放 → 播放页背景）：
 /// - `gradient`：主题主色 → 播放器底色的对角渐变（默认，兜底）；
 /// - `blur`：封面重度模糊背景（`blur(45px) saturate(1.2)` + 放大 + 压暗）；
 /// - `solid`：深色纯色；
 /// - `ripple`：模糊封面（[BlurredCover]）+ 水纹折射（[RippleBackground] 叠加其上，
 ///   对齐上游 `.bg-blur-wrap` + ripple canvas 的分层结构）；
-/// - `fluid`：流体背景（[FluidBackground]，对齐上游 AMLL `MeshGradientRenderer`）。
+/// - `fluid`：流体背景（[FluidBackground]，对齐上游 AMLL `MeshGradientRenderer`）；
+/// - `coverTone`：封面主色压暗/提亮的低对比对角渐变（[CoverToneBackground]，
+///   对齐 VutronMusic Classic 播放页；取色失败同样回退渐变）。
 ///
-/// 无封面时 blur / ripple / fluid 均回退渐变。
+/// 无封面时 blur / ripple / fluid / coverTone 均回退渐变。
 library;
 
 import 'dart:math' as math;
@@ -23,8 +25,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/render/quality_governor.dart';
 import '../../../services/render/render_quality_service.dart';
 import '../../../stores/app_prefs.dart';
-import '../../../theme/app_theme.dart';
 import 'blurred_cover.dart';
+import 'cover_tone_background.dart';
 import 'fluid_background.dart';
 import 'ripple_background.dart';
 
@@ -49,18 +51,9 @@ class PlayerBackground extends ConsumerWidget {
     final renderScale = prefs.rippleLowRes
         ? math.min(rippleLowResScale, adaptiveScale)
         : adaptiveScale;
-    final scheme = Theme.of(context).colorScheme;
-    final chrome = Theme.of(context).extension<AppChromeColors>();
     final gradient = DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            scheme.primary.withValues(alpha: 0.28),
-            chrome?.playerBackground ?? scheme.surface,
-          ],
-        ),
+        gradient: playerDefaultBackgroundGradient(context),
       ),
     );
     final hasCover = cover != null && cover!.isNotEmpty;
@@ -110,6 +103,10 @@ class PlayerBackground extends ConsumerWidget {
             ),
           ],
         );
+      case 'coverTone':
+        // 取色本身有默认渐变兜底；无封面时直接返回渐变，省掉一层组件。
+        if (!hasCover) return gradient;
+        return CoverToneBackground(cover: cover);
       default:
         return gradient;
     }

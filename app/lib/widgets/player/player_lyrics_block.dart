@@ -18,8 +18,22 @@ import '../../../stores/app_prefs.dart';
 import '../../../stores/lyrics_provider.dart';
 import '../../../theme/cover_color.dart';
 import 'lyrics_v7/lyrics_physics_wall.dart';
+import 'lyrics_edge_fade.dart';
 import 'lyrics_view.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+
+/// 歌词呈现预设。
+enum PlayerLyricsPresentation {
+  /// 跟随偏好：`simple` 滚动列表或 `amll` 物理歌词墙。
+  standard,
+
+  /// Vutron 经典布局：字号按 720p=28px 起算；引擎仍跟随偏好——`simple`
+  /// 左对齐（原文/译文同为左对齐）、当前行不放大、非当前行 0.95 缩放；
+  /// `amll` 物理墙同样按 [PlayerLyricsBlock.textAlign] 对齐。颜色统一走
+  /// 偏好/跟随逻辑（已唱色、未唱色、跟随主题/封面）。
+  vutron,
+}
 
 /// 全屏播放器歌词区（无状态；位置/歌词/样式由内部 Consumer 订阅）。
 class PlayerLyricsBlock extends ConsumerWidget {
@@ -29,6 +43,9 @@ class PlayerLyricsBlock extends ConsumerWidget {
     required this.lyricScale,
     this.onSeek,
     this.dragMs,
+    this.presentation = PlayerLyricsPresentation.standard,
+    this.textAlign = TextAlign.center,
+    this.fadeEdges = false,
   });
 
   /// 是否有歌词（无歌词显示空态占位图标）。
@@ -46,6 +63,15 @@ class PlayerLyricsBlock extends ConsumerWidget {
   /// 拖动进度条时高亮跟着走），同时冻结内部时钟——拖动位置是「用户目标」，
   /// 不能当成播放推进来外推。
   final double? dragMs;
+
+  /// 呈现预设（默认跟随偏好引擎；Vutron 布局用 [PlayerLyricsPresentation.vutron]）。
+  final PlayerLyricsPresentation presentation;
+
+  /// 水平对齐（由布局注册表声明；两种引擎都生效）。
+  final TextAlign textAlign;
+
+  /// 上下渐隐（对齐 SPlayer `.lyric-area`）；两种引擎都生效。
+  final bool fadeEdges;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -69,13 +95,17 @@ class PlayerLyricsBlock extends ConsumerWidget {
     final effPos = drag?.round() ?? pos;
     final effPlaying = drag == null && playing;
     final groups =
-        ref.watch(currentLyricsProvider).value ??
-        const <LyricGroup>[];
+        ref.watch(currentLyricsProvider).value ?? const <LyricGroup>[];
     final prefs = ref.watch(appPrefsProvider);
-    // 自适应字号：随窗口高度缩放（关闭则固定 px）。
+    final vutron = presentation == PlayerLyricsPresentation.vutron;
+    // Vutron 经典布局：字号按 720p=28px 起随窗口高度缩放；引擎仍跟随偏好
+    // （simple 列表左对齐 / AMLL 物理墙按其自身居中排版）。
+    final engine = prefs.lyricEngine;
     final scale = prefs.lyricAdaptiveFontSize ? lyricScale : 1.0;
-    final fontSize = prefs.lyricFontSize * scale;
-    final lineHeight = prefs.lyricLineHeight * scale;
+    final fontSize = vutron
+        ? (28 * (MediaQuery.sizeOf(context).height / 720)).clamp(24.0, 44.0)
+        : prefs.lyricFontSize * scale;
+    final lineHeight = vutron ? fontSize * 2.5 : prefs.lyricLineHeight * scale;
     final fontWeight = FontWeight.values.firstWhere(
       (w) => w.value == prefs.lyricFontWeight,
       orElse: () => FontWeight.w600,
@@ -92,43 +122,49 @@ class PlayerLyricsBlock extends ConsumerWidget {
     // （见 bar_lyric_text_widgets.dart），不在此处受其控制。
     const showTranslation = true;
     // 引擎切换：simple（旧实现）/ amll（AMLL 歌词墙）
-    final wall =
-        prefs.lyricEngine == 'amll'
-            ? AmllPhysicsWall(
-                groups: groups,
-                positionMs: effPos,
-                playing: effPlaying, // 播放中时内部时钟按 vsync 插值
-                // 字号与 simple 引擎一致：受「自适应字号」开关控制
-                // （开启则随窗口高度缩放）。
-                fontSize: fontSize,
-                fontFamily: prefs.fontFamily,
-                fontWeight: fontWeight,
-                playedColor: playedColor,
-                unplayedColor: unplayedColor,
-                showTranslation: showTranslation,
-                showRomanization: prefs.showRomanization,
-                alignFraction: prefs.amllAlignFraction,
-                inactiveAlpha: prefs.amllInactiveAlpha,
-                wordSweep: prefs.amllWordSweep,
-                hidePassed: prefs.amllHidePassed,
-                enableScale: prefs.amllEnableScale,
-                blurQuality: LyricsBlurQuality.parse(prefs.amllBlurQuality),
-                springPreset: prefs.amllSpringPreset,
-                animate: !ref.read(appPrefsProvider).performanceMode,
-                onSeek: onSeek ?? (_) {},
-              )
-            : LyricsView(
-                groups: groups,
-                positionMs: effPos,
-                fontSize: fontSize,
-                lineHeight: lineHeight,
-                fontWeight: fontWeight,
-                playedColor: playedColor,
-                unplayedColor: unplayedColor,
-                showTranslation: showTranslation,
-                showRomanization: prefs.showRomanization,
-                onSeek: onSeek,
-              );
-    return ClipRect(child: wall);
+    final wall = engine == 'amll'
+        ? AmllPhysicsWall(
+            groups: groups,
+            positionMs: effPos,
+            playing: effPlaying, // 播放中时内部时钟按 vsync 插值
+            // 字号与 simple 引擎一致：受「自适应字号」开关控制
+            // （开启则随窗口高度缩放）。
+            fontSize: fontSize,
+            fontFamily: prefs.fontFamily,
+            fontWeight: fontWeight,
+            playedColor: playedColor,
+            unplayedColor: unplayedColor,
+            showTranslation: showTranslation,
+            showRomanization: prefs.showRomanization,
+            alignFraction: prefs.amllAlignFraction,
+            inactiveAlpha: prefs.amllInactiveAlpha,
+            wordSweep: prefs.amllWordSweep,
+            hidePassed: prefs.amllHidePassed,
+            enableScale: prefs.amllEnableScale,
+            blurQuality: LyricsBlurQuality.parse(prefs.amllBlurQuality),
+            springPreset: prefs.amllSpringPreset,
+            textAlign: textAlign,
+            animate: !ref.read(appPrefsProvider).performanceMode,
+            onSeek: onSeek ?? (_) {},
+          )
+        : LyricsView(
+            groups: groups,
+            positionMs: effPos,
+            fontSize: fontSize,
+            lineHeight: lineHeight,
+            fontWeight: fontWeight,
+            playedColor: playedColor,
+            unplayedColor: unplayedColor,
+            showTranslation: showTranslation,
+            showRomanization: prefs.showRomanization,
+            currentFontSize: vutron ? fontSize : null,
+            inactiveFontWeight: vutron ? FontWeight.w600 : FontWeight.w400,
+            inactiveScale: vutron ? 0.95 : 1.0,
+            textAlign: textAlign,
+            onSeek: onSeek,
+          );
+    return ClipRect(
+      child: fadeEdges ? LyricsEdgeFade(child: wall) : wall,
+    );
   }
 }
