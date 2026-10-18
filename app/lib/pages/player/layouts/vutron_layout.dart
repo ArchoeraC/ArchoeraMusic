@@ -329,11 +329,10 @@ class _VutronVolume extends ConsumerWidget {
   }
 }
 
-/// 精简音量条：2px 圆角细线（无圆点），铺满整条宽度。
+/// 精简音量条：6px 圆角条（无圆点），铺满整条宽度。
 ///
-/// Vutron 的音量条是一条细线，Material [Slider]（3px 轨道 + 10px 圆点 +
-/// 56px 高命中区）在左栏里显得过粗，因此这里自绘一条更轻的轨道；去掉
-/// 圆点后可以使用完整宽度，拖动时只预览（引擎命令合并），松手落盘。
+/// 不使用 Material [Slider] 的圆点与高命中区，保留一条干净的整宽轨道；
+/// 拖动时只预览（引擎命令合并），松手落盘。
 class _VutronVolumeBar extends StatelessWidget {
   const _VutronVolumeBar({
     required this.value,
@@ -398,7 +397,7 @@ class _VutronVolumeBarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const trackHeight = 2.0;
+    const trackHeight = 6.0;
     final width = size.width;
     if (width <= 0) return;
     final cy = size.height / 2;
