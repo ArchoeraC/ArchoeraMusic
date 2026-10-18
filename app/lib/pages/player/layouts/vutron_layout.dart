@@ -225,7 +225,7 @@ class _VutronControls extends ConsumerWidget {
       required IconData icon,
       required String tooltip,
       required double iconSize,
-      required double alpha,
+      required Color color,
       VoidCallback? onPressed,
     }) => IconButton(
       tooltip: tooltip,
@@ -237,7 +237,7 @@ class _VutronControls extends ConsumerWidget {
         minWidth: (size / 6).clamp(30.0, 48.0),
         minHeight: 40,
       ),
-      color: scheme.onSurface.withValues(alpha: alpha),
+      color: color,
       icon: Icon(icon),
     );
 
@@ -248,14 +248,17 @@ class _VutronControls extends ConsumerWidget {
           icon: state.repeat == 'one' ? EtaIcons.repeatOne : EtaIcons.repeat,
           tooltip: l10n.queueRepeatMode,
           iconSize: 16,
-          alpha: state.repeat == 'off' ? 0.38 : 0.88,
+          // 与页面其它控制一致：循环开启 → 主题色，顺序播放压暗。
+          color: state.repeat == 'off'
+              ? scheme.onSurfaceVariant
+              : scheme.primary,
           onPressed: state.hasContent ? notifier.cycleRepeatMode : null,
         ),
         control(
           icon: EtaIcons.skipPrevious,
           tooltip: l10n.commonPrevious,
           iconSize: 24,
-          alpha: 0.88,
+          color: scheme.onSurface,
           onPressed: canPrevNext ? notifier.playPrevious : null,
         ),
         IconButton(
@@ -270,7 +273,10 @@ class _VutronControls extends ConsumerWidget {
             minWidth: (size / 5).clamp(40.0, 56.0),
             minHeight: 48,
           ),
-          color: scheme.onSurface.withValues(alpha: 0.92),
+          // 播放键与其它布局一致使用主题色（缓冲时压暗）。
+          color: state.hasContent
+              ? scheme.primary.withValues(alpha: state.buffering ? 0.35 : 1)
+              : scheme.onSurfaceVariant,
           icon: Icon(
             state.playing ? EtaIcons.pauseCircle : EtaIcons.playCircle,
           ),
@@ -279,14 +285,14 @@ class _VutronControls extends ConsumerWidget {
           icon: EtaIcons.skipForward,
           tooltip: l10n.commonNext,
           iconSize: 24,
-          alpha: 0.88,
+          color: scheme.onSurface,
           onPressed: canPrevNext ? notifier.playNext : null,
         ),
         control(
           icon: EtaIcons.shuffle,
           tooltip: state.shuffle ? l10n.queueShuffleOff : l10n.queueShuffle,
           iconSize: 16,
-          alpha: state.shuffle ? 0.88 : 0.38,
+          color: state.shuffle ? scheme.primary : scheme.onSurfaceVariant,
           onPressed: state.hasContent ? notifier.toggleShuffle : null,
         ),
       ],
@@ -372,7 +378,8 @@ class _VutronVolumeBar extends StatelessWidget {
               child: CustomPaint(
                 painter: _VutronVolumeBarPainter(
                   value: value.clamp(0.0, 1.0),
-                  active: scheme.onSurface.withValues(alpha: 0.80),
+                  // 音量填充跟随主题色，底轨保持低对比中性色。
+                  active: scheme.primary,
                   inactive: scheme.onSurface.withValues(alpha: 0.18),
                 ),
               ),

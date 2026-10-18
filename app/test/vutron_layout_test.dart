@@ -23,6 +23,7 @@ import 'package:archoera_music/stores/lyrics_provider.dart';
 import 'package:archoera_music/widgets/player/lyrics_view.dart';
 import 'package:archoera_music/widgets/player/lyrics_v7/lyrics_physics_wall.dart';
 import 'package:archoera_music/widgets/player/playback_progress_slider.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 class _StubPrefs extends AppPrefsNotifier {
   _StubPrefs([this.data = const <String, dynamic>{}]);
@@ -36,6 +37,7 @@ class _StubPrefs extends AppPrefsNotifier {
 class _StubPlayback extends PlaybackNotifier {
   @override
   PlaybackState build() => const PlaybackState(
+    source: 'test-source',
     title: '测试曲目',
     subtitle: '测试歌手',
     duration: Duration(minutes: 4),
@@ -141,6 +143,13 @@ void main() {
     expect(view.fadeEdges, isTrue);
     expect(view.inactiveScale, 0.95);
     expect(view.currentFontSize, view.fontSize);
+
+    // 播放键跟随主题色（与页面其它控制一致）。
+    final scheme = Theme.of(tester.element(find.byType(Scaffold))).colorScheme;
+    final playButton = tester.widget<IconButton>(
+      find.widgetWithIcon(IconButton, EtaIcons.playCircle),
+    );
+    expect(playButton.color, scheme.primary);
 
     // 译文单行 textAlign 之外，行内 Column 的交叉轴也要左对齐。
     final translation = tester.widget<Text>(find.text('第一行翻译'));
