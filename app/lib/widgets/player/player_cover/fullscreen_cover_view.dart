@@ -29,17 +29,19 @@ class PlayerFullscreenCover extends StatelessWidget {
           shaderCallback: (rect) => LinearGradient(
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
-            // 左半幅保持全不透明，右缘多段非线性 alpha 淡出（少段渐变换色带）。
+            // 渐隐区延伸到文字栏下方（封面绘制宽度比文字起点多 8% 页宽），
+            // 收尾很轻：文字起点处 alpha 约 0.16，不会把歌词压灰。
             colors: [
               Colors.white,
-              Colors.white.withValues(alpha: 0.97),
-              Colors.white.withValues(alpha: 0.86),
-              Colors.white.withValues(alpha: 0.62),
-              Colors.white.withValues(alpha: 0.34),
-              Colors.white.withValues(alpha: 0.12),
+              Colors.white,
+              Colors.white.withValues(alpha: 0.92),
+              Colors.white.withValues(alpha: 0.65),
+              Colors.white.withValues(alpha: 0.30),
+              Colors.white.withValues(alpha: 0.10),
+              Colors.white.withValues(alpha: 0),
               Colors.white.withValues(alpha: 0),
             ],
-            stops: const [0, 0.3, 0.5, 0.68, 0.82, 0.93, 1],
+            stops: const [0, 0.45, 0.60, 0.72, 0.82, 0.88, 0.92, 1],
           ).createShader(rect),
           child: CoverImage(
             cover: cover,
