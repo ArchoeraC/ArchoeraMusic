@@ -4,7 +4,7 @@
 
 /// NekoMusic **非标准 LRC** 归一化。
 ///
-/// 平台 `/api/music/lyrics/{id}` 返回的歌词形如：
+/// 平台音乐详情 `/api/music/info/{id}` 的 `data.lyrics` 返回的歌词形如：
 ///
 ///   # 可选注释
 ///   [00:12.34]歌词正文
