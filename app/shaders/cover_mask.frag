@@ -38,16 +38,27 @@ float valueNoise(vec2 p) {
 
 void main() {
   vec2 uv = FlutterFragCoord().xy / uSize;
+  float aspect = uSize.x / max(uSize.y, 1.0);
 
-  // 以横向直线为基础；uSeed 只轻微移动直线的整体位置，让每首封面略不同。
-  float d = uv.x + sin(uSeed * 1.7) * 0.015;
+  // ── 每首封面的形状参数（稳定 seed）──────────────────────────────
+  // 轻微倾斜 + 两个低频正弦，让边界先有「大趋势」，再由噪声打散细节。
+  float tilt = sin(uSeed * 1.7) * 0.060;
+  float phase = uSeed * 2.0;
+  float start = 0.48 + fract(uSeed * 0.37) * 0.08; // 0.48 ~ 0.56
+  float end = 0.88 + fract(uSeed * 0.61) * 0.05;   // 0.88 ~ 0.93
 
-  // 两个低频噪声八度，扰动幅度约 ±0.07：边界仍有直线趋势，只是轻微起伏。
-  float n1 = valueNoise(vec2(uv.x * 3.2 + uSeed, uv.y * 2.4 - uSeed * 0.7));
-  float n2 = valueNoise(vec2(uv.x * 7.0 - uSeed * 0.5, uv.y * 5.0 + uSeed));
-  d += (n1 - 0.5) * 0.10 + (n2 - 0.5) * 0.04;
+  float d = uv.x + (uv.y - 0.5) * tilt;
+  d += sin(uv.y * 3.1 + phase) * 0.022;
+  d += sin(uv.y * 6.3 - phase * 0.6) * 0.010;
 
-  // 0.55 之前完全保留封面，0.92 之后完全透明；文字起点约 x=0.52 页宽。
-  float alpha = 1.0 - smoothstep(0.55, 0.92, d);
+  // ── 各向同性噪声：按宽高比校正采样域，窗口/封面比例变化时颗粒不被拉长 ──
+  vec2 np = vec2(uv.x * aspect, uv.y) * 2.6 + uSeed * 1.7;
+  float n1 = valueNoise(np);
+  float n2 = valueNoise(np * 2.7 + 11.3);
+  float n3 = valueNoise(np * 6.1 - 7.1);
+  d += (n1 - 0.5) * 0.12 + (n2 - 0.5) * 0.05 + (n3 - 0.5) * 0.02;
+
+  // 0.48~0.56 之前完全保留，0.88~0.93 之后完全透明；文字起点约 x=0.52 页宽。
+  float alpha = 1.0 - smoothstep(start, end, d);
   fragColor = vec4(1.0, 1.0, 1.0, alpha);
 }
