@@ -29,8 +29,8 @@ enum PlayerLyricsPresentation {
 
   /// Vutron 经典布局：字号按 720p=28px 起算；引擎仍跟随偏好——`simple`
   /// 左对齐（原文/译文同为左对齐）、当前行不放大、非当前行 0.95 缩放；
-  /// `amll` 保持物理歌词墙自身的居中排版。颜色统一走偏好/跟随逻辑
-  /// （已唱色、未唱色、跟随主题/封面）。
+  /// `amll` 物理墙同样按 [PlayerLyricsBlock.textAlign] 对齐。颜色统一走
+  /// 偏好/跟随逻辑（已唱色、未唱色、跟随主题/封面）。
   vutron,
 }
 
@@ -43,6 +43,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
     this.onSeek,
     this.dragMs,
     this.presentation = PlayerLyricsPresentation.standard,
+    this.textAlign = TextAlign.center,
   });
 
   /// 是否有歌词（无歌词显示空态占位图标）。
@@ -63,6 +64,9 @@ class PlayerLyricsBlock extends ConsumerWidget {
 
   /// 呈现预设（默认跟随偏好引擎；Vutron 布局用 [PlayerLyricsPresentation.vutron]）。
   final PlayerLyricsPresentation presentation;
+
+  /// 水平对齐（由布局注册表声明；两种引擎都生效）。
+  final TextAlign textAlign;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -134,6 +138,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
             enableScale: prefs.amllEnableScale,
             blurQuality: LyricsBlurQuality.parse(prefs.amllBlurQuality),
             springPreset: prefs.amllSpringPreset,
+            textAlign: textAlign,
             animate: !ref.read(appPrefsProvider).performanceMode,
             onSeek: onSeek ?? (_) {},
           )
@@ -150,7 +155,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
             currentFontSize: vutron ? fontSize : null,
             inactiveFontWeight: vutron ? FontWeight.w600 : FontWeight.w400,
             inactiveScale: vutron ? 0.95 : 1.0,
-            textAlign: vutron ? TextAlign.left : TextAlign.center,
+            textAlign: textAlign,
             fadeEdges: vutron,
             onSeek: onSeek,
           );

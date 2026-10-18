@@ -50,6 +50,10 @@ class VutronPlayerLayout extends PlayerLayout {
   @override
   bool get usesDefaultBottomBar => false;
 
+  /// 经典布局：歌词（含 AMLL 物理墙）左对齐。
+  @override
+  TextAlign get lyricsAlign => TextAlign.left;
+
   @override
   Widget buildBody(BuildContext context, PlayerLayoutContext c) {
     return LayoutBuilder(
@@ -89,6 +93,7 @@ class VutronPlayerLayout extends PlayerLayout {
                         // 字号由 vutron 预设接管（720p=28px 起随高度缩放）。
                         lyricScale: 1,
                         presentation: PlayerLyricsPresentation.vutron,
+                        textAlign: lyricsAlign,
                         onSeek: c.onSeekLyric,
                         dragMs: c.dragMs,
                       ),
