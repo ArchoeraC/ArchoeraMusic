@@ -44,6 +44,7 @@ part 'player/player_page_view.dart';
 /// 入口：点击底部播放条封面/标题区（`/player` 顶层路由，盖住整个壳）。
 /// 布局：顶部（关闭 + 曲名 + 音质）→ 主体（封面 + 歌词区左右分栏，
 /// §10.2 LyricsView）→ 频谱 → 进度条 → 控制。
+/// `coverLayout: fullscreen` 时封面改铺满左侧整页、曲目信息移到歌词上方。
 class PlayerPage extends ConsumerStatefulWidget {
   const PlayerPage({super.key});
 
