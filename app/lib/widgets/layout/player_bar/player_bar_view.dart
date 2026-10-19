@@ -26,8 +26,8 @@ extension _PlayerBarView on _PlayerBarState {
     // 图片背景风格（有效时）：播放条恢复毛玻璃——0.7 高不透明底色
     // + BackdropFilter 模糊（对齐原版 footer 播放栏 blur16）；纯色风格
     // 走实底，不包模糊层
-    final imageMode =
-        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    final imageMode = appearanceStyleFor(prefs.appearanceStyle)
+        .effectiveImageBackground(prefs);
     // 播放条底色走扩展色（image 模式 = surfaceBright/0.7，纯色 = 面板实底）
     final chrome = Theme.of(context).extension<AppChromeColors>()!;
 

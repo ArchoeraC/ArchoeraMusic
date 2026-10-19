@@ -4,17 +4,17 @@
 
 /// 全屏播放器背景。
 ///
-/// 支持六种样式（设置 → 播放 → 播放页背景）：
+/// 背景样式走注册表（[playerBackgrounds]），模块位于 `styles/`：
 /// - `gradient`：主题主色 → 播放器底色的对角渐变（默认，兜底）；
 /// - `blur`：封面重度模糊背景（`blur(45px) saturate(1.2)` + 放大 + 压暗）；
 /// - `solid`：深色纯色；
-/// - `ripple`：模糊封面（[BlurredCover]）+ 水纹折射（[RippleBackground] 叠加其上，
-///   对齐上游 `.bg-blur-wrap` + ripple canvas 的分层结构）；
-/// - `fluid`：流体背景（[FluidBackground]，对齐上游 AMLL `MeshGradientRenderer`）；
-/// - `coverTone`：封面主色压暗/提亮的低对比对角渐变（[CoverToneBackground]，
-///   对齐 VutronMusic Classic 播放页；取色失败同样回退渐变）。
+/// - `ripple`：模糊封面 + 水纹折射（`RippleBackground` 叠加其上）；
+/// - `fluid`：流体背景（`FluidBackground`，对齐上游 AMLL `MeshGradientRenderer`）；
+/// - `coverTone`：封面主色压暗/提亮的低对比对角渐变。
 ///
-/// 无封面时 blur / ripple / fluid / coverTone 均回退渐变。
+/// 切换背景样式时通过 [CrossFadeSwitcher] 做 200ms 交叉淡化（对齐封面
+/// `fade` 动效），不再硬切；`blur` / `ripple` 内部的切歌交叉淡化保持不变。
+/// 无封面时大部分样式回退主题渐变。
 library;
 
 import 'dart:math' as math;
@@ -25,10 +25,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/render/quality_governor.dart';
 import '../../../services/render/render_quality_service.dart';
 import '../../../stores/app_prefs.dart';
-import 'blurred_cover.dart';
+import '../../common/cross_fade_switcher.dart';
 import 'cover_tone_background.dart';
-import 'fluid_background.dart';
-import 'ripple_background.dart';
+import 'player_background_registry.dart';
+import 'player_background_style.dart';
 
 /// 全屏播放器背景。[cover] 为当前曲目封面地址；[playing] 透传给水纹动画。
 class PlayerBackground extends ConsumerWidget {
@@ -57,58 +57,34 @@ class PlayerBackground extends ConsumerWidget {
       ),
     );
     final hasCover = cover != null && cover!.isNotEmpty;
-
-    switch (prefs.playerBgType) {
-      case 'solid':
-        return const ColoredBox(color: Color(0xFF141420));
-      case 'blur':
-        if (!hasCover) return gradient;
-        return BlurredCover(cover: cover!);
-      case 'ripple':
-        if (!hasCover) return gradient;
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            gradient,
-            // 不再叠 BlurredCover：RippleBackground 每帧画出**不透明**的预烘焙
-            // （模糊+饱和）封面，完全覆盖其下任何模糊层；此前那层全屏
-            // ImageFiltered(sigma45) 纯属每帧重算的浪费（Impeller 无图层缓存）。
-            RippleBackground(
-              cover: cover,
-              playing: playing,
-              speed: prefs.playerBgRippleSpeed,
-              animate: !prefs.performanceMode,
-              useShader: prefs.rippleShaderEnabled,
-              renderScale: renderScale,
-              damageClippedDynamic: prefs.rippleDamageClip,
-              fallbackColor: Colors.transparent,
-            ),
-          ],
-        );
-      case 'fluid':
-        if (!hasCover) return gradient;
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            gradient,
-            FluidBackground(
-              cover: cover,
-              playing: playing,
-              animate: !prefs.performanceMode,
-              flowSpeed: prefs.playerBgFlowSpeed,
-              renderScale: prefs.playerBgRenderScale,
-              fps: prefs.playerBgFps,
-              freezeOnPause: prefs.playerBgFreezeOnPause,
-              beat: prefs.playerBgBeat,
-            ),
-          ],
-        );
-      case 'coverTone':
-        // 取色本身有默认渐变兜底；无封面时直接返回渐变，省掉一层组件。
-        if (!hasCover) return gradient;
-        return CoverToneBackground(cover: cover);
-      default:
-        return gradient;
-    }
+    final style = playerBackgroundFor(prefs.playerBgType);
+    final animate = !prefs.performanceMode;
+    return CrossFadeSwitcher(
+      switchKey: style.id,
+      child: style.build(
+        context,
+        PlayerBackgroundContext(
+          cover: cover,
+          playing: playing,
+          hasCover: hasCover,
+          gradient: gradient,
+          ripple: RippleBackgroundConfig(
+            speed: prefs.playerBgRippleSpeed,
+            animate: animate,
+            useShader: prefs.rippleShaderEnabled,
+            damageClippedDynamic: prefs.rippleDamageClip,
+            renderScale: renderScale,
+          ),
+          fluid: FluidBackgroundConfig(
+            animate: animate,
+            flowSpeed: prefs.playerBgFlowSpeed,
+            renderScale: prefs.playerBgRenderScale,
+            fps: prefs.playerBgFps,
+            freezeOnPause: prefs.playerBgFreezeOnPause,
+            beat: prefs.playerBgBeat,
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -24,6 +24,8 @@ import '../widgets/common/anim.dart';
 import '../widgets/common/glass_surface.dart';
 import '../widgets/common/ink_clip.dart';
 import '../widgets/common/toast.dart';
+import '../widgets/layout/side_bar/nav_styles/sidebar_nav_style.dart';
+import '../widgets/layout/side_bar/nav_styles/sidebar_nav_style_registry.dart';
 import 'cache_section.dart';
 import 'history_section.dart';
 import 'scans_section.dart';

@@ -79,3 +79,18 @@ app/lib/pages/player/layouts/
 `coverTone`（封面主色）是背景选项而非布局：取当前封面主色派生低对比对角
 渐变，纯色层绘制、无模糊/无图片，切歌 300–450ms 过渡；无封面时回退主题
 渐变。与 `default` / `vutron` 等任意布局组合使用。
+
+### 6.1 背景注册表
+
+背景实现位于 `app/lib/widgets/player/background/styles/`，通过
+`player_background_registry.dart` 的 `playerBackgrounds` 注册；`PlayerBackground`
+只负责解析偏好快照与切换，不再维护 `switch (playerBgType)` 分支。新增样式：
+
+1. 在 `styles/` 新建模块并实现 `PlayerBackgroundStyle`（`id` + `build`）；
+2. 加进 `playerBackgrounds`；
+3. 在 `prefs_player.dart` 的 `playerBgTypes` 与设置页下拉里登记同一个 id；
+4. `test/player_background_registry_test.dart` 会守卫注册表与偏好白名单一致。
+
+切换背景样式时统一经 `CrossFadeSwitcher` 做 200ms `ease` 交叉淡化，避免
+模糊 ↔ 水纹等组合硬切；`blur` / `ripple` 内部的切歌交叉淡化（500ms / 700ms）
+保持不变。无封面时 `blur` / `ripple` / `fluid` / `coverTone` 均回退主题渐变。

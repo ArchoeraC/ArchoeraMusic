@@ -653,6 +653,7 @@
   "settingsTransitionStyleDesc": "Übergangsanimation beim Titelwechsel",
   "settingsTransitionStyleScale": "Skalierung",
   "settingsTransitionStyleSlide": "Schieben",
+  "settingsTransitionStyleFade": "Überblenden",
   "settingsPlayerBackground": "Player-Hintergrund",
   "settingsPlayerBackgroundDesc": "Hintergrundstil des Vollbild-Players",
   "settingsPlayerBgGradient": "Verlauf",

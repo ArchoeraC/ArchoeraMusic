@@ -85,7 +85,10 @@ extension _SettingsDialogActions on _SettingsDialogState {
   /// 测量选中分类在列表容器中的位置，驱动滑动指示条
   /// （对齐侧边栏 animated 模式；分类切换后经 postFrameCallback 调用）。
   void _updateCategoryIndicator() {
-    if (ref.read(appPrefsProvider).sidebarNavStyle != 'animated') return;
+    final style = sidebarNavStyleFor(
+      ref.read(appPrefsProvider).sidebarNavStyle,
+    );
+    if (!style.slidingIndicator) return;
     final hostCtx = _catHostKey.currentContext;
     final itemCtx = _catKeys[_category]?.currentContext;
     if (hostCtx == null || itemCtx == null || !itemCtx.mounted) return;

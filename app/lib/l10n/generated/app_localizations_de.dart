@@ -2341,6 +2341,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsTransitionStyleSlide => 'Schieben';
 
   @override
+  String get settingsTransitionStyleFade => 'Überblenden';
+
+  @override
   String get settingsPlayerBackground => 'Player-Hintergrund';
 
   @override

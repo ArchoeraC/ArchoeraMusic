@@ -529,6 +529,8 @@ C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出格式无�
 - CSS transitions / ripple 指令 / BackgroundRipple / 封面旋转 → `AnimationController` / 隐式动画
 - 主题：theme store + 动态取色（`utils/color.ts`）→ `ThemeData` + `ColorScheme.fromSeed`，亮/暗/跟随系统
 - 背景：AppBackground / PlayerBackground / BackgroundRender → 自绘渐变 + 封面模糊
+- 可插拔视觉样式（背景/封面切换/频谱/页面转场/侧栏/主题来源/外观/布局）统一走
+  “契约 + 注册表 + 独立模块”，见 [style-registries.md](style-registries.md)
 
 **弹窗与工具**
 - useDialog / SDialogProvider → 统一 `DialogService`

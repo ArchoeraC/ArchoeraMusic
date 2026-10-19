@@ -2353,6 +2353,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsTransitionStyleSlide => 'Deslizamiento';
 
   @override
+  String get settingsTransitionStyleFade => 'Fundido';
+
+  @override
   String get settingsPlayerBackground => 'Fondo del reproductor';
 
   @override
