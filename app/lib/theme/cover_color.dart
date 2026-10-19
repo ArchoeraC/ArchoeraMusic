@@ -14,6 +14,7 @@ import 'package:material_color_utilities/material_color_utilities.dart';
 import '../services/playback/playback_notifier.dart';
 import '../stores/app_prefs.dart';
 import '../utils/safe_file.dart';
+import 'theme_sources/theme_source_registry.dart';
 
 /// 封面取样尺寸（对齐原版 COVER_SAMPLE_SIZE=64，缩图降计算量）。
 const int _sampleSize = 64;
@@ -196,8 +197,7 @@ int _mostPopulous(Map<int, int> colorToCount) {
 Color _toCoverBaseColor(int argb) {
   final hct = Hct.fromInt(argb);
   final tone = hct.tone.clamp(28.0, 72.0).toDouble();
-  final chroma =
-      hct.chroma < _neutralChroma ? 0.0 : math.min(hct.chroma, 64.0);
+  final chroma = hct.chroma < _neutralChroma ? 0.0 : math.min(hct.chroma, 64.0);
   final out = Hct.from(hct.hue, chroma, tone).toInt();
   return Color(0xFF000000 | (out & 0xFFFFFF));
 }
@@ -206,8 +206,9 @@ Color _toCoverBaseColor(int argb) {
 ///
 /// 实时跟随当前曲目：切歌/切到 cover 来源时重新提取；切走 cover 时清空。
 /// 仅 cover 模式下才发请求（其余来源下 _extract 直接返回，避免无谓网络流量）。
-final coverColorProvider =
-    NotifierProvider<CoverColorNotifier, Color?>(CoverColorNotifier.new);
+final coverColorProvider = NotifierProvider<CoverColorNotifier, Color?>(
+  CoverColorNotifier.new,
+);
 
 class CoverColorNotifier extends Notifier<Color?> {
   int _token = 0;
@@ -231,7 +232,7 @@ class CoverColorNotifier extends Notifier<Color?> {
     ref.listen(
       appPrefsProvider.select((p) => (p.themeSource, p.followCoverColor)),
       (_, v) {
-        if (v.$1 == 'cover' || v.$2) {
+        if (themeSourceStyleFor(v.$1).usesCoverAccent || v.$2) {
           _extract(ref.read(playbackProvider).track?.cover);
         } else {
           state = null;
@@ -245,7 +246,10 @@ class CoverColorNotifier extends Notifier<Color?> {
   Future<void> _extract(String? cover) async {
     final prefs = ref.read(appPrefsProvider);
     // 仅在需要封面色时取色（global cover 主题 或 歌词跟随封面颜色）。
-    if (prefs.themeSource != 'cover' && !prefs.followCoverColor) return;
+    if (!themeSourceStyleFor(prefs.themeSource).usesCoverAccent &&
+        !prefs.followCoverColor) {
+      return;
+    }
     // 竞态 token：只认最后一次取色结果
     final token = ++_token;
     if (cover == null || cover.isEmpty) {
@@ -269,7 +273,7 @@ class CoverColorNotifier extends Notifier<Color?> {
 ///
 /// 与 [coverColorProvider] 的分工：
 /// - [coverColorProvider] 服务于全局主题 / 歌词跟随，受
-///   `themeSource == 'cover' || followCoverColor` 门控；
+///   `themeSourceStyleFor(...).usesCoverAccent || followCoverColor` 门控；
 /// - 本 provider 只服务背景样式，**不能沿用**上述门控——否则默认主题下
 ///   `coverTone` 将永远取不到色、只剩兜底渐变。
 ///

@@ -299,7 +299,7 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置封面切换动效样式（scale / slide）。
+  /// 设置封面切换动效样式（scale / slide / fade）。
   void setTransitionStyle(String value) {
     state = state.copyWithTransitionStyle(value);
     state.save();
