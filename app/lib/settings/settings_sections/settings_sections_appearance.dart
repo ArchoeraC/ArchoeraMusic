@@ -52,9 +52,10 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
     final prefs = ref.watch(appPrefsProvider);
     final accent = prefs.accent;
     final notifier = ref.read(appPrefsProvider.notifier);
+    final themeSource = themeSourceStyleFor(prefs.themeSource);
+    final appearanceStyle = appearanceStyleFor(prefs.appearanceStyle);
     // 图片风格「有效」才有背景子项可调（无图时回退 solid，对齐原版 effectiveStyle）
-    final imageStyle =
-        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    final imageStyle = appearanceStyle.effectiveImageBackground(prefs);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -100,7 +101,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             ),
           ],
         ),
-        if (prefs.themeSource == 'custom') ...[
+        if (themeSource.allowsCustomAccent) ...[
           const SizedBox(height: 8),
           SettingCard(
             children: [
@@ -112,7 +113,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               ),
             ],
           ),
-        ] else if (prefs.themeSource == 'cover') ...[
+        ] else if (themeSource.usesCoverAccent) ...[
           const SizedBox(height: 8),
           SettingNote(text: l10n.settingsThemeSourceCoverHint),
         ],
@@ -149,7 +150,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             ),
           ],
         ),
-        if (prefs.appearanceStyle == 'image') ...[
+        if (appearanceStyle.usesImageBackground) ...[
           const SizedBox(height: 8),
           _backgroundCard(scheme, prefs, l10n, notifier),
           if (imageStyle) ...[
@@ -172,7 +173,9 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                 SettingSliderTile(
                   icon: EtaIcons.moonOutline,
                   title: l10n.settingsBackgroundDim,
-                  subtitle: l10n.settingsBackgroundDimDesc(dim: prefs.backgroundDim),
+                  subtitle: l10n.settingsBackgroundDimDesc(
+                    dim: prefs.backgroundDim,
+                  ),
                   value: prefs.backgroundDim,
                   min: 0.3,
                   max: 0.9,
@@ -211,9 +214,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               onChanged: notifier.setFloatingPlayerBar,
             ),
             SettingSwitchTile(
-              icon: prefs.sidebarCollapsed
-                  ? EtaIcons.menu
-                  : EtaIcons.menu,
+              icon: prefs.sidebarCollapsed ? EtaIcons.menu : EtaIcons.menu,
               title: l10n.settingsSidebarCollapsed,
               subtitle: l10n.settingsSidebarCollapsedDesc,
               value: prefs.sidebarCollapsed,
@@ -299,7 +300,9 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
               title: l10n.settingsCoverRadius,
               subtitle: prefs.coverRadius == 0
                   ? l10n.settingsCoverRadiusSharp
-                  : l10n.settingsCoverRadiusPx(radius: prefs.coverRadius.round()),
+                  : l10n.settingsCoverRadiusPx(
+                      radius: prefs.coverRadius.round(),
+                    ),
               trailing: SSegmented<double>(
                 options: [
                   SSegmentedOption(0, l10n.settingsCoverRadiusSharpLabel),
@@ -792,7 +795,9 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
       ),
       child: icon != null
           ? Icon(icon, size: 14, color: iconColor)
-          : (selected ? Icon(EtaIcons.check, size: 14, color: checkColor) : null),
+          : (selected
+                ? Icon(EtaIcons.check, size: 14, color: checkColor)
+                : null),
     );
   }
 
@@ -827,10 +832,9 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
       ),
     );
     if (result != null) {
-      ref.read(appPrefsProvider.notifier).setSidebarCustomize(
-        order: result.$1,
-        hidden: result.$2,
-      );
+      ref
+          .read(appPrefsProvider.notifier)
+          .setSidebarCustomize(order: result.$1, hidden: result.$2);
     }
   }
 }
@@ -845,7 +849,8 @@ class _SidebarCustomizeEditor extends StatefulWidget {
   final Set<String> hidden;
 
   @override
-  State<_SidebarCustomizeEditor> createState() => _SidebarCustomizeEditorState();
+  State<_SidebarCustomizeEditor> createState() =>
+      _SidebarCustomizeEditorState();
 }
 
 class _SidebarCustomizeEditorState extends State<_SidebarCustomizeEditor> {
@@ -877,9 +882,19 @@ class _SidebarCustomizeEditorState extends State<_SidebarCustomizeEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _group(context, l10n: context.l10n, title: context.l10n.sidebarGroupMusic, list: _musicOrder),
+        _group(
+          context,
+          l10n: context.l10n,
+          title: context.l10n.sidebarGroupMusic,
+          list: _musicOrder,
+        ),
         const SizedBox(height: 14),
-        _group(context, l10n: context.l10n, title: context.l10n.sidebarGroupPersonal, list: _personalOrder),
+        _group(
+          context,
+          l10n: context.l10n,
+          title: context.l10n.sidebarGroupPersonal,
+          list: _personalOrder,
+        ),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -892,10 +907,9 @@ class _SidebarCustomizeEditorState extends State<_SidebarCustomizeEditor> {
             const SizedBox(width: 10),
             SButton(
               label: context.l10n.commonSave,
-              onPressed: () => Navigator.of(context).pop((
-                [..._musicOrder, ..._personalOrder],
-                _hidden,
-              )),
+              onPressed: () =>
+                  Navigator.of(context)
+                      .pop(([..._musicOrder, ..._personalOrder], _hidden)),
             ),
           ],
         ),
@@ -946,7 +960,9 @@ class _SidebarCustomizeEditorState extends State<_SidebarCustomizeEditor> {
                   height: 40,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    color: scheme.surfaceContainerHighest.withValues(
+                      alpha: 0.4,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: scheme.outline.withValues(alpha: 0.3),

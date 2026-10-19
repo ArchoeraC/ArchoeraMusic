@@ -684,6 +684,7 @@
   "settingsTransitionStyleDesc": "切歌时封面与歌曲信息的过渡动画效果",
   "settingsTransitionStyleScale": "缩放",
   "settingsTransitionStyleSlide": "侧边滑动",
+  "settingsTransitionStyleFade": "淡入淡出",
   "settingsPlayerBackground": "播放页背景",
   "settingsPlayerBackgroundDesc": "全屏播放器背景样式",
   "settingsPlayerBgGradient": "渐变",
