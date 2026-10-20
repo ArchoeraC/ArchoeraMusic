@@ -2,8 +2,6 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import 'dart:io' show File;
-
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,11 +11,12 @@ import '../services/scanner/library_store.dart';
 import '../stores/app_prefs.dart';
 import '../stores/player_route_animation.dart';
 import '../widgets/common/anim.dart';
-import '../widgets/common/baked_image_background.dart';
 import '../widgets/common/fps_monitor.dart';
 import '../widgets/layout/nav_header.dart';
 import '../widgets/layout/player_bar.dart';
 import '../widgets/layout/side_bar.dart';
+import 'appearance_styles/appearance_style_registry.dart';
+import 'route_transitions/route_transition_registry.dart';
 import 'shell_expand_transition.dart';
 
 /// 应用壳（对齐原项目 MainLayout.vue）：
@@ -39,8 +38,8 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(appPrefsProvider);
     // 图片风格「有效」才渲染背景（无图时回退 solid，对齐原版 effectiveStyle）
-    final imageStyle =
-        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    final appearanceStyle = appearanceStyleFor(prefs.appearanceStyle);
+    final background = appearanceStyle.buildBackground(context, prefs);
     final floating = prefs.floatingPlayerBar;
     final collapsed = prefs.sidebarCollapsed;
     // 全屏播放器展开时，主壳内容（侧边栏 + 页面区）缩放淡出并忽略指针
@@ -87,7 +86,7 @@ class AppShell extends ConsumerWidget {
     );
     final body = Stack(
       children: [
-        if (imageStyle) Positioned.fill(child: _AppBackground(prefs: prefs)),
+        if (background != null) Positioned.fill(child: background),
         // 内容层（停靠模式且播放条可见时底部让位；悬浮模式占满全高）
         Positioned.fill(
           child: Padding(
@@ -122,42 +121,10 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-/// 图片背景层（对齐原版 AppBackground.vue）：
-/// 封面图（cover 裁切）+ 高斯模糊 + 缩放 + 黑色遮罩（dim），忽略指针事件。
-class _AppBackground extends StatelessWidget {
-  const _AppBackground({required this.prefs});
-
-  final AppPrefs prefs;
-
-  @override
-  Widget build(BuildContext context) {
-    final path = prefs.backgroundImage;
-    if (path == null || path.isEmpty) return const SizedBox.shrink();
-    // 背景铺满全屏又带模糊/遮罩，无需原图全分辨率：按屏幕物理尺寸解码，
-    // 大壁纸（4K+）可省数 MB 解码位图内存。
-    final screen = MediaQuery.sizeOf(context);
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    final decodeW = (screen.width * dpr).round().clamp(1, 2560);
-    final decodeH = (screen.height * dpr).round().clamp(1, 2560);
-    return ClipRect(
-      // 一次性烘焙成静态纹理：避免实时 `ImageFiltered` 在每帧重算全屏模糊
-      // （Impeller 无图层光栅缓存，见 [BakedImageBackground]）。
-      child: BakedImageBackground(
-        provider: ResizeImage.resizeIfNeeded(
-          decodeW,
-          decodeH,
-          FileImage(File(path)),
-        ),
-        blurSigma: prefs.backgroundBlur.toDouble(),
-        scale: prefs.backgroundScale,
-        dim: prefs.backgroundDim,
-      ),
-    );
-  }
-}
-
 /// 侧边栏分支切换转场（对齐原版 route-fade/slide/zoom 的进入动画，
-/// out-in 语义下只对进入的新分支做动画）：
+/// out-in 语义下只对进入的新分支做动画）。
+///
+/// 具体转场实现与参数集中在 `route_transitions/`，此处只按偏好 id 查表：
 ///  - none：无转场，直接显示；
 ///  - fade：150ms 淡入（原版进入 0.15s）；
 ///  - slide：从右侧 +6px 滑入（原版 route-slide 进入 translateX(6px)）；
@@ -179,18 +146,26 @@ class _BranchTransition extends StatefulWidget {
 
 class _BranchTransitionState extends State<_BranchTransition>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 150),
-    value: 1,
-  );
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: routeTransitionFor(widget.transition).duration,
+      value: 1,
+    );
+  }
 
   @override
   void didUpdateWidget(covariant _BranchTransition old) {
     super.didUpdateWidget(old);
-    if (old.index != widget.index && widget.transition != 'none') {
+    final transition = routeTransitionFor(widget.transition);
+    if (old.index != widget.index && !transition.isNoop) {
       // 性能模式（MediaQuery.disableAnimations）：跳过分支转场动效
       if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
+      _ctrl.duration = transition.duration;
       _ctrl.forward(from: 0);
     }
   }
@@ -203,34 +178,11 @@ class _BranchTransitionState extends State<_BranchTransition>
 
   @override
   Widget build(BuildContext context) {
-    if (widget.transition == 'none' ||
+    final transition = routeTransitionFor(widget.transition);
+    if (transition.isNoop ||
         (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
       return widget.child;
     }
-    final curved = CurvedAnimation(
-      parent: _ctrl,
-      curve: Curves.easeOut,
-      reverseCurve: Curves.easeIn,
-    );
-    return switch (widget.transition) {
-      'slide' => FadeTransition(
-        opacity: curved,
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0.008, 0),
-            end: Offset.zero,
-          ).animate(curved),
-          child: widget.child,
-        ),
-      ),
-      'zoom' => FadeTransition(
-        opacity: curved,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
-          child: widget.child,
-        ),
-      ),
-      _ => FadeTransition(opacity: curved, child: widget.child),
-    };
+    return transition.build(context, _ctrl, widget.child);
   }
 }

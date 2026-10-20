@@ -14,6 +14,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../stores/app_prefs.dart';
+import '../../app/appearance_styles/appearance_style_registry.dart';
 import 'glass_blur.dart';
 
 class GlassDialogSurface extends ConsumerWidget {
@@ -35,8 +36,8 @@ class GlassDialogSurface extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(appPrefsProvider);
-    final imageStyle =
-        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    final imageStyle = appearanceStyleFor(prefs.appearanceStyle)
+        .effectiveImageBackground(prefs);
     // 非图片风格：实底面板 + 圆角裁剪（变暗由弹窗外 barrier 承担，
     // 弹窗本体保持与图片风格一致的实底可读性；圆角由本容器裁剪，
     // Dialog 侧配合 clipBehavior 保证画布也被裁剪，不出现直角溢出）。

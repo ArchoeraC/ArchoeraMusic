@@ -653,6 +653,7 @@
   "settingsTransitionStyleDesc": "曲の切り替え時にアルバムカバーと曲情報のトランジションアニメーション",
   "settingsTransitionStyleScale": "スケール",
   "settingsTransitionStyleSlide": "スライド",
+  "settingsTransitionStyleFade": "フェード",
   "settingsPlayerBackground": "プレイヤー背景",
   "settingsPlayerBackgroundDesc": "全画面プレイヤーの背景スタイル",
   "settingsPlayerBgGradient": "グラデーション",

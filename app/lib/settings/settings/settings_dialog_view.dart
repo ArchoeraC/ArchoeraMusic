@@ -10,7 +10,18 @@ extension _SettingsDialogView on _SettingsDialogState {
     final scheme = theme.colorScheme;
     final l10n = context.l10n;
     final window = MediaQuery.sizeOf(context);
-    final animated = ref.watch(appPrefsProvider).sidebarNavStyle == 'animated';
+    final navStyle = sidebarNavStyleFor(
+      ref.watch(appPrefsProvider).sidebarNavStyle,
+    );
+    final indicator = navStyle.slidingIndicator && _catIndicatorReady
+        ? navStyle.buildContainerIndicator(
+            context: context,
+            color: scheme.primary,
+            left: _catIndicatorLeft,
+            top: _catIndicatorTop,
+            height: _catIndicatorHeight,
+          )
+        : null;
     final devMode = ref.watch(appPrefsProvider).developerMode;
     final downloadModule = ref.watch(appPrefsProvider).downloadModuleEnabled;
     WidgetsBinding.instance.addPostFrameCallback(
@@ -93,32 +104,13 @@ extension _SettingsDialogView on _SettingsDialogState {
                                           scheme,
                                           cat,
                                           l10n,
-                                          animated,
+                                          navStyle,
                                         ),
                                   ],
                                 ),
                               ),
                             ),
-                            if (animated && _catIndicatorReady)
-                              AnimatedPositioned(
-                                duration: animDuration(
-                                  context,
-                                  const Duration(milliseconds: 250),
-                                ),
-                                curve: Curves.easeOut,
-                                left: _catIndicatorLeft,
-                                top: _catIndicatorTop + 10,
-                                height: _catIndicatorHeight - 20,
-                                width: 3,
-                                child: IgnorePointer(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: scheme.primary,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                            ?indicator,
                           ],
                         ),
                       ),
@@ -581,7 +573,7 @@ extension _SettingsDialogView on _SettingsDialogState {
     ColorScheme scheme,
     SettingsCategory cat,
     AppLocalizations l10n,
-    bool animated,
+    SidebarNavStyle navStyle,
   ) {
     final selected = _category == cat;
     return Padding(
@@ -620,7 +612,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                       ),
                       width: 3,
                       decoration: BoxDecoration(
-                        color: !animated && selected
+                        color: !navStyle.slidingIndicator && selected
                             ? scheme.primary
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(2),
