@@ -684,6 +684,7 @@
   "settingsTransitionStyleDesc": "Transition animation when switching tracks",
   "settingsTransitionStyleScale": "Scale",
   "settingsTransitionStyleSlide": "Slide",
+  "settingsTransitionStyleFade": "Fade",
   "settingsPlayerBackground": "Player Background",
   "settingsPlayerBackgroundDesc": "Full-screen player background style",
   "settingsPlayerBgGradient": "Gradient",

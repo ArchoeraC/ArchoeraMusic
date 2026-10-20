@@ -59,7 +59,7 @@ class PosterPlayerLayout extends PlayerLayout {
           child: RepaintBoundary(
             child: CoverSwitcher(
               coverKey: c.coverKey,
-              slide: c.transitionStyle == 'slide',
+              style: c.transitionStyle,
               next: c.slideNext,
               child: PlayerFullscreenCover(cover: c.current?.cover),
             ),

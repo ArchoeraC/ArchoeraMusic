@@ -80,7 +80,7 @@ class SplitPlayerLayout extends PlayerLayout {
                     child: RepaintBoundary(
                       child: CoverSwitcher(
                         coverKey: c.coverKey,
-                        slide: c.transitionStyle == 'slide',
+                        style: c.transitionStyle,
                         next: c.slideNext,
                         child: coverBlock,
                       ),

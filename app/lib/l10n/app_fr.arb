@@ -653,6 +653,7 @@
   "settingsTransitionStyleDesc": "Animation de transition lors du changement de chanson",
   "settingsTransitionStyleScale": "Échelle",
   "settingsTransitionStyleSlide": "Glissement",
+  "settingsTransitionStyleFade": "Fondu",
   "settingsPlayerBackground": "Arrière-plan du lecteur",
   "settingsPlayerBackgroundDesc": "Style d''arrière-plan du lecteur plein écran",
   "settingsPlayerBgGradient": "Dégradé",

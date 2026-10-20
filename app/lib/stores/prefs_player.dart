@@ -129,6 +129,9 @@ const int defaultSpectrumBarWidth = 4;
 const String defaultSpectrumStyle = 'bars';
 const Set<String> spectrumStyles = {'bars', 'wave', 'waveUp'};
 
+/// 封面切换动效样式（'scale' 缩放 / 'slide' 侧边滑动 / 'fade' 淡入淡出）。
+const Set<String> transitionStyles = {'scale', 'slide', 'fade'};
+
 /// 播放页背景样式（'gradient' 渐变 / 'blur' 模糊封面 / 'solid' 纯色 /
 /// 'ripple' 水纹 / 'fluid' 流体；默认 'gradient'，保持原主题渐变观感）。
 const String defaultPlayerBgType = 'gradient';
@@ -309,12 +312,12 @@ extension PlayerPrefs on AppPrefs {
     return defaultSpectrumStyle;
   }
 
-  /// 封面切换动效样式（'scale' 缩放 / 'slide' 侧边滑动；默认 scale）。
-  /// 对齐原版 settings.player.transitionStyle，全屏播放器切歌时
-  /// 封面与歌曲信息的过渡动画。
+  /// 封面切换动效样式（'scale' 缩放 / 'slide' 侧边滑动 / 'fade' 淡入淡出；
+  /// 默认 scale）。对齐原版 settings.player.transitionStyle，全屏播放器
+  /// 切歌时封面与歌曲信息的过渡动画。
   String get transitionStyle {
     final v = data[transitionStyleKey];
-    if (v == 'scale' || v == 'slide') return v as String;
+    if (transitionStyles.contains(v)) return v as String;
     return 'scale';
   }
 
@@ -535,7 +538,7 @@ extension PlayerPrefs on AppPrefs {
   AppPrefs copyWithTransitionStyle(String value) => AppPrefs(
     initialData: {
       ...data,
-      if (value == 'scale' || value == 'slide') transitionStyleKey: value,
+      if (transitionStyles.contains(value)) transitionStyleKey: value,
     },
   );
 

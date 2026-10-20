@@ -2248,6 +2248,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsTransitionStyleSlide => '슬라이드';
 
   @override
+  String get settingsTransitionStyleFade => '페이드';
+
+  @override
   String get settingsPlayerBackground => '플레이어 배경';
 
   @override

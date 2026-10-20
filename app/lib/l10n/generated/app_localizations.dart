@@ -4192,6 +4192,12 @@ abstract class AppLocalizations {
   /// **'侧边滑动'**
   String get settingsTransitionStyleSlide;
 
+  /// No description provided for @settingsTransitionStyleFade.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'淡入淡出'**
+  String get settingsTransitionStyleFade;
+
   /// No description provided for @settingsPlayerBackground.
   ///
   /// In zh_CN, this message translates to:

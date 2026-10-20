@@ -653,6 +653,7 @@
   "settingsTransitionStyleDesc": "Animación de transición al cambiar de canción",
   "settingsTransitionStyleScale": "Escala",
   "settingsTransitionStyleSlide": "Deslizamiento",
+  "settingsTransitionStyleFade": "Fundido",
   "settingsPlayerBackground": "Fondo del reproductor",
   "settingsPlayerBackgroundDesc": "Estilo de fondo del reproductor a pantalla completa",
   "settingsPlayerBgGradient": "Degradado",

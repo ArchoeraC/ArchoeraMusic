@@ -2225,6 +2225,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsTransitionStyleSlide => '侧边滑动';
 
   @override
+  String get settingsTransitionStyleFade => '淡入淡出';
+
+  @override
   String get settingsPlayerBackground => '播放页背景';
 
   @override
@@ -8156,6 +8159,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsTransitionStyleSlide => '侧边滑动';
 
   @override
+  String get settingsTransitionStyleFade => '淡入淡出';
+
+  @override
   String get settingsPlayerBackground => '播放页背景';
 
   @override
@@ -14085,6 +14091,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsTransitionStyleSlide => '側邊滑動';
+
+  @override
+  String get settingsTransitionStyleFade => '淡入淡出';
 
   @override
   String get settingsPlayerBackground => '播放頁背景';

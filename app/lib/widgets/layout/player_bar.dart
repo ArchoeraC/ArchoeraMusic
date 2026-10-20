@@ -9,6 +9,7 @@ import '../../services/netease/track.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/lyrics/lyric_line.dart';
 import '../../app/router.dart';
+import '../../app/appearance_styles/appearance_style_registry.dart';
 import '../../easter_egg/april_fools_state.dart';
 import '../../services/source/source_platform.dart';
 import '../../stores/app_prefs.dart';
@@ -26,6 +27,7 @@ import '../player/spectrum_view.dart';
 import '../common/toast.dart';
 import '../common/anim.dart';
 import '../common/glass_blur.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'player_bar/player_bar_view.dart';

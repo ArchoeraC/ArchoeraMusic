@@ -29,6 +29,22 @@ const weatherAutoLocateKey = 'appearance.weatherAutoLocate';
 const weatherCityKey = 'appearance.weatherCity';
 const weatherLocateSourceKey = 'appearance.weatherLocateSource';
 
+/// 主题色来源合法 id（与 `theme_sources/theme_source_registry.dart` 的注册表
+/// 一致；默认 `default`）。
+const Set<String> themeSourceIds = {'default', 'custom', 'cover', 'solid'};
+
+/// 外观风格合法 id（与 `app/appearance_styles/appearance_style_registry.dart`
+/// 的注册表一致；默认 `solid`）。
+const Set<String> appearanceStyleIds = {'solid', 'image'};
+
+/// 页面切换动效合法 id（与 `route_transitions/route_transition_registry.dart`
+/// 的注册表一致；默认 `fade`）。
+const Set<String> routeTransitionIds = {'none', 'fade', 'slide', 'zoom'};
+
+/// 侧边栏导航高亮样式合法 id（与 `side_bar/nav_styles/` 的注册表一致；
+/// 默认 `default`）。
+const Set<String> sidebarNavStyleIds = {'default', 'animated'};
+
 /// 侧边栏导航项稳定 key（与 `SideBar` 的 `_NavItem` 一一对应）与默认顺序。
 ///
 /// 顺序即侧边栏显示顺序；分组由生成建侧边栏时按 key 归属决定
@@ -48,9 +64,7 @@ List<String> _normalizeSidebarOrder(Object? value) {
   final out = <String>[];
   if (value is List) {
     for (final e in value) {
-      if (e is String &&
-          defaultSidebarOrder.contains(e) &&
-          !out.contains(e)) {
+      if (e is String && defaultSidebarOrder.contains(e) && !out.contains(e)) {
         out.add(e);
       }
     }
@@ -62,7 +76,8 @@ List<String> _normalizeSidebarOrder(Object? value) {
 }
 
 /// 外观域偏好：主题色/背景/动效/侧边栏/语言/字体/封面圆角。
-extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；null = 使用设计体系默认亮蓝。
+extension AppearancePrefs on AppPrefs {
+  /// 自定义主色（ARGB 值）；null = 使用设计体系默认亮蓝。
   /// 对齐原版 appearance.themeSource=custom + customColor（hex）。
   int? get accent => data[accentKey] as int?;
 
@@ -73,7 +88,7 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   /// - `solid`：纯色中性色板（无主题色，主/次色用灰阶）。
   String get themeSource {
     final v = data[themeSourceKey];
-    if (v == 'custom' || v == 'cover' || v == 'solid') return v as String;
+    if (v is String && themeSourceIds.contains(v)) return v;
     return 'default';
   }
 
@@ -93,7 +108,8 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   /// `solid` 纯色背景 / `image` 自定义图片背景。
   String get appearanceStyle {
     final v = data[appearanceStyleKey];
-    return v == 'image' ? 'image' : 'solid';
+    if (v is String && appearanceStyleIds.contains(v)) return v;
+    return 'solid';
   }
 
   /// 背景图片路径（磁盘绝对路径；null = 未选择，对齐 imageBackground.src）。
@@ -115,7 +131,7 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   /// `none` 无 / `fade` 淡入淡出 / `slide` 滑动 / `zoom` 缩放。
   String get routeTransition {
     final v = data[routeTransitionKey];
-    if (v == 'none' || v == 'slide' || v == 'zoom') return v as String;
+    if (v is String && routeTransitionIds.contains(v)) return v;
     return 'fade';
   }
 
@@ -126,11 +142,13 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   /// `default` 静态指示条 / `animated` 滑动高亮条。
   String get sidebarNavStyle {
     final v = data[sidebarNavStyleKey];
-    return v == 'animated' ? 'animated' : 'default';
+    if (v is String && sidebarNavStyleIds.contains(v)) return v;
+    return 'default';
   }
 
   /// 侧边栏导航项显示顺序（合法 key、去重、缺失按默认补齐）。
-  List<String> get sidebarOrder => _normalizeSidebarOrder(data[sidebarOrderKey]);
+  List<String> get sidebarOrder =>
+      _normalizeSidebarOrder(data[sidebarOrderKey]);
 
   /// 侧边栏隐藏的导航项 key 集合（仅含合法 key）。
   Set<String> get sidebarHiddenKeys {
@@ -202,11 +220,7 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   AppPrefs copyWithThemeSource(String value) => AppPrefs(
     initialData: {
       ...data,
-      if (value == 'default' ||
-          value == 'custom' ||
-          value == 'cover' ||
-          value == 'solid')
-        themeSourceKey: value,
+      if (themeSourceIds.contains(value)) themeSourceKey: value,
     },
   );
 
@@ -226,7 +240,7 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   AppPrefs copyWithAppearanceStyle(String value) => AppPrefs(
     initialData: {
       ...data,
-      if (value == 'solid' || value == 'image') appearanceStyleKey: value,
+      if (appearanceStyleIds.contains(value)) appearanceStyleKey: value,
     },
   );
 
@@ -261,11 +275,7 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   AppPrefs copyWithRouteTransition(String value) => AppPrefs(
     initialData: {
       ...data,
-      if (value == 'none' ||
-          value == 'fade' ||
-          value == 'slide' ||
-          value == 'zoom')
-        routeTransitionKey: value,
+      if (routeTransitionIds.contains(value)) routeTransitionKey: value,
     },
   );
 
@@ -274,8 +284,7 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
     initialData: {
       ...data,
       sidebarCollapsedKey: ?collapsed,
-      if (navStyle == 'default' || navStyle == 'animated')
-        sidebarNavStyleKey: navStyle,
+      if (sidebarNavStyleIds.contains(navStyle)) sidebarNavStyleKey: navStyle,
     },
   );
 
@@ -310,10 +319,7 @@ extension AppearancePrefs on AppPrefs {  /// 自定义主色（ARGB 值）；nul
   );
 
   AppPrefs copyWithAppearance({double? coverRadius}) => AppPrefs(
-    initialData: {
-      ...data,
-      coverRadiusKey: ?coverRadius?.clamp(0, 16),
-    },
+    initialData: {...data, coverRadiusKey: ?coverRadius?.clamp(0, 16)},
   );
 
   /// 设置顶栏微型天气配置（组件开关 / 自动定位 / 定位来源 / 手动城市）。

@@ -2349,6 +2349,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsTransitionStyleSlide => 'Glissement';
 
   @override
+  String get settingsTransitionStyleFade => 'Fondu';
+
+  @override
   String get settingsPlayerBackground => 'Arrière-plan du lecteur';
 
   @override

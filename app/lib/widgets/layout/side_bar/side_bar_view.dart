@@ -11,8 +11,16 @@ extension _SideBarView on _SideBarState {
     final l10n = context.l10n;
     final prefs = ref.watch(appPrefsProvider);
     final collapsed = prefs.sidebarCollapsed;
-    final navStyle = prefs.sidebarNavStyle;
-    final animated = navStyle == 'animated';
+    final navStyle = sidebarNavStyleFor(prefs.sidebarNavStyle);
+    final indicator = navStyle.slidingIndicator && _indicatorReady
+        ? navStyle.buildContainerIndicator(
+            context: context,
+            color: colorScheme.primary,
+            left: _indicatorLeft,
+            top: _indicatorTop,
+            height: _indicatorHeight,
+          )
+        : null;
     final width = collapsed ? 64.0 : 240.0;
     // 布局完成后测量选中项位置（折叠/展开切换后指示条跟随）
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateIndicator());
@@ -89,7 +97,7 @@ extension _SideBarView on _SideBarState {
             ),
           ),
           const Divider(height: 1),
-          // 导航菜单（分组）；animated 模式叠一层容器级滑动指示条
+          // 导航菜单（分组）；滑动样式叠一层容器级指示条
           Expanded(
             child: Stack(
               key: _navHostKey,
@@ -126,37 +134,15 @@ extension _SideBarView on _SideBarState {
                               theme,
                               item,
                               collapsed,
-                              animated,
+                              navStyle,
                             ),
                           ),
                       ],
                     ],
                   ),
                 ),
-                // 滑动高亮指示条（SMenu animated：绝对定位左 3px 圆角主色条，
-                // AnimatedPositioned 平滑更新 top/height，对齐 transition-[top,height] duration-250）
-                if (animated && _indicatorReady)
-                  AnimatedPositioned(
-                    duration: animDuration(
-                      context,
-                      const Duration(milliseconds: 250),
-                    ),
-                    curve: Curves.easeOut,
-                    // 对齐 SMenu animated：left 跟随选中项左缘；top/height
-                    // 上下各内缩 10px，与静态模式（Positioned top:10/bottom:10）一致
-                    left: _indicatorLeft,
-                    top: _indicatorTop + 10,
-                    height: _indicatorHeight - 20,
-                    width: 3,
-                    child: IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ),
+                // 容器级滑动高亮指示条（由高亮样式模块构建；静态样式返回 null）
+                ?indicator,
               ],
             ),
           ),
@@ -185,12 +171,12 @@ extension _SideBarView on _SideBarState {
     ThemeData theme,
     _NavItem item,
     bool collapsed,
-    bool animated,
+    SidebarNavStyle navStyle,
   ) {
     final colorScheme = theme.colorScheme;
     final selected = _currentIndex == item.index;
     final foreground = selected ? colorScheme.primary : colorScheme.onSurface;
-    // 位置锚点：animated 模式下滑动指示条据此定位。挂在背景容器
+    // 位置锚点：滑动样式下容器级指示条据此定位。挂在背景容器
     // （AnimatedContainer）上，使测量结果即选中项背景本身的位置与尺寸，
     // top+10 / height-20 即可与静态模式（Positioned top:10/bottom:10）完全对齐。
     final anchor = _navKeys[item.index] ??= GlobalKey();
@@ -223,7 +209,7 @@ extension _SideBarView on _SideBarState {
                 alignment: Alignment.center,
                 children: [
                   // 左侧选中指示条（对齐 SMenu default 模式；
-                  // animated 模式交给容器级滑动条，此处隐藏）
+                  // 滑动样式交给容器级指示条，此处隐藏）
                   Positioned(
                     left: 0,
                     top: 10,
@@ -236,7 +222,7 @@ extension _SideBarView on _SideBarState {
                       curve: Curves.easeOut,
                       width: 3,
                       decoration: BoxDecoration(
-                        color: !animated && selected
+                        color: !navStyle.slidingIndicator && selected
                             ? colorScheme.primary
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(2),

@@ -22,6 +22,7 @@ import '../services/platform/platform_capabilities.dart';
 import '../services/qqmusic/qq_liked_store.dart';
 import '../services/qqmusic/qqmusic_api.dart';
 import '../services/weather/weather_notifier.dart';
+import '../theme/theme_sources/theme_source_registry.dart';
 import 'app_prefs.dart';
 import 'event_bus.dart';
 import 'like_controller.dart';
@@ -210,7 +211,7 @@ final systemAccentProvider = StreamProvider<Color?>((ref) async* {
   // 仅在「主题色来源 = 跟随系统」时订阅系统强调色；custom/cover/solid 下完全
   // 不接触系统色（不查询、不订阅）。
   final source = ref.watch(appPrefsProvider.select((p) => p.themeSource));
-  if (source != 'default') return;
+  if (!themeSourceStyleFor(source).usesSystemAccent) return;
   final caps = PlatformCapabilities.instance();
   if (!caps.systemAccentAvailable) return;
   // 平台**推送**模型：订阅时桥接立即推当前值，之后推变化——Dart 不主动查询。
