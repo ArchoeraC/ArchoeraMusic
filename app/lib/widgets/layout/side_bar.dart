@@ -11,6 +11,8 @@ import '../../easter_egg/mouse_dodge.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import 'app_logo.dart';
+import 'side_bar/nav_styles/sidebar_nav_style.dart';
+import 'side_bar/nav_styles/sidebar_nav_style_registry.dart';
 import '../common/anim.dart';
 import '../common/ink_clip.dart';
 
@@ -149,7 +151,10 @@ class _SideBarState extends ConsumerState<SideBar> {
   /// 折叠/展开或切换分支后经 postFrameCallback 调用；位置未变时不做
   /// setState（避免 rebuild → 再测量 的死循环）。
   void _updateIndicator() {
-    if (ref.read(appPrefsProvider).sidebarNavStyle != 'animated') return;
+    final style = sidebarNavStyleFor(
+      ref.read(appPrefsProvider).sidebarNavStyle,
+    );
+    if (!style.slidingIndicator) return;
     final hostCtx = _navHostKey.currentContext;
     final itemCtx = _navKeys[_currentIndex]?.currentContext;
     if (hostCtx == null || itemCtx == null || !itemCtx.mounted) return;

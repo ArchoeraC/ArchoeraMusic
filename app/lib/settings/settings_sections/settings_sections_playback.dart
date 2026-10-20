@@ -871,6 +871,7 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                 options: [
                   SSegmentedOption('scale', l10n.settingsTransitionStyleScale),
                   SSegmentedOption('slide', l10n.settingsTransitionStyleSlide),
+                  SSegmentedOption('fade', l10n.settingsTransitionStyleFade),
                 ],
                 selected: prefs.transitionStyle,
                 onChanged: (v) =>

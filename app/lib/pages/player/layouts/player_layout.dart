@@ -74,7 +74,7 @@ class PlayerLayoutContext {
   /// 重内容（背景/歌词）是否已挂载（路由进入动画结束）。
   final bool contentMounted;
 
-  /// 切歌动效样式（`scale` / `slide`）。
+  /// 切歌动效样式（`scale` / `slide` / `fade`）。
   final String transitionStyle;
 
   final double coverLyricRatio;

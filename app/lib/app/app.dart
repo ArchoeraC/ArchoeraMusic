@@ -16,6 +16,8 @@ import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../theme/app_theme.dart';
 import '../theme/cover_color.dart';
+import '../theme/theme_sources/theme_source_registry.dart';
+import '../theme/theme_sources/theme_source_style.dart';
 import '../widgets/common/app_shortcuts.dart';
 import '../widgets/common/scheme_intro_gate.dart';
 import '../widgets/common/toast.dart';
@@ -23,6 +25,7 @@ import '../widgets/common/vault_crash_gate.dart';
 import '../widgets/common/vault_unlock_gate.dart';
 import '../widgets/common/vault_version_gate.dart';
 import 'background_unload_gate.dart';
+import 'appearance_styles/appearance_style_registry.dart';
 import 'bootstrap.dart';
 import 'router.dart';
 import 'theme_provider.dart';
@@ -43,20 +46,22 @@ class ArchoeraMusicApp extends ConsumerWidget {
     appPrefsSnapshot = prefs;
     final locale = ref.watch(localeProvider);
     // 主色种子（对齐原版 theme.ts generatePalette + trackedColorForCover）：
-    // custom → 自定义主色；cover → 当前播放封面提取；default → 跟随系统主题色
-    // （读取失败回退默认亮蓝）；solid → 无种子（中性灰阶）。
+    // default → 跟随系统主题色（读取失败回退默认亮蓝）；custom → 自定义主色；
+    // cover → 当前播放封面提取；solid → 无种子（中性灰阶）。
     final coverAccent = ref.watch(coverColorProvider);
     final systemAccent = ref.watch(systemAccentProvider).value;
-    final accent = switch (prefs.themeSource) {
-      'custom' => prefs.accentColor,
-      'cover' => coverAccent,
-      'default' => systemAccent,
-      _ => null,
-    };
+    final themeSource = themeSourceStyleFor(prefs.themeSource);
+    final accent = themeSource.accentSeed(
+      ThemeSourceContext(
+        prefs: prefs,
+        coverAccent: coverAccent,
+        systemAccent: systemAccent,
+      ),
+    );
     // 图片背景风格（有效时）强制暗色 + 全局着色（对齐原版 effectiveStyle/isDark/
     // effectiveGlobalTint：appearanceStyle=image 无 src 时回退 solid）
-    final imageStyle =
-        prefs.appearanceStyle == 'image' && prefs.backgroundImage != null;
+    final appearanceStyle = appearanceStyleFor(prefs.appearanceStyle);
+    final imageStyle = appearanceStyle.effectiveImageBackground(prefs);
     final globalTint = prefs.globalTint || imageStyle;
     // 深浅色「跟随系统」由平台桥接**推送**（被知道）；桥接未推/不可用时
     // 回退引擎的 ThemeMode.system。
@@ -104,7 +109,7 @@ class ArchoeraMusicApp extends ConsumerWidget {
                 accentSeed: accent,
                 fontFamily: fontFamily,
                 globalTint: globalTint,
-                solid: prefs.themeSource == 'solid',
+                solid: themeSource.solid,
                 imageBackground: imageStyle,
                 performanceMode: performanceMode,
               ),
@@ -114,7 +119,7 @@ class ArchoeraMusicApp extends ConsumerWidget {
                 accentSeed: accent,
                 fontFamily: fontFamily,
                 globalTint: globalTint,
-                solid: prefs.themeSource == 'solid',
+                solid: themeSource.solid,
                 imageBackground: imageStyle,
                 performanceMode: performanceMode,
               ),

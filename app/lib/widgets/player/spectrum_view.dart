@@ -12,6 +12,8 @@ import 'package:flutter/scheduler.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../stores/app_prefs.dart';
 import '../common/anim.dart';
+import 'spectrum_view/styles/spectrum_style.dart';
+import 'spectrum_view/styles/spectrum_style_registry.dart';
 
 part 'spectrum_view/spectrum_view_state.dart';
 part 'spectrum_view/spectrum_view_painter.dart';

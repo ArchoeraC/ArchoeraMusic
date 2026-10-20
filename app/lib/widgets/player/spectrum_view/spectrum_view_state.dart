@@ -59,16 +59,17 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
     final color = widget.color ?? Theme.of(context).colorScheme.primary;
     final style =
         widget.style ?? SpectrumStyle.fromStorage(prefs.spectrumStyle);
+    final renderer = spectrumStyleRendererFor(style.storageKey);
     final reverse = widget.reverse ?? prefs.reverseSpectrum;
     if (_painter.barWidth != barWidth ||
         _painter.color != color ||
-        _painter.style != style ||
+        _painter.style != renderer ||
         _painter.reverse != reverse ||
         _painter.nowMs != _clockMs) {
       _painter
         ..barWidth = barWidth
         ..color = color
-        ..style = style
+        ..style = renderer
         ..reverse = reverse
         ..nowMs = _clockMs;
       _repaint.value++;
@@ -95,7 +96,7 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
         opacity: targetOpacity,
         duration: animDuration(context, const Duration(milliseconds: 300)),
         curve: Curves.easeOut,
-        // 横向渐隐已并入 painter 的画笔 shader（_fadeShader），不再用
+        // 横向渐隐已并入画笔 shader（spectrumFadeShader），不再用
         // ShaderMask 离屏层（P3：减少一次合成 pass）。
         child: CustomPaint(
           size: Size(double.infinity, widget.height),

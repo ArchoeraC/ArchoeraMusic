@@ -2247,6 +2247,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsTransitionStyleSlide => 'スライド';
 
   @override
+  String get settingsTransitionStyleFade => 'フェード';
+
+  @override
   String get settingsPlayerBackground => 'プレイヤー背景';
 
   @override

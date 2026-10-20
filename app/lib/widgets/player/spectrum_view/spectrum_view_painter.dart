@@ -14,15 +14,13 @@ class _SpectrumPainter extends CustomPainter {
   static const int fftSize = 128;
   static const int pushIntervalMs = 50;
   static const int skipLow = 8;
-  static const int barGap = 3;
   static const double attack = 0.4;
   static const double decay = 0.88;
-  static const double _minBarHeight = 0.5;
 
   double barWidth;
   double radius;
   Color color = Colors.transparent;
-  SpectrumStyle style = SpectrumStyle.bars;
+  SpectrumStyleRenderer style = spectrumStyleRendererFor('bars');
   bool reverse = false;
   int nowMs = 0;
 
@@ -86,14 +84,17 @@ class _SpectrumPainter extends CustomPainter {
     final usableLen = _buildBins();
     if (usableLen <= 0) return;
 
-    switch (style) {
-      case SpectrumStyle.bars:
-        _paintBars(canvas, size, usableLen);
-      case SpectrumStyle.wave:
-        _paintWave(canvas, size, usableLen, mirror: true);
-      case SpectrumStyle.waveUp:
-        _paintWave(canvas, size, usableLen, mirror: false);
-    }
+    style.paint(
+      canvas,
+      size,
+      SpectrumPaintContext(
+        stereo: _stereo,
+        usableLen: usableLen,
+        barWidth: barWidth,
+        radius: radius,
+        color: color,
+      ),
+    );
   }
 
   int _buildBins() {
@@ -106,138 +107,12 @@ class _SpectrumPainter extends CustomPainter {
     return channelLength * 2;
   }
 
-  void _paintBars(Canvas canvas, Size size, int usableLen) {
-    final slotWidth = barWidth + barGap;
-    final numBars = (size.width / slotWidth).floor();
-    if (numBars <= 0) return;
-
-    // 单 Path 批量提交（替代 N 次 drawRRect）；横向渐隐由画笔 shader 承担，
-    // 不再需要 widget 侧 ShaderMask 离屏层。
-    final path = Path();
-    for (var i = 0; i < numBars; i++) {
-      final startBin = (i * usableLen / numBars).floor();
-      final endBin = ((i + 1) * usableLen / numBars).floor();
-      final lo = math.max(0, startBin - 1);
-      final hi = math.min(usableLen, math.max(endBin, startBin + 1) + 1);
-      var sum = 0.0;
-      for (var j = lo; j < hi; j++) {
-        sum += _stereo[j];
-      }
-      final v = sum / (hi - lo);
-      final barHeight = v * size.height;
-      if (barHeight <= _minBarHeight) continue;
-      path.addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            i * slotWidth,
-            size.height - barHeight,
-            barWidth,
-            barHeight,
-          ),
-          Radius.circular(radius),
-        ),
-      );
-    }
-    if (path.getBounds().isEmpty) return;
-    canvas.drawPath(
-      path,
-      Paint()..shader = _fadeShader(size, color),
-    );
-  }
-
-  /// 横向渐隐 shader（对齐原 ShaderMask 的 [0,0.05,0.12,0.88,0.95,1] 停点，
-  /// 0x99/255≈0.6）。直接作为画笔 shader → 免去 ShaderMask 的离屏合成。
-  static Shader _fadeShader(Size size, Color base) {
-    const stops = [0.0, 0.05, 0.12, 0.88, 0.95, 1.0];
-    const alphas = [0.0, 0.6, 1.0, 1.0, 0.6, 0.0];
-    return LinearGradient(
-      begin: Alignment.centerLeft,
-      end: Alignment.centerRight,
-      colors: [for (final a in alphas) base.withValues(alpha: a)],
-      stops: stops,
-    ).createShader(Offset.zero & size);
-  }
-
-  void _paintWave(
-    Canvas canvas,
-    Size size,
-    int usableLen, {
-    required bool mirror,
-  }) {
-    if (usableLen <= 1 || size.width <= 0) return;
-    final midY = size.height / 2;
-    final amp = math.max(size.height / 2 - 2, 1.0);
-    final pad = math.min(16.0, size.width * 0.05);
-    final curveWidth = size.width - 2 * pad;
-    if (curveWidth <= 2) return;
-    final stepX = curveWidth / (usableLen - 1);
-
-    final smoothBins = Float64List(usableLen);
-    for (var i = 0; i < usableLen; i++) {
-      final lo = math.max(0, i - 1);
-      final hi = math.min(usableLen - 1, i + 1);
-      var sum = 0.0;
-      var n = 0;
-      for (var j = lo; j <= hi; j++) {
-        final raw = _stereo[j];
-        sum += raw < 0 ? 0.0 : (raw > 1 ? 1.0 : raw);
-        n++;
-      }
-      smoothBins[i] = sum / n;
-    }
-
-    const fadeLen = 12;
-    for (var i = 0; i < fadeLen && i < usableLen; i++) {
-      final k = i / fadeLen;
-      smoothBins[i] *= k;
-      final j = usableLen - 1 - i;
-      if (j > i) {
-        smoothBins[j] *= k;
-      }
-    }
-
-    final paint = Paint()
-      ..shader = _fadeShader(size, color)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.5, math.min(3.0, barWidth))
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    void trace(Path path, double sign) {
-      path.moveTo(pad, midY + sign * smoothBins[0] * amp);
-      for (var i = 0; i < usableLen - 1; i++) {
-        final y = midY + sign * smoothBins[i] * amp;
-        final yMid =
-            midY + sign * ((smoothBins[i] + smoothBins[i + 1]) / 2) * amp;
-        path.quadraticBezierTo(
-          pad + i * stepX,
-          y,
-          pad + (i + 0.5) * stepX,
-          yMid,
-        );
-      }
-      path.lineTo(
-        pad + (usableLen - 1) * stepX,
-        midY + sign * smoothBins[usableLen - 1] * amp,
-      );
-    }
-
-    final upper = Path();
-    trace(upper, -1);
-    canvas.drawPath(upper, paint);
-    if (mirror) {
-      final lower = Path();
-      trace(lower, 1);
-      canvas.drawPath(lower, paint);
-    }
-  }
-
   @override
   bool shouldRepaint(covariant _SpectrumPainter old) =>
       old.nowMs != nowMs ||
       old.barWidth != barWidth ||
       old.radius != radius ||
       old.color != color ||
-      old.style != style ||
+      old.style.id != style.id ||
       old.reverse != reverse;
 }
