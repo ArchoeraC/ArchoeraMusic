@@ -1303,6 +1303,10 @@ static void json_escape_str(const char *in, char *out, size_t cap)
     out[o] = '\0';
 }
 
+/* 前向声明（定义在引擎线程节；切 sink 丢缓冲时需重建管线到已播放位置） */
+static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_ms,
+                                      double pos_base);
+
 /* 播放中切 sink：先在“新设备上、暂停状态”建好播放器（带音量/续播位置、
    不重发 playing），成功后停旧播新。失败返回 -1 且旧播放器原样保留（回退）。 */
 static int mediaengine_switch_sink(ArchoeraMediaEngine *e,
@@ -1315,10 +1319,12 @@ static int mediaengine_switch_sink(ArchoeraMediaEngine *e,
 
     if (!e->player) return 0; /* 尚未播放：仅存储（调用方已更新 sink_id） */
 
-    /* 流式播放：raw 设备直接切 sink（管线/解码不停，清缓冲续播） */
+    /* 流式播放：raw 设备直接切 sink（管线解码循环不停） */
     if (e->player_stream_mode) {
+        int rc;
         player_get_state(e->player, &playing, &pos_ms, &vol);
-        if (player_stream_switch_sink(e->player, e->sink_id) != 0) {
+        rc = player_stream_switch_sink(e->player, e->sink_id);
+        if (rc < 0) {
             if (errbuf && errcap > 0) {
                 snprintf(errbuf, errcap,
                     "流式切换到 sink '%s' 失败（设备消失/不支持），沿用原设备",
@@ -1328,6 +1334,20 @@ static int mediaengine_switch_sink(ArchoeraMediaEngine *e,
         }
         if (e->pos_interval_ms > 0) {
             player_set_position_interval(e->player, e->pos_interval_ms);
+        }
+        if (rc == 1) {
+            /* 新设备格式变化 → ring 里约 1~2.7s 预解码内容已丢弃。此时解码
+               游标仍领先播放位置，若不回退就会**静默跳过这截音频**（起播即
+               0:01~0:04、进度条永远落后声音）。把管线重建到已播放位置即
+               "从听到的地方继续"，内容不丢、位置基由 rebuild 重新对齐。
+               重建失败也不至于错位：player 侧已把位置基对齐到已播放点。 */
+            double dur_ms = pipeline_get_duration(e->p) * 1000.0;
+            double abs_ms = (double)e->session_offset_ms + pos_ms;
+            if (dur_ms > 0 && abs_ms > dur_ms) abs_ms = dur_ms;
+            if (mediaengine_stream_rebuild(e, (int64_t)abs_ms, pos_ms) != 0) {
+                ERA_LOGW(NULL, "[mediaengine] 切 sink 后重建管线失败，"
+                        "接受 %.0fms 内容跳段（位置基已对齐）\n", pos_ms);
+            }
         }
         return 0;
     }
@@ -1368,6 +1388,47 @@ static int mediaengine_switch_sink(ArchoeraMediaEngine *e,
     return 0;
 }
 
+/* ── 进程内「上次用户选择的 sink」────────────────────────────────
+ * 每个新会话（每首歌一个引擎实例）初始化 sink 时，若 env ARCHOERA_AUDIO_SINK
+ * 未显式指定则沿用该记忆：新会话**一开始就打开目标设备**，不必再走
+ * 「先开系统默认设备 → 收到 set_sink 再切」的二次开关。二次开关在蓝牙设备上
+ * 会多一次链路重协商（几百 ms 静音/抖动），且一旦旧缓冲不可复用还得重建解码
+ * 管线；能省则省。set_sink 命中同一 id 时 handle_set_sink 也是幂等直接返回。 */
+/* 锁惰性初始化：CRITICAL_SECTION / POSIX mutex 均不支持可靠静态初始化
+ *（同 segstore.c 进程池；MSVC 走 compat/pthread.h）。 */
+static pthread_mutex_t g_sink_pref_mu;
+static pthread_once_t g_sink_pref_once = PTHREAD_ONCE_INIT;
+static char g_sink_pref[PLAYER_SINK_ID_CAP]; /* 空串 = 未记录 */
+
+static void sink_pref_mu_init(void)
+{
+    pthread_mutex_init(&g_sink_pref_mu, NULL);
+}
+
+static void sink_pref_store(const char *id)
+{
+    pthread_once(&g_sink_pref_once, sink_pref_mu_init);
+    pthread_mutex_lock(&g_sink_pref_mu);
+    if (id && id[0]) {
+        snprintf(g_sink_pref, sizeof(g_sink_pref), "%s", id);
+    } else {
+        g_sink_pref[0] = '\0';
+    }
+    pthread_mutex_unlock(&g_sink_pref_mu);
+}
+
+/* 取记忆的 sink id（写入 out；返回 1 = 有记忆，0 = 无）。 */
+static int sink_pref_load(char *out, size_t cap)
+{
+    int has;
+    pthread_once(&g_sink_pref_once, sink_pref_mu_init);
+    pthread_mutex_lock(&g_sink_pref_mu);
+    has = g_sink_pref[0] != '\0';
+    if (has && out && cap > 0) snprintf(out, cap, "%s", g_sink_pref);
+    pthread_mutex_unlock(&g_sink_pref_mu);
+    return has;
+}
+
 /* set_sink 处理：存引擎选择 →（播放中）平滑重启播放器 → 事件回报。
    id 为空串 = 回系统默认。 */
 static void handle_set_sink(ArchoeraMediaEngine *e, const char *id)
@@ -1382,12 +1443,13 @@ static void handle_set_sink(ArchoeraMediaEngine *e, const char *id)
             req, e->player ? "yes" : "no");
 
     if (strcmp(req, old) == 0) {
-        /* 幂等：与当前应用一致，不重启 */
+        /* 幂等：与当前应用一致，不重启（新会话已按记忆 sink 直接打开） */
         ok = 1;
     } else {
         free(e->sink_id);
         e->sink_id = strdup(req);
         e->sink_user_set = 1;
+        sink_pref_store(req); /* 记住选择：下一首建会话即直接打开该设备 */
         if (e->player) {
             if (mediaengine_switch_sink(e, err, sizeof(err)) != 0) {
                 ok = 0;
@@ -2095,16 +2157,25 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
     pthread_cond_init(&e->ev_drain_cond, NULL);
     pthread_cond_init(&e->stage_cv, NULL);
 
-    /* 播放输出 sink 初始选择：env ARCHOERA_AUDIO_SINK 显式覆盖 → 否则系统默认。
-       仅播放模式有意义；后续 set_sink 命令会覆盖此值。 */
+    /* 播放输出 sink 初始选择：env ARCHOERA_AUDIO_SINK 显式覆盖 → 上会话用户
+       选择的记忆 → 系统默认。仅播放模式有意义；后续 set_sink 命令会覆盖此值。 */
     {
         const char *env = getenv("ARCHOERA_AUDIO_SINK");
-        e->sink_id = strdup((env && env[0]) ? env : "");
-        e->sink_user_set = (env && env[0]) ? 1 : 0;
+        char pref[PLAYER_SINK_ID_CAP];
+        char *init_id = NULL;
+        int from_env = (env && env[0]) ? 1 : 0;
+        if (from_env) {
+            init_id = strdup(env);
+        } else if (sink_pref_load(pref, sizeof(pref))) {
+            init_id = strdup(pref);
+        }
+        e->sink_id = init_id ? init_id : strdup("");
+        e->sink_user_set = (from_env || (init_id != NULL)) ? 1 : 0;
         e->last_volume = 1.0f;
         ERA_LOGI(NULL, "[mediaengine] 初始 sink=%s (%s)\n",
                 e->sink_id && e->sink_id[0] ? e->sink_id : "(系统默认)",
-                e->sink_user_set ? "env 显式指定" : "系统默认");
+                from_env ? "env 显式指定"
+                         : (init_id ? "上次选择" : "系统默认"));
     }
 
     /* pipeline_create（avformat_open_input 网络 IO）移到引擎线程执行：
