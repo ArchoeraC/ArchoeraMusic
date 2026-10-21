@@ -74,7 +74,9 @@ struct PlayerCtx {
     ma_device stream_device;    /* raw 输出设备 */
     int stream_dev_inited;      /* ma_device 已 init */
     qa_size stream_dev_started; /* ma_device 已 start（跨线程标志） */
-    qa_size stream_active;      /* 有喂入过 PCM（首包后为 1，供 playing 事件判定） */
+    qa_size stream_active;      /* 有喂入过 PCM（首包后为 1；play 命令据此启设备） */
+    qa_size stream_playing_sent;/* playing 事件已推送（首块真实 PCM 喂入时置位） */
+    int     emit_playing;       /* 1 = 首块 PCM 时推 playing（切 sink 静默重启用 0） */
     unsigned stream_dev_rate;   /* 设备采样率（原生适配/原生 sink） */
     unsigned stream_dev_ch;     /* 设备声道数 */
     unsigned stream_feed_rate;  /* 喂入内容采样率 */
@@ -905,16 +907,13 @@ PlayerCtx *player_stream_open(const char *sink_id,
             (double)p->ring_cap / (double)dev_rate, reason);
     }
 
-    /* 播放器就绪事件（等价文件模式：设备打开、可开始出声） */
-    if (st_opts.emit_playing && p->on_event) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "{\"type\":\"playing\"}");
-        p->on_event(buf, p->user_data);
-    }
-
-    if (!st_opts.start_paused) {
-        stream_device_start(p);
-    } else {
+    /* playing / 设备启动**延后到首块真实 PCM 喂入**（见 player_stream_write）：
+       设备一旦 start 就会立刻空转消费（输出静音），若此时就推 playing，UI 会
+       在真正出声前把状态切成「播放中」（时间基准从 0 起算），首块 PCM 到达后
+       又白等一个设备周期——表现为「缓冲态与实际出声错位、进度条/歌词整体偏移」。
+       因此这里只记状态，不推事件、不启设备。 */
+    p->emit_playing = st_opts.emit_playing ? 1 : 0;
+    if (st_opts.start_paused) {
         QA_STORE_REL(&p->playing, 0);
     }
     return p;
@@ -971,6 +970,22 @@ int player_stream_write(PlayerCtx *p, const float *pcm, int samples)
                    (need - first) * dch * sizeof(float));
         }
         QA_STORE_REL(&p->ring_w, w + need);
+    }
+
+    /* 首块**真实 PCM** 已入环：此刻才推 playing（真正开始出声），并立即回填
+       起点位置——UI 的「缓冲→播放」切换与时间基准零点因此对齐到同一次出声，
+       不会出现「状态还在缓冲，声音已经走了一截」导致进度条/歌词整体偏移。 */
+    if (!QA_LOAD_ACQ(&p->stream_playing_sent)) {
+        const double base_ms = stream_pos_base_get(p);
+        QA_STORE_REL(&p->stream_playing_sent, 1);
+        QA_STORE_REL(&p->last_pos_frame, (qa_size)base_ms);
+        if (p->emit_playing && p->on_event) {
+            char buf[128];
+            p->on_event("{\"type\":\"playing\"}", p->user_data);
+            snprintf(buf, sizeof(buf),
+                     "{\"type\":\"position\",\"position_ms\":%.0f}", base_ms);
+            p->on_event(buf, p->user_data);
+        }
     }
 
     /* 首包后启动设备（此前可能 start_paused / 等待首数据） */
@@ -1072,6 +1087,15 @@ void player_stream_seek_reset(PlayerCtx *p)
     QA_STORE_REL(&p->ended_reported, 0);
 }
 
+/* 流式切 sink。返回：0 = 已切且**环形缓冲/解码游标连续**（无内容丢失）；
+ * 1 = 已切但旧缓冲被丢弃（新设备格式不同，ring 里的帧不可复用）——调用方须
+ *     把管线重建到「已播放位置」，否则解码游标领先播放位置的 1~2.7s 内容会被
+ *     整段跳过（起播即 0:01~0:04、进度条永远落后声音）；
+ * -1 = 失败（旧设备原样保留，调用方回退）。
+ *
+ * 关键不变量：**切设备不得改变"解码游标 / 播放位置"的对应关系**。旧实现清空
+ * ring 后只把位置基设为已播放点，却没把解码游标退回去，于是预解码好的那截
+ * 内容被直接丢掉——每首歌起播都"少听"1~2.7s，进度条随之永久落后。 */
 int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
 {
     ma_result r;
@@ -1082,19 +1106,21 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
     int sink_native_known = 0;
     int native_adapt = 0;
     unsigned dev_rate, dev_ch;
+    unsigned old_rate, old_ch;
+    double played;
+    int keep_ring;
     int i;
 
     if (!p || !p->stream_mode || !p->stream_dev_inited) return -1;
 
-    /* 旧设备停止并释放 */
-    {
-        double played = player_stream_played_ms(p);
-        stream_device_stop(p);
-        ma_device_uninit(&p->stream_device);
-        p->stream_dev_inited = 0;
-        /* 保留 ring 计数并平移位置基：ring 清空后位置从已播放点延续 */
-        stream_pos_base_set(p, played);
-    }
+    played   = player_stream_played_ms(p);
+    old_rate = p->stream_dev_rate;
+    old_ch   = p->stream_dev_ch;
+
+    /* 旧设备停止并释放（ring / 游标先保留：等新设备格式确定后再决定是否复用） */
+    stream_device_stop(p);
+    ma_device_uninit(&p->stream_device);
+    p->stream_dev_inited = 0;
 
     ctx_inited = p->context_initialized ? 1 : 0;
     if (!ctx_inited) {
@@ -1160,24 +1186,11 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
     }
     if (dev_ch < 1) dev_ch = 1;
     if (dev_ch > 2) dev_ch = 2;
-    p->stream_dev_rate = dev_rate;
-    p->stream_dev_ch   = dev_ch;
-    p->stream_dev_ratio = (double)dev_rate / (double)p->stream_feed_rate;
 
-    /* 重建 swr（格式可能变化） */
-    if (p->stream_swr) { resampler_destroy(p->stream_swr); p->stream_swr = NULL; }
-    if (p->stream_conv_buf) { free(p->stream_conv_buf); p->stream_conv_buf = NULL; }
-    p->stream_conv_cap_frames = 0;
-    if (dev_rate != p->stream_feed_rate || dev_ch != p->stream_feed_ch) {
-        p->stream_swr = resampler_create((int)p->stream_feed_rate,
-                                          (int)p->stream_feed_ch,
-                                          AV_SAMPLE_FMT_FLT,
-                                          (int)dev_rate, (int)dev_ch);
-    }
-
-    /* 清空缓冲：新设备从当前解码点续播 */
-    QA_STORE_REL(&p->ring_w, 0);
-    QA_STORE_REL(&p->ring_r, 0);
+    /* ring 能否跨设备复用：设备格式（rate/ch）不变时，ring 里已解码的帧对
+       新设备**仍然有效**，保留计数即可无缝续播（位置基也不动）；格式变了才
+       必须丢弃——此时由调用方把管线重建到「已播放位置」，绝不静默跳过内容。 */
+    keep_ring = (p->ring != NULL && dev_rate == old_rate && dev_ch == old_ch);
 
     {
         ma_device_config dcfg = ma_device_config_init(ma_device_type_playback);
@@ -1194,15 +1207,39 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
         if (r != MA_SUCCESS) {
             ERA_LOGE(NULL, "[player] 流设备切 sink init 失败 %d\n", (int)r);
             p->stream_dev_inited = 0;
-            return -1;
+            return -1; /* 设备格式字段未改动，ring/位置基保持原样 */
         }
-        p->stream_dev_inited = 1;
-        QA_STORE_REL(&p->stream_dev_started, 0);
     }
+    p->stream_dev_rate = dev_rate;
+    p->stream_dev_ch   = dev_ch;
+    p->stream_dev_ratio = (double)dev_rate / (double)p->stream_feed_rate;
+
+    if (!keep_ring) {
+        /* 格式变化：重建 swr（feed→新设备格式） */
+        if (p->stream_swr) { resampler_destroy(p->stream_swr); p->stream_swr = NULL; }
+        if (p->stream_conv_buf) { free(p->stream_conv_buf); p->stream_conv_buf = NULL; }
+        p->stream_conv_cap_frames = 0;
+        if (dev_rate != p->stream_feed_rate || dev_ch != p->stream_feed_ch) {
+            p->stream_swr = resampler_create((int)p->stream_feed_rate,
+                                              (int)p->stream_feed_ch,
+                                              AV_SAMPLE_FMT_FLT,
+                                              (int)dev_rate, (int)dev_ch);
+        }
+        /* 旧缓冲不可复用：清 ring，位置基对齐到已播放点（调用方负责把解码
+           游标也退回该点，见返回值 1 的约定）。 */
+        QA_STORE_REL(&p->ring_w, 0);
+        QA_STORE_REL(&p->ring_r, 0);
+        stream_pos_base_set(p, played);
+    }
+
+    p->stream_dev_inited = 1;
+    QA_STORE_REL(&p->stream_dev_started, 0);
     if (QA_LOAD_ACQ(&p->playing)) {
         stream_device_start(p);
     }
-    return 0;
+    /* 0 = 缓冲连续（无缝，位置基未动）；1 = 缓冲已丢弃，调用方须重建管线到
+       已播放位置，否则解码游标领先的那截内容会被跳过。 */
+    return keep_ring ? 0 : 1;
 }
 
 void player_get_state(PlayerCtx *p, int *playing, double *pos_ms, float *volume)
