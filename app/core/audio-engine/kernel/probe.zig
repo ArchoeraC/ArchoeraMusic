@@ -424,7 +424,7 @@ test "identify: WAV 家族（WAV/RIFX/RF64/W64/AIFF）" {
     try testing.expectEqual(Format.wav, fmtBytes("RIFX\x24\x00\x00\x00WAVEfmt "));
     try testing.expectEqual(Format.wav, fmtBytes("RF64\x24\x00\x00\x00WAVEfmt "));
     // Sony Wave64：riff GUID(16) + filesize(8) + wave GUID(16)，"wave" 在偏移 24
-    var w64 = [_]u8{0} ** 40;
+    var w64: [40]u8 = @splat(0);
     @memcpy(w64[0..4], "riff");
     w64[4] = 0x2E;
     w64[5] = 0x91;
@@ -473,7 +473,7 @@ test "identify: 带 ID3 前导的 FLAC（标签在窗口内）" {
 }
 
 test "probe: ID3v2 标签超出窗口 → seek 判定 FLAC（位置不消耗）" {
-    const junk = [_]u8{0x41} ** 64;
+    const junk: [64]u8 = @splat(0x41);
     var file = std.ArrayList(u8).empty;
     defer file.deinit(testing.allocator);
     try file.appendSlice(testing.allocator, "ID3");
@@ -489,7 +489,7 @@ test "probe: ID3v2 标签超出窗口 → seek 判定 FLAC（位置不消耗）"
 
 test "identify: Ogg（Opus / Vorbis）" {
     // 构造 Ogg 页：27 字节头 + segment table + payload
-    var ogg = [_]u8{0} ** 64;
+    var ogg: [64]u8 = @splat(0);
     @memcpy(ogg[0..4], "OggS");
     ogg[26] = 1; // 1 个 segment
     @memcpy(ogg[28..36], "OpusHead");
@@ -611,7 +611,7 @@ test "probe: DTS 开关已开 → 识别（解码已接入）" {
 
 test "identify: Matroska（.mka）EBML + DocType" {
     // EBML 头魔数 + DocType "matroska"（probe_window=64 内含 DocType）
-    var head: [64]u8 = [_]u8{0} ** 64;
+    var head: [64]u8 = @splat(0);
     @memcpy(head[0..4], "\x1A\x45\xDF\xA3");
     // 在窗口内放置 DocType 元素：0x42 0x82 0x88 "matroska"（offset 0x15 附近）
     const doc = "matroska";
@@ -625,7 +625,7 @@ test "identify: Matroska（.mka）EBML + DocType" {
 }
 
 test "probe: mka 开启 → 识别（fmt/mka 已接入）" {
-    var head: [64]u8 = [_]u8{0} ** 64;
+    var head: [64]u8 = @splat(0);
     @memcpy(head[0..4], "\x1A\x45\xDF\xA3");
     const doc = "matroska";
     @memcpy(head[0x15..][0..2], &[_]u8{ 0x42, 0x82 });
@@ -637,7 +637,7 @@ test "probe: mka 开启 → 识别（fmt/mka 已接入）" {
 }
 
 test "probe: abort 透传 Aborted（mka 输入）" {
-    var head: [64]u8 = [_]u8{0} ** 64;
+    var head: [64]u8 = @splat(0);
     @memcpy(head[0..4], "\x1A\x45\xDF\xA3");
     const doc = "matroska";
     @memcpy(head[0x15..][0..2], &[_]u8{ 0x42, 0x82 });
@@ -698,3 +698,4 @@ test "AS4 format hint: 稳定数值 ↔ Format 双向映射（unknown/越界 →
     try testing.expectEqual(Format.flac, hintToFormat(2).?);
     try testing.expectEqual(Format.tta, hintToFormat(25).?);
 }
+

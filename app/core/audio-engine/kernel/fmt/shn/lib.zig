@@ -316,7 +316,7 @@ test "shn 健壮性: 坏魔数/截断头 → Corrupt；非 RIFF/FORM verbatim �
     var info: decoder.Info = undefined;
 
     // 坏魔数
-    var bad_magic = [_]u8{0} ** 64;
+    var bad_magic: [64]u8 = @splat(0);
     @memcpy(bad_magic[0..4], "XJKG");
     var r0 = io.Reader.openMem(&bad_magic);
     try testing.expectError(error.Corrupt, open(testing.allocator, &r0, &info));
@@ -326,7 +326,7 @@ test "shn 健壮性: 坏魔数/截断头 → Corrupt；非 RIFF/FORM verbatim �
     try testing.expectError(error.Corrupt, open(testing.allocator, &r1, &info));
 
     // 魔数正确但流损坏（version 后乱码 → channels=0）
-    var bad_stream = [_]u8{0} ** 64;
+    var bad_stream: [64]u8 = @splat(0);
     @memcpy(bad_stream[0..4], "ajkg");
     bad_stream[4] = 2;
     var r2 = io.Reader.openMem(&bad_stream);

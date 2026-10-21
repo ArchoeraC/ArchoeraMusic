@@ -420,7 +420,7 @@ fn parseCommentField(
 
     // 标准字段映射（首字段优先）
     const field = commentFieldOf(key) orelse return;
-    const s = allocator.dupeZ(u8, value) catch return error.OutOfMemory;
+    const s = allocator.dupeSentinel(u8, value, 0) catch return error.OutOfMemory;
     if (!setMetaField(meta, field, s)) allocator.free(s);
 }
 
@@ -767,7 +767,7 @@ test "streaminfo: 未知块类型（保留值 / 127 INVALID）→ 跳过容错" 
 }
 
 test "streaminfo: ID3v2 前置标签跳过（FLAC 规范允许）" {
-    const junk = [_]u8{0x41} ** 32;
+    const junk: [32]u8 = @splat(0x41);
     var stream = std.ArrayList(u8).empty;
     defer stream.deinit(testing.allocator);
     try stream.appendSlice(testing.allocator, "ID3");
@@ -963,21 +963,21 @@ test "streaminfo: REPLAYGAIN 畸形值 → 保持 null（不崩溃）" {
 }
 
 test "streaminfo: CUESHEET 解析（track/index → cue_points）" {
-    var hdr = [_]u8{0} ** 396;
+    var hdr: [396]u8 = @splat(0);
     hdr[136] = 0x80; // is_cd = 1
     hdr[137] = 2; // num_tracks = 2
-    var t1 = [_]u8{0} ** 36;
+    var t1: [36]u8 = @splat(0);
     std.mem.writeInt(u64, t1[0..8], 0, .big); // track_offset
     t1[8] = 1; // track_number
     t1[22] = 2; // num_indices
-    var idx1 = [_]u8{0} ** 12; // index 1.0: offset 0
-    var idx2 = [_]u8{0} ** 12;
+    var idx1: [12]u8 = @splat(0); // index 1.0: offset 0
+    var idx2: [12]u8 = @splat(0);
     std.mem.writeInt(u64, idx2[0..8], 58800, .big); // index 1.1: offset 58800
-    var t2 = [_]u8{0} ** 36;
+    var t2: [36]u8 = @splat(0);
     std.mem.writeInt(u64, t2[0..8], 123456, .big);
     t2[8] = 2;
     t2[22] = 1;
-    var idx3 = [_]u8{0} ** 12;
+    var idx3: [12]u8 = @splat(0);
     std.mem.writeInt(u64, idx3[0..8], 123456, .big); // index 2.0: offset 123456
 
     var buf = std.ArrayList(u8).empty;
@@ -1005,15 +1005,15 @@ test "streaminfo: CUESHEET 解析（track/index → cue_points）" {
 }
 
 test "streaminfo: CUESHEET 声明 track 数超载 → clamp 保留已解析点" {
-    var hdr = [_]u8{0} ** 396;
+    var hdr: [396]u8 = @splat(0);
     hdr[137] = 10; // 声明 10 个 track，块内只有 2 个
-    var t1 = [_]u8{0} ** 36;
+    var t1: [36]u8 = @splat(0);
     t1[22] = 1;
-    var idx1 = [_]u8{0} ** 12;
+    var idx1: [12]u8 = @splat(0);
     std.mem.writeInt(u64, idx1[0..8], 100, .big);
-    var t2 = [_]u8{0} ** 36;
+    var t2: [36]u8 = @splat(0);
     t2[22] = 1;
-    var idx2 = [_]u8{0} ** 12;
+    var idx2: [12]u8 = @splat(0);
     std.mem.writeInt(u64, idx2[0..8], 200, .big);
 
     var buf = std.ArrayList(u8).empty;

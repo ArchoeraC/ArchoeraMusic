@@ -233,14 +233,14 @@ pub fn lpSynthesisFilterf(buf: []f32, in: []const f32, coeffs: []const f32, orde
 // ---------------------------------------------------------------------------
 
 pub const Lfg = struct {
-    state: [64]u32 = [_]u32{0} ** 64,
+    state: [64]u32 = @splat(0),
     index: u32 = 0,
 
     /// av_lfg_init(c, 1)：MD5(seed_LE32 ++ [i] ++ 上一轮摘要[5..16]) → state[i..i+4]
     /// （C 的 av_md5_sum 就地写回 tmp，故输入跨轮次“链式”依赖上一轮摘要，需逐轮复刻）
     pub fn initSeed(seed: u32) Lfg {
         var c = Lfg{};
-        var tmp: [16]u8 = [_]u8{0} ** 16;
+        var tmp: [16]u8 = @splat(0);
         var i: usize = 8;
         while (i < 64) : (i += 4) {
             std.mem.writeInt(u32, tmp[0..4], seed, .little);

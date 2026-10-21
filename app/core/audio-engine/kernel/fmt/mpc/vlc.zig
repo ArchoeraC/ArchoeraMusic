@@ -62,14 +62,14 @@ pub const Vlc = struct {
     offset: i32 = 0,
     /// per-len canonical 起始码（已 <<32-len）；保留供调试/兼容，
     /// 解码用下方精确码字表（不依赖同长码字连续的假设）
-    first_code: [MaxLen + 1]u32 = [_]u32{0} ** (MaxLen + 1),
-    count: [MaxLen + 1]u16 = [_]u16{0} ** (MaxLen + 1),
-    first_sym: [MaxLen + 1]u16 = [_]u16{0} ** (MaxLen + 1),
+    first_code: [MaxLen + 1]u32 = @splat(0),
+    count: [MaxLen + 1]u16 = @splat(0),
+    first_sym: [MaxLen + 1]u16 = @splat(0),
     maxlen: u8 = 0,
     /// 每码长码字（输入序，升序）与符号下标（flat 存储，len_start 分段）
     code_buf: [MAX_SYMS]u32 = undefined,
     sym_idx_buf: [MAX_SYMS]u16 = undefined,
-    len_start: [MaxLen + 2]u16 = [_]u16{0} ** (MaxLen + 2),
+    len_start: [MaxLen + 2]u16 = @splat(0),
 
     pub fn init() Vlc {
         return .{};
@@ -98,7 +98,7 @@ pub const Vlc = struct {
 
         // 计算每个符号的码字（ff_vlc_init_from_lengths 增量算法）
         var code: u64 = 0;
-        var first_code_used = [_]bool{false} ** (MaxLen + 1);
+        var first_code_used: [(MaxLen + 1)]bool = @splat(false);
         for (0..n_) |i| {
             const l: usize = lens_in[i];
             if (l == 0) continue;
@@ -112,7 +112,7 @@ pub const Vlc = struct {
         // 精确码字表：按码长分段存放（同长码字随全局 code 单调递增 → 可二分）。
         // 同长码字在码空间未必连续（如 SV7 quant 表长交错），逐码字精确匹配
         // 才与 FFmpeg get_vlc2 的前缀解码逐位一致（SV8 表恰好连续，结果相同）。
-        var fill: [MaxLen + 1]u16 = [_]u16{0} ** (MaxLen + 1);
+        var fill: [MaxLen + 1]u16 = @splat(0);
         var start: u16 = 0;
         for (0..MaxLen + 1) |l| {
             self.len_start[l] = start;
@@ -252,7 +252,7 @@ test "vlc canonical build/decode roundtrip" {
 
     // 手工验证解码一个已知符号：全部位为 0 的码长 n 即第一组（最长 16→count=1?）。
     // 取 band 表：符号 0 位于 len1（counts 第 0 组为空 → 首符号为 len 2 的 13）。
-    var buf = [_]u8{0} ** 8;
+    var buf: [8]u8 = @splat(0);
     var br = BitReader{ .data = &buf };
     _ = &br;
 }

@@ -25,7 +25,9 @@ const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");
 const decoder = @import("../decoder.zig");
 
-const c = @cImport(@cInclude("interf_dec.h"));
+// Zig 0.17 移除 @cImport：头文件经 build.zig 的 addTranslateC 翻译为
+// 模块（见 build.zig 的 tc_amr），这里按模块名导入。
+const c = @import("c_amr");
 
 /// AMR-NB 帧载荷字节数（octet-aligned；type 12-15 无数据）
 const frame_sizes = [16]u8{ 12, 13, 15, 17, 19, 20, 26, 31, 5, 6, 5, 5, 0, 0, 0, 0 };

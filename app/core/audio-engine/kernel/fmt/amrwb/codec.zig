@@ -75,16 +75,16 @@ pub const Decoder = struct {
     fr_cur_mode: u8 = 0,
     fr_quality: bool = false,
     isf_cur: [LP_ORDER]f32 = undefined,
-    isf_q_past: [LP_ORDER]f32 = [_]f32{0} ** LP_ORDER,
+    isf_q_past: [LP_ORDER]f32 = @splat(0),
     isf_past_final: [LP_ORDER]f32 = undefined,
     isp: [4][LP_ORDER]f64 = undefined,
-    isp_sub4_past: [LP_ORDER]f64 = [_]f64{0} ** LP_ORDER,
+    isp_sub4_past: [LP_ORDER]f64 = @splat(0),
     lp_coef: [4][LP_ORDER]f32 = undefined,
 
     base_pitch_lag: u8 = 0,
     pitch_lag_int: i32 = 0,
 
-    excitation_buf: [EXC_BUF_LEN]f32 = [_]f32{0} ** EXC_BUF_LEN,
+    excitation_buf: [EXC_BUF_LEN]f32 = @splat(0),
 
     pitch_vector: [AMRWB_SFR_SIZE]f32 = undefined,
     fixed_vector: [AMRWB_SFR_SIZE]f32 = undefined,
@@ -99,15 +99,15 @@ pub const Decoder = struct {
     prev_ir_filter_nr: u8 = 0,
     prev_tr_gain: f32 = 0.0,
 
-    samples_az: [LP_ORDER + AMRWB_SFR_SIZE]f32 = [_]f32{0} ** (LP_ORDER + AMRWB_SFR_SIZE),
-    samples_up: [UPS_MEM_SIZE + AMRWB_SFR_SIZE]f32 = [_]f32{0} ** (UPS_MEM_SIZE + AMRWB_SFR_SIZE),
-    samples_hb: [LP_ORDER_16k + AMRWB_SFR_SIZE_16k]f32 = [_]f32{0} ** (LP_ORDER_16k + AMRWB_SFR_SIZE_16k),
+    samples_az: [LP_ORDER + AMRWB_SFR_SIZE]f32 = @splat(0),
+    samples_up: [UPS_MEM_SIZE + AMRWB_SFR_SIZE]f32 = @splat(0),
+    samples_hb: [LP_ORDER_16k + AMRWB_SFR_SIZE_16k]f32 = @splat(0),
 
-    hpf_31_mem: [2]f32 = [_]f32{0} ** 2,
-    hpf_400_mem: [2]f32 = [_]f32{0} ** 2,
-    demph_mem: [1]f32 = [_]f32{0} ** 1,
-    bpf_6_7_mem: [HB_FIR_SIZE]f32 = [_]f32{0} ** HB_FIR_SIZE,
-    lpf_7_mem: [HB_FIR_SIZE]f32 = [_]f32{0} ** HB_FIR_SIZE,
+    hpf_31_mem: [2]f32 = @splat(0),
+    hpf_400_mem: [2]f32 = @splat(0),
+    demph_mem: [1]f32 = @splat(0),
+    bpf_6_7_mem: [HB_FIR_SIZE]f32 = @splat(0),
+    lpf_7_mem: [HB_FIR_SIZE]f32 = @splat(0),
 
     prng: dsp.Lfg = undefined,
     first_frame: bool = true,

@@ -111,16 +111,16 @@ inline fn ceilLog2(v: usize) usize {
 
 pub const Band = struct {
     decor_enabled: bool = false,
-    orig_order: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
-    decor_coeff: [CHANNELS_MAX / 2]i32 = [_]i32{0} ** 4,
-    adapt_pred_order: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
+    orig_order: [CHANNELS_MAX]u8 = @splat(0),
+    decor_coeff: [CHANNELS_MAX / 2]i32 = @splat(0),
+    adapt_pred_order: [CHANNELS_MAX]u8 = @splat(0),
     highest_pred_order: u8 = 0,
-    fixed_pred_order: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
-    adapt_refl_coeff: [CHANNELS_MAX][PRED_ORDER_MAX]i32 = [_][PRED_ORDER_MAX]i32{[_]i32{0} ** PRED_ORDER_MAX} ** CHANNELS_MAX,
+    fixed_pred_order: [CHANNELS_MAX]u8 = @splat(0),
+    adapt_refl_coeff: [CHANNELS_MAX][PRED_ORDER_MAX]i32 = @splat(@splat(0)),
     dmix_embedded: bool = false,
     lsb_section_size: usize = 0,
-    nscalablelsbs: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
-    bit_width_adjust: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
+    nscalablelsbs: [CHANNELS_MAX]u8 = @splat(0),
+    bit_width_adjust: [CHANNELS_MAX]u8 = @splat(0),
 };
 
 pub const ChSet = struct {
@@ -137,26 +137,26 @@ pub const ChSet = struct {
     dmix_type: u8 = 0,
     hier_chset: bool = false,
     hier_ofs: usize = 0,
-    dmix_coeff: [DMIX_COEFFS_MAX]i32 = [_]i32{0} ** DMIX_COEFFS_MAX,
-    dmix_scale: [DMIX_SCALES_MAX]i32 = [_]i32{0} ** DMIX_SCALES_MAX,
-    dmix_scale_inv: [DMIX_SCALES_MAX]i32 = [_]i32{0} ** DMIX_SCALES_MAX,
+    dmix_coeff: [DMIX_COEFFS_MAX]i32 = @splat(0),
+    dmix_scale: [DMIX_SCALES_MAX]i32 = @splat(0),
+    dmix_scale_inv: [DMIX_SCALES_MAX]i32 = @splat(0),
     ch_mask: u32 = 0,
-    ch_remap: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
+    ch_remap: [CHANNELS_MAX]u8 = @splat(0),
 
     nfreqbands: u8 = 0,
     nabits: u8 = 0,
 
-    bands: [BANDS_MAX]Band = [_]Band{.{}} ** BANDS_MAX,
+    bands: [BANDS_MAX]Band = @splat(.{}),
 
     // 频带编码参数
     seg_common: bool = false,
-    rice_code_flag: [CHANNELS_MAX]bool = [_]bool{false} ** CHANNELS_MAX,
-    bitalloc_hybrid_linear: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
-    bitalloc_part_a: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
-    bitalloc_part_b: [CHANNELS_MAX]u8 = [_]u8{0} ** CHANNELS_MAX,
-    nsamples_part_a: [CHANNELS_MAX]u16 = [_]u16{0} ** CHANNELS_MAX,
+    rice_code_flag: [CHANNELS_MAX]bool = @splat(false),
+    bitalloc_hybrid_linear: [CHANNELS_MAX]u8 = @splat(0),
+    bitalloc_part_a: [CHANNELS_MAX]u8 = @splat(0),
+    bitalloc_part_b: [CHANNELS_MAX]u8 = @splat(0),
+    nsamples_part_a: [CHANNELS_MAX]u16 = @splat(0),
 
-    deci_history: [CHANNELS_MAX][DECI_HISTORY_MAX]i32 = [_][DECI_HISTORY_MAX]i32{[_]i32{0} ** DECI_HISTORY_MAX} ** CHANNELS_MAX,
+    deci_history: [CHANNELS_MAX][DECI_HISTORY_MAX]i32 = @splat(@splat(0)),
 };
 
 /// 每 chset 的采样缓冲。
@@ -189,8 +189,8 @@ pub const XllDecoder = struct {
     ch_mask_nbits: u8 = 0,
     fixed_lsb_width: u8 = 0,
 
-    chset: [CHSETS_MAX]ChSet = [_]ChSet{.{}} ** CHSETS_MAX,
-    bufs: [CHSETS_MAX]ChSetBuf = [_]ChSetBuf{.{}} ** CHSETS_MAX,
+    chset: [CHSETS_MAX]ChSet = @splat(.{}),
+    bufs: [CHSETS_MAX]ChSetBuf = @splat(.{}),
     navi: []i32 = &.{},
     scratch: []i32 = &.{},
 
@@ -204,7 +204,7 @@ pub const XllDecoder = struct {
     x_imax_syncword_present: bool = false,
 
     output_mask: u32 = 0,
-    output_samples: [SPEAKER_COUNT]?[]const i32 = [_]?[]const i32{null} ** SPEAKER_COUNT,
+    output_samples: [SPEAKER_COUNT]?[]const i32 = @splat(null),
 
     pub fn init(alloc: std.mem.Allocator) XllDecoder {
         return .{ .alloc = alloc };
@@ -1106,7 +1106,7 @@ const testing = std.testing;
 test "xll: 解析基本（无 sync）" {
     var dec = XllDecoder.init(testing.allocator);
     defer dec.deinit();
-    var buf: [64]u8 = [_]u8{0} ** 64;
+    var buf: [64]u8 = @splat(0);
     try testing.expectError(error.NoSync, dec.parseFrame(&buf, true));
 }
 

@@ -225,7 +225,7 @@ const testing = std.testing;
 
 /// 测试用 MSB-first 位写入器
 const BitWriter = struct {
-    buf: [64]u8 = [_]u8{0} ** 64,
+    buf: [64]u8 = @splat(0),
     pos: usize = 0,
 
     fn put(self: *BitWriter, value: u32, n: u6) void {

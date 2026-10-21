@@ -80,7 +80,7 @@ const ctables_msbf = blk: {
     @setEvalBranchQuota(1000000);
     var t: [CTABLES][256]f64 = undefined;
     for (0..256) |e| {
-        var acc: [CTABLES]f64 = [_]f64{0} ** CTABLES;
+        var acc: [CTABLES]f64 = @splat(0);
         for (0..8) |m| {
             const sign: f64 = if (((e >> (7 - m)) & 1) != 0) 1.0 else -1.0;
             for (0..CTABLES) |t2| acc[t2] += sign * htaps[t2 * 8 + m];
@@ -93,7 +93,7 @@ const ctables_lsbf = blk: {
     @setEvalBranchQuota(1000000);
     var t: [CTABLES][256]f64 = undefined;
     for (0..256) |e| {
-        var acc: [CTABLES]f64 = [_]f64{0} ** CTABLES;
+        var acc: [CTABLES]f64 = @splat(0);
         for (0..8) |m| {
             const sign: f64 = if (((e >> (7 - m)) & 1) != 0) 1.0 else -1.0;
             for (0..CTABLES) |t2| acc[t2] += sign * htaps[t2 * 8 + m];
@@ -151,7 +151,7 @@ const fir_coeffs = makeLowpass(FIR_TAPS, 20000.0 / 352800.0);
 
 /// 每声道 8× 抽取状态：维护 FIR 环 + 8 个计数。
 const DecimState = struct {
-    buf: [FIR_TAPS]f64 = [_]f64{0} ** FIR_TAPS,
+    buf: [FIR_TAPS]f64 = @splat(0),
     pos: usize = 0,
     pending: usize = 0,
     started: bool = false,
@@ -219,14 +219,14 @@ const Ctx = struct {
     dst_dec: ?*dstcodec.Decoder = null,
 
     /// DSD 数据读取游标（每声道字节偏移；DST 不使用）
-    ch_read: [16]u64 = [_]u64{0} ** 16,
+    ch_read: [16]u64 = @splat(0),
     eof: bool = false,
     total_done: u64 = 0,
 
     /// 每声道 DSP 状态
-    fifo: [16][FIFOSIZE]u8 = [_][FIFOSIZE]u8{[_]u8{0} ** FIFOSIZE} ** 16,
-    fifo_pos: [16]u8 = [_]u8{0} ** 16,
-    decim: [16]DecimState = [_]DecimState{.{}} ** 16,
+    fifo: [16][FIFOSIZE]u8 = @splat(@splat(0)),
+    fifo_pos: [16]u8 = @splat(0),
+    decim: [16]DecimState = @splat(.{}),
 
     /// 解码输出缓冲（交错 s16）
     pcm: std.ArrayList(i16) = .empty,
@@ -459,7 +459,7 @@ fn parseDff(f: *Ctx) Error!void {
         dec.* = .{};
         f.dst_dec = dec;
         // ffmpeg dst decode_init：dsd2pcm FIFO 以 0x69 填充
-        for (0..f.channels) |ch| f.fifo[ch] = [_]u8{0x69} ** FIFOSIZE;
+        for (0..f.channels) |ch| f.fifo[ch] = @splat(0x69);
     } else {
         if (!found_data or f.channels == 0) return error.Corrupt;
         f.ch_bytes = raw_size / f.channels;
@@ -739,7 +739,7 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
             ));
         f.frame_index = target_frame;
         for (0..f.channels) |ch| {
-            f.fifo[ch] = [_]u8{0x69} ** FIFOSIZE;
+            f.fifo[ch] = @splat(0x69);
             f.fifo_pos[ch] = 0;
             f.decim[ch] = .{};
         }
@@ -751,7 +751,7 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
         const target_byte: u64 = @min(target_bits / 8, f.ch_bytes);
         for (0..f.channels) |ch| {
             f.ch_read[ch] = target_byte;
-            f.fifo[ch] = [_]u8{0} ** FIFOSIZE;
+            f.fifo[ch] = @splat(0);
             f.fifo_pos[ch] = 0;
             f.decim[ch] = .{};
         }
@@ -880,8 +880,8 @@ test "dsd: DFF-DST → DSD 重建 + dsd2pcm f32 与 ffmpeg 逐位一致（全 10
     const dec = f.dst_dec.?;
 
     // dsd2pcm 状态：ffmpeg dst decode_init 以 0x69 填 FIFO
-    var g_fifo: [16][FIFOSIZE]u8 = [_][FIFOSIZE]u8{[_]u8{0x69} ** FIFOSIZE} ** 16;
-    var g_pos: [16]u8 = [_]u8{0} ** 16;
+    var g_fifo: [16][FIFOSIZE]u8 = @splat(@splat(0x69));
+    var g_pos: [16]u8 = @splat(0);
 
     var got = std.ArrayList(u8).empty;
     defer got.deinit(std.testing.allocator);

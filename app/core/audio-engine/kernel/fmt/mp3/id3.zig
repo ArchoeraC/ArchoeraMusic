@@ -291,7 +291,7 @@ fn parseTextFrame(
 
     // 标准字段映射（首字段优先）
     const field = id3TextField(id) orelse return;
-    const s = allocator.dupeZ(u8, value) catch return;
+    const s = allocator.dupeSentinel(u8, value, 0) catch return;
     if (!setMetaField(meta, field, s)) allocator.free(s);
 }
 
@@ -378,7 +378,7 @@ pub fn parseV1(reader: *Reader, allocator: Allocator, file_size: u64, meta: *dec
     // 年份 93..97
     const year = std.mem.trimEnd(u8, tag[93..97], "\x00");
     if (year.len > 0 and meta.date == null) {
-        meta.date = allocator.dupeZ(u8, year) catch return;
+        meta.date = allocator.dupeSentinel(u8, year, 0) catch return;
     }
     // 注释 97..127（v1.1 末 2 字节为 track+0，注释有效 28 字节）
     try setV1Field(allocator, meta, .comment, tag[97..125]);
@@ -388,7 +388,7 @@ fn setV1Field(allocator: Allocator, meta: *decoder.Metadata, field: MetaField, r
     if (fieldOccupied(meta, field)) return;
     const s = std.mem.trimEnd(u8, raw, "\x00 \t");
     if (s.len == 0) return;
-    const d = allocator.dupeZ(u8, s) catch return error.OutOfMemory;
+    const d = allocator.dupeSentinel(u8, s, 0) catch return error.OutOfMemory;
     if (!setMetaField(meta, field, d)) allocator.free(d);
 }
 

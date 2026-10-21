@@ -69,7 +69,7 @@ pub const Aac = struct {
     // Level-2 内存优化：重型 ChannelState 网格不再内嵌（原 64 槽 × ~126KB ≈ 8.1MB，
     // 稀疏写也会以页粒度整段变驻留），改为元素首次出现时独立小堆分配（每槽
     // ~126KB，互不相邻）；未出现元素的内存完全不分配，deinit 释放。
-    che: [4][MAX_ELEM_ID]?*Che = [_][MAX_ELEM_ID]?*Che{[_]?*Che{null} ** MAX_ELEM_ID} ** 4,
+    che: [4][MAX_ELEM_ID]?*Che = @splat(@splat(null)),
     // chan_config 布局（元素序列）；PCE（chan_config=0）时指向 layout_buf
     layout: []const LayoutElem = &.{},
     // PCE 动态布局缓冲（chan_config=0 的节目配置元素）
@@ -80,11 +80,11 @@ pub const Aac = struct {
 
     // VLC 表
     vlc_sf: Vlc = .{},
-    vlc_spec: [11]Vlc = [_]Vlc{.{}} ** 11,
+    vlc_spec: [11]Vlc = @splat(.{}),
 
     // 共享工作区
-    buf_mdct: [FRAME_LEN]f32 = [_]f32{0} ** FRAME_LEN,
-    temp: [FRAME_LEN]f32 = [_]f32{0} ** FRAME_LEN,
+    buf_mdct: [FRAME_LEN]f32 = @splat(0),
+    temp: [FRAME_LEN]f32 = @splat(0),
     mdct_scratch: [512]mdct_mod.Mdct(f32).Cplx = undefined,
     mdct_long: mdct_mod.Mdct(f32) = mdct_mod.Mdct(f32).init(1024),
     mdct_short: mdct_mod.Mdct(f32) = mdct_mod.Mdct(f32).init(128),
@@ -1677,7 +1677,7 @@ pub const Aac = struct {
         const chn: usize = if (ps_mode) 2 else self.channels;
         try self.out_buf.ensureUnusedCapacity(self.gpa, n * chn * 2);
         // 每帧一次布局解析 → 每输出声道一个源指针（null = 静音），热循环不再逐样本搜布局。
-        var chan_src = [_]?[*]const f32{null} ** MAX_CH;
+        var chan_src: [MAX_CH]?[*]const f32 = @splat(null);
         if (ps_mode) {
             chan_src[0] = &self.sbr_buf;
             if (chn > 1) chan_src[1] = &self.sbr_buf2;
@@ -1752,7 +1752,7 @@ const Che = struct {
     is_stereo: bool = false,
     present: bool = false,
     ch: [2]ChannelState = .{ .{}, .{} },
-    ms_mask: [MAX_GROUPS * MAX_SFB]bool = [_]bool{false} ** (MAX_GROUPS * MAX_SFB),
+    ms_mask: [MAX_GROUPS * MAX_SFB]bool = @splat(false),
     max_sfb_ste: u8 = 0,
     coup: Coupling = .{},
 };
@@ -1761,10 +1761,10 @@ const Che = struct {
 const Coupling = struct {
     coupling_point: u8 = 0, // 0=BEFORE_TNS 1=BETWEEN_TNS_AND_IMDCT 3=AFTER_IMDCT
     num_coupled: u8 = 0,
-    ty: [8]u8 = [_]u8{0} ** 8, // 0=SCE 1=CPE
-    id_select: [8]u8 = [_]u8{0} ** 8,
-    ch_select: [8]u8 = [_]u8{0} ** 8,
-    gain: [8][MAX_GROUPS * MAX_SFB]f32 = [_][MAX_GROUPS * MAX_SFB]f32{[_]f32{0} ** (MAX_GROUPS * MAX_SFB)} ** 8,
+    ty: [8]u8 = @splat(0), // 0=SCE 1=CPE
+    id_select: [8]u8 = @splat(0),
+    ch_select: [8]u8 = @splat(0),
+    gain: [8][MAX_GROUPS * MAX_SFB]f32 = @splat(@splat(0)),
 };
 
 /// cce_scale（耦合增益基数；对齐 aacdec_float.c）
@@ -1782,23 +1782,23 @@ inline fn cceGain(scale: f32, gain: i32) f32 {
 
 const ChannelState = struct {
     ics: Ics = .{},
-    band_type: [MAX_GROUPS * MAX_SFB]u8 = [_]u8{0} ** (MAX_GROUPS * MAX_SFB),
-    sfo: [MAX_GROUPS * MAX_SFB]i32 = [_]i32{0} ** (MAX_GROUPS * MAX_SFB),
-    sf: [MAX_GROUPS * MAX_SFB]f32 = [_]f32{0} ** (MAX_GROUPS * MAX_SFB),
-    coeffs: [FRAME_LEN]f32 = [_]f32{0} ** FRAME_LEN,
+    band_type: [MAX_GROUPS * MAX_SFB]u8 = @splat(0),
+    sfo: [MAX_GROUPS * MAX_SFB]i32 = @splat(0),
+    sf: [MAX_GROUPS * MAX_SFB]f32 = @splat(0),
+    coeffs: [FRAME_LEN]f32 = @splat(0),
     // output 需 2048：低 1024 为本帧样本，高 1024 供 LTP predTime（对齐 FFmpeg sce->output[2048]）
-    output: [2 * FRAME_LEN]f32 = [_]f32{0} ** (2 * FRAME_LEN),
-    saved: [FRAME_LEN]f32 = [_]f32{0} ** FRAME_LEN,
+    output: [2 * FRAME_LEN]f32 = @splat(0),
+    saved: [FRAME_LEN]f32 = @splat(0),
     tns_present: bool = false,
-    tns_n_filt: [MAX_GROUPS]u8 = [_]u8{0} ** MAX_GROUPS,
-    tns_length: [MAX_GROUPS][4]u8 = [_][4]u8{[_]u8{0} ** 4} ** MAX_GROUPS,
-    tns_order: [MAX_GROUPS][4]u8 = [_][4]u8{[_]u8{0} ** 4} ** MAX_GROUPS,
-    tns_direction: [MAX_GROUPS][4]bool = [_][4]bool{[_]bool{false} ** 4} ** MAX_GROUPS,
+    tns_n_filt: [MAX_GROUPS]u8 = @splat(0),
+    tns_length: [MAX_GROUPS][4]u8 = @splat(@splat(0)),
+    tns_order: [MAX_GROUPS][4]u8 = @splat(@splat(0)),
+    tns_direction: [MAX_GROUPS][4]bool = @splat(@splat(false)),
     tns_coef: [MAX_GROUPS][4][TNS_MAX_ORDER]f32 =
-        [_][4][TNS_MAX_ORDER]f32{[_][TNS_MAX_ORDER]f32{[_]f32{0} ** TNS_MAX_ORDER} ** 4} ** MAX_GROUPS,
+        @splat(@splat(@splat(0))),
     // AAC Main 预测器状态（672 个预测器）+ LTP 长时预测状态（3072 样本）
-    predictor_state: [MAX_PREDICTORS]PredictorState = [_]PredictorState{.{}} ** MAX_PREDICTORS,
-    ltp_state: [3072]f32 = [_]f32{0} ** 3072,
+    predictor_state: [MAX_PREDICTORS]PredictorState = @splat(.{}),
+    ltp_state: [3072]f32 = @splat(0),
 
     fn resetFrame(self: *ChannelState) void {
         @memset(&self.coeffs, 0);
@@ -1821,7 +1821,7 @@ const Ics = struct {
     predictor_present: bool = false,
     predictor_reset_group: u8 = 0,
     predictor_initialized: bool = false,
-    prediction_used: [48]bool = [_]bool{false} ** 48,
+    prediction_used: [48]bool = @splat(false),
     // LTP（AOT 4）长时预测
     ltp: Ltp = .{},
 };
@@ -1831,7 +1831,7 @@ const Ltp = struct {
     present: bool = false,
     lag: u16 = 0,
     coef: f32 = 0,
-    used: [40]bool = [_]bool{false} ** 40,
+    used: [40]bool = @splat(false),
 };
 
 /// AAC Main 频域预测器状态（对齐 aacdec_float_prediction.h）
@@ -2044,7 +2044,7 @@ fn testDeinit(aac: *Aac, a: std.mem.Allocator) void {
 test "AAC Level-2: 结构本体不再内嵌重型网格（< 96KB）" {
     // 旧布局：64 槽 × ~126KB ChannelState 网格 + 内嵌 SBR ≈ 8.3MB；
     // Level-2 后仅余共享工作区（mdct/temp/vlc/sbr 输出缓冲）
-    if (@import("builtin").mode != .ReleaseFast) {
+    if (@import("builtin").mode != .fast) {
         std.debug.print("Aac={d} Che={d} Sbr={d} ChannelState={d}\n", .{
             @sizeOf(Aac), @sizeOf(Che), @sizeOf(sbr_mod.Sbr), @sizeOf(ChannelState),
         });

@@ -445,7 +445,7 @@ test "ogg: CRC-32 非反射与已知向量" {
 test "ogg: 页解析与 CRC 回填自洽" {
     var buf = std.ArrayList(u8).empty;
     defer buf.deinit(testing.allocator);
-    try buildPage(&buf, testing.allocator, HEADER_TYPE_BOS, 0, 0x1234, 0, &[_]u8{ 10, 5, 255, 3 }, &([_]u8{0} ** 273));
+    try buildPage(&buf, testing.allocator, HEADER_TYPE_BOS, 0, 0x1234, 0, &[_]u8{ 10, 5, 255, 3 }, &@as([273]u8, @splat(0)));
     const page = (try parsePage(buf.items)) orelse return error.TestUnexpectedResult;
     try testing.expectEqual(@as(u32, 0x1234), page.serial);
     try testing.expectEqual(@as(u8, HEADER_TYPE_BOS), page.header_type);
@@ -455,12 +455,18 @@ test "ogg: 页解析与 CRC 回填自洽" {
     try testing.expectError(error.Corrupt, parsePage(buf.items));
 }
 
+/// Zig 0.17 移除了数组/字符串重复语法 `**`（数组改 @splat），此处保留
+/// "重复单字节"的 comptime 语义：返回 [n]u8 便于与字面量 `++` 拼接。
+fn repeatByte(comptime byte: u8, comptime n: usize) [n]u8 {
+    return @splat(byte);
+}
+
 test "ogg: Demux 单页内 packet 重组（lacing 分段）" {
     var page_buf = std.ArrayList(u8).empty;
     defer page_buf.deinit(testing.allocator);
     // 三个 packet：5 字节 / 260 字节（255+5 跨段） / 3 字节
     const lacing = [_]u8{ 5, 255, 5, 3 };
-    const payload = "ABCDE" ++ ("F" ** 255) ++ "GHIJK" ++ "XYZ";
+    const payload = "ABCDE" ++ repeatByte('F', 255) ++ "GHIJK" ++ "XYZ";
     try buildPage(&page_buf, testing.allocator, HEADER_TYPE_EOS, 42, 1, 0, &lacing, payload);
 
     const reader = io.Reader.openMem(page_buf.items);
@@ -486,7 +492,7 @@ fn buildThreePages(allocator: std.mem.Allocator, serial: u32) ![]u8 {
     var buf = std.ArrayList(u8).empty;
     defer buf.deinit(allocator);
     errdefer buf.deinit(allocator);
-    const payload = [_]u8{0} ** 40;
+    const payload: [40]u8 = @splat(0);
     try buildPage(&buf, allocator, HEADER_TYPE_BOS, 0, serial, 0, &[_]u8{payload.len}, &payload);
     var one = std.ArrayList(u8).empty;
     defer one.deinit(allocator);

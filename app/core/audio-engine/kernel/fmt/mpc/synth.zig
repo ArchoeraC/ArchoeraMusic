@@ -33,11 +33,11 @@ const OUT_SHIFT: u6 = 24;
 // ---------------------------------------------------------------------------
 
 pub const Lfg = struct {
-    state: [64]u32 = [_]u32{0} ** 64,
+    state: [64]u32 = @splat(0),
     index: u32 = 0,
 
     pub fn init(self: *Lfg, seed: u32) void {
-        var tmp: [16]u8 = [_]u8{0} ** 16;
+        var tmp: [16]u8 = @splat(0);
         var i: usize = 8;
         while (i < 64) : (i += 4) {
             std.mem.writeInt(u32, tmp[0..4], seed, .little);
@@ -114,7 +114,7 @@ inline fn mulh(a: u32, b: i32) i32 {
 /// dct32_fixed 输出 out[32]，输入 tab 视为 u32 模算术（SUINT），
 /// val 均按 u32 维护、位宽回绕；写回 out 时以 i32 位模式解释。
 pub fn dct32Fixed(out: *[era_sblimit]i32, tab_in: *const [era_sblimit]i32) void {
-    var val = [_]u32{0} ** 32;
+    var val: [32]u32 = @splat(0);
     for (0..era_sblimit) |i| val[i] = @bitCast(tab_in[i]);
 
     // BF0(a,b,c,s): tmp0=tab[a]+tab[b]; tmp1=tab[a]-tab[b]; val[a]=tmp0; val[b]=MULH((1<<s)*tmp1, c)
@@ -495,20 +495,20 @@ pub const EraBand = struct {
 
 pub const EraMpcCore = struct {
     /// oldDSCF[ch][band]（帧间持久）
-    era_old_dscf: [2][32]i32 = [_][32]i32{[_]i32{0} ** 32} ** 2,
-    era_bands: [32]EraBand = [_]EraBand{.{}} ** 32,
+    era_old_dscf: [2][32]i32 = @splat(@splat(0)),
+    era_bands: [32]EraBand = @splat(.{}),
     /// Q[ch][0..1152]
-    era_q: [2][era_mpc_frame_size]i32 = [_][era_mpc_frame_size]i32{[_]i32{0} ** era_mpc_frame_size} ** 2,
+    era_q: [2][era_mpc_frame_size]i32 = @splat(@splat(0)),
     /// 去量化后的 子带样本 [ch][36][32]
     era_sb_samples: [2][36][32]i32 = undefined,
     /// 合成滤波器状态
-    era_synth_buf: [2][1024]i32 = [_][1024]i32{[_]i32{0} ** 1024} ** 2,
+    era_synth_buf: [2][1024]i32 = @splat(@splat(0)),
     era_synth_buf_offset: [2]usize = .{ 0, 0 },
     era_rnd: Lfg = .{},
 
     pub fn init(self: *EraMpcCore) void {
-        self.era_old_dscf = [_][32]i32{[_]i32{0} ** 32} ** 2;
-        self.era_synth_buf = [_][1024]i32{[_]i32{0} ** 1024} ** 2;
+        self.era_old_dscf = @splat(@splat(0));
+        self.era_synth_buf = @splat(@splat(0));
         self.era_synth_buf_offset = .{ 0, 0 };
         self.era_rnd.init(0xDEADBEEF);
     }

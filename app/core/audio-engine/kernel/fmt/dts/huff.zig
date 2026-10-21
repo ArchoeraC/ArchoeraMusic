@@ -23,9 +23,9 @@ pub const max_entries = 129;
 
 /// 单张 VLC：最多 129 条（码长 ≤ 16）。
 pub const Huff = struct {
-    entries: [max_entries]Entry = [_]Entry{.{ .code = 0, .bits = 0, .sym = 0 }} ** max_entries,
-    start: [32]u16 = [_]u16{0} ** 32,
-    count: [32]u16 = [_]u16{0} ** 32,
+    entries: [max_entries]Entry = @splat(.{ .code = 0, .bits = 0, .sym = 0 }),
+    start: [32]u16 = @splat(0),
+    count: [32]u16 = @splat(0),
     size: u16 = 0,
     max_len: u8 = 0,
 
