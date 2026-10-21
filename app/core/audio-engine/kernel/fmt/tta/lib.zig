@@ -532,7 +532,7 @@ test "tta 健壮性: 截断/非法头 → Corrupt，format=2/非法位深 → Un
     try testing.expectError(error.Corrupt, open(testing.allocator, &r0, &info));
 
     // 帧表越过文件尾 → Corrupt（把 data_length 改到超大）
-    var bad = [_]u8{0} ** 64;
+    var bad: [64]u8 = @splat(0);
     @memcpy(bad[0..4], "TTA1");
     std.mem.writeInt(u16, bad[4..6], 1, .little);
     std.mem.writeInt(u16, bad[6..8], 2, .little);
@@ -543,7 +543,7 @@ test "tta 健壮性: 截断/非法头 → Corrupt，format=2/非法位深 → Un
     try testing.expectError(error.Corrupt, open(testing.allocator, &r1, &info));
 
     // format=2（加密）→ UnsupportedFormat
-    var enc = [_]u8{0} ** 22;
+    var enc: [22]u8 = @splat(0);
     @memcpy(enc[0..4], "TTA1");
     std.mem.writeInt(u16, enc[4..6], 2, .little);
     std.mem.writeInt(u16, enc[6..8], 1, .little);
@@ -554,7 +554,7 @@ test "tta 健壮性: 截断/非法头 → Corrupt，format=2/非法位深 → Un
     try testing.expectError(error.UnsupportedFormat, open(testing.allocator, &r2, &info));
 
     // 非法位深（32bit → bps 4，ffmpeg 不支持）→ UnsupportedFormat
-    var b32 = [_]u8{0} ** 22;
+    var b32: [22]u8 = @splat(0);
     @memcpy(b32[0..4], "TTA1");
     std.mem.writeInt(u16, b32[4..6], 1, .little);
     std.mem.writeInt(u16, b32[6..8], 1, .little);

@@ -209,7 +209,7 @@ test "fft: 480 点（3·5·2⁵）圆整" {
 }
 
 test "imdct: 120 点逆 MDCT 输出有限" {
-    var src: [120]f32 = [_]f32{0} ** 120;
+    var src: [120]f32 = @splat(0);
     src[10] = 16384.0;
     var out: [120]f32 = undefined;
     imdct(120, &src, &out);

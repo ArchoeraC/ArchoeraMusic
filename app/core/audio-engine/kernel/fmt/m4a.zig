@@ -1457,7 +1457,7 @@ fn parseMetadata(
         };
 
         if (m4aFieldOf(&item.type)) |field| {
-            const s = allocator.dupeZ(u8, trimmed) catch {
+            const s = allocator.dupeSentinel(u8, trimmed, 0) catch {
                 allocator.free(value);
                 return error.OutOfMemory;
             };
@@ -1867,7 +1867,7 @@ fn makeCookie(
     mb: u8,
     kb: u8,
 ) [36]u8 {
-    var b = [_]u8{0} ** 36;
+    var b: [36]u8 = @splat(0);
     std.mem.writeInt(u32, b[0..4], 36, .big);
     @memcpy(b[4..8], "alac");
     std.mem.writeInt(u32, b[8..12], 0, .big); // version
@@ -2003,11 +2003,11 @@ fn buildAlacM4a(
             const rate = std.mem.readInt(u32, cookie[32..36], .big);
             try stsd_payload.appendSlice(allocator, &.{ 0, 0, 0, 0 }); // size 占位
             try stsd_payload.appendSlice(allocator, "alac");
-            try stsd_payload.appendSlice(allocator, &([_]u8{0} ** 6)); // reserved
+            try stsd_payload.appendSlice(allocator, &@as([6]u8, @splat(0))); // reserved
             try stsd_payload.appendSlice(allocator, &.{ 0, 1 }); // data_reference_index
             try stsd_payload.appendSlice(allocator, &.{ 0, 0 }); // version
             try stsd_payload.appendSlice(allocator, &.{ 0, 0 }); // revision
-            try stsd_payload.appendSlice(allocator, &([_]u8{0} ** 4)); // vendor
+            try stsd_payload.appendSlice(allocator, &@as([4]u8, @splat(0))); // vendor
             try stsd_payload.appendSlice(allocator, &.{ 0, cookie[21] }); // channelcount
             try stsd_payload.appendSlice(allocator, &.{ 0, cookie[17] }); // samplesize
             try stsd_payload.appendSlice(allocator, &.{ 0, 0 }); // compression_id
@@ -2021,11 +2021,11 @@ fn buildAlacM4a(
         .aac => |info| {
             try stsd_payload.appendSlice(allocator, &.{ 0, 0, 0, 0 }); // size 占位
             try stsd_payload.appendSlice(allocator, "mp4a");
-            try stsd_payload.appendSlice(allocator, &([_]u8{0} ** 6)); // reserved
+            try stsd_payload.appendSlice(allocator, &@as([6]u8, @splat(0))); // reserved
             try stsd_payload.appendSlice(allocator, &.{ 0, 1 }); // data_reference_index
             try stsd_payload.appendSlice(allocator, &.{ 0, 0 }); // version
             try stsd_payload.appendSlice(allocator, &.{ 0, 0 }); // revision
-            try stsd_payload.appendSlice(allocator, &([_]u8{0} ** 4)); // vendor
+            try stsd_payload.appendSlice(allocator, &@as([4]u8, @splat(0))); // vendor
             try stsd_payload.appendSlice(allocator, &.{ 0, info.channels }); // channelcount
             try stsd_payload.appendSlice(allocator, &.{ 0, 16 }); // samplesize
             try stsd_payload.appendSlice(allocator, &.{ 0, 0 }); // compression_id

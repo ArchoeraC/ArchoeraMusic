@@ -41,13 +41,13 @@ runs:
         channel: stable
         cache: true
 
-    # Zig 0.16（EraAudio kernel）。归档名按 0.15.1+ 新规则 zig-<arch>-<os>；
+    # Zig 0.17（EraAudio kernel）。归档名按 0.15.1+ 新规则 zig-<arch>-<os>；
     # GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
-    - name: Install Zig 0.16 (EraAudio kernel)
+    - name: Install Zig 0.17 (EraAudio kernel)
       shell: bash
       run: |
         set -euo pipefail
-        VER=0.16.0
+        VER=0.17.0
         ZA="${{ inputs.zig_archive }}"
         ZD="$HOME/.local/zig-$VER"
         if [ ! -x "$ZD/zig" ]; then

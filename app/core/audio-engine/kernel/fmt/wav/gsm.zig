@@ -148,8 +148,8 @@ const apcm_mode = [9][4]u8{
 /// GSM 解码状态（镜像 FFmpeg GSMContext；流开头 / seek 后须置零）
 pub const Context = struct {
     /// 前 120 元素为上一帧尾部（long_term_synth 按 lag 回溯），随后 160 为当前帧
-    ref_buf: [280]i16 = [_]i16{0} ** 280,
-    v: [9]i32 = [_]i32{0} ** 9,
+    ref_buf: [280]i16 = @splat(0),
+    v: [9]i32 = @splat(0),
     lar: [2][8]i32 = .{ .{ 0, 0, 0, 0, 0, 0, 0, 0 }, .{ 0, 0, 0, 0, 0, 0, 0, 0 } },
     lar_idx: u1 = 0,
     msr: i32 = 0,
@@ -729,9 +729,9 @@ test "gsm: 非法块长 / 短块报错" {
     var ctx = Context{};
     var out: [ms_frame_size]i16 = undefined;
     // GSM_MS 块长须 41..65 且 (len-41) % 3 == 0
-    try testing.expectError(error.Corrupt, decodeGsmMs(&ctx, &[_]u8{0} ** 40, &out)); // < 41
-    try testing.expectError(error.Corrupt, decodeGsmMs(&ctx, &[_]u8{0} ** 42, &out)); // 非 3 对齐
-    try testing.expectError(error.Corrupt, decodeGsmMs(&ctx, &[_]u8{0} ** 66, &out)); // > 65
+    try testing.expectError(error.Corrupt, decodeGsmMs(&ctx, &@as([40]u8, @splat(0)), &out)); // < 41
+    try testing.expectError(error.Corrupt, decodeGsmMs(&ctx, &@as([42]u8, @splat(0)), &out)); // 非 3 对齐
+    try testing.expectError(error.Corrupt, decodeGsmMs(&ctx, &@as([66]u8, @splat(0)), &out)); // > 65
     // 纯 GSM 帧须 >= 33 字节
-    try testing.expectError(error.Corrupt, decodeGsm(&ctx, &[_]u8{0} ** 32, &out));
+    try testing.expectError(error.Corrupt, decodeGsm(&ctx, &@as([32]u8, @splat(0)), &out));
 }

@@ -296,7 +296,7 @@ pub fn mdctInvFullMath(comptime L: usize, in: []const f32, out: []f32) void {
     const pi: f64 = std.math.pi;
     const n: f64 = @floatFromInt(L);
     const half: f64 = (n + 1.0) / 2.0;
-    var acc: [2 * L]f64 = .{0} ** (2 * L);
+    var acc: [2 * L]f64 = @splat(0);
     for (0..L) |kk| {
         const k: f64 = @floatFromInt(kk);
         const dk = pi / n * (k + 0.5);

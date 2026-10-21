@@ -111,7 +111,7 @@ pub const PutBits = struct {
 };
 
 test "bitio roundtrip" {
-    var store = [_]u8{ 0 } ** 8;
+    var store: [8]u8 = @splat(0);
     var pb = PutBits.init(&store);
     pb.put(4, 0b1010);
     pb.put(4, 0b0101);

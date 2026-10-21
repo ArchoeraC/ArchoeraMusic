@@ -351,6 +351,6 @@ const testing = std.testing;
 test "exss: 非法数据" {
     var a: Asset = .{};
     try testing.expectError(error.Corrupt, parse("abcd", &a));
-    var buf: [8]u8 = [_]u8{0} ** 8;
+    var buf: [8]u8 = @splat(0);
     try testing.expectError(error.Corrupt, parse(&buf, &a));
 }

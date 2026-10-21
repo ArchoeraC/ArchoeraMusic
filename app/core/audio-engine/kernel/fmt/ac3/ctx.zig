@@ -20,11 +20,11 @@ pub const AC3_OUTPUT_LFEON: i32 = 8;
 /// 命名/实现为本项目自有）。状态放在 Ctx 内（每解码器实例一份），避免多流并发共享全局
 /// 状态导致串扰。
 pub const JitterRng = struct {
-    state: [64]u32 = [_]u32{0} ** 64,
+    state: [64]u32 = @splat(0),
     index: u32 = 0,
 
     pub fn init(self: *JitterRng, seed: u32) void {
-        var tmp: [16]u8 = [_]u8{0} ** 16;
+        var tmp: [16]u8 = @splat(0);
         var i: usize = 8;
         while (i < 64) : (i += 4) {
             std.mem.writeInt(u32, tmp[0..4], seed, .little);
@@ -109,34 +109,34 @@ pub const Ctx = struct {
     skip_syntax: i32 = 0,
 
     // 标准耦合
-    cpl_in_use: [t.AC3_MAX_BLOCKS]i32 = [_]i32{0} ** t.AC3_MAX_BLOCKS,
-    cpl_strategy_exists: [t.AC3_MAX_BLOCKS]i32 = [_]i32{0} ** t.AC3_MAX_BLOCKS,
-    channel_in_cpl: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
+    cpl_in_use: [t.AC3_MAX_BLOCKS]i32 = @splat(0),
+    cpl_strategy_exists: [t.AC3_MAX_BLOCKS]i32 = @splat(0),
+    channel_in_cpl: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
     phase_flags_in_use: i32 = 0,
-    phase_flags: [t.AC3_MAX_CPL_BANDS]i32 = [_]i32{0} ** t.AC3_MAX_CPL_BANDS,
+    phase_flags: [t.AC3_MAX_CPL_BANDS]i32 = @splat(0),
     num_cpl_bands: i32 = 0,
-    cpl_band_struct: [t.AC3_MAX_CPL_BANDS]u8 = [_]u8{0} ** t.AC3_MAX_CPL_BANDS,
-    cpl_band_sizes: [t.AC3_MAX_CPL_BANDS]u8 = [_]u8{0} ** t.AC3_MAX_CPL_BANDS,
+    cpl_band_struct: [t.AC3_MAX_CPL_BANDS]u8 = @splat(0),
+    cpl_band_sizes: [t.AC3_MAX_CPL_BANDS]u8 = @splat(0),
     firstchincpl: i32 = 0,
-    first_cpl_coords: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
-    cpl_coords: [t.AC3_MAX_CHANNELS][t.AC3_MAX_CPL_BANDS]i32 = [_][t.AC3_MAX_CPL_BANDS]i32{[_]i32{0} ** t.AC3_MAX_CPL_BANDS} ** t.AC3_MAX_CHANNELS,
+    first_cpl_coords: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
+    cpl_coords: [t.AC3_MAX_CHANNELS][t.AC3_MAX_CPL_BANDS]i32 = @splat(@splat(0)),
 
     // 频谱扩展（E-AC-3，暂保留字段）
     spx_in_use: i32 = 0,
-    channel_uses_spx: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS,
-    spx_atten_code: [t.AC3_MAX_CHANNELS]i8 = [_]i8{0} ** t.AC3_MAX_CHANNELS,
+    channel_uses_spx: [t.AC3_MAX_CHANNELS]u8 = @splat(0),
+    spx_atten_code: [t.AC3_MAX_CHANNELS]i8 = @splat(0),
     spx_src_start_freq: i32 = 0,
     spx_dst_end_freq: i32 = 0,
     spx_dst_start_freq: i32 = 0,
     num_spx_bands: i32 = 0,
-    spx_band_struct: [17]u8 = [_]u8{0} ** 17,
-    spx_band_sizes: [17]u8 = [_]u8{0} ** 17,
-    first_spx_coords: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS,
-    spx_noise_blend: [t.AC3_MAX_CHANNELS][17]f32 = [_][17]f32{[_]f32{0} ** 17} ** t.AC3_MAX_CHANNELS,
-    spx_signal_blend: [t.AC3_MAX_CHANNELS][17]f32 = [_][17]f32{[_]f32{0} ** 17} ** t.AC3_MAX_CHANNELS,
+    spx_band_struct: [17]u8 = @splat(0),
+    spx_band_sizes: [17]u8 = @splat(0),
+    first_spx_coords: [t.AC3_MAX_CHANNELS]u8 = @splat(0),
+    spx_noise_blend: [t.AC3_MAX_CHANNELS][17]f32 = @splat(@splat(0)),
+    spx_signal_blend: [t.AC3_MAX_CHANNELS][17]f32 = @splat(@splat(0)),
 
-    channel_uses_aht: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
-    pre_mantissa: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS][t.AC3_MAX_BLOCKS]i32 = [_][t.AC3_MAX_COEFS][t.AC3_MAX_BLOCKS]i32{[_][t.AC3_MAX_BLOCKS]i32{[_]i32{0} ** t.AC3_MAX_BLOCKS} ** t.AC3_MAX_COEFS} ** t.AC3_MAX_CHANNELS,
+    channel_uses_aht: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
+    pre_mantissa: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS][t.AC3_MAX_BLOCKS]i32 = @splat(@splat(@splat(0))),
 
     // 声道
     fbw_channels: i32 = 0,
@@ -154,51 +154,51 @@ pub const Ctx = struct {
     heavy_dynamic_range: [2]f32 = .{ 1.0, 1.0 },
 
     // 带宽
-    start_freq: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
-    end_freq: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
+    start_freq: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
+    end_freq: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
 
     // 重矩阵
     num_rematrixing_bands: i32 = 0,
-    rematrixing_flags: [4]i32 = [_]i32{0} ** 4,
+    rematrixing_flags: [4]i32 = @splat(0),
 
     // 指数
-    num_exp_groups: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
-    dexps: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]i8 = [_][t.AC3_MAX_COEFS]i8{[_]i8{0} ** t.AC3_MAX_COEFS} ** t.AC3_MAX_CHANNELS,
-    exp_strategy: [t.AC3_MAX_BLOCKS][t.AC3_MAX_CHANNELS]i32 = [_][t.AC3_MAX_CHANNELS]i32{[_]i32{0} ** t.AC3_MAX_CHANNELS} ** t.AC3_MAX_BLOCKS,
+    num_exp_groups: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
+    dexps: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]i8 = @splat(@splat(0)),
+    exp_strategy: [t.AC3_MAX_BLOCKS][t.AC3_MAX_CHANNELS]i32 = @splat(@splat(0)),
 
     // 位分配
     bit_alloc_params: ba.BitAllocParams = .{},
     first_cpl_leak: i32 = 0,
-    snr_offset: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
-    fast_gain: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
-    bap: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]u8 = [_][t.AC3_MAX_COEFS]u8{[_]u8{0} ** t.AC3_MAX_COEFS} ** t.AC3_MAX_CHANNELS,
-    psd: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]i16 = [_][t.AC3_MAX_COEFS]i16{[_]i16{0} ** t.AC3_MAX_COEFS} ** t.AC3_MAX_CHANNELS,
-    band_psd: [t.AC3_MAX_CHANNELS][t.AC3_CRITICAL_BANDS]i16 = [_][t.AC3_CRITICAL_BANDS]i16{[_]i16{0} ** t.AC3_CRITICAL_BANDS} ** t.AC3_MAX_CHANNELS,
-    mask: [t.AC3_MAX_CHANNELS][t.AC3_CRITICAL_BANDS]i16 = [_][t.AC3_CRITICAL_BANDS]i16{[_]i16{0} ** t.AC3_CRITICAL_BANDS} ** t.AC3_MAX_CHANNELS,
-    dba_mode: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
-    dba_nsegs: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
-    dba_offsets: [t.AC3_MAX_CHANNELS][8]u8 = [_][8]u8{[_]u8{0} ** 8} ** t.AC3_MAX_CHANNELS,
-    dba_lengths: [t.AC3_MAX_CHANNELS][8]u8 = [_][8]u8{[_]u8{0} ** 8} ** t.AC3_MAX_CHANNELS,
-    dba_values: [t.AC3_MAX_CHANNELS][8]u8 = [_][8]u8{[_]u8{0} ** 8} ** t.AC3_MAX_CHANNELS,
+    snr_offset: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
+    fast_gain: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
+    bap: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]u8 = @splat(@splat(0)),
+    psd: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]i16 = @splat(@splat(0)),
+    band_psd: [t.AC3_MAX_CHANNELS][t.AC3_CRITICAL_BANDS]i16 = @splat(@splat(0)),
+    mask: [t.AC3_MAX_CHANNELS][t.AC3_CRITICAL_BANDS]i16 = @splat(@splat(0)),
+    dba_mode: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
+    dba_nsegs: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
+    dba_offsets: [t.AC3_MAX_CHANNELS][8]u8 = @splat(@splat(0)),
+    dba_lengths: [t.AC3_MAX_CHANNELS][8]u8 = @splat(@splat(0)),
+    dba_values: [t.AC3_MAX_CHANNELS][8]u8 = @splat(@splat(0)),
 
     // 抖动
-    dither_flag: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
+    dither_flag: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
 
     // IMDCT
-    block_switch: [t.AC3_MAX_CHANNELS]i32 = [_]i32{0} ** t.AC3_MAX_CHANNELS,
+    block_switch: [t.AC3_MAX_CHANNELS]i32 = @splat(0),
 
     // 输出指针
     outptr: [t.AC3_MAX_CHANNELS][*]f32 = undefined,
 
     // 对齐数组
-    coeffs: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]f32 = [_][t.AC3_MAX_COEFS]f32{[_]f32{0} ** t.AC3_MAX_COEFS} ** t.AC3_MAX_CHANNELS,
-    transform_coeffs: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]f32 = [_][t.AC3_MAX_COEFS]f32{[_]f32{0} ** t.AC3_MAX_COEFS} ** t.AC3_MAX_CHANNELS,
-    delay: [t.EAC3_MAX_CHANNELS][t.AC3_BLOCK_SIZE]f32 = [_][t.AC3_BLOCK_SIZE]f32{[_]f32{0} ** t.AC3_BLOCK_SIZE} ** t.EAC3_MAX_CHANNELS,
-    window: [t.AC3_BLOCK_SIZE]f32 = [_]f32{0} ** t.AC3_BLOCK_SIZE,
-    tmp_output: [t.AC3_BLOCK_SIZE]f32 = [_]f32{0} ** t.AC3_BLOCK_SIZE,
-    output: [t.EAC3_MAX_CHANNELS][t.AC3_BLOCK_SIZE]f32 = [_][t.AC3_BLOCK_SIZE]f32{[_]f32{0} ** t.AC3_BLOCK_SIZE} ** t.EAC3_MAX_CHANNELS,
-    output_buffer: [t.EAC3_MAX_CHANNELS][t.AC3_BLOCK_SIZE * 6]f32 = [_][t.AC3_BLOCK_SIZE * 6]f32{[_]f32{0} ** (t.AC3_BLOCK_SIZE * 6)} ** t.EAC3_MAX_CHANNELS,
+    coeffs: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]f32 = @splat(@splat(0)),
+    transform_coeffs: [t.AC3_MAX_CHANNELS][t.AC3_MAX_COEFS]f32 = @splat(@splat(0)),
+    delay: [t.EAC3_MAX_CHANNELS][t.AC3_BLOCK_SIZE]f32 = @splat(@splat(0)),
+    window: [t.AC3_BLOCK_SIZE]f32 = @splat(0),
+    tmp_output: [t.AC3_BLOCK_SIZE]f32 = @splat(0),
+    output: [t.EAC3_MAX_CHANNELS][t.AC3_BLOCK_SIZE]f32 = @splat(@splat(0)),
+    output_buffer: [t.EAC3_MAX_CHANNELS][t.AC3_BLOCK_SIZE * 6]f32 = @splat(@splat(0)),
 
     // 下混系数
-    downmix_coeffs: [2][t.AC3_MAX_CHANNELS]f32 = [_][t.AC3_MAX_CHANNELS]f32{[_]f32{0} ** t.AC3_MAX_CHANNELS} ** 2,
+    downmix_coeffs: [2][t.AC3_MAX_CHANNELS]f32 = @splat(@splat(0)),
 };

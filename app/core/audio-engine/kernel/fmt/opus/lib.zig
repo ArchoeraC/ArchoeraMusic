@@ -834,7 +834,7 @@ fn parseOpusTags(meta: *decoder.Metadata, allocator: std.mem.Allocator, data: []
         try tags.append(allocator, .{ .key = k, .value = v });
 
         const field = commentFieldOf(key) orelse continue;
-        const s = try allocator.dupeZ(u8, value);
+        const s = try allocator.dupeSentinel(u8, value, 0);
         if (!setMetaField(meta, field, s)) allocator.free(s);
     }
     meta.tags = try tags.toOwnedSlice(allocator);
