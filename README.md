@@ -10,6 +10,8 @@
   <img src="screenshot.png" width="720" alt="ArchoeraMusic 主界面">
 </p>
 
+> 想先看看观感？[宣传页](https://betastudio2.github.io/ArchoeraMusic/) 用静态页面复刻了开屏动效，并整理了功能、引擎与下载入口。
+
 ---
 
 ArchoeraMusic 是一个开源的**多平台音乐播放器**，桌面为主（Linux / Windows / macOS），UI 层采用 Flutter，重型处理由多语言原生模块（C / C# / C++ / Rust / Go）经 FFI 进程内直连，无 Node 进程、无本地监听端口。
