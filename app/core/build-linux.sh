@@ -33,7 +33,7 @@ if command -v zig >/dev/null 2>&1; then
   (cd "$ROOT/audio-engine" && zig build -Doptimize=ReleaseFast -Dcpu=baseline) || exit 1
 else
   echo "[build-linux] 警告: 未检测到 zig，自研内核(EraAudio)不编译（引擎将以 FFmpeg/Stable 运行）；"
-  echo "          安装 Zig 0.16（https://ziglang.org/download）后重跑可启用 EraAudio。"
+  echo "          安装 Zig 0.17（https://ziglang.org/download）后重跑可启用 EraAudio。"
 fi
 
 # ── FFmpeg：使用自建「最小纯 LGPL·仅音频」版本（与 CI 一致）──────────

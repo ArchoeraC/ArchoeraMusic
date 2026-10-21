@@ -69,14 +69,14 @@ pub inline fn apeSign64(x: i64) i32 {
 
 /// 32-bit 预测器（fileversion < 3950 的最终重建）
 pub const Predictor = struct {
-    buf: [PREDICTOR_BUF]i32 = [_]i32{0} ** PREDICTOR_BUF,
+    buf: [PREDICTOR_BUF]i32 = @splat(0),
     buf_off: usize = 0,
     sample_pos: u32 = 0,
     lastA: [2]i32 = .{ 0, 0 },
     filterA: [2]i32 = .{ 0, 0 },
     filterB: [2]i32 = .{ 0, 0 },
-    coeffsA: [2][4]u32 = [_][4]u32{.{0} ** 4} ** 2,
-    coeffsB: [2][5]u32 = [_][5]u32{.{0} ** 5} ** 2,
+    coeffsA: [2][4]u32 = @splat(@splat(0)),
+    coeffsB: [2][5]u32 = @splat(@splat(0)),
 
     pub inline fn at(self: *const Predictor, i: usize) i32 {
         return self.buf[self.buf_off + i];
@@ -107,7 +107,7 @@ pub const Predictor = struct {
 
     /// init_predictor_decoder：按版本/压缩级别初始化系数与状态
     pub fn init(self: *Predictor, fileversion: u32, compression_level: u32) void {
-        self.buf = [_]i32{0} ** PREDICTOR_BUF;
+        self.buf = @splat(0);
         self.buf_off = 0;
         self.sample_pos = 0;
         self.lastA = .{ 0, 0 };
@@ -123,20 +123,20 @@ pub const Predictor = struct {
         } else {
             const ca: [4]u32 = .{ 360, 317, @bitCast(@as(i32, -109)), 98 };
             self.coeffsA = .{ ca, ca };
-            self.coeffsB = [_][5]u32{.{0} ** 5} ** 2;
+            self.coeffsB = @splat(@splat(0));
         }
     }
 };
 
 /// 64-bit 预测器（fileversion >= 3950）
 pub const Predictor64 = struct {
-    buf: [PREDICTOR_BUF]i64 = [_]i64{0} ** PREDICTOR_BUF,
+    buf: [PREDICTOR_BUF]i64 = @splat(0),
     buf_off: usize = 0,
     lastA: [2]i64 = .{ 0, 0 },
     filterA: [2]i64 = .{ 0, 0 },
     filterB: [2]i64 = .{ 0, 0 },
-    coeffsA: [2][4]u64 = [_][4]u64{.{0} ** 4} ** 2,
-    coeffsB: [2][5]u64 = [_][5]u64{.{0} ** 5} ** 2,
+    coeffsA: [2][4]u64 = @splat(@splat(0)),
+    coeffsB: [2][5]u64 = @splat(@splat(0)),
 
     pub inline fn at(self: *const Predictor64, i: usize) i64 {
         return self.buf[self.buf_off + i];
@@ -155,14 +155,14 @@ pub const Predictor64 = struct {
     }
 
     pub fn init(self: *Predictor64) void {
-        self.buf = [_]i64{0} ** PREDICTOR_BUF;
+        self.buf = @splat(0);
         self.buf_off = 0;
         self.lastA = .{ 0, 0 };
         self.filterA = .{ 0, 0 };
         self.filterB = .{ 0, 0 };
         const ca: [4]u64 = .{ 360, 317, @bitCast(@as(i64, -109)), 98 };
         self.coeffsA = .{ ca, ca };
-        self.coeffsB = [_][5]u64{.{0} ** 5} ** 2;
+        self.coeffsB = @splat(@splat(0));
     }
 };
 
@@ -292,8 +292,8 @@ fn filter3800(p: *Predictor, decoded: i32, filter: usize, delayA: usize, delayB:
 /// long_filter_high_3800（长 FIR 自适应滤波，< 3930 的 HIGH/EXTRA_HIGH）
 fn longFilterHigh3800(buffer: []i32, order: usize, shift: u5, length: usize) void {
     if (order >= length) return;
-    var coeffs = [_]i32{0} ** 256;
-    var delay = [_]i32{0} ** 512;
+    var coeffs: [256]i32 = @splat(0);
+    var delay: [512]i32 = @splat(0);
     for (0..order) |i| delay[i] = buffer[i];
     var dp: usize = 0;
     var i: usize = order;
@@ -327,8 +327,8 @@ fn longFilterHigh3800(buffer: []i32, order: usize, shift: u5, length: usize) voi
 
 /// long_filter_ehigh_3830（< 3930 的 EXTRA_HIGH 前置 8 阶）
 fn longFilterEhigh3830(buffer: []i32, length: usize) void {
-    var delay = [_]i32{0} ** 8;
-    var coeffs = [_]u32{0} ** 8;
+    var delay: [8]i32 = @splat(0);
+    var coeffs: [8]u32 = @splat(0);
     for (0..length) |i| {
         var dotprod: i32 = 0;
         const sign = apeSign(buffer[i]);

@@ -290,7 +290,7 @@ fn addTag(f: *SpeexCtx, key: []const u8, value: []const u8) Error!void {
         .{ "DESCRIPTION", 5 },
     });
     if (map.get(kbuf)) |slot| {
-        const dup = try f.allocator.dupeZ(u8, vbuf);
+        const dup = try f.allocator.dupeSentinel(u8, vbuf, 0);
         errdefer f.allocator.free(dup);
         try f.meta_strings.append(f.allocator, dup[0 .. dup.len]);
         const field: *?[:0]const u8 = switch (slot) {
@@ -531,7 +531,7 @@ fn parseSpeexComment(f: *MetaCtx, data: []const u8) void {
         f.tags.append(f.allocator, .{ .key = kbuf, .value = vbuf }) catch return;
 
         if (map.get(kbuf)) |slot| {
-            const dup = f.allocator.dupeZ(u8, vbuf) catch return;
+            const dup = f.allocator.dupeSentinel(u8, vbuf, 0) catch return;
             f.strings.append(f.allocator, dup[0..dup.len]) catch {
                 f.allocator.free(dup);
                 return;
@@ -877,6 +877,12 @@ test "spx: seek_ms 冒烟（granule 定位 + 状态重建 + 位置推进）" {
     try testing.expect(dec.positionMs() > 1500);
 }
 
+/// Zig 0.17 移除了数组/字符串重复语法 `**`（数组改 @splat），此处保留
+/// "重复单字节"的 comptime 语义：返回 [n]u8 便于与字面量 `++` 拼接。
+fn repeatByte(comptime byte: u8, comptime n: usize) [n]u8 {
+    return @splat(byte);
+}
+
 test "spx: SpeexHeader 解析（q6_8k 头）" {
     const h = try parseHeader(q6_spx[27 + 1 ..][0..80]);
     try testing.expectEqual(@as(i32, 8000), h.rate);
@@ -888,7 +894,7 @@ test "spx: SpeexHeader 解析（q6_8k 头）" {
     try testing.expect(!h.vbr);
     // 魔数不符 / 过短 → Corrupt
     try testing.expectError(error.Corrupt, parseHeader(q6_spx[27 + 1 ..][0..67]));
-    try testing.expectError(error.Corrupt, parseHeader("OggSxxxx" ++ "x" ** 72));
+    try testing.expectError(error.Corrupt, parseHeader("OggSxxxx" ++ repeatByte('x', 72)));
 }
 
 test "spx: 头部包与 comment 跳过后首帧可解（open 全链路 Info）" {

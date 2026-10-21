@@ -301,8 +301,8 @@ pub const ChannelCtx = struct {
     prev_block_len: usize = 0,
     transmit_coefs: bool = false,
     num_subframes: usize = 0,
-    subframe_len: [MAX_SUBFRAMES]usize = .{0} ** MAX_SUBFRAMES,
-    subframe_offset: [MAX_SUBFRAMES]usize = .{0} ** MAX_SUBFRAMES,
+    subframe_len: [MAX_SUBFRAMES]usize = @splat(0),
+    subframe_offset: [MAX_SUBFRAMES]usize = @splat(0),
     cur_subframe: usize = 0,
     decoded_samples: usize = 0,
     grouped: bool = false,
@@ -310,7 +310,7 @@ pub const ChannelCtx = struct {
     reuse_sf: bool = false,
     scale_factor_step: i32 = 0,
     max_scale_factor: i32 = 0,
-    saved_scale_factors: [2]ScaleBuf = .{.{0} ** MAX_BANDS} ** 2,
+    saved_scale_factors: [2]ScaleBuf = @splat(@splat(0)),
     scale_factor_idx: usize = 0,
     /// 当前量化使用的 scale factor 缓冲（= 本 subframe 的 chan.scale_factors）
     cur_scale: usize = 0,
@@ -324,10 +324,10 @@ pub const ChannelCtx = struct {
 pub const ChanGroup = struct {
     num_channels: usize = 0,
     transform: bool = false,
-    transform_band: [MAX_BANDS]bool = .{false} ** MAX_BANDS,
-    decorrelation_matrix: [CH_CAP * CH_CAP]f32 = .{0} ** (CH_CAP * CH_CAP),
+    transform_band: [MAX_BANDS]bool = @splat(false),
+    decorrelation_matrix: [CH_CAP * CH_CAP]f32 = @splat(0),
     /// 组内声道序号（decode_coeffs 等按此访问各自 out）
-    channel_data: [CH_CAP]usize = .{0} ** CH_CAP,
+    channel_data: [CH_CAP]usize = @splat(0),
 };
 
 pub const Params = struct {
@@ -357,13 +357,13 @@ pub const Dec = struct {
     min_samples_per_subframe: usize = 0,
     num_possible_block_sizes: usize = 0,
 
-    num_sfb: [BLOCK_SIZES]i32 = .{0} ** BLOCK_SIZES,
-    sfb_offsets: [BLOCK_SIZES][MAX_BANDS]u16 = .{.{0} ** MAX_BANDS} ** BLOCK_SIZES,
-    sf_offsets: [BLOCK_SIZES][BLOCK_SIZES][MAX_BANDS]u8 = .{.{.{0} ** MAX_BANDS} ** BLOCK_SIZES} ** BLOCK_SIZES,
-    subwoofer_cutoffs: [BLOCK_SIZES]usize = .{0} ** BLOCK_SIZES,
+    num_sfb: [BLOCK_SIZES]i32 = @splat(0),
+    sfb_offsets: [BLOCK_SIZES][MAX_BANDS]u16 = @splat(@splat(0)),
+    sf_offsets: [BLOCK_SIZES][BLOCK_SIZES][MAX_BANDS]u8 = @splat(@splat(@splat(0))),
+    subwoofer_cutoffs: [BLOCK_SIZES]usize = @splat(0),
 
     window_storage: [FRAME_CAP * 2]f32 = undefined,
-    win_slices: [BLOCK_SIZES][]const f32 = .{&.{}} ** BLOCK_SIZES,
+    win_slices: [BLOCK_SIZES][]const f32 = @splat(&.{}),
     sin64: [33]f32 = undefined,
 
     // packet 状态
@@ -392,7 +392,7 @@ pub const Dec = struct {
     // subframe 状态
     subframe_len: usize = 0,
     channels_for_cur_subframe: usize = 0,
-    channel_indexes_for_cur_subframe: [CH_CAP]usize = .{0} ** CH_CAP,
+    channel_indexes_for_cur_subframe: [CH_CAP]usize = @splat(0),
     num_bands: usize = 0,
     transmit_num_vec_coeffs: bool = false,
     cur_sfb_offsets: []const u16 = &.{},
@@ -595,8 +595,8 @@ pub const Dec = struct {
     }
 
     fn decodeTilehdr(self: *Dec) Error!void {
-        var num_samples: [CH_CAP]usize = .{0} ** CH_CAP;
-        var contains_subframe: [CH_CAP]bool = .{false} ** CH_CAP;
+        var num_samples: [CH_CAP]usize = @splat(0);
+        var contains_subframe: [CH_CAP]bool = @splat(false);
         var channels_for_cur_subframe: usize = self.channels;
         var fixed_channel_layout = false;
         var min_channel_len: usize = 0;
@@ -656,7 +656,7 @@ pub const Dec = struct {
     // ---- 声道变换 ----
     fn decodeDecorrelationMatrix(self: *Dec, g: *ChanGroup) void {
         const n = g.num_channels;
-        var rotation_offset: [CH_CAP * CH_CAP]u8 = .{0} ** (CH_CAP * CH_CAP);
+        var rotation_offset: [CH_CAP * CH_CAP]u8 = @splat(0);
         @memset(g.decorrelation_matrix[0 .. n * n], 0);
         var i: usize = 0;
         while (i < (n * (n - 1)) >> 1) : (i += 1) {
@@ -1488,12 +1488,12 @@ pub fn getSignedBits(gb: *Bits, n: usize) i32 {
 }
 
 test "getSignedBits 符号扩展" {
-    var buf = [1]u8{0} ** 4;
+    var buf: [1]u8 = @splat(0);
     var w = BitWriter{ .buf = &buf };
     w.write(6, 0x20); // -32
     var b = Bits{ .buf = &buf, .cap = 6 };
     try std.testing.expectEqual(@as(i32, -32), getSignedBits(&b, 6));
-    var buf2 = [1]u8{0} ** 4;
+    var buf2: [1]u8 = @splat(0);
     var w2 = BitWriter{ .buf = &buf2 };
     w2.write(6, 0x1F); // 31
     var b2 = Bits{ .buf = &buf2, .cap = 6 };

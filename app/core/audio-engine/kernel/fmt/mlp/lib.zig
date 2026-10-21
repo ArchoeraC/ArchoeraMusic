@@ -715,8 +715,8 @@ fn filterChannel(s: *c.Ctx, substr: usize, channel: usize) void {
     const st = &s.substream[substr];
     const fircoeff = &st.channel_params[channel].coeff[c.FIR];
     const iircoeff = &st.channel_params[channel].coeff[c.IIR];
-    var state_buffer: [c.MAX_BLOCKSIZE + c.MAX_FIR_ORDER]i32 = [_]i32{0} ** (c.MAX_BLOCKSIZE + c.MAX_FIR_ORDER);
-    var iir_buf: [c.MAX_BLOCKSIZE + c.MAX_IIR_ORDER]i32 = [_]i32{0} ** (c.MAX_BLOCKSIZE + c.MAX_IIR_ORDER);
+    var state_buffer: [c.MAX_BLOCKSIZE + c.MAX_FIR_ORDER]i32 = @splat(0);
+    var iir_buf: [c.MAX_BLOCKSIZE + c.MAX_IIR_ORDER]i32 = @splat(0);
     const fir = &st.channel_params[channel].filter_params[c.FIR];
     const iir = &st.channel_params[channel].filter_params[c.IIR];
     const filter_shift: u32 = fir.shift;
@@ -917,8 +917,8 @@ fn readAccessUnit(s: *c.Ctx, buf: []const u8, out: []i16, out_pos: *usize) !usiz
         return 0;
     }
 
-    var substream_parity_present: [c.MAX_SUBSTREAMS]u8 = [_]u8{0} ** c.MAX_SUBSTREAMS;
-    var substream_data_len: [c.MAX_SUBSTREAMS]u16 = [_]u16{0} ** c.MAX_SUBSTREAMS;
+    var substream_parity_present: [c.MAX_SUBSTREAMS]u8 = @splat(0);
+    var substream_data_len: [c.MAX_SUBSTREAMS]u16 = @splat(0);
 
     var substr: usize = 0;
     while (substr < s.num_substreams) : (substr += 1) {
@@ -963,7 +963,7 @@ fn readAccessUnit(s: *c.Ctx, buf: []const u8, out: []i16, out_pos: *usize) !usiz
         var sbr = BitReader.init(buf[substream_buf_pos .. substream_buf_pos + sub_len]);
     if (s.mlp_dbg < 30 and substr == 1 and s.frame_count >= 8 and s.frame_count <= 11) { for (0..1) |_| {} }
         s.matrix_changed = 0;
-        s.filter_changed = [_][c.NUM_FILTERS]i32{[_]i32{0} ** c.NUM_FILTERS} ** c.MAX_CHANNELS;
+        s.filter_changed = @splat(@splat(0));
 
         st.blockpos = 0;
         st.end_of_stream = 0;

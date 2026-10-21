@@ -225,11 +225,11 @@ fn bitalloc(f: *CeltFrame, rc: *Rc) void {
     var dynalloc: i32 = 6;
     var extrabits: i32 = 0;
 
-    var boost = [_]i32{0} ** CELT_MAX_BANDS;
-    var trim_offset = [_]i32{0} ** CELT_MAX_BANDS;
-    var threshold = [_]i32{0} ** CELT_MAX_BANDS;
-    var bits1 = [_]i32{0} ** CELT_MAX_BANDS;
-    var bits2 = [_]i32{0} ** CELT_MAX_BANDS;
+    var boost: [CELT_MAX_BANDS]i32 = @splat(0);
+    var trim_offset: [CELT_MAX_BANDS]i32 = @splat(0);
+    var threshold: [CELT_MAX_BANDS]i32 = @splat(0);
+    var bits1: [CELT_MAX_BANDS]i32 = @splat(0);
+    var bits2: [CELT_MAX_BANDS]i32 = @splat(0);
 
     // Spread
     if (rc.tell() + 4 <= @as(u32, @intCast(f.framebits))) {
