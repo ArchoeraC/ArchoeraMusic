@@ -17,6 +17,18 @@ mixin _PlaybackNotifierSession
     SegStoreHandle store = 0,
     bool memoryStore = false,
   }) async {
+    // 时间基准必须在引擎**可能出声之前**锚定（预加载源建会话极快，首块 PCM
+    // 可能在本方法返回前后就已入环出声）：若等引擎创建完再回写
+    // `position=offset / playing=false / duration=0`，就会把引擎已上报的
+    // 「已开始播放/时长/位置」覆盖回起点，表现为「缓冲态与实际出声错位，
+    // 进度条、歌词等整体落后声音一截」。
+    _sessionOffsetMs = offsetMs;
+    state = state.copyWith(
+      playing: false,
+      position: Duration(milliseconds: offsetMs),
+      duration: Duration.zero,
+      fft: null,
+    );
     await _stopEngine();
     final AudioEngineProcess engine;
     try {
@@ -46,7 +58,6 @@ mixin _PlaybackNotifierSession
     // store 所有权交给 _engineStore：此后由 _stopEngine（engine.stop join 之后）
     // 负责 destroy，本方法其余失败出口不再触碰（避免同句柄重复释放）。
     _engineStore = store;
-    _sessionOffsetMs = offsetMs;
     _engineSubs.add(engine.events.listen(_onEngineEvent));
     _fftStarted = false;
     final sinkId = ref.read(appPrefsProvider).sink;
@@ -58,14 +69,9 @@ mixin _PlaybackNotifierSession
     final fadeIn = ref.read(appPrefsProvider).crossfadeEnabled;
     final fadeMs = ref.read(appPrefsProvider).crossfadeDurationMs;
     unawaited(engine.setVolume(fadeIn ? 0 : state.volume));
-    state = state.copyWith(
-      source: source,
-      sessionId: engine.sessionId,
-      playing: false,
-      position: Duration(milliseconds: offsetMs),
-      duration: Duration.zero,
-      fft: null,
-    );
+    // 只回填会话身份：位置/时长/播放态已由引擎事件（ready/playing/position）
+    // 权威上报，此处不得再写，否则会覆盖刚收到的真实状态。
+    state = state.copyWith(source: source, sessionId: engine.sessionId);
     var startedInTime = false;
     try {
       await engine.started.timeout(const Duration(seconds: 30));

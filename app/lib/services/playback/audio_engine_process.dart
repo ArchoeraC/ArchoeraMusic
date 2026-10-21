@@ -68,8 +68,12 @@ class EngineDone extends EngineEvent {
   const EngineDone();
 }
 
-/// 播放已开始（声音输出已建立；文件模式指 miniaudio 加载 WAV 后开始播放，
-/// duration_ms 为完整时长）。
+/// 播放已开始（**首块真实 PCM 已入环、设备随即启动**，即真正开始出声；
+/// 不再在「设备打开、尚未喂入数据」时提前上报）。文件模式指 miniaudio 加载
+/// WAV 后开始播放，duration_ms 为完整时长。
+///
+/// 语义要点：`playing` 到达 = 音频时间轴零点（首帧），UI 的「缓冲→播放」切换
+/// 与进度/歌词时间基准必须以此为准；引擎随后立即补推一条起点 `position`。
 class EnginePlaying extends EngineEvent {
   const EnginePlaying({required this.durationMs});
 
