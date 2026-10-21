@@ -1178,7 +1178,7 @@ pub const G722Band = struct {
 /// 初始：prev_samples_pos=22、低带 scale_factor=8、高带 scale_factor=2
 /// （g722dec.c 69-71）。
 pub const G722State = struct {
-    prev_samples: [1024]i16 = .{0} ** 1024,
+    prev_samples: [1024]i16 = @splat(0),
     prev_samples_pos: usize = 22,
     band: [2]G722Band = [2]G722Band{ .{ .scale_factor = 8 }, .{ .scale_factor = 2 } },
 };
@@ -1383,12 +1383,12 @@ test "adpcm: MS 非零增量" {
 test "adpcm: 非法输入" {
     var out: [9]i16 = undefined;
     // 块太短
-    try testing.expectError(error.Corrupt, decodeImaWav(&[_]u8{0} ** 3, 1, 9, &out));
+    try testing.expectError(error.Corrupt, decodeImaWav(&@as([3]u8, @splat(0)), 1, 9, &out));
     // predictor 索引越界（MS >6）
     var blk = [_]u8{ 7, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     try testing.expectError(error.Corrupt, decodeMs(&blk, 1, 10, &out));
     // 通道数非法（>8）
-    var blk8 = [_]u8{0} ** 100;
+    var blk8: [100]u8 = @splat(0);
     var st = ContState{};
     try testing.expectError(error.UnsupportedFormat, decodeMs(&blk8, 9, 10, &out));
     try testing.expectError(error.UnsupportedFormat, decodeImaWav(&blk8, 9, 10, &out));
@@ -1398,7 +1398,7 @@ test "adpcm: 非法输入" {
 test "adpcm: IMA QT 单声道静音块" {
     var st = ContState{};
     // predictor=0, step_index=0（BE 0x0000）+ 32B 数据全 0 → predictor 保持 0
-    var blk: [34]u8 = [_]u8{0} ** 34;
+    var blk: [34]u8 = @splat(0);
     var out: [64]i16 = undefined;
     try decodeImaQt(&st, &blk, 1, &out);
     for (out) |v| try testing.expectEqual(@as(i16, 0), v);
@@ -1407,7 +1407,7 @@ test "adpcm: IMA QT 单声道静音块" {
 test "adpcm: IMA QT predictor 打包与启发式" {
     var st = ContState{};
     // predictor=0x180（高 9 位，BE）= 0x0180 → step_index=0x00, predictor=0x180
-    var blk: [68]u8 = [_]u8{0} ** 68; // 双声道
+    var blk: [68]u8 = @splat(0); // 双声道
     blk[0] = 0x01;
     blk[1] = 0x80;
     var out: [128]i16 = undefined;
@@ -1422,10 +1422,10 @@ test "adpcm: IMA QT 启发式跨块保持" {
     // 块 2 头 predictor=0x180（差 0 ≤0x7f 且 step 相同）→ 沿用块 1 展开状态，
     // 首样本应继续从 0x180 起而非强制重设为 0x180（无差异，但验证启发式不重设）。
     var st = ContState{};
-    var blk1: [34]u8 = [_]u8{0} ** 34;
+    var blk1: [34]u8 = @splat(0);
     blk1[0] = 0x01;
     blk1[1] = 0x80;
-    var blk2: [34]u8 = [_]u8{0} ** 34;
+    var blk2: [34]u8 = @splat(0);
     blk2[0] = 0x01;
     blk2[1] = 0x80;
     var out1: [64]i16 = undefined;
@@ -1476,7 +1476,7 @@ test "adpcm: Creative CT 步长下限 511" {
 
 test "adpcm: IMA WAV 四声道块" {
     // 4 声道：4B×4 头 + 每轮每通道 4B 数据（2 轮 = 32B）→ 17 样本/通道
-    var blk: [48]u8 = [_]u8{0} ** 48;
+    var blk: [48]u8 = @splat(0);
     var out: [68]i16 = undefined;
     try decodeImaWav(&blk, 4, 17, &out);
     for (out) |v| try testing.expectEqual(@as(i16, 0), v);
@@ -1485,7 +1485,7 @@ test "adpcm: IMA WAV 四声道块" {
 test "adpcm: MS ADPCM 四声道块" {
     // 4 声道：块头 7×4=28B（每通道 pred+idelta+s1+s2）+ 数据每通道 (10-2)/2=4B
     // block_align=44 → spb = (44-28)*2/4+2 = 10
-    var blk: [44]u8 = [_]u8{0} ** 44;
+    var blk: [44]u8 = @splat(0);
     var out: [40]i16 = undefined;
     try decodeMs(&blk, 4, 10, &out);
     // 每通道头部样本输出：s2=0, s1=0（交错：ch0..ch3 依次）
@@ -1522,7 +1522,7 @@ test "adpcm: IMA DK4 样本数与非法输入" {
     var out: [5]i16 = undefined;
     try testing.expectError(error.Corrupt, decodeDk4(&blk, 1, 5, &out));
     // >2 声道 → UnsupportedFormat
-    var blk8 = [_]u8{0} ** 100;
+    var blk8: [100]u8 = @splat(0);
     try testing.expectError(error.UnsupportedFormat, decodeDk4(&blk8, 3, 9, &out));
 }
 
@@ -1536,7 +1536,7 @@ test "adpcm: DK3 样本数公式" {
 test "adpcm: DK3 单块解码（sum/diff 输出）" {
     // sum=100, diff=50 → L=150, R=50；数据 nibble 全 0（diff=0）→ 保持
     // block_align=18：N=2 → samples_per_ch=2 → 1 迭代消费 2 数据字节
-    var blk: [18]u8 = [_]u8{0} ** 18;
+    var blk: [18]u8 = @splat(0);
     std.mem.writeInt(u16, blk[10..12], 100, .little); // status[0].predictor = sum
     std.mem.writeInt(u16, blk[12..14], 50, .little); // status[1].predictor = diff
     var out: [4]i16 = undefined;
@@ -1547,7 +1547,7 @@ test "adpcm: DK3 单块解码（sum/diff 输出）" {
 
 test "adpcm: DK3 零填充越界展开（镜像 bytestream）" {
     // block_align=19：N=3 → samples_per_ch=4 → 2 迭代需 4 字节，实有 3 → 末字节零填充
-    var blk: [19]u8 = [_]u8{0} ** 19;
+    var blk: [19]u8 = @splat(0);
     std.mem.writeInt(u16, blk[10..12], 100, .little);
     std.mem.writeInt(u16, blk[12..14], 50, .little);
     var out: [8]i16 = undefined;
@@ -1560,7 +1560,7 @@ test "adpcm: DK3 非零 nibble 递推" {
     // sum=100, diff=50, idx 0/0；数据字节 0x07 0x00 → nibble 顺序 低0x07/高0x00/低0x00/高0x00
     // nibble 7（0b0111）：step=7 → diff = ((2*7+1)*7)>>3 = 13（直接乘法，对齐
     //   adpcm_ima_expand_nibble）→ sum = 113，step_index = 0 + index_table[7] = 8
-    var blk: [18]u8 = [_]u8{0} ** 18;
+    var blk: [18]u8 = @splat(0);
     std.mem.writeInt(u16, blk[10..12], 100, .little);
     std.mem.writeInt(u16, blk[12..14], 50, .little);
     blk[16] = 0x07;
@@ -1577,11 +1577,11 @@ test "adpcm: DK3 非零 nibble 递推" {
 
 test "adpcm: DK3 非法输入" {
     // 块头 < 16 → Corrupt
-    var blk = [_]u8{0} ** 15;
+    var blk: [15]u8 = @splat(0);
     var out: [4]i16 = undefined;
     try testing.expectError(error.Corrupt, decodeDk3(&blk, 2, 2, &out));
     // step_index > 88 → Corrupt
-    var blk2: [18]u8 = [_]u8{0} ** 18;
+    var blk2: [18]u8 = @splat(0);
     std.mem.writeInt(u16, blk2[10..12], 100, .little);
     std.mem.writeInt(u16, blk2[12..14], 50, .little);
     blk2[14] = 90;
@@ -1600,7 +1600,7 @@ test "adpcm: XBOX 样本数公式" {
 test "adpcm: XBOX 单块解码（末样本丢弃）" {
     // 立体声 block_align=16：头 8B + 数据 8B = 1 轮 → 输出 8 样本/通道（解码 9 丢 1）
     // predictor L=100/R=-50，idx 0/0；数据 nibble 全 0 → 保持
-    var blk: [16]u8 = [_]u8{0} ** 16;
+    var blk: [16]u8 = @splat(0);
     std.mem.writeInt(u16, blk[0..2], 100, .little);
     std.mem.writeInt(u16, blk[2..4], 0, .little);
     std.mem.writeInt(u16, blk[4..6], @bitCast(@as(i16, -50)), .little);
@@ -1616,16 +1616,16 @@ test "adpcm: XBOX 单块解码（末样本丢弃）" {
 
 test "adpcm: XBOX 非法输入" {
     // step_index > 88 → Corrupt
-    var blk: [16]u8 = [_]u8{0} ** 16;
+    var blk: [16]u8 = @splat(0);
     std.mem.writeInt(u16, blk[0..2], 100, .little);
     std.mem.writeInt(u16, blk[2..4], 200, .little); // idx 200 > 88
     var out: [16]i16 = undefined;
     try testing.expectError(error.Corrupt, decodeXbox(&blk, 2, 8, &out));
     // 头不足 → Corrupt
-    var blk2 = [_]u8{0} ** 7;
+    var blk2: [7]u8 = @splat(0);
     try testing.expectError(error.Corrupt, decodeXbox(&blk2, 2, 8, &out));
     // >8 声道 → UnsupportedFormat
-    var blk3 = [_]u8{0} ** 100;
+    var blk3: [100]u8 = @splat(0);
     try testing.expectError(error.UnsupportedFormat, decodeXbox(&blk3, 9, 8, &out));
 }
 
@@ -1643,7 +1643,7 @@ test "adpcm: SANYO 3-bit 位流解码（LSB 优先）" {
     // 样本 1 (010)：delta=2 → add=2*87=174 → pred 374；step=((87>>1)+174)>>1=108
     // 样本 2 (011)：delta=3 → add=4*108-54=378 → pred 752；step=2*108=216
     // 样本 3 (000)：delta=0 → add=0 → pred 752；step=(3*216)>>2=162
-    var blk: [6]u8 = [_]u8{0} ** 6;
+    var blk: [6]u8 = @splat(0);
     std.mem.writeInt(u16, blk[0..2], 100, .little);
     std.mem.writeInt(u16, blk[2..4], 100, .little);
     // 位打包（LSB 优先）：s0=001 s1=010 s2=011 s3=000
@@ -1668,7 +1668,7 @@ test "adpcm: SANYO 立体声位流交错（sample×channel 序）" {
     // s2L=0：step L=(3*56)>>2=42
     // s2R=0：step R=(3*27)>>2=20
     // 全部 delta 0 → predictor 保持 0
-    var blk: [8]u8 = [_]u8{0} ** 8;
+    var blk: [8]u8 = @splat(0);
     std.mem.writeInt(u16, blk[0..2], 0, .little);
     std.mem.writeInt(u16, blk[2..4], 100, .little);
     std.mem.writeInt(u16, blk[4..6], 0, .little);
@@ -1684,11 +1684,11 @@ test "adpcm: SANYO 立体声位流交错（sample×channel 序）" {
 
 test "adpcm: SANYO 非法输入" {
     var st = ContState{};
-    var blk = [_]u8{0} ** 8;
+    var blk: [8]u8 = @splat(0);
     var out: [6]i16 = undefined;
     try testing.expectError(error.UnsupportedFormat, decodeSanyo(&st, &blk, 3, 4, 3, &out)); // 3 声道
     try testing.expectError(error.UnsupportedFormat, decodeSanyo(&st, &blk, 1, 2, 3, &out)); // 位深 2
-    try testing.expectError(error.Corrupt, decodeSanyo(&st, &[_]u8{0} ** 3, 1, 3, 4, &out)); // 头不足
+    try testing.expectError(error.Corrupt, decodeSanyo(&st, &@as([3]u8, @splat(0)), 1, 3, 4, &out)); // 头不足
 }
 
 // ---------------------------------------------------------------------------

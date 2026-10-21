@@ -31,7 +31,9 @@ const io = @import("../../io.zig");
 const decoder = @import("../../decoder.zig");
 const ogg = @import("../ogg.zig");
 
-const c = @cImport(@cInclude("stb_vorbis.h"));
+// Zig 0.17 移除 @cImport：头文件经 build.zig 的 addTranslateC 翻译为
+// 模块（见 build.zig 的 tc_vorbis），这里按模块名导入。
+const c = @import("c_vorbis");
 
 const VORBIS_need_more_data = 1;
 /// pushdata 打开时初始数据块大小（逐步增长直到包含全部头）
@@ -207,7 +209,7 @@ fn parseVorbisComment(meta: *decoder.Metadata, allocator: std.mem.Allocator, dat
         try tags.append(allocator, .{ .key = k, .value = v });
 
         const field = commentFieldOf(key) orelse continue;
-        const s = try allocator.dupeZ(u8, value);
+        const s = try allocator.dupeSentinel(u8, value, 0);
         if (!setMetaField(meta, field, s)) allocator.free(s);
     }
     meta.tags = try tags.toOwnedSlice(allocator);
@@ -357,7 +359,7 @@ fn extractComments(f: *VorbisCtx, allocator: std.mem.Allocator) Error!void {
         try tags.append(allocator, .{ .key = k, .value = v });
 
         const field = commentFieldOf(key) orelse continue;
-        const s = try allocator.dupeZ(u8, value);
+        const s = try allocator.dupeSentinel(u8, value, 0);
         if (!setMetaField(&f.meta, field, s)) allocator.free(s);
     }
     f.meta.tags = try tags.toOwnedSlice(allocator);

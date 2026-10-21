@@ -286,7 +286,7 @@ fn dumpIfRequested(a: std.mem.Allocator) !void {
         defer a.free(r);
         const path = try std.mem.concat(a, u8, &.{ prefix, tag, ".f32" });
         defer a.free(path);
-        const path_z = try a.dupeZ(u8, path);
+        const path_z = try a.dupeSentinel(u8, path, 0);
         defer a.free(path_z);
         const f = fopen(path_z.ptr, "wb") orelse return error.Corrupt;
         _ = fwrite(std.mem.sliceAsBytes(r).ptr, 1, std.mem.sliceAsBytes(r).len, f);
@@ -308,7 +308,7 @@ fn dumpObj(a: std.mem.Allocator, file_data: []const u8, hdr: *const asf.Header, 
     const n = packets.demuxObjects(file_data, hdr, flat, sizes_buf) catch return error.Corrupt;
     const path = try std.mem.concat(a, u8, &.{ prefix, tag, ".obj" });
     defer a.free(path);
-    const path_z = try a.dupeZ(u8, path);
+    const path_z = try a.dupeSentinel(u8, path, 0);
     defer a.free(path_z);
     const f = fopen(path_z.ptr, "wb") orelse return error.Corrupt;
     defer _ = fclose(f);

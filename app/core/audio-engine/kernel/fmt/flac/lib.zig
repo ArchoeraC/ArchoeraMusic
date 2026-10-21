@@ -616,7 +616,7 @@ const TestBits = @import("residual.zig").TestBits;
 
 /// 构造 STREAMINFO（34 字节）：rate/channels/bps/total_samples/max_blocksize
 fn makeStreamInfoBytes(rate: u32, channels: u8, bps: u8, total: u64, blocksize: u16) [34]u8 {
-    var b = [_]u8{0} ** 34;
+    var b: [34]u8 = @splat(0);
     std.mem.writeInt(u16, b[0..2], blocksize, .big);
     std.mem.writeInt(u16, b[2..4], blocksize, .big);
     // 字节 10-12（24 位）：samplerate(20) << 4 | (channels-1)(3) << 1 | (bps-1) 高位 1 位
@@ -1187,19 +1187,19 @@ test "flac 集成: VORBIS_COMMENT + CUESHEET + PICTURE 端到端（Info 填充 +
     // CUESHEET payload：2 tracks × 1 index（offset 0 / 100）
     var cs = std.ArrayList(u8).empty;
     defer cs.deinit(testing.allocator);
-    var hdr = [_]u8{0} ** 396;
+    var hdr: [396]u8 = @splat(0);
     hdr[137] = 2;
     try cs.appendSlice(testing.allocator, &hdr);
-    var t1 = [_]u8{0} ** 36;
+    var t1: [36]u8 = @splat(0);
     t1[22] = 1;
     try cs.appendSlice(testing.allocator, &t1);
-    var idx1 = [_]u8{0} ** 12;
+    var idx1: [12]u8 = @splat(0);
     std.mem.writeInt(u64, idx1[0..8], 0, .big);
     try cs.appendSlice(testing.allocator, &idx1);
-    var t2 = [_]u8{0} ** 36;
+    var t2: [36]u8 = @splat(0);
     t2[22] = 1;
     try cs.appendSlice(testing.allocator, &t2);
-    var idx2 = [_]u8{0} ** 12;
+    var idx2: [12]u8 = @splat(0);
     std.mem.writeInt(u64, idx2[0..8], 100, .big);
     try cs.appendSlice(testing.allocator, &idx2);
 

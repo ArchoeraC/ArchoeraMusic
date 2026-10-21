@@ -75,7 +75,7 @@ pub fn totalSamples(final_granule: i64, pre_skip: u16) u64 {
 const testing = std.testing;
 
 test "opus head: OpusHead 解析（mono/stereo 默认映射）" {
-    var data = [_]u8{0} ** 19;
+    var data: [19]u8 = @splat(0);
     @memcpy(data[0..8], HEAD_MAGIC);
     data[8] = 1; // version
     data[9] = 2; // channels
@@ -93,7 +93,7 @@ test "opus head: OpusHead 解析（mono/stereo 默认映射）" {
 
 test "opus head: 非法头" {
     // 版本字段非 1 → UnsupportedFormat
-    var bad = [_]u8{0} ** 19;
+    var bad: [19]u8 = @splat(0);
     @memcpy(bad[0..8], HEAD_MAGIC);
     bad[8] = 2;
     try testing.expectError(error.UnsupportedFormat, parseHead(&bad));

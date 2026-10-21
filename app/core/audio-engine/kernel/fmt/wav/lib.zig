@@ -1282,7 +1282,7 @@ fn parseInfoList(ctx: *WavCtx, reader: *io.Reader, total: u64) Error!void {
     var remaining = total;
     while (remaining >= 8) {
         // 容错读取子 chunk 头：文件截断时跳过剩余并停止（不报 Corrupt）
-        var h: [8]u8 = [_]u8{0} ** 8;
+        var h: [8]u8 = @splat(0);
         var got: usize = 0;
         while (got < 8) {
             const r = try reader.read(h[got..]);
@@ -1327,7 +1327,7 @@ fn readTextField(ctx: *WavCtx, field: ?MetaField, reader: *io.Reader, len: u64) 
     if (len > got) try reader.seek(@intCast(len - got), .current);
     const trimmed = std.mem.trim(u8, buf[0..got], " \t\r\n\x00");
     if (trimmed.len == 0) return;
-    const s = ctx.allocator.dupeZ(u8, trimmed) catch return error.OutOfMemory;
+    const s = ctx.allocator.dupeSentinel(u8, trimmed, 0) catch return error.OutOfMemory;
     setMeta(ctx, field.?, s);
 }
 
@@ -1524,7 +1524,7 @@ fn buildRiff(allocator: std.mem.Allocator, riff_id: []const u8, endian: std.buil
     errdefer buf.deinit(allocator);
     try buf.appendSlice(allocator, riff_id);
     const size_pos = buf.items.len;
-    try buf.appendSlice(allocator, &[_]u8{0} ** 4);
+    try buf.appendSlice(allocator, &@as([4]u8, @splat(0)));
     try buf.appendSlice(allocator, "WAVE");
     for (chunks) |c| {
         try buf.appendSlice(allocator, &c.id);
@@ -1546,7 +1546,7 @@ fn buildAiff(allocator: std.mem.Allocator, is_aifc: bool, chunks: []const AiffCh
     errdefer buf.deinit(allocator);
     try buf.appendSlice(allocator, "FORM");
     const size_pos = buf.items.len;
-    try buf.appendSlice(allocator, &[_]u8{0} ** 4);
+    try buf.appendSlice(allocator, &@as([4]u8, @splat(0)));
     try buf.appendSlice(allocator, if (is_aifc) "AIFC" else "AIFF");
     for (chunks) |c| {
         try buf.appendSlice(allocator, &c.id);
@@ -1568,7 +1568,7 @@ fn buildW64(allocator: std.mem.Allocator, chunks: []const W64Chunk) ![]u8 {
     errdefer buf.deinit(allocator);
     try buf.appendSlice(allocator, &chunk.riff_guid);
     const size_pos = buf.items.len;
-    try buf.appendSlice(allocator, &[_]u8{0} ** 8);
+    try buf.appendSlice(allocator, &@as([8]u8, @splat(0)));
     try buf.appendSlice(allocator, &chunk.wave_guid);
     for (chunks) |c| {
         try buf.appendSlice(allocator, &c.guid);
@@ -1577,7 +1577,7 @@ fn buildW64(allocator: std.mem.Allocator, chunks: []const W64Chunk) ![]u8 {
         try buf.appendSlice(allocator, &sz);
         try buf.appendSlice(allocator, c.payload);
         const pad: usize = (8 - (c.payload.len % 8)) % 8;
-        if (pad > 0) try buf.appendSlice(allocator, (&[_]u8{0} ** 7)[0..pad]);
+        if (pad > 0) try buf.appendSlice(allocator, (&@as([7]u8, @splat(0)))[0..pad]);
     }
     std.mem.writeInt(u64, buf.items[size_pos..][0..8], @intCast(buf.items.len - 16), .little);
     return buf.toOwnedSlice(allocator);
@@ -2046,7 +2046,7 @@ test "wav 畸形: data 段越界 → clamp 到文件尾" {
 }
 
 test "wav 畸形: 缺 fmt chunk → Corrupt" {
-    const junk = [_]u8{0} ** 4;
+    const junk: [4]u8 = @splat(0);
     const file = try buildRiff(testing.allocator, "RIFF", .little, &.{
         .{ .id = "JUNK".*, .payload = &junk },
         .{ .id = "data".*, .payload = &junk },
@@ -2174,7 +2174,7 @@ test "wav 集成: AIFC ima4（ADPCM IMA QT）端到端" {
     @memcpy(comm[18..22], "ima4");
 
     // SSND：1 块 34B（2B BE 头 predictor=0/step=0 + 32B 数据全 0）→ 64 样本/通道
-    var ssnd: [44]u8 = [_]u8{0} ** 44; // offset(4)+blockSize(4)+块(34)+pad(2 对齐)
+    var ssnd: [44]u8 = @splat(0); // offset(4)+blockSize(4)+块(34)+pad(2 对齐)
     std.mem.writeInt(u32, ssnd[0..4], 0, .big);
     std.mem.writeInt(u32, ssnd[4..8], 0, .big);
 
@@ -2860,7 +2860,7 @@ test "wav 集成: RIFF smpl + cue 解析（循环点/提示点）" {
     const pcm = [_]u8{ 0x64, 0x00, 0x38, 0xFF, 0x00, 0x01, 0xFE, 0xFF }; // 2 帧交错（8B）
 
     // smpl：36B 头 + 2 个循环点（各 24B）
-    var smpl: [36 + 2 * 24]u8 = [_]u8{0} ** (36 + 2 * 24);
+    var smpl: [36 + 2 * 24]u8 = @splat(0);
     std.mem.writeInt(u32, smpl[28..32], 2, .little); // numSampleLoops
     // loop 0：type=0 forward, start=0, end=2, playCount=0（无限）
     std.mem.writeInt(u32, smpl[36 + 4 ..][0..4], 0, .little);
@@ -2874,7 +2874,7 @@ test "wav 集成: RIFF smpl + cue 解析（循环点/提示点）" {
     std.mem.writeInt(u32, smpl[36 + 24 + 20 ..][0..4], 4, .little);
 
     // cue：4B 计数 + 2 个点（各 24B）
-    var cue: [4 + 2 * 24]u8 = [_]u8{0} ** (4 + 2 * 24);
+    var cue: [4 + 2 * 24]u8 = @splat(0);
     std.mem.writeInt(u32, cue[0..4], 2, .little);
     std.mem.writeInt(u32, cue[4..8], 1001, .little); // id 1
     std.mem.writeInt(u32, cue[8..12], 7, .little); // position
@@ -2921,7 +2921,7 @@ test "wav 畸形: smpl/cue 计数超载 → clamp 保留已解析条目" {
     const pcm = [_]u8{ 0x64, 0x00, 0x38, 0xFF };
 
     // smpl 声明 1000 个循环，但实际只有 1 个（头 36B + 1×24B）
-    var smpl: [36 + 24]u8 = [_]u8{0} ** (36 + 24);
+    var smpl: [36 + 24]u8 = @splat(0);
     std.mem.writeInt(u32, smpl[28..32], 1000, .little);
     std.mem.writeInt(u32, smpl[36 + 4 ..][0..4], 1, .little); // type
     std.mem.writeInt(u32, smpl[36 + 8 ..][0..4], 10, .little); // start
@@ -2952,14 +2952,14 @@ test "wav 畸形: smpl/cue 计数超载 → clamp 保留已解析条目" {
 
 test "wav 集成: RIFX（大端）smpl/cue 解析" {
     // 大端字段验证：ctx.endian 应用于 smpl/cue 的字段读取
-    var smpl: [36 + 24]u8 = [_]u8{0} ** (36 + 24);
+    var smpl: [36 + 24]u8 = @splat(0);
     std.mem.writeInt(u32, smpl[28..32], 1, .big);
     std.mem.writeInt(u32, smpl[36 + 4 ..][0..4], 2, .big); // type=2 backward
     std.mem.writeInt(u32, smpl[36 + 8 ..][0..4], 4, .big); // start
     std.mem.writeInt(u32, smpl[36 + 12 ..][0..4], 8, .big); // end
     std.mem.writeInt(u32, smpl[36 + 20 ..][0..4], 3, .big); // playCount
 
-    var cue: [4 + 24]u8 = [_]u8{0} ** (4 + 24);
+    var cue: [4 + 24]u8 = @splat(0);
     std.mem.writeInt(u32, cue[0..4], 1, .big);
     std.mem.writeInt(u32, cue[4..8], 77, .big); // id
     std.mem.writeInt(u32, cue[8..12], 12, .big); // position
@@ -3054,14 +3054,14 @@ test "caf 集成: lpcm s16le mono（镜像 ffmpeg 布局：desc + chan + info + 
 
     // desc payload：flags 0x2（LE）、bytes_per_packet 2、fpp 1、ch 1、bits 16
     const desc = cafDescPayload(44100.0, "lpcm".*, 0x2, 2, 1, 1, 16);
-    var edit: [4]u8 = [_]u8{0} ** 4; // edit count 0
+    var edit: [4]u8 = @splat(0); // edit count 0
     const data_chunk = try std.mem.concat(testing.allocator, u8, &.{ &edit, &pcm });
     defer testing.allocator.free(data_chunk);
 
     const file = try buildCaf(testing.allocator, &.{
         .{ .id = "desc".*, .payload = &desc },
-        .{ .id = "chan".*, .payload = &[_]u8{0} ** 12 },
-        .{ .id = "info".*, .payload = &[_]u8{0} ** 16 },
+        .{ .id = "chan".*, .payload = &@as([12]u8, @splat(0)) },
+        .{ .id = "info".*, .payload = &@as([16]u8, @splat(0)) },
         .{ .id = "data".*, .payload = data_chunk },
     });
     defer testing.allocator.free(file);
@@ -3091,14 +3091,14 @@ test "caf 集成: lpcm s16be stereo（chan 后置跳过 + 大端直出）" {
     for (vals, 0..) |v, i| std.mem.writeInt(i16, pcm[2 * i ..][0..2], v, .big);
 
     const desc = cafDescPayload(48000.0, "lpcm".*, 0x0, 4, 1, 2, 16);
-    var edit: [4]u8 = [_]u8{0} ** 4;
+    var edit: [4]u8 = @splat(0);
     const data_chunk = try std.mem.concat(testing.allocator, u8, &.{ &edit, &pcm });
     defer testing.allocator.free(data_chunk);
 
     const file = try buildCaf(testing.allocator, &.{
         .{ .id = "desc".*, .payload = &desc },
         .{ .id = "data".*, .payload = data_chunk },
-        .{ .id = "chan".*, .payload = &[_]u8{0} ** 12 }, // data 后仍有 chunk → 读到即停
+        .{ .id = "chan".*, .payload = &@as([12]u8, @splat(0)) }, // data 后仍有 chunk → 读到即停
     });
     defer testing.allocator.free(file);
 
@@ -3122,7 +3122,7 @@ test "caf 集成: lpcm f32le（flags 0x3 = float|LE）与 f64be（flags 0x1）" 
     const f32v = [_]f32{ 0.5, -1.25 };
     for (f32v, 0..) |v, i| std.mem.writeInt(u32, p32[4 * i ..][0..4], @bitCast(v), .little);
     const desc32 = cafDescPayload(8000.0, "lpcm".*, 0x3, 4, 1, 1, 32);
-    var edit: [4]u8 = [_]u8{0} ** 4;
+    var edit: [4]u8 = @splat(0);
     const dc32 = try std.mem.concat(testing.allocator, u8, &.{ &edit, &p32 });
     defer testing.allocator.free(dc32);
     const file32 = try buildCaf(testing.allocator, &.{
@@ -3184,7 +3184,7 @@ test "caf 畸形: desc 可变包（fpp 0）→ UnsupportedFormat；缺 desc → 
     try testing.expectError(error.UnsupportedFormat, openMem(testing.allocator, file, &info));
 
     // 首 chunk 非 desc → Corrupt
-    const file2 = try buildCaf(testing.allocator, &.{.{ .id = "free".*, .payload = &[_]u8{0} ** 8 }});
+    const file2 = try buildCaf(testing.allocator, &.{.{ .id = "free".*, .payload = &@as([8]u8, @splat(0)) }});
     defer testing.allocator.free(file2);
     try testing.expectError(error.Corrupt, openMem(testing.allocator, file2, &info));
 }
@@ -3194,7 +3194,7 @@ test "au 集成: s16be mono + s24be stereo（大端 PCM 直出，annotation 跳�
     var p16: [8]u8 = undefined;
     const v16 = [_]i16{ 1000, -2000, 3000, -4000 };
     for (v16, 0..) |v, i| std.mem.writeInt(i16, p16[2 * i ..][0..2], v, .big);
-    const file = try buildAu(testing.allocator, 3, 44100, 1, &[_]u8{0} ** 8, &p16);
+    const file = try buildAu(testing.allocator, 3, 44100, 1, &@as([8]u8, @splat(0)), &p16);
     defer testing.allocator.free(file);
 
     var info: decoder.Info = undefined;

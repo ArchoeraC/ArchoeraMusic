@@ -42,12 +42,12 @@ pub const GrInfo = struct {
 };
 
 pub const DecoderState = struct {
-    mdct_overlap: [2][9 * 32]f32 = .{ .{0} ** (9 * 32) } ** 2,
-    qmf_state: [15 * 2 * 32]f32 = .{0} ** (15 * 2 * 32),
+    mdct_overlap: [2][9 * 32]f32 = @splat(@splat(0)),
+    qmf_state: [15 * 2 * 32]f32 = @splat(0),
     reserv: i32 = 0,
     free_format_bytes: i32 = 0,
     header: [4]u8 = .{ 0, 0, 0, 0 },
-    reserv_buf: [511]u8 = .{0} ** 511,
+    reserv_buf: [511]u8 = @splat(0),
 };
 
 const Scratch = struct {

@@ -37,7 +37,7 @@ pub fn decodeBandStructureInner(
     band_struct: []u8,
     band_sizes: []u8,
 ) !i32 {
-    var bnd_sz: [22]u8 = [_]u8{0} ** 22;
+    var bnd_sz: [22]u8 = @splat(0);
     const n_subbands: i32 = end_subband - start_subband;
 
     // blk==0：整段 band_struct 用默认带结构填充（后续 blk 复用未改写部分）
@@ -233,8 +233,8 @@ test "decodeBandStructure：blk0 用默认带结构" {
     t.initStatic();
     var buf = [_]u8{ 0x00, 0x00 };
     var gb = BitReader.init(&buf);
-    var band_struct: [18]u8 = [_]u8{0} ** 18;
-    var band_sizes: [18]u8 = [_]u8{0} ** 18;
+    var band_struct: [18]u8 = @splat(0);
+    var band_sizes: [18]u8 = @splat(0);
     const err = decodeBandStructure(&gb, 0, 1, 0, 18, &band_struct, &band_sizes);
     try std.testing.expect(!err);
     try std.testing.expectEqual(@as(usize, 1), gb.bit_pos);
@@ -252,7 +252,7 @@ test "couplingStrategy：立体声启用耦合" {
     ctx.eac3 = 0;
     ctx.channel_mode = t.AC3_CHMODE_STEREO;
     ctx.fbw_channels = 2;
-    var stages: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS;
+    var stages: [t.AC3_MAX_CHANNELS]u8 = @splat(0);
     const err = couplingStrategy(&ctx, 0, &stages);
     try std.testing.expect(!err);
     try std.testing.expectEqual(@as(usize, 18), ctx.gb.bit_pos);
@@ -294,7 +294,7 @@ test "couplingStrategy：耦合未使用（cpl_in_use=0）" {
     ctx.eac3 = 0;
     ctx.channel_mode = t.AC3_CHMODE_STEREO;
     ctx.fbw_channels = 2;
-    var stages: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS;
+    var stages: [t.AC3_MAX_CHANNELS]u8 = @splat(0);
     const err = couplingStrategy(&ctx, 0, &stages);
     try std.testing.expect(!err);
     try std.testing.expectEqual(@as(usize, 1), ctx.gb.bit_pos);

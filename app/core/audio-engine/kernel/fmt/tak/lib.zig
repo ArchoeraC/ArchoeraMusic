@@ -569,7 +569,7 @@ test "tak 结构: 帧表 = 38 帧，metadata STREAMINFO 位段解析" {
 test "tak 健壮性: 坏魔数/截断 → Corrupt；非法位深 → UnsupportedFormat" {
     var info: decoder.Info = undefined;
     // 坏魔数（非 tBaK 也不像帧 → Corrupt）
-    var bad = [_]u8{0} ** 64;
+    var bad: [64]u8 = @splat(0);
     @memcpy(bad[0..4], "XXXX");
     var r0 = io.Reader.openMem(&bad);
     try testing.expectError(error.Corrupt, open(testing.allocator, &r0, &info));

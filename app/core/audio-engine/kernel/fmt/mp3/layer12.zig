@@ -11,11 +11,11 @@ const hdr = @import("header.zig");
 const synth = @import("synth.zig");
 
 pub const ScaleInfo = struct {
-    scf: [3 * 64]f32 = .{0} ** (3 * 64),
+    scf: [3 * 64]f32 = @splat(0),
     total_bands: u8 = 0,
     stereo_bands: u8 = 0,
-    bitalloc: [64]u8 = .{0} ** 64,
-    scfcod: [64]u8 = .{0} ** 64,
+    bitalloc: [64]u8 = @splat(0),
+    scfcod: [64]u8 = @splat(0),
 };
 
 const SubbandAlloc = struct {

@@ -86,7 +86,7 @@ const Vlc = struct {
                 return a.code < b.code;
             }
         }.lt);
-        var len_ofs: [24]u16 = .{0} ** 24;
+        var len_ofs: [24]u16 = @splat(0);
         var idx: usize = 0;
         var l: usize = 1;
         while (l <= 22) : (l += 1) {
@@ -134,24 +134,24 @@ pub const WmaDec = struct {
     coefs_start: usize = 0,
     coefs_end: usize = 0, // = (frame_len - frame_len*9/100)
     // 指数带（固定块长单块，数组按块长 k=0 存放）
-    exponent_bands: [25]usize = .{0} ** 25,
+    exponent_bands: [25]usize = @splat(0),
     exponent_sizes: usize = 0,
     high_band_start: usize = 0,
-    exponent_high_bands: [HIGH_BAND_MAX]usize = .{0} ** HIGH_BAND_MAX,
+    exponent_high_bands: [HIGH_BAND_MAX]usize = @splat(0),
     exponent_high_sizes: usize = 0,
 
     // 状态
     ms_stereo: bool = false,
     channel_coded: [2]bool = .{ false, false },
-    high_band_coded: [2][HIGH_BAND_MAX]bool = .{.{false} ** HIGH_BAND_MAX} ** 2,
-    high_band_values: [2][HIGH_BAND_MAX]i32 = .{.{0} ** HIGH_BAND_MAX} ** 2,
-    exponents: [2][BLOCK_MAX_SIZE]f32 = .{.{0} ** BLOCK_MAX_SIZE} ** 2,
+    high_band_coded: [2][HIGH_BAND_MAX]bool = @splat(@splat(false)),
+    high_band_values: [2][HIGH_BAND_MAX]i32 = @splat(@splat(0)),
+    exponents: [2][BLOCK_MAX_SIZE]f32 = @splat(@splat(0)),
     max_exponent: [2]f32 = .{ 1.0, 1.0 },
     exponents_initialized: [2]bool = .{ false, false },
-    coefs1: [2][BLOCK_MAX_SIZE]f32 = .{.{0} ** BLOCK_MAX_SIZE} ** 2,
-    coefs: [2][BLOCK_MAX_SIZE]f32 = .{.{0} ** BLOCK_MAX_SIZE} ** 2,
-    output: [2 * BLOCK_MAX_SIZE]f32 = .{0} ** (2 * BLOCK_MAX_SIZE),
-    frame_out: [2][2 * BLOCK_MAX_SIZE]f32 = .{.{0} ** (2 * BLOCK_MAX_SIZE)} ** 2,
+    coefs1: [2][BLOCK_MAX_SIZE]f32 = @splat(@splat(0)),
+    coefs: [2][BLOCK_MAX_SIZE]f32 = @splat(@splat(0)),
+    output: [2 * BLOCK_MAX_SIZE]f32 = @splat(0),
+    frame_out: [2][2 * BLOCK_MAX_SIZE]f32 = @splat(@splat(0)),
     mdct_scratch: [1024]wma_mdct.Cplx = undefined,
 
     windows: [BLOCK_MAX_SIZE]f32 = undefined,
@@ -164,8 +164,8 @@ pub const WmaDec = struct {
     noise_index: usize = 0,
 
     // run/level 查找表（按 huffman 原索引），2 组
-    run_table: [2][4096]u16 = .{.{0} ** 4096} ** 2,
-    level_table: [2][4096]f32 = .{.{0} ** 4096} ** 2,
+    run_table: [2][4096]u16 = @splat(@splat(0)),
+    level_table: [2][4096]f32 = @splat(@splat(0)),
 
     vlc_work: [2][4096]VlcEntry = undefined,
     vlc: [2]Vlc = undefined,

@@ -56,7 +56,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         scanner = amrwb.FrameScanner.init(data);
     }
 
-    var counts: [16]usize = [_]usize{0} ** 16;
+    var counts: [16]usize = @splat(0);
     var seq = std.ArrayList(u8).empty;
     defer seq.deinit(gpa);
     var n: usize = 0;

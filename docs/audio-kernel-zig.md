@@ -334,7 +334,7 @@ pub fn open(path: []const u8, info: *Info) !Decoder {
 
 ```
 app/core/audio-engine/                # C 壳保留 + Zig 内核（FFmpeg 依赖拆为可选后端，见 §18）
-├── build.zig                         # 单一构建脚本（Zig 0.16；C 壳 + Zig 内核混合，见 §5.1）
+├── build.zig                         # 单一构建脚本（Zig 0.17；C 壳 + Zig 内核混合，见 §5.1）
 ├── build.zig.zon                     # 依赖声明（当前应为空——零包依赖）
 ├── include/
 │   ├── archoera_mediaengine.h        # 保留：FFI 契约（Dart，符号面不变）
@@ -441,9 +441,20 @@ source（本地文件 / Dart 预下载临时文件）
 
 ## 5. 构建系统：build.zig 与跨平台矩阵
 
-### 5.1 `build.zig` 骨架（Zig 0.16 API；C 壳 + Zig 内核混合产出）
+### 5.1 `build.zig` 骨架（Zig 0.17 API；C 壳 + Zig 内核混合产出）
 
-> API 说明：Zig 0.16 已废弃 `b.addSharedLibrary` / `Compile.root_source_file` 旧式，
+> **0.17 迁移要点（2026-10）**：
+> - 数组/字符串重复语法 `a ** b` 已移除 → 用 `@splat`（数组类型需由上下文提供，
+>   故 `var x = [1]u8{0} ** n;` 须写成 `var x: [n]u8 = @splat(0);`）；
+> - `@cImport` 已移除 → C 头经 `b.addTranslateC(.{ .root_source_file, .target,
+>   .optimize })` 生成模块，源码侧 `@import("c_amr")` / `@import("c_vorbis")`
+>   （官方建议改用 translate-c 外部包；这里保留内置步骤以维持零第三方依赖/离线构建）；
+> - `std.builtin.OptimizeMode` → `std.builtin.Optimize`（枚举值 `.debug/.safe/
+>   .fast/.small`，`.ReleaseSafe` 等写法不再是枚举字段）；
+> - `std.meta.fields` / `Allocator.dupeZ` 已移除 → `@typeInfo(T).@"enum".field_names`
+>   / `allocator.dupeSentinel(u8, s, 0)`。
+
+> API 说明：`b.addSharedLibrary` / `Compile.root_source_file` 旧式写法已废弃，
 > 改为 `b.addLibrary(.{ .name, .linkage, .root_module })` + `b.createModule(.{ .root_source_file, .target, .optimize })`；
 > C 源经 `root_module.addCSourceFiles(...)` 并入同一模块，系统库经 `root_module.linkSystemLibrary(...)`。
 
