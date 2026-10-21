@@ -128,12 +128,18 @@ mixin _PlaybackNotifierLoading
         _log('load 被新会话取代（排队中）: $source');
         return;
       }
+      // 切歌瞬间即把时间基准归零（否则缓冲/预加载期间进度条仍停在上一首的
+      // 位置，起播时才跳回 0，看起来像「整体向后偏移一点」）。position 在
+      // _startSession 前就锚定，引擎首块 PCM 出声时的事件不会再被回写覆盖。
       state = state.copyWith(
         title: title,
         subtitle: subtitle,
         trackId: trackId,
         track: track,
         quality: quality,
+        playing: false,
+        position: Duration(milliseconds: offsetMs),
+        duration: Duration.zero,
         buffering: true,
       );
       _historyRecorded = false;
