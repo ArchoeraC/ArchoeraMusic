@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!-- ArchoeraMusic 404 — AGPL-3.0-or-later -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>404 — ArchoeraMusic</title>
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+  .notfound {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 40px 24px;
+    text-align: center;
+    background:
+      radial-gradient(700px 380px at 50% 10%, rgba(206, 212, 224, 0.09), transparent 70%),
+      #000;
+  }
+
+  .notfound .logo-mark {
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+    font-size: 30px;
+    margin-bottom: 28px;
+  }
+
+  .notfound-code {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.34em;
+    color: #6b6b6b;
+  }
+
+  .notfound h1 {
+    margin: 18px 0 0;
+    font-size: clamp(30px, 5vw, 54px);
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+
+  .notfound p {
+    margin: 16px 0 0;
+    color: #8f8f8f;
+    font-size: 13.5px;
+  }
+
+  .notfound-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 30px;
+  }
+
+  .notfound-foot {
+    margin-top: 60px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: #5d5d5d;
+  }
+</style>
+</head>
+<body>
+<main class="notfound">
+  <span class="logo-mark" aria-hidden="true"><span class="icon eta-mark">&#xE101;</span></span>
+  <p class="notfound-code">404 · NOT FOUND</p>
+  <h1>这里没有声音。</h1>
+  <p>你要找的页面不在了。回首页，继续听吧。</p>
+  <div class="notfound-actions">
+    <a class="btn btn-primary" href="./">回到首页</a>
+    <a class="btn btn-ghost" href="https://github.com/BetaStudio2/ArchoeraMusic" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+  <p class="notfound-foot">ArchoeraMusic © BetaStudio2 · AGPL-3.0-or-later</p>
+</main>
+</body>
+</html>

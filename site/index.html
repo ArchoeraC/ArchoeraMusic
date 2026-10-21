@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<!--
+  ArchoeraMusic 宣传页（GitHub Pages）
+  Copyright (C) 2026 Archoera && BetaStudio2
+  SPDX-License-Identifier: AGPL-3.0-or-later
+  纯静态：无构建、无 CDN、无 Node 运行时依赖。
+  开屏动效参数见 assets/css/site.css 与 assets/js/site.js 顶部说明。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArchoeraMusic — 开源、多端、面向本地与在线音乐的混合架构播放器</title>
+<meta name="description" content="ArchoeraMusic 是一个开源的跨平台音乐播放器：Flutter 桌面 UI + 自研多语言原生模块 FFI 直连，内置统一音频引擎、本地曲库、多音源在线与可插拔视觉样式。AGPL-3.0-or-later。">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ArchoeraMusic">
+<meta property="og:title" content="ArchoeraMusic — 开源、多端音乐播放器">
+<meta property="og:description" content="Flutter 桌面 UI + 自研多语言原生模块 FFI 直连，内置统一音频引擎与可插拔视觉样式。">
+<meta property="og:url" content="https://betastudio2.github.io/ArchoeraMusic/">
+<meta property="og:image" content="https://betastudio2.github.io/ArchoeraMusic/assets/img/home-og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preload" as="image" href="assets/img/home.webp" fetchpriority="high">
+<link rel="preload" href="assets/fonts/Manrope.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="assets/fonts/EtaMark.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="stylesheet" href="assets/css/site.css">
+<script>
+  /* 首屏开屏在标记里就是可见的（避免主页闪一下）；主脚本若加载失败，
+     3 秒后自动放行，绝不停在纯黑画面。 */
+  document.documentElement.classList.add("js-reveal");
+  window.addEventListener("load", function () {
+    window.setTimeout(function () {
+      if (window.archoeraSiteReady) return;
+      var splash = document.getElementById("splash");
+      if (splash) {
+        splash.classList.remove("is-active", "is-dismissing");
+        splash.setAttribute("aria-hidden", "true");
+      }
+      document.documentElement.classList.remove("js-reveal");
+      document.body.classList.add("is-ready");
+    }, 3000);
+  });
+</script>
+</head>
+<body>
+
+<noscript>
+  <style>
+    #splash { display: none !important; }
+    .char { animation: none !important; }
+    [data-reveal] { opacity: 1 !important; transform: none !important; }
+  </style>
+</noscript>
+
+<div id="splash" class="splash is-active" aria-hidden="false">
+  <div class="splash-screen">
+    <div class="splash-glow"></div>
+    <div class="splash-center">
+      <div class="splash-logo" aria-hidden="true"><span class="icon eta-mark">&#xE101;</span></div>
+      <div class="splash-brand" data-text="ArchoeraMusic" aria-label="ArchoeraMusic">ArchoeraMusic</div>
+      <div class="splash-engine">
+        <span class="icon eta-mark" aria-hidden="true">&#xE102;</span>
+        <span>Powered by EraSync</span>
+      </div>
+    </div>
+    <div class="splash-footer">ArchoeraMusic © BetaStudio2 · Powered by Flutter</div>
+  </div>
+</div>
+
+<div class="scroll-progress" aria-hidden="true"><span></span></div>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#top" aria-label="ArchoeraMusic 首页">
+      <span class="logo-mark" aria-hidden="true"><span class="icon eta-mark">&#xE101;</span></span>
+      <span class="brand-name">ArchoeraMusic</span>
+    </a>
+
+    <nav class="site-nav" aria-label="主导航">
+      <a href="#product" data-nav="product">产品</a>
+      <a href="#features" data-nav="features">功能</a>
+      <a href="#engine" data-nav="engine">引擎</a>
+      <a href="#styles" data-nav="styles">样式</a>
+      <a href="#gallery" data-nav="gallery">界面</a>
+      <a href="#splash-demo" data-nav="splash-demo">开屏</a>
+      <a href="#download" data-nav="download">下载</a>
+    </nav>
+
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-sm replay-btn" type="button" data-replay-splash>重播开屏</button>
+      <a class="btn btn-primary btn-sm" href="https://github.com/BetaStudio2/ArchoeraMusic/releases/latest" target="_blank" rel="noopener">下载</a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="打开菜单">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="mobile-menu" id="mobile-menu" aria-hidden="true">
+    <nav aria-label="移动端导航">
+      <a href="#product">产品</a>
+      <a href="#features">功能</a>
+      <a href="#engine">引擎</a>
+      <a href="#styles">样式</a>
+      <a href="#gallery">界面</a>
+      <a href="#splash-demo">开屏</a>
+      <a href="#download">下载</a>
+      <a href="#docs">文档</a>
+      <a href="https://github.com/BetaStudio2/ArchoeraMusic" target="_blank" rel="noopener">GitHub ↗</a>
+    </nav>
+    <p class="mobile-menu-meta">Linux · Windows · macOS<br>AGPL-3.0-or-later</p>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ══ 首屏 ══════════════════════════════════════════════════════════ -->
+  <section class="hero" id="hero">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="hero-aura"></div>
+      <div class="hero-grid"></div>
+      <div class="hero-grain"></div>
+    </div>
+
+    <div class="wrap hero-inner">
+      <p class="hero-kicker">ARCHOERAMUSIC <span class="dot-sep"></span> DESKTOP MUSIC PLAYER</p>
+      <h1 class="hero-title">
+        <span class="line"><span>把音乐，</span></span>
+        <span class="line"><span>放回自己的播放器里。</span></span>
+      </h1>
+      <p class="hero-sub">
+        开源、多端、面向本地与在线音乐的混合架构播放器。<br>
+        Flutter 桌面 UI，重型处理交给自研原生模块，经 FFI 进程内直连。
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary btn-lg" href="https://github.com/BetaStudio2/ArchoeraMusic/releases/latest" target="_blank" rel="noopener">下载最新版本</a>
+        <button class="btn btn-ghost btn-lg" type="button" data-replay-splash>观看开屏动效</button>
+        <a class="btn btn-quiet" href="https://github.com/BetaStudio2/ArchoeraMusic" target="_blank" rel="noopener">浏览源码 ↗</a>
+      </div>
+      <ul class="hero-meta">
+        <li>Linux · Windows · macOS</li>
+        <li>AGPL-3.0-or-later</li>
+        <li>v1.0.1+2</li>
+      </ul>
+
+      <div class="hero-visual" id="hero-visual">
+        <div class="hero-visual-glow" aria-hidden="true"></div>
+        <figure class="app-window" data-parallax>
+          <div class="app-window-bar">
+            <span class="window-logo" aria-hidden="true"><span class="icon eta-mark">&#xE101;</span></span>
+            <span class="window-title">ArchoeraMusic</span>
+            <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          </div>
+          <div class="app-window-body">
+            <img src="assets/img/home.webp" width="1800" height="1072"
+                 alt="ArchoeraMusic 主界面：左侧导航、发现页、推荐歌单与播放条" fetchpriority="high">
+          </div>
+          <figcaption>主界面 · 发现页<span>截图可能落后于最新版本</span></figcaption>
+        </figure>
+
+        <span class="float-chip chip-a" aria-hidden="true">
+          <span class="icon eta-mark">&#xE102;</span> EraAudio · Zig 内核
+        </span>
+        <span class="float-chip chip-c" aria-hidden="true">
+          8 个样式域
+        </span>
+        <span class="float-chip chip-b" aria-hidden="true">
+          <i class="chip-pulse"></i> PCM 驻留内存
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 跑马灯 ═══════════════════════════════════════════════════════ -->
+  <section class="ticker-band" aria-label="支持的格式与音源">
+    <div class="ticker">
+      <span class="ticker-label">FORMATS</span>
+      <div class="ticker-viewport">
+        <div class="ticker-track" data-ticker>
+          <span>FLAC</span><i>·</i><span>APE</span><i>·</i><span>DSD</span><i>·</i><span>DSF</span><i>·</i>
+          <span>Opus</span><i>·</i><span>OGG</span><i>·</i><span>WAV</span><i>·</i><span>M4A</span><i>·</i>
+          <span>AIFF</span><i>·</i><span>WMA</span><i>·</i><span>MP3</span><i>·</i><span>WEBM</span><i>·</i>
+        </div>
+      </div>
+    </div>
+    <div class="ticker ticker-reverse">
+      <span class="ticker-label">SOURCES</span>
+      <div class="ticker-viewport">
+        <div class="ticker-track" data-ticker>
+          <span>NT</span><i>·</i><span>KG</span><i>·</i><span>QM</span><i>·</i>
+          <span>NK</span><i>·</i><span>本地曲库</span><i>·</i><span>流媒体</span><i>·</i>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 立场 ═════════════════════════════════════════════════════════ -->
+  <section class="manifesto">
+    <div class="wrap">
+      <p class="kicker" data-reveal>立场</p>
+      <div class="manifesto-lines">
+        <p class="manifesto-line" data-reveal>不塞广告。</p>
+        <p class="manifesto-line" data-reveal>不做遥测。</p>
+        <p class="manifesto-line" data-reveal>不要求管理员权限。</p>
+      </div>
+      <p class="manifesto-copy" data-reveal>
+        只做播放器该做的事：把音源整理好，把声音解出来，把界面交给你。
+        数据默认留在本机，凭据放进本地保险库，运行时不需要提权。
+      </p>
+
+      <dl class="stats">
+        <div data-reveal>
+          <dt>1</dt>
+          <dd><strong>个主进程</strong><span>Flutter + Dart + 原生 FFI；保险库为独立小进程</span></dd>
+        </div>
+        <div data-reveal>
+          <dt>0</dt>
+          <dd><strong>个监听端口</strong><span>MCP 可选，默认关闭且仅回环</span></dd>
+        </div>
+        <div data-reveal>
+          <dt>6</dt>
+          <dd><strong>门语言</strong><span>C · C++ · C# · Rust · Go · Zig</span></dd>
+        </div>
+        <div data-reveal>
+          <dt>8</dt>
+          <dd><strong>个样式域</strong><span>布局 / 背景 / 转场 / 频谱 / 主题…</span></dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ══ 全幅沉浸式播放页 ════════════════════════════════════════════ -->
+  <section class="cinema" id="cinema">
+    <div class="cinema-sticky">
+      <div class="cinema-media" data-cinema-media>
+        <img src="assets/img/player.webp" width="2000" height="1215"
+             alt="沉浸式全屏播放页：封面、逐字歌词与底部频谱">
+      </div>
+      <div class="cinema-shade" aria-hidden="true"></div>
+      <div class="wrap cinema-copy" data-reveal>
+        <p class="kicker">沉浸式播放页</p>
+        <h2>让封面和歌词，<br>占满整块屏幕。</h2>
+        <p class="cinema-lede">
+          三套播放页布局、逐字歌词、封面取色背景与 FFT 频谱。
+          声音在后台，画面在眼前。
+        </p>
+        <ul class="cinema-tags">
+          <li>逐字歌词</li><li>FFT 频谱</li><li>封面取色</li><li>三套布局</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 产品叙事（滚动切换）═════════════════════════════════════════ -->
+  <section class="showcase" id="product">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">产品</p>
+        <h2>一扇窗，一条链路，<br>一套可以换的外壳。</h2>
+      </header>
+
+      <div class="showcase-layout">
+        <div class="showcase-copy">
+          <article class="showcase-step is-active" data-step="0" data-reveal>
+            <p class="step-index">01</p>
+            <h3>所有音源，住进同一扇窗</h3>
+            <p>
+              NT、KG、QM 三个在线音源，加上本地曲库与自建流媒体服务器，
+              在同一个界面里搜索、收藏、播放。登录态由本地凭据保险库保管，不上传。
+            </p>
+            <ul class="step-tags">
+              <li>在线音源</li><li>本地扫描</li><li>流媒体聚合</li>
+            </ul>
+          </article>
+
+          <article class="showcase-step" data-step="1" data-reveal>
+            <p class="step-index">02</p>
+            <h3>从文件到耳朵，一条进程内的链路</h3>
+            <p>
+              解码、EQ、响度归一化、限幅、FFT 与变速变调都在 C 引擎里完成；
+              自研 Zig 内核按格式渐进接管。PCM 默认驻留内存，不写临时文件。
+            </p>
+            <ul class="step-tags">
+              <li>FFmpeg + EraAudio</li><li>内存播放</li><li>FFT 频谱</li>
+            </ul>
+          </article>
+
+          <article class="showcase-step" data-step="2" data-reveal>
+            <p class="step-index">03</p>
+            <h3>连外观，也不是写死的</h3>
+            <p>
+              播放页布局、背景、封面转场、频谱、页面转场、侧栏、主题色与外观风格，
+              8 个样式域各自独立成模块。未知 id 安全回退，旧配置不会把界面弄坏。
+            </p>
+            <ul class="step-tags">
+              <li>注册表 + 契约</li><li>模块化</li><li>安全回退</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="showcase-stage-wrap">
+          <div class="showcase-stage" data-stage="0">
+            <div class="stage-top">
+              <span class="stage-dot"></span>
+              <span data-stage-label>PRODUCT VIEW 01 / 03</span>
+            </div>
+
+            <div class="stage-view view-library is-active" data-view="0">
+              <div class="mini-window">
+                <div class="mini-body">
+                  <img src="assets/img/home.webp" width="1800" height="1072" alt="ArchoeraMusic 主界面中的发现页与推荐歌单">
+                </div>
+                <div class="mini-caption">
+                  <span>发现 · 推荐歌单</span>
+                  <span>NT / KG / QM · 本地 · 流媒体</span>
+                </div>
+              </div>
+              <span class="stage-tag tag-left">在线音源</span>
+              <span class="stage-tag tag-right">本地曲库</span>
+              <span class="stage-tag tag-bottom">流媒体聚合</span>
+            </div>
+
+            <div class="stage-view view-engine" data-view="1">
+              <div class="mini-window">
+                <div class="mini-body">
+                  <img src="assets/img/player-default.webp" width="1800" height="1094" alt="播放页：封面、逐字歌词与底部 FFT 频谱">
+                </div>
+                <div class="mini-caption">
+                  <span>播放页 · 逐字歌词</span>
+                  <span>FFT 频谱 / 封面取色</span>
+                </div>
+              </div>
+              <span class="stage-tag tag-left">逐字歌词</span>
+              <span class="stage-tag tag-right">FFT 频谱</span>
+            </div>
+
+            <div class="stage-view view-styles" data-view="2">
+              <div class="layout-preview">
+                <img data-layout-preview src="assets/img/layout-default.webp" width="900" height="547"
+                     alt="默认播放页布局预览">
+              </div>
+              <div class="layout-tabs" role="tablist" aria-label="播放页布局">
+                <button class="layout-tab is-active" type="button" role="tab" aria-selected="true"
+                        data-layout="default" data-src="assets/img/layout-default.webp">
+                  default<em>经典</em>
+                </button>
+                <button class="layout-tab" type="button" role="tab" aria-selected="false"
+                        data-layout="fullscreen" data-src="assets/img/layout-fullscreen.webp">
+                  fullscreen<em>全屏封面</em>
+                </button>
+                <button class="layout-tab" type="button" role="tab" aria-selected="false"
+                        data-layout="vutron" data-src="assets/img/layout-vutron.webp">
+                  vutron<em>紧凑</em>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 功能 ═════════════════════════════════════════════════════════ -->
+  <section class="section section-features" id="features">
+    <div class="wrap">
+      <header class="section-head split" data-reveal>
+        <div>
+          <p class="kicker">功能</p>
+          <h2>该有的都有，<br>不该有的不做。</h2>
+        </div>
+        <p class="section-lede">
+          从在线音源到本地曲库，从解码到歌词，所有能力收在同一个播放器里。
+          没有广告位，没有账号体系，没有需要提权的后台服务。
+        </p>
+      </header>
+
+      <div class="capabilities">
+        <article class="capability" data-reveal>
+          <span class="cap-index">01</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE180;</span></span>
+          <h3>多音源在线</h3>
+          <p>NT、KG、QM 三个在线音源，另有默认关闭的实验性音源 NK。</p>
+        </article>
+        <article class="capability" data-reveal>
+          <span class="cap-index">02</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE14F;</span></span>
+          <h3>本地曲库</h3>
+          <p>多目录增量 / 全量扫描，坏文件隔离、元数据刮削与本地搜索索引。</p>
+        </article>
+        <article class="capability" data-reveal>
+          <span class="cap-index">03</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE115;</span></span>
+          <h3>统一音频引擎</h3>
+          <p>EQ、响度归一化、限幅、FFT、变速变调，全部在 C 引擎内完成。</p>
+        </article>
+        <article class="capability" data-reveal>
+          <span class="cap-index">04</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE11D;</span></span>
+          <h3>EraAudio 内核</h3>
+          <p>FFmpeg 保持默认主引擎，自研 Zig 内核逐格式接管，契约不变。</p>
+        </article>
+        <article class="capability" data-reveal>
+          <span class="cap-index">05</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE15B;</span></span>
+          <h3>歌单与收藏</h3>
+          <p>跨音源统一的收藏、新建、改名与增删歌曲，不绑定单一平台。</p>
+        </article>
+        <article class="capability" data-reveal>
+          <span class="cap-index">06</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE1A4;</span></span>
+          <h3>流媒体聚合</h3>
+          <p>可选自建流媒体服务端，并聚合兼容协议的流媒体音乐库。</p>
+        </article>
+        <article class="capability" data-reveal>
+          <span class="cap-index">07</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE136;</span></span>
+          <h3>下载</h3>
+          <p>URL 解析与队列下沉到 Rust 原生层，支持续传，界面只做状态。</p>
+        </article>
+        <article class="capability" data-reveal>
+          <span class="cap-index">08</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE1BB;</span></span>
+          <h3>歌词</h3>
+          <p>表现层对齐 AMLL：逐字动画、扫亮、景深、间奏点与人声行。</p>
+        </article>
+        <article class="capability" data-reveal>
+          <span class="cap-index">09</span>
+          <span class="cap-icon"><span class="icon" aria-hidden="true">&#xE183;</span></span>
+          <h3>可插拔视觉</h3>
+          <p>8 个样式域走「契约 + 注册表 + 独立模块」，换风格不改主体。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 引擎 ═════════════════════════════════════════════════════════ -->
+  <section class="section section-engine" id="engine">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">引擎</p>
+        <h2>一条管线，从文件到耳朵。</h2>
+        <p class="section-lede">
+          解码、DSP 与输出都在进程内的原生库里跑，Dart 只做调度和画面。
+          频谱数据经 <code>pcm_window</code> 取窗，不靠临时文件往返。
+        </p>
+      </header>
+
+      <div class="engine-diagram" data-reveal>
+        <div class="diagram-line" aria-hidden="true"></div>
+        <div class="diagram-step">
+          <span class="diagram-num">01</span>
+          <span class="diagram-label">INPUT</span>
+          <strong>本地 / 在线 / 流媒体</strong>
+          <p>格式白名单含 FLAC、Opus、APE、DSD 等</p>
+        </div>
+        <div class="diagram-step">
+          <span class="diagram-num">02</span>
+          <span class="diagram-label">DECODE</span>
+          <strong>FFmpeg + EraAudio</strong>
+          <p>Zig 内核按格式渐进接管</p>
+        </div>
+        <div class="diagram-step">
+          <span class="diagram-num">03</span>
+          <span class="diagram-label">DSP</span>
+          <strong>EQ · 响度 · 限幅 · FFT</strong>
+          <p>ReplayGain / R128 与运行时兜底增益</p>
+        </div>
+        <div class="diagram-step">
+          <span class="diagram-num">04</span>
+          <span class="diagram-label">OUTPUT</span>
+          <strong>miniaudio 直出</strong>
+          <p>PCM 驻留内存，默认不落盘</p>
+        </div>
+      </div>
+
+      <div class="engine-spectrum-wide" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+
+      <div class="engine-facts">
+        <div class="fact card" data-reveal>
+          <h3>进程模型</h3>
+          <ul class="check-list">
+            <li>单进程：Flutter UI + 纯 Dart 业务层 + 原生 FFI</li>
+            <li>无 Node 侧车、无本地 HTTP 端口（MCP 可选且默认关闭）</li>
+            <li>平台能力统一走 C++ 桥接器，不需要管理员 / root</li>
+            <li>凭据保险库独立小进程，只碰加密容器</li>
+          </ul>
+        </div>
+        <div class="fact card" data-reveal>
+          <h3>多语言分工</h3>
+          <dl class="lang-list">
+            <div><dt>C</dt><dd>统一音频引擎：解码 / DSP / 输出</dd></div>
+            <div><dt>C++</dt><dd>元数据刮削、平台能力桥接</dd></div>
+            <div><dt>C#</dt><dd>曲库扫描（TagLibSharp）</dd></div>
+            <div><dt>Rust</dt><dd>下载器、凭据保险库、内嵌 CLI</dd></div>
+            <div><dt>Go</dt><dd>流媒体协议层（可选）</dd></div>
+            <div><dt>Zig</dt><dd>EraAudio 解码内核</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 样式 ═════════════════════════════════════════════════════════ -->
+  <section class="section section-styles" id="styles">
+    <div class="wrap">
+      <header class="section-head split" data-reveal>
+        <div>
+          <p class="kicker">样式</p>
+          <h2>整套外观，<br>都是可替换的。</h2>
+        </div>
+        <p class="section-lede">
+          每个样式域由「契约 + 注册表 + 独立模块」三部分组成，消费方只解析偏好 id；
+          未知 id 一律回退默认项，旧配置不会把界面弄坏。
+        </p>
+      </header>
+
+      <div class="style-table" data-reveal>
+        <div class="style-row">
+          <div class="style-name"><span class="icon" aria-hidden="true">&#xE157;</span>播放页布局</div>
+          <div class="style-ids"><code>default</code><code>fullscreen</code><code>vutron</code></div>
+        </div>
+        <div class="style-row">
+          <div class="style-name"><span class="icon" aria-hidden="true">&#xE1AF;</span>播放页背景</div>
+          <div class="style-ids"><code>gradient</code><code>blur</code><code>solid</code><code>ripple</code><code>fluid</code><code>coverTone</code></div>
+        </div>
+        <div class="style-row">
+          <div class="style-name"><span class="icon" aria-hidden="true">&#xE177;</span>封面切换</div>
+          <div class="style-ids"><code>scale</code><code>slide</code><code>fade</code></div>
+        </div>
+        <div class="style-row">
+          <div class="style-name"><span class="icon" aria-hidden="true">&#xE115;</span>频谱样式</div>
+          <div class="style-ids"><code>bars</code><code>wave</code><code>waveUp</code></div>
+        </div>
+        <div class="style-row">
+          <div class="style-name"><span class="icon" aria-hidden="true">&#xE1C4;</span>页面转场</div>
+          <div class="style-ids"><code>none</code><code>fade</code><code>slide</code><code>zoom</code></div>
+        </div>
+        <div class="style-row">
+          <div class="style-name"><span class="icon" aria-hidden="true">&#xE125;</span>侧栏导航</div>
+          <div class="style-ids"><code>default</code><code>animated</code></div>
+        </div>
+        <div class="style-row">
+          <div class="style-name"><span class="icon" aria-hidden="true">&#xE183;</span>主题色来源</div>
+          <div class="style-ids"><code>default</code><code>custom</code><code>cover</code><code>solid</code></div>
+        </div>
+        <div class="style-row">
+          <div class="style-name"><span class="icon" aria-hidden="true">&#xE111;</span>外观风格</div>
+          <div class="style-ids"><code>solid</code><code>image</code></div>
+        </div>
+      </div>
+
+      <p class="footnote" data-reveal>
+        注册表与偏好白名单由守卫测试保证一致；新增一种样式只需要新建模块、登记 id、补文案。
+        详见 <a href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs/style-registries.md" target="_blank" rel="noopener">样式注册表文档 ↗</a>。
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ 界面一览 ═════════════════════════════════════════════════════ -->
+  <section class="section section-gallery" id="gallery">
+    <div class="wrap">
+      <header class="section-head split" data-reveal>
+        <div>
+          <p class="kicker">界面</p>
+          <h2>真正的界面，<br>就是这样。</h2>
+        </div>
+        <p class="section-lede">
+          不是效果图，是应用本身的渲染结果：曲库、外观设置、Vutron 布局与发现页。
+          左右滑动，或用箭头翻页。
+        </p>
+      </header>
+    </div>
+
+    <div class="gallery-pin" data-gallery-pin>
+      <div class="gallery-sticky">
+        <div class="wrap">
+          <div class="gallery-pin-head">
+            <div>
+              <p class="kicker">界面一览</p>
+              <p class="gallery-pin-title">曲库、设置与布局，都是真的。</p>
+            </div>
+            <p class="gallery-count" data-gallery-count>01 / 04</p>
+          </div>
+
+          <div class="gallery-shell">
+            <button class="gallery-nav gallery-prev" type="button" data-gallery-prev aria-label="上一张">
+              <span aria-hidden="true">←</span>
+            </button>
+
+            <div class="gallery" data-gallery tabindex="0" aria-label="应用界面截图">
+              <figure class="gallery-card">
+                <button class="gallery-open" type="button" data-lightbox data-media-reveal
+                        data-full="assets/img/library.webp"
+                        data-caption="本地曲库 · 146 首 / 4.9 GB · 增量扫描与本地搜索">
+                  <img src="assets/img/library.webp" width="1800" height="1094"
+                       alt="本地曲库界面：曲目列表、专辑封面与播放条">
+                  <span class="gallery-zoom" aria-hidden="true">查看大图 ↗</span>
+                </button>
+                <figcaption><strong>本地曲库</strong><span>增量扫描 · 坏文件隔离 · 本地搜索</span></figcaption>
+              </figure>
+
+              <figure class="gallery-card">
+                <button class="gallery-open" type="button" data-lightbox data-media-reveal
+                        data-full="assets/img/settings.webp"
+                        data-caption="外观设置 · 主题色来源 / 背景风格 / 布局">
+                  <img src="assets/img/settings.webp" width="1800" height="1094"
+                       alt="外观设置界面：主题模式、主题色来源与背景风格">
+                  <span class="gallery-zoom" aria-hidden="true">查看大图 ↗</span>
+                </button>
+                <figcaption><strong>外观设置</strong><span>主题色 / 背景 / 布局切换</span></figcaption>
+              </figure>
+
+              <figure class="gallery-card">
+                <button class="gallery-open" type="button" data-lightbox data-media-reveal
+                        data-full="assets/img/player-vutron.webp"
+                        data-caption="Vutron 播放页布局 · 紧凑封面 + 逐字歌词">
+                  <img src="assets/img/player-vutron.webp" width="1800" height="1094"
+                       alt="Vutron 播放页布局：紧凑封面、进度条与滚动歌词">
+                  <span class="gallery-zoom" aria-hidden="true">查看大图 ↗</span>
+                </button>
+                <figcaption><strong>Vutron 布局</strong><span>紧凑封面 + 滚动歌词</span></figcaption>
+              </figure>
+
+              <figure class="gallery-card">
+                <button class="gallery-open" type="button" data-lightbox data-media-reveal
+                        data-full="assets/img/home.webp"
+                        data-caption="发现页 · 每日推荐 / 推荐歌单 / 热门歌手">
+                  <img src="assets/img/home.webp" width="1800" height="1072"
+                       alt="发现页：每日推荐、推荐歌单与热门歌手">
+                  <span class="gallery-zoom" aria-hidden="true">查看大图 ↗</span>
+                </button>
+                <figcaption><strong>发现页</strong><span>每日推荐 / 歌单 / 歌手</span></figcaption>
+              </figure>
+            </div>
+
+            <button class="gallery-nav gallery-next" type="button" data-gallery-next aria-label="下一张">
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+
+          <div class="gallery-progress" aria-hidden="true"><span data-gallery-progress></span></div>
+          <p class="gallery-hint">左右滑动或使用箭头翻页 · 点击图片放大</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 开屏动效 ═════════════════════════════════════════════════════ -->
+  <section class="section section-splash" id="splash-demo">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">开屏动效</p>
+        <h2>开屏，按源码 1:1 复刻。</h2>
+        <p class="section-lede">
+          曲线、间隔、透明度都取自 <code>splash_screen.dart</code> 与 <code>bootstrap.dart</code>：
+          Logo 上滑渐亮，字标逐字浮现，底部小字延迟上移，1.9s 后 550ms 淡出。
+        </p>
+      </header>
+
+      <div class="stage-shell" data-reveal>
+        <div class="stage" id="stage">
+          <div class="stage-frame" id="stage-frame"></div>
+          <button class="stage-play" type="button" data-stage-play aria-label="重播开屏动效">
+            <span class="play-tri" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="stage-bar">
+          <div class="seg" role="group" aria-label="解码引擎">
+            <button type="button" class="seg-btn is-active" data-engine="stable" aria-pressed="true">Stable</button>
+            <button type="button" class="seg-btn" data-engine="eraudio" aria-pressed="false">EraAudio</button>
+          </div>
+          <label class="switch">
+            <input type="checkbox" data-slowmo>
+            <span>0.5× 慢放</span>
+          </label>
+          <button class="btn btn-ghost btn-sm" type="button" data-stage-replay>重播</button>
+          <p class="stage-hint">演示只播放 1s 入场；实际应用在 1.9s 后淡出到主界面。</p>
+        </div>
+      </div>
+
+      <div class="timeline" data-reveal>
+        <div class="timeline-item">
+          <span class="time">0 – 550ms</span>
+          <strong>背景光晕</strong>
+          <p>主色径向渐变淡入，easeOut</p>
+        </div>
+        <div class="timeline-item">
+          <span class="time">0 – 500ms</span>
+          <strong>Logo</strong>
+          <p>上移 16% 高度并渐亮，easeOutExpo</p>
+        </div>
+        <div class="timeline-item">
+          <span class="time">38ms / 字</span>
+          <strong>字标</strong>
+          <p>单字 420ms 浮现，easeOutCubic</p>
+        </div>
+        <div class="timeline-item">
+          <span class="time">350 – 850ms</span>
+          <strong>底部小字</strong>
+          <p>上移并渐显到 40% 不透明度</p>
+        </div>
+        <div class="timeline-item">
+          <span class="time">500 – 950ms</span>
+          <strong>引擎行</strong>
+          <p>EraAudio 时出现，终态 80%</p>
+        </div>
+        <div class="timeline-item">
+          <span class="time">1900 – 2450ms</span>
+          <strong>淡出</strong>
+          <p>透明度 1→0、缩放 1→0.98、上移 3%</p>
+        </div>
+      </div>
+
+      <p class="footnote" data-reveal>
+        系统开启「减少动态效果」时，开屏直接呈静态画面并跳过淡出——与应用的性能模式一致。
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ 下载 ═════════════════════════════════════════════════════════ -->
+  <section class="section section-download" id="download">
+    <div class="wrap">
+      <header class="section-head" data-reveal>
+        <p class="kicker">下载</p>
+        <h2>挑一个包，装上就能听。</h2>
+        <p class="section-lede">
+          桌面三端由 CI 从源码构建。Linux 各发行版在自己的容器里打包，
+          避免跨发行版链接到不同 soname 的 FFmpeg / TagLib。
+        </p>
+      </header>
+
+      <div class="download-grid">
+        <article class="download-card" data-reveal>
+          <div class="download-head">
+            <h3>Linux</h3>
+            <span class="download-arch">x86_64</span>
+          </div>
+          <p class="pkg-line"><code>.deb</code><code>.rpm</code><code>.pkg.tar.zst</code><code>.AppImage</code><code>.flatpak</code></p>
+          <p class="download-copy">
+            Ubuntu 24.04 / Deepin 25 / Fedora / Arch，另有 NixOS flake 产物。
+            每个包内附 <code>BUILD-INFO.txt</code>，写明构建基线与最低 glibc。
+          </p>
+          <a class="download-link" href="https://github.com/BetaStudio2/ArchoeraMusic/releases/latest" target="_blank" rel="noopener">获取 Linux 版本 <span>↗</span></a>
+        </article>
+
+        <article class="download-card" data-reveal>
+          <div class="download-head">
+            <h3>Windows</h3>
+            <span class="download-arch">x64</span>
+          </div>
+          <p class="pkg-line"><code>安装包</code><code>portable zip</code></p>
+          <p class="download-copy">
+            Inno Setup 安装向导默认 per-user，不需要管理员权限；
+            也有解压即用的便携版，配置随身带走。
+          </p>
+          <a class="download-link" href="https://github.com/BetaStudio2/ArchoeraMusic/releases/latest" target="_blank" rel="noopener">获取 Windows 版本 <span>↗</span></a>
+        </article>
+
+        <article class="download-card" data-reveal>
+          <div class="download-head">
+            <h3>macOS</h3>
+            <span class="download-arch">Intel / Apple Silicon</span>
+          </div>
+          <p class="pkg-line"><code>.app</code></p>
+          <p class="download-copy">
+            Intel 与 Apple Silicon 分别构建，产物随 Release 一并上传；
+            首次打开如遇 Gatekeeper 提示，请按文档放行。
+          </p>
+          <a class="download-link" href="https://github.com/BetaStudio2/ArchoeraMusic/releases/latest" target="_blank" rel="noopener">获取 macOS 版本 <span>↗</span></a>
+        </article>
+      </div>
+
+      <div class="download-cta" data-reveal>
+        <a class="btn btn-primary btn-lg" href="https://github.com/BetaStudio2/ArchoeraMusic/releases/latest" target="_blank" rel="noopener">前往 Releases 下载</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs/user-build-from-source.md" target="_blank" rel="noopener">从源码构建</a>
+        <span>需要自行编译？手册覆盖三端环境、逐模块构建与打包。</span>
+      </div>
+
+      <p class="footnote" data-reveal>
+        发布产物附 <code>.sig1</code> 分离签名（ECDSA P-256 / SHA-256，key1），公钥随 Release 分发；
+        可用 <code>bash app/tool/verify_release.sh &lt;dir&gt;</code> 校验。项目以 AGPL-3.0-or-later 开源。
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ 文档 ═════════════════════════════════════════════════════════ -->
+  <section class="section section-docs" id="docs">
+    <div class="wrap">
+      <header class="section-head split" data-reveal>
+        <div>
+          <p class="kicker">文档</p>
+          <h2>想改哪儿，<br>都有据可查。</h2>
+        </div>
+        <p class="section-lede">
+          架构、构建、样式契约、MCP 接入与隐私边界都写在仓库里。
+          这个页面本身也是纯静态文件，源码就在 <code>site/</code>。
+        </p>
+      </header>
+
+      <div class="doc-list">
+        <a class="doc-item" href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs/architecture.md" target="_blank" rel="noopener" data-reveal>
+          <span class="doc-index">01</span>
+          <span class="doc-title">架构设计</span>
+          <span class="doc-desc">进程模型 / 音频管线 / FFI 桥接</span>
+          <span class="doc-arrow">↗</span>
+        </a>
+        <a class="doc-item" href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs/user-build-from-source.md" target="_blank" rel="noopener" data-reveal>
+          <span class="doc-index">02</span>
+          <span class="doc-title">自编译手册</span>
+          <span class="doc-desc">三端环境 / 逐模块构建 / 打包</span>
+          <span class="doc-arrow">↗</span>
+        </a>
+        <a class="doc-item" href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs/player-layouts.md" target="_blank" rel="noopener" data-reveal>
+          <span class="doc-index">03</span>
+          <span class="doc-title">播放页布局</span>
+          <span class="doc-desc">三种布局的模块化拆法</span>
+          <span class="doc-arrow">↗</span>
+        </a>
+        <a class="doc-item" href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs/style-registries.md" target="_blank" rel="noopener" data-reveal>
+          <span class="doc-index">04</span>
+          <span class="doc-title">样式注册表</span>
+          <span class="doc-desc">契约 / 注册表 / 守卫测试</span>
+          <span class="doc-arrow">↗</span>
+        </a>
+        <a class="doc-item" href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs/mcp.md" target="_blank" rel="noopener" data-reveal>
+          <span class="doc-index">05</span>
+          <span class="doc-title">MCP 接入</span>
+          <span class="doc-desc">让本地 Agent 控制播放器</span>
+          <span class="doc-arrow">↗</span>
+        </a>
+        <a class="doc-item" href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs/privacy.md" target="_blank" rel="noopener" data-reveal>
+          <span class="doc-index">06</span>
+          <span class="doc-title">隐私政策</span>
+          <span class="doc-desc">最小必要 / 本地优先</span>
+          <span class="doc-arrow">↗</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 结尾 CTA ═════════════════════════════════════════════════════ -->
+  <section class="finale">
+    <div class="finale-bg" aria-hidden="true"></div>
+    <div class="wrap finale-inner">
+      <span class="finale-mark" aria-hidden="true"><span class="icon eta-mark">&#xE101;</span></span>
+      <h2>把音乐，<br>放回自己的播放器里。</h2>
+      <p>开源、多端、本地与在线混合架构。现在就可以下载。</p>
+      <div class="finale-actions">
+        <a class="btn btn-primary btn-lg" href="https://github.com/BetaStudio2/ArchoeraMusic/releases/latest" target="_blank" rel="noopener">下载最新版本</a>
+        <a class="btn btn-ghost btn-lg" href="https://github.com/BetaStudio2/ArchoeraMusic" target="_blank" rel="noopener">在 GitHub 上查看</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <span class="logo-mark" aria-hidden="true"><span class="icon eta-mark">&#xE101;</span></span>
+      <div>
+        <strong>ArchoeraMusic</strong>
+        <p>开源、多端、面向本地与在线音乐的混合架构播放器。</p>
+      </div>
+    </div>
+    <nav class="footer-links" aria-label="页脚链接">
+      <div>
+        <span>项目</span>
+        <a href="https://github.com/BetaStudio2/ArchoeraMusic" target="_blank" rel="noopener">源码</a>
+        <a href="https://github.com/BetaStudio2/ArchoeraMusic/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/CHANGELOG.md" target="_blank" rel="noopener">更新日志</a>
+        <a href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/LICENSE" target="_blank" rel="noopener">许可</a>
+      </div>
+      <div>
+        <span>更多</span>
+        <a href="#gallery">界面一览</a>
+        <a href="#splash-demo">开屏动效</a>
+        <a href="#styles">样式清单</a>
+        <a href="https://github.com/BetaStudio2/ArchoeraMusic/blob/main/docs" target="_blank" rel="noopener">全部文档</a>
+        <a href="https://github.com/BetaStudio2/ArchoeraMusic/security" target="_blank" rel="noopener">安全报告</a>
+      </div>
+    </nav>
+  </div>
+  <div class="wrap footer-bottom">
+    <p>ArchoeraMusic © BetaStudio2 · Powered by Flutter · AGPL-3.0-or-later</p>
+    <p>本页是纯静态宣传页；应用本体是 Flutter 桌面程序。你好喵～</p>
+    <a href="#top">回到顶部 ↑</a>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" aria-hidden="true" role="dialog" aria-modal="true" aria-label="界面大图">
+  <button class="lightbox-close" type="button" data-lightbox-close aria-label="关闭">×</button>
+  <figure class="lightbox-frame">
+    <img id="lightbox-image" alt="">
+    <figcaption id="lightbox-caption"></figcaption>
+  </figure>
+</div>
+
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>
