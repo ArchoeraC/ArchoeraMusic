@@ -35,8 +35,8 @@ pub fn main() void {
     {
         var buf = [_]u8{ 0x00, 0x00 };
         var gb = BitReader.init(&buf);
-        var band_struct: [18]u8 = [_]u8{0} ** 18;
-        var band_sizes: [18]u8 = [_]u8{0} ** 18;
+        var band_struct: [18]u8 = @splat(0);
+        var band_sizes: [18]u8 = @splat(0);
         const err = cp.decodeBandStructure(&gb, 0, 1, 0, 18, &band_struct, &band_sizes);
         const default_match = std.mem.eql(u8, &band_struct, &t.eac3_default_cpl_band_struct);
         const sizes_match = band_sizes[0] == 12 and band_sizes[1] == 12 and band_sizes[2] == 12 and
@@ -59,7 +59,7 @@ pub fn main() void {
         ctx.eac3 = 0;
         ctx.channel_mode = t.AC3_CHMODE_STEREO;
         ctx.fbw_channels = 2;
-        var stages: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS;
+        var stages: [t.AC3_MAX_CHANNELS]u8 = @splat(0);
         const err = cp.couplingStrategy(&ctx, 0, &stages);
         const ok = !err and
             ctx.gb.bit_pos == 18 and
@@ -129,7 +129,7 @@ pub fn main() void {
         ctx.first_cpl_coords[2] = 0;
         ctx.channel_in_cpl[1] = 1;
         ctx.channel_in_cpl[2] = 1;
-        var stages: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS;
+        var stages: [t.AC3_MAX_CHANNELS]u8 = @splat(0);
         const err = cp.couplingStrategy(&ctx, 0, &stages);
         const ok = !err and ctx.gb.bit_pos == 1 and ctx.cpl_in_use[0] == 0 and
             ctx.channel_in_cpl[1] == 0 and ctx.channel_in_cpl[2] == 0 and
@@ -143,8 +143,8 @@ pub fn main() void {
         // 位流越界：eac3=0 需读 17 个合并标志位，仅 1 字节 → true
         var buf = [_]u8{0xFF};
         var gb = BitReader.init(&buf);
-        var band_struct: [18]u8 = [_]u8{0} ** 18;
-        var band_sizes: [18]u8 = [_]u8{0} ** 18;
+        var band_struct: [18]u8 = @splat(0);
+        var band_sizes: [18]u8 = @splat(0);
         check(cp.decodeBandStructure(&gb, 0, 0, 0, 18, &band_struct, &band_sizes), "err_A_truncated");
     }
     {
@@ -155,7 +155,7 @@ pub fn main() void {
         ctx.eac3 = 0;
         ctx.channel_mode = t.AC3_CHMODE_MONO;
         ctx.fbw_channels = 1;
-        var stages: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS;
+        var stages: [t.AC3_MAX_CHANNELS]u8 = @splat(0);
         check(cp.couplingStrategy(&ctx, 0, &stages), "err_B_mono_coupling");
     }
     {
@@ -167,7 +167,7 @@ pub fn main() void {
         ctx.eac3 = 0;
         ctx.channel_mode = t.AC3_CHMODE_STEREO;
         ctx.fbw_channels = 2;
-        var stages: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS;
+        var stages: [t.AC3_MAX_CHANNELS]u8 = @splat(0);
         check(cp.couplingStrategy(&ctx, 0, &stages), "err_C_invalid_range");
     }
     {
@@ -179,7 +179,7 @@ pub fn main() void {
         ctx.channel_mode = t.AC3_CHMODE_STEREO;
         ctx.fbw_channels = 2;
         ctx.cpl_in_use[0] = 1;
-        var stages: [t.AC3_MAX_CHANNELS]u8 = [_]u8{0} ** t.AC3_MAX_CHANNELS;
+        var stages: [t.AC3_MAX_CHANNELS]u8 = @splat(0);
         check(cp.couplingStrategy(&ctx, 0, &stages), "err_D_enhanced_coupling");
     }
     {

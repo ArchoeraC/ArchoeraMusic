@@ -191,7 +191,7 @@ pub const Vlc = struct {
 
 /// 全部 LBR VLC（ff_dca_init_vlcs 的 LBR 段；消费顺序一致）
 pub const VlcSet = struct {
-    tnl_grp: [5]Vlc = [_]Vlc{Vlc.empty} ** 5,
+    tnl_grp: [5]Vlc = @splat(Vlc.empty),
     tnl_scf: Vlc = Vlc.empty,
     damp: Vlc = Vlc.empty,
     dph: Vlc = Vlc.empty,
@@ -247,8 +247,8 @@ const Tone = struct {
     x_freq: u8 = 0,
     f_delt: u8 = 0,
     ph_rot: u8 = 0,
-    amp: [LBR_CHANNELS]u8 = [_]u8{0} ** LBR_CHANNELS,
-    phs: [LBR_CHANNELS]u8 = [_]u8{0} ** LBR_CHANNELS,
+    amp: [LBR_CHANNELS]u8 = @splat(0),
+    phs: [LBR_CHANNELS]u8 = @splat(0),
 };
 
 const Chunk = struct {
@@ -294,38 +294,38 @@ pub const LbrDecoder = struct {
     framenum: u8 = 0,
     lbr_rand: u32 = 1,
 
-    quant_levels: [LBR_CHANNELS / 2][LBR_SUBBANDS]u8 = [_][LBR_SUBBANDS]u8{[_]u8{0} ** LBR_SUBBANDS} ** (LBR_CHANNELS / 2),
-    sb_indices: [LBR_SUBBANDS]u8 = [_]u8{0} ** LBR_SUBBANDS,
-    sec_ch_sbms: [LBR_CHANNELS / 2][LBR_SUBBANDS]u8 = [_][LBR_SUBBANDS]u8{[_]u8{0} ** LBR_SUBBANDS} ** (LBR_CHANNELS / 2),
-    sec_ch_lrms: [LBR_CHANNELS / 2][LBR_SUBBANDS]u8 = [_][LBR_SUBBANDS]u8{[_]u8{0} ** LBR_SUBBANDS} ** (LBR_CHANNELS / 2),
-    ch_pres: [LBR_CHANNELS]u32 = [_]u32{0} ** LBR_CHANNELS,
+    quant_levels: [LBR_CHANNELS / 2][LBR_SUBBANDS]u8 = @splat(@splat(0)),
+    sb_indices: [LBR_SUBBANDS]u8 = @splat(0),
+    sec_ch_sbms: [LBR_CHANNELS / 2][LBR_SUBBANDS]u8 = @splat(@splat(0)),
+    sec_ch_lrms: [LBR_CHANNELS / 2][LBR_SUBBANDS]u8 = @splat(@splat(0)),
+    ch_pres: [LBR_CHANNELS]u32 = @splat(0),
 
     grid_1_scf: [LBR_CHANNELS][12][8]u8 = undefined,
     grid_2_scf: [LBR_CHANNELS][3][64]u8 = undefined,
     grid_3_avg: [LBR_CHANNELS][LBR_SUBBANDS - 4]i8 = undefined,
     grid_3_scf: [LBR_CHANNELS][LBR_SUBBANDS - 4][8]i8 = undefined,
-    grid_3_pres: [LBR_CHANNELS]u32 = [_]u32{0} ** LBR_CHANNELS,
+    grid_3_pres: [LBR_CHANNELS]u32 = @splat(0),
     high_res_scf: [LBR_CHANNELS][LBR_SUBBANDS][8]u8 = undefined,
     part_stereo: [LBR_CHANNELS][LBR_SUBBANDS / 4][5]u8 = undefined,
     part_stereo_pres: u32 = 0,
 
     lpc_coeff: [2][LBR_CHANNELS][3][2][8]f32 = undefined,
 
-    sb_scf: [LBR_SUBBANDS]f32 = [_]f32{0} ** LBR_SUBBANDS,
+    sb_scf: [LBR_SUBBANDS]f32 = @splat(0),
 
     /// 时域样本缓冲：每 (ch,sb) 行 = 8 历史 + 128 样本 + 8 填充
     ts_buffer: []f32 = &.{},
 
-    history: [LBR_CHANNELS][LBR_SUBBANDS * 4]f32 = [_][LBR_SUBBANDS * 4]f32{[_]f32{0} ** (LBR_SUBBANDS * 4)} ** LBR_CHANNELS,
-    window: [LBR_SUBBANDS * 4]f32 = [_]f32{0} ** (LBR_SUBBANDS * 4),
+    history: [LBR_CHANNELS][LBR_SUBBANDS * 4]f32 = @splat(@splat(0)),
+    window: [LBR_SUBBANDS * 4]f32 = @splat(0),
 
-    lfe_data: [64]f32 = [_]f32{0} ** 64,
-    lfe_history: [5][2]f32 = [_][2]f32{[_]f32{0} ** 2} ** 5,
+    lfe_data: [64]f32 = @splat(0),
+    lfe_history: [5][2]f32 = @splat(@splat(0)),
     lfe_scale: f32 = 0,
 
-    tonal_scf: [6]u8 = [_]u8{0} ** 6,
-    tonal_bounds: [5][32][2]u16 = [_][32][2]u16{[_][2]u16{[_]u16{0} ** 2} ** 32} ** 5,
-    tones: [LBR_TONES]Tone = [_]Tone{.{}} ** LBR_TONES,
+    tonal_scf: [6]u8 = @splat(0),
+    tonal_bounds: [5][32][2]u16 = @splat(@splat(@splat(0))),
+    tones: [LBR_TONES]Tone = @splat(.{}),
     ntones: usize = 0,
 
     /// IMDCT 余弦表：tab[j*n + i]（i<n/2）= cos_d(j,i)、tab[j*n + n/2 + i] = cos_u(j,i)
@@ -335,7 +335,7 @@ pub const LbrDecoder = struct {
     mdct_scale: f32 = 0,
 
     // 输出平面（帧内有效）：按 ffmpeg 帧声道序（AV_CH 规范序）
-    out_planes: [8][]f32 = [_][]f32{&.{}} ** 8,
+    out_planes: [8][]f32 = @splat(&.{}),
     out_buf: []f32 = &.{},
     out_nch: u8 = 0,
 
@@ -410,11 +410,11 @@ pub const LbrDecoder = struct {
 
         var chunk_lfe_c: Chunk = .{};
         var chunk_tonal_c: Chunk = .{};
-        var chunk_tonal_grp: [5]Chunk = [_]Chunk{.{}} ** 5;
-        var chunk_grid1: [LBR_CHANNELS / 2]Chunk = [_]Chunk{.{}} ** (LBR_CHANNELS / 2);
-        var chunk_hr_grid: [LBR_CHANNELS / 2]Chunk = [_]Chunk{.{}} ** (LBR_CHANNELS / 2);
-        var chunk_ts1: [LBR_CHANNELS / 2]Chunk = [_]Chunk{.{}} ** (LBR_CHANNELS / 2);
-        var chunk_ts2: [LBR_CHANNELS / 2]Chunk = [_]Chunk{.{}} ** (LBR_CHANNELS / 2);
+        var chunk_tonal_grp: [5]Chunk = @splat(.{});
+        var chunk_grid1: [LBR_CHANNELS / 2]Chunk = @splat(.{});
+        var chunk_hr_grid: [LBR_CHANNELS / 2]Chunk = @splat(.{});
+        var chunk_ts1: [LBR_CHANNELS / 2]Chunk = @splat(.{});
+        var chunk_ts2: [LBR_CHANNELS / 2]Chunk = @splat(.{});
 
         var gb = ByteCursor{ .data = data };
 
@@ -449,18 +449,18 @@ pub const LbrDecoder = struct {
         }
 
         // 清空当前帧状态
-        self.quant_levels = [_][LBR_SUBBANDS]u8{[_]u8{0} ** LBR_SUBBANDS} ** (LBR_CHANNELS / 2);
-        self.sb_indices = [_]u8{0xff} ** LBR_SUBBANDS;
-        self.sec_ch_sbms = [_][LBR_SUBBANDS]u8{[_]u8{0} ** LBR_SUBBANDS} ** (LBR_CHANNELS / 2);
-        self.sec_ch_lrms = [_][LBR_SUBBANDS]u8{[_]u8{0} ** LBR_SUBBANDS} ** (LBR_CHANNELS / 2);
-        self.ch_pres = [_]u32{0} ** LBR_CHANNELS;
-        self.grid_1_scf = [_][12][8]u8{[_][8]u8{[_]u8{0} ** 8} ** 12} ** LBR_CHANNELS;
-        self.grid_2_scf = [_][3][64]u8{[_][64]u8{[_]u8{0} ** 64} ** 3} ** LBR_CHANNELS;
-        self.grid_3_avg = [_][LBR_SUBBANDS - 4]i8{[_]i8{0} ** (LBR_SUBBANDS - 4)} ** LBR_CHANNELS;
-        self.grid_3_scf = [_][LBR_SUBBANDS - 4][8]i8{[_][8]i8{[_]i8{0} ** 8} ** (LBR_SUBBANDS - 4)} ** LBR_CHANNELS;
-        self.grid_3_pres = [_]u32{0} ** LBR_CHANNELS;
-        self.tonal_scf = [_]u8{0} ** 6;
-        self.lfe_data = [_]f32{0} ** 64;
+        self.quant_levels = @splat(@splat(0));
+        self.sb_indices = @splat(0xff);
+        self.sec_ch_sbms = @splat(@splat(0));
+        self.sec_ch_lrms = @splat(@splat(0));
+        self.ch_pres = @splat(0);
+        self.grid_1_scf = @splat(@splat(@splat(0)));
+        self.grid_2_scf = @splat(@splat(@splat(0)));
+        self.grid_3_avg = @splat(@splat(0));
+        self.grid_3_scf = @splat(@splat(@splat(0)));
+        self.grid_3_pres = @splat(0);
+        self.tonal_scf = @splat(0);
+        self.lfe_data = @splat(0);
         self.part_stereo_pres = 0;
         self.framenum = (self.framenum + 1) & 31;
 
@@ -472,7 +472,7 @@ pub const LbrDecoder = struct {
         }
 
         self.lpc_coeff[self.framenum & 1] = zero_lpc: {
-            break :zero_lpc [_][3][2][8]f32{[_][2][8]f32{[_][8]f32{[_]f32{0} ** 8} ** 2} ** 3} ** LBR_CHANNELS;
+            break :zero_lpc @splat(@splat(@splat(@splat(0))));
         };
 
         for (0..5) |group| {
@@ -737,11 +737,11 @@ pub const LbrDecoder = struct {
     /// ff_dca_lbr_flush
     pub fn flush(self: *LbrDecoder) void {
         if (self.sample_rate == 0) return;
-        self.part_stereo = [_][LBR_SUBBANDS / 4][5]u8{[_][5]u8{[_]u8{16} ** 5} ** (LBR_SUBBANDS / 4)} ** LBR_CHANNELS;
-        self.lpc_coeff = [_][LBR_CHANNELS][3][2][8]f32{[_][3][2][8]f32{[_][2][8]f32{[_][8]f32{[_]f32{0} ** 8} ** 2} ** 3} ** LBR_CHANNELS} ** 2;
-        self.history = [_][LBR_SUBBANDS * 4]f32{[_]f32{0} ** (LBR_SUBBANDS * 4)} ** LBR_CHANNELS;
-        self.tonal_bounds = [_][32][2]u16{[_][2]u16{[_]u16{0} ** 2} ** 32} ** 5;
-        self.lfe_history = [_][2]f32{[_]f32{0} ** 2} ** 5;
+        self.part_stereo = @splat(@splat(@splat(16)));
+        self.lpc_coeff = @splat(@splat(@splat(@splat(@splat(0)))));
+        self.history = @splat(@splat(0));
+        self.tonal_bounds = @splat(@splat(@splat(0)));
+        self.lfe_history = @splat(@splat(0));
         self.framenum = 0;
         self.ntones = 0;
         for (0..self.nchannels) |ch| {
@@ -1414,7 +1414,7 @@ pub const LbrDecoder = struct {
                 } else {
                     var blk: usize = 0;
                     while (blk < LBR_TIME_SAMPLES / 8) : (blk += 1) {
-                        var accum: [8]f32 = .{0} ** 8;
+                        var accum: [8]f32 = @splat(0);
                         const base = blk * 8;
                         for (2..6) |k| {
                             const other = self.timeSamples(ch, k)[LBR_TIME_HISTORY + base ..][0..8];

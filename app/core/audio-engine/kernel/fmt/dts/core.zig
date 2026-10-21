@@ -114,27 +114,27 @@ pub const DcaDecoder = struct {
     xxch_spkr_mask: u32 = 0,
     xxch_dmix_embedded: bool = false,
     xxch_dmix_scale_inv: i32 = 0,
-    xxch_dmix_mask: [xxch_channels_max]u32 = [_]u32{0} ** xxch_channels_max,
-    xxch_dmix_coeff: [xxch_dmix_coeff_max]i32 = [_]i32{0} ** xxch_dmix_coeff_max,
+    xxch_dmix_mask: [xxch_channels_max]u32 = @splat(0),
+    xxch_dmix_coeff: [xxch_dmix_coeff_max]i32 = @splat(0),
 
     // ---- 主声道编码头 ----
-    nsubbands: [DCA_CHANNELS]u8 = [_]u8{0} ** DCA_CHANNELS,
-    subband_vq_start: [DCA_CHANNELS]u8 = [_]u8{0} ** DCA_CHANNELS,
-    joint_intensity_index: [DCA_CHANNELS]u8 = [_]u8{0} ** DCA_CHANNELS,
-    transition_mode_sel: [DCA_CHANNELS]u8 = [_]u8{0} ** DCA_CHANNELS,
-    scale_factor_sel: [DCA_CHANNELS]u8 = [_]u8{0} ** DCA_CHANNELS,
-    bit_allocation_sel: [DCA_CHANNELS]u8 = [_]u8{0} ** DCA_CHANNELS,
-    quant_index_sel: [DCA_CHANNELS][CODE_BOOKS]u8 = [_][CODE_BOOKS]u8{[_]u8{0} ** CODE_BOOKS} ** DCA_CHANNELS,
-    scale_factor_adj: [DCA_CHANNELS][CODE_BOOKS]i32 = [_][CODE_BOOKS]i32{[_]i32{0} ** CODE_BOOKS} ** DCA_CHANNELS,
+    nsubbands: [DCA_CHANNELS]u8 = @splat(0),
+    subband_vq_start: [DCA_CHANNELS]u8 = @splat(0),
+    joint_intensity_index: [DCA_CHANNELS]u8 = @splat(0),
+    transition_mode_sel: [DCA_CHANNELS]u8 = @splat(0),
+    scale_factor_sel: [DCA_CHANNELS]u8 = @splat(0),
+    bit_allocation_sel: [DCA_CHANNELS]u8 = @splat(0),
+    quant_index_sel: [DCA_CHANNELS][CODE_BOOKS]u8 = @splat(@splat(0)),
+    scale_factor_adj: [DCA_CHANNELS][CODE_BOOKS]i32 = @splat(@splat(0)),
 
     // ---- 子帧 side info ----
-    nsubsubframes: [DCA_SUBFRAMES]u8 = [_]u8{0} ** DCA_SUBFRAMES,
+    nsubsubframes: [DCA_SUBFRAMES]u8 = @splat(0),
     prediction_mode: [DCA_CHANNELS][DCA_SUBBANDS_X96]bool = undefined,
     prediction_vq_index: [DCA_CHANNELS][DCA_SUBBANDS_X96]u16 = undefined,
     bit_allocation: [DCA_CHANNELS][DCA_SUBBANDS_X96]i16 = undefined,
     transition_mode: [DCA_SUBFRAMES][DCA_CHANNELS][DCA_SUBBANDS]u8 = undefined,
     scale_factors: [DCA_CHANNELS][DCA_SUBBANDS][2]i32 = undefined,
-    joint_scale_sel: [DCA_CHANNELS]u8 = [_]u8{0} ** DCA_CHANNELS,
+    joint_scale_sel: [DCA_CHANNELS]u8 = @splat(0),
     joint_scale_factors: [DCA_CHANNELS][DCA_SUBBANDS_X96]i32 = undefined,
 
     // ---- 子带样本缓冲（跨帧持久）----
@@ -149,11 +149,11 @@ pub const DcaDecoder = struct {
     x96_band: [DCA_CHANNELS][DCA_SUBBANDS_X96][]i32 = undefined,
 
     // ---- 合成滤波器历史（跨帧持久）----
-    hist1: [DCA_CHANNELS][1024]i32 = [_][1024]i32{[_]i32{0} ** 1024} ** DCA_CHANNELS,
-    hist2: [DCA_CHANNELS][32]i32 = [_][32]i32{[_]i32{0} ** 32} ** DCA_CHANNELS,
-    offset: [DCA_CHANNELS]u9 = [_]u9{0} ** DCA_CHANNELS,
-    hist2_x96: [DCA_CHANNELS][64]i32 = [_][64]i32{[_]i32{0} ** 64} ** DCA_CHANNELS,
-    offset_x96: [DCA_CHANNELS]u10 = [_]u10{0} ** DCA_CHANNELS,
+    hist1: [DCA_CHANNELS][1024]i32 = @splat(@splat(0)),
+    hist2: [DCA_CHANNELS][32]i32 = @splat(@splat(0)),
+    offset: [DCA_CHANNELS]u9 = @splat(0),
+    hist2_x96: [DCA_CHANNELS][64]i32 = @splat(@splat(0)),
+    offset_x96: [DCA_CHANNELS]u10 = @splat(0),
     lfe_history_x96: i32 = 0,
     /// 上一帧合成模式（true = 64-band）；切换时清空 DSP 历史（对齐 ffmpeg）
     filter_x96_mode: bool = false,
@@ -172,7 +172,7 @@ pub const DcaDecoder = struct {
     // ---- 输出平面缓冲（跨帧复用）----
     outbuf: []i32 = &.{},
     /// 最近一帧按扬声器位的输出平面（内部 scratch，下次 decode 前有效）
-    speaker_planes: [32]?[]const i32 = [_]?[]const i32{null} ** 32,
+    speaker_planes: [32]?[]const i32 = @splat(null),
 
     pub fn init(alloc: std.mem.Allocator) DcaDecoder {
         return .{ .alloc = alloc };
@@ -1494,9 +1494,9 @@ pub const DcaDecoder = struct {
     pub fn filter(self: *DcaDecoder, out: *DecodedFrame, x96_synth: bool) !void {
         if (x96_synth != self.filter_x96_mode) {
             // 切换 32/64-band：清空 DSP 历史（对齐 ffmpeg set_filter_mode）
-            for (&self.hist1) |*h| h.* = [_]i32{0} ** 1024;
-            for (&self.hist2) |*h| h.* = [_]i32{0} ** 32;
-            for (&self.hist2_x96) |*h| h.* = [_]i32{0} ** 64;
+            for (&self.hist1) |*h| h.* = @splat(0);
+            for (&self.hist2) |*h| h.* = @splat(0);
+            for (&self.hist2_x96) |*h| h.* = @splat(0);
             for (&self.offset) |*o| o.* = 0;
             for (&self.offset_x96) |*o| o.* = 0;
             self.lfe_history_x96 = 0;
@@ -1509,7 +1509,7 @@ pub const DcaDecoder = struct {
             self.outbuf = try self.alloc.alloc(i32, 8 * nsamples);
         }
 
-        var plane: [32]?[]i32 = [_]?[]i32{null} ** 32;
+        var plane: [32]?[]i32 = @splat(null);
         var scratch = self.outbuf[0 .. 8 * nsamples];
         @memset(scratch, 0);
         var pi: usize = 0;
@@ -1760,7 +1760,7 @@ pub fn remapOrder(mask: u32, order: *[8]u32) usize {
     const wide = mask == 0x0001FFFE or mask == 0x0001FFFF; // 7.0/7.1 wide（本阶段不产生）
     const d2w = if (wide) dca2wav_wide else dca2wav_norm;
     var wav_mask: u32 = 0;
-    var wav_map: [18]u32 = [_]u32{0} ** 18;
+    var wav_map: [18]u32 = @splat(0);
     var nout: usize = 0;
     for (0..28) |dca_ch| {
         if (mask & (@as(u32, 1) << @intCast(dca_ch)) != 0) {

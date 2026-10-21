@@ -879,7 +879,7 @@ fn mkvAddTag(allocator: Allocator, list: *std.ArrayList(decoder.Tag), name: []co
 
 fn mkvMapField(allocator: Allocator, meta: *decoder.Metadata, name: []const u8, value: []const u8) void {
     const slot = mkvField(name) orelse return;
-    const z = allocator.dupeZ(u8, value) catch return;
+    const z = allocator.dupeSentinel(u8, value, 0) catch return;
     switch (slot) {
         0 => if (meta.title == null) {
             meta.title = z;
@@ -1437,7 +1437,7 @@ fn signedOf(payload: []const u8) i64 {
 // ---------------------------------------------------------------------------
 
 fn makeAdts(object_type: u8, sampling_index: u4, chan_config: u4, frame_len: usize) [7]u8 {
-    var h = [_]u8{0} ** 7;
+    var h: [7]u8 = @splat(0);
     const profile: u32 = if (object_type >= 1) object_type - 1 else 0;
     const total: u32 = @intCast(7 + frame_len);
     const si: u32 = @as(u32, sampling_index) & 0xF;
@@ -1710,7 +1710,7 @@ fn buildDtshdContainerPayload(allocator: Allocator, raw: []const u8, out: *std.A
     var b: [8]u8 = undefined;
     std.mem.writeInt(u64, &b, 12, .big);
     try out.appendSlice(allocator, &b);
-    try out.appendSlice(allocator, &[_]u8{0} ** 12);
+    try out.appendSlice(allocator, &@as([12]u8, @splat(0)));
     try out.appendSlice(allocator, "STRMDATA");
     std.mem.writeInt(u64, &b, raw.len, .big);
     try out.appendSlice(allocator, &b);

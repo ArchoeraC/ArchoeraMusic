@@ -42,7 +42,7 @@ pub fn setDownmixCoeffs(s: *Ctx) void {
     const cmix: f32 = t.gain_levels[@as(usize, @intCast(s.center_mix_level))];
     const smix: f32 = t.gain_levels[@as(usize, @intCast(s.surround_mix_level))];
 
-    var dm: [2][t.AC3_MAX_CHANNELS]f32 = [_][t.AC3_MAX_CHANNELS]f32{[_]f32{0} ** t.AC3_MAX_CHANNELS} ** 2;
+    var dm: [2][t.AC3_MAX_CHANNELS]f32 = @splat(@splat(0));
 
     const chm: usize = @intCast(s.channel_mode);
     const fbw: usize = @intCast(s.fbw_channels);
@@ -317,7 +317,7 @@ test "ac3UpmixDelay: 3F 重建 C 声道" {
     const old_d1 = s.delay[1];
     ac3UpmixDelay(&s);
     try std.testing.expect(std.mem.eql(f32, &s.delay[2], &old_d1)); // C = 旧 R
-    try std.testing.expect(std.mem.eql(f32, &s.delay[1], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[1], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
     try std.testing.expectEqual(@as(f32, 1.0), s.delay[0][0]); // L 不变
     try std.testing.expectEqual(@as(f32, 301.0), s.delay[3][0]); // 3F 不碰 ch3
 }
@@ -328,10 +328,10 @@ test "ac3UpmixDelay: 3F2R 链式 fallthrough" {
     fillDelay(&s);
     const old_d1 = s.delay[1];
     ac3UpmixDelay(&s);
-    try std.testing.expect(std.mem.eql(f32, &s.delay[1], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[1], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
     try std.testing.expect(std.mem.eql(f32, &s.delay[2], &old_d1));
-    try std.testing.expect(std.mem.eql(f32, &s.delay[3], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
-    try std.testing.expect(std.mem.eql(f32, &s.delay[4], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[3], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[4], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
     try std.testing.expectEqual(@as(f32, 1.0), s.delay[0][0]); // L 不变
 }
 
@@ -340,8 +340,8 @@ test "ac3UpmixDelay: 2F2R/2F1R/3F1R 清环绕声道" {
     s.channel_mode = t.AC3_CHMODE_2F2R;
     fillDelay(&s);
     ac3UpmixDelay(&s);
-    try std.testing.expect(std.mem.eql(f32, &s.delay[2], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
-    try std.testing.expect(std.mem.eql(f32, &s.delay[3], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[2], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[3], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
     try std.testing.expectEqual(@as(f32, 1.0), s.delay[0][0]);
     try std.testing.expectEqual(@as(f32, 101.0), s.delay[1][0]);
 
@@ -349,7 +349,7 @@ test "ac3UpmixDelay: 2F2R/2F1R/3F1R 清环绕声道" {
     s.channel_mode = t.AC3_CHMODE_2F1R;
     fillDelay(&s);
     ac3UpmixDelay(&s);
-    try std.testing.expect(std.mem.eql(f32, &s.delay[2], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[2], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
     try std.testing.expectEqual(@as(f32, 301.0), s.delay[3][0]); // 2F1R 不碰 ch3
 
     s = .{};
@@ -358,8 +358,8 @@ test "ac3UpmixDelay: 2F2R/2F1R/3F1R 清环绕声道" {
     const old_d1 = s.delay[1];
     ac3UpmixDelay(&s);
     try std.testing.expect(std.mem.eql(f32, &s.delay[2], &old_d1));
-    try std.testing.expect(std.mem.eql(f32, &s.delay[1], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
-    try std.testing.expect(std.mem.eql(f32, &s.delay[3], &[_]f32{0} ** t.AC3_BLOCK_SIZE));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[1], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
+    try std.testing.expect(std.mem.eql(f32, &s.delay[3], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0))));
     try std.testing.expectEqual(@as(f32, 401.0), s.delay[4][0]); // 3F1R 不碰 ch4
 }
 

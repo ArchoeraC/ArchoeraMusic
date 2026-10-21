@@ -52,11 +52,11 @@ pub const PSCommonContext = struct {
     num_env_old: i32 = 0,
     num_env: i32 = 0,
     enable_ipdopd: i32 = 0,
-    border_position: [PS_MAX_NUM_ENV + 1]i32 = [_]i32{-1} ** (PS_MAX_NUM_ENV + 1),
-    iid_par: [PS_MAX_NUM_ENV][PS_MAX_NR_IIDICC]i8 = [_][PS_MAX_NR_IIDICC]i8{[_]i8{0} ** PS_MAX_NR_IIDICC} ** PS_MAX_NUM_ENV,
-    icc_par: [PS_MAX_NUM_ENV][PS_MAX_NR_IIDICC]i8 = [_][PS_MAX_NR_IIDICC]i8{[_]i8{0} ** PS_MAX_NR_IIDICC} ** PS_MAX_NUM_ENV,
-    ipd_par: [PS_MAX_NUM_ENV][PS_MAX_NR_IIDICC]i8 = [_][PS_MAX_NR_IIDICC]i8{[_]i8{0} ** PS_MAX_NR_IIDICC} ** PS_MAX_NUM_ENV,
-    opd_par: [PS_MAX_NUM_ENV][PS_MAX_NR_IIDICC]i8 = [_][PS_MAX_NR_IIDICC]i8{[_]i8{0} ** PS_MAX_NR_IIDICC} ** PS_MAX_NUM_ENV,
+    border_position: [PS_MAX_NUM_ENV + 1]i32 = @splat(-1),
+    iid_par: [PS_MAX_NUM_ENV][PS_MAX_NR_IIDICC]i8 = @splat(@splat(0)),
+    icc_par: [PS_MAX_NUM_ENV][PS_MAX_NR_IIDICC]i8 = @splat(@splat(0)),
+    ipd_par: [PS_MAX_NUM_ENV][PS_MAX_NR_IIDICC]i8 = @splat(@splat(0)),
+    opd_par: [PS_MAX_NUM_ENV][PS_MAX_NR_IIDICC]i8 = @splat(@splat(0)),
     is34bands: i32 = 0,
     is34bands_old: i32 = 0,
 };
@@ -65,20 +65,20 @@ pub const PSCommonContext = struct {
 
 pub const PSCtx = struct {
     common: PSCommonContext = .{},
-    in_buf: [5][44][2]f32 = [_][44][2]f32{[_][2]f32{[_]f32{0} ** 2} ** 44} ** 5,
-    delay: [PS_MAX_SSB][PS_QMF_TIME_SLOTS + PS_MAX_DELAY][2]f32 = [_][PS_QMF_TIME_SLOTS + PS_MAX_DELAY][2]f32{[_][2]f32{[_]f32{0} ** 2} ** (PS_QMF_TIME_SLOTS + PS_MAX_DELAY)} ** PS_MAX_SSB,
-    ap_delay: [PS_MAX_AP_BANDS][PS_AP_LINKS][PS_QMF_TIME_SLOTS + PS_MAX_AP_DELAY][2]f32 = [_][PS_AP_LINKS][PS_QMF_TIME_SLOTS + PS_MAX_AP_DELAY][2]f32{[_][PS_QMF_TIME_SLOTS + PS_MAX_AP_DELAY][2]f32{[_][2]f32{[_]f32{0} ** 2} ** (PS_QMF_TIME_SLOTS + PS_MAX_AP_DELAY)} ** PS_AP_LINKS} ** PS_MAX_AP_BANDS,
-    peak_decay_nrg: [34]f32 = [_]f32{0} ** 34,
-    power_smooth: [34]f32 = [_]f32{0} ** 34,
-    peak_decay_diff_smooth: [34]f32 = [_]f32{0} ** 34,
-    H11: [2][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32 = [_][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32{[_][PS_MAX_NR_IIDICC]f32{[_]f32{0} ** PS_MAX_NR_IIDICC} ** (PS_MAX_NUM_ENV + 1)} ** 2,
-    H12: [2][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32 = [_][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32{[_][PS_MAX_NR_IIDICC]f32{[_]f32{0} ** PS_MAX_NR_IIDICC} ** (PS_MAX_NUM_ENV + 1)} ** 2,
-    H21: [2][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32 = [_][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32{[_][PS_MAX_NR_IIDICC]f32{[_]f32{0} ** PS_MAX_NR_IIDICC} ** (PS_MAX_NUM_ENV + 1)} ** 2,
-    H22: [2][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32 = [_][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32{[_][PS_MAX_NR_IIDICC]f32{[_]f32{0} ** PS_MAX_NR_IIDICC} ** (PS_MAX_NUM_ENV + 1)} ** 2,
-    Lbuf: [91][32][2]f32 = [_][32][2]f32{[_][2]f32{[_]f32{0} ** 2} ** 32} ** 91,
-    Rbuf: [91][32][2]f32 = [_][32][2]f32{[_][2]f32{[_]f32{0} ** 2} ** 32} ** 91,
-    opd_hist: [PS_MAX_NR_IIDICC]i8 = [_]i8{0} ** PS_MAX_NR_IIDICC,
-    ipd_hist: [PS_MAX_NR_IIDICC]i8 = [_]i8{0} ** PS_MAX_NR_IIDICC,
+    in_buf: [5][44][2]f32 = @splat(@splat(@splat(0))),
+    delay: [PS_MAX_SSB][PS_QMF_TIME_SLOTS + PS_MAX_DELAY][2]f32 = @splat(@splat(@splat(0))),
+    ap_delay: [PS_MAX_AP_BANDS][PS_AP_LINKS][PS_QMF_TIME_SLOTS + PS_MAX_AP_DELAY][2]f32 = @splat(@splat(@splat(@splat(0)))),
+    peak_decay_nrg: [34]f32 = @splat(0),
+    power_smooth: [34]f32 = @splat(0),
+    peak_decay_diff_smooth: [34]f32 = @splat(0),
+    H11: [2][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32 = @splat(@splat(@splat(0))),
+    H12: [2][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32 = @splat(@splat(@splat(0))),
+    H21: [2][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32 = @splat(@splat(@splat(0))),
+    H22: [2][PS_MAX_NUM_ENV + 1][PS_MAX_NR_IIDICC]f32 = @splat(@splat(@splat(0))),
+    Lbuf: [91][32][2]f32 = @splat(@splat(@splat(0))),
+    Rbuf: [91][32][2]f32 = @splat(@splat(@splat(0))),
+    opd_hist: [PS_MAX_NR_IIDICC]i8 = @splat(0),
+    ipd_hist: [PS_MAX_NR_IIDICC]i8 = @splat(0),
 };
 
 /// 清零全部状态（对齐 FFmpeg calloc / 带宽切换复位）
@@ -827,7 +827,7 @@ fn hybridAnalysis(self: *PSCtx, L: *const [2][38][64]f32, is34: bool) void {
 fn decorrelation(self: *PSCtx, is34: bool) void {
     const n0: usize = 0;
     const nL: usize = 32;
-    var power: [34][32]f32 = [_][32]f32{[_]f32{0} ** 32} ** 34;
+    var power: [34][32]f32 = @splat(@splat(0));
     var transient_gain: [34][32]f32 = undefined;
     const peak_decay_factor: f32 = 0.76592833836465;
 

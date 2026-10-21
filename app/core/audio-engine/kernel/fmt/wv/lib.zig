@@ -191,13 +191,13 @@ const Decorr = struct {
     value: i32 = 0,
     weightA: i32 = 0,
     weightB: i32 = 0,
-    samplesA: [MAX_TERM]i32 = [_]i32{0} ** MAX_TERM,
-    samplesB: [MAX_TERM]i32 = [_]i32{0} ** MAX_TERM,
+    samplesA: [MAX_TERM]i32 = @splat(0),
+    samplesB: [MAX_TERM]i32 = @splat(0),
 };
 
 /// 声道熵解码状态
 const WvChannel = struct {
-    median: [3]i32 = [_]i32{0} ** 3,
+    median: [3]i32 = @splat(0),
     slow_level: i32 = 0,
     error_limit: i32 = 0,
     bitrate_acc: u32 = 0,
@@ -215,8 +215,8 @@ const BlockCtx = struct {
     frame_flags: u32 = 0,
     sample_rate: u32 = 0,
     terms: usize = 0,
-    decorr: [MAX_TERMS]Decorr = [_]Decorr{.{}} ** MAX_TERMS,
-    ch: [2]WvChannel = [_]WvChannel{.{}} ** 2,
+    decorr: [MAX_TERMS]Decorr = @splat(.{}),
+    ch: [2]WvChannel = @splat(.{}),
     zero: bool = false,
     one: bool = false,
     zeroes: u32 = 0,

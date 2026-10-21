@@ -191,7 +191,7 @@ const std = @import("std");
 
 test "psd 映射：exp→psd = 3072 - exp<<7" {
     t.initStatic();
-    var exp: [t.AC3_MAX_COEFS]i8 = [_]i8{0} ** t.AC3_MAX_COEFS;
+    var exp: [t.AC3_MAX_COEFS]i8 = @splat(0);
     exp[0] = 0;
     exp[1] = 8;
     exp[2] = 24;
@@ -205,8 +205,8 @@ test "psd 映射：exp→psd = 3072 - exp<<7" {
 
 test "bap：强信号高 bap，弱信号低 bap" {
     t.initStatic();
-    var mask: [t.AC3_CRITICAL_BANDS]i16 = [_]i16{0} ** t.AC3_CRITICAL_BANDS;
-    var psd: [t.AC3_MAX_COEFS]i16 = [_]i16{0} ** t.AC3_MAX_COEFS;
+    var mask: [t.AC3_CRITICAL_BANDS]i16 = @splat(0);
+    var psd: [t.AC3_MAX_COEFS]i16 = @splat(0);
     var bap: [t.AC3_MAX_COEFS]u8 = undefined;
     psd[0] = 2816; // 强（exp=2）
     psd[1] = 512;  // 弱（exp=20）

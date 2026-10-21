@@ -232,7 +232,7 @@ fn mapField(meta: *decoder.Metadata, name: []const u8, value: []const u8, alloca
         else if (std.ascii.eqlIgnoreCase(name, "WM/Composer")) 4
         else null;
     const s = slot orelse return;
-    const z = try allocator.dupeZ(u8, value);
+    const z = try allocator.dupeSentinel(u8, value, 0);
     switch (s) {
         0 => meta.album = z,
         1 => meta.artist = z,

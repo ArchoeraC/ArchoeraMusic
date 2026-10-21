@@ -210,7 +210,7 @@ pub const Dec = struct {
         }
         @memset(self.vbm_tree[0..25], -1);
         var gb = bitio.Bits.init(cfg.extradata[22..]);
-        var cntr: [8]u8 = .{0} ** 8;
+        var cntr: [8]u8 = @splat(0);
         for (0..17) |n| {
             const res: usize = @intCast(gb.get(3));
             self.vbm_tree[res * 3 + cntr[res]] = @intCast(n);

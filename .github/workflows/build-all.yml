@@ -22,7 +22,7 @@
 #  构建目标 / 基线 / 最低 glibc / 提交，用户无需靠后缀猜适用性。
 #
 #  各发行版 Linux job 共用 .github/actions/build-linux（复合 action）：工具链
-#  (rust/go/dotnet/flutter) → Zig 0.16 → build-linux.sh → zig build test →
+#  (rust/go/dotnet/flutter) → Zig 0.17 → build-linux.sh → zig build test →
 #  cargo test（archoerashell）→ pub get/analyze/test → vault 端到端 →
 #  flutter build linux。发行版专属的系统依赖安装与打包由各 job 负责。
 #
@@ -31,7 +31,7 @@
 #  vault-rs）→ pub get/analyze/test → flutter build（经内嵌 cargo/脚本阶段链入
 #  archoerashell；vault 由 bundle 步骤/CMake install 收入 native/）→ 打包。
 #
-#  Zig 0.16 安装沿用已修复逻辑（f99266b / 7116dfc）：归档名按 0.15.1+ 新规则
+#  Zig 0.17 安装沿用已修复逻辑（f99266b / 7116dfc）：归档名按 0.15.1+ 新规则
 #  zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
 #
 #  ┌─ release job ─────────────────────────────────────────────────────
@@ -304,12 +304,12 @@ jobs:
           channel: stable
           cache: true
 
-      # ──────────────────── Zig 0.16（EraAudio kernel）────────────────
-      - name: Install Zig 0.16 (EraAudio kernel)
+      # ──────────────────── Zig 0.17（EraAudio kernel）────────────────
+      - name: Install Zig 0.17 (EraAudio kernel)
         if: matrix.os == 'macos'
         run: |
           set -euo pipefail
-          VER=0.16.0
+          VER=0.17.0
           ZA="${{ matrix.zig_archive }}"
           ZD="$HOME/.local/zig-$VER"
           if [ ! -x "$ZD/zig" ]; then
@@ -322,12 +322,12 @@ jobs:
           # GITHUB_PATH 对当前步骤不生效：同步骤用绝对路径验证
           "$ZD/zig" version
 
-      - name: Install Zig 0.16 (EraAudio kernel, windows-msvc)
+      - name: Install Zig 0.17 (EraAudio kernel, windows-msvc)
         if: matrix.os == 'windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $ver = '0.16.0'
+          $ver = '0.17.0'
           $zd = Join-Path $env:LOCALAPPDATA "zig-$ver"
           if (!(Test-Path (Join-Path $zd 'zig.exe'))) {
             $zip = Join-Path $env:TEMP "zig.zip"

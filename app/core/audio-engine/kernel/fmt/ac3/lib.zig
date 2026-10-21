@@ -63,7 +63,7 @@ const DecoderCtx = struct {
     s: c.Ctx = .{},
 
     /// 帧缓冲（含填充防越界）
-    frame_buf: [4096]u8 = [_]u8{0} ** 4096,
+    frame_buf: [4096]u8 = @splat(0),
     sample_rate: u32 = 0,
     channels: u8 = 0,
 
@@ -282,7 +282,7 @@ fn decodeFrame(f: *DecoderCtx) Error!bool {
     const blk_out = try f.allocator.alloc(f32, t.AC3_BLOCK_SIZE * blk_count * oc);
     defer f.allocator.free(blk_out);
 
-    var bit_alloc_stages = [_]u8{0} ** t.AC3_MAX_CHANNELS;
+    var bit_alloc_stages: [t.AC3_MAX_CHANNELS]u8 = @splat(0);
 
     var blk: usize = 0;
     while (blk < blk_count) : (blk += 1) {
@@ -783,9 +783,9 @@ fn spxCoordinates(s: *c.Ctx) bool {
 /// 应用谱扩展（对照 C `ff_eac3_apply_spectral_extension`）。将低频系数拷贝到
 /// 高频扩展区，按 band 计算 RMS，做 notch 衰减与噪声/信号混合。
 fn applySpectralExtension(s: *c.Ctx) void {
-    var wrapflag = [_]u8{0} ** 17;
+    var wrapflag: [17]u8 = @splat(0);
     wrapflag[0] = 1;
-    var copy_sizes: [17]i32 = [_]i32{0} ** 17;
+    var copy_sizes: [17]i32 = @splat(0);
     var num_copy_sections: usize = 0;
     var bin: i32 = s.spx_dst_start_freq;
     var bnd: usize = 0;
