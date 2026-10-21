@@ -256,7 +256,7 @@ pub const Decoder8 = struct {
         var era_maxband: i32 = 0;
 
         if (keyframe) {
-            c.era_q = [_][era_mpc_frame_size]i32{[_]i32{0} ** era_mpc_frame_size} ** 2;
+            c.era_q = @splat(@splat(0));
         }
 
         if (keyframe) {

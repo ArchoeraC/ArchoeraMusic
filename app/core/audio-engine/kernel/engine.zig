@@ -557,7 +557,7 @@ pub fn writeTestWav(tmp: *testing.TmpDir, io: std.Io, name: []const u8) ![:0]u8 
 
     const rel = try std.fs.path.join(testing.allocator, &.{ ".zig-cache", "tmp", tmp.sub_path[0..], name });
     defer testing.allocator.free(rel);
-    return testing.allocator.dupeZ(u8, rel);
+    return testing.allocator.dupeSentinel(u8, rel, 0);
 }
 
 test "zk: open 成功并填充 ZkInfo" {
@@ -619,7 +619,7 @@ test "zk: open 填充标签元数据（LIST-INFO）" {
 
     const rel = try std.fs.path.join(testing.allocator, &.{ ".zig-cache", "tmp", tmp.sub_path[0..], "meta.wav" });
     defer testing.allocator.free(rel);
-    const full = try testing.allocator.dupeZ(u8, rel);
+    const full = try testing.allocator.dupeSentinel(u8, rel, 0);
     defer testing.allocator.free(full);
 
     var info: ZkInfo = undefined;
@@ -775,7 +775,7 @@ test "zk: 非 WAV 文件 → null + 状态码 unsupported(1)" {
     std.Io.File.close(f, io);
     const rel = try std.fs.path.join(testing.allocator, &.{ ".zig-cache", "tmp", tmp.sub_path[0..], "t.bin" });
     defer testing.allocator.free(rel);
-    const full = try testing.allocator.dupeZ(u8, rel);
+    const full = try testing.allocator.dupeSentinel(u8, rel, 0);
     defer testing.allocator.free(full);
 
     var errbuf: [64]u8 = undefined;

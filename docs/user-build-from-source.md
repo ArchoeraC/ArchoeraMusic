@@ -1,6 +1,6 @@
 # 用户自编译手册（太长不看版 · 附详细步骤）
 
-> **太长不看版**：装好 Flutter SDK + Zig 0.16 + Rust + Go + .NET 10 + CMake/Clang + FFmpeg 开发库后，
+> **太长不看版**：装好 Flutter SDK + Zig 0.17 + Rust + Go + .NET 10 + CMake/Clang + FFmpeg 开发库后，
 > 依次执行两行命令即可（Linux 为例）：
 >
 > ```bash
@@ -37,7 +37,7 @@
 版本要求以 `app/core/build-linux.sh` 头注释与 `.github/workflows/build-all.yml` 为准：
 
 - **Flutter SDK** `^3.12`（`cat app/pubspec.yaml | grep sdk` 查看精确约束）
-- **Zig 0.16.x**：编译自研解码内核 EraAudio（`app/core/audio-engine/kernel/`）。缺 Zig 时脚本告警并回退
+- **Zig 0.17.x**：编译自研解码内核 EraAudio（`app/core/audio-engine/kernel/`）。缺 Zig 时脚本告警并回退
   FFmpeg/Stable 运行（EraAudio 不启用）；如需完整内核请安装 0.16。
 - **CMake ≥ 3.16 + C 工具链**（GCC/Clang），用于 audio-engine / scraper
 - **Rust 工具链**：tempo-rs（静态链接）、downloader、subsonic transcoder
@@ -184,7 +184,7 @@ makepkg -f --skipinteg --nocheck --nodeps                      # 产出 *.pkg.ta
 - **找不到原生库**（如 `ARCHOERA_SCANNER_FFI` / `ARCHOERA_SCRAPER_FFI` 相关报错）：说明 `native/`
   平铺库缺失或路径未命中。本地跑请先完成第 2 步再 `flutter run`；发布包内库在 `bundle/native/`。
   排查可设 `ARCHOERA_NATIVE_DIR` 指向库目录。
-- **EraAudio 未启用**：`command -v zig` 为空或版本非 0.16 → 装好 0.16 后重跑
+- **EraAudio 未启用**：`command -v zig` 为空或版本非 0.17 → 装好 0.17 后重跑
   `app/core/build-linux.sh`（它会先编译 Zig 内核）。
 - **audio-engine CMake 找不到 FFmpeg**：确认 `pkg-config --modversion libavcodec` 能查到——用系统
   FFmpeg 时装其开发库；用自建最小 FFmpeg 时确认已 `export PKG_CONFIG_PATH=$HOME/.local/ffmpeg-minimal/lib/pkgconfig`。

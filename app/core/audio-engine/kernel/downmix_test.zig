@@ -232,7 +232,7 @@ fn runUnitAssertions() void {
         const old_d1 = s.delay[1];
         dm.ac3UpmixDelay(&s);
         var ok = std.mem.eql(f32, &s.delay[2], &old_d1);
-        ok = ok and std.mem.eql(f32, &s.delay[1], &[_]f32{0} ** t.AC3_BLOCK_SIZE);
+        ok = ok and std.mem.eql(f32, &s.delay[1], &@as([t.AC3_BLOCK_SIZE]f32, @splat(0)));
         ok = ok and s.delay[0][0] == 1.0 and s.delay[3][0] == 301.0;
         check(ok, "unit_upmix_3f");
     }

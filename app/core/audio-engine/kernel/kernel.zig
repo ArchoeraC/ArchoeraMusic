@@ -1567,7 +1567,8 @@ export fn zk_takeover_bitmap() c_ulonglong {
 
 /// 给定 probe.Format 枚举序 → 1（已接管）/ 0（未接管或越界）。
 export fn zk_takeover_of_format(fmt: c_int) c_int {
-    if (fmt < 0 or fmt >= @as(c_int, @intCast(std.meta.fields(probe.Format).len))) return 0;
+    // 0.17：std.meta.fields 已移除 → @typeInfo 的 SoA 字段
+    if (fmt < 0 or fmt >= @as(c_int, @intCast(@typeInfo(probe.Format).@"enum".field_names.len))) return 0;
     const f: probe.Format = @enumFromInt(@as(u8, @intCast(fmt)));
     return if (takeover.ofFormat(f)) 1 else 0;
 }
@@ -2361,7 +2362,7 @@ test "zk_loudness_measure: 解码立体声 1kHz 正弦 WAV → 有效响应/峰�
     std.Io.File.close(f, io_inst);
     const rel = try std.fs.path.join(testing.allocator, &.{ ".zig-cache", "tmp", tmp.sub_path[0..], "loud.wav" });
     defer testing.allocator.free(rel);
-    const full = try testing.allocator.dupeZ(u8, rel);
+    const full = try testing.allocator.dupeSentinel(u8, rel, 0);
     defer testing.allocator.free(full);
 
     var res: CLoudnessResult = undefined;

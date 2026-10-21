@@ -180,8 +180,8 @@ pub const Decoder = struct {
     sample_type: SampleType = .s16,
     sample_rate: u32 = 0,
 
-    era_decoded_base: [era_max_channels]?[]i32 = [_]?[]i32{null} ** era_max_channels,
-    offset: [era_max_channels]?[]i32 = [_]?[]i32{null} ** era_max_channels,
+    era_decoded_base: [era_max_channels]?[]i32 = @splat(null),
+    offset: [era_max_channels]?[]i32 = @splat(null),
     coeffs: []i32 = &.{},
 
     phase: enum { need_header, decoding, done, failed } = .need_header,

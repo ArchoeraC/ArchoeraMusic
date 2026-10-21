@@ -152,7 +152,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
             continue;
         };
 
-        var spk_planes: SpeakerPlanes = [_]?[]const i32{null} ** xll.SPEAKER_COUNT;
+        var spk_planes: SpeakerPlanes = @splat(null);
         for (0..xll.SPEAKER_COUNT) |s| spk_planes[s] = core_dec.speakerPlane(s);
 
         var xll_ok = false;

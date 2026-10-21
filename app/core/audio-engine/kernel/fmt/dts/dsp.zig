@@ -482,7 +482,7 @@ pub fn lfeX96Fixed(dst: []i32, src: []const i32, hist: *i32, len: usize) void {
 }
 
 test "dsp: imdctHalf32 输出有界" {
-    var in: [32]i32 = [_]i32{1000} ** 32;
+    var in: [32]i32 = @splat(1000);
     var out: [32]i32 = undefined;
     imdctHalf32(&out, &in);
     for (out) |v| try std.testing.expect(v >= -(1 << 23) and v <= (1 << 23) - 1);

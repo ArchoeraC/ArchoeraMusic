@@ -287,7 +287,7 @@ fn cosfGlibc(x: f32) f32 {
 }
 
 fn lspToLpc(freq: []const f32, order: usize, ak: []f32) void {
-    var wp = [_]f32{0} ** (4 * NB_ORDER + 2);
+    var wp: [(4 * NB_ORDER + 2)]f32 = @splat(0);
     var x_freq: [NB_ORDER]f32 = undefined;
     const m = order >> 1;
 
@@ -635,15 +635,15 @@ pub const DecoderState = struct {
     dtx_enabled: bool = false,
     highpass_enabled: bool = false,
 
-    exc_buf: [NB_DEC_BUFFER]f32 = [_]f32{0} ** NB_DEC_BUFFER,
+    exc_buf: [NB_DEC_BUFFER]f32 = @splat(0),
     mem_hp: [2]f32 = .{ 0, 0 },
-    old_qlsp: [NB_ORDER]f32 = [_]f32{0} ** NB_ORDER,
-    interp_qlpc: [NB_ORDER]f32 = [_]f32{0} ** NB_ORDER,
-    mem_sp: [NB_ORDER]f32 = [_]f32{0} ** NB_ORDER,
-    g0_mem: [QMF_ORDER]f32 = [_]f32{0} ** QMF_ORDER,
-    g1_mem: [QMF_ORDER]f32 = [_]f32{0} ** QMF_ORDER,
-    pi_gain: [NB_NB_SUBFRAMES]f32 = [_]f32{0} ** NB_NB_SUBFRAMES,
-    exc_rms: [NB_NB_SUBFRAMES]f32 = [_]f32{0} ** NB_NB_SUBFRAMES,
+    old_qlsp: [NB_ORDER]f32 = @splat(0),
+    interp_qlpc: [NB_ORDER]f32 = @splat(0),
+    mem_sp: [NB_ORDER]f32 = @splat(0),
+    g0_mem: [QMF_ORDER]f32 = @splat(0),
+    g1_mem: [QMF_ORDER]f32 = @splat(0),
+    pi_gain: [NB_NB_SUBFRAMES]f32 = @splat(0),
+    exc_rms: [NB_NB_SUBFRAMES]f32 = @splat(0),
 
     pub fn init(self: *DecoderState, mode: *const SpeexMode) void {
         self.* = .{ .mode = mode, .modeID = mode.modeID };
@@ -1151,7 +1151,7 @@ fn nbDecode(
 
         // 二次码本（部分模式）
         if (sm.double_codebook) {
-            var innov2 = [_]f32{0} ** NB_SUBFRAME_SIZE;
+            var innov2: [NB_SUBFRAME_SIZE]f32 = @splat(0);
             sm.innovation_unquant.?(&innov2, sm.innovation_params.?, NB_SUBFRAME_SIZE, gb, &st.seed);
             signalMul(&innov2, 0.454545 * ener);
             for (0..NB_SUBFRAME_SIZE) |i| innov[i] += innov2[i];
@@ -1331,7 +1331,7 @@ fn sbDecode(
         const rl = low_pi_gain[sub];
         const filter_ratio = (rl + 0.01) / (rh + 0.01);
 
-        var exc = [_]f32{0} ** 80;
+        var exc: [80]f32 = @splat(0);
         if (sm.innovation_unquant == null) {
             // 折叠模式（wb_submode1）：低带创新谱折叠
             // C: g = expf(.125f * (x - 10)) / filter_ratio
@@ -1355,7 +1355,7 @@ fn sbDecode(
             sm.innovation_unquant.?(exc[0..st.subframe_size], sm.innovation_params.?, st.subframe_size, gb, &st.seed);
             signalMul(exc[0..st.subframe_size], scale);
             if (sm.double_codebook) {
-                var innov2 = [_]f32{0} ** 80;
+                var innov2: [80]f32 = @splat(0);
                 sm.innovation_unquant.?(innov2[0..st.subframe_size], sm.innovation_params.?, st.subframe_size, gb, &st.seed);
                 signalMul(innov2[0..st.subframe_size], 0.4 * scale);
                 for (0..st.subframe_size) |k| exc[k] += innov2[k];

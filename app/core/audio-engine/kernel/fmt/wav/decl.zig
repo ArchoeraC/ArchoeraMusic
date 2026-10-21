@@ -84,7 +84,7 @@ pub const WavFmt = struct {
     block_align: usize,
     /// fmt 扩展区（cbSize 字节，镜像 ff_get_wav_header 语义；上限 64）
     /// 当前仅 F16LE 判定需要（extradata_len == 2 && LE16 == 1）
-    extradata: [64]u8 = .{0} ** 64,
+    extradata: [64]u8 = @splat(0),
     extradata_len: u8 = 0,
 };
 
@@ -119,7 +119,7 @@ pub fn parseWavFmt(reader: *io.Reader, csize: u64, endian: std.builtin.Endian) E
     var bits = readU16(f[14..16], endian);
     var rest = csize - 16;
 
-    var extradata: [64]u8 = .{0} ** 64;
+    var extradata: [64]u8 = @splat(0);
     var extradata_len: u8 = 0;
 
     if (tag == 0xFFFE) {

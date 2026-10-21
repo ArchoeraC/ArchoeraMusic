@@ -82,7 +82,7 @@ const Ctx = struct {
     /// Xing/Info TOC（100 字节，8-bit 量化）。保留供粗略定位/诊断；**不用于
     /// 精确帧寻址**——8-bit 量化误差可达 file_size/512 字节（多帧），无法唯一
     /// 确定落点帧号，故精确索引走分块帧头扫描（见 `frames`）。
-    toc: [100]u8 = [_]u8{0} ** 100,
+    toc: [100]u8 = @splat(0),
     has_toc: bool = false,
     /// Xing 提供的总样本数（无 = 0）
     total_samples_xing: u64 = 0,
@@ -185,7 +185,7 @@ const Xing = struct {
     /// encoder_padding（样本）
     padding: u32 = 0,
     /// 100 字节 TOC（存在 = has_toc；值经 8-bit 量化，仅作粗略定位提示）
-    toc: [100]u8 = [_]u8{0} ** 100,
+    toc: [100]u8 = @splat(0),
     has_toc: bool = false,
 };
 
@@ -1035,7 +1035,7 @@ test "mp3 帧索引: 帧 0 = stream_start 且相邻帧偏移差 = 帧字节数" 
 /// 构造一帧含 Xing/Info 标记与编码扩展的 synthetic 首帧（MPEG1 L3 44100 st，
 /// frame_bytes=417；frame 内各字段按 ffmpeg mp3dec 顺序排布）
 fn buildXingFrame(marker: [4]u8, magic: [4]u8, delay: u32, padding: u32) [417]u8 {
-    var b = [_]u8{0} ** 417;
+    var b: [417]u8 = @splat(0);
     @memcpy(b[0..4], &[_]u8{ 0xFF, 0xFB, 0x90, 0x00 }); // MPEG1 L3 128k 44100 stereo
     const x = 4 + 32; // side info（stereo MPEG1）=32
     @memcpy(b[x..][0..4], &marker);

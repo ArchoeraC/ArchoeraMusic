@@ -304,7 +304,7 @@ test "dts: 帧头负例" {
     // 伪 sync（≥18 字节，通过窗口检查）
     try testing.expectError(error.Sync, parse("NOTASYNCWORD-0123456789abcdef", .be16));
     // 14-bit 打包不支持
-    var b14: [hdr.header_window]u8 = [_]u8{0} ** hdr.header_window;
+    var b14: [hdr.header_window]u8 = @splat(0);
     b14[0] = 0x1F;
     b14[1] = 0xFF;
     b14[2] = 0xE8;
@@ -1279,7 +1279,7 @@ fn decodePayloadToS16(
             else => return error.Corrupt,
         };
 
-        var spk_planes: [SPK]?[]const i32 = [_]?[]const i32{null} ** SPK;
+        var spk_planes: [SPK]?[]const i32 = @splat(null);
         for (0..SPK) |s| spk_planes[s] = core_dec.speakerPlane(s);
 
         var xll_ok = false;
@@ -1437,7 +1437,7 @@ fn decodeXllPayloadToS32(payload: []const u8, out: []u8) !usize {
         var frame: core.DecodedFrame = undefined;
         try core_dec.decode(payload[off .. off + core_len], &frame);
 
-        var spk_planes: [SPK]?[]const i32 = [_]?[]const i32{null} ** SPK;
+        var spk_planes: [SPK]?[]const i32 = @splat(null);
         for (0..SPK) |s| spk_planes[s] = core_dec.speakerPlane(s);
 
         var xll_ok = false;
@@ -1529,7 +1529,7 @@ fn makeDtshdContainer(a: stdio.mem.Allocator, payload: []const u8, samples_per_f
     const aupr_hdr = [_]u8{ 0x41, 0x55, 0x50, 0x52, 0x2D, 0x48, 0x44, 0x52 };
     stdio.mem.writeInt(u16, aupr[19..21], initial_padding, .big);
 
-    const filler = [_]u8{0xAB} ** 12;
+    const filler: [12]u8 = @splat(0xAB);
     const len = 16 + filler.len + 16 + aupr.len + 16 + payload.len;
     const out = try a.alloc(u8, len);
     @memcpy(out[0..8], "DTSHDHDR");

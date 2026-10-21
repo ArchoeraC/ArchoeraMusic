@@ -185,7 +185,7 @@ const ChanData = struct {
     time_diff_flag: bool = false,
     time_diff_sign: bool = false,
     time_diff_index: u32 = 0,
-    weighting: [6]i32 = [_]i32{0} ** 6,
+    weighting: [6]i32 = @splat(0),
 };
 
 /// 解析 ALSSpecificConfig（dsi = mp4 esds DecoderSpecificInfo 原始字节）。
@@ -248,7 +248,7 @@ pub const Decoder = struct {
 
     /// BGMC LUT
     bgmc_lut: []u8 = &.{},
-    bgmc_lut_status: [LUT_BUFF]i32 = [_]i32{-1} ** LUT_BUFF,
+    bgmc_lut_status: [LUT_BUFF]i32 = @splat(-1),
 
     frame_id: u64 = 0,
     cur_frame_length: u32 = 0,

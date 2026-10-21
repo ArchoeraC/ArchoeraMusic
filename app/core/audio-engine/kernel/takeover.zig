@@ -33,9 +33,10 @@ pub const Verdict = enum(c_int) {
 pub const bitmap: u64 = blk: {
     @setEvalBranchQuota(20000);
     var b: u64 = 0;
-    for (std.meta.fields(probe.Format)) |f| {
-        const fmt: probe.Format = @enumFromInt(f.value);
-        if (probe.enabled(fmt)) b |= (@as(u64, 1) << @intCast(f.value));
+    // 0.17：std.meta.fields 已移除；@typeInfo 改为 SoA（field_names）
+    for (@typeInfo(probe.Format).@"enum".field_names) |name| {
+        const fmt = @field(probe.Format, name);
+        if (probe.enabled(fmt)) b |= (@as(u64, 1) << @intCast(@intFromEnum(fmt)));
     }
     break :blk b;
 };
@@ -129,9 +130,9 @@ pub fn ofExt(ext: []const u8) Verdict {
 const testing = std.testing;
 
 test "takeover: bitmap 与 ofFormat 逐位一致" {
-    inline for (std.meta.fields(probe.Format)) |f| {
-        const fmt: probe.Format = @enumFromInt(f.value);
-        const bit = (bitmap >> @intCast(f.value)) & 1;
+    inline for (@typeInfo(probe.Format).@"enum".field_names) |name| {
+        const fmt = @field(probe.Format, name);
+        const bit = (bitmap >> @intCast(@intFromEnum(fmt))) & 1;
         try testing.expectEqual(@as(u64, if (ofFormat(fmt)) 1 else 0), bit);
     }
 }

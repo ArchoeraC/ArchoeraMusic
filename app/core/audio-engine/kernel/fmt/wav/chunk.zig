@@ -155,7 +155,7 @@ test "chunk: RIFF 头读取与跳过（含奇对齐）" {
     var bytes = std.ArrayList(u8).empty;
     defer bytes.deinit(testing.allocator);
     try bytes.appendSlice(testing.allocator, "fmt \x10\x00\x00\x00");
-    try bytes.appendSlice(testing.allocator, &[_]u8{0} ** 16);
+    try bytes.appendSlice(testing.allocator, &@as([16]u8, @splat(0)));
     try bytes.appendSlice(testing.allocator, "JUNK\x05\x00\x00\x00");
     try bytes.appendSlice(testing.allocator, "hello");
     try bytes.appendSlice(testing.allocator, &[_]u8{0}); // pad
@@ -186,7 +186,7 @@ test "chunk: W64 头与 8 字节对齐" {
     try bytes.appendSlice(testing.allocator, &fmt_guid);
     std.mem.writeInt(u64, @ptrCast(&sz), 40, .little);
     try bytes.appendSlice(testing.allocator, &sz);
-    try bytes.appendSlice(testing.allocator, &[_]u8{0} ** 16);
+    try bytes.appendSlice(testing.allocator, &@as([16]u8, @splat(0)));
 
     var reader = io.Reader.openMem(bytes.items);
     try testing.expect(try checkW64Header(&reader));
@@ -202,7 +202,7 @@ test "chunk: AIFF 头与奇对齐" {
     defer bytes.deinit(testing.allocator);
     try bytes.appendSlice(testing.allocator, "FORM\x00\x00\x00\x20AIFF");
     try bytes.appendSlice(testing.allocator, "COMM\x00\x00\x00\x12"); // 18 字节
-    try bytes.appendSlice(testing.allocator, &[_]u8{0} ** 18);
+    try bytes.appendSlice(testing.allocator, &@as([18]u8, @splat(0)));
     try bytes.appendSlice(testing.allocator, &[_]u8{0}); // pad
 
     var reader = io.Reader.openMem(bytes.items);

@@ -406,7 +406,7 @@ test "opus rc: opus_ilog" {
 }
 
 test "opus rc: tell / tell_frac 单调性" {
-    const data = [_]u8{0} ** 16;
+    const data: [16]u8 = @splat(0);
     var rc = Rc.decInit(&data); // 归一化后 range > BOT，tell_frac 安全
     const t0 = rc.tell();
     const tf0 = rc.tellFrac();
@@ -419,7 +419,7 @@ test "opus rc: tell / tell_frac 单调性" {
 
 test "opus rc: dec_log 二分读取一致性" {
     // 手工构造 8 字节零流（编码端补码 → 全 0xFF 位流）
-    const data = [_]u8{0x00} ** 8;
+    const data: [8]u8 = @splat(0x00);
     var rc = Rc.decInit(&data);
     // 8 次 decLog(1)：每读 1 位，应能稳定推进不崩溃且位预算增长
     const before = rc.tell();

@@ -449,7 +449,7 @@ fn makeCookie(
     mb: u8,
     kb: u8,
 ) [36]u8 {
-    var b = [_]u8{0} ** 36;
+    var b: [36]u8 = @splat(0);
     std.mem.writeInt(u32, b[0..4], 36, .big);
     @memcpy(b[4..8], "alac");
     std.mem.writeInt(u32, b[8..12], 0, .big); // version
@@ -536,7 +536,7 @@ test "alac config: 24-bit → 32bit 输出左移 8" {
 
 test "alac config: 非法字段 → Corrupt" {
     // 过短
-    var short = [_]u8{0} ** 10;
+    var short: [10]u8 = @splat(0);
     try testing.expectError(error.Corrupt, Config.parse(&short));
     // max_samples_per_frame = 0
     var c0 = makeCookie(0, 16, 1, 44100, 40, 10, 14);

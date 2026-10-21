@@ -86,10 +86,10 @@ pub const Vlc = struct {
 
     entries: [max_entries]Entry = undefined,
     /// start[len]/count[len]：长度为 len 的码在 entries 中的区间（len 0 未用）
-    start: [20]u16 = [_]u16{0} ** 20,
-    count: [20]u16 = [_]u16{0} ** 20,
+    start: [20]u16 = @splat(0),
+    count: [20]u16 = @splat(0),
     /// 规范 Huffman 每长度首码（canonical first code）；canonical=true 时用于 O(1)/长度解码
-    first_code: [20]u32 = [_]u32{0} ** 20,
+    first_code: [20]u32 = @splat(0),
     canonical: bool = false,
     max_len: u8 = 0,
     size: u16 = 0,

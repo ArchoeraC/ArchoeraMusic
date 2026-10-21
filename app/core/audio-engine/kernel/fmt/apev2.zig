@@ -123,7 +123,7 @@ pub fn parse(allocator: std.mem.Allocator, reader: *io.Reader, file_size: u64) E
         if (key.len > upper.len) continue;
         for (key, 0..) |ch, idx| upper[idx] = std.ascii.toUpper(ch);
         const slot = field_map.get(upper[0..key.len]) orelse continue;
-        const s = try allocator.dupeZ(u8, value);
+        const s = try allocator.dupeSentinel(u8, value, 0);
         switch (slot) {
             0 => out.meta.title = s,
             1 => out.meta.artist = s,
@@ -195,7 +195,7 @@ test "apev2: 解析尾部标签（文本项映射标准字段 + 全量 tags）" 
 }
 
 test "apev2: 非 APE 尾返回空（非错误）" {
-    var buf = [_]u8{0} ** 64;
+    var buf: [64]u8 = @splat(0);
     var reader = io.Reader.openMem(&buf);
     var tags = try parse(testing.allocator, &reader, buf.len);
     defer tags.deinit(testing.allocator);

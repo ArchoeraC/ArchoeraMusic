@@ -48,7 +48,7 @@ pub const EraEq = struct {
     allocator: std.mem.Allocator,
     sample_rate: u32,
     channels: u8,
-    gains: [era_eq_band_count]f32 = [_]f32{0.0} ** era_eq_band_count,
+    gains: [era_eq_band_count]f32 = @splat(0.0),
     preamp_db: f32 = 0.0,
     /// `[band * channels + ch]`，长度 = band_count × channels。
     filters: []EraBiquad,
@@ -202,7 +202,7 @@ test "era_eq: 静音输入保持静音；非零增益不产生 NaN/Inf" {
     const eq = try era_eq_create(testing.allocator, 48000, 2);
     defer era_eq_destroy(eq);
 
-    var silence = [_]f32{0.0} ** 64;
+    var silence: [64]f32 = @splat(0.0);
     era_eq_process(eq, &silence, 32);
     for (silence) |v| try testing.expectEqual(@as(f32, 0.0), v);
 

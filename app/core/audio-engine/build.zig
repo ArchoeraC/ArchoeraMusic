@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! archoera_kernel 构建脚本（Zig 0.16.0 build API）
+//! archoera_kernel 构建脚本（Zig 0.17.0 build API）
 //!
 //! 目标产物：
 //!   - archoera_kernel：纯 Zig 音频解码内核（静态库）
@@ -118,10 +118,31 @@ pub fn build(b: *std.Build) void {
     // 60MB 栈帧（大函数 Debug 临时量病理），默认 8MB 线程栈即段错误；ReleaseSafe
     // 正常分配小帧、保持安全检查，8MB 栈下全绿。可用 -Dtest-optimize 覆盖。
     const test_optimize = b.option(
-        std.builtin.OptimizeMode,
+        std.builtin.Optimize,
         "test-optimize",
-        "单元测试构建优化模式（默认 ReleaseSafe）",
-    ) orelse .ReleaseSafe;
+        "单元测试构建优化模式（默认 safe = ReleaseSafe 语义）",
+    ) orelse .safe;
+
+    // ---- C 头翻译（Zig 0.17 移除了 @cImport）----
+    // 0.17 起 C 翻译改由构建期显式完成：源码侧 @import("c_amr") / ("c_vorbis")。
+    // 说明：官方推荐改用 translate-c 外部包（Step.TranslateC 已标记 deprecated），
+    // 这里保留内置步骤以维持**离线可构建、不新增第三方依赖**；待 0.18 移除前再迁移。
+    const tc_vorbis = b.addTranslateC(.{
+        .root_source_file = b.path("kernel/c/stb_vorbis.h"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tc_vorbis.addIncludePath(b.path("kernel/c"));
+    const tc_amr = b.addTranslateC(.{
+        .root_source_file = b.path("kernel/c/amr/interf_dec.h"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tc_amr.addIncludePath(b.path("kernel/c/amr"));
+    tc_amr.addIncludePath(b.path("kernel/c/amr/amr_nb/dec/include"));
+    tc_amr.addIncludePath(b.path("kernel/c/amr/amr_nb/common/include"));
+    tc_amr.addIncludePath(b.path("kernel/c/amr/common/dec/include"));
+    tc_amr.addIncludePath(b.path("kernel/c/amr/oscl"));
 
     // ---- 内核静态库 ----
     const kernel = b.addLibrary(.{
@@ -135,6 +156,8 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
+    kernel.root_module.addImport("c_amr", tc_amr.createModule());
+    kernel.root_module.addImport("c_vorbis", tc_vorbis.createModule());
     // vendored 单文件 C 库：stb_vorbis（public domain，Vorbis 解码，§9.12）
     // -fno-sanitize=undefined：vendored C 含有符号左移（OpenCORE/stb 风格），
     // zig 对 C 的 UB 检测在 Debug 下会 panic（生产 ReleaseFast 亦不检测）
@@ -151,15 +174,11 @@ pub fn build(b: *std.Build) void {
     kernel.root_module.addIncludePath(b.path("kernel/c/amr/common/dec/include"));
     // vendored OpenCORE AMR-NB 解码器（Apache-2.0，§9.13；按 -x c 编译）
     const amr_flags = [_][]const u8{
-        "-O2", "-DDISABLE_AMRNB_ENCODER", "-fwrapv", "-fno-sanitize=undefined",
-        "-I", "kernel/c/amr/oscl",
-        "-I", "kernel/c/amr/amr_nb/dec/src",
-        "-I", "kernel/c/amr/amr_nb/dec/include",
-        "-I", "kernel/c/amr/amr_nb/common/include",
-        "-I", "kernel/c/amr/amr_nb/common/src",
-        "-I", "kernel/c/amr/amr_nb/enc/src",
-        "-I", "kernel/c/amr/common/dec/include",
-        "-I", "kernel/c/amr",
+        "-O2", "-DDISABLE_AMRNB_ENCODER",         "-fwrapv", "-fno-sanitize=undefined",
+        "-I",  "kernel/c/amr/oscl",               "-I",      "kernel/c/amr/amr_nb/dec/src",
+        "-I",  "kernel/c/amr/amr_nb/dec/include", "-I",      "kernel/c/amr/amr_nb/common/include",
+        "-I",  "kernel/c/amr/amr_nb/common/src",  "-I",      "kernel/c/amr/amr_nb/enc/src",
+        "-I",  "kernel/c/amr/common/dec/include", "-I",      "kernel/c/amr",
     };
     kernel.root_module.addCSourceFiles(.{
         .files = &amr_sources,
@@ -183,6 +202,8 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
+    kernel_shared.root_module.addImport("c_amr", tc_amr.createModule());
+    kernel_shared.root_module.addImport("c_vorbis", tc_vorbis.createModule());
     kernel_shared.root_module.addCSourceFile(.{
         .file = b.path("kernel/c/stb_vorbis.c"),
         .flags = &.{ "-O3", "-fno-sanitize=undefined" },
@@ -221,6 +242,8 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
+    kernel_tests.root_module.addImport("c_amr", tc_amr.createModule());
+    kernel_tests.root_module.addImport("c_vorbis", tc_vorbis.createModule());
     kernel_tests.root_module.addCSourceFile(.{
         .file = b.path("kernel/c/stb_vorbis.c"),
         .flags = &.{ "-O3", "-fno-sanitize=undefined" },
@@ -238,6 +261,10 @@ pub fn build(b: *std.Build) void {
     });
 
     const test_step = b.step("test", "运行内核单元测试（zig build test）");
-    const run_tests = b.addRunArtifact(kernel_tests);
+    // 直接执行测试产物（不经 build runner 的 test-server/listen 协议）：
+    // 0.17 的 listen 协议路径在本内核 7xx 用例下偶发「process terminated with
+    // signal SEGV」（同一二进制直接执行稳定通过）。直接执行仍是标准测试入口
+    // （失败以非 0 退出码收敛），CI 语义不变，且日志按用例逐行输出更易定位。
+    const run_tests = b.addRunFile(kernel_tests.getEmittedBin());
     test_step.dependOn(&run_tests.step);
 }
