@@ -8,7 +8,7 @@
 
 | 项 | 措施 | 位置 |
 | --- | --- | --- |
-| SEC-21 | 所有 GitHub Actions 依赖 **pin 到 40 位 commit SHA**（含签名作业），不再用可变主版本标签 | `build-all.yml`、`actions/build-linux/action.yml`、`security-audit.yml` |
+| SEC-21 | 所有 GitHub Actions 依赖 **pin 到 40 位 commit SHA**（含签名作业），不再用可变主版本标签 | `build-all.yml`、`actions/build-linux/action.yml`、`security-audit.yml`、`codeql.yml` |
 | SEC-22 | `protect-main` 开启 **Require review from Code Owners**：CI/签名/打包/水印等关键路径改动无法被非 owner 自合并（owner 为 bypass actor，可自建 PR 自合并） | GitHub ruleset + `.github/CODEOWNERS` |
 | SEC-23 | `release` 作业在签名前**校验发版 tag 指向受保护长分支**（`main` 或 `ArchoeraOS`）的祖先提交，否则拒绝构建/签名 | `build-all.yml` release 作业 |
 | SEC-24 | tag 名经 **`$GITHUB_REF_NAME` 环境变量**注入，`run:` 内不再内插 `${{ github.ref_name }}` | `build-all.yml` |
@@ -87,3 +87,32 @@
   两者都只动锁文件、不改 `Cargo.toml` 约束。
   确属**不适用**的公告才可经 `ignore` 放行，且须在 workflow 注释写明理由
   （如 RUSTSEC-2023-0071：`rsa` 仅用于公钥加密、不持私钥）。
+
+## 4. 已知风险与例外
+
+以下条目是**已评估并接受**的已知风险（或纯属误报/不适用），在此集中登记，避免被
+误判为「尚未发现」或「已修复」。新增例外须同样写明理由、影响面与复核条件。
+
+- **RUSTSEC-2023-0071（`rsa` Marvin 计时侧信道）——不适用**：
+  该公告只影响**持有私钥**、执行解密/签名的一方。downloader 仅用
+  `RsaPublicKey::encrypt`（酷狗登录公钥加密，见 `app/core/downloader/src/crypto.rs`），
+  **不持私钥、不做解密**，故攻击面不存在。已在 `security-audit.yml` 的 `ignore`
+  中登记（附同样理由的注释），待上游 `rsa` 出补丁后复核是否可以去掉该 ignore。
+- **RUSTSEC-2024-0436（`paste` crate 停止维护）——不适用（编译期）**：
+  该 crate 经 `lofty`（downloader 的标签/元数据处理依赖，`Cargo.toml` 中 `lofty = "0.25"`）
+  传递引入，是 **proc-macro**，只在编译期展开宏，**无运行时暴露面**，也不进入发布产物。
+  `cargo audit` 将其归为 **warning**（unmaintained）而**不拦截**构建；等 `lofty`
+  换用其它实现（或版本升级去掉该依赖）后该项自然消失。
+- **第三方音源明文 HTTP 端点——上游既定行为，MITM 可篡改内容**：
+  `http://login.user.kugou.com`（短信验证码发送，见 `app/lib/services/kugou/kugou_request.dart`）、
+  `http://lyrics.kugou.com`（歌词搜索/下载，见 `app/core/downloader/src/metadata.rs`）、
+  `http://mobilecdn.kugou.com`（歌曲搜索，同上）、`http://aqqmusic.tc.qq.com`（QQ 音乐媒体直链；
+  downloader 的重定向白名单允许公网明文 http，示例见 `app/core/downloader/src/lib.rs`）
+  均走**明文 HTTP**：这是**上游服务的既定行为**，客户端无法单方面改成 TLS。
+  影响面：同网络路径上的 MITM 可**篡改歌词/媒体内容**（返回错误歌词、替换音频流），
+  也可能观察到查询参数（关键词、手机号在查询串中）。
+  **不触及本地凭据保险库**：vault 全本地、文件权限 `0600`、敏感缓冲释放前 `zeroize`，
+  且上述明文请求不携带 vault 内的令牌/密码。若上游提供 https 端点，应**优先替换**。
+- **`os/vm/mkosi.key` 从未入库（提醒）**：本地镜像构建密钥被 `.gitignore` 的 `*.key`
+  规则覆盖，`git ls-files` 中不存在该文件。维护者**不要**用 `git add -f` 强加——一旦
+  入库即使后续删除也会留在历史里，需整条历史重写才能清除。
