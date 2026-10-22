@@ -87,6 +87,37 @@ NUGETCFG
         platforms = [ "x86_64-linux" ];
       };
 
+      # ── Zig 0.17 工具链 ─────────────────────────────────────────────────
+      # 本 flake.lock 钉的 nixpkgs 里 `pkgs.zig` 仍是 0.16，而内核已迁移到 0.17 语法
+      # （`std.builtin.Optimize` 等），用 0.16 会在 `zig build` 阶段直接报错。故这里取
+      # 官方预编译发行包——与 CI 其它平台（build-linux.sh / build-all.yml 的
+      # VER=0.17.0）同一版本来源，也免去在 Nix 里从源码编 zig（LLVM 全量）的开销。
+      # 升级版本：改 version 并按 url 重算 hash（nix-prefetch-url --type sha256 <url>）。
+      zig017 = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
+        pname = "zig";
+        version = "0.17.0";
+        src = pkgs.fetchurl {
+          url = "https://ziglang.org/download/${finalAttrs.version}/zig-x86_64-linux-${finalAttrs.version}.tar.xz";
+          hash = "sha256-HL6d+fJ+a3jRTMvKQ7ZwOkBO957xxGPekB1/CI1OICY=";
+        };
+        # 发行包已编好：只需摆放 bin/zig 与 lib/（zig 按 <exe>/../lib 定位标准库）。
+        nativeBuildInputs = [ pkgs.xz ];
+        sourceRoot = "zig-x86_64-linux-${finalAttrs.version}";
+        dontConfigure = true;
+        dontBuild = true;
+        dontStrip = true;
+        installPhase = ''
+          runHook preInstall
+          mkdir -p "$out/bin"
+          cp -a zig "$out/bin/zig"
+          cp -a lib "$out/lib"
+          runHook postInstall
+        '';
+        meta = commonMeta // {
+          description = "ArchoeraMusic 使用的 Zig 编译器（官方预编译发行包）";
+        };
+      });
+
       # ── 1. 最小纯 LGPL·仅音频 FFmpeg ─────────────────────────────────────
       ffmpegMinimal = pkgs.stdenv.mkDerivation {
         pname = "archoera-ffmpeg-minimal";
@@ -128,7 +159,7 @@ NUGETCFG
         pname = "archoera-kernel";
         inherit version;
         src = src;
-        nativeBuildInputs = [ pkgs.zig ];
+        nativeBuildInputs = [ zig017 ];
         dontConfigure = true;
         buildPhase = ''
           runHook preBuild
@@ -444,7 +475,7 @@ NUGETCFG
           # core/shell 原生 CLI staticlib）、cmake 目标 audio_engine_cmake /
           # subsonic_go 会在 Flutter 构建期重编 audio-engine 与 subsonic，
           # 故需 zig / go / rust 工具链与 FFmpeg。
-          zig
+          zig017
           go
           rustc
           cargo
