@@ -29,8 +29,11 @@ jobs:
       issues: write
     strategy:
       fail-fast: false
+      # vault-rs 是凭据保险库（全本地存储、0600 + zeroize），属最高安全等级，
+      # 必须纳入每周扫描（此前遗漏）。
       matrix:
         dir:
+          - app/core/vault-rs
           - app/core/downloader
           - app/core/shell
           - app/core/subsonic/transcoder
