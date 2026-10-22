@@ -978,7 +978,9 @@ int player_stream_write(PlayerCtx *p, const float *pcm, int samples)
     if (!QA_LOAD_ACQ(&p->stream_playing_sent)) {
         const double base_ms = stream_pos_base_get(p);
         QA_STORE_REL(&p->stream_playing_sent, 1);
-        QA_STORE_REL(&p->last_pos_frame, (qa_size)base_ms);
+        /* 值参数是 size_t：`qa_size` 在非 MSVC 下是 `_Atomic size_t`，clang 不允许把
+           原子类型隐式退化为其值类型（gcc 放行），故此处显式转 size_t。 */
+        QA_STORE_REL(&p->last_pos_frame, (size_t)base_ms);
         if (p->emit_playing && p->on_event) {
             char buf[128];
             p->on_event("{\"type\":\"playing\"}", p->user_data);

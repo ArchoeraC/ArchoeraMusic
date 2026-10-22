@@ -38,7 +38,7 @@
 
 - **Flutter SDK** `^3.12`（`cat app/pubspec.yaml | grep sdk` 查看精确约束）
 - **Zig 0.17.x**：编译自研解码内核 EraAudio（`app/core/audio-engine/kernel/`）。缺 Zig 时脚本告警并回退
-  FFmpeg/Stable 运行（EraAudio 不启用）；如需完整内核请安装 0.16。
+  FFmpeg/Stable 运行（EraAudio 不启用）；如需完整内核请安装 0.17。
 - **CMake ≥ 3.16 + C 工具链**（GCC/Clang），用于 audio-engine / scraper
 - **Rust 工具链**：tempo-rs（静态链接）、downloader、subsonic transcoder
 - **Go 1.23+**：subsonic 服务端
