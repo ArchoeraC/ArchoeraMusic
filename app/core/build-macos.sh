@@ -45,7 +45,7 @@ if command -v zig >/dev/null 2>&1; then
   (cd "$ROOT/audio-engine" && zig build -Doptimize=ReleaseFast ${ZIG_KERNEL_TARGET:+-Dtarget=$ZIG_KERNEL_TARGET}) || exit 1
 else
   echo "[build-macos] 警告: 未检测到 zig，自研内核(EraAudio)不编译（引擎将以 FFmpeg/Stable 运行）；"
-  echo "          安装 Zig 0.16（https://ziglang.org/download）后重跑可启用 EraAudio。"
+  echo "          安装 Zig 0.17（https://ziglang.org/download）后重跑可启用 EraAudio。"
 fi
 
 echo "[build-macos] ===== audio-engine ====="

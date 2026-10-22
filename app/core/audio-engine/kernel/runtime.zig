@@ -432,6 +432,21 @@ pub const Runtime = struct {
         return id < self.stalled.len and self.stalled[id];
     }
 
+    /// 遥测：首个「正在跑任务」的服役槽（reg==busy，且未停滞/未自退）；无则 null。
+    /// 测试用：定位承载长转任务的槽——**不得假设引导槽 id0 一定拿到首个任务**：
+    /// 为撑满池而提交的后续任务会让 Master 补建新 worker，新 worker 同样从队头自领，
+    /// 谁先被 OS 调度到并不确定（CI 高负载下即会换槽）。
+    pub fn firstBusySlot(self: *Runtime) ?usize {
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
+        for (self.reg.entries[0..self.workers.items.len], 0..) |*e, id| {
+            if (self.stalled[id]) continue;
+            if (self.exited[id].load(.acquire)) continue;
+            if (e.state == tables.WState.busy) return id;
+        }
+        return null;
+    }
+
     /// 遥测：某槽是否被标退役（持锁读；`retire` 为普通内存，锁外读属数据竞争）。
     pub fn slotRetire(self: *Runtime, id: usize) bool {
         self.mutex.lockUncancelable(self.io);
@@ -1320,10 +1335,13 @@ test "runtime: 弹性扩容——积压驱动补建至 cap，max 界住线程数
 /// 为最迟自退预算（防检测失效时把测试挂死——届时仅断言失败而非悬挂）。
 const StallJob = struct {
     stop: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    /// 任务体真正开工（已由某 worker 取走并在跑）——测试据此定位承载槽，而不是假设 id0。
+    entered: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     budget_ns: u64 = 0,
 
     fn run(ctx: *anyopaque) void {
         const s: *StallJob = @ptrCast(@alignCast(ctx));
+        s.entered.store(true, .release);
         const ioinst = Io.Threaded.global_single_threaded.io();
         const deadline: i96 = if (s.budget_ns > 0)
             Io.Timestamp.now(ioinst, .awake).nanoseconds + @as(i96, @intCast(s.budget_ns))
@@ -1344,6 +1362,17 @@ fn tSleepMs(ms: u64) void {
     Io.Timeout.sleep(.{ .duration = dur }, Io.Threaded.global_single_threaded.io()) catch {};
 }
 
+/// 有界自旋等待「任务已开工」（entered 置位是稳定态）；超时返回 false（防真失败时挂死）。
+fn waitJobEntered(entered: *const std.atomic.Value(bool)) bool {
+    const ioinst = Io.Threaded.global_single_threaded.io();
+    const deadline = Io.Timestamp.now(ioinst, .awake).nanoseconds + @as(i96, 5 * std.time.ns_per_s);
+    while (!entered.load(.acquire)) {
+        if (Io.Timestamp.now(ioinst, .awake).nanoseconds >= deadline) return false;
+        std.Thread.yield() catch {};
+    }
+    return true;
+}
+
 test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用、停机干净（确定性）" {
     // 长转探针：进入即置 entered，自旋至 stop（稳定态；不依赖 sleep/真实 tick）。
     const Probe = struct {
@@ -1358,9 +1387,11 @@ test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用
     var probe = Probe{};
     var normal = TestCtx{};
     const rt = try Runtime.init(std.heap.c_allocator, .{
-        .min_workers = 1, // id0 确定性承接首个（长转）任务
+        .min_workers = 1, // 首个（长转）任务由引导 worker 开工——但**不**假定它就是 id0
         .max_workers = 4,
-        .stall_timeout_ns = 50 * std.time.ns_per_ms, // >0 才允许停滞扫描
+        // >0 才启用定时 tick；2s 足够长，使「短任务」不会被定时扫描误杀——本用例的停滞
+        // 由下方「置旧开工时刻 + 直调 scanStalled」确定性触发，与 tick 相位无关。
+        .stall_timeout_ns = 2 * std.time.ns_per_s,
     });
     defer {
         probe.stop.store(true, .release); // 无论走到哪都先放停靠标志，防滞留
@@ -1368,7 +1399,7 @@ test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用
         rt.deinit();
     }
 
-    // 长转任务先占住 id0（min=1 时确定性只有它可接）
+    // 长转任务先开工（等 entered 稳定态），再扫出承载它的槽 id
     try testing.expect(rt.submit(.{ .run = Probe.run, .ctx = &probe }));
     // 等它真正开工（有界自旋 yield，不用 sleep / 轮询）
     {
@@ -1380,6 +1411,7 @@ test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用
         }
         try testing.expect(probe.entered.load(.acquire));
     }
+    const probe_slot = rt.firstBusySlot() orelse return error.TestUnexpectedResult;
 
     // 正常任务由扩容出的其余 worker 完成
     const n_normal: usize = 12;
@@ -1402,14 +1434,15 @@ test "runtime: §5.2 层2 停滞——长转 worker 被 detach，池继续可用
     var waiter = Waiter{ .rt = rt };
     const wth = try std.Thread.spawn(.{ .allocator = std.heap.c_allocator }, Waiter.run, .{&waiter});
 
-    // 确定性停滞：把 id0 开工时刻置为「很久以前」，**直调**扫描（不等真实 tick / sleep）。
+    // 确定性停滞：把承载长转任务的槽开工时刻置为「很久以前」，**直调**扫描（不等真实
+    // tick / sleep）。断言对象是该槽（probe_slot）而非固定 id0。
     rt.mutex.lockUncancelable(rt.io);
-    rt.started_ns[0].store(1, .monotonic);
+    rt.started_ns[probe_slot].store(1, .monotonic);
     rt.mutex.unlock(rt.io);
     rt.scanStalled();
     try testing.expectEqual(@as(usize, 1), rt.stall_count.load(.acquire));
-    try testing.expect(rt.slotStalled(0));
-    try testing.expect(!rt.exited[0].load(.acquire)); // 长转任务仍在跑，尚未自退
+    try testing.expect(rt.slotStalled(probe_slot));
+    try testing.expect(!rt.exited[probe_slot].load(.acquire)); // 长转任务仍在跑，尚未自退
 
     // 排空（probe 已被放弃、正常任务完成）→ 本线程 waitIdle 返回；join 等待者（确定性，无轮询）
     rt.waitIdle();
@@ -1502,7 +1535,9 @@ test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 wo
     const rt = try Runtime.init(std.heap.c_allocator, .{
         .min_workers = 1,
         .max_workers = 4,
-        .stall_timeout_ns = 120 * std.time.ns_per_ms,
+        // 2s：停滞由「置旧开工时刻 + 直调 scanStalled」确定性触发；超时拉长只为让 Master
+        // 的定时 tick 不掺和（否则 40ms 级短任务在 CI 高负载下可能被误判停滞）。
+        .stall_timeout_ns = 2 * std.time.ns_per_s,
     });
     defer {
         probe.stop.store(true, .release);
@@ -1510,55 +1545,56 @@ test "runtime: F3 in-use 记账——停滞 detach 后 busyCount 只算服役 wo
         rt.deinit();
     }
 
-    // id0（唯一引导 worker）先占住长转任务（确定性：min=1 时只有它能接）
+    // 长转任务先开工（等 entered 稳定态），再扫出承载它的槽 id——**不**假定是 id0：
+    // 后续为撑满池提交的任务会让 Master 补建新 worker，新 worker 同样从队头自领。
     try testing.expect(rt.submit(.{ .run = StallJob.run, .ctx = &probe }));
+    try testing.expect(waitJobEntered(&probe.entered));
+    const probe_slot = rt.firstBusySlot() orelse return error.TestUnexpectedResult;
 
     // 汇聚任务强制补建到 max_workers=4：3 个任务必须 3 个空闲 worker 才能全部开工
-    //（id0 被长转占住）→ 确定性满编，不依赖调度顺序/任务完成速度。
+    //（probe_slot 被长转占住）→ 确定性满编，不依赖调度顺序/任务完成速度。
     var started = std.atomic.Value(usize).init(0);
     var done = std.atomic.Value(u32).init(0);
     var bars: [3]BarrierJob = undefined;
     for (&bars) |*b| b.* = .{ .started = &started, .done = &done, .want = 3 };
     for (&bars) |*b| try testing.expect(rt.submit(.{ .run = BarrierJob.run, .ctx = b }));
     var grew = false;
-    for (0..2000) |_| { // 有界；确定条件：补建到 cap
-        if (rt.workerCount() == 4) {
+    for (0..2000) |_| { // 有界；确定条件：补建到 cap 且 3 个汇聚任务全部开工完工
+        if (rt.workerCount() == 4 and done.load(.acquire) == 3) {
             grew = true;
             break;
         }
         tSleepMs(2);
     }
     try testing.expect(grew);
-    rt.waitIdle();
-    try testing.expectEqual(@as(u32, 3), done.load(.acquire));
 
-    // 确定性 detach：把 id0 的开工时刻置为「很久以前」，直接触发停滞扫描
-    //（不等 120ms 真实时钟 / Master tick；扫描只认 now-started 关系）。
+    // 确定性 detach：把承载长转任务的槽开工时刻置为「很久以前」，直接触发停滞扫描
+    //（不等真实时钟 / Master tick；扫描只认 now-started 关系）。
     rt.mutex.lockUncancelable(rt.io);
-    rt.started_ns[0].store(1, .monotonic);
+    rt.started_ns[probe_slot].store(1, .monotonic);
     rt.mutex.unlock(rt.io);
     rt.scanStalled();
     try testing.expectEqual(@as(usize, 1), rt.stall_count.load(.acquire));
-    try testing.expect(rt.slotStalled(0));
-    try testing.expect(!rt.exited[0].load(.acquire)); // 长转任务仍在跑，尚未自退
+    try testing.expect(rt.slotStalled(probe_slot));
+    try testing.expect(!rt.exited[probe_slot].load(.acquire)); // 长转任务仍在跑，尚未自退
 
-    // busyCount 记账：把「已停滞的 id0」与 3 个服役槽都标 busy；stalled 槽必须被排除
-    // → 恰 3（若误计 id0 则为 4）。窗口内临时 inflight=1 使 Master 的空闲回收裁决退避。
+    // busyCount 记账：把「已停滞的 probe_slot」与其余 3 个服役槽都标 busy；stalled 槽必须被
+    // 排除 → 恰 3（若误计停滞槽则为 4）。窗口内临时 inflight=1 使 Master 的空闲回收裁决退避。
     rt.mutex.lockUncancelable(rt.io);
     rt.inflight = 1;
-    rt.reg.entries[0].state = .busy; // id0：stalled=true → 不得计入
-    rt.reg.entries[1].markBusy();
-    rt.reg.entries[2].markBusy();
-    rt.reg.entries[3].markBusy();
+    for (rt.reg.entries[0..rt.workers.items.len], 0..) |*e, id| {
+        if (id == probe_slot) {
+            e.state = .busy; // 已停滞：stalled=true → 不得计入
+        } else {
+            e.markBusy();
+        }
+    }
     rt.mutex.unlock(rt.io);
     try testing.expectEqual(@as(usize, 3), rt.busyCount());
 
     // 还原簿记（真实 worker 仍空闲等待；shutdown 会置 worker_shutdown 收尾）
     rt.mutex.lockUncancelable(rt.io);
-    rt.reg.entries[0].beginIdle(0);
-    rt.reg.entries[1].beginIdle(0);
-    rt.reg.entries[2].beginIdle(0);
-    rt.reg.entries[3].beginIdle(0);
+    for (rt.reg.entries[0..rt.workers.items.len]) |*e| e.beginIdle(0);
     rt.inflight = 0;
     rt.mutex.unlock(rt.io);
 }
@@ -1568,7 +1604,10 @@ test "runtime: F3 槽位容量恢复——停滞自返后槽复用，二次突�
     const rt = try Runtime.init(std.heap.c_allocator, .{
         .min_workers = 1,
         .max_workers = 4,
-        .stall_timeout_ns = 100 * std.time.ns_per_ms,
+        // 2s：停滞由「置旧开工时刻 + 直调 scanStalled」触发，槽复用由直调 respawnRetired
+        // 触发——判定点都是「旧线程已离开」这一稳定事实，与 tick 相位无关；超时拉长同时
+        // 保证 40ms 级短任务不会被定时扫描误杀（CI 高负载下 100ms 曾误判）。
+        .stall_timeout_ns = 2 * std.time.ns_per_s,
     });
     defer {
         probe.stop.store(true, .release);
@@ -1576,22 +1615,32 @@ test "runtime: F3 槽位容量恢复——停滞自返后槽复用，二次突�
         rt.deinit();
     }
 
-    // 与上一测试相同的前戏：id0 wedged → detach，池扩到 4（3 服役 + 1 退役）
+    // 长转任务先开工（等 entered 稳定态），再扫出承载它的槽 id（不假定是 id0）
     try testing.expect(rt.submit(.{ .run = StallJob.run, .ctx = &probe }));
+    try testing.expect(waitJobEntered(&probe.entered));
+    const probe_slot = rt.firstBusySlot() orelse return error.TestUnexpectedResult;
+
+    // 5 个短任务把池撑到 cap=4（min=1 → Master 补建），随后确定性制造停滞
     var done0 = std.atomic.Value(u32).init(0);
     var w0: [5]SleepJob = undefined;
     for (&w0) |*j| j.* = .{ .ms = 40, .done = &done0 };
     for (&w0) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
-    var stalled = false;
-    for (0..600) |_| {
-        if (rt.stall_count.load(.acquire) >= 1 and rt.workerCount() == 4) {
-            stalled = true;
+    var grew = false;
+    for (0..2000) |_| {
+        if (done0.load(.acquire) == 5 and rt.workerCount() == 4) {
+            grew = true;
             break;
         }
-        tSleepMs(10);
+        tSleepMs(2);
     }
-    try testing.expect(stalled);
-    try testing.expect(rt.slotStalled(0));
+    try testing.expect(grew);
+
+    rt.mutex.lockUncancelable(rt.io);
+    rt.started_ns[probe_slot].store(1, .monotonic);
+    rt.mutex.unlock(rt.io);
+    rt.scanStalled();
+    try testing.expectEqual(@as(usize, 1), rt.stall_count.load(.acquire));
+    try testing.expect(rt.slotStalled(probe_slot));
 
     // 满编但仅 3 服役：4 路并发无法全忙（此时忙得上限 = 3，容量已损失 1）。
     // 只断言**稳定终态**（4 个短任务全部完成）；不再轮询瞬时 busy 峰值
@@ -1602,19 +1651,23 @@ test "runtime: F3 槽位容量恢复——停滞自返后槽复用，二次突�
     for (&wb) |*j| try testing.expect(rt.submit(.{ .run = SleepJob.run, .ctx = j }));
     try testing.expect(pollDrained(rt, &doneB, 4, 400, 10));
 
-    // 放停靠标志 → wedged 线程自返（置 exited[0]）→ Master 超时 tick 复用槽（respawnInto）。
-    // 注：exited[0] 中间态可能极短（下一 tick 即被复用复位），只轮询稳定的终态——复用后
-    // stalled/exited 均为 false（复用是清这两个标志的唯一路径，此前 stalled[0] 已确认为 true）。
+    // 放停靠标志 → wedged 线程自返（置 exited）→ F3 复用该槽（respawnInto）。
+    // 先等「旧线程已离开」（exited 稳定态），再直调复用入口——不等 Master 定时 tick。
     probe.stop.store(true, .release);
-    var respawned = false;
-    for (0..600) |_| {
-        if (!rt.slotStalled(0) and !rt.exited[0].load(.acquire)) {
-            respawned = true;
+    var left = false;
+    for (0..2000) |_| {
+        if (rt.exited[probe_slot].load(.acquire)) {
+            left = true;
             break;
         }
-        tSleepMs(20);
+        tSleepMs(2);
     }
-    try testing.expect(respawned);
+    try testing.expect(left);
+    rt.respawnRetired();
+    // 复用是清 stalled/exited 的唯一路径：两者同时归零即证明槽已复活为服役 worker。
+    try testing.expect(!rt.slotStalled(probe_slot));
+    try testing.expect(!rt.exited[probe_slot].load(.acquire));
+    try testing.expectEqual(@as(usize, 4), rt.workerCount());
 
     // 容量恢复：4 个短占用任务全部完成（稳定终态）；workerCount 恢复满编。
     var doneC = std.atomic.Value(u32).init(0);
