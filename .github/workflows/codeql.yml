@@ -1,0 +1,47 @@
+# SEC-26 补充：CodeQL 代码扫描（GitHub code scanning）。
+# 与 security-audit.yml（各生态**依赖**漏洞）互补：本工作流扫描**自有代码**的
+# 数据流 / 内存安全问题，结果写入 Security → Code scanning（此前仓库无任何代码扫描）。
+#
+# 只扫 c-cpp：内存安全风险集中在 C/C++ 一侧——Zig 内核的 C ABI、app/native/platform
+# 平台桥接、app/native 各平台后端。Dart 侧由 `dart analyze lib` 覆盖、Go/.NET 由
+# govulncheck / dotnet 覆盖，且多语言全量扫描会显著拖长 CI。
+# 用 build-mode: none（无构建提取）：直接按源码做编译单元提取，避免把整个
+# Flutter/CMake/Zig 工程编一遍（本仓库原生构建链路过重）。
+#
+# 全部 GitHub Actions 依赖固定到 40 位 commit SHA（SEC-21），行尾注释标版本。
+name: Code scanning (CodeQL)
+
+on:
+  push:
+    branches: [main, ArchoeraOS]
+  pull_request:
+    branches: [main]
+  schedule:
+    # 每周一 03:23 UTC（与 security-audit 的 03:17 错开，并避开整点高峰）
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL (c-cpp)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # fork PR 的 GITHUB_TOKEN 被降级、无 security-events: write，SARIF 上传必失败：
+    # 只在非 PR 或「同仓库分支 PR」上跑，避免外部贡献者的 CI 无谓飘红。
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # job 级权限覆盖顶层：上传 SARIF 需 security-events: write；
+    # packages: read 用于拉取 CodeQL 查询包（沿用本仓库安全作业的最小授权习惯）。
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: github/codeql-action/init@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
+        with:
+          languages: c-cpp
+          build-mode: none
+      - uses: github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3

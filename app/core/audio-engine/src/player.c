@@ -682,6 +682,31 @@ static void stream_free_ring(PlayerCtx *p)
     p->stream_conv_cap_frames = 0;
 }
 
+/* 按设备格式 (dev_rate, dev_ch) 分配 ring（旧 ring 由本函数释放）。
+ * 成功返回 0 并复位读写计数；失败返回 -1 且 **p 保持原样**（旧 ring/容量不动）。
+ * ring 按 dev_ch 交错存放，容量与声道数必须和新设备一致，否则写侧按新 dch
+ * 写旧尺寸缓冲会堆越界。 */
+static int stream_ring_realloc(PlayerCtx *p, unsigned dev_rate, unsigned dev_ch)
+{
+    size_t cap_frames, cap_pow2;
+    float *nb;
+
+    if (!p || dev_rate == 0 || dev_ch == 0) return -1;
+    /* 容量 = 不小于 dev_rate * STREAM_RING_SECONDS 的 2 的幂（同 open/seek 算法） */
+    cap_frames = (size_t)((double)dev_rate * STREAM_RING_SECONDS);
+    cap_pow2 = 1;
+    while (cap_pow2 < cap_frames) cap_pow2 <<= 1;
+    nb = (float *)malloc(cap_pow2 * (size_t)dev_ch * sizeof(float));
+    if (!nb) return -1;
+    /* 先分配成功再替换：失败路径绝不留 ring==NULL 且 ring_cap==0 */
+    if (p->ring) free(p->ring);
+    p->ring = nb;
+    p->ring_cap = cap_pow2;
+    QA_STORE_REL(&p->ring_w, 0);
+    QA_STORE_REL(&p->ring_r, 0);
+    return 0;
+}
+
 /* 幂等释放流设备资源（device/ring/swr）；不释放 p（含 context）。 */
 static void stream_teardown(PlayerCtx *p)
 {
@@ -923,6 +948,9 @@ int player_stream_write(PlayerCtx *p, const float *pcm, int samples)
 {
     if (!p || !p->stream_mode || !p->stream_dev_inited) return -1;
     if (samples <= 0 || !pcm) return -1;
+    /* 防御：无 ring（分配失败/已被释放）时绝不进入写路径——下面 mask =
+       ring_cap-1 在 ring_cap==0 时会算出 SIZE_MAX，直接堆越界。 */
+    if (!p->ring || p->ring_cap == 0) return -1;
 
     const unsigned ch = p->stream_feed_ch;
     (void)ch;
@@ -1062,23 +1090,26 @@ void player_stream_seek_reset(PlayerCtx *p)
     p->stream_stall_last_r = 0;
     p->stream_stall_warned = 0;
     stream_device_stop(p);
-    stream_free_ring(p);
-    /* 重新分配空 ring（容量随设备率；seek 后解码重新喂入） */
-    {
-        size_t cap_frames = (size_t)((double)p->stream_dev_rate * STREAM_RING_SECONDS);
-        size_t cap_pow2 = 1;
-        while (cap_pow2 < cap_frames) cap_pow2 <<= 1;
-        p->ring_cap = cap_pow2;
-        p->ring = (float *)malloc(cap_pow2 * p->stream_dev_ch * sizeof(float));
-    }
-    /* seek 后喂入继续：重建 feed→设备 重采样（stream_free_ring 已释放） */
-    if (p->stream_dev_rate != p->stream_feed_rate ||
-        p->stream_dev_ch != p->stream_feed_ch) {
-        p->stream_swr = resampler_create((int)p->stream_feed_rate,
-                                          (int)p->stream_feed_ch,
-                                          AV_SAMPLE_FMT_FLT,
-                                          (int)p->stream_dev_rate,
-                                          (int)p->stream_dev_ch);
+    /* 重新分配空 ring（容量随设备率；seek 后解码重新喂入）。先 malloc 成功再
+       替换旧 ring：失败时保留旧 ring/容量并继续用（绝不留下 ring==NULL 且
+       ring_cap==0 —— 写侧 mask = ring_cap-1 会算出 SIZE_MAX 而堆越界）。 */
+    if (stream_ring_realloc(p, p->stream_dev_rate, p->stream_dev_ch) != 0) {
+        ERA_LOGE(NULL, "[player] seek 重建 ring 失败（rate=%u ch=%u），沿用旧 ring\n",
+                 p->stream_dev_rate, p->stream_dev_ch);
+    } else {
+        /* seek 后喂入继续：重建 feed→设备 重采样（等价于原先 stream_free_ring
+           一并释放 swr/conv_buf：先释放，再按格式差异按需重建）。 */
+        if (p->stream_swr) { resampler_destroy(p->stream_swr); p->stream_swr = NULL; }
+        if (p->stream_conv_buf) { free(p->stream_conv_buf); p->stream_conv_buf = NULL; }
+        p->stream_conv_cap_frames = 0;
+        if (p->stream_dev_rate != p->stream_feed_rate ||
+            p->stream_dev_ch != p->stream_feed_ch) {
+            p->stream_swr = resampler_create((int)p->stream_feed_rate,
+                                              (int)p->stream_feed_ch,
+                                              AV_SAMPLE_FMT_FLT,
+                                              (int)p->stream_dev_rate,
+                                              (int)p->stream_dev_ch);
+        }
     }
     QA_STORE_REL(&p->ring_w, 0);
     QA_STORE_REL(&p->ring_r, 0);
@@ -1093,7 +1124,7 @@ void player_stream_seek_reset(PlayerCtx *p)
  * 1 = 已切但旧缓冲被丢弃（新设备格式不同，ring 里的帧不可复用）——调用方须
  *     把管线重建到「已播放位置」，否则解码游标领先播放位置的 1~2.7s 内容会被
  *     整段跳过（起播即 0:01~0:04、进度条永远落后声音）；
- * -1 = 失败（旧设备原样保留，调用方回退）。
+ * -1 = 切换失败，旧设备已释放（当前无输出设备），调用方须重试/重启会话。
  *
  * 关键不变量：**切设备不得改变"解码游标 / 播放位置"的对应关系**。旧实现清空
  * ring 后只把位置基设为已播放点，却没把解码游标退回去，于是预解码好的那截
@@ -1212,6 +1243,17 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
             return -1; /* 设备格式字段未改动，ring/位置基保持原样 */
         }
     }
+    /* 设备格式变化时**先**按新格式重建 ring，成功后才提交 p->stream_dev_ch：
+       ring 按 dch 交错存放，若沿用旧尺寸缓冲而写侧已按新 dch 写 → 堆越界。
+       失败则宁可不切（新设备已开但未启动，直接释放），绝不留越界隐患。 */
+    if (!keep_ring && stream_ring_realloc(p, dev_rate, dev_ch) != 0) {
+        ma_device_uninit(&p->stream_device);
+        p->stream_dev_inited = 0;
+        ERA_LOGE(NULL, "[player] 流式切 sink 重建 ring 失败（rate=%u ch=%u）\n",
+                 dev_rate, dev_ch);
+        return -1;
+    }
+
     p->stream_dev_rate = dev_rate;
     p->stream_dev_ch   = dev_ch;
     p->stream_dev_ratio = (double)dev_rate / (double)p->stream_feed_rate;
@@ -1227,10 +1269,9 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
                                               AV_SAMPLE_FMT_FLT,
                                               (int)dev_rate, (int)dev_ch);
         }
-        /* 旧缓冲不可复用：清 ring，位置基对齐到已播放点（调用方负责把解码
-           游标也退回该点，见返回值 1 的约定）。 */
-        QA_STORE_REL(&p->ring_w, 0);
-        QA_STORE_REL(&p->ring_r, 0);
+        /* 旧缓冲不可复用：ring 内容与读写计数已由 stream_ring_realloc 复位；
+           位置基对齐到已播放点（调用方负责把解码游标也退回该点，见返回值 1
+           的约定）。 */
         stream_pos_base_set(p, played);
     }
 

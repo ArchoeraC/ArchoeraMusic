@@ -1308,7 +1308,9 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
                                       double pos_base);
 
 /* 播放中切 sink：先在“新设备上、暂停状态”建好播放器（带音量/续播位置、
-   不重发 playing），成功后停旧播新。失败返回 -1 且旧播放器原样保留（回退）。 */
+   不重发 playing），成功后停旧播新。失败返回 -1：非流式分支旧播放器原样保留
+   （回退）；流式分支的旧设备在换 sink 前已 stop+uninit，失败时**没有输出设备**，
+   调用方须重试/重启会话。 */
 static int mediaengine_switch_sink(ArchoeraMediaEngine *e,
                                    char *errbuf, size_t errcap)
 {
@@ -1327,7 +1329,8 @@ static int mediaengine_switch_sink(ArchoeraMediaEngine *e,
         if (rc < 0) {
             if (errbuf && errcap > 0) {
                 snprintf(errbuf, errcap,
-                    "流式切换到 sink '%s' 失败（设备消失/不支持），沿用原设备",
+                    "流式切换到 sink '%s' 失败（设备消失/不支持），"
+                    "当前无输出设备，请重试或重启会话",
                     e->sink_id[0] ? e->sink_id : "(系统默认)");
             }
             return -1;
