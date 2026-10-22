@@ -181,6 +181,9 @@ makepkg -f --skipinteg --nocheck --nodeps                      # 产出 *.pkg.ta
 
 ## 7. 常见问题排查
 
+> 构建成功后的**运行期**问题（无声 / 扫描不到 / 歌词 / 下载 / 流媒体 / 凭据库等）见
+> [疑难解答](troubleshooting.md)。本节只列构建与打包相关项。
+
 - **找不到原生库**（如 `ARCHOERA_SCANNER_FFI` / `ARCHOERA_SCRAPER_FFI` 相关报错）：说明 `native/`
   平铺库缺失或路径未命中。本地跑请先完成第 2 步再 `flutter run`；发布包内库在 `bundle/native/`。
   排查可设 `ARCHOERA_NATIVE_DIR` 指向库目录。
