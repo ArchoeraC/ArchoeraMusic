@@ -11,6 +11,7 @@
 #    重新启用：把对应生态的 open-pull-requests-limit 改回正整数（如 5）。
 #    参见 GitHub 文档 “configuration-options-for-the-dependabot.yml-file” 的
 #    open-pull-requests-limit 一节。
+#    新增生态同样默认 open-pull-requests-limit: 0；重新启用需人工逐个评估（同上）。
 #
 # 注：本仓库 Dependabot 漏洞告警（alerts）与安全更新（security updates）本身处于关闭状态；
 #     漏洞扫描由 .github/workflows/security-audit.yml（cargo audit / govulncheck /
@@ -30,7 +31,7 @@ updates:
       - dependencies
       - ci
 
-  # ── Rust（下载器 / archoerashell / transcoder / tempo-rs）──
+  # ── Rust（下载器 / archoerashell / transcoder / tempo-rs / vault-rs）──
   - package-ecosystem: cargo
     directory: /app/core/downloader
     schedule:
@@ -51,6 +52,13 @@ updates:
     labels: [dependencies, rust]
   - package-ecosystem: cargo
     directory: /app/core/audio-engine/tempo-rs
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
+    labels: [dependencies, rust]
+  # vault-rs：凭据保险库（最高安全等级，此前遗漏；与 security-audit.yml 一致）
+  - package-ecosystem: cargo
+    directory: /app/core/vault-rs
     schedule:
       interval: weekly
     open-pull-requests-limit: 0 # 停用版本更新（见文件头）
@@ -86,3 +94,17 @@ updates:
       interval: weekly
     open-pull-requests-limit: 0 # 停用版本更新（见文件头）
     labels: [dependencies, flutter]
+
+  # ── Node（app/eta-tools 下的图标/标记生成脚本，各自独立 package.json）──
+  - package-ecosystem: npm
+    directory: /app/eta-tools/eta_icons
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
+    labels: [dependencies, npm]
+  - package-ecosystem: npm
+    directory: /app/eta-tools/eta_mark
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
+    labels: [dependencies, npm]
