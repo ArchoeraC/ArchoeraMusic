@@ -7,9 +7,11 @@
 #   - include/miniaudio.h     miniaudio v0.11.25（MIT-0 / public domain）
 #
 # 注意：CodeQL 的 paths-ignore 对**被 src/*.c #include 的头文件**不生效
-# （头文件内容随源文件一起被提取）。因此 miniaudio.h 不能靠这里排除，
-# 它的整数乘法告警在 2026-10-27 按 `won't fix` 逐条 dismiss；升级
-# miniaudio 后需复核是否出现新告警。stb_vorbis.c 是独立编译单元，可正常排除。
+# （头文件内容随源文件一起被提取）。因此 miniaudio.h 不能靠这里排除：
+# 它的整数乘法告警在 2026-10-27 按 `won't fix` 逐条 dismiss，并在
+# `.github/codeql/filter_sarif.py` 中按 SARIF 路径过滤后再上传，避免
+# 后续扫描重复产生；升级 miniaudio 后需复核是否出现新告警。
+# stb_vorbis.c 是独立编译单元，可正常排除。
 #
 # 自研代码（src/*.c、kernel/*.zig、app/native/**）仍全量扫描；不要为了
 # 「清零告警」把 src/ 或 app/native/ 加进 paths-ignore。
