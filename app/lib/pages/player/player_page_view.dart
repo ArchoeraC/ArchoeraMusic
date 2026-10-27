@@ -21,7 +21,7 @@ extension _PlayerPageView on _PlayerPageState {
     final subtitle =
         ref.watch(playbackProvider.select((s) => s.subtitle)) ?? '';
     final quality = ref.watch(playbackProvider.select((s) => s.quality));
-    // 可选档位（KG hash / Neko maxQuality 等差异由 _availableLevels 封装）。
+    // 可选档位（如 KG hash 的差异由 _availableLevels 封装）。
     final qualityLevels = _availableLevels(current);
     final buffering = ref.watch(playbackProvider.select((s) => s.buffering));
     final playing = ref.watch(playbackProvider.select((s) => s.playing));
@@ -324,7 +324,7 @@ class _PlayerTopBar extends StatelessWidget {
           ),
           const Spacer(),
           const _SleepTimerButton(),
-          // 当前曲目可切音质档位（Neko 自可选音质流起同样支持）。
+          // 当前曲目可切音质档位。
           if (current != null)
             QualityMenu(
               levels: qualityLevels,

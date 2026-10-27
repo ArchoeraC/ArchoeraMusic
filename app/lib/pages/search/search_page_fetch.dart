@@ -111,7 +111,7 @@ extension _SearchPageFetch on _SearchPageState {
 
   /// 单个平台搜索单曲：游标与分页差异由注册表适配器封装（[loaded] = 该平台
   /// 已累计条数，append 时据此取下一页；netease 用 offset，kugou/qqmusic 用
-  /// page，neko 无分页）。
+  /// page）。
   Future<SearchResult<Track>> _searchSongsFrom(
     String platform, {
     required bool append,
@@ -268,7 +268,7 @@ extension _SearchPageFetch on _SearchPageState {
 
   /// 单个平台专辑/歌手/歌单下一页（[loaded] = 该平台已累计条数）。
   ///
-  /// 分页游标、KG 分类参数、QQ 歌手单页上限、Neko 无分页等差异均由注册表
+  /// 分页游标、KG 分类参数、QQ 歌手单页上限等差异均由注册表
   /// 适配器封装（见 [SourcePlatform.searchCover]）。
   Future<SearchResult<CoverItem>> _searchCoversFrom(
     String platform, {

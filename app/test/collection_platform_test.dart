@@ -14,8 +14,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/services/kugou/kugou_api.dart';
-import 'package:archoera_music/services/neko/neko_api.dart';
-import 'package:archoera_music/services/neko/neko_types.dart';
 import 'package:archoera_music/services/netease/apis_netease_caller.dart';
 import 'package:archoera_music/services/netease/netease_api.dart';
 import 'package:archoera_music/services/netease/track.dart';
@@ -28,7 +26,7 @@ void main() {
   final l10n = lookupAppLocalizations(const Locale('zh'));
 
   test('已注册平台与未注册回退 NT', () {
-    for (final s in const ['netease', 'kugou', 'qqmusic', 'neko']) {
+    for (final s in const ['netease', 'kugou', 'qqmusic']) {
       expect(collectionPlatform(s).source, s, reason: '$s 未注册或错位');
     }
     expect(collectionPlatform('streaming').source, 'netease');
@@ -52,13 +50,8 @@ void main() {
       'collectedPlaylist',
       'liked',
     ]);
-    expect(collectionPlatform('neko').tabIds, [
-      'created',
-      'collectedPlaylist',
-      'liked',
-    ]);
 
-    for (final s in const ['netease', 'kugou', 'qqmusic', 'neko']) {
+    for (final s in const ['netease', 'kugou', 'qqmusic']) {
       final p = collectionPlatform(s);
       expect(p.tabs(l10n).map((t) => t.id).toList(), p.tabIds);
       expect(p.tabIds.contains(p.defaultTabId), isTrue);
@@ -69,7 +62,6 @@ void main() {
   test('红心键归一（KG 小写 hash / 其余 id）', () {
     Track t(String source) => Track(id: 'AbC', title: 'x', source: source);
     expect(collectionPlatform('netease').likeKey(t('netease')), 'AbC');
-    expect(collectionPlatform('neko').likeKey(t('neko')), 'AbC');
     expect(collectionPlatform('kugou').likeKey(t('kugou')), 'abc');
     expect(collectionPlatform('qqmusic').likeKey(t('qqmusic')), 'AbC');
   });
@@ -77,7 +69,7 @@ void main() {
   test('本机库 / 对账能力位', () {
     expect(collectionPlatform('qqmusic').localLikedStore, isTrue);
     expect(collectionPlatform('qqmusic').reconcileLiked, isFalse);
-    for (final s in const ['netease', 'kugou', 'neko']) {
+    for (final s in const ['netease', 'kugou']) {
       expect(collectionPlatform(s).localLikedStore, isFalse);
       expect(collectionPlatform(s).reconcileLiked, isTrue);
     }
@@ -95,7 +87,6 @@ void main() {
         neteaseAuthProvider.overrideWith(_FakeNeteaseAuth.new),
         kugouApiProvider.overrideWith((ref) => _FakeKugouApi()),
         qqMusicApiProvider.overrideWith((ref) => _FakeQqMusicApi()),
-        nekoApiProvider.overrideWith((ref) => _FakeNekoApi()),
       ],
     );
     addTearDown(container.dispose);
@@ -113,13 +104,6 @@ void main() {
     expect(kg['kugou.created']!.single.title, 'c1');
     expect(kg['kugou.collectedPlaylist']!.single.title, 'p1');
     expect(kg['kugou.collectedAlbum']!.single.title, 'a1');
-
-    final nk = await collectionPlatform('neko')
-        .fetchFavorites(container, 'created');
-    expect(nk['neko.created'], isA<List<CoverItem>>());
-    expect(nk['neko.created']!.single.title, 'n1');
-    expect(nk['neko.collectedPlaylist']!.single.title, 'n2');
-    expect(nk['neko.liked']!.single.title, '我喜欢');
 
     final qq = await collectionPlatform('qqmusic')
         .fetchFavorites(container, 'created');
@@ -189,20 +173,6 @@ class _FakeKugouApi extends KugouApi {
       ],
     );
   }
-}
-
-class _FakeNekoApi extends NekoApi {
-  @override
-  Future<NekoUserLibrary> userLibrary() async {
-    return const NekoUserLibrary(
-      createdPlaylists: [NekoPlaylist(id: 'n1', name: 'n1')],
-      collectedPlaylists: [NekoPlaylist(id: 'n2', name: 'n2')],
-      isVip: false,
-    );
-  }
-
-  @override
-  Future<Set<String>> likedIds() async => {'n1'};
 }
 
 class _FakeQqMusicApi extends QqMusicApi {

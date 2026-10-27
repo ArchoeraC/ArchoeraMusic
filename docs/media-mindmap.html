@@ -57,7 +57,7 @@
       <div class="node"><span class="k">① 播放（内核 EraAudio）</span></div>
       <ul class="tree">
         <li><div class="node"><span class="d">Dart 编排</span>：PlaybackNotifier · <code>resolvePlaySource</code>
-          <span class="tag">SourcePlatform 注册表：NT/KG/QQ/Neko/local/streaming</span></div></li>
+          <span class="tag">SourcePlatform 注册表：NT/KG/QQ/local/streaming</span></div></li>
         <li><div class="node"><span class="d">C 壳</span> <code>pipeline.c</code>：会话 · PCM 落盘或内存 · miniaudio 自播 · 事件 FIFO</div></li>
         <li><div class="node"><span class="d">传输</span>：本地路径 · <code>mem</code>（SegStore 内存源） · <code>cb</code>（宿主 AVIO） · <b>原生 HTTP(S)</b>（<code>kernel/net.zig</code>，在线直链优先）
           <span class="tag">宿主注入为回退基线</span></div></li>

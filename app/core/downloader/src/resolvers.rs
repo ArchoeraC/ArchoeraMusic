@@ -37,7 +37,7 @@ use crate::models::*;
 /// 音源 URL 解析器：把 enqueue 请求解析为可下载 URL。
 ///
 /// 只有**具备 Rust 自研解析**的音源才实现本 trait；直传/预解析音源
-/// （QQ、Neko、Streaming、未来未知音源）不在注册表中，调用方据此走
+/// （QQ、Streaming、未来未知音源）不在注册表中，调用方据此走
 /// Dart 播放管线预解析 URL 回退（§12.1），行为与历史一致。
 pub trait SourceResolver: Send + Sync {
     /// 解析可下载 URL；[cancel] 为任务取消标志（解析阶段也响应取消）。
@@ -66,7 +66,7 @@ static NETEASE_RESOLVER: NeteaseResolver = NeteaseResolver;
 /// ② 在 [resolver_for_platform] 加一条匹配。业务侧无需改动中央 match。
 ///
 /// - Kugou / Netease → `Some(..)`
-/// - Qqmusic / Neko / Streaming 及未来未知音源 → `None`（行为不变）
+/// - Qqmusic / Streaming 及未来未知音源 → `None`（行为不变）
 pub fn resolver_for(source: &str) -> Option<&'static dyn SourceResolver> {
     resolver_for_platform(SourcePlatform::from_wire(source))
 }
@@ -76,11 +76,8 @@ pub fn resolver_for_platform(source: SourcePlatform) -> Option<&'static dyn Sour
     match source {
         SourcePlatform::Kugou => Some(&KUGOU_RESOLVER),
         SourcePlatform::Netease => Some(&NETEASE_RESOLVER),
-        // QQ / Neko / Streaming / 未知：Rust 无自研解析 → Dart 预解析直链。
-        SourcePlatform::Qqmusic
-        | SourcePlatform::Neko
-        | SourcePlatform::Streaming
-        | SourcePlatform::Unknown => None,
+        // QQ / Streaming / 未知：Rust 无自研解析 → Dart 预解析直链。
+        SourcePlatform::Qqmusic | SourcePlatform::Streaming | SourcePlatform::Unknown => None,
     }
 }
 
@@ -878,7 +875,7 @@ mod tests {
     #[test]
     fn registry_returns_none_for_preresolved_and_unknown() {
         // 预解析/直链音源：无自研解析 → None（走 Dart 预解析 URL）。
-        for s in ["qqmusic", "neko", "streaming"] {
+        for s in ["qqmusic", "streaming"] {
             assert!(resolver_for(s).is_none(), "source={s} 应无注册解析器");
             assert!(resolver_for_platform(SourcePlatform::from_wire(s)).is_none());
         }

@@ -185,7 +185,7 @@ class _CommentInputBar extends StatelessWidget {
   final AppLocalizations l10n;
   final Future<void> Function() onSend;
 
-  /// 非空 = 正在回复该用户（顶部显示「回复 @昵称」条；仅 NK 传值）。
+  /// 非空 = 正在回复该用户（顶部显示「回复 @昵称」条）。
   final String? replyToName;
   final VoidCallback? onCancelReply;
 
@@ -325,13 +325,13 @@ class _CommentTile extends StatelessWidget {
 
   final NeteaseComment comment;
 
-  /// 回复回调；null = 隐藏回复入口（非 NK）。
+  /// 回复回调；null = 隐藏回复入口。
   final void Function(NeteaseComment)? onReply;
 
-  /// 删除回调；null = 隐藏删除入口（非 NK）；单个条目还须 [NeteaseComment.canDelete]。
+  /// 删除回调；null = 隐藏删除入口；单个条目还须 [NeteaseComment.canDelete]。
   final void Function(NeteaseComment)? onDelete;
 
-  /// true（仅 NK）= 展开全部楼内回复并带操作；false = 只展示第一条引用（旧样式）。
+  /// true = 展开全部楼内回复并带操作；false = 只展示第一条引用（旧样式）。
   final bool renderReplies;
 
   @override
@@ -451,7 +451,7 @@ class _CommentTile extends StatelessWidget {
   }
 }
 
-/// 楼内回复条目（NK 展开样式；含回复 / 删除入口）。
+/// 楼内回复条目（展开样式；含回复 / 删除入口）。
 class _ReplyTile extends StatelessWidget {
   const _ReplyTile({required this.reply, this.onReply, this.onDelete});
 

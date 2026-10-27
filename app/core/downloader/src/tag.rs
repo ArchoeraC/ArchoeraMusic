@@ -175,7 +175,7 @@ pub fn write_tags(path: &Path, content: &TagContent) -> Result<(), String> {
 
         // 内置：删除全部广告/推广类标签项（**全音源通用**）。即使本次没有可写
         // 歌词，也会把源文件夹带的广告歌词/COMMENT/LABEL/PUBLISHER 等删掉
-        // （如 Neko 直传文件的「资源来自Neko云音乐…」）。图片项 text() 为 None，
+        // （如直传文件里的「资源来自某云音乐…」）。图片项 text() 为 None，
         // 不受影响。
         let ad_keys: Vec<ItemKey> = tag
             .items()
@@ -353,7 +353,7 @@ mod tests {
 
     /// 端到端：源文件夹带广告 LYRICS/COMMENT/LABEL/PUBLISHER 时，write_tags
     /// 必须把这些广告项删除（内置全音源清洗）。
-    /// 用法：TAG_TEST_FILE=/path/to/neko.flac cargo test ads -- --ignored --nocapture
+    /// 用法：TAG_TEST_FILE=/path/to/sample.flac cargo test ads -- --ignored --nocapture
     #[test]
     #[ignore]
     fn e2e_strip_ad_tags_on_real_file() {

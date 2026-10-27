@@ -63,7 +63,7 @@ class LikedStore extends ChangeNotifier {
   /// 平台加载错误（无缓存时的失败信息）。
   String error(String platform) => _state(platform).error;
 
-  /// 当前平台登录用户 key（NT uid / KG userid / NK userId），缓存键。
+  /// 当前平台登录用户 key（如 NT uid / KG userid），缓存键。
   String? _userKey(String platform) =>
       collectionPlatform(platform).likedUserKey(_ref);
 
@@ -227,8 +227,8 @@ class LikedStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 全量拉取当前平台收藏（由注册表适配器提供：KG likedTracks / NT likedSongs /
-  /// NK likedTracks，均为循环翻页拉满）。
+  /// 全量拉取当前平台收藏（由注册表适配器提供：KG likedTracks / NT likedSongs
+  /// 等，均为循环翻页拉满）。
   Future<List<Track>> _fetchAll(String platform) =>
       collectionPlatform(platform).fetchLikedTracks(_ref);
 }
