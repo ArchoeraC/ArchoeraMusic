@@ -51,13 +51,13 @@ final navSearchQueryProvider =
       ShellPageSelection<String>.new,
     );
 
-/// 「我喜欢」页当前来源平台：'netease' / 'kugou' / 'qqmusic' / 'neko'。
+/// 「我喜欢」页当前来源平台：'netease' / 'kugou' / 'qqmusic'。
 final likedPlatformProvider =
     NotifierProvider<ShellPageSelection<String>, String?>(
       ShellPageSelection<String>.new,
     );
 
-/// 「收藏」页当前来源平台：'netease' / 'kugou' / 'qqmusic' / 'neko'。
+/// 「收藏」页当前来源平台：'netease' / 'kugou' / 'qqmusic'。
 final favoritesPlatformProvider =
     NotifierProvider<ShellPageSelection<String>, String?>(
       ShellPageSelection<String>.new,
@@ -77,12 +77,6 @@ final favoritesKugouTabProvider =
 
 /// 「收藏」页 QM 分类 Tab（`_QqTab.name`）。
 final favoritesQqTabProvider =
-    NotifierProvider<ShellPageSelection<String>, String?>(
-      ShellPageSelection<String>.new,
-    );
-
-/// 「收藏」页 Neko 分类 Tab（`_NekoTab.name`）。
-final favoritesNekoTabProvider =
     NotifierProvider<ShellPageSelection<String>, String?>(
       ShellPageSelection<String>.new,
     );

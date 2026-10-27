@@ -149,9 +149,7 @@ void decoder_apply_http_headers(AVDictionary **opts, const char *headers)
     char ua[256] = {0};
     /* 是否显式提供了 User-Agent（即使值为空）：空值也要设进 user_agent，
      * 否则 FFmpeg http 会用默认 `Lavf/…`（会被按客户端区分的服务端拦截）。
-     * NekoMusic 源会带非空客户端 UA——诚实自报 `ArchoeraMusic/<版本>`，或在
-     * 服务端不认自报标识时回退为官方桌面 UA 形状（见
-     * lib/services/neko/neko_identity.dart）；不再使用已拆除的「空 UA 放行」。 */
+     * 在线源的客户端 UA 由宿主按源注入；不再使用已拆除的「空 UA 放行」。 */
     int has_ua = 0;
     char extra[1024] = {0};
     const char *cur = headers;
@@ -206,7 +204,7 @@ Decoder* decoder_open_headers(const char *url, const char *headers)
     av_dict_set(&fmt_opts, "probesize", "1048576", 0);
     /* 分析时长 0.5 秒足够（默认 5 秒，对大文件导致首帧延迟数秒） */
     av_dict_set(&fmt_opts, "analyzeduration", "500000", 0);
-    /* 按源注入客户端标识头（如 NekoMusic；FFmpeg http 仅认 user_agent/headers）。 */
+    /* 按源注入客户端标识头（FFmpeg http 仅认 user_agent/headers）。 */
     decoder_apply_http_headers(&fmt_opts, headers);
     int ret = avformat_open_input(&d->fmt_ctx, url, NULL, &fmt_opts);
     av_dict_free(&fmt_opts);

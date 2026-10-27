@@ -201,9 +201,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     super.dispose();
   }
 
-  /// 当前曲目可选的音质档（**由音源注册表裁剪**）：KG 按品质 hash、Neko 按
-  /// `maxQuality`、其余源全档；差异全部封装在 [SourcePlatform.availableQualities]
-  /// 及其异步 `maxQualityProvider` 内。
+  /// 当前曲目可选的音质档（**由音源注册表裁剪**）：KG 按品质 hash、其余源全档；
+  /// 差异全部封装在 [SourcePlatform.availableQualities] 及其异步
+  /// `maxQualityProvider` 内。
   List<String> _availableLevels(Track? track) {
     if (track == null) return const ['hq'];
     final platform = sourcePlatform(track.source);
