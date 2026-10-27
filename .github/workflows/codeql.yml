@@ -65,4 +65,6 @@ jobs:
       - uses: github/codeql-action/upload-sarif@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
         with:
           sarif_file: ${{ runner.temp }}/codeql-results
-          category: "/language:c-cpp"
+          # 必须与 analyze 的默认 category 一致（分析键 = workflow 路径:job id），
+          # 否则会被当成另一套分析，历史告警不会随“结果消失”转为 fixed。
+          category: ".github/workflows/codeql.yml:analyze"
