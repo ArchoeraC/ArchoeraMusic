@@ -13,8 +13,8 @@ extension _SongRowView on _SongRowState {
     final primary = theme.colorScheme.primary;
     // 强迫症预设：列表标签与副标题显示开关（对齐原项目 preset）
     final prefs = ref.watch(appPrefsProvider);
-    // 音质角标：同步源（KG/QQ/NT）由元数据推断；异步源（Neko）经注册表
-    // provider 取 `maxQuality`（按 id 缓存，滚动不重发；并发受限）。
+    // 音质角标：同步源（KG/QQ/NT）由元数据推断；异步源经注册表 provider
+    // 取 `maxQuality`（按 id 缓存，滚动不重发；并发受限）。
     final maxAsync = sourcePlatform(item.source).maxQualityProvider(item);
     final maxQuality = maxAsync == null
         ? null
@@ -533,7 +533,7 @@ class _SourceBadge extends StatelessWidget {
 }
 
 /// 可用最高音质标签（label + 是否无损档）：由「音源注册表」适配器按来源给出
-/// （KG hash 链 / QQ 文件大小 / Neko 服务端 `maxQuality` / 其余按
+/// （KG hash 链 / QQ 文件大小 / 其余按
 /// [Track.quality] 反推）。返回 null 表示无可用信息（列表不显示音质标签）。
 ({String label, bool lossless})? _bestQuality(
   Track t,

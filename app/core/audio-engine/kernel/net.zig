@@ -342,7 +342,7 @@ pub const HttpStream = struct {
     url_scratch: std.ArrayList(u8),
 
     /// 额外请求头（owned；`\n` 或 `\r\n` 分行，可空）。随重定向原样重发。
-    /// 由宿主按源注入（如 NekoMusic 的 `X-Neko-Client` / `User-Agent`）。
+    /// 由宿主按源注入（如 `User-Agent` 等客户端标识）。
     headers: []u8,
 
     /// 初始 URL 是否为本机 / 私网主机（SEC-12：决定重定向到内网是否放行）。
@@ -809,7 +809,7 @@ pub const HttpStream = struct {
     }
 
     /// 写 HTTP/1.1 GET 请求。内置最小必备头（Host/Accept/Range/Connection），
-    /// 另有 [extra]（`\n` 或 `\r\n` 分行的附加头，如 `X-Neko-Client` / `User-Agent`）。
+    /// 另有 [extra]（`\n` 或 `\r\n` 分行的附加头，如 `User-Agent`）。
     /// 若 [extra] 已自带 `User-Agent`，则不再追加内置默认 UA（避免双 UA）。
     fn writeRequest(
         w: *Io.Writer,
@@ -1301,10 +1301,10 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
         target = it.next() orelse "/";
     }
 
-    // 头（收集 Range / X-Neko-Client / 首个空行结束）
+    // 头（收集 Range / 自定义测试头 / 首个空行结束）
     var range_start: u64 = 0;
     var has_range = false;
-    var neko_header: []const u8 = "";
+    var test_header: []const u8 = "";
     while (true) {
         const raw = r.takeDelimiterInclusive('\n') catch return;
         if (raw.len <= 2) break; // "\r\n"
@@ -1318,8 +1318,8 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
             const dash = std.mem.indexOfScalarPos(u8, value, eq + 1, '-') orelse continue;
             range_start = std.fmt.parseInt(u64, value[eq + 1 .. dash], 10) catch 0;
             has_range = true;
-        } else if (std.ascii.eqlIgnoreCase(name, "x-neko-client")) {
-            neko_header = value;
+        } else if (std.ascii.eqlIgnoreCase(name, "x-test-client")) {
+            test_header = value;
         }
     }
 
@@ -1333,12 +1333,12 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
         return;
     }
 
-    // 自定义请求头回显：以收到的 X-Neko-Client 值作为正文（供请求头测试断言）。
+    // 自定义请求头回显：以收到的 X-Test-Client 值作为正文（供请求头测试断言）。
     if (std.mem.eql(u8, target, "/echoheader")) {
         var echo_hdr: [128]u8 = undefined;
-        const hs_echo = std.fmt.bufPrint(&echo_hdr, "HTTP/1.1 200 OK\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n", .{neko_header.len}) catch return;
+        const hs_echo = std.fmt.bufPrint(&echo_hdr, "HTTP/1.1 200 OK\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n", .{test_header.len}) catch return;
         w.writeAll(hs_echo) catch return;
-        w.writeAll(neko_header) catch return;
+        w.writeAll(test_header) catch return;
         w.flush() catch {};
         return;
     }
@@ -1470,7 +1470,7 @@ test "HttpStream: 顺序读取 + sizeHint" {
     try testing.expectEqualSlices(u8, payload, got);
 }
 
-test "HttpStream: 自定义请求头随请求发送（X-Neko-Client）" {
+test "HttpStream: 自定义请求头随请求发送（X-Test-Client）" {
     const payload = try makeTestPayload(testing.allocator, 16);
     defer testing.allocator.free(payload);
     const ts = try TestServer.start(payload);
@@ -1481,7 +1481,7 @@ test "HttpStream: 自定义请求头随请求发送（X-Neko-Client）" {
 
     // 测试夹具仅需一个可辨识的值（真实版本由宿主按 ArchoeraMusic 版本注入）。
     const hs = try HttpStream.openWith(testing.allocator, url, .{
-        .headers = "X-Neko-Client: test-client\r\nUser-Agent: test-agent",
+        .headers = "X-Test-Client: test-client\r\nUser-Agent: test-agent",
     });
     defer hs.close();
 

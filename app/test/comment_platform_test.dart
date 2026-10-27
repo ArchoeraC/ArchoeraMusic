@@ -16,7 +16,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('已注册平台：source 与适配器一一对应', () {
-    for (final s in ['netease', 'kugou', 'qqmusic', 'neko']) {
+    for (final s in ['netease', 'kugou', 'qqmusic']) {
       expect(commentPlatformFor(s).source, s, reason: '$s 未注册或错位');
     }
   });
@@ -37,13 +37,6 @@ void main() {
     final qq = commentPlatformFor('qqmusic');
     expect(qq.supportsHot, isTrue);
     expect(qq.supportsSend, isFalse);
-
-    final nk = commentPlatformFor('neko');
-    expect(nk.supportsHot, isFalse);
-    expect(nk.supportsSend, isTrue);
-    expect(nk.supportsReply, isTrue);
-    expect(nk.supportsDelete, isTrue);
-    expect(nk.expandsReplies, isTrue);
   });
 
   test('未注册源回退 NT（历史行为：异源走 NT 云搜索匹配）', () {

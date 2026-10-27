@@ -5,7 +5,7 @@
 /// 下载能力注册表。
 ///
 /// 下载器先前按 `track.source` 写死分支（回退来源集合、请求 headers、
-/// 扩展名推断、kugou extra、neko 探测）。现统一收敛到本文件的
+/// 扩展名推断、kugou extra）。现统一收敛到本文件的
 /// [DownloadPlatform] 接口：**新增音源 = 实现一个适配器并放进 [_all]**，
 /// 控制器与请求构造不再出现具体平台分支。
 ///
@@ -18,7 +18,6 @@ library;
 
 import '../netease/track.dart';
 import '../../apis/runtime.dart';
-import '../../stores/providers.dart';
 
 /// 单个音源的下载能力适配器。
 abstract class DownloadPlatform {
@@ -57,8 +56,8 @@ abstract class DownloadPlatform {
   /// 同步扩展名覆盖（已知格式时直接给定；默认 null 走通用推断）。
   String? fileExtensionOverride(Track track, String quality) => null;
 
-  /// 异步探测扩展名（直链无扩展名的源，如 Neko 按文件头魔数嗅探）；
-  /// 默认 null（调用方回退通用推断）。[quality] 与取流档位一致（Neko 不同档
+  /// 异步探测扩展名（直链无扩展名时按文件头魔数嗅探）；
+  /// 默认 null（调用方回退通用推断）。[quality] 与取流档位一致（不同档
   /// 位容器可能不同：转码档为 MP3，原始档可能为 FLAC）。
   Future<String?> probeExtension(
     dynamic ref,
@@ -138,7 +137,6 @@ final List<DownloadPlatform> _all = [
   _NeteaseDownloadPlatform(),
   _KugouDownloadPlatform(),
   _QqMusicDownloadPlatform(),
-  _NekoDownloadPlatform(),
   _StreamingDownloadPlatform(),
 ];
 
@@ -224,56 +222,6 @@ class _QqMusicDownloadPlatform extends DownloadPlatform {
     }
     return headers;
   }
-}
-
-// ── Neko（实验性音源） ───────────────────────────────────────────────────
-
-class _NekoDownloadPlatform extends DownloadPlatform {
-  @override
-  String get source => 'neko';
-
-  @override
-  bool get nativeResolver => false;
-
-  @override
-  Future<String?> probeExtension(
-    dynamic ref,
-    Track track, {
-    String quality = 'hq',
-  }) async {
-    // Neko 直链无扩展名：按文件头魔数嗅探真实容器（对齐官方 PC 客户端），
-    // 且与所选音质同档（standard/hq 为转码 MP3，sq/hires 为原始容器）。
-    try {
-      return await ref
-          .read(nekoApiProvider)
-          .probeAudioExtension(track.id, quality: quality);
-    } catch (_) {
-      // 探测失败回退通用扩展名推断
-      return null;
-    }
-  }
-
-  @override
-  String qualityKey(String quality, String ext) {
-    // Neko：standard/hq 为服务端转码 MP3；sq/hires 为原始音源，容器可能是
-    // FLAC/WAV/OGG/M4A（以探测为准）。仅用于下载任务 actualQuality 展示。
-    if (ext == 'mp3') return quality == 'lq' ? '128k' : '320k';
-    return quality == 'hi-res' ? 'flac24bit' : 'flac';
-  }
-
-  @override
-  String resolveExtension(
-    Track track, {
-    required String url,
-    required String quality,
-    String? probed,
-  }) =>
-      // 跳过 `_extFromCodec`：Neko 入队前元数据可能被其它音源重写
-      //（`neko_metadata` 会带上匹配源的 codec），用它推断会与实际容器错配。
-      fileExtensionOverride(track, quality) ??
-      probed ??
-      DownloadPlatform._extFromUrl(url) ??
-      ((quality == 'lossless' || quality == 'hi-res') ? 'flac' : 'mp3');
 }
 
 // ── Streaming（Subsonic / Jellyfin） ────────────────────────────────────

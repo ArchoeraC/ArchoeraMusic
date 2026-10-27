@@ -7,7 +7,7 @@
 /// 启动最早处调用 [loadAppVersion] 读取一次并缓存。对外两个版本视图：
 /// - [appVersion]：完整版本（含 `+构建号`，如 `0.9.20+5`），供设置页展示；
 /// - [clientVersion]：**语义版本**（截断 `+构建号`，如 `0.9.20`），供客户端标识
-///   （NekoMusic 的 UA / `X-Neko-Client`，见 `services/neko/neko_identity.dart`）。
+///   用于客户端 User-Agent / 版本标识。
 ///
 /// 实现走 `rootBundle` 读取内置的 `pubspec.yaml`（与设置页「版本」同源），**不使用
 /// `package_info_plus` 等平台插件**——本项目禁止 Dart 直接调平台 API（见 AGENTS.md

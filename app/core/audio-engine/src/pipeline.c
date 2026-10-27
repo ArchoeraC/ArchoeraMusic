@@ -312,7 +312,7 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
     av_dict_set(&opts, "reconnect_streamed", "1", 0);
     av_dict_set(&opts, "reconnect_max_retries", "3", 0);
     av_dict_set(&opts, "reconnect_delay_max", "5", 0);
-    /* 按源注入客户端标识头（如 NekoMusic）；FFmpeg http 仅认这些选项。 */
+    /* 按源注入客户端标识头；FFmpeg http 仅认这些选项。 */
     decoder_apply_http_headers(&opts, p->headers);
     int oret = avio_open2(&cb->avio, url, AVIO_FLAG_READ, &cb->interrupt, &opts);
     av_dict_free(&opts);
