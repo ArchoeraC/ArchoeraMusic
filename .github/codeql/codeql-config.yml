@@ -1,0 +1,16 @@
+# ArchoeraMusic CodeQL 配置（c-cpp）
+#
+# 排除随源码引入（vendored）的第三方单文件库：它们由上游维护，安全修复
+# 走「升级到上游新版本」而不是在本仓库逐条改动；纳入扫描会在 Security 页
+# 持续产生与业务代码无关的噪音（2026-10-22 首次扫描 44 条中占 36 条）。
+#
+#   - include/miniaudio.h        miniaudio v0.11.25（含内嵌 dr_wav/dr_flac/
+#                                dr_mp3/stb_vorbis，MIT-0 / public domain）
+#   - kernel/c/stb_vorbis.c      stb_vorbis v1.22（public domain）
+#
+# 自研代码（src/*.c、kernel/*.zig、app/native/**）仍全量扫描；不要为了
+# 「清零告警」把 src/ 或 app/native/ 加进来。
+name: ArchoeraMusic CodeQL config
+paths-ignore:
+  - app/core/audio-engine/include/miniaudio.h
+  - app/core/audio-engine/kernel/c/stb_vorbis.c

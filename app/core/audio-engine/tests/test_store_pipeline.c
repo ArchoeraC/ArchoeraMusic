@@ -102,6 +102,18 @@ int main(int argc, char **argv)
     cfg.output_channels = 2;
     cfg.engine_mode = 0;       /* Stable=FFmpeg：磁盘/Store 两路同为 FFmpeg 对拍 */
 
+    /* 防守回归：非法输出声道数应在打开解码器前被拒绝（声道数参与
+     * 「帧数 × 声道 × 4」的缓冲尺寸计算，越界值可能整型溢出）。 */
+    EngineConfig bad = cfg;
+    bad.output_channels = 0;
+    AudioPipeline *pb = pipeline_create(file, &bad, dummy_output, NULL);
+    CHECK(pb == NULL, "非法声道数 0 被拒绝");
+    if (pb) pipeline_destroy(pb);
+    bad.output_channels = 9;
+    pb = pipeline_create(file, &bad, dummy_output, NULL);
+    CHECK(pb == NULL, "非法声道数 9 被拒绝");
+    if (pb) pipeline_destroy(pb);
+
     AudioPipeline *pd = pipeline_create(file, &cfg, dummy_output, NULL);
     CHECK(pd != NULL, "pipeline_create（磁盘路径）打开");
     AudioPipeline *ps = pipeline_create_store(st, &cfg, dummy_output, NULL);
