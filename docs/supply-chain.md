@@ -99,11 +99,12 @@
   `cpp/*` 告警。其中 **36 条位于 vendored 第三方库**：`kernel/c/stb_vorbis.c` 的
   1 条指针溢出检查由 `.github/codeql/codeql-config.yml` 的 `paths-ignore` 排除并
   自动转为 fixed；`include/miniaudio.h` 的 35 条整数乘法提升**无法用路径过滤排除**
-  （CodeQL 对 `#include` 进 `src/*.c` 的头文件不生效），已按 `won't fix` 逐条
-  dismiss，并在 `.github/codeql/filter_sarif.py` 中于上传前按 SARIF 主位置路径
-  剔除，避免后续扫描重复刷屏；`upload-sarif` 的 `category` 必须与 analyze
+  （CodeQL 对 `#include` 进 `src/*.c` 的头文件不生效），曾按 `won't fix` 逐条
+  dismiss，后按「不保留 dismiss」要求 reopen，并在 `.github/codeql/filter_sarif.py`
+  中于上传前按 SARIF 主位置路径剔除。`upload-sarif` 的 `category` 必须与 analyze
   默认分析键（`.github/workflows/codeql.yml:analyze`）一致，否则历史告警不会
-  随结果消失转为 fixed。升级 miniaudio 时复核是否出现新告警。
+  随结果消失转为 fixed；对齐后成功将 35 条统一转为 fixed。**2026-10-27 最终
+  44 fixed / 0 open / 0 dismissed**。升级 miniaudio 时复核是否出现新告警。
   **8 条位于自研代码**（`pipeline.c` 5 / `encoder.c` 1 / `main.c` 2），已按
   「乘法先提升 `size_t` + 溢出检查」「JSON 追加统一校验剩余空间」加固，合并后
   新一轮 main 扫描已全部转为 fixed。自研目录（`src/`、`kernel/*.zig`、
