@@ -30,6 +30,12 @@ mixin _PlaybackNotifierSession
       fft: null,
     );
     await _stopEngine();
+    // 切歌淡入：新会话从 0 逐渐升到目标音量（避免硬起音）。必须把初始增益
+    // **随会话配置一起**传进引擎：会话在 start() 返回前就可能已出声，事后再
+    // 发 set_volume 会漏掉最先几帧（表现为第 0 秒瞬间满音量）。
+    final fadeIn = ref.read(appPrefsProvider).crossfadeEnabled;
+    final fadeMs = ref.read(appPrefsProvider).crossfadeDurationMs;
+    final initialVolume = fadeIn ? 0.0 : state.volume;
     final AudioEngineProcess engine;
     try {
       engine = await AudioEngineProcess.start(
@@ -40,6 +46,7 @@ mixin _PlaybackNotifierSession
         offsetMs: offsetMs,
         bitrate: bitrate,
         passthrough: passthrough,
+        initialVolume: initialVolume,
       );
     } catch (e) {
       // store 会话引擎创建失败：句柄尚未交给 _engine/_engineStore，就地释放后
@@ -65,10 +72,9 @@ mixin _PlaybackNotifierSession
       unawaited(engine.sendCommand('set_sink', {'id': sinkId}));
     }
     _lastSpectrumAtMs = -1000;
-    // 切歌淡入：新会话从 0 逐渐升到目标音量（避免硬起音）。
-    final fadeIn = ref.read(appPrefsProvider).crossfadeEnabled;
-    final fadeMs = ref.read(appPrefsProvider).crossfadeDurationMs;
-    unawaited(engine.setVolume(fadeIn ? 0 : state.volume));
+    // 会话起点音量（与建会话时传入的 initialVolume 一致；再发一次兜底，
+    // 覆盖 sink 切换等重建路径）。
+    unawaited(engine.setVolume(initialVolume));
     // 只回填会话身份：位置/时长/播放态已由引擎事件（ready/playing/position）
     // 权威上报，此处不得再写，否则会覆盖刚收到的真实状态。
     state = state.copyWith(source: source, sessionId: engine.sessionId);

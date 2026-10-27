@@ -14,8 +14,6 @@ import '../services/history/history_store.dart';
 import '../services/kugou/kugou_api.dart';
 import '../services/liked/liked_cache.dart';
 import '../services/liked/liked_loader.dart';
-import '../services/neko/neko_api.dart';
-import '../services/neko/neko_lyric_rewriter.dart';
 import '../services/netease/apis_netease_caller.dart';
 import '../services/netease/netease_api.dart';
 import '../services/platform/platform_capabilities.dart';
@@ -98,58 +96,6 @@ final kugouApiProvider = ChangeNotifierProvider<KugouApi>((ref) => KugouApi());
 /// [ChangeNotifierProvider]：登录态（cookie 落盘 vault）变化时通知 UI。
 final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
   (ref) => QqMusicApi(),
-);
-
-// ── 实验性音源 NekoMusic ────────────────────────────────────────
-
-/// NekoMusic 直连（统一 REST + 不透明 token；纯 Dart，无签名加密）。
-///
-/// **实验性音源，默认关闭**（`source.neko.enabled`）：关闭时 UI 不展示
-/// Neko 平台、也不发请求。登录态变化（token 恢复 / 登录 / 登出）时通知 UI。
-final nekoApiProvider = ChangeNotifierProvider<NekoApi>((ref) => NekoApi());
-
-/// Neko 下载歌词重写（Neko 元数据已规范，仅下载时把站点广告歌词换成标准 LRC）。
-final nekoLyricRewriterProvider = Provider<NekoLyricRewriter>(
-  (ref) => NekoLyricRewriter(),
-);
-
-/// 列表逐行读取最高音质时的并发限制器（避免瞬时几十个 `/api/music/info` 并发）。
-class _AsyncLimiter {
-  _AsyncLimiter(this.maxConcurrent);
-
-  final int maxConcurrent;
-  int _active = 0;
-  final List<Completer<void>> _waiters = [];
-
-  Future<T> run<T>(Future<T> Function() task) async {
-    if (_active >= maxConcurrent) {
-      final waiter = Completer<void>();
-      _waiters.add(waiter);
-      await waiter.future;
-    }
-    _active++;
-    try {
-      return await task();
-    } finally {
-      _active--;
-      if (_waiters.isNotEmpty) _waiters.removeAt(0).complete();
-    }
-  }
-}
-
-final _nekoMaxQualityLimiterProvider = Provider<_AsyncLimiter>(
-  (ref) => _AsyncLimiter(3),
-);
-
-/// Neko 曲目实际最高音质（`/api/music/info/{id}` 的 `maxQuality`，已归一化为
-/// 服务端四档 `standard`/`hq`/`sq`/`hires`）。
-///
-/// 播放页 / 详情弹窗 / 歌曲列表角标据此裁剪与展示；失败 / 未升级 / 无字段
-/// → null。按曲目 id 缓存（非 autoDispose：一次请求终身命中，列表滚动不重发）。
-final nekoMaxQualityProvider = FutureProvider.family<String?, String>(
-  (ref, id) => ref
-      .read(_nekoMaxQualityLimiterProvider)
-      .run(() => ref.read(nekoApiProvider).fetchMaxQuality(id)),
 );
 
 // ── 顶栏微型天气 ────────────────────────────────────────────────

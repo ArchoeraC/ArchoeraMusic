@@ -73,6 +73,9 @@ typedef struct {
                                        硬上限，查询故障回落；驻留仅供频谱 pcm_window）
                                    >0 = 用户上限（引擎绝不越过用户设定）
                                    -1 = 无上限（整曲可回访；设置须显式警告） */
+    float initial_volume;    /**< 会话初始音量（0~1，默认 1.0）。必须在**首块 PCM
+                                  出声前**生效：播放器/管线建会话时直接以此增益
+                                  起播，避免「第 0 秒按满音量出声」的起播爆音。 */
 } EngineConfig;
 
 /** 默认配置宏 */
@@ -99,6 +102,7 @@ typedef struct {
     .engine_mode = 0, \
     .no_disk_cache = 0, \
     .pcm_mem_cap_kb = 0, \
+    .initial_volume = 1.0f, \
 })
 
 /** 管线实例（不透明指针） */
@@ -142,7 +146,7 @@ AudioPipeline* pipeline_create(const char *source,
 /**
  * 同 [pipeline_create]，另按源注入在线 URL 的额外请求头 [headers]
  * （`\n`/`\r\n` 分行的 `Name: value`；NULL = 无）。原生 HTTP(S) 与 FFmpeg
- * http/tls 路径均会带上，用于携带客户端标识（如 NekoMusic 的 `X-Neko-Client`）。
+ * http/tls 路径均会带上，用于携带客户端标识。
  */
 AudioPipeline* pipeline_create_with_headers(const char *source,
                                             const char *headers,

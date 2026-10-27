@@ -77,6 +77,9 @@ final class EngineConfigC extends Struct {
 
   @Int64()
   external int pcmMemCapKb; // 0=auto / >0=用户上限(KB) / -1=无上限
+
+  @Float()
+  external double initialVolume; // 会话初始音量（0~1）；首块 PCM 前生效
 }
 
 typedef _CreateNative =
@@ -531,6 +534,7 @@ Pointer<EngineConfigC> engineConfigFromParams({
   int engineMode = 0,
   int noDiskCache = 0,
   int pcmMemCapKb = 0,
+  double initialVolume = 1.0,
 }) {
   final p = calloc<EngineConfigC>();
   p.ref
@@ -551,7 +555,8 @@ Pointer<EngineConfigC> engineConfigFromParams({
     ..tempoPitchSync = true
     ..engineMode = engineMode
     ..noDiskCache = noDiskCache
-    ..pcmMemCapKb = pcmMemCapKb;
+    ..pcmMemCapKb = pcmMemCapKb
+    ..initialVolume = initialVolume.clamp(0.0, 1.0);
   for (var i = 0; i < 10; i++) {
     p.ref.eqGains[i] = (eqGains != null && i < eqGains.length) ? eqGains[i] : 0;
   }
