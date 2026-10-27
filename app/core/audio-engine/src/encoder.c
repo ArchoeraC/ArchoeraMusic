@@ -25,6 +25,8 @@
 #include <libavutil/frame.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <limits.h>
 
 #define LOG_TAG "[audio-engine:encoder]"
 #include <stdio.h>
@@ -79,9 +81,22 @@ Encoder* encoder_create(int sample_rate, int channels, int bitrate,
     Encoder *e = calloc(1, sizeof(*e));
     if (!e) return NULL;
 
+    /* 声道数参与「帧数 × 声道 × 4」的缓冲尺寸计算；帧长同样先按 int64
+     * 计算，避免 sample_rate × frame_size_ms 在 int 里溢出。 */
+    if (sample_rate <= 0 || channels <= 0 || channels > 8 ||
+        frame_size_ms <= 0) {
+        free(e);
+        return NULL;
+    }
+    int64_t frame_size = (int64_t)sample_rate * frame_size_ms / 1000;
+    if (frame_size <= 0 || frame_size > INT_MAX / 2) {
+        free(e);
+        return NULL;
+    }
+
     e->output_cb = output;
     e->output_user = user;
-    e->frame_size = sample_rate * frame_size_ms / 1000; /* 如 48000*20/1000 = 960 */
+    e->frame_size = (int)frame_size; /* 如 48000*20/1000 = 960 */
 
     /* 1. 创建 OGG 输出格式上下文 */
     int ret = avformat_alloc_output_context2(&e->fmt_ctx, NULL, "ogg", NULL);
@@ -154,7 +169,9 @@ Encoder* encoder_create(int sample_rate, int channels, int bitrate,
 
     /* 7. 分配 PCM 累积缓冲（容纳 2 个 Opus 帧） */
     e->pcm_capacity = e->frame_size * 2;
-    e->pcm_buffer = malloc(e->pcm_capacity * channels * sizeof(float));
+    size_t pcm_samples = (size_t)e->pcm_capacity * (size_t)channels;
+    if (pcm_samples > SIZE_MAX / sizeof(float)) goto fail;
+    e->pcm_buffer = malloc(pcm_samples * sizeof(float));
     if (!e->pcm_buffer) goto fail;
 
     e->enc_frame = av_frame_alloc();
