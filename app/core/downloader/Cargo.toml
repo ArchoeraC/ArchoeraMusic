@@ -60,3 +60,8 @@ windows-sys      = { version = "0.61", features = ["Win32_System_Memory", "Win32
 lto       = true
 strip     = "symbols"
 opt-level = "s"
+
+[patch.crates-io]
+# RUSTSEC-2024-0436：lofty 0.25.5 仍依赖已停维护的 paste。vendor/lofty 仅把
+# paste 换成 API 兼容的 pastey；升级 lofty 时同步重打该补丁（见 vendor/lofty/VENDOR.md）。
+lofty = { path = "vendor/lofty" }

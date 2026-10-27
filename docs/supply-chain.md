@@ -93,8 +93,8 @@
   `AsyncFd`**（只用到 tokio 的 fs/io-util/sync/time，其余经 reqwest 传递），无运行时
   暴露面；仍按「能升就升」执行 `cargo update -p tokio --precise 1.53.3`，只改
   `Cargo.lock`（tokio 的 `windows-sys` 解析随之回到 0.52，Windows 目标仍在依赖图内）。
-  跟踪 issue #171 随本修复关闭。`paste`（RUSTSEC-2024-0436）维持 §4 的
-  「不适用（编译期）」结论，issue #162 作为上游依赖跟踪项保留。
+  跟踪 issue #171 随本修复关闭。`paste`（RUSTSEC-2024-0436）已在同批通过
+  vendor `lofty` + `pastey` 补丁消除（见 §4），`Cargo.lock` 不再包含 `paste`。
 - **CodeQL 告警分级（2026-10-27）**：2026-10-22 启用 CodeQL 后首轮产生 44 条
   `cpp/*` 告警。其中 **36 条位于 vendored 第三方库**：`kernel/c/stb_vorbis.c` 的
   1 条指针溢出检查由 `.github/codeql/codeql-config.yml` 的 `paths-ignore` 排除并
@@ -119,11 +119,14 @@
   `RsaPublicKey::encrypt`（酷狗登录公钥加密，见 `app/core/downloader/src/crypto.rs`），
   **不持私钥、不做解密**，故攻击面不存在。已在 `security-audit.yml` 的 `ignore`
   中登记（附同样理由的注释），待上游 `rsa` 出补丁后复核是否可以去掉该 ignore。
-- **RUSTSEC-2024-0436（`paste` crate 停止维护）——不适用（编译期）**：
-  该 crate 经 `lofty`（downloader 的标签/元数据处理依赖，`Cargo.toml` 中 `lofty = "0.25"`）
-  传递引入，是 **proc-macro**，只在编译期展开宏，**无运行时暴露面**，也不进入发布产物。
-  `cargo audit` 将其归为 **warning**（unmaintained）而**不拦截**构建；等 `lofty`
-  换用其它实现（或版本升级去掉该依赖）后该项自然消失。
+- **RUSTSEC-2024-0436（`paste` crate 停止维护）——已消除（2026-10-27）**：
+  原先经 `lofty`（downloader 的标签/元数据处理依赖）传递引入，是 **proc-macro**，
+  只在编译期展开、无运行时暴露面；但 `cargo audit` 会持续报 unmaintained。
+  `lofty` 0.25.5 上游仍依赖 `paste`，且无新版本可换。现 vendor `lofty` 至
+  `app/core/downloader/vendor/lofty`，仅将 `paste` 换成 API 兼容的维护分支
+  `pastey` 0.2.3，并用 `[patch.crates-io]` 强制使用；`Cargo.lock` 不再包含
+  `paste`，cargo audit 的 unmaintained 警告消失。升级 lofty 时需重放补丁，
+  步骤见 `app/core/downloader/vendor/lofty/VENDOR.md`。
 - **第三方音源明文 HTTP 端点——上游既定行为，MITM 可篡改内容**：
   `http://login.user.kugou.com`（短信验证码发送，见 `app/lib/services/kugou/kugou_request.dart`）、
   `http://lyrics.kugou.com`（歌词搜索/下载，见 `app/core/downloader/src/metadata.rs`）、
