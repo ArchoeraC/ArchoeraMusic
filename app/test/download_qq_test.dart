@@ -28,22 +28,6 @@ void main() {
     expect(req['extra'], isEmpty);
   });
 
-  test('：携带标准 LRC 歌词（强制重写）；无歌词时该字段为 null', () {
-    const withLyrics = Track(
-      id: '33814',
-      title: '三拜红尘凉',
-      source: '',
-      artists: [TrackArtist(name: '尹昔眠')],
-      lyrics: '[00:01.00]标准歌词',
-    );
-    final req = buildDownloadRequest(withLyrics);
-    expect(req['source'], '');
-    expect(req['lyrics'], '[00:01.00]标准歌词');
-
-    const noLyrics = Track(id: '1', title: 't', source: '');
-    expect(buildDownloadRequest(noLyrics)['lyrics'], isNull);
-  });
-
   test('kugou 仍带 hashes/sizes extra', () {
     const track = Track(
       id: 'abc',

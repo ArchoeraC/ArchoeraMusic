@@ -1062,113 +1062,8 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo ubicar el archivo (no hay gestor de archivos disponible)';
 
   @override
-  String get settingsSectionThirdPartyService => 'Servicios de terceros';
-
-  @override
-  String get settingsAttribution =>
-      'Con la tecnología de la API de  Music';
-
-  @override
-  String get settingsApiDocs => 'Documentación de la API de  Music';
-
-  @override
   String get settingsSongCacheMemoryHint =>
       'La «reproducción en memoria» está activada: la caché de canciones no se escribirá en disco';
-
-  @override
-  String get platform => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => 'Fuentes experimentales';
-
-  @override
-  String get settingsExperimentalSourceSubtitle =>
-      'Fuentes de terceros (desactivadas por defecto)';
-
-  @override
-  String get settingsTitle => '';
-
-  @override
-  String get settingsNote =>
-      'Fuente experimental de terceros, no oficial; solo inicio de sesión (sin registro ni compra VIP). Puede dejar de funcionar en cualquier momento.';
-
-  @override
-  String get settingsEnable => 'Activar ';
-
-  @override
-  String get settingsEnableDesc =>
-      'Mostrar NK en búsqueda, me gusta y biblioteca (desactivado por defecto)';
-
-  @override
-  String get settingsLogin => 'Iniciar sesión';
-
-  @override
-  String get settingsLogout => 'Cerrar sesión';
-
-  @override
-  String settingsLoggedInAs({required Object name}) {
-    return 'Sesión iniciada como $name';
-  }
-
-  @override
-  String get settingsNotLoggedIn => 'Sin iniciar sesión';
-
-  @override
-  String get LoginTitle => 'Iniciar sesión en ';
-
-  @override
-  String get LoginTabQr => 'Código QR';
-
-  @override
-  String get LoginTabPassword => 'Correo y contraseña';
-
-  @override
-  String get LoginEmail => 'Correo';
-
-  @override
-  String get LoginPassword => 'Contraseña';
-
-  @override
-  String get LoginPasswordHint => 'Introduce tu contraseña';
-
-  @override
-  String get LoginSubmit => 'Iniciar sesión';
-
-  @override
-  String get LoginQrHint =>
-      'Escanea con la app  para iniciar sesión';
-
-  @override
-  String get QrScanned => 'Escaneado, confirma en el teléfono';
-
-  @override
-  String get QrCanceled => 'Inicio de sesión cancelado';
-
-  @override
-  String get QrExpired => 'Código QR caducado, vuelve a generarlo';
-
-  @override
-  String get toastLoginRequired =>
-      'Operación fallida (comprueba que hayas iniciado sesión en tu cuenta NK)';
-
-  @override
-  String get pageLikedLoginHint =>
-      'Inicia sesión en NK para ver tus me gusta';
-
-  @override
-  String get pageLikedLoginDesc =>
-      'Inicia sesión en  para sincronizar tus me gusta';
-
-  @override
-  String get pageLikedEmptyHint =>
-      'Aún no hay canciones que te gusten: toca el corazón en la búsqueda';
-
-  @override
-  String get pageFavLoginDesc =>
-      'Inicia sesión en  para ver listas y favoritos';
-
-  @override
-  String get pageFavEmptyHint => 'Aún no hay listas ni favoritos';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -5782,7 +5677,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      'Uso: archoerashell search <fuente> <texto> [-n límite] [-p página]\n\nBuscar canciones en una fuente.\n  fuente: netease | kugou | qqmusic | \n  -n, --limit <n>   resultados (1-50, por defecto 20)\n  -p, --page <n>    página (desde 1)\nEjemplo: archoerashell search netease Jay -n 10';
+      'Uso: archoerashell search <fuente> <texto> [-n límite] [-p página]\n\nBuscar canciones en una fuente.\n  fuente: netease | kugou | qqmusic\n  -n, --limit <n>   resultados (1-50, por defecto 20)\n  -p, --page <n>    página (desde 1)\nEjemplo: archoerashell search netease Jay -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>

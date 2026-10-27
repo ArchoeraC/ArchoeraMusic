@@ -1033,104 +1033,8 @@ class AppLocalizationsJa extends AppLocalizations {
   String get toastRevealFileFailed => 'ファイルを表示できません（ファイルマネージャーが利用できません）';
 
   @override
-  String get settingsSectionThirdPartyService => 'サードパーティサービス';
-
-  @override
-  String get settingsAttribution => '本アプリは  Music API によって提供されています';
-
-  @override
-  String get settingsApiDocs => ' Music API ドキュメント';
-
-  @override
   String get settingsSongCacheMemoryHint =>
       '「メモリ内再生」が有効なため、楽曲キャッシュはディスクに書き込まれません';
-
-  @override
-  String get platform => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => '実験的音源';
-
-  @override
-  String get settingsExperimentalSourceSubtitle => 'サードパーティ音源（既定でオフ）';
-
-  @override
-  String get settingsTitle => '';
-
-  @override
-  String get settingsNote =>
-      'サードパーティの実験的音源です（非公式）。ログインのみ対応で、新規登録や VIP 購入はありません。予告なく利用できなくなる場合があります。';
-
-  @override
-  String get settingsEnable => ' を有効化';
-
-  @override
-  String get settingsEnableDesc => '検索・お気に入り・ライブラリに NK を表示（既定でオフ）';
-
-  @override
-  String get settingsLogin => 'ログイン';
-
-  @override
-  String get settingsLogout => 'ログアウト';
-
-  @override
-  String settingsLoggedInAs({required Object name}) {
-    return 'ログイン中：$name';
-  }
-
-  @override
-  String get settingsNotLoggedIn => '未ログイン';
-
-  @override
-  String get LoginTitle => ' にログイン';
-
-  @override
-  String get LoginTabQr => '二次元コード';
-
-  @override
-  String get LoginTabPassword => 'メールとパスワード';
-
-  @override
-  String get LoginEmail => 'メール';
-
-  @override
-  String get LoginPassword => 'パスワード';
-
-  @override
-  String get LoginPasswordHint => 'パスワードを入力';
-
-  @override
-  String get LoginSubmit => 'ログイン';
-
-  @override
-  String get LoginQrHint => ' アプリでスキャンしてログイン';
-
-  @override
-  String get QrScanned => 'スキャン済み。スマホで確認してください';
-
-  @override
-  String get QrCanceled => 'ログインをキャンセルしました';
-
-  @override
-  String get QrExpired => '二次元コードの有効期限が切れました。再生成してください';
-
-  @override
-  String get toastLoginRequired => '操作に失敗しました（NK アカウントにログインしているか確認してください）';
-
-  @override
-  String get pageLikedLoginHint => 'NK にログインしてお気に入りを表示';
-
-  @override
-  String get pageLikedLoginDesc => ' にログインしてお気に入りを同期';
-
-  @override
-  String get pageLikedEmptyHint => 'お気に入りの曲はまだありません。検索ページでハートをタップ';
-
-  @override
-  String get pageFavLoginDesc => ' にログインしてプレイリストとお気に入りを表示';
-
-  @override
-  String get pageFavEmptyHint => 'プレイリストやお気に入りはまだありません';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -5508,7 +5412,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      '使い方: archoerashell search <音源> <キーワード> [-n 件数] [-p ページ]\n\n指定音源で曲を検索。\n  音源: netease | kugou | qqmusic | \n  -n, --limit <n>   件数（1〜50、既定 20）\n  -p, --page <n>    ページ（1 から）\n例: archoerashell search netease 周杰倫 -n 10';
+      '使い方: archoerashell search <音源> <キーワード> [-n 件数] [-p ページ]\n\n指定音源で曲を検索。\n  音源: netease | kugou | qqmusic\n  -n, --limit <n>   件数（1〜50、既定 20）\n  -p, --page <n>    ページ（1 から）\n例: archoerashell search netease 周杰倫 -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>
