@@ -20,7 +20,7 @@
 （凭据保险库 vault、平台登录会话等属于敏感面）。
 
 - **首选**：GitHub 私密漏洞报告——本仓库 **Security → Advisories → Report a vulnerability**；
-- **备选**：通过仓库所有者（BetaStudio2）公示的联系方式私信。
+- **备选**：通过仓库维护者（BetaStudio2）公示的联系方式私信。
 
 报告请包含：
 

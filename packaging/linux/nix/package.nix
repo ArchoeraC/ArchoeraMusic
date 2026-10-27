@@ -94,7 +94,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   meta = {
     description = "An open-source music player, connect to alternative music service, support offline playback";
-    homepage = "https://github.com/BetaStudio2/ArchoeraMusic";
+    homepage = "https://github.com/ArchoeraC/ArchoeraMusic";
     license = lib.licenses.agpl3Only;
     platforms = [ "x86_64-linux" ];
   };
