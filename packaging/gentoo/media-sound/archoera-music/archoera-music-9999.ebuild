@@ -10,8 +10,8 @@ EAPI=8
 inherit eutils
 
 DESCRIPTION="An open-source music player, connect to alternative music service, support offline playback"
-HOMEPAGE="https://github.com/BetaStudio2/ArchoeraMusic"
-SRC_URI="https://github.com/BetaStudio2/ArchoeraMusic/releases/download/v${PV}/ArchoeraMusic-v${PV}-linux-x86_64.tar.gz"
+HOMEPAGE="https://github.com/ArchoeraC/ArchoeraMusic"
+SRC_URI="https://github.com/ArchoeraC/ArchoeraMusic/releases/download/v${PV}/ArchoeraMusic-v${PV}-linux-x86_64.tar.gz"
 
 LICENSE="AGPL-3"
 SLOT="0"

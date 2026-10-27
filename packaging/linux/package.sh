@@ -20,7 +20,7 @@ APP_NAME="ArchoeraMusic"
 APP_ID="awa.archoera.betastudio2.archoera_music"
 BIN="archoera_music"
 DEST_PREFIX="/opt/archoera-music"
-REPO_URL="https://github.com/BetaStudio2/ArchoeraMusic"
+REPO_URL="https://github.com/ArchoeraC/ArchoeraMusic"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"

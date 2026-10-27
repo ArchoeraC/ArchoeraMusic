@@ -29,7 +29,7 @@ ArchoeraMusic 是一个开源的**多平台音乐播放器**，桌面为主（Li
 > 完整的自编译手册（三端环境 / 逐模块构建 / 调试 / 打包 / 常见问题）见 **[docs/user-build-from-source.md](docs/user-build-from-source.md)**；三端打包由 [CI workflows](.github/workflows) 提供。
 
 ```bash
-git clone https://github.com/BetaStudio2/ArchoeraMusic.git
+git clone https://github.com/ArchoeraC/ArchoeraMusic.git
 cd ArchoeraMusic
 
 # 编译模块：Linux/macOS 逐模块，Windows 用 app/core/build_windows.bat（详见上述手册）
@@ -81,6 +81,6 @@ flutter run -d linux      # 或 windows / macos
 
 ## 联系与贡献
 
-- 仓库：<https://github.com/BetaStudio2/ArchoeraMusic>
+- 仓库：<https://github.com/ArchoeraC/ArchoeraMusic>
 - 贡献前请阅读 **[CONTRIBUTING.md](CONTRIBUTING.md)**；安全漏洞请按 [SECURITY.md](SECURITY.md) 隐式报告。
 - PR 合入前需通过签名或显式确认接受 [贡献者授权](docs/licensing.md#22-贡献者授权contributor-license-grant)。

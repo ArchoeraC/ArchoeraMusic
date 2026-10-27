@@ -3381,7 +3381,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsPrivacy9Body =>
-      '本ポリシーの内容、お客様の情報セキュリティまたは関連事項についてご不明な点、ご意見、お申し立てがある場合は、以下の方法で開発者までご連絡ください：\n· GitHub リポジトリと Issue：https://github.com/BetaStudio2/ArchoeraMusic\nフィードバックを受領後、できるだけ早く回答いたします。\n\n';
+      '本ポリシーの内容、お客様の情報セキュリティまたは関連事項についてご不明な点、ご意見、お申し立てがある場合は、以下の方法で開発者までご連絡ください：\n· GitHub リポジトリと Issue：https://github.com/ArchoeraC/ArchoeraMusic\nフィードバックを受領後、できるだけ早く回答いたします。\n\n';
 
   @override
   String get settingsPrivacyFooter => '本ポリシーの最終更新：2026 年 9 月 29 日。';
