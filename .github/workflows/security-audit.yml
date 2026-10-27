@@ -11,8 +11,19 @@ on:
   workflow_dispatch:
   push:
     branches: [main, ArchoeraOS]
+    # 纯文档 / 官网改动不跑依赖扫描与 workflow lint（代码/配置改动仍全量）。
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'site/**'
+      - 'LICENSE'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'site/**'
+      - 'LICENSE'
 
 permissions:
   contents: read
