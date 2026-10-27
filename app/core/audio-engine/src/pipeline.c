@@ -39,6 +39,7 @@
 #include <libavutil/dict.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <limits.h>
 #include <math.h>
 #include <signal.h>
@@ -58,6 +59,25 @@
 
 /* store 内存源 AVIO 读缓冲字节数（av_malloc 分配，随 avio_context_free 释放） */
 #define STORE_AVIO_BUF_SIZE 32768
+
+/* 交错 float PCM 缓冲：帧数 × 声道 × sizeof(float) 的因子来自配置/解码器，
+ * 先提升到 size_t 并检查乘法溢出，避免 int 乘法先溢出再转 size_t。 */
+static float *pcm_alloc_f32(int frames, int channels)
+{
+    if (frames <= 0 || channels <= 0) return NULL;
+    size_t samples = (size_t)frames * (size_t)channels;
+    if (samples > SIZE_MAX / sizeof(float)) return NULL;
+    return malloc(samples * sizeof(float));
+}
+
+/* realloc 版本：失败时原指针仍有效，由调用方决定保留或释放。 */
+static float *pcm_realloc_f32(float *old, int frames, int channels)
+{
+    if (frames <= 0 || channels <= 0) return NULL;
+    size_t samples = (size_t)frames * (size_t)channels;
+    if (samples > SIZE_MAX / sizeof(float)) return NULL;
+    return realloc(old, samples * sizeof(float));
+}
 
 /* segstore 已并入 audio_engine_static 主库（audio-memory-source.md M2）：store 模式
  * 对 segstore 为强链接（不再是弱符号守卫）。SegStore 不透明类型由 audio_engine.h
@@ -407,6 +427,14 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     p->headers = headers;
     p->max_frames_per_call = 64;
 
+    /* 输出声道数参与「帧数 × 声道 × 4」的缓冲尺寸计算，限定合法范围
+     * （当前播放/Opus 输出最多 8 声道），防止异常配置导致整型溢出。 */
+    if (p->cfg.output_channels <= 0 || p->cfg.output_channels > 8) {
+        ERA_LOGE(NULL, "%s 非法输出声道数: %d（允许 1..8）\n",
+                LOG_TAG, p->cfg.output_channels);
+        goto fail;
+    }
+
     /* 1. 打开解码器：
      *    - store 内存源：engine_mode==EraAudio 且 Store 连续时优先自研内核内存解码
      *      （纯内存，docs/audio-memory-source.md §7）；分段/未接管/内核未链接 → FFmpeg-mem；
@@ -686,12 +714,12 @@ static AudioPipeline* pipeline_create_impl(const char *source,
 
     /* 6. 分配临时缓冲 */
     p->pcm_temp_capacity = PCM_TEMP_CAPACITY;
-    p->pcm_temp = malloc(p->pcm_temp_capacity * cfg->output_channels * sizeof(float));
+    p->pcm_temp = pcm_alloc_f32(p->pcm_temp_capacity, cfg->output_channels);
     if (!p->pcm_temp) goto fail;
 
     /* tempo 输出缓冲 */
     p->tempo_buf_capacity = PCM_TEMP_CAPACITY * 2; /* tempo 可能输出最多 2 倍 */
-    p->tempo_buf = malloc(p->tempo_buf_capacity * cfg->output_channels * sizeof(float));
+    p->tempo_buf = pcm_alloc_f32(p->tempo_buf_capacity, cfg->output_channels);
     if (!p->tempo_buf) goto fail;
 
     ERA_LOGI(NULL, "%s 管线就绪: → %dHz / %dch / %s [backend=%s transport=%s]\n",
@@ -757,13 +785,16 @@ static int process_dsp_chain(AudioPipeline *p, float *pcm, int samples)
 
     /* tempo: 变速变调（改变样本数，就地写回 pcm） */
     if (!tempo_is_bypass(p->tempo)) {
-        /* 确保输出缓冲足够 */
-        int need = (int)((float)samples / 0.5f) + 256;
-        if (need > p->tempo_buf_capacity) {
-            p->tempo_buf_capacity = need * 2;
-            p->tempo_buf = realloc(p->tempo_buf,
-                p->tempo_buf_capacity * p->cfg.output_channels * sizeof(float));
-            if (!p->tempo_buf) return -1;
+        /* 确保输出缓冲足够：速度最低 0.5× 时最多 2 倍样本数 */
+        int64_t need64 = (int64_t)samples * 2 + 256;
+        if (need64 > p->tempo_buf_capacity) {
+            if (need64 > INT_MAX / 2) return -1;
+            int new_cap = (int)need64 * 2;
+            float *grown = pcm_realloc_f32(p->tempo_buf, new_cap,
+                                           p->cfg.output_channels);
+            if (!grown) return -1;
+            p->tempo_buf = grown;
+            p->tempo_buf_capacity = new_cap;
         }
 
         int t_samples = samples;
@@ -803,15 +834,21 @@ static int process_frame(AudioPipeline *p, AVFrame *frame)
     }
 
     int in_samples = frame->nb_samples;
+    if (in_samples <= 0 || frame->sample_rate <= 0) return -1;
 
-    /* 估算输出样本数 */
-    int max_out = (int)((int64_t)in_samples * p->cfg.output_sample_rate /
-                        frame->sample_rate) + 256;
+    /* 估算输出样本数（int64 过渡，避免乘法/加 256 溢出 int） */
+    int64_t max_out64 = (int64_t)in_samples * p->cfg.output_sample_rate /
+                        frame->sample_rate + 256;
+    if (max_out64 <= 0 || max_out64 > INT_MAX) return -1;
+    int max_out = (int)max_out64;
     if (max_out > p->pcm_temp_capacity) {
-        p->pcm_temp_capacity = max_out * 2;
-        p->pcm_temp = realloc(p->pcm_temp,
-            p->pcm_temp_capacity * p->cfg.output_channels * sizeof(float));
-        if (!p->pcm_temp) return -1;
+        if (max_out > INT_MAX / 2) return -1;
+        int new_cap = max_out * 2;
+        float *grown = pcm_realloc_f32(p->pcm_temp, new_cap,
+                                       p->cfg.output_channels);
+        if (!grown) return -1;
+        p->pcm_temp = grown;
+        p->pcm_temp_capacity = new_cap;
     }
 
     /* swresample */
@@ -850,12 +887,19 @@ static int native_process_chunk(AudioPipeline *p)
 
     /* 估算输出样本数并保证缓冲足够（同 FFmpeg 路径） */
     int native_sr = native_decoder_sample_rate(p->native);
-    int max_out = (int)((int64_t)frames * p->cfg.output_sample_rate / native_sr) + 256;
+    if (native_sr <= 0) return -1;
+    int64_t max_out64 = (int64_t)frames * p->cfg.output_sample_rate /
+                        native_sr + 256;
+    if (max_out64 <= 0 || max_out64 > INT_MAX) return -1;
+    int max_out = (int)max_out64;
     if (max_out > p->pcm_temp_capacity) {
-        p->pcm_temp_capacity = max_out * 2;
-        p->pcm_temp = realloc(p->pcm_temp,
-            p->pcm_temp_capacity * p->cfg.output_channels * sizeof(float));
-        if (!p->pcm_temp) return -1;
+        if (max_out > INT_MAX / 2) return -1;
+        int new_cap = max_out * 2;
+        float *grown = pcm_realloc_f32(p->pcm_temp, new_cap,
+                                       p->cfg.output_channels);
+        if (!grown) return -1;
+        p->pcm_temp = grown;
+        p->pcm_temp_capacity = new_cap;
     }
 
     int out_samples = resampler_process(p->resampler,

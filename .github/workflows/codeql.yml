@@ -44,4 +44,7 @@ jobs:
         with:
           languages: c-cpp
           build-mode: none
+          # 排除 vendored 第三方单文件库（miniaudio / stb_vorbis）；这些
+          # 告警由上游修复，不按本项目代码标准逐条处置，见配置文件注释。
+          config-file: ./.github/codeql/codeql-config.yml
       - uses: github/codeql-action/analyze@4bfa242aa49c5f7c6770b98670d354a7dfac05f8 # v3
