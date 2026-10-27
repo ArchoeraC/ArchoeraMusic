@@ -324,6 +324,7 @@ class AudioEngineProcess {
     bool normalization = false,
     double? tempoSpeed,
     double? tempoPitch,
+    double initialVolume = 1.0,
   }) async {
     // 会话目录统一走系统临时目录（Windows %TEMP% / POSIX /tmp）。
     // 文件模式：引擎 WAV/PCM 落盘 + PcmAnalyzer 按需读取在此；
@@ -372,6 +373,7 @@ class AudioEngineProcess {
         engineMode: engineMode,
         noDiskCache: memoryOn ? 1 : 0,
         pcmMemCapKb: memCapKb,
+        initialVolume: initialVolume,
       );
       try {
         final h = store != 0
