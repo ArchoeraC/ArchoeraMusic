@@ -1708,6 +1708,7 @@ static int mediaengine_stream_begin(ArchoeraMediaEngine *e)
     int rate, ch;
     player_start_options popts = PLAYER_START_OPTIONS_DEFAULT;
     if (!e->player_file || !e->p) return 0;
+    popts.volume = e->last_volume; /* 首块 PCM 即按会话音量出声，避免满音量爆音 */
     rate = pipeline_get_output_sample_rate(e->p);
     ch = e->cfg.output_channels;
     if (rate <= 0) rate = 48000;
@@ -1913,6 +1914,11 @@ static void *engine_thread(void *arg)
         return NULL;
     }
 
+    /* 非播放器输出（Opus/WAV 直出）的初始音量：与播放器路径一样在首块 PCM
+       之前写入，避免起播第一帧按满增益输出。播放器路径稍后由 player 侧
+       以同一增益起播（见 mediaengine_stream_begin / 播放器启动处）。 */
+    pipeline_set_volume(e->p, e->last_volume);
+
     if (e->mem_mode) {
         /* 内存播放模式：不开 stream.wav / stream.pcm（PCM 入内存块列表）。
            mem_sr 供 Dart 线程 pcm_window 换算，写入持 mem_lock。 */
@@ -2048,6 +2054,7 @@ static void *engine_thread(void *arg)
                         "播放原生适配见 [player] 日志)\n",
                         e->sink_id && e->sink_id[0] ? e->sink_id : "(系统默认)");
                 player_start_options popts = PLAYER_START_OPTIONS_DEFAULT;
+                popts.volume = e->last_volume; /* 与流式路径一致：按会话音量起播 */
                 e->player = player_start_opts(e->wav_file, e->sink_id,
                                                  &popts, player_event_cb, e);
                 if (!e->player) {
@@ -2174,11 +2181,15 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
         }
         e->sink_id = init_id ? init_id : strdup("");
         e->sink_user_set = (from_env || (init_id != NULL)) ? 1 : 0;
-        e->last_volume = 1.0f;
-        ERA_LOGI(NULL, "[mediaengine] 初始 sink=%s (%s)\n",
+        /* 初始音量由会话配置给出：必须在首块 PCM 出声前就位，否则起播瞬间
+           会按默认满音量出声（播放器/管线的默认增益均为 1.0）。 */
+        e->last_volume = e->cfg.initial_volume;
+        if (e->last_volume < 0.0f) e->last_volume = 0.0f;
+        ERA_LOGI(NULL, "[mediaengine] 初始 sink=%s (%s) volume=%.2f\n",
                 e->sink_id && e->sink_id[0] ? e->sink_id : "(系统默认)",
                 from_env ? "env 显式指定"
-                         : (init_id ? "上次选择" : "系统默认"));
+                         : (init_id ? "上次选择" : "系统默认"),
+                e->last_volume);
     }
 
     /* pipeline_create（avformat_open_input 网络 IO）移到引擎线程执行：
