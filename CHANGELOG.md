@@ -4,6 +4,21 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [1.0.2+5] - 2026-10-27
+
+> [!NOTE]
+> 本次没有功能改动，主要是安全、依赖与代码扫描的加固喵
+
+你好喵～
+本次带来了以下的更新喵：
+
+1、44 条 CodeQL 代码扫描告警全部清零：音频引擎的 PCM 缓冲尺寸计算与 FFT JSON 写入补上溢出 / 越界防护，vendored 的 miniaudio / stb_vorbis 不再计入自有代码告警
+2、下载引擎升级 tokio 1.53.3，修复 RUSTSEC-2026-0386（`AsyncFd` I/O safety）
+3、不再依赖已停止维护的 `paste`：vendor `lofty` 并切换到兼容的 `pastey`，cargo audit 的 unmaintained 警告消失
+4、CodeQL 上传前过滤 vendored 第三方结果，Security 页保持 0 条 open 告警；新增非法输出声道数等防守回归测试
+
+我喜欢你！
+
 ## [1.0.1+4] - 2026-10-27
 
 > [!NOTE]
