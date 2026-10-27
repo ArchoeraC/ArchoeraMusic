@@ -101,7 +101,9 @@
   自动转为 fixed；`include/miniaudio.h` 的 35 条整数乘法提升**无法用路径过滤排除**
   （CodeQL 对 `#include` 进 `src/*.c` 的头文件不生效），已按 `won't fix` 逐条
   dismiss，并在 `.github/codeql/filter_sarif.py` 中于上传前按 SARIF 主位置路径
-  剔除，避免后续扫描重复刷屏；升级 miniaudio 时复核是否出现新告警。
+  剔除，避免后续扫描重复刷屏；`upload-sarif` 的 `category` 必须与 analyze
+  默认分析键（`.github/workflows/codeql.yml:analyze`）一致，否则历史告警不会
+  随结果消失转为 fixed。升级 miniaudio 时复核是否出现新告警。
   **8 条位于自研代码**（`pipeline.c` 5 / `encoder.c` 1 / `main.c` 2），已按
   「乘法先提升 `size_t` + 溢出检查」「JSON 追加统一校验剩余空间」加固，合并后
   新一轮 main 扫描已全部转为 fixed。自研目录（`src/`、`kernel/*.zig`、
