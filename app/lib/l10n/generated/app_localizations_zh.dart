@@ -3343,7 +3343,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsPrivacy9Body =>
-      '如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/BetaStudio2/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n';
+      '如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/ArchoeraC/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n';
 
   @override
   String get settingsPrivacyFooter => '本政策最近更新：2026 年 9 月 29 日。';
@@ -9182,7 +9182,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsPrivacy9Body =>
-      '如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/BetaStudio2/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n';
+      '如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/ArchoeraC/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n';
 
   @override
   String get settingsPrivacyFooter => '本政策最近更新：2026 年 9 月 29 日。';
@@ -15021,7 +15021,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsPrivacy9Body =>
-      '如對本政策的內容、您的資訊安全或相關事項有任何疑問、意見或申訴，歡迎透過以下方式與開發者聯絡：\n· GitHub 倉庫與 Issue：https://github.com/BetaStudio2/ArchoeraMusic\n我們將在收到回饋後儘快答覆。\n\n';
+      '如對本政策的內容、您的資訊安全或相關事項有任何疑問、意見或申訴，歡迎透過以下方式與開發者聯絡：\n· GitHub 倉庫與 Issue：https://github.com/ArchoeraC/ArchoeraMusic\n我們將在收到回饋後儘快答覆。\n\n';
 
   @override
   String get settingsPrivacyFooter => '本政策最近更新：2026 年 9 月 29 日。';

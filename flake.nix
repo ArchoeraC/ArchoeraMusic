@@ -599,7 +599,7 @@ NUGETCFG
 
         meta = with lib; {
           description = "开源、多端、面向本地与在线音乐的混合架构播放器";
-          homepage = "https://github.com/BetaStudio2/ArchoeraMusic";
+          homepage = "https://github.com/ArchoeraC/ArchoeraMusic";
           license = licenses.agpl3Only;
           mainProgram = "archoera-music";
           platforms = [ "x86_64-linux" ];

@@ -3527,7 +3527,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsPrivacy9Body =>
-      'Bei Fragen, Anmerkungen oder Beschwerden zu dieser Richtlinie, Ihrer Informationssicherheit oder damit zusammenhängenden Angelegenheiten können Sie den Entwickler wie folgt kontaktieren:\n· GitHub-Repository & Issues: https://github.com/BetaStudio2/ArchoeraMusic\nWir antworten schnellstmöglich nach Eingang Ihres Feedbacks.\n\n';
+      'Bei Fragen, Anmerkungen oder Beschwerden zu dieser Richtlinie, Ihrer Informationssicherheit oder damit zusammenhängenden Angelegenheiten können Sie den Entwickler wie folgt kontaktieren:\n· GitHub-Repository & Issues: https://github.com/ArchoeraC/ArchoeraMusic\nWir antworten schnellstmöglich nach Eingang Ihres Feedbacks.\n\n';
 
   @override
   String get settingsPrivacyFooter =>

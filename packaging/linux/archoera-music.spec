@@ -8,7 +8,7 @@ Version:        %{app_version}
 Release:        1
 Summary:        An open-source music player
 License:        AGPL-3.0-only
-URL:            https://github.com/BetaStudio2/ArchoeraMusic
+URL:            https://github.com/ArchoeraC/ArchoeraMusic
 BuildArch:      x86_64
 Group:          Applications/Multimedia
 AutoReqProv:    no
