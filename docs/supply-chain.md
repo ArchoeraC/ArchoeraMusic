@@ -96,13 +96,15 @@
   跟踪 issue #171 随本修复关闭。`paste`（RUSTSEC-2024-0436）维持 §4 的
   「不适用（编译期）」结论，issue #162 作为上游依赖跟踪项保留。
 - **CodeQL 告警分级（2026-10-27）**：2026-10-22 启用 CodeQL 后首轮产生 44 条
-  `cpp/*` 告警。其中 **36 条位于 vendored 第三方单文件库**
-  （`include/miniaudio.h` 的 35 条整数乘法提升、`kernel/c/stb_vorbis.c` 的 1 条
-  指针溢出检查），由 `.github/codeql/codeql-config.yml` 的 `paths-ignore` 排除，
-  存量告警按 `won't fix`（上游库）dismiss；**8 条位于自研代码**
+  `cpp/*` 告警。其中 **36 条位于 vendored 第三方库**：`kernel/c/stb_vorbis.c` 的
+  1 条指针溢出检查由 `.github/codeql/codeql-config.yml` 的 `paths-ignore` 排除并
+  自动转为 fixed；`include/miniaudio.h` 的 35 条整数乘法提升**无法用路径过滤排除**
+  （CodeQL 对 `#include` 进 `src/*.c` 的头文件不生效），已按 `won't fix` 逐条
+  dismiss，升级 miniaudio 时复核是否出现新告警。**8 条位于自研代码**
   （`pipeline.c` 5 / `encoder.c` 1 / `main.c` 2），已按「乘法先提升 `size_t` +
-  溢出检查」「JSON 追加统一校验剩余空间」加固，下一轮扫描应自动关闭。
-  自研目录（`src/`、`kernel/*.zig`、`app/native/**`）**不得**加入 `paths-ignore`。
+  溢出检查」「JSON 追加统一校验剩余空间」加固，合并后新一轮 main 扫描已全部转为
+  fixed。自研目录（`src/`、`kernel/*.zig`、`app/native/**`）**不得**加入
+  `paths-ignore`。
 
 ## 4. 已知风险与例外
 
