@@ -4,7 +4,7 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
-## [1.0.2+4] - 2026-10-27
+## [1.0.1+4] - 2026-10-27
 
 > [!NOTE]
 > 本次下线了实验性音源 NekoMusic
