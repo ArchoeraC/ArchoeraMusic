@@ -886,7 +886,7 @@
   "settingsPrivacy8Title": "8. 개인정보 처리방침의 업데이트\n",
   "settingsPrivacy8Body": "당사는 기능 반복, 기술 아키텍처 진화 또는 법령 변경에 따라 본 방침을 적시에 개정할 수 있습니다. 업데이트된 버전은 소프트웨어 또는 공식 저장소와 함께 배포되며, 문서 상단에 표시된 「최근 업데이트」 날짜부터 효력이 발생합니다; 업데이트 후에도 본 소프트웨어를 계속 사용하는 경우 귀하는 업데이트된 방침을 읽고 이해하고 동의한 것으로 간주됩니다.\n\n",
   "settingsPrivacy9Title": "9. 문의하기\n",
-  "settingsPrivacy9Body": "본 방침의 내용, 귀하의 정보 보안 또는 관련 사항에 대해 문의, 의견 또는 이의가 있는 경우 다음 방법으로 개발자에게 연락해 주십시오:\n· GitHub 저장소 및 Issue: https://github.com/BetaStudio2/ArchoeraMusic\n피드백을 받은 후 최대한 빠르게 답변드리겠습니다.\n\n",
+  "settingsPrivacy9Body": "본 방침의 내용, 귀하의 정보 보안 또는 관련 사항에 대해 문의, 의견 또는 이의가 있는 경우 다음 방법으로 개발자에게 연락해 주십시오:\n· GitHub 저장소 및 Issue: https://github.com/ArchoeraC/ArchoeraMusic\n피드백을 받은 후 최대한 빠르게 답변드리겠습니다.\n\n",
   "settingsPrivacyFooter": "본 방침 최종 업데이트: 2026년 9월 29일.",
   "settingsSectionEnvInfo": "환경 정보",
   "settingsEnvVersion": "버전",

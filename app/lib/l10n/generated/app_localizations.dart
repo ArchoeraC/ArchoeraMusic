@@ -6193,7 +6193,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPrivacy9Body.
   ///
   /// In zh_CN, this message translates to:
-  /// **'如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/BetaStudio2/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n'**
+  /// **'如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：\n· GitHub 仓库与 Issue：https://github.com/ArchoeraC/ArchoeraMusic\n我们将在收到反馈后尽快答复。\n\n'**
   String get settingsPrivacy9Body;
 
   /// No description provided for @settingsPrivacyFooter.
