@@ -62,6 +62,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <getopt.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -559,6 +560,21 @@ static void handle_command(AudioPipeline *p, const char *line) {
 /* 前端渲染契约：固定 128 bins 归一化频谱（[0,1] 对数映射，对齐 Electron Rust 端） */
 #define FFT_PUSH_BINS 128
 
+/* 追加一段 JSON。snprintf 返回值是「空间足够时应写入的长度」，截断时会
+ * ≥ 剩余空间；若直接拿它做下一次 sizeof(buf) - off，减法会下溢成巨大的
+ * size_t 并越界写。这里统一校验，返回新偏移（-1 = 失败）。 */
+static int json_append(char *buf, size_t cap, int off, const char *fmt, ...)
+{
+    if (off < 0 || (size_t)off >= cap) return -1;
+    size_t remaining = cap - (size_t)off;
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf + off, remaining, fmt, ap);
+    va_end(ap);
+    if (n < 0 || (size_t)n >= remaining) return -1;
+    return off + n;
+}
+
 /* 推送一帧 FFT 频谱到 fft_fd（JSON 行，双声道归一化 [0,1] bins） */
 static int push_fft_frame(AudioPipeline *p, int fft_fd)
 {
@@ -571,19 +587,24 @@ static int push_fft_frame(AudioPipeline *p, int fft_fd)
 
     /* 构造 JSON（双声道独立数据；offsetMs=起始偏移+已处理位置，供前端按播放位置取帧） */
     char fft_json[16384];
-    int off = snprintf(fft_json, sizeof(fft_json),
+    int off = json_append(fft_json, sizeof(fft_json), 0,
         "{\"type\":\"fft\",\"bins\":%d,\"offsetMs\":%.0f,\"ldata\":[",
         bins, (double)g_offset_ms + pipeline_get_fft_processed_seconds(p) * 1000.0);
+    if (off < 0) return -1;
     for (int i = 0; i < bins; i++) {
-        off += snprintf(fft_json + off, sizeof(fft_json) - off,
+        off = json_append(fft_json, sizeof(fft_json), off,
             "%.1f%s", fft_data[i], i < bins - 1 ? "," : "");
+        if (off < 0) return -1;
     }
-    off += snprintf(fft_json + off, sizeof(fft_json) - off, "],\"rdata\":[");
+    off = json_append(fft_json, sizeof(fft_json), off, "],\"rdata\":[");
+    if (off < 0) return -1;
     for (int i = 0; i < bins; i++) {
-        off += snprintf(fft_json + off, sizeof(fft_json) - off,
+        off = json_append(fft_json, sizeof(fft_json), off,
             "%.1f%s", fft_data_r[i], i < bins - 1 ? "," : "");
+        if (off < 0) return -1;
     }
-    off += snprintf(fft_json + off, sizeof(fft_json) - off, "]}");
+    off = json_append(fft_json, sizeof(fft_json), off, "]}");
+    if (off < 0) return -1;
 
     int ret = write_fd(fft_fd, fft_json, off);
     if (ret < 0) return ret;

@@ -87,6 +87,22 @@
   两者都只动锁文件、不改 `Cargo.toml` 约束。
   确属**不适用**的公告才可经 `ignore` 放行，且须在 workflow 注释写明理由
   （如 RUSTSEC-2023-0071：`rsa` 仅用于公钥加密、不持私钥）。
+- **2026-10-27 复扫（tokio）**：downloader 命中 RUSTSEC-2026-0386
+  （tokio 1.53.2 的 `AsyncFd::new` / `try_new` / `with_interest` / `try_with_interest`
+  违反 I/O safety；修复版 `>=1.51.6,<1.52.0` 或 `>=1.53.3`）。downloader **不调用
+  `AsyncFd`**（只用到 tokio 的 fs/io-util/sync/time，其余经 reqwest 传递），无运行时
+  暴露面；仍按「能升就升」执行 `cargo update -p tokio --precise 1.53.3`，只改
+  `Cargo.lock`（tokio 的 `windows-sys` 解析随之回到 0.52，Windows 目标仍在依赖图内）。
+  跟踪 issue #171 随本修复关闭。`paste`（RUSTSEC-2024-0436）维持 §4 的
+  「不适用（编译期）」结论，issue #162 作为上游依赖跟踪项保留。
+- **CodeQL 告警分级（2026-10-27）**：2026-10-22 启用 CodeQL 后首轮产生 44 条
+  `cpp/*` 告警。其中 **36 条位于 vendored 第三方单文件库**
+  （`include/miniaudio.h` 的 35 条整数乘法提升、`kernel/c/stb_vorbis.c` 的 1 条
+  指针溢出检查），由 `.github/codeql/codeql-config.yml` 的 `paths-ignore` 排除，
+  存量告警按 `won't fix`（上游库）dismiss；**8 条位于自研代码**
+  （`pipeline.c` 5 / `encoder.c` 1 / `main.c` 2），已按「乘法先提升 `size_t` +
+  溢出检查」「JSON 追加统一校验剩余空间」加固，下一轮扫描应自动关闭。
+  自研目录（`src/`、`kernel/*.zig`、`app/native/**`）**不得**加入 `paths-ignore`。
 
 ## 4. 已知风险与例外
 
