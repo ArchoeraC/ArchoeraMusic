@@ -14,8 +14,19 @@ name: Code scanning (CodeQL)
 on:
   push:
     branches: [main, ArchoeraOS]
+    # 纯文档 / 官网改动不跑 CodeQL（代码与配置改动仍全量扫描）。
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'site/**'
+      - 'LICENSE'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'site/**'
+      - 'LICENSE'
   schedule:
     # 每周一 03:23 UTC（与 security-audit 的 03:17 错开，并避开整点高峰）
     - cron: '23 3 * * 1'
