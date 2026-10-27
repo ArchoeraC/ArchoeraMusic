@@ -1054,110 +1054,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t reveal the file (no file manager available)';
 
   @override
-  String get settingsSectionThirdPartyService => 'Third-party services';
-
-  @override
-  String get settingsAttribution => 'Powered by  Music API';
-
-  @override
-  String get settingsApiDocs => ' Music API docs';
-
-  @override
   String get settingsSongCacheMemoryHint =>
       '\"In-memory playback\" is on — song cache won\'t be written to disk';
-
-  @override
-  String get platform => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => 'Experimental sources';
-
-  @override
-  String get settingsExperimentalSourceSubtitle =>
-      'Third-party sources (off by default)';
-
-  @override
-  String get settingsTitle => '';
-
-  @override
-  String get settingsNote =>
-      'Third-party experimental source, unofficial; login only — no sign-up or VIP purchase. May stop working at any time.';
-
-  @override
-  String get settingsEnable => 'Enable ';
-
-  @override
-  String get settingsEnableDesc =>
-      'Show NK in search, liked and favorites (off by default)';
-
-  @override
-  String get settingsLogin => 'Log in';
-
-  @override
-  String get settingsLogout => 'Log out';
-
-  @override
-  String settingsLoggedInAs({required Object name}) {
-    return 'Signed in as $name';
-  }
-
-  @override
-  String get settingsNotLoggedIn => 'Not signed in';
-
-  @override
-  String get LoginTitle => 'Sign in to ';
-
-  @override
-  String get LoginTabQr => 'QR code';
-
-  @override
-  String get LoginTabPassword => 'Email & password';
-
-  @override
-  String get LoginEmail => 'Email';
-
-  @override
-  String get LoginPassword => 'Password';
-
-  @override
-  String get LoginPasswordHint => 'Enter your password';
-
-  @override
-  String get LoginSubmit => 'Sign in';
-
-  @override
-  String get LoginQrHint => 'Scan with the  mobile app to sign in';
-
-  @override
-  String get QrScanned => 'Scanned, confirm on your phone';
-
-  @override
-  String get QrCanceled => 'Sign-in canceled';
-
-  @override
-  String get QrExpired => 'QR code expired, please regenerate';
-
-  @override
-  String get toastLoginRequired =>
-      'Operation failed (please make sure you are logged in to your NK account)';
-
-  @override
-  String get pageLikedLoginHint => 'Sign in to NK to view your liked songs';
-
-  @override
-  String get pageLikedLoginDesc =>
-      'Sign in to  to sync your liked songs';
-
-  @override
-  String get pageLikedEmptyHint =>
-      'No liked songs yet — tap the heart on the search page';
-
-  @override
-  String get pageFavLoginDesc =>
-      'Sign in to  to view playlists and favorites';
-
-  @override
-  String get pageFavEmptyHint => 'No playlists or favorites yet';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -5689,7 +5587,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      'Usage: archoerashell search <source> <query> [-n limit] [-p page]\n\nSearch songs on a source.\n  source: netease | kugou | qqmusic | \n  -n, --limit <n>   result count (1-50, default 20)\n  -p, --page <n>    page (1-based)\nExample: archoerashell search netease Jay -n 10';
+      'Usage: archoerashell search <source> <query> [-n limit] [-p page]\n\nSearch songs on a source.\n  source: netease | kugou | qqmusic\n  -n, --limit <n>   result count (1-50, default 20)\n  -p, --page <n>    page (1-based)\nExample: archoerashell search netease Jay -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>

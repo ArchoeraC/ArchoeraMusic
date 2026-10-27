@@ -24,19 +24,15 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/kugou/kugou_api.dart';
-import '../../services//_api.dart';
-import '../../services//_types.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../services/qqmusic/qq_liked_store.dart';
 import '../../services/qqmusic/qqmusic_api.dart';
-import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../stores/shell_page_state.dart';
 import '../../stores/user_playlists.dart';
 import '../common/toast.dart';
 import 'kugou_login_button.dart';
-import '_login_dialog.dart';
 import 'netease_login_dialog.dart';
 import 'qqmusic_login_dialog.dart';
 import 'track_list_dialog.dart';
@@ -111,7 +107,7 @@ abstract class CollectionPlatform {
   /// 本机红心库（QQ）：列表/状态不经服务端，离线可用。
   bool get localLikedStore => false;
 
-  /// 红心键（跨端稳定标识；NT/NK=id，KG=hash，QQ=songmid）。
+  /// 红心键（跨端稳定标识；NT=id，KG=hash，QQ=songmid）。
   String likeKey(Track t);
 
   /// 是否参与权威列表对账（QQ 本机列表不走对账）。
@@ -120,7 +116,7 @@ abstract class CollectionPlatform {
   /// 收藏成功 / 取消后是否维护共享「我喜欢」列表增量（NT / KG 覆写为 true）。
   bool get likedLocalDelta => false;
 
-  /// 缓存 user key（NT uid / KG userid / NK userId / QQ 'local'）。
+  /// 缓存 user key（NT uid / KG userid / QQ 'local'）。
   String? likedUserKey(dynamic ref);
 
   /// 轻量红心 id 集合（启动同步用）。
@@ -176,7 +172,7 @@ abstract class CollectionPlatform {
   String get defaultTabId;
 
   /// 拉取某分类；返回「tabKey → 数据」映射（一次请求可填充多个分类，
-  /// 如 KG/QQ/NK 的曲库接口）。key 形如 `'$source.$tabId'`。
+  /// 如 KG/QQ 的曲库接口）。key 形如 `'$source.$tabId'`。
   Future<Map<String, List<CoverItem>>> fetchFavorites(
     dynamic ref,
     String tabId,
@@ -203,7 +199,7 @@ abstract class CollectionPlatform {
 
   // ── 歌单管理（收藏 / 新建 / 编辑 / 删除 / 增删歌曲）──────────────
   //
-  // 仅支持用户歌单管理的音源实现（NT / ）；其余默认「不支持」，UI 自动
+  // 仅支持用户歌单管理的音源实现（如 NT）；其余默认「不支持」，UI 自动
   // 隐藏相关入口。**新增音源只需实现这些方法**，UI 与数据面无需改动。
 
   /// 是否支持用户歌单管理。
@@ -269,7 +265,7 @@ CollectionPlatform collectionPlatform(String source) =>
 List<CollectionPlatform> collectionPlatforms(dynamic ref) =>
     _all.where((p) => p.enabled(ref)).toList(growable: false);
 
-/// 全部已注册平台的适配器（含当前被关闭的实验源；红心同步等全量遍历用）。
+/// 全部已注册平台的适配器（红心同步等全量遍历用）。
 List<CollectionPlatform> allCollectionPlatforms() => List.unmodifiable(_all);
 
 /// 默认「我喜欢」平台：优先已登录的 NT → KG → QQ，否则 NT（与历史一致；
@@ -289,7 +285,6 @@ final List<CollectionPlatform> _all = [
   _NeteaseCollection(),
   _KugouCollection(),
   _QqCollection(),
-  _Collection(),
 ];
 
 final Map<String, CollectionPlatform> _registry = {
@@ -1034,316 +1029,3 @@ class _QqCollection extends CollectionPlatform {
   String favEmptyHint(AppLocalizations l10n) => l10n.pageFavEmptyHint;
 }
 
-// ── NK ─────────────────────────────────────────────────────────────────
-
-class _Collection extends CollectionPlatform {
-  @override
-  String get source => '';
-
-  @override
-  String label(AppLocalizations l10n) => l10n.platform;
-
-  @override
-  ProviderListenable<Object?>? get authSignal =>
-      ApiProvider.select<Object?>((s) => s.isLoggedIn);
-
-  @override
-  String likeFailedText(AppLocalizations l10n) => l10n.toastLoginRequired;
-
-  @override
-  NotifierProvider<ShellPageSelection<String>, String?> get tabSelection =>
-      favoritesTabProvider;
-
-  @override
-  List<String> get tabIds => const ['created', 'collectedPlaylist', 'liked'];
-
-  @override
-  bool enabled(dynamic ref) {
-    // `ref` 为 dynamic（注册表同时被 WidgetRef / Ref 调用）：dynamic 调用不走
-    // 扩展方法（extension getter 无法动态派发），必须显式转回 AppPrefs 再读，
-    // 否则运行时 NoSuchMethodError → 「我喜欢 / 收藏 / 搜索」整页白屏。
-    final prefs = ref.read(appPrefsProvider) as AppPrefs;
-    return prefs.Enabled;
-  }
-
-  @override
-  bool loggedIn(dynamic ref) => ref.read(ApiProvider).isLoggedIn;
-
-  @override
-  Future<void> login(BuildContext context) => showLoginDialog(context);
-
-  @override
-  String likeKey(Track t) => t.id;
-
-  @override
-  String? likedUserKey(dynamic ref) {
-    final id = ref.read(ApiProvider).userId;
-    return id.isEmpty ? null : id;
-  }
-
-  @override
-  Future<Set<String>> fetchLikedIds(dynamic ref) =>
-      ref.read(ApiProvider).likedIds();
-
-  @override
-  Future<List<Track>> fetchLikedTracks(dynamic ref) =>
-      ref.read(ApiProvider).likedTracks();
-
-  @override
-  Future<void> setLiked(dynamic ref, Track t, bool like) =>
-      ref.read(ApiProvider).like(t.id, like: like);
-
-  @override
-  LikedView likedView(dynamic ref) {
-    final store = ref.read(likedStoreProvider);
-    return LikedView(
-      tracks: store.tracks(source),
-      total: store.total(source),
-      loaded: store.loaded(source),
-      loading: store.loading(source),
-      error: store.error(source),
-      likeIds: ref.read(likeControllerProvider).idsFor(source),
-    );
-  }
-
-  @override
-  void resetLiked(dynamic ref) => ref.read(likedStoreProvider).reset(source);
-
-  @override
-  void ensureLikedLoaded(dynamic ref) {
-    if (!enabled(ref) || !loggedIn(ref)) return; // 关闭/未登录不发请求
-    ref.read(likedStoreProvider).ensureLoaded(source);
-  }
-
-  @override
-  Future<void> likedRefresh(BuildContext context, dynamic ref) =>
-      ref.read(likedStoreProvider).refresh(source, writeCache: true);
-
-  @override
-  String likedSubtitle(dynamic ref, AppLocalizations l10n, LikedView view) =>
-      likedAvailable(ref)
-      ? l10n.commonSongCountHint(count: view.total)
-      : l10n.pageLikedLoginHint;
-
-  @override
-  String likedLoginDesc(AppLocalizations l10n) => l10n.pageLikedLoginDesc;
-
-  @override
-  String likedEmptyHint(AppLocalizations l10n) => l10n.pageLikedEmptyHint;
-
-  @override
-  List<CollectionTab> tabs(AppLocalizations l10n) => [
-    CollectionTab('created', (l) => l.pageFavKgCreated, EtaIcons.music2Outline),
-    CollectionTab(
-      'collectedPlaylist',
-      (l) => l.pageFavKgCollectedPlaylist,
-      EtaIcons.music2Outline,
-    ),
-    CollectionTab('liked', (l) => l.sidebarLiked, EtaIcons.music2Outline),
-  ];
-
-  @override
-  String get defaultTabId => 'created';
-
-  @override
-  Future<Map<String, List<CoverItem>>> fetchFavorites(
-    dynamic ref,
-    String tabId,
-  ) async {
-    final Api api = ref.read(ApiProvider);
-    final lib = await api.userLibrary();
-    String? cover(String? path) {
-      if (path == null || path.isEmpty || path.contains('/avatar/default')) {
-        return null;
-      }
-      return api.resolveUrl(path);
-    }
-
-    CoverItem toItem(Playlist p) => CoverItem(
-      id: p.id,
-      title: p.name,
-      cover: cover(p.firstMusicCover),
-      subtitle: p.creator ?? '',
-      trackCount: p.musicCount,
-      source: '',
-    );
-
-    var likedItems = const <CoverItem>[];
-    try {
-      final ids = await api.likedIds();
-      if (ids.isNotEmpty) {
-        likedItems = [
-          CoverItem(
-            id: 'profile:favorites',
-            title: '我喜欢',
-            trackCount: ids.length,
-            source: '',
-          ),
-        ];
-      }
-    } catch (_) {
-      // 计数失败不影响歌单展示
-    }
-    return {
-      tabKey('created'): lib.createdPlaylists.map(toItem).toList(),
-      tabKey('collectedPlaylist'): lib.collectedPlaylists.map(toItem).toList(),
-      tabKey('liked'): likedItems,
-    };
-  }
-
-  @override
-  void openFavorite(
-    BuildContext context,
-    dynamic ref,
-    String tabId,
-    CoverItem item,
-  ) {
-    if (tabId == 'liked') {
-      showTracksDialog(
-        context,
-        title: item.title,
-        cover: item.cover,
-        loadTracks: (r) => r.read(ApiProvider).likedTracks(),
-      );
-      return;
-    }
-    if (tabId == 'collectedPlaylist') {
-      showFavoritePlaylistDialog(context, item);
-      return;
-    }
-    showPlaylistDetailDialog(context, item);
-  }
-
-  @override
-  String favTabSubtitle(
-    AppLocalizations l10n,
-    String tabId,
-    int count,
-    bool loggedIn,
-  ) {
-    if (!loggedIn) {
-      return switch (tabId) {
-        'collectedPlaylist' => l10n.pageFavKgCollectedPlaylistLoginHint,
-        'liked' => l10n.pageFavKgCollectedAlbumLoginHint,
-        _ => l10n.pageFavKgCreatedLoginHint,
-      };
-    }
-    return switch (tabId) {
-      'collectedPlaylist' => l10n.pageFavKgCollectedPlaylistCount(count: count),
-      'liked' => l10n.pageFavKgCollectedAlbumCount(count: count),
-      _ => l10n.pageFavKgCreatedCount(count: count),
-    };
-  }
-
-  @override
-  String favLoginDesc(AppLocalizations l10n) => l10n.pageFavLoginDesc;
-
-  @override
-  String favEmptyHint(AppLocalizations l10n) => l10n.pageFavEmptyHint;
-
-  // ── 歌单管理 ──────────────────────────────────────────────────
-
-  @override
-  bool playlistManageSupported(dynamic ref) => true;
-
-  @override
-  Future<UserPlaylists> fetchUserPlaylists(dynamic ref) async {
-    final Api api = ref.read(ApiProvider);
-    if (!api.isLoggedIn) return const UserPlaylists(loaded: true);
-    final created = await api.userPlaylists();
-    // 收藏歌单失败不影响自建展示。
-    var collected = const <Playlist>[];
-    try {
-      collected = await api.favoritePlaylists();
-    } catch (_) {
-      // 忽略：仅收藏为空
-    }
-    String? cover(String? path) {
-      if (path == null || path.isEmpty || path.contains('/avatar/default')) {
-        return null;
-      }
-      return api.resolveUrl(path);
-    }
-
-    UserPlaylist toItem(Playlist p, bool c) => UserPlaylist(
-      id: p.id,
-      name: p.name,
-      cover: cover(p.firstMusicCover),
-      trackCount: p.musicCount,
-      owner: p.creator,
-      description: p.description,
-      collected: c,
-    );
-
-    return UserPlaylists(
-      all: [
-        for (final p in created) toItem(p, false),
-        for (final p in collected) toItem(p, true),
-      ],
-      loaded: true,
-    );
-  }
-
-  @override
-  Future<void> setPlaylistCollected(
-    dynamic ref,
-    String id, {
-    required bool collected,
-  }) async {
-    final Api api = ref.read(ApiProvider);
-    if (collected) {
-      await api.favoritePlaylist(id);
-    } else {
-      await api.unfavoritePlaylist(id);
-    }
-  }
-
-  @override
-  Future<String?> createPlaylist(
-    dynamic ref,
-    String name, {
-    String? description,
-    int privacy = 0,
-  }) async {
-    final Api api = ref.read(ApiProvider);
-    final created = await api.createPlaylist(name, description: description);
-    return created?.id;
-  }
-
-  @override
-  Future<void> updatePlaylist(
-    dynamic ref,
-    String id, {
-    String? name,
-    String? description,
-  }) async {
-    final Api api = ref.read(ApiProvider);
-    await api.updatePlaylist(id, name: name, description: description);
-  }
-
-  @override
-  Future<void> deletePlaylist(dynamic ref, String id) {
-    final Api api = ref.read(ApiProvider);
-    return api.deletePlaylist(id);
-  }
-
-  @override
-  Future<int?> addTracksToPlaylist(
-    dynamic ref,
-    String id,
-    List<String> trackIds,
-  ) {
-    final Api api = ref.read(ApiProvider);
-    return api.addMusicToPlaylist(id, trackIds);
-  }
-
-  @override
-  Future<void> removeTracksFromPlaylist(
-    dynamic ref,
-    String id,
-    List<String> trackIds,
-  ) {
-    final Api api = ref.read(ApiProvider);
-    return api.removeMusicFromPlaylist(id, trackIds);
-  }
-}

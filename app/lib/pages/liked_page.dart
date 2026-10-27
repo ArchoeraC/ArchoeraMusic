@@ -8,7 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/netease/track.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/source/source_platform.dart';
-import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';
@@ -26,7 +25,7 @@ part 'liked/liked_page_view.dart';
 
 /// 我喜欢页（对齐原项目 Liked.vue）。
 ///
-/// 平台切换与数据（NT / KG / QM / NK）**全部由 `CollectionPlatform` 注册表
+/// 平台切换与数据（NT / KG / QM）**全部由 `CollectionPlatform` 注册表
 /// 驱动**：平台列表、登录引导、登录动作、红心键、列表数据、刷新/同步语义、
 /// 空态文案都来自适配器；本页不含任何具体平台分支。新增音源只需注册适配器。
 class LikedPage extends ConsumerStatefulWidget {
@@ -47,8 +46,8 @@ class _LikedPageState extends ConsumerState<LikedPage> {
   @override
   void initState() {
     super.initState();
-    // 优先恢复上次显式选择（壳内容因播放页展开被卸载后重建）；实验性音源
-    // 已关闭时不保留 NK 选择。无显式选择时按登录态给默认值。
+    // 优先恢复上次显式选择（壳内容因播放页展开被卸载后重建）；
+    // 无显式选择时按登录态给默认值。
     final restored = ref.read(likedPlatformProvider);
     _platform = (restored != null && collectionPlatform(restored).enabled(ref))
         ? restored
