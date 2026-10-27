@@ -102,6 +102,6 @@
 
 如对本政策的内容、您的信息安全或相关事项有任何疑问、意见或申诉，欢迎通过以下方式与开发者联系：
 
-- **GitHub 仓库与 Issue**：https://github.com/BetaStudio2/ArchoeraMusic
+- **GitHub 仓库与 Issue**：https://github.com/ArchoeraC/ArchoeraMusic
 
 我们将在收到反馈后尽快答复。

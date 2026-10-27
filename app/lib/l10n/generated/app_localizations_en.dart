@@ -3490,7 +3490,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPrivacy9Body =>
-      'If you have any questions, comments or complaints about this policy, your information security or related matters, you are welcome to contact the developer at:\n· GitHub repository & Issues: https://github.com/BetaStudio2/ArchoeraMusic\nWe will reply as soon as possible after receiving your feedback.\n\n';
+      'If you have any questions, comments or complaints about this policy, your information security or related matters, you are welcome to contact the developer at:\n· GitHub repository & Issues: https://github.com/ArchoeraC/ArchoeraMusic\nWe will reply as soon as possible after receiving your feedback.\n\n';
 
   @override
   String get settingsPrivacyFooter =>

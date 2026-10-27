@@ -3384,7 +3384,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsPrivacy9Body =>
-      '본 방침의 내용, 귀하의 정보 보안 또는 관련 사항에 대해 문의, 의견 또는 이의가 있는 경우 다음 방법으로 개발자에게 연락해 주십시오:\n· GitHub 저장소 및 Issue: https://github.com/BetaStudio2/ArchoeraMusic\n피드백을 받은 후 최대한 빠르게 답변드리겠습니다.\n\n';
+      '본 방침의 내용, 귀하의 정보 보안 또는 관련 사항에 대해 문의, 의견 또는 이의가 있는 경우 다음 방법으로 개발자에게 연락해 주십시오:\n· GitHub 저장소 및 Issue: https://github.com/ArchoeraC/ArchoeraMusic\n피드백을 받은 후 최대한 빠르게 답변드리겠습니다.\n\n';
 
   @override
   String get settingsPrivacyFooter => '본 방침 최종 업데이트: 2026년 9월 29일.';

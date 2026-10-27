@@ -886,7 +886,7 @@
   "settingsPrivacy8Title": "8. プライバシーポリシーの更新\n",
   "settingsPrivacy8Body": "当方は、機能の反復、技術アーキテクチャの進化または法令の変更に応じて、本ポリシーを適宜改訂することがあります。更新後のバージョンはソフトウェアまたは公式リポジトリとともに公開され、冒頭に記載された「最終更新」日から効力を生じます；更新後も本ソフトウェアを引き続きご利用になる場合、お客様は更新後のポリシーを読み、理解し、同意したものとみなします。\n\n",
   "settingsPrivacy9Title": "9. お問い合わせ\n",
-  "settingsPrivacy9Body": "本ポリシーの内容、お客様の情報セキュリティまたは関連事項についてご不明な点、ご意見、お申し立てがある場合は、以下の方法で開発者までご連絡ください：\n· GitHub リポジトリと Issue：https://github.com/BetaStudio2/ArchoeraMusic\nフィードバックを受領後、できるだけ早く回答いたします。\n\n",
+  "settingsPrivacy9Body": "本ポリシーの内容、お客様の情報セキュリティまたは関連事項についてご不明な点、ご意見、お申し立てがある場合は、以下の方法で開発者までご連絡ください：\n· GitHub リポジトリと Issue：https://github.com/ArchoeraC/ArchoeraMusic\nフィードバックを受領後、できるだけ早く回答いたします。\n\n",
   "settingsPrivacyFooter": "本ポリシーの最終更新：2026 年 9 月 29 日。",
   "settingsSectionEnvInfo": "環境情報",
   "settingsEnvVersion": "バージョン",

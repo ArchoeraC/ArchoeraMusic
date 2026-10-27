@@ -275,7 +275,7 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
 
   /// 项目 GitHub 仓库地址（仅展示 / 复制，不打开链接）。
   static const String _kRepoUrl =
-      'https://github.com/BetaStudio2/ArchoeraMusic';
+      'https://github.com/ArchoeraC/ArchoeraMusic';
 
   Widget _envRow(String label, String value) {
     final scheme = Theme.of(context).colorScheme;
