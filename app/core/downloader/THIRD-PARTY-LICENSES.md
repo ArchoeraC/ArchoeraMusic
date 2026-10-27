@@ -26,6 +26,16 @@
 | `pkcs7` | 0.4 | **MIT / Apache-2.0** | ✅ | PKCS#7 padding |
 | `hex` | 0.4 | **MIT / Apache-2.0** | ✅ | Hex 编解码 |
 | `num-bigint` / `num-traits` | 0.4 / 0.2 | **MIT / Apache-2.0** | ✅ | 大整数运算（Kugou kgCalcMid: hex→BigInt→dec） |
+| `lofty` | 0.25.5（vendor） | **MIT / Apache-2.0** | ✅ | 音频标签读写；见下方 vendored 说明 |
+| `pastey` | 0.2.3 | **MIT / Apache-2.0** | ✅ | `paste` 的 API 兼容维护分支（仅编译期 proc-macro） |
+
+## Vendored Rust 源码（`vendor/`）
+
+| 目录 | 上游 | 许可证 | 修改 |
+|---|---|---|---|
+| `vendor/lofty` | `lofty` 0.25.5 | **MIT / Apache-2.0** | 仅把 `paste` 依赖/引用改为 `pastey`（RUSTSEC-2024-0436），其余与上游一致；`Cargo.toml` 用 `[patch.crates-io]` 指向该目录。升级步骤见 `vendor/lofty/VENDOR.md` |
+
+> `pastey` 是 `paste` 的维护分支，作为普通 crates.io 依赖引入，不随源码 vendored。
 
 ## 可选第三方平台 SDK（默认 off，仅 feature 切换时拉取）
 
