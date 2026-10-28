@@ -58,6 +58,20 @@ target_include_directories(archoera_platform PRIVATE
 # 导出宏：Windows 上 apl_* 需 __declspec(dllexport)（见 archoera_platform.h）。
 target_compile_definitions(archoera_platform PRIVATE ARCHOERA_PLATFORM_BUILD)
 
+# Windows VERSIONINFO（统一制作者 / 版本号，见 app/cmake/archoera_version.cmake）。
+if(WIN32)
+  enable_language(RC)
+  include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/archoera_version.cmake")
+  archoera_configure_version_rc(
+    "${CMAKE_CURRENT_BINARY_DIR}/archoera_platform.rc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../pubspec.yaml"
+    "archoera_platform.dll"
+    "ArchoeraMusic platform bridge"
+    "archoera_platform"
+    2)
+  target_sources(archoera_platform PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/archoera_platform.rc")
+endif()
+
 if(MSVC)
   target_compile_options(archoera_platform PRIVATE /W3 /permissive- /Zc:__cplusplus /utf-8)
   target_compile_definitions(archoera_platform PRIVATE _WIN32_WINNT=0x0A00 WINVER=0x0A00)

@@ -35,6 +35,20 @@ add_library(archoera_log SHARED src/archoera_log.c)
 target_include_directories(archoera_log PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_compile_definitions(archoera_log PRIVATE ARCHOERA_LOG_BUILD)
 
+# Windows VERSIONINFO（统一制作者 / 版本号）。
+if(WIN32)
+  enable_language(RC)
+  include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/archoera_version.cmake")
+  archoera_configure_version_rc(
+    "${CMAKE_CURRENT_BINARY_DIR}/archoera_log.rc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../pubspec.yaml"
+    "archoera_log.dll"
+    "ArchoeraMusic unified logging core"
+    "archoera_log"
+    2)
+  target_sources(archoera_log PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/archoera_log.rc")
+endif()
+
 if(MSVC)
   target_compile_options(archoera_log PRIVATE /W3 /utf-8)
   # fopen 等 CRT “不安全”告警：本库仅追加写自有日志文件，无需 _s 变体。

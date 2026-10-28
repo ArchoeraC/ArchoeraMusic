@@ -89,14 +89,15 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.archoera" "\0"
-            VALUE "FileDescription", "archoera_music" "\0"
+            VALUE "CompanyName", "io.awa.archoera.betastudio2" "\0"
+            VALUE "FileDescription", "ArchoeraMusic" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "archoera_music" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.archoera. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 io.awa.archoera.betastudio2" "\0"
             VALUE "OriginalFilename", "archoera_music.exe" "\0"
-            VALUE "ProductName", "archoera_music" "\0"
+            VALUE "ProductName", "ArchoeraMusic" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
+            VALUE "Comments", "https://github.com/ArchoeraC/ArchoeraMusic" "\0"
         END
     END
     BLOCK "VarFileInfo"

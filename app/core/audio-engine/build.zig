@@ -109,9 +109,7 @@ const amr_sources = [_][]const u8{
 };
 // total: 92 files
 
-
 pub fn build(b: *std.Build) void {
-
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     // 单元测试构建模式：默认 ReleaseSafe。Debug 下 fmt.m4a.open 被编译器分配约
@@ -219,6 +217,70 @@ pub fn build(b: *std.Build) void {
         .files = &amr_sources,
         .flags = &amr_flags,
     });
+
+    // Windows VERSIONINFO：统一制作者/版本号（与 app/pubspec.yaml 同步）。
+    // 自包含 RC（数字常量）避免依赖 Windows SDK 头；非 Windows 目标忽略。
+    if (target.result.os.tag == .windows) {
+        // 读取 app/pubspec.yaml 的版本（build 根为 app/core/audio-engine）。
+        const pubspec = std.Io.Dir.cwd().readFileAlloc(
+            b.graph.io,
+            "../../pubspec.yaml",
+            b.allocator,
+            std.Io.Limit.limited(1 << 20),
+        ) catch "";
+        var version: []const u8 = "0.0.0+0";
+        var lines = std.mem.splitScalar(u8, pubspec, '\n');
+        while (lines.next()) |line| {
+            const trimmed = std.mem.trim(u8, line, " \t\r");
+            if (std.mem.startsWith(u8, trimmed, "version:")) {
+                version = std.mem.trim(u8, trimmed["version:".len..], " \t");
+                break;
+            }
+        }
+        const plus = std.mem.indexOfScalar(u8, version, '+') orelse version.len;
+        const base = version[0..plus];
+        const build_num = if (plus < version.len) version[plus + 1 ..] else "0";
+        var parts = std.mem.splitScalar(u8, base, '.');
+        const major = parts.next() orelse "0";
+        const minor = parts.next() orelse "0";
+        const patch = parts.next() orelse "0";
+        const comma = b.fmt("{s},{s},{s},{s}", .{ major, minor, patch, build_num });
+        const rc_text = b.fmt(
+            \\1 VERSIONINFO
+            \\ FILEVERSION {s}
+            \\ PRODUCTVERSION {s}
+            \\ FILEFLAGSMASK 0x3fL
+            \\ FILEFLAGS 0x0L
+            \\ FILEOS 0x40004L
+            \\ FILETYPE 2
+            \\ FILESUBTYPE 0x0L
+            \\BEGIN
+            \\    BLOCK "StringFileInfo"
+            \\    BEGIN
+            \\        BLOCK "040904e4"
+            \\        BEGIN
+            \\            VALUE "CompanyName", "io.awa.archoera.betastudio2"
+            \\            VALUE "FileDescription", "ArchoeraMusic audio kernel"
+            \\            VALUE "FileVersion", "{s}"
+            \\            VALUE "InternalName", "archoera_kernel"
+            \\            VALUE "LegalCopyright", "Copyright (C) 2026 io.awa.archoera.betastudio2"
+            \\            VALUE "OriginalFilename", "archoera_kernel.dll"
+            \\            VALUE "ProductName", "ArchoeraMusic"
+            \\            VALUE "ProductVersion", "{s}"
+            \\            VALUE "Comments", "https://github.com/ArchoeraC/ArchoeraMusic"
+            \\        END
+            \\    END
+            \\    BLOCK "VarFileInfo"
+            \\    BEGIN
+            \\        VALUE "Translation", 0x409, 1252
+            \\    END
+            \\END
+        , .{ comma, comma, version, version });
+        const write_files = b.addWriteFiles();
+        const rc = write_files.add("archoera_kernel.rc", rc_text);
+        kernel_shared.root_module.addWin32ResourceFile(.{ .file = rc });
+    }
+
     // Windows：动态库只装 DLL（scanner DllImport 运行期加载），不装 import lib，
     // 避免与静态库同名竞态覆盖（见上）。非 Windows 无同名冲突，正常安装。
     if (target.result.os.tag == .windows) {

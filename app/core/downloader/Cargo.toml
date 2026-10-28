@@ -56,6 +56,10 @@ libc             = "0.2"
 # 必须同时启用 Win32_Foundation，否则 E0425（Windows CI 已实测复现）。
 windows-sys      = { version = "0.61", features = ["Win32_System_Memory", "Win32_Foundation"] }
 
+# Windows 版本资源（VERSIONINFO + 图标）；build.rs 在非 Windows 宿主/目标跳过。
+[build-dependencies]
+winres = "0.1"
+
 [profile.release]
 lto       = true
 strip     = "symbols"
