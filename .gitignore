@@ -50,6 +50,9 @@ app/core/audio-engine/*.pcm
 # subsonic（Go c-shared + Rust 转码器 cdylib；build/ 由 build.sh 产出）
 app/core/subsonic/build/
 app/core/subsonic/transcoder/target/
+# build_windows.bat 生成的 Go Windows 版本资源（仅 windows/amd64 生效）
+app/core/subsonic/version_windows_amd64.rc
+app/core/subsonic/version_windows_amd64.syso
 
 # downloader（Rust 下载器 cdylib）
 app/core/downloader/target/

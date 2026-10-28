@@ -6,6 +6,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>indexer-ffi</AssemblyName>
     <RootNamespace>Archoera.Indexer.Ffi</RootNamespace>
+    <!-- 统一制作者/产品元数据（NativeAOT 产物用于 Windows 版本资源/程序集信息） -->
+    <Company>io.awa.archoera.betastudio2</Company>
+    <Product>ArchoeraMusic</Product>
+    <AssemblyTitle>ArchoeraMusic library indexer</AssemblyTitle>
+    <Copyright>Copyright (C) 2026 io.awa.archoera.betastudio2</Copyright>
     <!-- NativeAOT 共享库：dotnet publish -r &lt;rid&gt; 产出 libindexer-ffi.so/.dylib/.dll，
          供 Flutter FFI 直接调用（进程内、无子进程） -->
     <OutputType>Library</OutputType>

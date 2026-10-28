@@ -11,7 +11,7 @@ PRODUCT_NAME = archoera_music
 PRODUCT_BUNDLE_IDENTIFIER = com.archoera.archoeraMusic
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.archoera. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 io.awa.archoera.betastudio2. All rights reserved.
 
 // Swift ⇄ C：暴露原生 archoerashell 入口（app/core/shell 的 Rust staticlib）。
 SWIFT_OBJC_BRIDGING_HEADER = Runner/Runner-Bridging-Header.h

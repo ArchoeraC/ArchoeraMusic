@@ -49,6 +49,10 @@ windows = { version = "0.58", features = [
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "3"
 
+# Windows 版本资源（VERSIONINFO + 图标）。build.rs 在非 Windows 目标直接跳过。
+[build-dependencies]
+winres = "0.1"
+
 [profile.release]
 opt-level = 3
 lto = true

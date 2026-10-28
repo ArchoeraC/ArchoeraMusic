@@ -23,6 +23,10 @@ symphonia = { version = "0.6", default-features = false, features = [
 mp3lame-encoder = "0.2"
 anyhow = "1"
 
+# Windows 版本资源（VERSIONINFO + 图标）；build.rs 在非 Windows 宿主/目标跳过。
+[build-dependencies]
+winres = "0.1"
+
 [profile.release]
 lto = true
 strip = "symbols"
