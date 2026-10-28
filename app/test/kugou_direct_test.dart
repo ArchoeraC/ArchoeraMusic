@@ -26,6 +26,9 @@ void main() {
   // 歌词/签名等与出口无关的断言照常执行；直链断言默认跳过，设
   // ARCHOERA_ONLINE_TEST=1 启用（与 online_playback_test.dart 同口径）。
   final onlineEnabled = Platform.environment['ARCHOERA_ONLINE_TEST'] == '1';
+  // 真实网络用例默认跳过：第三方接口的风控/地域/断网都会变成假红或长时间
+  // 等待（曾把 CI 拖死）；显式设 ARCHOERA_ONLINE_TEST=1 才执行。
+  final onlineSkip = onlineEnabled ? null : '真实网络请求：设 ARCHOERA_ONLINE_TEST=1 启用';
 
   // ── 加密 / 签名单元测试 ──────────────────────────────────────────
 
@@ -86,7 +89,7 @@ void main() {
     );
     // ignore: avoid_print
     print('[KG] qr/check status=$status (等待扫码即可，无需真人扫码)');
-  }, timeout: const Timeout(Duration(seconds: 30)));
+  }, timeout: const Timeout(Duration(seconds: 30)), skip: onlineSkip);
 
   test('calculateMid 为十进制大整数', () {
     final mid = kgCalcMid(kgRandomString(16));
@@ -185,6 +188,7 @@ void main() {
       print('[KG] hi-res 降级=$urlHires');
     },
     timeout: const Timeout(Duration(seconds: 120)),
+    skip: onlineSkip,
   );
 
   test('直连歌词（真实请求，KRC 解码）', () async {
@@ -204,7 +208,7 @@ void main() {
     expect(lyric!.lrc, isNotEmpty);
     // ignore: avoid_print
     print('[KG] 歌词首行: ${lyric.lrc.split('\n').first}');
-  }, timeout: const Timeout(Duration(seconds: 30)));
+  }, timeout: const Timeout(Duration(seconds: 30)), skip: onlineSkip);
 
   test('分类搜索：歌手/歌单/专辑（真实请求，字段解析）', () async {
     final api = KugouApi();
@@ -227,7 +231,7 @@ void main() {
 
     final albums = await api.searchByType('周杰伦', type: 'album', pagesize: 5);
     expect(albums.items.whereType<CoverItem>(), isNotEmpty, reason: '专辑搜索应有结果');
-  }, timeout: const Timeout(Duration(seconds: 60)));
+  }, timeout: const Timeout(Duration(seconds: 60)), skip: onlineSkip);
 
   test('登录态注入：session 保存 + 带 token 请求链路正常', () async {
     final api = KugouApi();
@@ -246,5 +250,5 @@ void main() {
     // ignore: avoid_print
     print('[KG] 登录态 resolvePlayUrl → '
         '${url ?? '(null，无效 token 被拒属正常)'}');
-  }, timeout: const Timeout(Duration(seconds: 30)));
+  }, timeout: const Timeout(Duration(seconds: 30)), skip: onlineSkip);
 }

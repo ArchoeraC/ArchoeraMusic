@@ -22,14 +22,15 @@
 #  构建目标 / 基线 / 最低 glibc / 提交，用户无需靠后缀猜适用性。
 #
 #  各发行版 Linux job 共用 .github/actions/build-linux（复合 action）：工具链
-#  (rust/go/dotnet/flutter) → Zig 0.17 → build-linux.sh → zig build test →
-#  cargo test（archoerashell）→ pub get/analyze/test → vault 端到端 →
-#  flutter build linux。发行版专属的系统依赖安装与打包由各 job 负责。
+#  (rust/go/dotnet/flutter) → Zig 0.17 → build-linux.sh → pub get/analyze →
+#  flutter build linux。**CI 不跑测试**：单测/回归按 AGENTS.md 的「提交前必跑」
+#  在本地执行（完整套件曾把流水线拖到数十分钟甚至挂死）。发行版专属的系统
+#  依赖安装与打包由各 job 负责。
 #
 #  macOS/Windows job：工具链 → 一站式原生构建（build-macos.sh / build_windows.bat，
-#  含 archoerashell staticlib + vault-rs 凭据保险库）→ cargo test（archoerashell +
-#  vault-rs）→ pub get/analyze/test → flutter build（经内嵌 cargo/脚本阶段链入
-#  archoerashell；vault 由 bundle 步骤/CMake install 收入 native/）→ 打包。
+#  含 archoerashell staticlib + vault-rs 凭据保险库）→ pub get/analyze → flutter
+#  build（经内嵌 cargo/脚本阶段链入 archoerashell；vault 由 bundle 步骤/CMake
+#  install 收入 native/）→ 打包。
 #
 #  Zig 0.17 安装沿用已修复逻辑（f99266b / 7116dfc）：归档名按 0.15.1+ 新规则
 #  zig-<arch>-<os>；GITHUB_PATH 对当前步骤不生效，同步骤内用绝对路径验证。
@@ -404,18 +405,7 @@ jobs:
             app/core/build_windows.log
           if-no-files-found: ignore
 
-      # ───────── Rust 原生 CLI（archoerashell）+ vault-rs 单测（各桌面端）─────────
-      - name: Rust tests (archoerashell + vault-rs)
-        if: matrix.os == 'macos' || matrix.os == 'windows'
-        # archoerashell：与 Linux 共享同一 crate；build.rs 从 ARB 生成帮助/标签文案。
-        # vault-rs：macOS/Windows 的 OS 钥匙串后端（Keychain/DPAPI）与进程护栏在此
-        # 按本机目标编译并跑纯函数单测（Argon2id RFC 9106 向量 / 恢复码归一化）。
-        # 完整原生构建由随后的 build-macos.sh / build_windows.bat 完成。
-        run: |
-          cargo test --release --manifest-path app/core/shell/Cargo.toml
-          cargo test --release --manifest-path app/core/vault-rs/Cargo.toml
-
-      # ───────────── Flutter pub get / analyze / test（统一在 app/）─────
+      # ───────────── Flutter pub get / analyze（统一在 app/）─────────────
       - name: Flutter pub get
         working-directory: app
         run: flutter pub get
@@ -423,14 +413,6 @@ jobs:
       - name: Analyze
         working-directory: app
         run: dart analyze lib
-
-      - name: Test (unit smoke + 平台桥接 ABI 守卫)
-        working-directory: app
-        # native_platform_abi_test.dart 是纯文本静态检查（不依赖原生产物，
-        # 三端均可跑）：守住 backend.h 契约符号「无条件 + namespace archoera」
-        # 定义，防 2026-10-14 那类只在链接期暴露的 Windows LNK2019 复发。
-        # Linux job 跑完整套件时已自动覆盖，这里显式带上以覆盖 macOS/Windows。
-        run: flutter test test/widget_test.dart test/native_platform_abi_test.dart
 
       # ──────────────────────── Flutter 端构建（分平台）─────────────────
       - name: Build Flutter macOS

@@ -13,6 +13,10 @@ dart analyze lib      # 0 issue
 flutter test          # 全绿
 ```
 
+> CI（`.github/workflows/build-all.yml`）**只做编译与打包、不跑测试**：单测/回归
+> 的门禁完全依赖上面的本地步骤，别指望 Actions 帮你兜底。
+> 真实网络用例默认跳过，需要时 `ARCHOERA_ONLINE_TEST=1 flutter test` 显式启用。
+
 改动以下模块时另跑：
 
 ```bash
