@@ -47,9 +47,15 @@ fi
 
 # 用 -o 固定 publish 输出目录（不依赖 bin/Release/<tfm>/<rid> 路径，
 # Windows 的 AOT 输出还带 x64 前缀，随 TFM 升级会漂移）。
+APPVER="$(sed -n 's/^version:[[:space:]]*//p' "$(dirname "$0")/../../pubspec.yaml" | head -1)"
+[ -n "$APPVER" ] || APPVER="0.0.0+0"
+APPVER_NUM="${APPVER/+/.}"
 dotnet publish scanner-ffi/scanner-ffi.csproj \
   -c Release \
   -r "$RID" \
+  -p:Version="$APPVER_NUM" \
+  -p:FileVersion="$APPVER_NUM" \
+  -p:InformationalVersion="$APPVER" \
   -o build/publish
 
 cp "build/publish/scanner-ffi.$EXT" build/
