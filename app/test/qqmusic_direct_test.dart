@@ -34,6 +34,9 @@ void main() {
   // 用例与此无关。默认跳过，设 ARCHOERA_ONLINE_TEST=1 启用（与
   // online_playback_test.dart 同口径；CI 默认不跑，避免出口相关假红）。
   final onlineEnabled = Platform.environment['ARCHOERA_ONLINE_TEST'] == '1';
+  // 真实网络用例默认跳过：第三方接口的风控（QQ 常返回 2001）/地域/断网都会
+  // 变成假红或长时间等待；显式设 ARCHOERA_ONLINE_TEST=1 才执行。
+  final onlineSkip = onlineEnabled ? null : '真实网络请求：设 ARCHOERA_ONLINE_TEST=1 启用';
 
   test('直连搜索解析（真实请求）', () async {
     final result = await api.searchSongs('命运交响曲 贝多芬', page: 1, limit: 3);
@@ -45,7 +48,7 @@ void main() {
     expect(first.qqmusic!.mediaMid, isNotEmpty);
     expect(first.title, isNotEmpty);
     expect(first.duration, greaterThan(0));
-  }, timeout: const Timeout(Duration(seconds: 30)));
+  }, timeout: const Timeout(Duration(seconds: 30)), skip: onlineSkip);
 
   test('song_url：免费曲目访客可播（真实请求）', () async {
     // 古典公版曲目通常无需会员即可拿 M500/M800 直链
@@ -62,9 +65,7 @@ void main() {
     }
     expect(url, isNotNull, reason: '免费曲目应能取到直链: $lastErr');
     expect(url, startsWith('http'));
-  }, timeout: const Timeout(Duration(seconds: 40)), skip: onlineEnabled
-      ? null
-      : '需出口可取到可播直链：设 ARCHOERA_ONLINE_TEST=1 启用');
+  }, timeout: const Timeout(Duration(seconds: 40)), skip: onlineSkip);
 
   test('song_url：VIP 曲目按接口语义拒绝（不绕过）', () async {
     final result = await api.searchSongs('晴天 周杰伦', page: 1, limit: 1);
@@ -73,13 +74,13 @@ void main() {
       () => api.resolvePlayUrl(result.items.first, quality: 'hq'),
       throwsA(isA<QqApiException>()),
     );
-  }, timeout: const Timeout(Duration(seconds: 40)));
+  }, timeout: const Timeout(Duration(seconds: 40)), skip: onlineSkip);
 
   test('登录出码：QQ 扫码拿到 key + base64 图（真实请求，不扫码）', () async {
     final qr = await api.qrKey();
     expect(qr['key'], isNotEmpty);
     expect(qr['content'], startsWith('data:image/'));
-  }, timeout: const Timeout(Duration(seconds: 30)));
+  }, timeout: const Timeout(Duration(seconds: 30)), skip: onlineSkip);
 
   test('歌词 lyric（真实请求，QRC/LRC 解密链路）', () async {
     final result = await api.searchSongs('晴天 周杰伦', page: 1, limit: 1);
@@ -89,16 +90,16 @@ void main() {
     expect(body, isA<Map>());
     // 歌词内容非空或明确失败都允许；但必须有 code 字段（不抛网络错）
     expect((body as Map).containsKey('code'), isTrue);
-  }, timeout: const Timeout(Duration(seconds: 30)));
+  }, timeout: const Timeout(Duration(seconds: 30)), skip: onlineSkip);
 
   test('歌单详情 song_list（真实请求）', () async {
     final tracks = await api.playlistTracks('2340100311');
     // QM官方巅峰榜歌单；只验证链路不崩，曲目可空
     expect(tracks, isA<List<Track>>());
-  }, timeout: const Timeout(Duration(seconds: 30)));
+  }, timeout: const Timeout(Duration(seconds: 30)), skip: onlineSkip);
 
   test('搜索返回 SearchResult 语义（真实请求）', () async {
     final r = await api.searchAlbums('周杰伦', page: 1, limit: 5);
     expect(r, isA<SearchResult<CoverItem>>());
-  }, timeout: const Timeout(Duration(seconds: 30)));
+  }, timeout: const Timeout(Duration(seconds: 30)), skip: onlineSkip);
 }
