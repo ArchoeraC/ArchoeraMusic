@@ -6,11 +6,16 @@
 ; 更新（同 AppId 旧版已安装）时沿用旧版的安装模式与目录（由 Inno 读卸载注册表
 ; 自动识别，无需自存位置）；模式不一致则以失败退出。
 ; 用法（CI）：
-;   ISCC.exe /DVersion=0.9.16+4 /DAppDir=<release目录> \
+;   ISCC.exe /DVersion=0.9.16+4 /DVersionNumeric=0.9.16.4 /DAppDir=<release目录> \
 ;     /DOutputDir=<输出目录> packaging\windows\archoera_music.iss
 
 #ifndef Version
   #define Version "0.0.0"
+#endif
+; Windows 版本资源的固定四段式（1.0.2+0 → 1.0.2.0）。CI 传入；
+; 本地手动编译时退回 1.0.0.0，避免 FileVersion 为空。
+#ifndef VersionNumeric
+  #define VersionNumeric "1.0.0.0"
 #endif
 #ifndef AppDir
   #define AppDir ""
@@ -31,7 +36,24 @@ AppId={{2EE05715-CB4C-4636-99BE-2C450858181B}
 AppName={#AppName}
 AppVersion={#Version}
 AppVerName={#AppName} {#Version}
-AppPublisher=BetaStudio2
+AppPublisher=io.awa.archoera.betastudio2
+AppCopyright=Copyright (C) 2026 io.awa.archoera.betastudio2
+AppPublisherURL=https://github.com/ArchoeraC/ArchoeraMusic
+AppSupportURL=https://github.com/ArchoeraC/ArchoeraMusic/issues
+AppUpdatesURL=https://github.com/ArchoeraC/ArchoeraMusic/releases
+
+; ── 安装器自身 PE 的 VERSIONINFO ──
+; 不写这些字段时 setup.exe 的文件属性是空的（FileVersion/版权/原始文件名都缺失），
+; 未签名 + 空元数据会显著抬高 AV/信誉模型的分数。
+VersionInfoVersion={#VersionNumeric}
+VersionInfoCompany=io.awa.archoera.betastudio2
+VersionInfoDescription={#AppName} Setup
+VersionInfoCopyright=Copyright (C) 2026 io.awa.archoera.betastudio2
+VersionInfoProductName={#AppName}
+; ProductVersion 必须是 2~4 段数字；显示用的 "1.0.2+0" 走 *TextVersion。
+VersionInfoProductVersion={#VersionNumeric}
+VersionInfoProductTextVersion={#Version}
+VersionInfoTextVersion={#Version}
 
 ; ── 安装模式与向导 ──
 ; 默认最低权限（per-user，免 UAC）；允许用户在向导内显式改选「为所有用户安装」

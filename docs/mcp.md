@@ -203,24 +203,22 @@
 
 ```bash
 archoera_music archoerashell [全局选项] <命令> [参数...]   # Linux / macOS
-archoera_music archoerashell [全局选项] <命令> ...         # Windows（主程序子命令）
+archoera_music archoerashell [全局选项] <命令> ...         # Windows（转发到伴生程序）
 archoerashell.exe [全局选项] <命令> [参数...]             # Windows（控制台伴生程序，推荐）
 ```
 
-它**不启动 GUI**：主 GUI 程序在 Flutter 初始化前拦截 `archoerashell` 子命令，直接调用
-原生 Rust 入口（`app/core/shell`，`staticlib`），**完全不加载 Flutter 引擎 / Dart**，
-命令行调用即时返回：
+它**不启动 GUI**：主 GUI 程序在 Flutter 初始化前拦截 `archoerashell` 子命令，
+**完全不加载 Flutter 引擎 / Dart**，命令行调用即时返回：
 
 - **Linux**：`app/linux/runner/main.cc` 检测子命令后调用 `archoera_shell_main`；由
   `app/linux/CMakeLists.txt` 的内嵌 cargo 目标编译 `libarchoera_shell.a` 链入。
-- **Windows**：两种入口共享同一 Rust staticlib——
-  - `archoerashell.exe`（`app/windows/runner/shell_main.cpp`，**控制台子系统**伴生
-    程序）：cmd/PowerShell 会等待其退出且独占控制台输入，**推荐**用于交互式 REPL 与
-    脚本。
-  - `archoera_music.exe archoerashell …`（`app/windows/runner/main.cpp` 在 `wWinMain`
-    起始处分派）：适合**一次性命令**。GUI 子系统进程被终端调用时由
-    `app/core/shell/src/console.rs` 接管/补齐标准流、切 UTF-8 并开启 ANSI，但它与
-    调用方 shell 争抢同一控制台输入，**不适合交互式 REPL**。
+- **Windows**：Rust CLI **只**编进控制台伴生程序 `archoerashell.exe`
+  （`app/windows/runner/shell_main.cpp`，控制台子系统）——cmd/PowerShell 会等待其
+  退出且独占控制台输入，REPL 与脚本都稳。
+  `archoera_music.exe archoerashell …` 仍保留兼容：`main.cpp` 在 `wWinMain` 起始处
+  检测到子命令后，**转发**给同目录的 `archoerashell.exe`（继承标准输入/输出与退出码），
+  因此 GUI 主程序不再静态链入 Rust std（不引入 `WS2_32`/控制台/`dbghelp` 等导入，
+  避免未签名 GUI 被 AV 误判为内置网络命令行的 loader）。
 - **macOS**：`app/macos/Runner/main.swift` 在 `NSApplicationMain` 之前检测子命令；
   `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段按 `$ARCHS`（Release 为
   `arm64 x86_64`）逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a`
@@ -240,10 +238,9 @@ archoerashell.exe [全局选项] <命令> [参数...]             # Windows（�
 > archoerashell status
 > archoerashell            # 进入交互式 REPL
 > ```
-> 主程序子命令 `archoera_music archoerashell …` 仅适合一次性命令（GUI 子系统，
-> PowerShell 默认不等待且会与它争抢输入）；需要严格同步时用
-> `Start-Process … -Wait -NoNewWindow`（或 `start /wait`）。`stdout` 被重定向/管道时
-> 输出自动回退纯文本。
+> 主程序子命令 `archoera_music archoerashell …` 是兼容入口：GUI 进程把参数转发给
+> 同目录的 `archoerashell.exe` 并等待其退出，行为与直接调用伴生程序一致；需要严格
+> 同步时仍建议直接用 `archoerashell.exe`。`stdout` 被重定向/管道时输出自动回退纯文本。
 
 **交互式终端（REPL）**：`archoerashell` 后**不带命令**时，若 `stdin` 为交互式
 终端则进入提示符模式，可连续输入命令（`exit`/`quit`/`Ctrl-D` 退出，空行忽略）；

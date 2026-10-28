@@ -22,6 +22,14 @@ setlocal enabledelayedexpansion
 
 rem ---- 路径 ----
 set "ROOT=%~dp0"                        rem app/core/
+rem ---- 应用版本（app/pubspec.yaml；供 Windows VERSIONINFO 使用）----
+set "APPVER="
+for /f "tokens=2" %%v in ('findstr /b /c:"version:" "%ROOT%..\pubspec.yaml" 2^>nul') do if not defined APPVER set "APPVER=%%v"
+if not defined APPVER set "APPVER=0.0.0+0"
+set "APPVER_NUM=%APPVER:+=.%"
+rem 没有 +build 时补足四段（VERSIONINFO 的 FILEVERSION 必须四段）。
+if "%APPVER:+=%"=="%APPVER%" set "APPVER_NUM=%APPVER_NUM%.0"
+set "APPVER_COMMA=%APPVER_NUM:.=,%"
 set "TRIPLET=%VCPKG_TARGET_TRIPLET%"
 if "%TRIPLET%"=="" set "TRIPLET=x64-windows-release"
 set "VCPKG_PREFIX=%ROOT%..\vcpkg_installed\%TRIPLET%"
@@ -114,7 +122,10 @@ rem （Dart DynamicLibrary lookup；segstore.c 源见下，.so 内 segstore 函�
 echo [build_windows] 编译 fft.dll...
 :: /utf-8：源码为无 BOM 的 UTF-8，含中文字符串字面量；不带该开关时 MSVC 按本地
 :: 代码页（非 UTF-8 环境，如英文 CI）解析会报 C2001（与 native/platform 一致）。
-cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src src\fft.c src\era_log.c /Fe:build\fft.dll /link /DEF:build\fft.def
+call :write_version_rc "build\fft.rc" "fft.dll" "ArchoeraMusic FFT" "fft" "2"
+rc /nologo /fo build\fft.res build\fft.rc
+if errorlevel 1 exit /b 1
+cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src src\fft.c src\era_log.c /Fe:build\fft.dll /link /DEF:build\fft.def build\fft.res
 if errorlevel 1 exit /b 1
 
 rem --- 自研解码内核（EraAudio, Zig 静态库, windows-msvc ReleaseFast）---
@@ -155,6 +166,9 @@ rem Zig 内核（EraAudio 原生 HTTP(S)/TLS）在 Windows 依赖系统库：cry
 rem 枚举/校验）、ws2_32（Winsock）、bcrypt（std.crypto.random）；MSVC 不会自动带上，
 rem 须在最终链接显式补齐（FFmpeg 覆盖了 ws2_32/bcrypt，但不含 crypt32）。
 :: /utf-8：见上方 fft.dll 说明（源码含中文字符串字面量，须显式声明 UTF-8）。
+call :write_version_rc "build\archoera_mediaengine.rc" "archoera_mediaengine.dll" "ArchoeraMusic audio engine" "archoera_mediaengine" "2"
+rc /nologo /fo build\archoera_mediaengine.res build\archoera_mediaengine.rc
+if errorlevel 1 exit /b 1
 cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
     src\encoder.c src\equalizer.c src\parametric_eq.c src\lowfreq.c ^
@@ -167,7 +181,7 @@ cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src /I include\compat /I "%
     "%VCPKG_PREFIX%\lib\avutil.lib" "%VCPKG_PREFIX%\lib\swresample.lib" ^
     build\libaudio_tempo.lib %KERNEL_FLAG% %KERNEL_LIB% ntdll.lib ole32.lib ^
     crypt32.lib ws2_32.lib bcrypt.lib ^
-    /Fe:build\archoera_mediaengine.dll /link /DEF:build\archoera_mediaengine.def
+    /Fe:build\archoera_mediaengine.dll /link /DEF:build\archoera_mediaengine.def build\archoera_mediaengine.res
 if errorlevel 1 exit /b 1
 popd
 
@@ -197,7 +211,8 @@ rem =====================================================================
 echo [build_windows] ===== scanner =====
 pushd "%ROOT%scanner"
 if not exist build mkdir build
-dotnet publish scanner-ffi\scanner-ffi.csproj -c Release -r win-x64
+dotnet publish scanner-ffi\scanner-ffi.csproj -c Release -r win-x64 ^
+    -p:Version=%APPVER_NUM% -p:FileVersion=%APPVER_NUM% -p:InformationalVersion=%APPVER%
 if errorlevel 1 exit /b 1
 
 rem csproj 的 CopyToScannerBuild target（AfterTargets=Publish）已把主库与
@@ -220,7 +235,8 @@ rem =====================================================================
 echo [build_windows] ===== indexer =====
 pushd "%ROOT%indexer"
 if not exist build mkdir build
-dotnet publish indexer-ffi\indexer-ffi.csproj -c Release -r win-x64
+dotnet publish indexer-ffi\indexer-ffi.csproj -c Release -r win-x64 ^
+    -p:Version=%APPVER_NUM% -p:FileVersion=%APPVER_NUM% -p:InformationalVersion=%APPVER%
 if errorlevel 1 exit /b 1
 
 rem csproj 的 CopyToIndexerBuild target（AfterTargets=Publish）已把主库与
@@ -256,6 +272,20 @@ pushd transcoder
 cargo build --release
 if errorlevel 1 exit /b 1
 popd
+
+echo [build_windows] 生成 Go 版本资源 (windows/amd64 .syso)...
+call :write_version_rc "version_windows_amd64.rc" "libarchoera_subsonic.dll" "ArchoeraMusic Subsonic server" "archoera_subsonic" "2"
+del /q version_windows_amd64.syso 2>nul
+where windres >nul 2>nul
+if errorlevel 1 (
+    echo [build_windows] 警告: 未找到 windres，跳过 Go 版本资源
+) else (
+    windres -O coff -i version_windows_amd64.rc -o version_windows_amd64.syso
+    if errorlevel 1 (
+        del /q version_windows_amd64.syso 2>nul
+        echo [build_windows] 警告: windres 失败，跳过 Go 版本资源
+    )
+)
 
 echo [build_windows] 构建服务端 (go c-shared)...
 set CGO_ENABLED=1
@@ -358,4 +388,43 @@ if errorlevel 1 exit /b 1
 popd
 
 echo [build_windows] 全部模块构建完成
+exit /b 0
+
+rem =====================================================================
+rem  :write_version_rc <out.rc> <OriginalFilename> <FileDescription> <InternalName> <FILETYPE>
+rem  为 cl 直编的 DLL 生成统一 VERSIONINFO（制作者 io.awa.archoera.betastudio2）。
+rem  纯 ASCII；不用 winver.h（rc.exe 在部分环境找不到 SDK 头时也能编译）。
+rem =====================================================================
+:write_version_rc
+> "%~1" (
+  echo 1 VERSIONINFO
+  echo  FILEVERSION %APPVER_COMMA%
+  echo  PRODUCTVERSION %APPVER_COMMA%
+  echo  FILEFLAGSMASK 0x3fL
+  echo  FILEFLAGS 0x0L
+  echo  FILEOS 0x40004L
+  echo  FILETYPE %~5
+  echo  FILESUBTYPE 0x0L
+  echo BEGIN
+  echo     BLOCK "StringFileInfo"
+  echo     BEGIN
+  echo         BLOCK "040904e4"
+  echo         BEGIN
+  echo             VALUE "CompanyName", "io.awa.archoera.betastudio2"
+  echo             VALUE "FileDescription", "%~3"
+  echo             VALUE "FileVersion", "%APPVER%"
+  echo             VALUE "InternalName", "%~4"
+  echo             VALUE "LegalCopyright", "Copyright ^(C^) 2026 io.awa.archoera.betastudio2"
+  echo             VALUE "OriginalFilename", "%~2"
+  echo             VALUE "ProductName", "ArchoeraMusic"
+  echo             VALUE "ProductVersion", "%APPVER%"
+  echo             VALUE "Comments", "https://github.com/ArchoeraC/ArchoeraMusic"
+  echo         END
+  echo     END
+  echo     BLOCK "VarFileInfo"
+  echo     BEGIN
+  echo         VALUE "Translation", 0x409, 1252
+  echo     END
+  echo END
+)
 exit /b 0

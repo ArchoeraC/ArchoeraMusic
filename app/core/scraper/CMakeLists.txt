@@ -83,6 +83,20 @@ add_library(archoera_scraper SHARED
 
 target_include_directories(archoera_scraper PRIVATE include)
 
+# Windows VERSIONINFO（统一制作者 / 版本号）。
+if(WIN32)
+    enable_language(RC)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/archoera_version.cmake")
+    archoera_configure_version_rc(
+        "${CMAKE_CURRENT_BINARY_DIR}/archoera_scraper.rc"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../pubspec.yaml"
+        "archoera_scraper.dll"
+        "ArchoeraMusic metadata scraper"
+        "archoera_scraper"
+        2)
+    target_sources(archoera_scraper PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/archoera_scraper.rc")
+endif()
+
 target_link_libraries(archoera_scraper PRIVATE
     CURL::libcurl
     OpenSSL::Crypto

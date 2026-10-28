@@ -133,7 +133,7 @@ Version: $version_deb
 Section: sound
 Priority: optional
 Architecture: amd64
-Maintainer: BetaStudio2 (ArchoeraMusic) <noreply@github.com>
+Maintainer: io.awa.archoera.betastudio2 <noreply@github.com>
 Homepage: $REPO_URL
 Depends: libc6, libstdc++6, zlib1g, libgtk-3-0 | libgtk-3-0t64, libdbus-1-3, libepoxy0, libfontconfig1, libfribidi0, libx11-6, libxi6, libatk-bridge2.0-0, libcloudproviders0, libcurl4, libssl3, libsqlite3-0, liblzma5
 Description: An open-source music player
