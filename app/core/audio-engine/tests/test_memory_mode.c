@@ -222,6 +222,7 @@ static int dir_has_stream_files(const char *sdir)
 /* 跑一个引擎内存模式会话（headless）并等其线程退出 */
 static ArchoeraMediaEngine *run_mem_session(const char *src, const char *sdir,
                                             long long cap_kb,
+                                            float initial_volume,
                                             char *errbuf, int errcap)
 {
     EngineConfig cfg = ENGINE_CONFIG_DEFAULT;
@@ -231,6 +232,7 @@ static ArchoeraMediaEngine *run_mem_session(const char *src, const char *sdir,
     snprintf(wav, sizeof(wav), "%s/stream.wav", sdir);
     cfg.no_disk_cache = 1;
     cfg.pcm_mem_cap_kb = cap_kb;
+    cfg.initial_volume = initial_volume;
     e = archoera_mediaengine_create(src, &cfg, wav, sdir, errbuf, errcap);
     if (!e) {
         fprintf(stderr, "create failed: %s\n", errbuf);
@@ -329,11 +331,11 @@ int main(void)
     const int frames = 1024;
     const double dur_sec = 8.0;
     char base[] = "/tmp/archoera-mem-test-XXXXXX";
-    char wav_path[512], dir_full[512], dir_ev[512], dir_st[512];
+    char wav_path[512], dir_full[512], dir_ev[512], dir_st[512], dir_vol[512];
     char errbuf[256];
     EngineConfig rcfg = ENGINE_CONFIG_DEFAULT;
     AudioPipeline *rp;
-    ArchoeraMediaEngine *efull = NULL, *eev = NULL, *est = NULL;
+    ArchoeraMediaEngine *efull = NULL, *eev = NULL, *est = NULL, *evol = NULL;
     SegStore *st = NULL;
     float *l, *r, *l2, *r2;
     int sr;
@@ -348,9 +350,11 @@ int main(void)
     snprintf(dir_full, sizeof(dir_full), "%s/full", base);
     snprintf(dir_ev, sizeof(dir_ev), "%s/ev", base);
     snprintf(dir_st, sizeof(dir_st), "%s/store", base);
+    snprintf(dir_vol, sizeof(dir_vol), "%s/vol", base);
     mkdir(dir_full, 0700);
     mkdir(dir_ev, 0700);
     mkdir(dir_st, 0700);
+    mkdir(dir_vol, 0700);
 
     sr = write_sine_wav(wav_path, dur_sec);
     CHECK(sr == 44100, "生成确定性 44.1k 立体声测试源");
@@ -380,7 +384,7 @@ int main(void)
     fprintf(stderr, "        参考块数=%d\n", g_block_count);
 
     /* 1) 无上限会话：整曲可回访 + 窗口与参考一致 + 不落盘 */
-    efull = run_mem_session(wav_path, dir_full, -1, errbuf, sizeof(errbuf));
+    efull = run_mem_session(wav_path, dir_full, -1, 1.0f, errbuf, sizeof(errbuf));
     CHECK(efull != NULL, "内存模式（无上限）会话可创建");
     if (efull) {
         const long probes[4] = { 200, 1500, 5000, total_ms - 60 };
@@ -412,7 +416,7 @@ int main(void)
     }
 
     /* 2) 用户上限会话（1 MiB，远小于整曲 ~2.8MB f32）：滚动淘汰生效 */
-    eev = run_mem_session(wav_path, dir_ev, 1024, errbuf, sizeof(errbuf));
+    eev = run_mem_session(wav_path, dir_ev, 1024, 1.0f, errbuf, sizeof(errbuf));
     CHECK(eev != NULL, "内存模式（cap=1MiB）会话可创建");
     if (eev) {
         CHECK(!dir_has_stream_files(dir_ev),
@@ -457,9 +461,30 @@ int main(void)
         CHECK(archoera_mediaengine_pcm_epoch(est) >= 0, "store 会话 pcm_epoch 可用");
     }
 
+    /* 4) 播放会话的 initial_volume **不得**落到管线：pipeline_set_volume 的实现
+       是把限幅器阈值下移 volume 的 dB 数，并非增益级；播放音量由 player 侧承担。
+       旧实现无条件在管线侧下发它——起播比 seek/切 sink 重建管线（阈值复位）后
+       小声一档，表现为「拖进度条后音量突然变大，与起播不一致」。本用例以 0.4
+       初始音量建会话，解码 PCM 必须与音量 1.0 的参考完全一致。 */
+    evol = run_mem_session(wav_path, dir_vol, -1, 0.4f, errbuf, sizeof(errbuf));
+    CHECK(evol != NULL, "内存模式（initial_volume=0.4）会话可创建");
+    if (evol) {
+        double md = 0.0;
+        ok = archoera_mediaengine_pcm_window(evol, 1500, frames, l, r) == 0 &&
+             ref_window(sr, 1500, frames, l2, r2) == 0;
+        if (ok) {
+            max_diff(l, l2, frames, &md);
+            if (md > 1e-4) ok = 0;
+            max_diff(r, r2, frames, &md);
+            if (md > 1e-4) ok = 0;
+        }
+        CHECK(ok, "播放会话 PCM 不受 initial_volume 影响（限幅阈值不充当音量）");
+    }
+
     if (efull) archoera_mediaengine_destroy(efull);
     if (eev) archoera_mediaengine_destroy(eev);
     if (est) archoera_mediaengine_destroy(est);
+    if (evol) archoera_mediaengine_destroy(evol);
     if (st) segstore_destroy(st); /* 引擎 destroy 后由调用方释放 */
     ref_reset();
 
@@ -467,6 +492,7 @@ int main(void)
     rmdir(dir_full);
     rmdir(dir_ev);
     rmdir(dir_st);
+    rmdir(dir_vol);
     rmdir(base);
     free(l); free(r); free(l2); free(r2);
 

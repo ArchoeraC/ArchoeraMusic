@@ -447,6 +447,10 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     final engine = _engine;
     if (engine == null) return;
     await engine.sendCommand('set_sink', {'id': sinkId});
+    // 新设备格式与旧 ring 不一致时，引擎会在已播放位置**重建管线**（见
+    // mediaengine_switch_sink → mediaengine_stream_rebuild），运行时效果随旧
+    // 管线丢失；与 seek 同理重放一次，保证换设备后音色/归一化音量不变。
+    unawaited(applyAudioEffects());
   }
 
   /// 切换空档用的全零频谱帧（懒建一次；bins 与 C 契约一致 = 128）。
@@ -533,6 +537,12 @@ class PlaybackNotifier extends _PlaybackNotifierBase
       }
       final relMs = targetMs - _sessionOffsetMs;
       await engine.seek(Duration(milliseconds: relMs));
+      // 流式会话的 seek 在引擎内**重建管线**（新管线按初始 cfg 建立）：运行时
+      // 下发的 EQ / PEQ / 低频 / 限幅 / 响度归一化 / 变速只作用于旧管线实例，
+      // 会随旧管线销毁而失效。命令 FIFO 按序处理，这里紧跟 seek 重放一次即可
+      // 落到新管线——否则拖进度条后音色、音量（响度归一化）与起播时不一致，
+      // 播放速度也会被悄悄还原成 1.0。
+      unawaited(applyAudioEffects());
       // 立即回填绝对位置（引擎 seek 后首帧位置事件前，UI 不闪回 0:00）
       state = state.copyWith(position: offset);
       _log('seek ok: ${targetMs}ms');
