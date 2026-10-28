@@ -36,9 +36,12 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
-# === ArchoeraMusic archoerashell：内嵌 cargo staticlib（一键构建）===
-# 以 staticlib 形式链入 runner：wWinMain 检测到 `archoerashell` 子命令时直接调用
-# Rust 入口，命令行调用完全不初始化 Flutter/Dart（见 app/core/shell）。
+# === ArchoeraMusic archoerashell：独立控制台伴生程序 ===
+# **不**把 Rust staticlib 链入 GUI runner：Rust std 会带入
+# `IsDebuggerPresent` / `RtlCaptureContext` / `dbghelp` / `WS2_32` 等导入，
+# 让一个未签名的 GUI 程序在 AV 眼里像「内置网络命令行 + 调试符号」的 loader。
+# GUI 侧只保留 `archoera_music archoerashell …` 的分派（转到同目录的
+# archoerashell.exe），CLI 本体在控制台伴生程序里（见 main.cpp）。
 find_program(CARGO cargo REQUIRED)
 set(SHELL_CRATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../core/shell")
 # 桌面端仅发布 Release；VS 多配置生成器下 CMAKE_BUILD_TYPE 为空，按 Release 处理。
@@ -56,16 +59,17 @@ add_custom_target(shell_cargo ALL
   COMMENT "cargo build archoera-shell"
   VERBATIM
 )
-add_dependencies(${BINARY_NAME} shell_cargo)
-target_link_libraries(${BINARY_NAME} PRIVATE "${SHELL_STATIC_LIB}")
-# Rust std 的 MSVC 系统依赖（staticlib 内已带 /DEFAULTLIB，此处显式补齐更稳）。
-target_link_libraries(${BINARY_NAME} PRIVATE ntdll userenv ws2_32 dbghelp)
 
 # 控制台子系统伴生程序：cmd / PowerShell 会等待其退出且独占控制台输入，交互式
-# REPL 可用（GUI 子系统主程序的同子命令会与调用方 shell 争抢输入）。
-add_executable(archoerashell "shell_main.cpp")
+# REPL 可用。shell.rc 提供 VERSIONINFO（无签名的裸 exe 也应具备完整元数据）。
+add_executable(archoerashell "shell_main.cpp" "shell.rc")
 apply_standard_settings(archoerashell)
 target_compile_definitions(archoerashell PRIVATE "NOMINMAX")
+target_compile_definitions(archoerashell PRIVATE "FLUTTER_VERSION=\"${FLUTTER_VERSION}\"")
+target_compile_definitions(archoerashell PRIVATE "FLUTTER_VERSION_MAJOR=${FLUTTER_VERSION_MAJOR}")
+target_compile_definitions(archoerashell PRIVATE "FLUTTER_VERSION_MINOR=${FLUTTER_VERSION_MINOR}")
+target_compile_definitions(archoerashell PRIVATE "FLUTTER_VERSION_PATCH=${FLUTTER_VERSION_PATCH}")
+target_compile_definitions(archoerashell PRIVATE "FLUTTER_VERSION_BUILD=${FLUTTER_VERSION_BUILD}")
 target_link_libraries(archoerashell PRIVATE "${SHELL_STATIC_LIB}")
 target_link_libraries(archoerashell PRIVATE ntdll userenv ws2_32 dbghelp)
 add_dependencies(archoerashell shell_cargo)

@@ -8,6 +8,9 @@
 #include <iostream>
 
 void CreateAndAttachConsole() {
+#ifndef NDEBUG
+  // 仅调试构建（`flutter run` / 调试器）需要控制台；Release 不引入
+  // AllocConsole/freopen_s 等控制台重定向导入（AV 会将其视为调试/隐藏窗口特征）。
   if (::AllocConsole()) {
     FILE *unused;
     if (freopen_s(&unused, "CONOUT$", "w", stdout)) {
@@ -19,6 +22,7 @@ void CreateAndAttachConsole() {
     std::ios::sync_with_stdio();
     FlutterDesktopResyncOutputStreams();
   }
+#endif
 }
 
 std::vector<std::string> GetCommandLineArguments() {
