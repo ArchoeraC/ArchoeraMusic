@@ -1529,7 +1529,10 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
             e->last_volume = (float)vol;
             if (e->player) {
                 player_command(e->player, "set_volume", NULL, &vol);
-            } else {
+            } else if (!e->player_file) {
+                /* 仅无播放器的直出会话用管线音量；播放会话一律交给 player
+                   （player 尚未创建时也不必下发：stream_begin / 播放器启动会
+                   以 e->last_volume 起播，见 engine_thread 的说明）。 */
                 pipeline_set_volume(e->p, (float)vol);
             }
         }
@@ -1914,10 +1917,18 @@ static void *engine_thread(void *arg)
         return NULL;
     }
 
-    /* 非播放器输出（Opus/WAV 直出）的初始音量：与播放器路径一样在首块 PCM
-       之前写入，避免起播第一帧按满增益输出。播放器路径稍后由 player 侧
-       以同一增益起播（见 mediaengine_stream_begin / 播放器启动处）。 */
-    pipeline_set_volume(e->p, e->last_volume);
+    /* 无播放器的直出会话（Opus/WAV 批处理，player_file=NULL）才在管线侧落
+       初始音量。**播放会话不得调这个接口**：
+         - pipeline_set_volume 的实现是「把限幅器阈值下移 volume 的 dB 数」，
+           并非增益级；player 侧（stream_volume / ma_sound）已按用户音量衰减，
+           两处叠加会把起播音量压掉一档；
+         - 更致命的是该阈值只存在于当前管线实例：seek / 切 sink 会重建管线
+           （mediaengine_stream_rebuild 用 e->cfg 复建），阈值复位到 -1dB，
+           而 player 音量不变 → 拖进度条后音量突然变大，与起播时不一致。
+       起播首块 PCM 的用户音量由 player start_options.volume（见
+       mediaengine_stream_begin / 播放器启动处）保证，首帧不会满音量。
+       内存模式 PCM 块只供频谱分析，同样不该被音量缩放。 */
+    if (!e->player_file) pipeline_set_volume(e->p, e->last_volume);
 
     if (e->mem_mode) {
         /* 内存播放模式：不开 stream.wav / stream.pcm（PCM 入内存块列表）。
