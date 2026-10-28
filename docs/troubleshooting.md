@@ -106,6 +106,29 @@ AppImage 在无 FUSE 的环境可解包运行：`./ArchoeraMusic-*.AppImage --ap
 xattr -dr com.apple.quarantine ArchoeraMusic.app
 ```
 
+### 1.6 Windows Defender 报 `Trojan:Win32/Bearfoos.A!ml`（误报）
+
+这是 **机器学习误报**（`!ml`），不是程序行为异常。官方 Windows 产物目前**未做
+Authenticode 签名**，Defender 会依据「未签名 + 低信誉 + 原生导入/安装器形态」打分；
+`archoera_music.exe` 曾被静态链接的 Rust CLI 带入 `WS2_32`/控制台/`dbghelp` 等导入，
+进一步抬高了分数。
+
+发布侧已做的收敛：GUI 主程序**不再**静态链接命令行客户端（Windows 改为转发到同目录
+`archoerashell.exe`）；Release 不再包含调试器/控制台创建代码（`IsDebuggerPresent`/
+`AllocConsole`）；`archoera_music.exe`、`archoerashell.exe`、`archoera-vault.exe` 与
+安装器都带完整 VERSIONINFO。
+
+用户侧处理（**不建议**直接关闭实时保护）：
+
+1. 用发布页的 `SHA256SUMS` 与 `.sig1` 核对文件完整性；
+2. 在「Windows 安全中心 → 病毒和威胁防护 → 保护历史记录」确认被隔离的具体文件；
+3. 通过 <https://www.microsoft.com/en-us/wdsi/filesubmission> 提交该文件为误报
+   （每个新版本哈希不同，需要重新提交）；
+4. 确认来源可信后，仅对被隔离的**安装目录**添加排除项，或使用便携 zip。
+
+长期解法是 Authenticode 代码签名 + 信誉积累；应用层的 `.sig1`/原生清单只能证明
+完整性，不能替代 OS 代码签名。
+
 ---
 
 ## 2. 播放与音频

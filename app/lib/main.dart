@@ -37,8 +37,8 @@ import 'widgets/list/cover_image.dart';
 /// （无 libmpv/media_kit 依赖）。
 Future<void> main(List<String> args) async {
   // 说明：CLI（`archoerashell`）由各平台 runner 在 Flutter 初始化前拦截
-  // `archoera_music archoerashell …` 子命令并直调原生 Rust 入口（见 app/core/shell），
-  // 不经过本 Dart 入口（Dart 版 CLI 已删除）。
+  // `archoera_music archoerashell …` 子命令（见 app/core/shell）；Windows 转交
+  // 同目录的 `archoerashell.exe`，不经过本 Dart 入口（Dart 版 CLI 已删除）。
   //
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化——既是 Flutter
   // binding，也让后续 windowManager（MethodChannel）可用（单实例分支要用）。

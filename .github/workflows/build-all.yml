@@ -461,6 +461,9 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           $ver = (Select-String -Path "app/pubspec.yaml" -Pattern '^version:').Line.Split(' ')[1].Trim()
+          # Inno 的 VersionInfoVersion 必须是四段数字：1.0.2+0 → 1.0.2.0
+          $verParts = $ver -split '\+'
+          $verNum = if ($verParts.Count -ge 2) { "$($verParts[0]).$($verParts[1])" } else { "$($verParts[0]).0" }
           $rel = "app\build\windows\x64\runner\Release"
           $out = "$PWD\build\windows-extra"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
@@ -477,6 +480,7 @@ jobs:
           else { $iscc = $iscc.Source }
           & $iscc `
             "/DVersion=$ver" `
+            "/DVersionNumeric=$verNum" `
             "/DAppDir=$PWD\$rel" `
             "/DOutputDir=$out" `
             packaging\windows\archoera_music.iss

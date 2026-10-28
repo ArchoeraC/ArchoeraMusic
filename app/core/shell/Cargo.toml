@@ -24,5 +24,9 @@ serde_json = "1"
 
 [profile.release]
 lto       = true
-strip     = "symbols"
+# Release 不留符号/调试信息，且 panic 直接 abort：避免把 Rust 的
+# backtrace/dbghelp 符号解析链（AV 眼中的「调试/转储」特征）带进 CLI。
+strip     = true
+debug     = false
+panic     = "abort"
 opt-level = "s"
