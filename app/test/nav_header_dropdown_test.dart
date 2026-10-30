@@ -14,8 +14,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:archoera_music/app/shell_expand_transition.dart';
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
+import 'package:archoera_music/stores/player_route_animation.dart';
 import 'package:archoera_music/widgets/layout/nav_header.dart';
 
 /// 回归（2026-10）：搜索栏**展开后不能保持**——旧实现用 `Positioned.fill` 不透明拦截层收起下拉，
@@ -110,6 +112,133 @@ void main() {
   });
 
   _searchBarKeepsOpenRegression();
+  _shellUnmountRegression();
+  _playerExpandRegression();
+}
+
+/// 回归（2026-10）：播放页开始展开时，搜索下拉浮层（挂在**根 Overlay**，不在
+/// 壳子树内、不随壳内容缩放淡出）必须立刻收起，而不是悬在播放页上方。
+void _playerExpandRegression() {
+  testWidgets('播放页路由动画开始展开 → 搜索下拉收起并摘除', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPrefsProvider.overrideWith(_NoSideEffectsPrefsNotifier.new),
+        ],
+        child: const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: NavHeader()),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+
+    // 模拟 PlayerPage 写入路由动画并开始展开（0 → 1）
+    final routeCtrl = AnimationController(
+      vsync: const TestVSync(),
+      duration: const Duration(milliseconds: 500),
+    );
+    addTearDown(routeCtrl.dispose);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(NavHeader)),
+    );
+    container.read(playerRouteAnimationProvider.notifier).set(routeCtrl);
+    routeCtrl.forward();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // 收起动画（360ms）走完 → 浮层从 Overlay 摘除
+    await tester.pumpAndSettle();
+    expect(
+      find.byType(SingleChildScrollView),
+      findsNothing,
+      reason: '播放页展开时下拉浮层必须收起，不能悬在播放页上方',
+    );
+
+    // 先卸载 NavHeader（去掉动画监听）再由 teardown 销毁路由动画
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+}
+
+/// 回归（2026-10）：聚焦搜索框后立刻展开全屏播放页 —— 壳内容（含 NavHeader）
+/// 随 [ShellExpandTransition] 卸载，下拉面板必须同步摘除。
+///
+/// 旧实现把「移除 OverlayEntry」挂在 `_panelCtrl.reverse().whenComplete(...)` 上，
+/// 而 dispose 紧接着就销毁了 controller：ticker 被取消，`TickerFuture` **永不
+/// 完成** → 入口永久留在根 Overlay。锚点（LayerLink target）随壳内容一起消失后
+/// `CompositedTransformFollower` 退化为左上角，且旧 State 的 TapRegion 组已不存在
+/// → 表现为「搜索下拉卡死左上角且无法解除」。
+void _shellUnmountRegression() {
+  /// [openAnimation]：聚焦后到壳内容卸载之间推进的时长——1s = 下拉已完全展开；
+  /// 120ms = 下拉展开动画途中（对应「点搜索框后**立刻**点开播放页」）。
+  Future<void> unmountWhileOpen(
+    WidgetTester tester, {
+    required Duration openAnimation,
+  }) async {
+    final expandCtrl = AnimationController(
+      vsync: const TestVSync(),
+      duration: const Duration(milliseconds: 500),
+    );
+    addTearDown(expandCtrl.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPrefsProvider.overrideWith(_NoSideEffectsPrefsNotifier.new),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ShellExpandTransition(
+              animation: expandCtrl,
+              placeholder: const SizedBox.shrink(),
+              child: const NavHeader(),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // 聚焦展开下拉（推进到指定时刻）
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    await tester.pump(openAnimation);
+    expect(
+      find.byType(SingleChildScrollView),
+      findsOneWidget,
+      reason: '聚焦后应展开下拉',
+    );
+
+    // 播放页展开：壳内容随动画结束被卸载（NavHeader dispose）
+    expandCtrl.forward();
+    await tester.pumpAndSettle();
+    expect(find.byType(NavHeader), findsNothing, reason: '壳内容应已卸载');
+
+    // 浮层必须随之摘除：否则会永久卡在根 Overlay 左上角
+    expect(
+      find.byType(SingleChildScrollView),
+      findsNothing,
+      reason: '壳内容卸载后下拉浮层必须移除（旧实现 whenComplete 永不触发 → 卡死）',
+    );
+  }
+
+  testWidgets('搜索下拉展开后壳内容卸载（播放页完全展开）→ 浮层不残留', (tester) async {
+    await unmountWhileOpen(tester, openAnimation: const Duration(seconds: 1));
+  });
+
+  testWidgets('聚焦后立刻展开播放页（下拉动画途中壳内容卸载）→ 浮层不残留', (
+    tester,
+  ) async {
+    await unmountWhileOpen(
+      tester,
+      openAnimation: const Duration(milliseconds: 120),
+    );
+  });
 }
 
 /// 回归：展开后单击输入框 / 清除按钮**不收起**；点外部才收起且外部能收到点击。
