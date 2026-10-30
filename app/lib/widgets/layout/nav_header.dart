@@ -17,6 +17,7 @@ import '../../services/playback/playback_notifier.dart';
 import '../../services/weather/weather_notifier.dart';
 import '../../settings/settings_dialog.dart';
 import '../../stores/app_prefs.dart';
+import '../../stores/player_route_animation.dart';
 import '../../stores/providers.dart';
 import '../../stores/shell_page_state.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -68,6 +69,11 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   final _searchLayerLink = LayerLink();
   OverlayEntry? _searchOverlayEntry;
 
+  /// 当前全屏播放页的路由动画（0 = 折叠，1 = 完全展开；由 `PlayerPage`
+  /// 经 [playerRouteAnimationProvider] 写入）。展开开始即收起搜索下拉：浮层挂在
+  /// 根 Overlay 上，**不会**随壳内容一起缩放淡出。
+  Animation<double>? _playerRouteAnim;
+
   /// 输入文本 + 宽度动画合并监听（浮层面板内容实时刷新）。
   late final Listenable _searchListenable = Listenable.merge([
     _searchCtrl,
@@ -115,6 +121,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
       duration: _panelExpandMs,
       reverseDuration: _panelCollapseMs,
     );
+    // 收起动效结束 → 摘除浮层（见 [_onPanelStatusChanged]）。
+    _panelCtrl.addStatusListener(_onPanelStatusChanged);
     _widthCtrl = AnimationController(vsync: this, duration: _widthExpandMs);
   }
 
@@ -122,7 +130,15 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   void dispose() {
     _searchFocus.removeListener(_onSearchFocusChanged);
     _suggestDebounce?.cancel();
-    _hideSearchDropdown();
+    // 浮层必须**同步**摘除，不能等收起动画：壳内容被卸载（全屏播放页完全
+    // 展开 → [ShellExpandTransition] 卸掉 NavHeader）时，controller 随即被
+    // dispose，任何挂在动画完成回调上的移除都不会再执行 → 入口永久留在根
+    // Overlay：锚点（LayerLink target）消失后 follower 退化为左上角，旧 State
+    // 的 TapRegion 组也已不存在 → 「下拉卡死在左上角且无法解除」。
+    _removeSearchOverlay();
+    _playerRouteAnim?.removeListener(_onPlayerRouteExpand);
+    _playerRouteAnim = null;
+    _panelCtrl.removeStatusListener(_onPanelStatusChanged);
     _panelCtrl.dispose();
     _widthCtrl.dispose();
     _searchCtrl.dispose();
@@ -161,13 +177,61 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   void _hideSearchDropdown() {
     _suggestDebounce?.cancel();
     _widthCtrl.reverse();
+    if (_searchOverlayEntry == null) return;
+    // 收起动效期间浮层仍挂在 Overlay 上（保持原节奏），动效走到 dismissed 后
+    // 由 [_onPanelStatusChanged] 摘除；已在收起态（值为 0、状态不再变化）时
+    // 状态监听不会触发，直接摘。
+    _panelCtrl.reverse();
+    if (_panelCtrl.isDismissed) _removeSearchOverlay();
+  }
+
+  /// 面板收起动画走完 → 摘除浮层。
+  ///
+  /// 刻意**不用** `_panelCtrl.reverse().whenComplete(...)`：`TickerFuture` 在
+  /// ticker 被取消（快速重开时下一次 `forward`、或 controller 被 dispose）
+  /// 时**永不完成**，回调不跑 → 入口永久残留在根 Overlay（也不再有 State 能
+  /// 摘除它）。状态监听对这两种取消都免疫，且不会像「每次 forward 都先摘再插」
+  /// 那样产生重复入口。
+  void _onPanelStatusChanged(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed) _removeSearchOverlay();
+  }
+
+  void _removeSearchOverlay() {
     final entry = _searchOverlayEntry;
-    if (entry == null) return;
     _searchOverlayEntry = null;
-    // 收起动效结束后移除 overlay（期间快速重开时 forward 平滑接续）
-    _panelCtrl.reverse().whenComplete(() {
-      if (entry.mounted) entry.remove();
-    });
+    // 不判 `entry.mounted`：插入后若同一帧就被卸载，入口还没有对应的
+    // `_OverlayEntryWidget`（mounted 为 false）但**已登记**在 Overlay 里，
+    // 跳过 remove 会留下孤儿入口（正是本 bug 的残留形态）。字段置空保证
+    // 只会调用一次，不会触发 remove 的重复断言。
+    entry?.remove();
+  }
+
+  /// 绑定/解绑播放页路由动画（幂等）。
+  void _bindPlayerRouteAnim(Animation<double>? next) {
+    if (identical(_playerRouteAnim, next)) return;
+    _playerRouteAnim?.removeListener(_onPlayerRouteExpand);
+    _playerRouteAnim = next;
+    next?.addListener(_onPlayerRouteExpand);
+    _onPlayerRouteExpand();
+  }
+
+  /// 播放页开始展开（壳内容随后整体缩放淡出、最终卸载）→ 收起搜索下拉。
+  ///
+  /// 下拉浮层在**根 Overlay** 里（见 [_buildSearchOverlay]），不在壳子树内，
+  /// 因此不会随壳内容淡出；不主动收起会悬停在播放页上方，直到壳内容卸载才
+  /// 消失（那已经是「卡住」的观感）。
+  void _onPlayerRouteExpand() {
+    final anim = _playerRouteAnim;
+    if (anim == null ||
+        anim.status != AnimationStatus.forward ||
+        anim.value <= 0) {
+      return;
+    }
+    if (_searchFocus.hasFocus) {
+      _searchFocus.unfocus(); // → [_onSearchFocusChanged] → 收起
+    } else {
+      _hideSearchDropdown();
+    }
   }
 
   /// 下拉浮层：只放**锚定面板**（外部点击收起改由 [TapRegion] 按组判定，见 [_searchTapGroup]）。
@@ -407,6 +471,12 @@ class _NavHeaderState extends ConsumerState<NavHeader>
         selection: TextSelection.collapsed(offset: value.length),
       );
     });
+    // 播放页展开（壳内容即将缩放淡出并卸载）→ 收起搜索下拉（浮层不在壳内，
+    // 不随淡出；见 [_onPlayerRouteExpand]）。
+    ref.listen(
+      playerRouteAnimationProvider,
+      (_, next) => _bindPlayerRouteAnim(next),
+    );
     return SizedBox(
       height: 64,
       child: Padding(
