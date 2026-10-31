@@ -45,6 +45,7 @@ const lowfreqHpfFreqKey = 'audio.lowfreq.hpf.freq';
 const lowfreqHpfOrderKey = 'audio.lowfreq.hpf.order';
 const lowfreqBassGainKey = 'audio.lowfreq.bass.gain';
 const lowfreqBassFreqKey = 'audio.lowfreq.bass.freq';
+const channelMergeKey = 'audio.channelMerge.enabled';
 
 /// 均衡器频段数（对齐引擎 `EQ_BANDS = 10`）。
 const int eqBandCount = 10;
@@ -279,6 +280,19 @@ extension AudioFxPrefs on AppPrefs {
         lowfreqBassFreqMax,
       ),
     },
+  );
+
+  // ── 多声道合并（单侧设备兜底）────────────────────────────────
+
+  /// 多声道合并总开关（默认关 = 逐位旁通）。
+  ///
+  /// 开启后引擎把所有声道按等功率合并为单声道并复制到每个输出声道，
+  /// 设备实际只有左/右一侧发声时不会漏掉另一侧内容。
+  bool get channelMergeEnabled => data[channelMergeKey] as bool? ?? false;
+
+  /// 设置多声道合并。
+  AppPrefs copyWithChannelMerge(bool value) => AppPrefs(
+    initialData: {...data, channelMergeKey: value},
   );
 }
 

@@ -476,6 +476,11 @@ static void handle_command(AudioPipeline *p, const char *line) {
             if (json_get_number(line, "bass_freq", &bass_freq) != 0) bass_freq = 100.0;
             pipeline_set_lowfreq_bass(p, (float)bass_gain, (float)bass_freq);
         }
+    } else if (strcmp(type, "set_channel_merge") == 0) {
+        bool enabled = false;
+        if (json_get_bool(line, "enabled", &enabled) == 0) {
+            pipeline_set_channel_merge_enabled(p, enabled);
+        }
     } else if (strcmp(type, "set_volume") == 0) {
         double vol = 1.0;
         if (json_get_number(line, "gain", &vol) == 0) {

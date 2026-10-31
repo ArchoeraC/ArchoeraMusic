@@ -27,6 +27,7 @@
 #include "equalizer.h"
 #include "parametric_eq.h"
 #include "lowfreq.h"
+#include "channel_merge.h"
 #include "loudness.h"
 #include "limiter.h"
 #include "fft.h"
@@ -116,6 +117,7 @@ struct AudioPipeline {
     Equalizer   *equalizer;
     ParametricEq *peq;          /* 方向① D1：参数化 EQ（默认旁通） */
     LowFreq     *lowfreq;       /* 方向① D2：次声/低频管理（默认旁通） */
+    ChannelMerge *channel_merge; /* 多声道合并（默认旁通；单侧设备兜底） */
     Loudness    *loudness;
     Limiter     *limiter;
     Tempo       *tempo;
@@ -579,6 +581,11 @@ static AudioPipeline* pipeline_create_impl(const char *source,
         ERA_LOGE(NULL, "%s 次声/低频管理创建失败\n", LOG_TAG);
         goto fail;
     }
+    p->channel_merge = channel_merge_create(out_channels);
+    if (!p->channel_merge) {
+        ERA_LOGE(NULL, "%s 多声道合并创建失败\n", LOG_TAG);
+        goto fail;
+    }
     p->peq = parametric_eq_create(out_rate, out_channels, PEQ_MAX_BANDS);
     if (!p->peq) {
         ERA_LOGE(NULL, "%s 参数化 EQ 创建失败\n", LOG_TAG);
@@ -764,14 +771,15 @@ AudioPipeline* pipeline_create_store(SegStore *store,
     return pipeline_create_impl(NULL, NULL, store, cfg, output, user);
 }
 
-/* 处理链前段（不含 tempo/fft）：低频管理 → 参数化 EQ → 固定 EQ → 响度 → 限幅。
- * 供 process_dsp_chain 与 pipeline_run 的 flush 路径共用，保证两条路径一致。 */
+/* 处理链前段（不含 tempo/fft）：低频管理 → 参数化 EQ → 固定 EQ → 响度 →
+ * 多声道合并 → 限幅（合并放在限幅前，等功率求和后的峰值由限幅器兜住）。 */
 static void process_pre_tempo(AudioPipeline *p, float *pcm, int samples)
 {
     lowfreq_process(p->lowfreq, pcm, samples);
     parametric_eq_process(p->peq, pcm, samples);
     equalizer_process(p->equalizer, pcm, samples);
     loudness_process(p->loudness, pcm, samples);
+    channel_merge_process(p->channel_merge, pcm, samples);
     limiter_process(p->limiter, pcm, samples);
 }
 
@@ -1092,6 +1100,13 @@ void pipeline_set_lowfreq_bass(AudioPipeline *p, float gain_db, float freq)
     lowfreq_set_bass(p->lowfreq, gain_db, freq);
 }
 
+/* 多声道合并（运行时命令；默认旁通）。 */
+void pipeline_set_channel_merge_enabled(AudioPipeline *p, bool enabled)
+{
+    if (!p || !p->channel_merge) return;
+    channel_merge_set_enabled(p->channel_merge, enabled);
+}
+
 void pipeline_set_volume(AudioPipeline *p, float volume)
 {
     if (!p || !p->limiter) return;
@@ -1298,6 +1313,7 @@ void pipeline_destroy(AudioPipeline *p)
     if (p->equalizer) equalizer_destroy(p->equalizer);
     if (p->peq) parametric_eq_destroy(p->peq);
     if (p->lowfreq) lowfreq_destroy(p->lowfreq);
+    if (p->channel_merge) channel_merge_destroy(p->channel_merge);
     if (p->loudness) loudness_destroy(p->loudness);
     if (p->limiter) limiter_destroy(p->limiter);
     if (p->tempo) tempo_destroy(p->tempo);

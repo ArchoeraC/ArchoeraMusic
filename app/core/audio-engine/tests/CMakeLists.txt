@@ -562,6 +562,26 @@ add_test(NAME test_lowfreq COMMAND test_lowfreq)
 set_tests_properties(test_lowfreq PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 多声道合并（单侧设备兜底）：默认旁通 / 单侧内容复制 / 等功率合并；
+# 内核 zk_dsp_channel_merge_* 与纯 C 参考对拍（内核缺失时仅测 C API）。
+add_executable(test_channel_merge test_channel_merge.c
+    dsp_ref/channel_merge_ref.c
+)
+target_link_libraries(test_channel_merge PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_channel_merge PRIVATE Threads::Threads)
+endif()
+if(UNIX)
+    target_link_libraries(test_channel_merge PRIVATE m)
+endif()
+target_include_directories(test_channel_merge PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_channel_merge COMMAND test_channel_merge)
+set_tests_properties(test_channel_merge PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # N4 流式 Reader 缓冲预算（zk_stream_*）：默认/夹取/超预算拒绝/记账归零
 add_executable(test_stream_budget test_stream_budget.c)
 target_link_libraries(test_stream_budget PRIVATE audio_engine_static)

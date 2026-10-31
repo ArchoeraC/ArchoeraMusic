@@ -285,6 +285,14 @@ void pipeline_set_lowfreq_hpf(AudioPipeline *p, float freq, int order);
 /** 运行时设置 bass shelf（gain_db / freq）。 */
 void pipeline_set_lowfreq_bass(AudioPipeline *p, float gain_db, float freq);
 
+/**
+ * 运行时启用/禁用多声道合并（默认禁用 = 逐位旁通）。
+ *
+ * 开启后把重采样后的所有声道按等功率（1/√N）求和为单声道并复制到每个
+ * 输出声道；用于设备实际只有左/右一侧发声时避免丢失另一侧内容。
+ */
+void pipeline_set_channel_merge_enabled(AudioPipeline *p, bool enabled);
+
 /** 运行时启用/禁用 FFT */
 void pipeline_set_fft_enabled(AudioPipeline *p, bool enabled);
 

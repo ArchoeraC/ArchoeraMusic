@@ -6,7 +6,8 @@ part of '../settings_sections.dart';
 
 // ── 音频效果 ──────────────────────────────────────────────────────────
 
-/// 音频效果分类：10 段均衡器 / 响度归一化 / 播放速度。
+/// 音频效果分类：10 段均衡器 / 参数化 EQ / 低频管理 / 多声道合并 /
+/// 响度归一化 / 播放速度。
 ///
 /// 引擎支持运行时命令，改动即时下发（无需重启会话）；滑块用本地草稿值
 /// 保证拖动顺滑，松手才落盘并下发。
@@ -360,6 +361,27 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
               onChangeEnd: (v) {
                 setState(() => _draftBassFreq = v);
                 notifier.setLowFreq(bassFreq: v);
+                _apply();
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // 1.7) 多声道合并（单侧设备兜底）
+        SettingSection(
+          title: '声道',
+          note: '设备实际只有左/右一侧发声（单只耳机、单声道音箱等）时开启；'
+              '合并后两侧都能听到完整内容，正常立体声设备建议保持关闭。',
+          children: [
+            SettingSwitchTile(
+              icon: EtaIcons.speakerOutline,
+              title: '多声道合并',
+              subtitle: prefs.channelMergeEnabled
+                  ? '已启用（所有声道合并为单声道输出）'
+                  : '已停用（保持原始立体声）',
+              value: prefs.channelMergeEnabled,
+              onChanged: (v) {
+                notifier.setChannelMerge(v);
                 _apply();
               },
             ),

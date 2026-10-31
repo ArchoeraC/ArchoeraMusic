@@ -155,6 +155,8 @@ set(AUDIO_ENGINE_SOURCES
     # 方向① D1/D2：参数化 EQ + 次声/低频管理
     src/parametric_eq.c
     src/lowfreq.c
+    # 多声道合并（单侧设备兜底；默认旁通）
+    src/channel_merge.c
     src/pipeline.c
     src/pcm_uds.c
     src/player.c
