@@ -10,13 +10,28 @@
 /// [mediaHeadersForUrl] 取头——新增音源只需在此加一条解析器，无需改各 widget。
 library;
 
+import '../../apis/bilibili/core/config.dart'
+    show kBilibiliReferer, kBilibiliUserAgent;
+
 /// 单条媒体请求头解析器：命中则返回需附加的请求头，否则返回 null。
 typedef MediaHeaderResolver = Map<String, String>? Function(Uri uri);
 
 /// 已注册解析器（顺序即匹配优先级）。
 ///
 /// 当前没有需要额外请求头的音源；保留该表，新增音源时在此追加解析器即可。
-final List<MediaHeaderResolver> _resolvers = <MediaHeaderResolver>[];
+final List<MediaHeaderResolver> _resolvers = <MediaHeaderResolver>[
+  // B 站图片/头像：部分 CDN 对无 Referer 请求返回 403。
+  (uri) {
+    final host = uri.host.toLowerCase();
+    if (host == 'hdslb.com' || host.endsWith('.hdslb.com')) {
+      return const {
+        'User-Agent': kBilibiliUserAgent,
+        'Referer': kBilibiliReferer,
+      };
+    }
+    return null;
+  },
+];
 
 /// 解析某媒体 URL 对应的请求头；未命中返回 null。
 Map<String, String>? mediaHeadersForUrl(String url) {

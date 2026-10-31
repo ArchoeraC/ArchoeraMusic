@@ -46,6 +46,7 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       // 显式拉取一次，保证头部账号资料每次启动都刷新（失败静默）。
       unawaited(ref.read(kugouApiProvider).refreshUserInfo());
       unawaited(ref.read(qqMusicApiProvider).loadProfileSilently());
+      unawaited(ref.read(bilibiliApiProvider).loadProfileSilently());
       // 启动同步红心集合：
       // KG会话在 KugouApi 构造函数同步恢复（userid 首帧已就位），下方
       // ref.listen 变更监听收不到「恢复」事件 → 不显式同步则KG红心恒为空。
@@ -93,6 +94,14 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
         unawaited(_mergeQqOnlineFavorites(ref));
       }
     });
+    // B 站登录态：下载器原生解析需要 Cookie（会员/登录可见音轨）。
+    ref.listen(
+      bilibiliApiProvider.select((s) => s.isLoggedIn),
+      (prev, next) {
+        if (prev == next) return;
+        ref.read(downloadControllerProvider.notifier).syncSessions();
+      },
+    );
     return widget.child;
   }
 

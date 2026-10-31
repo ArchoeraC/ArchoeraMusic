@@ -4238,6 +4238,67 @@ class AppLocalizationsEn extends AppLocalizations {
   String get platformQQMusic => 'QM';
 
   @override
+  String get bilibiliLibraryTitle => 'Bilibili';
+
+  @override
+  String get bilibiliOpenLibrary => 'Bilibili library';
+
+  @override
+  String get bilibiliNewSongs => 'New songs';
+
+  @override
+  String get bilibiliRecommendations => 'Recommended';
+
+  @override
+  String get bilibiliPopular => 'Popular';
+
+  @override
+  String get bilibiliFollowing => 'Following';
+
+  @override
+  String get bilibiliLoginToView =>
+      'Sign in to view your Bilibili favorites and history';
+
+  @override
+  String get bilibiliEmptyFavorites => 'No favorites yet';
+
+  @override
+  String get bilibiliEmptyHistory => 'No watch history yet';
+
+  @override
+  String get bilibiliFavoritesLogin => 'Sign in to view Bilibili favorites';
+
+  @override
+  String get bilibiliHistoryLogin => 'Sign in to view Bilibili watch history';
+
+  @override
+  String get brandBilibili => 'Bilibili';
+
+  @override
+  String get platformBilibili => 'Bilibili';
+
+  @override
+  String get loginBilibiliScanHint => 'Scan with the Bilibili mobile app';
+
+  @override
+  String get bilibiliSelectPart => 'Select video part';
+
+  @override
+  String get bilibiliLoginRequired => 'Sign in to Bilibili first';
+
+  @override
+  String get bilibiliVerificationRequired =>
+      'Bilibili requires verification on its website';
+
+  @override
+  String get bilibiliRateLimited =>
+      'Bilibili rate limit reached. Try again later.';
+
+  @override
+  String get bilibiliUnavailable =>
+      'This video is unavailable or not accessible.';
+
+  @override
   String get loginQqQrLogin => 'Sign in with QM QR code';
 
   @override
