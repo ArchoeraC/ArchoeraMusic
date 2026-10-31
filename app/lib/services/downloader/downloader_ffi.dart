@@ -114,6 +114,10 @@ class DownloaderLibrary {
       .lookupFunction<_SetNeteaseCookieNative, _SetNeteaseCookieDart>(
         'archoera_downloader_set_netease_cookie',
       );
+  late final _SetBilibiliCookieDart _setBilibiliCookie = _lib
+      .lookupFunction<_SetBilibiliCookieNative, _SetBilibiliCookieDart>(
+        'archoera_downloader_set_bilibili_cookie',
+      );
   late final _SetIdentityDart _setIdentity = _lib
       .lookupFunction<_SetIdentityNative, _SetIdentityDart>(
         'archoera_downloader_set_identity',
@@ -306,6 +310,16 @@ class DownloaderLibrary {
     }
   }
 
+  /// 注入 B 站会话 Cookie（空串 = 清除）；供 Rust 原生 WBI/playurl 使用。
+  int setBilibiliCookie(String cookieHeader) {
+    final c = cookieHeader.toNativeUtf8();
+    try {
+      return _setBilibiliCookie(c);
+    } finally {
+      calloc.free(c);
+    }
+  }
+
   /// 注入设备指纹（Dart 持久化的 downloaderIdentity JSON；幂等）。
   ///
   /// 对齐 Rust `archoera_downloader_set_identity`：KG mid / 网易
@@ -393,6 +407,9 @@ typedef _SetKugouSessionDart = int Function(Pointer<Utf8>, Pointer<Utf8>);
 
 typedef _SetNeteaseCookieNative = Int32 Function(Pointer<Utf8>);
 typedef _SetNeteaseCookieDart = int Function(Pointer<Utf8>);
+
+typedef _SetBilibiliCookieNative = Int32 Function(Pointer<Utf8>);
+typedef _SetBilibiliCookieDart = int Function(Pointer<Utf8>);
 
 typedef _SetIdentityNative = Int32 Function(Pointer<Utf8> json);
 typedef _SetIdentityDart = int Function(Pointer<Utf8>);
