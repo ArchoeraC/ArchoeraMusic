@@ -439,6 +439,7 @@ jobs:
         env:
           CPPWINRT_INCLUDE: C:\vcpkg\installed\x64-windows-release\include
           _CLIENT_ID: ${{ secrets._CLIENT_ID }}
+        shell: pwsh
         run: |
           $buildArgs = @('--release')
           if ($env:_CLIENT_ID) {
