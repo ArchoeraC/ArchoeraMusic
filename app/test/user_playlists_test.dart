@@ -9,6 +9,8 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:archoera_music/services//_api.dart';
+import 'package:archoera_music/services//_types.dart';
 import 'package:archoera_music/services/netease/apis_netease_caller.dart';
 import 'package:archoera_music/services/netease/netease_api.dart';
 import 'package:archoera_music/services/netease/track.dart';
@@ -67,6 +69,59 @@ class _FakeNeteaseAuth extends NeteaseAuthNotifier {
       const NeteaseAccount(userId: 'u1', nickname: 'tester');
 }
 
+class _FakeApi extends Api {
+  List<Playlist> created = const [];
+  List<Playlist> collected = const [];
+  final List<String> log = [];
+
+  @override
+  bool get isLoggedIn => true;
+
+  @override
+  String resolveUrl(String pathOrUrl) => pathOrUrl;
+
+  @override
+  Future<List<Playlist>> userPlaylists() async => created;
+
+  @override
+  Future<List<Playlist>> favoritePlaylists() async => collected;
+
+  @override
+  Future<void> favoritePlaylist(String id) async => log.add('favorite:$id');
+
+  @override
+  Future<void> unfavoritePlaylist(String id) async => log.add('unfavorite:$id');
+
+  @override
+  Future<Playlist?> createPlaylist(
+    String name, {
+    String? description,
+  }) async {
+    log.add('create:$name');
+    return const Playlist(id: 'n1', name: 'n1');
+  }
+
+  @override
+  Future<void> deletePlaylist(String id) async => log.add('delete:$id');
+
+  @override
+  Future<void> updatePlaylist(
+    String id, {
+    String? name,
+    String? description,
+  }) async => log.add('update:$id:$name');
+
+  @override
+  Future<int?> addMusicToPlaylist(String id, List<String> ids) async {
+    log.add('add:$id:${ids.join('+')}');
+    return 2;
+  }
+
+  @override
+  Future<void> removeMusicFromPlaylist(String id, List<String> ids) async =>
+      log.add('del:$id:${ids.join('+')}');
+}
+
 void main() {
   test('NT：分档判定 + 能力位 + 写操作联动', () async {
     final api = _FakeNeteaseApi()
@@ -100,6 +155,39 @@ void main() {
 
     expect(await store.addTracks('netease', 'own1', ['a', 'b']), 1);
     expect(api.log.last, 'add:own1:a+b');
+  });
+
+  test('：分档 + 收藏 / 加歌 / 建删改', () async {
+    final api = _FakeApi()
+      ..created = const [Playlist(id: '1', name: 'own')]
+      ..collected = const [Playlist(id: '2', name: 'fav')];
+    final container = ProviderContainer(
+      overrides: [ApiProvider.overrideWith((ref) => api)],
+    );
+    addTearDown(container.dispose);
+
+    final store = container.read(userPlaylistsProvider);
+    expect(store.supported(''), isTrue);
+    await store.ensureLoaded('');
+    final v = store.view('');
+    expect(v.created.map((p) => p.id).toList(), ['1']);
+    expect(v.collected.map((p) => p.id).toList(), ['2']);
+    expect(v.likedPlaylistId, isNull);
+
+    await store.setCollected('', '2', collected: false);
+    expect(api.log.last, 'unfavorite:2');
+
+    expect(await store.addTracks('', '1', ['7', '8']), 2);
+    expect(api.log.last, 'add:1:7+8');
+
+    expect(await store.create('', '新'), 'n1');
+    expect(api.log.last, 'create:新');
+
+    await store.updateMeta('', '1', name: '改');
+    expect(api.log.last, 'update:1:改');
+
+    await store.remove('', '1');
+    expect(api.log.last, 'delete:1');
   });
 
   test('不支持音源的适配器：能力位 false、数据为空', () async {
