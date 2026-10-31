@@ -24,8 +24,6 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/kugou/kugou_api.dart';
-import '../../services/neko/neko_api.dart';
-import '../../services/neko/neko_types.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../services/qqmusic/qq_liked_store.dart';
@@ -36,12 +34,14 @@ import '../../stores/shell_page_state.dart';
 import '../../stores/user_playlists.dart';
 import '../common/toast.dart';
 import 'kugou_login_button.dart';
-import 'neko_login_dialog.dart';
 import 'netease_login_dialog.dart';
 import 'qqmusic_login_dialog.dart';
 import 'track_list_dialog.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../services/neko/neko_api.dart';
+import '../../services/neko/neko_types.dart';
+import 'neko_login_dialog.dart';
 
 /// 收藏页的一个分类 Tab。
 class CollectionTab {
@@ -111,7 +111,7 @@ abstract class CollectionPlatform {
   /// 本机红心库（QQ）：列表/状态不经服务端，离线可用。
   bool get localLikedStore => false;
 
-  /// 红心键（跨端稳定标识；NT/NK=id，KG=hash，QQ=songmid）。
+  /// 红心键（跨端稳定标识；NT=id，KG=hash，QQ=songmid）。
   String likeKey(Track t);
 
   /// 是否参与权威列表对账（QQ 本机列表不走对账）。
@@ -120,7 +120,7 @@ abstract class CollectionPlatform {
   /// 收藏成功 / 取消后是否维护共享「我喜欢」列表增量（NT / KG 覆写为 true）。
   bool get likedLocalDelta => false;
 
-  /// 缓存 user key（NT uid / KG userid / NK userId / QQ 'local'）。
+  /// 缓存 user key（NT uid / KG userid / QQ 'local'）。
   String? likedUserKey(dynamic ref);
 
   /// 轻量红心 id 集合（启动同步用）。
@@ -176,7 +176,7 @@ abstract class CollectionPlatform {
   String get defaultTabId;
 
   /// 拉取某分类；返回「tabKey → 数据」映射（一次请求可填充多个分类，
-  /// 如 KG/QQ/NK 的曲库接口）。key 形如 `'$source.$tabId'`。
+  /// 如 KG/QQ 的曲库接口）。key 形如 `'$source.$tabId'`。
   Future<Map<String, List<CoverItem>>> fetchFavorites(
     dynamic ref,
     String tabId,
@@ -203,7 +203,7 @@ abstract class CollectionPlatform {
 
   // ── 歌单管理（收藏 / 新建 / 编辑 / 删除 / 增删歌曲）──────────────
   //
-  // 仅支持用户歌单管理的音源实现（NT / Neko）；其余默认「不支持」，UI 自动
+  // 仅支持用户歌单管理的音源实现（如 NT）；其余默认「不支持」，UI 自动
   // 隐藏相关入口。**新增音源只需实现这些方法**，UI 与数据面无需改动。
 
   /// 是否支持用户歌单管理。
@@ -265,11 +265,17 @@ abstract class CollectionPlatform {
 CollectionPlatform collectionPlatform(String source) =>
     _registry[source] ?? _registry['netease']!;
 
+/// 该源是否注册了自己的收藏适配器。
+///
+/// [collectionPlatform] 对未注册源会回退 NT，因此**所有写操作（红心 / 歌单）
+/// 必须先判断本函数**：否则 B 站等无收藏能力的曲目会被写进网易云红心或歌单。
+bool hasCollectionAdapter(String source) => _registry.containsKey(source);
+
 /// 已启用平台的适配器（顺序即下拉顺序）。
 List<CollectionPlatform> collectionPlatforms(dynamic ref) =>
     _all.where((p) => p.enabled(ref)).toList(growable: false);
 
-/// 全部已注册平台的适配器（含当前被关闭的实验源；红心同步等全量遍历用）。
+/// 全部已注册平台的适配器（红心同步等全量遍历用）。
 List<CollectionPlatform> allCollectionPlatforms() => List.unmodifiable(_all);
 
 /// 默认「我喜欢」平台：优先已登录的 NT → KG → QQ，否则 NT（与历史一致；

@@ -87,7 +87,8 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
         }
       case ShortcutAction.likeToggle:
         final track = s.track;
-        if (track != null) {
+        // 无收藏适配器的源（B 站 / 本地 / 流媒体）不触发红心写操作。
+        if (track != null && sourceSupportsLike(track.source)) {
           // ignore: discarded_futures
           ref.read(likeControllerProvider).toggle(track);
         }

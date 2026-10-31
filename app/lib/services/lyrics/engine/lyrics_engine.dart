@@ -29,14 +29,17 @@ class LyricsEngine {
 
   /// 按「本平台优先 → 用户来源顺序」排出候选来源。
   ///
-  /// 非在线源（local / streaming）只返回自身；未知来源返回空（无歌词）。
-  List<LyricSource> orderedSources(String trackSource, List<String> sourceOrder) {
+  /// 非在线源（local / streaming）只返回自身；没有专属歌词源的在线平台
+  /// （如 B 站视频）按用户来源顺序用其它平台补全；未知来源同样如此。
+  List<LyricSource> orderedSources(
+    String trackSource,
+    List<String> sourceOrder,
+  ) {
     final own = _byId[trackSource];
-    if (own == null || !own.online) {
-      return own == null ? const [] : [own];
-    }
-    final out = <LyricSource>[own];
-    for (final id in sourceOrder) {
+    if (own != null && !own.online) return [own];
+    final ids = sourceOrder.isEmpty ? _byId.keys : sourceOrder;
+    final out = <LyricSource>[?own];
+    for (final id in ids) {
       if (id == trackSource) continue;
       final source = _byId[id];
       if (source != null && source.online) out.add(source);

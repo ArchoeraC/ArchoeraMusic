@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart' show ChangeNotifierProvider;
 
 import '../services/history/history_store.dart';
+import '../services/bilibili/bilibili_api.dart';
 import '../services/kugou/kugou_api.dart';
 import '../services/liked/liked_cache.dart';
 import '../services/liked/liked_loader.dart';
@@ -150,6 +151,15 @@ final nekoMaxQualityProvider = FutureProvider.family<String?, String>(
   (ref, id) => ref
       .read(_nekoMaxQualityLimiterProvider)
       .run(() => ref.read(nekoApiProvider).fetchMaxQuality(id)),
+);
+
+// ── 直连 Bilibili API ─────────────────────────────────────────
+
+/// 直连 B 站（api/passport 官方接口；WBI 签名，Cookie 经 vault 持久化）。
+///
+/// [ChangeNotifierProvider]：登录态/资料变化时通知顶部账号菜单与注册表。
+final bilibiliApiProvider = ChangeNotifierProvider<BilibiliApi>(
+  (ref) => BilibiliApi(),
 );
 
 // ── 顶栏微型天气 ────────────────────────────────────────────────

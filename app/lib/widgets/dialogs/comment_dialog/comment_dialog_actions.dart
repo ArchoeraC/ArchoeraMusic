@@ -68,7 +68,11 @@ extension _CommentDialogActions on _CommentDialogState {
   }
 
   NeteaseCommentPage _mergePage(NeteaseCommentPage next, int page) {
-    final merged = [...?_page?.list, ...next.list];
+    final merged = [...?_page?.list];
+    final seen = {for (final c in merged) c.id};
+    for (final c in next.list) {
+      if (seen.add(c.id)) merged.add(c);
+    }
     final capped = merged.length > _CommentDialogState._maxComments
         ? merged.sublist(merged.length - _CommentDialogState._maxComments)
         : merged;

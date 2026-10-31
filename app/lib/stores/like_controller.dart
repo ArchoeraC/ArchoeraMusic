@@ -83,7 +83,10 @@ class LikeController extends ChangeNotifier {
       _sets.putIfAbsent(source, () => <String>{});
 
   /// 当前曲目是否已喜欢（按 source 路由到对应平台集合与红心键）。
+  ///
+  /// 无收藏适配器的源（B 站 / 本地 / 流媒体）恒为 false。
   bool isLiked(Track track) {
+    if (!hasCollectionAdapter(track.source)) return false;
     final key = collectionPlatform(track.source).likeKey(track);
     return key.isNotEmpty && _setFor(track.source).contains(key);
   }
@@ -190,7 +193,10 @@ class LikeController extends ChangeNotifier {
 
   /// 切换红心：乐观更新 + 失败回滚。
   /// 成功返回 true；失败回滚并返回 false（调用方负责提示）。
+  ///
+  /// 无收藏适配器的源（B 站 / 本地 / 流媒体）直接返回 false，绝不走 NT 回退。
   Future<bool> toggle(Track track) async {
+    if (!hasCollectionAdapter(track.source)) return false;
     final adapter = collectionPlatform(track.source);
     final key = adapter.likeKey(track);
     if (key.isEmpty) return false;

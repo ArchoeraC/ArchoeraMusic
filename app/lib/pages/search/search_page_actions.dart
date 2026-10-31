@@ -8,6 +8,11 @@ part of '../search_page.dart';
 
 extension _SearchPageActions on _SearchPageState {
   void _onTabChanged() {
+    // B 站只有视频搜索：禁止进入封面 Tab（TabBar 也被隐藏）。
+    if (!sourcePlatform(_platform).supportsCoverSearch && _tabs.index != 0) {
+      _tabs.index = 0;
+      return;
+    }
     // 记住 Tab（跨壳内容卸载/重挂载恢复）。
     ref.read(searchTabIndexProvider.notifier).set(_tabs.index);
     if (!_tabs.indexIsChanging) return;
@@ -24,6 +29,9 @@ extension _SearchPageActions on _SearchPageState {
     if (platform == _platform) return;
     ref.read(searchPlatformProvider.notifier).set(platform);
     setState(() => _platform = platform);
+    if (!sourcePlatform(platform).supportsCoverSearch) {
+      _tabs.index = 0;
+    }
     _resetAll();
     if (_query.isNotEmpty) unawaited(_fetch(append: false));
   }
@@ -59,6 +67,12 @@ extension _SearchPageActions on _SearchPageState {
     if (_resolving) return;
     setState(() => _resolving = true);
     try {
+      // 分P选择 / 身份补齐（注册表默认原样返回；B 站多P在这里弹窗）。
+      final prepared = await sourcePlatform(
+        track.source,
+      ).preparePlay(context, ref, track);
+      if (!mounted || prepared == null) return;
+      track = prepared;
       final String? url = await sourcePlatform(
         track.source,
       ).resolvePlayUrl(ref, track, quality: 'hq');

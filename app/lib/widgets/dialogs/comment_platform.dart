@@ -20,8 +20,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../../apis/bilibili/core/types.dart' show BilibiliComment;
 import '../../services/kugou/kugou_api.dart';
-import '../../services/neko/neko_types.dart';
 import '../../services/netease/comment.dart';
 import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
@@ -30,6 +30,7 @@ import '../common/toast.dart';
 import 'neko_login_dialog.dart';
 import 'netease_login_dialog.dart';
 import 'qqmusic_login_dialog.dart';
+import '../../services/neko/neko_types.dart';
 
 /// 平台操作的可直接展示异常（消息已本地化）。弹窗原样 toast，不再套「发送失败：」。
 class CommentOperationException implements Exception {
@@ -52,16 +53,16 @@ abstract class CommentPlatform {
   /// 是否提供「热门 / 最新」两 Tab（NT、QQ）。
   bool get supportsHot => false;
 
-  /// 是否支持发表评论（NT、NK）。
+  /// 是否支持发表评论（如 NT）。
   bool get supportsSend => false;
 
-  /// 是否支持回复（NK）。
+  /// 是否支持回复。
   bool get supportsReply => false;
 
-  /// 是否支持删除（NK）。
+  /// 是否支持删除。
   bool get supportsDelete => false;
 
-  /// 是否把楼内回复展开为独立条目并带操作（NK）。false = 只展示第一条引用。
+  /// 是否把楼内回复展开为独立条目并带操作。false = 只展示第一条引用。
   bool get expandsReplies => false;
 
   /// 解析评论目标 id；null = 不可评论（弹窗显示「未找到」）。
@@ -102,6 +103,7 @@ final Map<String, CommentPlatform> _registry = {
     _KugouCommentPlatform(),
     _QqCommentPlatform(),
     _NekoCommentPlatform(),
+    _BilibiliCommentPlatform(),
   ])
     p.source: p,
 };
@@ -255,9 +257,83 @@ class _QqCommentPlatform extends CommentPlatform {
     String targetId, {
     required bool hot,
     required int page,
-  }) => ref
-      .read(qqMusicApiProvider)
-      .songComments(targetId, page: page, hot: hot);
+  }) =>
+      ref.read(qqMusicApiProvider).songComments(targetId, page: page, hot: hot);
+}
+
+// ── Bilibili ───────────────────────────────────────────────────────────
+
+/// B 站评论 → 通用展示模型。
+NeteaseComment _biliToTile(BilibiliComment c) => NeteaseComment(
+  id: c.id,
+  userName: c.userName,
+  avatar: c.avatar,
+  text: c.text,
+  location: c.location,
+  likedCount: c.likedCount,
+  replyTotal: c.replyTotal,
+  time: c.timeMs,
+  reply: c.replies.map(_biliToTile).toList(),
+);
+
+class _BilibiliCommentPlatform extends CommentPlatform {
+  @override
+  String get source => 'bilibili';
+
+  @override
+  String label(AppLocalizations l10n) => l10n.brandBilibili;
+
+  /// 热门 / 最新分别走 `mode=3` / `mode=2`。
+  @override
+  bool get supportsHot => true;
+
+  /// 评论接口是游标分页：缓存每页返回的 next 供下一页使用。
+  final Map<String, int> _nextCursor = {};
+
+  static String _key(String targetId, bool hot) =>
+      '$targetId:${hot ? 'hot' : 'latest'}';
+
+  @override
+  Future<String?> resolveTarget(
+    BuildContext context,
+    WidgetRef ref,
+    Track track,
+  ) => ref.read(bilibiliApiProvider).commentTarget(track);
+
+  @override
+  Future<NeteaseCommentPage> fetchPage(
+    WidgetRef ref,
+    String targetId, {
+    required bool hot,
+    required int page,
+  }) async {
+    final key = _key(targetId, hot);
+    if (page <= 1) _nextCursor.remove(key);
+    final next = page <= 1 ? 0 : _nextCursor[key];
+    if (next == null) {
+      return NeteaseCommentPage(
+        list: const [],
+        total: 0,
+        page: page,
+        limit: 20,
+      );
+    }
+    final result = await ref
+        .read(bilibiliApiProvider)
+        .videoComments(targetId, hot: hot, next: next);
+    final cursor = result.next;
+    if (cursor == null) {
+      _nextCursor.remove(key);
+    } else {
+      _nextCursor[key] = cursor;
+    }
+    return NeteaseCommentPage(
+      list: [for (final c in result.list) _biliToTile(c)],
+      total: result.total,
+      page: page,
+      limit: 20,
+    );
+  }
 }
 
 // ── NK ─────────────────────────────────────────────────────────────────

@@ -34,14 +34,63 @@ List<String> _splitArtists(String? text) =>
 List<String> normalizeTrackArtists(Track track) =>
     track.artists.map((artist) => normalize(artist.name)).where((s) => s.isNotEmpty).toList();
 
-/// 搜索关键词用全部歌手，减少平台返回同名异歌手候选
-String buildLyricSearchKeyword(Track track) => [
-      track.title,
-      track.artists.map((artist) => artist.name).join(' '),
-    ]
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .join(' ');
+/// B 站等视频源的标题清洗：去掉【…】/[…] 包装、常见「官方MV / 完整版」修饰，
+/// 优先取《…》里的歌名，便于拿歌名去其它平台模糊匹配歌词。
+///
+/// 例：
+/// - `【原创曲】为女则刚！原创歌曲《女也》完整版` → `女也`
+/// - `【4K修复】《晴天》官方MV` → `晴天`
+/// - `【MV】七里香（完整版）` → `七里香`
+String bilibiliLyricTitle(String raw) {
+  var title = raw.trim();
+  if (title.isEmpty) return title;
+
+  // 中文书名号通常就是歌名；多条时取最后一条（「《影视/企划》主题曲《歌名》」
+  // 的常见写法里歌名在后）。
+  final names = RegExp(r'《([^《》]{1,80})》')
+      .allMatches(title)
+      .map((m) => m.group(1)!.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  if (names.isNotEmpty) return names.last;
+
+  // 去掉成对标签：`【…】`、`[…]`、带修饰词的 `(…)`。
+  title = title.replaceAll(RegExp(r'【[^】]{0,60}】'), ' ');
+  title = title.replaceAll(RegExp(r'\[[^\]]{0,60}\]'), ' ');
+  title = title.replaceAll(
+    RegExp(
+      r'[（(][^（）()]{0,40}(?:官方|完整版|高清|无损|hi-?res|4k|8k|1080p|720p|mv|live|现场|动态歌词|歌词版|纯享|加长|翻唱|cover)[^（）()]{0,20}[）)]',
+      caseSensitive: false,
+    ),
+    ' ',
+  );
+  // 尾部裸露的修饰词（含前导分隔符）。
+  title = title.replaceAll(
+    RegExp(
+      r'(?:\s*[-—|·]\s*)?(?:官方\s*)?(?:mv|完整版|高清|无损|hi-?res|4k|8k|1080p|720p|动态歌词|歌词版|纯享版?|加长版?|现场版?|翻唱|cover)\s*$',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  title = title.replaceAll(RegExp(r'^[\s\-—|/·、,，]+|[\s\-—|/·、,，]+$'), '');
+  return title.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+/// 歌词模糊匹配用的标题：视频源先做包装信息清洗，其余源用原曲名。
+String lyricSearchTitle(Track track) =>
+    track.source == 'bilibili' ? bilibiliLyricTitle(track.title) : track.title;
+
+/// 搜索关键词：视频源只取清洗后的歌名（UP 主名常不是演唱者，带上反而降低命中），
+/// 其余源用「曲名 + 全部歌手」。
+String buildLyricSearchKeyword(Track track) {
+  final title = lyricSearchTitle(track);
+  final artist =
+      track.source == 'bilibili' ? '' : track.artists.map((a) => a.name).join(' ');
+  return [title, artist]
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .join(' ');
+}
 
 /// 歌手是否有可用交集
 ({bool exact, bool contains}) _artistMatches(
@@ -100,7 +149,10 @@ LyricCandidate<E>? pickBestCandidate<E>(
   List<LyricCandidate<E>> candidates,
   Track track,
 ) {
-  final trackName = normalize(track.title);
+  // 视频源（B 站）的歌名常带包装信息，且 UP 主不一定是演唱者：
+  // 用清洗后的歌名比较，并放宽歌手硬性条件（仍作为加分项）。
+  final isVideoSource = track.source == 'bilibili';
+  final trackName = normalize(lyricSearchTitle(track));
   final trackArtists = normalizeTrackArtists(track);
   final trackAlbum = normalize(track.album?.name);
   final trackDuration = track.duration;
@@ -132,7 +184,12 @@ LyricCandidate<E>? pickBestCandidate<E>(
     if (_durationFar(candidate.duration, trackDuration)) continue;
 
     final artist = _artistMatches(candidate.artist, trackArtists);
-    if (trackArtists.isNotEmpty && !artist.exact && !artist.contains) continue;
+    if (!isVideoSource &&
+        trackArtists.isNotEmpty &&
+        !artist.exact &&
+        !artist.contains) {
+      continue;
+    }
     // 置信度地板：name 仅子串命中时必须有 artist 或时长佐证，否则视为巧合 substring 丢弃
     if (!nameExact &&
         !artist.exact &&

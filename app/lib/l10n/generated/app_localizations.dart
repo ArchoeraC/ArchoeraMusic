@@ -7702,6 +7702,120 @@ abstract class AppLocalizations {
   /// **'QM'**
   String get platformQQMusic;
 
+  /// No description provided for @bilibiliLibraryTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'哔哩哔哩'**
+  String get bilibiliLibraryTitle;
+
+  /// No description provided for @bilibiliOpenLibrary.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'哔哩哔哩资料库'**
+  String get bilibiliOpenLibrary;
+
+  /// No description provided for @bilibiliNewSongs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'新歌'**
+  String get bilibiliNewSongs;
+
+  /// No description provided for @bilibiliRecommendations.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'推荐'**
+  String get bilibiliRecommendations;
+
+  /// No description provided for @bilibiliPopular.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'热门'**
+  String get bilibiliPopular;
+
+  /// No description provided for @bilibiliFollowing.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关注'**
+  String get bilibiliFollowing;
+
+  /// No description provided for @bilibiliLoginToView.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录后可查看 B 站收藏与历史'**
+  String get bilibiliLoginToView;
+
+  /// No description provided for @bilibiliEmptyFavorites.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂无收藏夹'**
+  String get bilibiliEmptyFavorites;
+
+  /// No description provided for @bilibiliEmptyHistory.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'暂无观看历史'**
+  String get bilibiliEmptyHistory;
+
+  /// No description provided for @bilibiliFavoritesLogin.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录后查看 B 站收藏夹'**
+  String get bilibiliFavoritesLogin;
+
+  /// No description provided for @bilibiliHistoryLogin.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录后查看 B 站观看历史'**
+  String get bilibiliHistoryLogin;
+
+  /// No description provided for @brandBilibili.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'哔哩哔哩'**
+  String get brandBilibili;
+
+  /// No description provided for @platformBilibili.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'哔哩哔哩'**
+  String get platformBilibili;
+
+  /// No description provided for @loginBilibiliScanHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请使用哔哩哔哩手机客户端扫码登录'**
+  String get loginBilibiliScanHint;
+
+  /// No description provided for @bilibiliSelectPart.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'选择分P'**
+  String get bilibiliSelectPart;
+
+  /// No description provided for @bilibiliLoginRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请先登录哔哩哔哩'**
+  String get bilibiliLoginRequired;
+
+  /// No description provided for @bilibiliVerificationRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'哔哩哔哩要求验证，请先在官网完成'**
+  String get bilibiliVerificationRequired;
+
+  /// No description provided for @bilibiliRateLimited.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'哔哩哔哩请求过于频繁，请稍后重试'**
+  String get bilibiliRateLimited;
+
+  /// No description provided for @bilibiliUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'该视频不可用或没有访问权限'**
+  String get bilibiliUnavailable;
+
   /// No description provided for @loginQqQrLogin.
   ///
   /// In zh_CN, this message translates to:

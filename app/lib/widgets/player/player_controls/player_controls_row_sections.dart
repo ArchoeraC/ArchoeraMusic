@@ -7,6 +7,7 @@ part of '../player_controls_row.dart';
 class _PlayerControlsLeftGroup extends StatelessWidget {
   const _PlayerControlsLeftGroup({
     required this.canLike,
+    required this.canComment,
     required this.liked,
     required this.current,
     required this.l10n,
@@ -16,6 +17,7 @@ class _PlayerControlsLeftGroup extends StatelessWidget {
   });
 
   final bool canLike;
+  final bool canComment;
   final bool liked;
   final Track? current;
   final dynamic l10n;
@@ -36,15 +38,14 @@ class _PlayerControlsLeftGroup extends StatelessWidget {
             color: liked ? Colors.redAccent : colorScheme.onSurfaceVariant,
             onPressed: () => onToggleLike(current!),
           ),
-        if (canLike) ...[
-          const SizedBox(width: 12),
+        if (canLike && canComment) const SizedBox(width: 12),
+        if (canComment)
           CtrlIcon(
             tooltip: l10n.menuComment,
             icon: EtaIcons.commentOutline,
             size: 24,
             onPressed: onShowComments,
           ),
-        ],
       ],
     );
   }

@@ -35,6 +35,7 @@ extension _SearchPageView on _SearchPageState {
             query: _query,
             platform: _platform,
             tabs: _tabs,
+            showTabs: sourcePlatform(_platform).supportsCoverSearch,
             platforms: sourcePlatforms(ref),
             onPlatformChanged: _switchPlatform,
           ),
@@ -60,6 +61,9 @@ extension _SearchPageView on _SearchPageState {
     required double coverRadius,
     required Set<String> rowLikedIds,
   }) {
+    // 无收藏适配器的源（B 站）不显示行内红心，避免写入 NT 回退。
+    // 聚合搜索结果只包含可收藏平台，保持原有红心。
+    final canLikeRows = _platform == 'all' || sourceSupportsLike(_platform);
     if (_query.isEmpty) {
       return SearchEmptyState(
         icon: EtaIcons.earth,
@@ -109,8 +113,8 @@ extension _SearchPageView on _SearchPageState {
                 hasMore: _songs.hasMore,
                 loadingMore: _songs.loadingMore,
                 showSource: _platform == 'all',
-                likedIds: rowLikedIds,
-                onToggleLike: _toggleLike,
+                likedIds: canLikeRows ? rowLikedIds : null,
+                onToggleLike: canLikeRows ? _toggleLike : null,
                 onContextMenu: _onTrackMenu,
                 onReachBottom: () => _fetch(append: true),
               ),
@@ -157,6 +161,7 @@ class _SearchPageHeader extends StatelessWidget {
     required this.query,
     required this.platform,
     required this.tabs,
+    required this.showTabs,
     required this.platforms,
     required this.onPlatformChanged,
   });
@@ -164,6 +169,9 @@ class _SearchPageHeader extends StatelessWidget {
   final String query;
   final String platform;
   final TabController tabs;
+
+  /// 是否显示歌曲/专辑/歌手/歌单 Tab（B 站只有视频）。
+  final bool showTabs;
 
   /// 已启用且可搜索的音源（顺序即下拉顺序；含实验源开关过滤）。
   final List<SourcePlatform> platforms;
@@ -206,20 +214,22 @@ class _SearchPageHeader extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          TabBar(
-            controller: tabs,
-            // TabAlignment.start 仅对可滚动 TabBar 有效：必须 isScrollable，
-            // 否则指示条偏移与标签不一致。
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            tabs: [
-              Tab(text: l10n.commonSongs),
-              Tab(text: l10n.commonAlbums),
-              Tab(text: l10n.commonArtists),
-              Tab(text: l10n.commonPlaylists),
-            ],
-          ),
+          if (showTabs) ...[
+            const SizedBox(height: 12),
+            TabBar(
+              controller: tabs,
+              // TabAlignment.start 仅对可滚动 TabBar 有效：必须 isScrollable，
+              // 否则指示条偏移与标签不一致。
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              tabs: [
+                Tab(text: l10n.commonSongs),
+                Tab(text: l10n.commonAlbums),
+                Tab(text: l10n.commonArtists),
+                Tab(text: l10n.commonPlaylists),
+              ],
+            ),
+          ],
         ],
       ),
     );
