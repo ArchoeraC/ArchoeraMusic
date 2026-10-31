@@ -29,12 +29,18 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
+import '../../widgets/dialogs/bilibili_login_dialog.dart';
+import '../../widgets/dialogs/bilibili_parts_dialog.dart';
 import '../../widgets/dialogs/collection_platform.dart';
 import '../../widgets/dialogs/comment_platform.dart';
 import '../../widgets/dialogs/kugou_login_button.dart';
 import '../../widgets/dialogs/netease_login_dialog.dart';
 import '../../widgets/dialogs/qqmusic_login_dialog.dart';
 import '../../widgets/dialogs/track_list_dialog.dart';
+import '../../apis/bilibili/core/config.dart'
+    show kBilibiliReferer, kBilibiliUserAgent;
+import '../../apis/bilibili/core/request.dart'
+    show BilibiliApiException, BilibiliErrorKind;
 import '../../apis/qqmusic/core/request.dart' show QmErrorKind;
 import '../kugou/kugou_api.dart' show KugouApi;
 import '../lyrics/engine/lyric_source.dart';
@@ -85,6 +91,9 @@ abstract class SourcePlatform {
   /// 是否出现在「搜索音源下拉」中（local / streaming 无搜索能力 → false）。
   bool get searchable => true;
 
+  /// 是否支持专辑 / 歌手 / 歌单封面搜索（B 站只有视频，搜索页据此隐藏 Tab）。
+  bool get supportsCoverSearch => true;
+
   /// 是否参与搜索页 `'all'` 聚合。
   bool get inAggregate => true;
 
@@ -112,11 +121,22 @@ abstract class SourcePlatform {
   /// 入队前的曲目预处理（如 KG 补 hash）。
   Future<Track> prepareForDownload(dynamic ref, Track t) async => t;
 
-  /// 通用曲目右键菜单是否显示「红心 / 评论 / 添加到歌单」（NT / KG）。
+  /// 通用曲目右键菜单是否显示「红心 / 评论区 / 添加到歌单」（NT / KG）。
   bool get trackMenuLikeComment => false;
+
+  /// 通用曲目右键菜单是否显示「评论」（默认跟随 [trackMenuLikeComment]）。
+  ///
+  /// B 站等只有评论、没有本地红心的源单独覆写为 true。
+  bool get trackMenuComment => trackMenuLikeComment;
 
   /// 通用曲目右键菜单是否显示「查看歌手 / 媒体详情 / 下载」（NT / KG / QQ）。
   bool get trackMenuArtistDownload => false;
+
+  /// 是否显示「查看歌手」（默认随 [trackMenuArtistDownload]；B 站 UP 主详情未接）。
+  bool get trackMenuArtist => trackMenuArtistDownload;
+
+  /// 是否显示「媒体详情」（默认随 [trackMenuArtistDownload]）。
+  bool get trackMenuDetail => trackMenuArtistDownload;
 
   /// 播放时是否必须以「引擎直连流式」处理（跳过整首内存门禁）。流媒体为真。
   bool get streamDirectOnly => false;
@@ -213,6 +233,15 @@ abstract class SourcePlatform {
     String? streamingQuality,
     void Function(String message)? log,
   });
+
+  /// 播放前预处理（分P选择等）；返回 null = 用户取消。
+  ///
+  /// 默认原样返回；B 站等多分P音源在这里弹选择框并补齐身份。
+  Future<Track?> preparePlay(
+    BuildContext context,
+    dynamic ref,
+    Track track,
+  ) async => track;
 
   // ── 播放辅助（歌曲缓存 / 自动换源 / 元数据补齐） ──────────────────
 
@@ -360,12 +389,16 @@ List<String> aggregateSourceKeys() => [
 
 /// 该源是否有「收藏 / 我喜欢」能力（供 canLike 等判定，避免硬编码平台列表）。
 bool sourceSupportsLike(String source) =>
-    sourcePlatform(source).collections != null;
+    hasCollectionAdapter(source) && sourcePlatform(source).collections != null;
 
 /// 收藏操作失败提示文案（由该源的收藏适配器提供；无适配器回退 NT 文案）。
 String likeFailedTextFor(String source, AppLocalizations l10n) =>
     sourcePlatform(source).collections?.likeFailedText(l10n) ??
     l10n.toastLoginRequiredNetease;
+
+/// 该源是否支持评论区（B 站为只读评论，也支持打开）。
+bool sourceSupportsComment(String source) =>
+    sourcePlatform(source).trackMenuComment;
 
 /// 由 [TrackQuality] 反推等级短码：无损编解码器 → Hi-Res（sr≥96k 且 24bit）
 /// / 无损；否则按 bitrate 分档（≥320k HQ / ≥192k SQ / LQ）。
@@ -399,6 +432,7 @@ final List<SourcePlatform> _all = [
   _NeteaseSource(),
   _KugouSource(),
   _QqSource(),
+  _BilibiliSource(),
   _LocalSource(),
   _StreamingSource(),
 ];
@@ -1070,6 +1104,184 @@ class _QqSource extends SourcePlatform {
   }
 }
 
+// ── Bilibili ───────────────────────────────────────────────────────────
+
+class _BilibiliSource extends SourcePlatform {
+  @override
+  String get source => 'bilibili';
+
+  @override
+  String label(AppLocalizations l10n) => l10n.platformBilibili;
+
+  @override
+  String get badgeLabel => 'B';
+
+  @override
+  Color get badgeColor => const Color(0xFFFB7299);
+
+  @override
+  bool get searchable => true;
+
+  /// B 站是视频搜索，混入歌曲聚合会明显污染结果；只在显式选择时使用。
+  @override
+  bool get inAggregate => false;
+
+  @override
+  bool get supportsCoverSearch => false;
+
+  @override
+  bool get searchCoolable => true;
+
+  @override
+  bool get downloadable => true;
+
+  /// 下载需要登录：会员/付费内容以账号实际权限为准。
+  @override
+  bool get downloadRequiresLogin => true;
+
+  @override
+  bool get downloadFallbackSupported => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
+
+  /// 只有评论区，没有本机红心。
+  @override
+  bool get trackMenuComment => true;
+
+  @override
+  CommentPlatform? get comments => commentPlatformFor(source);
+
+  /// UP 主详情页尚未接入：只显示「媒体详情 / 下载」。
+  @override
+  bool get trackMenuArtist => false;
+
+  @override
+  bool get trackMenuDetail => true;
+
+  /// 长视频不整首拉入内存 / 不后台缓存整片，交给引擎直连流式播放。
+  @override
+  bool get streamDirectOnly => true;
+
+  @override
+  bool get songCacheable => false;
+
+  @override
+  bool get autoFallback => false;
+
+  @override
+  List<String> get supportedQualities => const [
+    'lq',
+    'sq',
+    'hq',
+    'lossless',
+    'hi-res',
+  ];
+
+  @override
+  List<String> availableQualities(Track t, {String? maxQuality}) =>
+      supportedQualities;
+
+  @override
+  String? qualityLabel(AppLocalizations l10n, Track t, {String? maxQuality}) =>
+      'AAC / FLAC / Dolby';
+
+  @override
+  ({String label, bool lossless})? qualityBadge(
+    Track t,
+    AppLocalizations l10n, {
+    String? maxQuality,
+  }) => (label: 'AAC', lossless: false);
+
+  @override
+  Map<String, String> get mediaHeaders => const {
+    'User-Agent': kBilibiliUserAgent,
+    'Referer': kBilibiliReferer,
+  };
+
+  @override
+  String get songCacheReferer => kBilibiliReferer;
+
+  @override
+  bool loggedIn(dynamic ref) => ref.read(bilibiliApiProvider).isLoggedIn;
+
+  @override
+  ProviderListenable<Object?>? get authSignal =>
+      bilibiliApiProvider.select<Object?>((s) => s.isLoggedIn);
+
+  @override
+  Future<void> login(BuildContext context) => showBilibiliLoginDialog(context);
+
+  @override
+  String searchErrorDetail(AppLocalizations l10n, Object? err) {
+    if (err is BilibiliApiException) {
+      return switch (err.kind) {
+        BilibiliErrorKind.authRequired => l10n.bilibiliLoginRequired,
+        BilibiliErrorKind.verificationRequired =>
+          l10n.bilibiliVerificationRequired,
+        BilibiliErrorKind.rateLimited => l10n.bilibiliRateLimited,
+        BilibiliErrorKind.network => l10n.searchNetworkError,
+        BilibiliErrorKind.unavailable =>
+          err.message.isEmpty ? l10n.bilibiliUnavailable : err.message,
+        BilibiliErrorKind.invalidResponse ||
+        BilibiliErrorKind.invalidRequest => err.message,
+      };
+    }
+    return '$err';
+  }
+
+  @override
+  Future<SearchResult<Track>> searchSongs(
+    dynamic ref,
+    String query, {
+    required bool append,
+    required int loaded,
+    required int limit,
+  }) {
+    final page = append ? (loaded ~/ 20) + 1 : 1;
+    return ref
+        .read(bilibiliApiProvider)
+        .searchSongs(query, page: page, limit: 20);
+  }
+
+  @override
+  Future<String?> resolvePlayUrl(
+    dynamic ref,
+    Track track, {
+    required String quality,
+    String? streamingQuality,
+    void Function(String message)? log,
+  }) async {
+    try {
+      return await ref
+          .read(bilibiliApiProvider)
+          .resolvePlayUrl(track, quality: quality);
+    } catch (e) {
+      log?.call('Bilibili 解析失败: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<Track> prepareForDownload(dynamic ref, Track t) =>
+      ref.read(bilibiliApiProvider).prepareForDownload(t);
+
+  @override
+  Future<Track?> preparePlay(
+    BuildContext context,
+    dynamic ref,
+    Track track,
+  ) async {
+    final api = ref.read(bilibiliApiProvider);
+    final detail = await api.detailForTrack(track);
+    if (!context.mounted) return null;
+    if (detail.parts.length > 1) {
+      return showBilibiliPartsDialog(context, track, detail, api: api);
+    }
+    return api.trackForPart(detail, detail.parts.first);
+  }
+}
+
 // ── 本地文件 ────────────────────────────────────────────────────────────
 
 class _LocalSource extends SourcePlatform {
@@ -1157,8 +1369,9 @@ class _StreamingSource extends SourcePlatform {
       return null;
     }
     // 凭据按需从 vault 惰性解密后临时构造客户端（不读长驻状态中的明文）。
-    final cfg =
-        await ref.read(streamingProvider.notifier).resolvedServer(serverId);
+    final cfg = await ref
+        .read(streamingProvider.notifier)
+        .resolvedServer(serverId);
     if (cfg == null) {
       log?.call('流媒体服务器不存在: $serverId（${track.title}）');
       return null;

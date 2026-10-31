@@ -18,9 +18,11 @@ void showTrackContextMenu(
   // - 「红心 / 评论 / 添加到歌单」：NT / KG；
   // - 「查看歌手 / 详情 / 下载」：NT / KG / QQ。
   final sp = sourcePlatform(track.source);
-  final likeComment = sp.trackMenuLikeComment;
+  final canLike = sp.trackMenuLikeComment;
+  final canComment = sp.trackMenuComment;
   final canDownload = sp.trackMenuArtistDownload;
-  final canViewArtist = sp.trackMenuArtistDownload;
+  final canViewArtist = sp.trackMenuArtist;
+  final canViewDetail = sp.trackMenuDetail;
   final liked = ref.read(likeControllerProvider).isLiked(track);
   final toggle = onToggleLike ?? (t) => _defaultToggleLike(context, ref, t);
   final l10n = context.l10n;
@@ -42,20 +44,23 @@ void showTrackContextMenu(
           toast(l10n.toastAddedToQueue);
         },
       ),
-      if (likeComment) ...[
+      if (canLike || canComment) ...[
         SContextMenuItem.divider(),
-        SContextMenuItem(
-          label: liked ? l10n.menuUnlike : l10n.menuLike,
-          icon: liked ? EtaIcons.heart : EtaIcons.heartOutline,
-          onTap: () => toggle(track),
-        ),
-        SContextMenuItem(
-          label: l10n.menuComment,
-          icon: EtaIcons.chatOutline,
-          onTap: () => showCommentDialog(context, track: track),
-        ),
+        if (canLike)
+          SContextMenuItem(
+            label: liked ? l10n.menuUnlike : l10n.menuLike,
+            icon: liked ? EtaIcons.heart : EtaIcons.heartOutline,
+            onTap: () => toggle(track),
+          ),
+        if (canComment)
+          SContextMenuItem(
+            label: l10n.menuComment,
+            icon: EtaIcons.chatOutline,
+            onTap: () => showCommentDialog(context, track: track),
+          ),
         // 添加到歌单：由注册表适配器声明是否支持（如网易云）。
-        if (collectionPlatform(track.source).playlistManageSupported(ref))
+        if (canLike &&
+            collectionPlatform(track.source).playlistManageSupported(ref))
           SContextMenuItem(
             label: l10n.playlistPickTitle,
             icon: EtaIcons.add,
@@ -67,10 +72,10 @@ void showTrackContextMenu(
           ),
       ],
       // 查看歌手 / 媒体详情：在线来源通用（含 QQ）。
-      if (canViewArtist) ...[
+      if (canViewArtist || canViewDetail) ...[
         SContextMenuItem.divider(),
         // 查看歌手：按来源分发到各平台歌手详情（NT/KG/QQ 均已接通）。
-        if (track.artists.isNotEmpty)
+        if (canViewArtist && track.artists.isNotEmpty)
           SContextMenuItem(
             label: l10n.menuViewArtist,
             icon: EtaIcons.userOutline,
@@ -89,11 +94,12 @@ void showTrackContextMenu(
               );
             },
           ),
-        SContextMenuItem(
-          label: l10n.menuTrackDetail,
-          icon: EtaIcons.informationOutline,
-          onTap: () => showTrackDetailDialog(context, track: track),
-        ),
+        if (canViewDetail)
+          SContextMenuItem(
+            label: l10n.menuTrackDetail,
+            icon: EtaIcons.informationOutline,
+            onTap: () => showTrackDetailDialog(context, track: track),
+          ),
       ],
       if (canDownload && ref.read(appPrefsProvider).downloadModuleEnabled)
         SContextMenuItem(

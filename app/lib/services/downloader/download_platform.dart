@@ -17,6 +17,8 @@
 library;
 
 import '../netease/track.dart';
+import '../../apis/bilibili/core/config.dart'
+    show kBilibiliReferer, kBilibiliUserAgent;
 import '../../apis/runtime.dart';
 
 /// 单个音源的下载能力适配器。
@@ -33,6 +35,15 @@ abstract class DownloadPlatform {
 
   /// 是否支持下载（能力位，供下载 UI 使用）。
   bool get supportsDownload => true;
+
+  /// 该源可选下载音质（高 → 低）；默认全档。下载弹窗按所选曲目取交集。
+  List<String> get supportedQualities => const [
+    'hi-res',
+    'lossless',
+    'hq',
+    'sq',
+    'lq',
+  ];
 
   /// 是否嵌入元数据（标签）。
   bool get embedsMetadata => true;
@@ -137,6 +148,7 @@ final List<DownloadPlatform> _all = [
   _NeteaseDownloadPlatform(),
   _KugouDownloadPlatform(),
   _QqMusicDownloadPlatform(),
+  _BilibiliDownloadPlatform(),
   _StreamingDownloadPlatform(),
 ];
 
@@ -222,6 +234,43 @@ class _QqMusicDownloadPlatform extends DownloadPlatform {
     }
     return headers;
   }
+}
+
+// ── Bilibili ───────────────────────────────────────────────────────────
+
+class _BilibiliDownloadPlatform extends DownloadPlatform {
+  @override
+  String get source => 'bilibili';
+
+  /// Rust 侧有自研 WBI + playurl 解析（重启用）；Dart 回退仍作为兜底。
+  @override
+  bool get nativeResolver => true;
+
+  @override
+  bool get playbackFallback => true;
+
+  @override
+  List<String> get supportedQualities => const [
+    'lq',
+    'sq',
+    'hq',
+    'lossless',
+    'hi-res',
+  ];
+
+  @override
+  List<List<String>> requestHeaders(Track track, String quality) => const [
+    ['User-Agent', kBilibiliUserAgent],
+    ['Referer', kBilibiliReferer],
+  ];
+
+  /// B 站 DASH 音频是 MP4/M4A 容器（AAC / FLAC / E-AC-3），不能落成裸 `.aac`。
+  @override
+  String? fileExtensionOverride(Track track, String quality) => 'm4a';
+
+  @override
+  String qualityKey(String quality, String ext) =>
+      (quality == 'lossless' || quality == 'hi-res') ? 'flac' : 'aac';
 }
 
 // ── Streaming（Subsonic / Jellyfin） ────────────────────────────────────

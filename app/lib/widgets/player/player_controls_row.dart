@@ -31,6 +31,7 @@ class PlayerControlsRow extends ConsumerWidget {
     required this.hasContent,
     required this.hasQueue,
     required this.canLike,
+    required this.canComment,
     required this.liked,
     required this.current,
     required this.shuffle,
@@ -46,6 +47,7 @@ class PlayerControlsRow extends ConsumerWidget {
 
   final bool hasQueue;
   final bool canLike;
+  final bool canComment;
   final bool liked;
   final Track? current;
   final bool shuffle;
@@ -73,6 +75,7 @@ class PlayerControlsRow extends ConsumerWidget {
             Expanded(
               child: _PlayerControlsLeftGroup(
                 canLike: canLike,
+                canComment: canComment,
                 liked: liked,
                 current: current,
                 l10n: l10n,

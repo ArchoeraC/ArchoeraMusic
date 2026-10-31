@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 
 import '../pages/download_page.dart';
+import '../pages/bilibili_page.dart';
 import '../pages/favorites_page.dart';
 import '../pages/history_page.dart';
 import '../pages/home_page.dart';
@@ -117,6 +118,15 @@ final appRouter = GoRouter(
               builder: (context, state) => StreamingPlaylistDetailPage(
                 id: Uri.decodeComponent(state.pathParameters['id'] ?? ''),
               ),
+            ),
+          ],
+        ),
+        // 隐藏分支：哔哩哔哩资料库（不在侧边栏，账号菜单 context.go 进入）
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/bilibili',
+              builder: (context, state) => const BilibiliPage(),
             ),
           ],
         ),
