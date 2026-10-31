@@ -12,6 +12,7 @@ import '../services/log/log.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
 import '../services/search/search_service.dart';
+import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../widgets/common/splash_screen.dart';
 
@@ -36,6 +37,8 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
         await Future.wait([
           ref.read(playbackProvider.notifier).restore(),
           ref.read(neteaseAuthProvider.notifier).init(),
+          // 实验性音源 Neko：恢复登录态（未启用时也只是读一次空会话）。
+          ref.read(nekoApiProvider).restore(),
         ]);
       } catch (e, s) {
         // 现场恢复 / 登录态初始化异常不阻塞后续初始化（下载引擎等），
@@ -95,13 +98,16 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       }
     });
     // B 站登录态：下载器原生解析需要 Cookie（会员/登录可见音轨）。
-    ref.listen(
-      bilibiliApiProvider.select((s) => s.isLoggedIn),
-      (prev, next) {
-        if (prev == next) return;
-        ref.read(downloadControllerProvider.notifier).syncSessions();
-      },
-    );
+    ref.listen(bilibiliApiProvider.select((s) => s.isLoggedIn), (prev, next) {
+      if (prev == next) return;
+      ref.read(downloadControllerProvider.notifier).syncSessions();
+    });
+    // 实验性音源 Neko 登录态变化：同步红心集合（仅在该音源启用时）。
+    ref.listen(nekoApiProvider.select((s) => s.isLoggedIn), (prev, next) {
+      if (prev == next) return;
+      if (!nekoSourceUsable(ref.read(appPrefsProvider))) return;
+      ref.read(likeControllerProvider).sync();
+    });
     return widget.child;
   }
 

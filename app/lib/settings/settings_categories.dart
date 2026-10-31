@@ -26,6 +26,9 @@ enum SettingsCategory {
   searchIndex(EtaIcons.search2),
   mediaSource(EtaIcons.serverOutline),
 
+  /// 实验性音源（第三方音源接入，默认关闭）。
+  experimentalSource(EtaIcons.flaskOutline),
+
   /// MCP 接入（本地 MCP / REST / WebSocket 控制服务，默认关闭）。
   mcp(EtaIcons.chipOutline),
   about(EtaIcons.informationOutline),
@@ -51,6 +54,7 @@ enum SettingsCategory {
     scanner => l10n.settingsCatScanner,
     searchIndex => l10n.settingsCatSearchIndex,
     mediaSource => l10n.settingsCatMediaSource,
+    experimentalSource => l10n.settingsCatExperimentalSource,
     mcp => l10n.settingsCatMcp,
     about => l10n.settingsCatAbout,
     developer => l10n.settingsCatDeveloper,
@@ -70,6 +74,7 @@ enum SettingsCategory {
     scanner => l10n.settingsScannerSubtitle,
     searchIndex => l10n.settingsSearchIndexSubtitle,
     mediaSource => l10n.settingsMediaSourceSubtitle,
+    experimentalSource => l10n.settingsExperimentalSourceSubtitle,
     mcp => l10n.settingsMcpSubtitle,
     about => l10n.settingsAboutSubtitle,
     developer => l10n.settingsDeveloperSubtitle,

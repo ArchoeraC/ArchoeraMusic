@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/netease/netease_api.dart' show CoverItem;
 import '../services/log/log.dart';
+import '../stores/app_prefs.dart';
 import '../stores/favorites_revision.dart';
 import '../stores/shell_page_state.dart';
 import '../../l10n/l10n.dart';
@@ -55,9 +56,10 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   @override
   void initState() {
     super.initState();
-    // 恢复上次平台选择（壳内容因播放页展开被卸载后重建）。
+    // 恢复上次平台选择（壳内容因播放页展开被卸载后重建）；实验性音源已关闭
+    // 时不保留 NK 选择（避免对其发请求）。
     var source = ref.read(favoritesPlatformProvider) ?? 'netease';
-    // 不可用的平台不保留选择：回退首个已启用平台。
+    // 已关闭（如实验性音源开关）的平台不保留选择：回退首个已启用平台。
     if (!collectionPlatform(source).enabled(ref)) {
       final enabled = collectionPlatforms(ref);
       source = enabled.isEmpty ? 'netease' : enabled.first.source;

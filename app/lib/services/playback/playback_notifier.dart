@@ -32,7 +32,7 @@ part 'playback_notifier/playback_notifier_queue.dart';
 part 'playback_notifier/playback_notifier_loading.dart';
 part 'playback_notifier/playback_notifier_session.dart';
 
-/// 在线源请求头（如客户端标识头）→ 引擎请求头块（`\n` 分行）。
+/// 在线源请求头（如 NekoMusic 的 `X-Neko-Client`）→ 引擎请求头块（`\n` 分行）。
 ///
 /// 供 `AudioEngineProcess.create` 透传给 native HTTP(S) 与 FFmpeg http/tls；
 /// 无附加头时返回 null（引擎用内置默认头）。

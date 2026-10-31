@@ -26,7 +26,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 弹出「添加到歌单」选择器。
 ///
-/// [source] 为音源（如 `netease`）；[tracks] 中仅与该音源一致、且 id 非空
+/// [source] 为音源（`netease` / `neko`）；[tracks] 中仅与该音源一致、且 id 非空
 /// 的曲目会被加入；[excludeId] 用于从某个歌单内部加入时排除该歌单自身。
 Future<void> showPlaylistPickerDialog(
   BuildContext context, {

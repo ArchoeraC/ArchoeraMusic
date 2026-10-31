@@ -23,6 +23,10 @@ const AD_MARKERS: &[&str] = &[
     "http://",
     "https://",
     "www.",
+    "music.nekocore.cn",
+    "neko云音乐",
+    "neko cloud music",
+    "neko music",
     "资源来自",
     "获取更多无损音乐",
     "更多免费无损音乐",
@@ -73,9 +77,9 @@ mod tests {
 
     #[test]
     fn detects_promo_text() {
-        assert!(is_ad_text("资源来自某云音乐 Resources from Some Cloud Music"));
-        assert!(is_ad_text("获取更多无损音乐https://example.com/music/"));
-        assert!(is_ad_text("更多免费无损音乐就来某云音乐"));
+        assert!(is_ad_text("资源来自Neko云音乐 Resources from Neko Cloud Music"));
+        assert!(is_ad_text("获取更多无损音乐https://music.nekocore.cn/"));
+        assert!(is_ad_text("更多免费无损音乐就来Neko云音乐"));
         assert!(is_ad_text("关注公众号：xxx"));
         assert!(!is_ad_text("[00:12.34]晴天"));
         assert!(!is_ad_text(""));
@@ -83,8 +87,8 @@ mod tests {
 
     #[test]
     fn lyrics_keep_real_lines_drop_ads() {
-        let raw = "[00:00.05]资源来自某云音乐 Resources from Some Cloud Music\n\
-                   [00:00.10]获取更多无损音乐https://example.com/music/\n\
+        let raw = "[00:00.05]资源来自Neko云音乐 Resources from Neko Cloud Music\n\
+                   [00:00.10]获取更多无损音乐https://music.nekocore.cn/\n\
                    [00:12.34]故事的小黄花\n\
                    [00:15.00]从出生那年就飘着";
         let out = sanitize_lyrics(raw).unwrap();
@@ -93,15 +97,15 @@ mod tests {
 
     #[test]
     fn lyrics_all_ads_yields_none() {
-        let raw = "资源来自某云音乐\n更多免费无损音乐https://example.com/music";
+        let raw = "资源来自Neko云音乐\n更多免费无损音乐https://music.nekocore.cn";
         assert!(sanitize_lyrics(raw).is_none());
     }
 
     #[test]
     fn field_ad_removed_clean_kept() {
-        assert!(sanitize_field("更多免费无损音乐就来某云音乐 https://example.com/music").is_none());
-        assert!(sanitize_field("资源来自某云音乐").is_none());
-        assert!(sanitize_field("www.example.com").is_none());
+        assert!(sanitize_field("更多免费无损音乐就来Neko云音乐 https://music.nekocore.cn").is_none());
+        assert!(sanitize_field("Neko Music").is_none());
+        assert!(sanitize_field("music.nekocore.cn").is_none());
         assert_eq!(sanitize_field("  三拜红尘凉 ").as_deref(), Some("三拜红尘凉"));
         assert_eq!(sanitize_field("尹昔眠").as_deref(), Some("尹昔眠"));
     }

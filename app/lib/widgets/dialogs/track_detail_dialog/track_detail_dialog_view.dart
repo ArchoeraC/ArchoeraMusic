@@ -17,7 +17,7 @@ class _TrackDetailBody extends ConsumerWidget {
     final t = track;
 
     final platform = sourcePlatform(t.source);
-    // 异步源的「实际最高档」：注册表提供 provider，加载完成自动重建；
+    // 异步源（Neko）的实际最高档：注册表提供 provider，加载完成自动重建；
     // 同步源（KG 等）为 null，直接由 [qualityLabel] 从元数据推断。
     final maxAsync = platform.maxQualityProvider(t);
     final maxQuality = maxAsync == null

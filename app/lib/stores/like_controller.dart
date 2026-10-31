@@ -8,7 +8,7 @@
 /// - [toggle] 乐观更新 + 失败回滚（失败返回 false 由调用方提示）；
 /// - [sync] 按当前登录态刷新集合（登录/退出后调用）。
 ///
-/// 平台差异（红心键归一、id 集合拉取、收藏/取消、QQ 本机库等）
+/// 平台差异（红心键归一、id 集合拉取、收藏/取消、QQ 本机库、Neko 实验开关等）
 /// 全部由 `widgets/dialogs/collection_platform.dart` 的适配器提供；**新增音源
 /// 只需注册适配器**，本文件无需改动。
 library;
@@ -172,7 +172,7 @@ class LikeController extends ChangeNotifier {
   }
 
   Future<void> _syncOnce() async {
-    // 遍历所有已注册平台（顺序与注册表一致）。不可用
+    // 遍历所有已注册平台（顺序与注册表一致）。未启用（Neko 开关）或不可用
     // （未登录）的平台清空集合；其余拉轻量 id 集合对齐（网络失败保留旧集合）。
     for (final adapter in allCollectionPlatforms()) {
       final source = adapter.source;
@@ -227,9 +227,9 @@ class LikeController extends ChangeNotifier {
 
   /// 服务端确认成功后，同步维护收藏列表增量（新喜欢插入头部 /
   /// 取消喜欢移除）并写库——与「刷新=全量重拉+写库」同一持久化语义。
-  /// QQ 走 [QqLikedStore]（与既有行为一致）。
+  /// QQ 走 [QqLikedStore]、NK 不做本地增量（与既有行为一致）。
   void _applyStoreDelta(Track track, bool target) {
-    // 仅维护共享「我喜欢」列表增量的平台（NT / KG；QQ 走本机库）。
+    // 仅维护共享「我喜欢」列表增量的平台（NT / KG；QQ 走本机库、NK 不增量）。
     if (!collectionPlatform(track.source).likedLocalDelta) return;
     final store = _ref.read(likedStoreProvider);
     if (target) {

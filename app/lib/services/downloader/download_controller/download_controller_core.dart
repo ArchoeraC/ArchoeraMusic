@@ -288,7 +288,7 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
 
   /// Rust 在 resolving 阶段解析失败 → 调度一次播放管线回退解析。
   ///
-  /// kugou/netease：Rust 自研解析失败后回退；qqmusic/streaming：Rust
+  /// kugou/netease：Rust 自研解析失败后回退；qqmusic/neko/streaming：Rust
   /// 无解析，直接由 Dart 播放管线解析（是否回退由适配器 [playbackFallback]
   /// 决定）。
   void _scheduleFallback(String taskId) {
@@ -347,7 +347,7 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
     if (current == null || current.status != 'failed') return;
 
     final platform = downloadPlatform(track.source);
-    // 直链无扩展名的源由适配器按**取流档位**探测真实容器；
+    // 直链无扩展名的源（如 Neko）由适配器按**取流档位**探测真实容器；
     // 失败回退通用推断。
     final probed = await platform.probeExtension(ref, track, quality: quality);
     final resolved = _buildPreResolved(

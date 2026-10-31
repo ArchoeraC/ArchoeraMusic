@@ -99,6 +99,16 @@ dart analyze lib         # 可选：静态检查
 flutter build linux --release
 ```
 
+> **可选：启用 NekoMusic 音源**。该音源要求构建时注入 NekoMusic 后台签发的
+> **公开客户端标识**（不是密钥，但仓库不内置；CI 从 Secret `NEKO_CLIENT_ID` 取值）：
+>
+> ```bash
+> flutter build linux --release --dart-define=NEKO_CLIENT_ID=nkc_pub_xxxxxxxxxxxxxxxxxxxx
+> ```
+>
+> Windows / macOS 同理，把 `linux` 换成对应平台即可。**不注入时构建照常成功**，
+> 只是 App 内不出现 NekoMusic 音源（fail-closed，不会回落到任何公用标识）。
+
 **产物位置**：`app/build/linux/x64/release/bundle/`
 - `archoera_music`（可执行文件）
 - `data/`（Flutter assets + icudtl）

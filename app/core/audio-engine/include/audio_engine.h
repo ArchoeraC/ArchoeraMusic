@@ -146,7 +146,7 @@ AudioPipeline* pipeline_create(const char *source,
 /**
  * 同 [pipeline_create]，另按源注入在线 URL 的额外请求头 [headers]
  * （`\n`/`\r\n` 分行的 `Name: value`；NULL = 无）。原生 HTTP(S) 与 FFmpeg
- * http/tls 路径均会带上，用于携带客户端标识。
+ * http/tls 路径均会带上，用于携带客户端标识（如 NekoMusic 的 `X-Neko-Client`）。
  */
 AudioPipeline* pipeline_create_with_headers(const char *source,
                                             const char *headers,
