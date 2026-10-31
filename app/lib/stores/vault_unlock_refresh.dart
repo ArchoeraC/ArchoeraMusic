@@ -26,9 +26,10 @@ Future<void> refreshAfterVaultUnlock(dynamic ref) async {
   invalidateNeteaseSessionCache();
   qmReloadQQMusicCookies(); // QQ cookies 为进程级缓存，须显式失效
 
-  // ② 逐平台重读登录态。三个平台的"登录态来源"各不相同：
+  // ② 逐平台重读登录态。四个平台的"登录态来源"各不相同：
   //    NetEase：Notifier（显式 init）
   //    Kugou  ：API 实例在**构造期**从库内会话恢复 → 重建实例
+  //    Neko   ：显式 `restore()`（bootstrap 入口）
   //    QQ     ：进程级 cookie 缓存 → 已在 ① 失效，此后按需重取
   try {
     await ref.read(neteaseAuthProvider.notifier).init();
@@ -37,5 +38,10 @@ Future<void> refreshAfterVaultUnlock(dynamic ref) async {
     Log.e('vault', '解锁后登录态刷新失败（NetEase）：$e');
   }
   ref.invalidate(kugouApiProvider);
+  try {
+    await ref.read(nekoApiProvider).restore();
+  } catch (e) {
+    Log.e('vault', '解锁后登录态刷新失败（Neko）：$e');
+  }
   ref.read(downloadControllerProvider.notifier).syncSessions();
 }

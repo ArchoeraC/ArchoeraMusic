@@ -15,8 +15,8 @@ void showTrackContextMenu(
   List<SContextMenuItem> extra = const [],
 }) {
   // 菜单项可见性由音源注册表声明（不再硬编码平台列表）：
-  // - 「红心 / 评论 / 添加到歌单」：NT / KG；
-  // - 「查看歌手 / 详情 / 下载」：NT / KG / QQ。
+  // - 「红心 / 评论 / 添加到歌单」：NT / KG / Neko；
+  // - 「查看歌手 / 详情 / 下载」：NT / KG / QQ / Neko。
   final sp = sourcePlatform(track.source);
   final likeComment = sp.trackMenuLikeComment;
   final canDownload = sp.trackMenuArtistDownload;
@@ -54,7 +54,7 @@ void showTrackContextMenu(
           icon: EtaIcons.chatOutline,
           onTap: () => showCommentDialog(context, track: track),
         ),
-        // 添加到歌单：由注册表适配器声明是否支持（如网易云）。
+        // 添加到歌单：由注册表适配器声明是否支持（网易云 / Neko）。
         if (collectionPlatform(track.source).playlistManageSupported(ref))
           SContextMenuItem(
             label: l10n.playlistPickTitle,
@@ -69,7 +69,8 @@ void showTrackContextMenu(
       // 查看歌手 / 媒体详情：在线来源通用（含 QQ）。
       if (canViewArtist) ...[
         SContextMenuItem.divider(),
-        // 查看歌手：按来源分发到各平台歌手详情（NT/KG/QQ 均已接通）。
+        // 查看歌手：按来源分发到各平台歌手详情（NT/KG/QQ/NK 均已接通）。
+        // Neko 无歌手 id，以名字作 id（与详情弹窗约定一致）。
         if (track.artists.isNotEmpty)
           SContextMenuItem(
             label: l10n.menuViewArtist,

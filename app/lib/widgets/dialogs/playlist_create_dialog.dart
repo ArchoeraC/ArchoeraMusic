@@ -20,7 +20,7 @@ import 's_dialog.dart';
 
 /// 弹出「新建歌单」弹窗。
 ///
-/// [source] 为音源（如 `netease`）。成功返回新歌单 id；取消 / 失败返回
+/// [source] 为音源（`netease` / `neko`）。成功返回新歌单 id；取消 / 失败返回
 /// null。[quietSubmit] 为 true 时交由调用方提示（如选择器加入歌曲后再统一提示）。
 Future<String?> showPlaylistCreateDialog(
   BuildContext context, {
@@ -108,7 +108,7 @@ class _PlaylistCreateDialogState extends ConsumerState<_PlaylistCreateDialog> {
             autofocus: true,
             onSubmitted: (_) => _submit(),
           ),
-          // 「私密」由适配器声明（仅部分音源支持）。
+          // 「私密」由适配器声明（仅网易云支持；Neko 无该概念）。
           if (collectionPlatform(widget.source)
               .playlistPrivacySupported(ref)) ...[
             const SizedBox(height: 14),

@@ -111,7 +111,7 @@ export fn zk_decoder_open_url(
 }
 
 /// 同 [zk_decoder_open_url]，但附带自定义请求头（`\n`/`\r\n` 分行；空指针 = 无）。
-/// 供宿主按源注入 `User-Agent` 等客户端标识。
+/// 供宿主按源注入 `X-Neko-Client` / `User-Agent` 等标识。
 export fn zk_decoder_open_url_headers(
     url: [*:0]const u8,
     headers: ?[*:0]const u8,
@@ -1161,7 +1161,7 @@ export fn zk_engine_open_url(
 }
 
 /// 同 [zk_engine_open_url]，但附带自定义请求头（`\n`/`\r\n` 分行；空指针 = 无）。
-/// 供宿主按源注入 `User-Agent` 等客户端标识。
+/// 供宿主按源注入 `X-Neko-Client` / `User-Agent` 等标识。
 export fn zk_engine_open_url_headers(
     h: ?*khost.Host,
     url: [*:0]const u8,

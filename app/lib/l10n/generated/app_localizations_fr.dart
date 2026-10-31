@@ -1061,8 +1061,117 @@ class AppLocalizationsFr extends AppLocalizations {
       'Impossible de localiser le fichier (aucun gestionnaire de fichiers disponible)';
 
   @override
+  String get settingsSectionThirdPartyService => 'Services tiers';
+
+  @override
+  String get settingsNekoAttribution => 'Propulsé par l\'API Neko Music';
+
+  @override
+  String get settingsNekoApiDocs => 'Documentation de l\'API Neko Music';
+
+  @override
   String get settingsSongCacheMemoryHint =>
       'La « lecture en mémoire » est activée — le cache des morceaux ne sera pas écrit sur le disque';
+
+  @override
+  String get platformNeko => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => 'Sources expérimentales';
+
+  @override
+  String get settingsExperimentalSourceSubtitle =>
+      'Sources tierces (désactivées par défaut)';
+
+  @override
+  String get settingsNekoTitle => 'NekoMusic';
+
+  @override
+  String get settingsNekoNote =>
+      'Source expérimentale tierce, non officielle ; connexion uniquement (ni inscription ni achat VIP). Peut cesser de fonctionner à tout moment.';
+
+  @override
+  String get settingsNekoEnable => 'Activer NekoMusic';
+
+  @override
+  String get settingsNekoEnableDesc =>
+      'Afficher NK dans la recherche, les favoris et la bibliothèque (désactivé par défaut)';
+
+  @override
+  String get settingsNekoUnavailable =>
+      'Aucun identifiant client configuré (NEKO_CLIENT_ID) ; la source NekoMusic est indisponible.';
+
+  @override
+  String get settingsNekoLogin => 'Se connecter';
+
+  @override
+  String get settingsNekoLogout => 'Se déconnecter';
+
+  @override
+  String settingsNekoLoggedInAs({required Object name}) {
+    return 'Connecté en tant que $name';
+  }
+
+  @override
+  String get settingsNekoNotLoggedIn => 'Non connecté';
+
+  @override
+  String get nekoLoginTitle => 'Se connecter à NekoMusic';
+
+  @override
+  String get nekoLoginTabQr => 'Code QR';
+
+  @override
+  String get nekoLoginTabPassword => 'E-mail et mot de passe';
+
+  @override
+  String get nekoLoginEmail => 'E-mail';
+
+  @override
+  String get nekoLoginPassword => 'Mot de passe';
+
+  @override
+  String get nekoLoginPasswordHint => 'Saisissez votre mot de passe';
+
+  @override
+  String get nekoLoginSubmit => 'Se connecter';
+
+  @override
+  String get nekoLoginQrHint =>
+      'Scannez avec l\'application NekoMusic pour vous connecter';
+
+  @override
+  String get nekoQrScanned => 'Scanné, confirmez sur votre téléphone';
+
+  @override
+  String get nekoQrCanceled => 'Connexion annulée';
+
+  @override
+  String get nekoQrExpired => 'Code QR expiré, veuillez le régénérer';
+
+  @override
+  String get toastLoginRequiredNeko =>
+      'Échec de l\'opération (vérifiez que vous êtes connecté à votre compte NK)';
+
+  @override
+  String get pageLikedNekoLoginHint =>
+      'Connectez-vous à NK pour voir vos titres aimés';
+
+  @override
+  String get pageLikedNekoLoginDesc =>
+      'Connectez-vous à NekoMusic pour synchroniser vos titres aimés';
+
+  @override
+  String get pageLikedNekoEmptyHint =>
+      'Aucun titre aimé pour l\'instant — touchez le cœur dans la recherche';
+
+  @override
+  String get pageFavNekoLoginDesc =>
+      'Connectez-vous à NekoMusic pour voir playlists et favoris';
+
+  @override
+  String get pageFavNekoEmptyHint =>
+      'Aucune playlist ni favori pour l\'instant';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -5679,7 +5788,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      'Utilisation : archoerashell search <source> <texte> [-n nombre] [-p page]\n\nRechercher des titres sur une source.\n  source : netease | kugou | qqmusic\n  -n, --limit <n>   nombre de résultats (1-50, défaut 20)\n  -p, --page <n>    page (à partir de 1)\nExemple : archoerashell search netease Jay -n 10';
+      'Utilisation : archoerashell search <source> <texte> [-n nombre] [-p page]\n\nRechercher des titres sur une source.\n  source : netease | kugou | qqmusic | neko\n  -n, --limit <n>   nombre de résultats (1-50, défaut 20)\n  -p, --page <n>    page (à partir de 1)\nExemple : archoerashell search netease Jay -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>

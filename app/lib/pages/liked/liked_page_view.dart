@@ -21,6 +21,15 @@ extension _LikedPageView on _LikedPageState {
         ref.listen(signal, (_, _) => _onAuthChanged(p.source));
       }
     }
+    // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
+    ref.watch(appPrefsProvider.select(nekoSourceUsable));
+    // 已启用平台集合变化：当前平台被关闭则退回默认平台。
+    ref.listen(appPrefsProvider.select(nekoSourceUsable), (prev, next) {
+      if (!collectionPlatform(_platform).enabled(ref)) {
+        _switchPlatform(defaultLikedPlatform(ref));
+      }
+    });
+
     // 两个可能的「我喜欢」后端（服务端 store / QQ 本机库）变化都会触发重建。
     ref.watch(likedStoreProvider);
     ref.watch(qqLikedStoreProvider);

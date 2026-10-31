@@ -44,10 +44,10 @@ class NeteaseComment {
   /// 被回复的引用内容（beReplied，仅展示引用）。
   final List<NeteaseComment> reply;
 
-  /// 是否可删除（由服务端按当前登录用户 / 管理员判定）。
+  /// 是否可删除（目前仅 NK：服务端按当前登录用户 / 管理员判定）。
   final bool canDelete;
 
-  /// 被回复者昵称（楼内回复项）。
+  /// 被回复者昵称（目前仅 NK 的楼内回复项）。
   final String? replyToName;
 }
 

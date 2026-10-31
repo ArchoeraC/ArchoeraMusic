@@ -109,7 +109,7 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 | # | 事项 | 说明 |
 |---|---|---|
-| N1 | **应用侧接线** | 把 Subsonic 之外的在线音源（见音源注册表）接入 cb/直连路径，而非一律「Dart 预下载→本地文件」 |
+| N1 | **应用侧接线** | 把 Subsonic 之外的音源（Neko 等，见音源注册表）接入 cb/直连路径，而非一律「Dart 预下载→本地文件」 |
 | N2 | **Range seek 完整化** | `on_seek` 发 Range 重定位；验证远端 seek 与本地逐样本一致（含 EOF 后 seek） |
 | N3 | **断流 / 超时 / 重连** | `Reader.abort()` 中断、缓冲欠载、宿主重试的语义与错误上报 |
 | N4 | **缓冲策略** | 每路 callback Reader 私有缓冲与目标内存预算（对齐 `audio-memory-source.md`） |

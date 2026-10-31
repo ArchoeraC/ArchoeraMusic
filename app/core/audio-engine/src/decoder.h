@@ -26,7 +26,8 @@ Decoder* decoder_open(const char *url);
 /**
  * 同 [decoder_open]，另按源注入 HTTP 请求头 [headers]（`\n`/`\r\n` 分行的
  * `Name: value`；NULL = 无）。仅对 FFmpeg 的 http/tls 协议生效：`User-Agent`
- * 映射到 `user_agent`，其余拼接到 `headers`。供在线源携带客户端标识。
+ * 映射到 `user_agent`，其余拼接到 `headers`。供在线源携带客户端标识（如
+ * NekoMusic 的 `X-Neko-Client`）。
  */
 Decoder* decoder_open_headers(const char *url, const char *headers);
 
