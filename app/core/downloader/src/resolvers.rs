@@ -23,8 +23,11 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, bail, Result};
+use md5::{Digest, Md5};
+use reqwest::header::{self, HeaderMap, HeaderValue};
 
 use crate::crypto::kugou as kg;
 use crate::crypto::netease as nm;
@@ -59,6 +62,8 @@ pub use self::SourceResolver as PlatformUrlResolver;
 static KUGOU_RESOLVER: KugouResolver = KugouResolver;
 /// Netease 解析器进程级单例。
 static NETEASE_RESOLVER: NeteaseResolver = NeteaseResolver;
+/// Bilibili 解析器进程级单例。
+static BILIBILI_RESOLVER: BilibiliResolver = BilibiliResolver;
 
 /// 按音源取自研 URL 解析器（`None` = 无 Rust 解析，走 Dart 预解析直链）。
 ///
@@ -76,6 +81,7 @@ pub fn resolver_for_platform(source: SourcePlatform) -> Option<&'static dyn Sour
     match source {
         SourcePlatform::Kugou => Some(&KUGOU_RESOLVER),
         SourcePlatform::Netease => Some(&NETEASE_RESOLVER),
+        SourcePlatform::Bilibili => Some(&BILIBILI_RESOLVER),
         // QQ / Streaming / 未知：Rust 无自研解析 → Dart 预解析直链。
         SourcePlatform::Qqmusic | SourcePlatform::Streaming | SourcePlatform::Unknown => None,
     }
@@ -860,6 +866,422 @@ impl SourceResolver for NeteaseResolver {
     }
 }
 
+// ============================================================
+// 默认实现 A3：Bilibili 自研 WBI + DASH 音频（AAC/M4A）
+// ============================================================
+
+#[derive(Default, Clone, Debug)]
+pub struct BilibiliResolver;
+
+const BILI_API: &str = "https://api.bilibili.com";
+const BILI_UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 \
+(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+const BILI_REFERER: &str = "https://www.bilibili.com/";
+const BILI_MIXIN: [usize; 32] = [
+    46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49, 33, 9, 42, 19,
+    29, 28, 14, 39, 12, 38, 41, 13,
+];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BiliAudioKind {
+    Aac,
+    Flac,
+    Dolby,
+}
+
+struct BiliAudio {
+    id: u64,
+    bandwidth: u64,
+    urls: Vec<String>,
+    size: Option<u64>,
+    kind: BiliAudioKind,
+}
+
+/// 从 `dash.audio` / `dash.flac.audio` / `dash.dolby.audio` 收集候选音轨。
+///
+/// `flac.audio` 在接口里可能是对象（单条），其它为数组；两种都接受。
+/// 只按编码过滤，权限由服务端下发结果决定。
+fn bili_collect_audio(value: Option<&serde_json::Value>, kind: BiliAudioKind, out: &mut Vec<BiliAudio>) {
+    let Some(value) = value else { return };
+    let rows: Vec<&serde_json::Value> = match value {
+        serde_json::Value::Array(items) => items.iter().collect(),
+        serde_json::Value::Object(_) => vec![value],
+        _ => return,
+    };
+    for row in rows {
+        let codecs = row
+            .get("codecs")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let matches = match kind {
+            BiliAudioKind::Aac => codecs.starts_with("mp4a"),
+            BiliAudioKind::Flac => codecs == "flac",
+            BiliAudioKind::Dolby => {
+                codecs.starts_with("ec-3")
+                    || codecs.starts_with("eac3")
+                    || codecs.starts_with("ac-3")
+            }
+        };
+        if !matches {
+            continue;
+        }
+        let urls = bili_audio_urls(row);
+        if urls.is_empty() {
+            continue;
+        }
+        out.push(BiliAudio {
+            id: row.get("id").and_then(|v| v.as_u64()).unwrap_or(0),
+            bandwidth: row.get("bandwidth").and_then(|v| v.as_u64()).unwrap_or(0),
+            urls,
+            size: row.get("size").and_then(|v| v.as_u64()),
+            kind,
+        });
+    }
+}
+
+/// 按统一音质档挑选音轨：
+/// - lq / sq / hq → AAC 对应档位（缺档时取不高于目标的最高档）；
+/// - lossless / hi-res → FLAC → 杜比 → 192K AAC。
+fn bili_select_audio(candidates: &[BiliAudio], quality: Quality) -> Option<&BiliAudio> {
+    let mut premium: Vec<&BiliAudio> = candidates
+        .iter()
+        .filter(|c| c.kind != BiliAudioKind::Aac)
+        .collect();
+    premium.sort_by(|a, b| {
+        if a.kind != b.kind {
+            return if a.kind == BiliAudioKind::Flac {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            };
+        }
+        b.bandwidth.cmp(&a.bandwidth)
+    });
+    if matches!(quality, Quality::Lossless | Quality::HiRes) {
+        if let Some(found) = premium.first() {
+            return Some(*found);
+        }
+    }
+
+    let target = match quality {
+        Quality::Lq => 30216,
+        Quality::Sq => 30232,
+        _ => 30280,
+    };
+    let mut aac: Vec<&BiliAudio> = candidates
+        .iter()
+        .filter(|c| c.kind == BiliAudioKind::Aac && c.id <= target)
+        .collect();
+    aac.sort_by_key(|c| (c.id, c.bandwidth));
+    if let Some(found) = aac.last() {
+        return Some(*found);
+    }
+    candidates
+        .iter()
+        .filter(|c| c.kind == BiliAudioKind::Aac)
+        .max_by_key(|c| c.bandwidth)
+        .or_else(|| premium.first().copied())
+}
+
+impl SourceResolver for BilibiliResolver {
+    fn resolve_play_url<'a>(
+        &'a self,
+        request: &'a EnqueueRequest,
+        cancel: &'a Arc<AtomicBool>,
+    ) -> Pin<Box<dyn Future<Output = Result<ResolvedUrl>> + Send + 'a>> {
+        Box::pin(async move {
+            if cancel.load(Ordering::Relaxed) {
+                bail!("已取消");
+            }
+            let (bvid, cid) = bili_split_id(&request.platform_id);
+            if !bili_valid_bvid(&bvid) {
+                bail!("无效的 B 站 BV 号: {bvid}");
+            }
+
+            let client = crate::http_client();
+            let cookie = crate::bilibili_cookie();
+            let headers = bili_headers(cookie.as_deref());
+            let cid = match cid {
+                Some(cid) => cid,
+                None => bili_view_cid(&client, &headers, &bvid).await?,
+            };
+            if cancel.load(Ordering::Relaxed) {
+                bail!("已取消");
+            }
+
+            let (image_key, sub_key) = bili_wbi_keys(&client, &headers).await?;
+            let mut params = BTreeMap::new();
+            params.insert("bvid".to_string(), bvid.clone());
+            params.insert("cid".to_string(), cid);
+            // 272 = DASH(16) + 杜比音频(256)；只请求音频所需能力位，
+            // 不请求 HDR / 4K / 8K / AV1 等视频档位，响应中的 dash.video 一律忽略。
+            params.insert("fnval".to_string(), "272".to_string());
+            params.insert("fnver".to_string(), "0".to_string());
+            params.insert("fourk".to_string(), "0".to_string());
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|e| anyhow!("系统时间异常: {e}"))?
+                .as_secs();
+            let query = bili_sign_query_at(&params, &image_key, &sub_key, timestamp)?;
+            let url = format!("{BILI_API}/x/player/wbi/playurl?{query}");
+            let value = bili_get_json(&client, &url, &headers).await?;
+            let data = bili_check_code(&value)?;
+
+            if data.get("is_preview").and_then(|v| v.as_i64()) == Some(1) {
+                bail!("B 站仅提供预览");
+            }
+            let mut candidates = Vec::new();
+            bili_collect_audio(data.pointer("/dash/audio"), BiliAudioKind::Aac, &mut candidates);
+            bili_collect_audio(
+                data.pointer("/dash/flac/audio"),
+                BiliAudioKind::Flac,
+                &mut candidates,
+            );
+            bili_collect_audio(
+                data.pointer("/dash/dolby/audio"),
+                BiliAudioKind::Dolby,
+                &mut candidates,
+            );
+            if candidates.is_empty() {
+                bail!("B 站无可用音频流");
+            }
+            let chosen = bili_select_audio(&candidates, request.quality)
+                .ok_or_else(|| anyhow!("B 站无匹配音质档位的音频流"))?;
+            let quality_key = match chosen.kind {
+                BiliAudioKind::Aac => "aac",
+                BiliAudioKind::Flac => "flac",
+                BiliAudioKind::Dolby => "eac3",
+            };
+            log::debug!(
+                "Bilibili 选择音轨 id={} bandwidth={} kind={:?} urls={}",
+                chosen.id,
+                chosen.bandwidth,
+                chosen.kind,
+                chosen.urls.len()
+            );
+            Ok(ResolvedUrl {
+                url: chosen.urls[0].clone(),
+                quality_key: quality_key.to_string(),
+                file_ext: "m4a".to_string(),
+                file_size: chosen.size,
+                extra_headers: vec![
+                    ("User-Agent".to_string(), BILI_UA.to_string()),
+                    ("Referer".to_string(), BILI_REFERER.to_string()),
+                ],
+            })
+        })
+    }
+}
+
+fn bili_split_id(raw: &str) -> (String, Option<String>) {
+    let mut parts = raw.splitn(2, ':');
+    let bvid = parts.next().unwrap_or("").trim().to_string();
+    let cid = parts
+        .next()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    (bvid, cid)
+}
+
+fn bili_valid_bvid(value: &str) -> bool {
+    value.len() == 12
+        && value.starts_with("BV")
+        && value[2..].bytes().all(|b| b.is_ascii_alphanumeric())
+}
+
+fn bili_valid_wbi_key(value: &str) -> bool {
+    value.len() == 32 && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn bili_percent_encode(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for byte in input.as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(*byte, b'-' | b'_' | b'.' | b'~') {
+            out.push(*byte as char);
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
+fn bili_sign_query_at(
+    params: &BTreeMap<String, String>,
+    image_key: &str,
+    sub_key: &str,
+    timestamp: u64,
+) -> Result<String> {
+    if !bili_valid_wbi_key(image_key) || !bili_valid_wbi_key(sub_key) {
+        bail!("B 站 WBI key 非法");
+    }
+    let mut all = params.clone();
+    all.insert("wts".to_string(), timestamp.to_string());
+    let query = all
+        .iter()
+        .map(|(key, value)| {
+            let cleaned: String = value
+                .chars()
+                .filter(|c| !matches!(c, '!' | '\'' | '(' | ')' | '*'))
+                .collect();
+            format!(
+                "{}={}",
+                bili_percent_encode(key),
+                bili_percent_encode(&cleaned)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("&");
+    let raw = format!("{image_key}{sub_key}");
+    let mixin = BILI_MIXIN
+        .iter()
+        .map(|&index| raw.as_bytes().get(index).copied().map(char::from))
+        .collect::<Option<String>>()
+        .ok_or_else(|| anyhow!("B 站 WBI mixin key 越界"))?;
+    let digest = hex::encode(Md5::digest(format!("{query}{mixin}").as_bytes()));
+    Ok(format!("{query}&w_rid={digest}"))
+}
+
+fn bili_headers(cookie: Option<&str>) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(header::USER_AGENT, HeaderValue::from_static(BILI_UA));
+    headers.insert(header::REFERER, HeaderValue::from_static(BILI_REFERER));
+    headers.insert(header::ACCEPT, HeaderValue::from_static("application/json"));
+    if let Some(cookie) = cookie {
+        if let Ok(value) = HeaderValue::from_str(cookie) {
+            headers.insert(header::COOKIE, value);
+        }
+    }
+    headers
+}
+
+async fn bili_get_json(
+    client: &reqwest::Client,
+    url: &str,
+    headers: &HeaderMap,
+) -> Result<serde_json::Value> {
+    crate::request_pacing().await;
+    let response = client
+        .get(url)
+        .headers(headers.clone())
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await?;
+    let status = response.status();
+    if !status.is_success() {
+        bail!("B 站 HTTP {status}");
+    }
+    let bytes = response.bytes().await?;
+    if bytes.len() > 4 * 1024 * 1024 {
+        bail!("B 站响应过大");
+    }
+    serde_json::from_slice(&bytes).map_err(|e| anyhow!("B 站响应不是有效 JSON: {e}"))
+}
+
+fn bili_check_code(value: &serde_json::Value) -> Result<&serde_json::Value> {
+    let code = value.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
+    if code != 0 {
+        let message = value
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("B 站内容不可用");
+        bail!("B 站 code={code}: {message}");
+    }
+    value
+        .get("data")
+        .ok_or_else(|| anyhow!("B 站响应缺少 data"))
+}
+
+fn bili_key_from_url(raw: &str) -> Option<String> {
+    let url = reqwest::Url::parse(raw).ok()?;
+    let name = url.path_segments()?.last()?;
+    let stem = name.split('.').next().unwrap_or(name);
+    bili_valid_wbi_key(stem).then(|| stem.to_string())
+}
+
+async fn bili_wbi_keys(
+    client: &reqwest::Client,
+    headers: &HeaderMap,
+) -> Result<(String, String)> {
+    let value = bili_get_json(
+        client,
+        &format!("{BILI_API}/x/web-interface/nav"),
+        headers,
+    )
+    .await?;
+    let image_key = value
+        .pointer("/data/wbi_img/img_url")
+        .and_then(|v| v.as_str())
+        .and_then(bili_key_from_url)
+        .ok_or_else(|| anyhow!("B 站未返回 WBI img key"))?;
+    let sub_key = value
+        .pointer("/data/wbi_img/sub_url")
+        .and_then(|v| v.as_str())
+        .and_then(bili_key_from_url)
+        .ok_or_else(|| anyhow!("B 站未返回 WBI sub key"))?;
+    Ok((image_key, sub_key))
+}
+
+async fn bili_view_cid(
+    client: &reqwest::Client,
+    headers: &HeaderMap,
+    bvid: &str,
+) -> Result<String> {
+    let value = bili_get_json(
+        client,
+        &format!("{BILI_API}/x/web-interface/view?bvid={bvid}"),
+        headers,
+    )
+    .await?;
+    let data = bili_check_code(&value)?;
+    let cid = data
+        .pointer("/pages/0/cid")
+        .and_then(|v| v.as_i64())
+        .or_else(|| data.get("cid").and_then(|v| v.as_i64()))
+        .ok_or_else(|| anyhow!("B 站视频缺少 cid"))?;
+    if cid <= 0 {
+        bail!("B 站视频 cid 非法");
+    }
+    Ok(cid.to_string())
+}
+
+fn bili_audio_urls(row: &serde_json::Value) -> Vec<String> {
+    let mut urls = Vec::new();
+    if let Some(url) = row.get("baseUrl").and_then(|v| v.as_str()) {
+        urls.push(url.to_string());
+    }
+    if let Some(url) = row.get("base_url").and_then(|v| v.as_str()) {
+        urls.push(url.to_string());
+    }
+    for key in ["backupUrl", "backup_url"] {
+        if let Some(items) = row.get(key).and_then(|v| v.as_array()) {
+            for item in items {
+                if let Some(url) = item.as_str() {
+                    urls.push(url.to_string());
+                }
+            }
+        }
+    }
+    urls.retain(|url| {
+        reqwest::Url::parse(url)
+            .map(|u| u.scheme() == "https" && u.host_str().is_some() && u.username().is_empty())
+            .unwrap_or(false)
+    });
+    urls.dedup();
+    if let Some(index) = urls.iter().position(|url| {
+        reqwest::Url::parse(url)
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+            .map(|host| host.starts_with("upos-") && host.ends_with(".bilivideo.com"))
+            .unwrap_or(false)
+    }) {
+        let preferred = urls.remove(index);
+        urls.insert(0, preferred);
+    }
+    urls
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -868,6 +1290,7 @@ mod tests {
     fn registry_resolves_self_hosted_sources() {
         assert!(resolver_for("kugou").is_some());
         assert!(resolver_for("netease").is_some());
+        assert!(resolver_for("bilibili").is_some());
         // 大小写不敏感（from_wire 归一）
         assert!(resolver_for("Kugou").is_some());
     }
@@ -880,7 +1303,99 @@ mod tests {
             assert!(resolver_for_platform(SourcePlatform::from_wire(s)).is_none());
         }
         // 未来未知音源同样 None，不再硬报错。
-        assert!(resolver_for("bilibili").is_none());
         assert!(resolver_for_platform(SourcePlatform::Unknown).is_none());
+    }
+
+    #[test]
+    fn bilibili_wbi_matches_published_vector() {
+        let mut params = BTreeMap::new();
+        params.insert("foo".to_string(), "114".to_string());
+        params.insert("bar".to_string(), "514".to_string());
+        params.insert("zab".to_string(), "1919810".to_string());
+        let query = bili_sign_query_at(
+            &params,
+            "7cd084941338484aae1ad9425b84077c",
+            "4932caff0ff746eab6f01bf08b70ac45",
+            1702204169,
+        )
+        .unwrap();
+        assert_eq!(
+            query,
+            "bar=514&foo=114&wts=1702204169&zab=1919810&\
+             w_rid=8f6f2b5b3d485fe1886cec6a0be8c5d4"
+        );
+    }
+
+    #[test]
+    fn bilibili_id_and_quality_helpers() {
+        assert!(bili_valid_bvid("BV1Cjxy68EKv"));
+        assert!(!bili_valid_bvid("BV123"));
+        assert_eq!(
+            bili_split_id("BV1Cjxy68EKv:123"),
+            ("BV1Cjxy68EKv".to_string(), Some("123".to_string()))
+        );
+        assert_eq!(
+            bili_split_id("BV1Cjxy68EKv"),
+            ("BV1Cjxy68EKv".to_string(), None)
+        );
+    }
+
+    fn audio(id: u64, bandwidth: u64, kind: BiliAudioKind) -> BiliAudio {
+        BiliAudio {
+            id,
+            bandwidth,
+            urls: vec![format!("https://upos-test.bilivideo.com/{id}.m4s")],
+            size: None,
+            kind,
+        }
+    }
+
+    #[test]
+    fn bilibili_audio_levels_fall_back_to_aac() {
+        let candidates = vec![
+            audio(30216, 65_000, BiliAudioKind::Aac),
+            audio(30280, 192_000, BiliAudioKind::Aac),
+        ];
+        assert_eq!(
+            bili_select_audio(&candidates, Quality::Lq).map(|c| c.id),
+            Some(30216)
+        );
+        assert_eq!(
+            bili_select_audio(&candidates, Quality::Hq).map(|c| c.id),
+            Some(30280)
+        );
+        // 无 FLAC / 杜比：无损档回退到最高的 AAC。
+        assert_eq!(
+            bili_select_audio(&candidates, Quality::Lossless).map(|c| c.id),
+            Some(30280)
+        );
+        assert_eq!(
+            bili_select_audio(&candidates, Quality::HiRes).map(|c| c.id),
+            Some(30280)
+        );
+    }
+
+    #[test]
+    fn bilibili_audio_prefers_flac_then_dolby() {
+        let with_flac = vec![
+            audio(30280, 192_000, BiliAudioKind::Aac),
+            audio(30250, 448_000, BiliAudioKind::Dolby),
+            audio(30251, 1_200_000, BiliAudioKind::Flac),
+        ];
+        let chosen = bili_select_audio(&with_flac, Quality::Lossless).unwrap();
+        assert_eq!(chosen.kind, BiliAudioKind::Flac);
+        assert_eq!(chosen.id, 30251);
+        // 普通档不受无损音轨影响。
+        assert_eq!(
+            bili_select_audio(&with_flac, Quality::Hq).map(|c| c.id),
+            Some(30280)
+        );
+
+        let dolby_only = vec![
+            audio(30280, 192_000, BiliAudioKind::Aac),
+            audio(30250, 448_000, BiliAudioKind::Dolby),
+        ];
+        let chosen = bili_select_audio(&dolby_only, Quality::HiRes).unwrap();
+        assert_eq!(chosen.kind, BiliAudioKind::Dolby);
     }
 }

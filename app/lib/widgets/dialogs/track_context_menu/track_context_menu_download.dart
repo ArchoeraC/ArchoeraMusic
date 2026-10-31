@@ -38,9 +38,10 @@ Future<void> downloadTracks(
   final directOnly = online.every(
     (t) => sourcePlatform(t.source).downloadDirectOnly,
   );
+  final levels = _downloadQualityLevelsFor(online);
   final quality = directOnly
       ? defaultQuality
-      : await _pickDownloadQuality(context, defaultQuality);
+      : await _pickDownloadQuality(context, defaultQuality, levels);
   if (quality == null || !context.mounted) return;
   final controller = ref.read(downloadControllerProvider.notifier);
   // 引擎按需加载：入队前确保引擎就绪（首次入队可能尚未加载）。
@@ -157,13 +158,26 @@ Future<bool> _showLoginPrompt(BuildContext context, String platform) async {
   return go ?? false;
 }
 
+/// 本次批量下载可选的音质：取所有曲目所属源支持档位的交集（保持全局顺序）。
+List<String> _downloadQualityLevelsFor(List<Track> tracks) {
+  var levels = downloadQualityLevels;
+  for (final track in tracks) {
+    final supported = downloadPlatform(track.source).supportedQualities;
+    levels = levels.where(supported.contains).toList(growable: false);
+  }
+  return levels.isEmpty ? downloadQualityLevels : levels;
+}
+
 Future<String?> _pickDownloadQuality(
   BuildContext context,
   String defaultQuality,
+  List<String> levels,
 ) {
-  final levels = downloadQualityLevels;
   final scheme = Theme.of(context).colorScheme;
   final l10n = context.l10n;
+  final effectiveDefault = levels.contains(defaultQuality)
+      ? defaultQuality
+      : levels.first;
   return SDialog.show<String>(
     context,
     title: l10n.downloadQualityTitle,
@@ -188,7 +202,7 @@ Future<String?> _pickDownloadQuality(
               color: scheme.onSurfaceVariant,
             ),
             title: Text(l10nQualityLabel(l10n, l)),
-            trailing: l == defaultQuality
+            trailing: l == effectiveDefault
                 ? Text(
                     l10n.commonDefault,
                     style: TextStyle(
