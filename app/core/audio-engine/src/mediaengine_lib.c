@@ -1523,6 +1523,12 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
             if (json_get_number(line, "bass_freq", &bass_freq) != 0) bass_freq = 100.0;
             pipeline_set_lowfreq_bass(e->p, (float)bass_gain, (float)bass_freq);
         }
+    } else if (strcmp(type, "set_channel_merge") == 0) {
+        /* 多声道合并：设备只有单侧发声时的兜底（默认关） */
+        bool enabled = false;
+        if (json_get_bool(line, "enabled", &enabled) == 0) {
+            pipeline_set_channel_merge_enabled(e->p, enabled);
+        }
     } else if (strcmp(type, "set_volume") == 0) {
         double vol = 1.0;
         if (json_get_number(line, "gain", &vol) == 0) {
