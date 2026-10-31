@@ -28,6 +28,7 @@ import '../../app/app_quit.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/log/log.dart';
+import '../../services/downloader/download_controller.dart';
 import '../../services/mcp/mcp_key_store.dart';
 import '../../services/security/data_destroyer.dart';
 import '../../services/security/vault_kdf.dart';

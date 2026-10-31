@@ -36,6 +36,12 @@ Future<void> refreshAfterVaultUnlock(dynamic ref) async {
     // 网络异常不阻断解锁（登录态可能仍为空，用户可后续重登）。
     Log.e('vault', '解锁后登录态刷新失败（NetEase）：$e');
   }
+  // B 站：请求层每次从 store 读取 Cookie，无需重建实例；显式拉一次资料。
+  try {
+    await ref.read(bilibiliApiProvider).loadProfileSilently();
+  } catch (e) {
+    Log.e('vault', '解锁后登录态刷新失败（Bilibili）：$e');
+  }
   ref.invalidate(kugouApiProvider);
   ref.read(downloadControllerProvider.notifier).syncSessions();
 }

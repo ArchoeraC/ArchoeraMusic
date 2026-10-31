@@ -208,6 +208,12 @@ class DownloaderEngine {
     return _lib.setNeteaseCookie(cookieHeader);
   }
 
+  /// 注入 B 站会话 Cookie（空串 = 清除）；供 Rust 原生 WBI/playurl 使用。
+  int setBilibiliCookie(String cookieHeader) {
+    _ensureInit();
+    return _lib.setBilibiliCookie(cookieHeader);
+  }
+
   /// 注入设备指纹（init 后调用；Dart 首次生成持久化的 downloaderIdentity JSON）。
   /// 幂等，引擎重建时重复注入同值。
   int setDownloaderIdentity(String identityJson) {

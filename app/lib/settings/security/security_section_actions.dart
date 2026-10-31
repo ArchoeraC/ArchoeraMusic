@@ -20,8 +20,10 @@ extension _SecuritySectionActions on _SecuritySectionState {
   Future<void> _revokeAll() async {
     await _revokeNetease();
     ref.read(kugouApiProvider).clearSession();
+    ref.read(bilibiliApiProvider).logout();
     ref.read(neteaseAuthProvider.notifier).clear();
     await ref.read(streamingProvider.notifier).clearAll();
+    ref.read(downloadControllerProvider.notifier).syncSessions();
   }
 
   Future<bool?> _confirmShred(BuildContext context, String title, String desc) {

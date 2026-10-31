@@ -10,6 +10,7 @@ import '../../easter_egg/april_fools_state.dart';
 import '../../services/playback/playback_notifier.dart';
 import '../../services/shortcuts/shortcut_action.dart';
 import '../../services/shortcuts/shortcut_binding.dart';
+import '../../services/source/source_platform.dart';
 import '../../settings/settings_dialog.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';

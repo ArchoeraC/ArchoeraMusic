@@ -261,6 +261,12 @@ abstract class CollectionPlatform {
 CollectionPlatform collectionPlatform(String source) =>
     _registry[source] ?? _registry['netease']!;
 
+/// 该源是否注册了自己的收藏适配器。
+///
+/// [collectionPlatform] 对未注册源会回退 NT，因此**所有写操作（红心 / 歌单）
+/// 必须先判断本函数**：否则 B 站等无收藏能力的曲目会被写进网易云红心或歌单。
+bool hasCollectionAdapter(String source) => _registry.containsKey(source);
+
 /// 已启用平台的适配器（顺序即下拉顺序）。
 List<CollectionPlatform> collectionPlatforms(dynamic ref) =>
     _all.where((p) => p.enabled(ref)).toList(growable: false);
@@ -1028,4 +1034,3 @@ class _QqCollection extends CollectionPlatform {
   @override
   String favEmptyHint(AppLocalizations l10n) => l10n.pageFavEmptyHint;
 }
-

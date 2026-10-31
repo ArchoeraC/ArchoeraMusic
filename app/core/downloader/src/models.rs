@@ -81,6 +81,9 @@ pub enum SourcePlatform {
     /// （`/rest/stream?format=raw`，原文件）。Rust 无自研解析，
     /// 恒走 Dart 播放管线回退预解析 URL。
     Streaming,
+    /// 哔哩哔哩：Rust 侧自研 WBI + playurl（AAC/M4A）；会员/登录可见音轨
+    /// 使用 Dart 注入的会话 Cookie。
+    Bilibili,
     /// 未知 / 未来音源：wire 字符串无法识别时**归一到这里**（不再反序列化报错）。
     ///
     /// Rust 无自研解析与平台元数据实现，恒走 Dart 预解析直链 + 兜底元数据路径，
@@ -96,6 +99,7 @@ impl SourcePlatform {
             SourcePlatform::Netease => "netease",
             SourcePlatform::Qqmusic => "qqmusic",
             SourcePlatform::Streaming => "streaming",
+            SourcePlatform::Bilibili => "bilibili",
             SourcePlatform::Unknown => "unknown",
         }
     }
@@ -111,6 +115,7 @@ impl SourcePlatform {
             "netease" => SourcePlatform::Netease,
             "qqmusic" => SourcePlatform::Qqmusic,
             "streaming" => SourcePlatform::Streaming,
+            "bilibili" => SourcePlatform::Bilibili,
             _ => SourcePlatform::Unknown,
         }
     }
@@ -148,6 +153,9 @@ pub struct EnqueueRequest {
     pub artist: String,
     #[serde(default)]
     pub album: Option<String>,
+    /// 封面 URL（可选；未知/直传音源由 Dart 带入，引擎只在文件无内嵌封面时下载）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_url: Option<String>,
     /// 强制重写歌词（标准 LRC 文本）。非空时在元数据合并中**优先于内嵌/平台
     /// 歌词**——直传源可在入队前由 Dart 取标准源歌词注入（其内嵌/平台歌词
     /// 常为站点广告或非标准格式，不可信）。
@@ -227,7 +235,7 @@ mod tests {
     #[test]
     fn unknown_source_is_tolerated_and_normalized() {
         // 未来新增音源：未知字符串不再反序列化报错，归一为 Unknown（走预解析直链）。
-        let parsed: SourcePlatform = serde_json::from_str("\"bilibili\"").unwrap();
+        let parsed: SourcePlatform = serde_json::from_str("\"future_source\"").unwrap();
         assert_eq!(parsed, SourcePlatform::Unknown);
         assert_eq!(parsed.as_str(), "unknown");
         // 含空白的未知值同样归一
@@ -241,6 +249,7 @@ mod tests {
             ("\"netease\"", SourcePlatform::Netease, "netease"),
             ("\"qqmusic\"", SourcePlatform::Qqmusic, "qqmusic"),
             ("\"streaming\"", SourcePlatform::Streaming, "streaming"),
+            ("\"bilibili\"", SourcePlatform::Bilibili, "bilibili"),
         ] {
             let parsed: SourcePlatform = serde_json::from_str(json).unwrap();
             assert_eq!(parsed, variant);
@@ -251,7 +260,15 @@ mod tests {
 
     #[test]
     fn source_from_wire_matches_serde() {
-        for s in ["kugou", "netease", "qqmusic", "streaming", "unknown", "wat"] {
+        for s in [
+            "kugou",
+            "netease",
+            "qqmusic",
+            "streaming",
+            "bilibili",
+            "unknown",
+            "wat",
+        ] {
             let via_serde: SourcePlatform =
                 serde_json::from_str(&format!("\"{s}\"")).unwrap();
             assert_eq!(via_serde, SourcePlatform::from_wire(s), "wire={s}");

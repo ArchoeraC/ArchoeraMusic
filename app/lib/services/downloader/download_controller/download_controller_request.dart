@@ -17,6 +17,7 @@ Map<String, dynamic> buildDownloadRequest(
     'title': track.title,
     'artist': track.artistNames,
     'album': track.album?.name,
+    'coverUrl': track.coverOriginal ?? track.cover,
     // 强制重写歌词（直传源在入队前已取标准 LRC）：引擎按
     // 「enqueue 元数据 > 平台 > 内嵌」合并，非空时覆盖内嵌歌词。
     'lyrics': (lyrics == null || lyrics.isEmpty) ? null : lyrics,
