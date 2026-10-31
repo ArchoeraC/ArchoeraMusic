@@ -126,7 +126,8 @@ ZkDecoder *zk_decoder_open_url(const char *url, ZkInfo *info,
 
 /**
  * 同 [zk_decoder_open_url]，另附带自定义请求头 [headers]（`\n`/`\r\n` 分行；
- * NULL = 无）。供宿主按源注入 `User-Agent` 等客户端标识。headers 生命周期仅本调用内。
+ * NULL = 无）。供宿主按源注入 `X-Neko-Client` / `User-Agent` 等标识（如
+ * NekoMusic 防爬）。headers 生命周期仅本调用内。
  */
 ZkDecoder *zk_decoder_open_url_headers(const char *url, const char *headers, ZkInfo *info,
                                        char *errbuf, int errbuf_size);
@@ -377,7 +378,7 @@ ZkEngineStream *zk_engine_open_url(ZkEngine *h, const char *url,
 
 /**
  * 同 [zk_engine_open_url]，另附带自定义请求头 [headers]（`\n`/`\r\n` 分行；
- * NULL = 无）。供宿主按源注入 `User-Agent` 等客户端标识。headers
+ * NULL = 无）。供宿主按源注入 `X-Neko-Client` / `User-Agent` 等标识。headers
  * 生命周期仅本调用内（内核会复制保留至会话关闭）。
  */
 ZkEngineStream *zk_engine_open_url_headers(ZkEngine *h, const char *url, const char *headers,

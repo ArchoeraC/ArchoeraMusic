@@ -230,7 +230,7 @@ class _DownloadReq {
   _DownloadReq(this.url, this.headers, this.gateEnv, this.reply);
   final String url;
 
-  /// 出站请求头（如部分音源需要的客户端标识；主 isolate 组装后随消息传入，
+  /// 出站请求头（如 NekoMusic 需要的客户端标识；主 isolate 组装后随消息传入，
   /// 因为新建 isolate 不继承主 isolate 的全局状态）。
   final Map<String, String> headers;
   final Map<String, String>? gateEnv;
@@ -332,7 +332,7 @@ Future<WholeTrackPrepareResult> _downloadIntoStore(
   try {
     final req = await client.getUrl(Uri.parse(url)).timeout(_downloadTimeout);
     // 通用请求：不注入平台专属 referer/UA（qqmusic 个别源失败即回退 URL 路径）；
-    // [headers] 由调用方按源提供（如个别音源需要的客户端标识）。
+    // [headers] 由调用方按源提供（如 NekoMusic 的客户端标识）。
     req.headers.set(HttpHeaders.acceptHeader, '*/*');
     headers.forEach(req.headers.set);
     final resp = await req.close().timeout(_downloadTimeout);

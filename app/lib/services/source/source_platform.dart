@@ -16,7 +16,7 @@
 /// [_all]**，各调用点无需改动。
 ///
 /// 说明：注册表按 [Track.source] 取值（`netease` / `kugou` / `qqmusic` /
-/// `local` / `streaming`；不含 subsonic）。
+/// `neko` / `local` / `streaming`；不含 subsonic）。
 library;
 
 import 'dart:typed_data';
@@ -32,6 +32,7 @@ import '../../stores/providers.dart';
 import '../../widgets/dialogs/collection_platform.dart';
 import '../../widgets/dialogs/comment_platform.dart';
 import '../../widgets/dialogs/kugou_login_button.dart';
+import '../../widgets/dialogs/neko_login_dialog.dart';
 import '../../widgets/dialogs/netease_login_dialog.dart';
 import '../../widgets/dialogs/qqmusic_login_dialog.dart';
 import '../../widgets/dialogs/track_list_dialog.dart';
@@ -41,12 +42,15 @@ import '../lyrics/engine/lyric_source.dart';
 import '../qqmusic/qqmusic_api.dart' show QqApiException;
 import '../lyrics/sources/kugou_lyric_source.dart';
 import '../lyrics/sources/local_lyric_source.dart';
+import '../lyrics/sources/neko_lyric_source.dart';
 import '../lyrics/sources/netease_lyric_source.dart';
 import '../lyrics/sources/qqmusic_lyric_source.dart';
 import '../lyrics/sources/streaming_lyric_source.dart';
 import 'metadata_editor.dart';
 import '../netease/netease_api.dart';
 import '../netease/track.dart';
+import '../neko/neko_identity.dart';
+import '../neko/neko_quality.dart';
 import '../../utils/format.dart';
 import '../streaming/streaming_client.dart';
 import '../streaming/streaming_http.dart';
@@ -109,13 +113,13 @@ abstract class SourcePlatform {
   /// 下载是否恒取原文件、无音质档（流媒体服务端 `format=raw`）。
   bool get downloadDirectOnly => false;
 
-  /// 入队前的曲目预处理（如 KG 补 hash）。
+  /// 入队前的曲目预处理（KG 补 hash / Neko 重写歌词）。
   Future<Track> prepareForDownload(dynamic ref, Track t) async => t;
 
-  /// 通用曲目右键菜单是否显示「红心 / 评论 / 添加到歌单」（NT / KG）。
+  /// 通用曲目右键菜单是否显示「红心 / 评论 / 添加到歌单」（NT / KG / Neko）。
   bool get trackMenuLikeComment => false;
 
-  /// 通用曲目右键菜单是否显示「查看歌手 / 媒体详情 / 下载」（NT / KG / QQ）。
+  /// 通用曲目右键菜单是否显示「查看歌手 / 媒体详情 / 下载」（NT / KG / QQ / Neko）。
   bool get trackMenuArtistDownload => false;
 
   /// 播放时是否必须以「引擎直连流式」处理（跳过整首内存门禁）。流媒体为真。
@@ -227,7 +231,8 @@ abstract class SourcePlatform {
 
   /// 本源音频拉流（内存源 / 缓存下载）需附加的请求头。
   ///
-  /// 默认空；个别音源需要专用标识头时在此覆写。
+  /// 默认空；NekoMusic 走本站 `/api/*`，需带客户端标识头以通过防爬（见
+  /// `services/neko/neko_identity.dart`）。
   Map<String, String> get mediaHeaders => const {};
 
   /// 播放失败时是否允许自动换源（搜索另一平台同名曲重试）。
@@ -238,9 +243,12 @@ abstract class SourcePlatform {
   Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async =>
       const [];
 
+  /// 播放前的展示元数据补齐（NK 用其它源补全）；默认原样返回。
+  Future<Track> enrichMetadata(dynamic ref, Track t) async => t;
+
   // ── 媒体信息（右键「媒体详细信息」弹窗） ──────────────────────────
 
-  /// 该源特有的音质描述（如 KG 品质链 + 体积）；无 → null。
+  /// 该源特有的音质描述（如 KG 品质链 + 体积、Neko 实际最高档）；无 → null。
   ///
   /// [maxQuality] 为已归一化的「实际最高档」（异步源由 [maxQualityProvider]
   /// 预取后回填）；null = 未知 / 不适用。
@@ -258,7 +266,8 @@ abstract class SourcePlatform {
 
   /// 可用最高音质徽标（label + 是否无损档）；null = 无信息（不显示）。
   ///
-  /// 默认由 [Track.quality] 反推；各源可覆写（KG hash 链 / QQ 文件大小）。
+  /// 默认由 [Track.quality] 反推；各源可覆写（KG hash 链 / QQ 文件大小 /
+  /// Neko 服务端 `maxQuality`）。
   ({String label, bool lossless})? qualityBadge(
     Track t,
     AppLocalizations l10n, {
@@ -271,14 +280,14 @@ abstract class SourcePlatform {
   List<String> get supportedQualities => audioQualityLevels;
 
   /// 本源针对 [t] 的可选档位（在 [supportedQualities] 基础上按曲目实际能力
-  /// 裁剪，如 KG 按品质 hash）。[maxQuality] 为已归一化的
+  /// 裁剪，如 KG 按品质 hash、Neko 按 `maxQuality`）。[maxQuality] 为已归一化的
   /// 实际最高档（未知 → null，按全档展示）。
   List<String> availableQualities(Track t, {String? maxQuality}) =>
       supportedQualities;
 
-  /// 本源「实际最高档」的异步来源；同步可得的源返回 null。播放页 / 详情弹窗
-  /// 据此预取后回填 [availableQualities] 与 [qualityLabel]，调用方无需感知具体
-  /// 音源。
+  /// 本源「实际最高档」的异步来源（Neko → `nekoMaxQualityProvider`）；同步
+  /// 可得的源返回 null。播放页 / 详情弹窗据此预取后回填 [availableQualities]
+  /// 与 [qualityLabel]，调用方无需感知具体音源。
   ProviderListenable<AsyncValue<String?>>? maxQualityProvider(Track t) => null;
 
   // ── 组合能力访问器 ────────────────────────────────────────────────
@@ -399,6 +408,7 @@ final List<SourcePlatform> _all = [
   _NeteaseSource(),
   _KugouSource(),
   _QqSource(),
+  _NekoSource(),
   _LocalSource(),
   _StreamingSource(),
 ];
@@ -1066,6 +1076,176 @@ class _QqSource extends SourcePlatform {
         showQqArtistDetailDialog(context, item);
       default:
         showQqPlaylistDetailDialog(context, item);
+    }
+  }
+}
+
+// ── NK ─────────────────────────────────────────────────────────────────
+
+class _NekoSource extends SourcePlatform {
+  @override
+  String get source => 'neko';
+
+  /// NekoMusic 走本站 `/api/*`：音频拉流带客户端标识头（UA + X-Neko-Client）。
+  @override
+  Map<String, String> get mediaHeaders => nekoRequestHeaders;
+
+  @override
+  Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async {
+    final keyword = [
+      t.title,
+      if (t.artistNames.trim().isNotEmpty) t.artistNames.trim(),
+    ].join(' ');
+    return (await sourcePlatform(
+      'netease',
+    ).searchSongs(ref, keyword, append: false, loaded: 0, limit: 20)).items;
+  }
+
+  @override
+  String label(AppLocalizations l10n) => l10n.platformNeko;
+
+  @override
+  String get badgeLabel => 'K';
+
+  @override
+  Color get badgeColor => const Color(0xFF8B5CF6);
+
+  @override
+  bool get downloadable => true;
+
+  @override
+  bool get trackMenuLikeComment => true;
+
+  @override
+  bool get trackMenuArtistDownload => true;
+
+  @override
+  Future<Track> prepareForDownload(dynamic ref, Track t) =>
+      ref.read(nekoLyricRewriterProvider).rewrite(t);
+
+  @override
+  ({String label, bool lossless})? qualityBadge(
+    Track t,
+    AppLocalizations l10n, {
+    String? maxQuality,
+  }) => nekoQualityBadge(maxQuality);
+
+  // ── 音质选择注册表（Neko 服务端四档；`sq` 与服务端 `hq` 同档，去重） ──
+
+  @override
+  List<String> get supportedQualities => const [
+    'lq',
+    'hq',
+    'lossless',
+    'hi-res',
+  ];
+
+  @override
+  ProviderListenable<AsyncValue<String?>>? maxQualityProvider(Track t) =>
+      nekoMaxQualityProvider(t.id);
+
+  @override
+  List<String> availableQualities(Track t, {String? maxQuality}) =>
+      nekoLevelsForMaxQuality(maxQuality);
+
+  @override
+  String? qualityLabel(AppLocalizations l10n, Track t, {String? maxQuality}) {
+    final max = normalizeNekoQuality(maxQuality);
+    if (max == null) return null; // 未知最高档：不展示（避免误导）
+    return l10nQualityLabel(l10n, nekoLevelsForMaxQuality(max).last);
+  }
+
+  @override
+  bool enabled(dynamic ref) {
+    // 同 collection_platform.dart：`ref` 为 dynamic，扩展 getter 须显式转
+    // AppPrefs 读取，否则动态派发抛 NoSuchMethodError（搜索页白屏）。
+    final prefs = ref.read(appPrefsProvider) as AppPrefs;
+    return nekoSourceUsable(prefs);
+  }
+
+  @override
+  ProviderListenable<Object?>? get authSignal =>
+      nekoApiProvider.select<Object?>((s) => s.isLoggedIn);
+
+  @override
+  bool loggedIn(dynamic ref) => ref.read(nekoApiProvider).isLoggedIn;
+
+  @override
+  Future<void> login(BuildContext context) async {
+    await showNekoLoginDialog(context);
+  }
+
+  @override
+  CollectionPlatform? get collections => collectionPlatform(source);
+
+  @override
+  CommentPlatform? get comments => commentPlatformFor(source);
+
+  @override
+  List<LyricSource> lyricSources(dynamic ref) => [NekoLyricSource(ref)];
+
+  @override
+  Future<SearchResult<Track>> searchSongs(
+    dynamic ref,
+    String query, {
+    required bool append,
+    required int loaded,
+    required int limit,
+  }) {
+    // 服务端无分页（上限约 50），一次给全，hasMore=false。
+    return ref.read(nekoApiProvider).searchSongs(query, page: 1);
+  }
+
+  @override
+  Future<SearchResult<CoverItem>> searchAlbums(
+    dynamic ref,
+    String query, {
+    required bool append,
+    required int loaded,
+    required int limit,
+  }) => ref.read(nekoApiProvider).searchAlbums(query);
+
+  @override
+  Future<SearchResult<CoverItem>> searchArtists(
+    dynamic ref,
+    String query, {
+    required bool append,
+    required int loaded,
+    required int limit,
+  }) => ref.read(nekoApiProvider).searchArtists(query);
+
+  @override
+  Future<SearchResult<CoverItem>> searchPlaylists(
+    dynamic ref,
+    String query, {
+    required bool append,
+    required int loaded,
+    required int limit,
+  }) => ref.read(nekoApiProvider).searchPlaylists(query);
+
+  @override
+  Future<String?> resolvePlayUrl(
+    dynamic ref,
+    Track track, {
+    required String quality,
+    String? streamingQuality,
+    void Function(String message)? log,
+  }) => ref.read(nekoApiProvider).resolvePlayUrl(track, quality: quality);
+
+  @override
+  void openCover(
+    BuildContext context,
+    dynamic ref,
+    SourceSearchKind kind,
+    CoverItem item,
+  ) {
+    switch (kind) {
+      case SourceSearchKind.playlist:
+        showNekoPlaylistDetailDialog(context, item);
+      case SourceSearchKind.artist:
+        showNekoArtistDialog(context, item);
+      default:
+        break;
     }
   }
 }

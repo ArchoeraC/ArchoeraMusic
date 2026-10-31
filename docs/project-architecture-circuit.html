@@ -642,13 +642,14 @@
         group: "api",
         type: "service",
         title: "音源注册表与纯 Dart API",
-        meta: "SourcePlatform 把 netease / kugou / qqmusic / streaming / local 统一起来",
+        meta: "SourcePlatform 把 netease / kugou / qqmusic / neko / streaming / local 统一起来",
         description: "SourcePlatform 把搜索、播放解析、歌词、收藏和详情能力统一成一套接口，播放和搜索页面不直接写平台分支。",
         files: [
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/source/source_platform.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/netease/netease_api.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/kugou/kugou_api.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/qqmusic/qqmusic_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/neko/neko_api.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/streaming/streaming_client.dart"
         ]
       },
@@ -804,12 +805,13 @@
         group: "api",
         type: "remote",
         title: "纯 Dart 平台 API",
-        meta: "netease / kugou / qqmusic / streaming",
+        meta: "netease / kugou / qqmusic / neko / streaming",
         description: "这里是远端平台适配层，负责请求在线平台、拿搜索结果、解析歌曲地址和登录态相关能力。",
         files: [
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/netease/netease_api.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/kugou/kugou_api.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/qqmusic/qqmusic_api.dart",
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/neko/neko_api.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/streaming/streaming_client.dart"
         ]
       },
@@ -1052,7 +1054,7 @@
         edges: [
           { from: "ui", to: "playback_core", kind: "call", label: "用户操作 -> 播放命令", description: "点击播放、切歌、seek、切页时，页面把动作交给 PlaybackNotifier。" },
           { from: "playback_core", to: "source_core", kind: "call", label: "resolve / search / lyric", description: "播放控制器通过 SourcePlatform 统一请求在线平台能力。" },
-          { from: "source_core", to: "remote_apis", kind: "net", label: "HTTP / cookie / 远端平台", description: "注册表内部再分发到网易、酷狗、QQ 音乐和流媒体客户端。" },
+          { from: "source_core", to: "remote_apis", kind: "net", label: "HTTP / cookie / 远端平台", description: "注册表内部再分发到网易、酷狗、QQ 音乐、Neko 和流媒体客户端。" },
           { from: "playback_core", to: "audio_process", kind: "call", label: "start / stop / command", description: "PlaybackNotifier 通过 AudioEngineProcess 管理引擎会话。" },
           { from: "audio_process", to: "engine_bindings", kind: "call", label: "FFI 句柄调用", description: "AudioEngineProcess 再把操作落到 engine_bindings 定义的 C ABI 上。" },
           { from: "engine_bindings", to: "audio_engine_native", kind: "call", label: "archoera_mediaengine_*", description: "实际的 C 接口调用进入原生音频引擎。" },

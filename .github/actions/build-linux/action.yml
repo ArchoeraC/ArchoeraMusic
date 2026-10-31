@@ -6,6 +6,12 @@ description: >-
   发行版专属的系统依赖安装与打包步骤由调用方 job 负责（复合 action 在调用方
   job 的容器/runner 内执行，因此天然复用各发行版的本地库）。
 inputs:
+  neko_client_id:
+    description: >-
+      NekoMusic 客户端标识（公开标识，通过 Secret 传入；复合 action 读不到 secrets
+      上下文，故由调用方以 input 传入）。为空时该音源在产物中禁用。
+    required: false
+    default: ''
   zig_archive:
     description: Zig 官方归档后缀（如 x86_64-linux）
     required: false
@@ -102,10 +108,19 @@ runs:
       working-directory: app
       run: dart analyze lib
 
+    # NekoMusic 客户端标识由调用方以 input 传入（来自仓库 Secret）。
+    # 未配置时构建照常成功，App 内该音源整体禁用（fail-closed）。
     - name: Build Flutter Linux (release)
       shell: bash
       working-directory: app
-      run: flutter build linux --release
+      env:
+        NEKO_CLIENT_ID: ${{ inputs.neko_client_id }}
+      run: |
+        args=(--release)
+        if [ -n "${NEKO_CLIENT_ID:-}" ]; then
+          args+=("--dart-define=NEKO_CLIENT_ID=${NEKO_CLIENT_ID}")
+        fi
+        flutter build linux "${args[@]}"
 
     # 自包含运行库：把 FFmpeg/TagLib 的传递依赖闭包收进 native/ 并加 RUNPATH=$ORIGIN，
     # 产物不再依赖目标发行版的 soname（防系统库差异/升级导致加载断裂）。

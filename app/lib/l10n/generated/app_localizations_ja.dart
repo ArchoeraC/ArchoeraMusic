@@ -1033,8 +1033,108 @@ class AppLocalizationsJa extends AppLocalizations {
   String get toastRevealFileFailed => 'ファイルを表示できません（ファイルマネージャーが利用できません）';
 
   @override
+  String get settingsSectionThirdPartyService => 'サードパーティサービス';
+
+  @override
+  String get settingsNekoAttribution => '本アプリは Neko Music API によって提供されています';
+
+  @override
+  String get settingsNekoApiDocs => 'Neko Music API ドキュメント';
+
+  @override
   String get settingsSongCacheMemoryHint =>
       '「メモリ内再生」が有効なため、楽曲キャッシュはディスクに書き込まれません';
+
+  @override
+  String get platformNeko => 'NK';
+
+  @override
+  String get settingsCatExperimentalSource => '実験的音源';
+
+  @override
+  String get settingsExperimentalSourceSubtitle => 'サードパーティ音源（既定でオフ）';
+
+  @override
+  String get settingsNekoTitle => 'NekoMusic';
+
+  @override
+  String get settingsNekoNote =>
+      'サードパーティの実験的音源です（非公式）。ログインのみ対応で、新規登録や VIP 購入はありません。予告なく利用できなくなる場合があります。';
+
+  @override
+  String get settingsNekoEnable => 'NekoMusic を有効化';
+
+  @override
+  String get settingsNekoEnableDesc => '検索・お気に入り・ライブラリに NK を表示（既定でオフ）';
+
+  @override
+  String get settingsNekoUnavailable =>
+      'クライアント ID（NEKO_CLIENT_ID）が設定されていないため、NekoMusic 音源は利用できません。';
+
+  @override
+  String get settingsNekoLogin => 'ログイン';
+
+  @override
+  String get settingsNekoLogout => 'ログアウト';
+
+  @override
+  String settingsNekoLoggedInAs({required Object name}) {
+    return 'ログイン中：$name';
+  }
+
+  @override
+  String get settingsNekoNotLoggedIn => '未ログイン';
+
+  @override
+  String get nekoLoginTitle => 'NekoMusic にログイン';
+
+  @override
+  String get nekoLoginTabQr => '二次元コード';
+
+  @override
+  String get nekoLoginTabPassword => 'メールとパスワード';
+
+  @override
+  String get nekoLoginEmail => 'メール';
+
+  @override
+  String get nekoLoginPassword => 'パスワード';
+
+  @override
+  String get nekoLoginPasswordHint => 'パスワードを入力';
+
+  @override
+  String get nekoLoginSubmit => 'ログイン';
+
+  @override
+  String get nekoLoginQrHint => 'NekoMusic アプリでスキャンしてログイン';
+
+  @override
+  String get nekoQrScanned => 'スキャン済み。スマホで確認してください';
+
+  @override
+  String get nekoQrCanceled => 'ログインをキャンセルしました';
+
+  @override
+  String get nekoQrExpired => '二次元コードの有効期限が切れました。再生成してください';
+
+  @override
+  String get toastLoginRequiredNeko => '操作に失敗しました（NK アカウントにログインしているか確認してください）';
+
+  @override
+  String get pageLikedNekoLoginHint => 'NK にログインしてお気に入りを表示';
+
+  @override
+  String get pageLikedNekoLoginDesc => 'NekoMusic にログインしてお気に入りを同期';
+
+  @override
+  String get pageLikedNekoEmptyHint => 'お気に入りの曲はまだありません。検索ページでハートをタップ';
+
+  @override
+  String get pageFavNekoLoginDesc => 'NekoMusic にログインしてプレイリストとお気に入りを表示';
+
+  @override
+  String get pageFavNekoEmptyHint => 'プレイリストやお気に入りはまだありません';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -5412,7 +5512,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      '使い方: archoerashell search <音源> <キーワード> [-n 件数] [-p ページ]\n\n指定音源で曲を検索。\n  音源: netease | kugou | qqmusic\n  -n, --limit <n>   件数（1〜50、既定 20）\n  -p, --page <n>    ページ（1 から）\n例: archoerashell search netease 周杰倫 -n 10';
+      '使い方: archoerashell search <音源> <キーワード> [-n 件数] [-p ページ]\n\n指定音源で曲を検索。\n  音源: netease | kugou | qqmusic | neko\n  -n, --limit <n>   件数（1〜50、既定 20）\n  -p, --page <n>    ページ（1 から）\n例: archoerashell search netease 周杰倫 -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>

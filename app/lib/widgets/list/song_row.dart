@@ -25,7 +25,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 part 'song_row/song_row_view.dart';
 
 /// 红心匹配键：由「收藏平台」适配器按来源归一
-/// （[CollectionPlatform.likeKey]：KG 用 hash 小写、QM 用 songmid、NT 用
+/// （[CollectionPlatform.likeKey]：KG 用 hash 小写、QM 用 songmid、NT/NK 用
 /// track.id）——不在此硬编码平台，与 `LikeController` 保持同源。
 String songLikeKey(Track t) => collectionPlatform(t.source).likeKey(t);
 

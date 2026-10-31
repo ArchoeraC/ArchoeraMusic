@@ -90,7 +90,13 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     final idx = state.queueIndex;
     if (idx < 0 || idx >= q.length) return;
     final track = q[idx];
-    final playTrack = track;
+    // 实验性音源 Neko 元数据不规范：播放前用其它音源补充/重写**展示元数据**
+    // （标题/歌手/专辑/封面/时长；不改 id 与 source，播放仍走 Neko 直链）。
+    // 结果按曲目 id 缓存，仅首次播放多一次搜索请求。失败静默用原元数据。
+    var playTrack = track;
+    // 播放前的**展示元数据**补齐（如 NK 用其它源补全标题/歌手/封面）；
+    // 不改 id/source，播放仍走本源。失败静默用原元数据。
+    playTrack = await sourcePlatform(track.source).enrichMetadata(ref, track);
     final String? url;
     try {
       url = await _resolveSource(playTrack, quality: state.quality);
