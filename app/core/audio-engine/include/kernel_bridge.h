@@ -612,6 +612,29 @@ void zk_dsp_lowfreq_process(ZkDspLowFreq *lf, float *pcm, int samples);
 /** 释放次声低频管理块；NULL 空操作。 */
 void zk_dsp_lowfreq_destroy(ZkDspLowFreq *lf);
 
+/* ---- 多声道合并（kernel/dsp/channel_merge.zig）----
+ *
+ * 设备实际只有左/右一侧发声时的兜底：把交错 PCM 的所有声道按等功率
+ * （1/√N）求和为单声道，再复制到每一个输出声道。整块默认禁用 = 逐位旁通。
+ *
+ * 契约与 D1/D2 一致：create 非法参数 / OOM 返回 NULL（调用方回退纯 C）；
+ * process 就地处理交错 float32（samples = 每声道帧数）；destroy NULL 空操作。
+ */
+/** 多声道合并句柄（不透明） */
+typedef struct ZkDspChannelMerge ZkDspChannelMerge;
+
+/** 创建多声道合并块（channels 1..64）；失败返回 NULL。 */
+ZkDspChannelMerge *zk_dsp_channel_merge_create(int channels);
+
+/** 整块启用（enabled != 0）/ 禁用（默认禁用 = 逐位旁通）。 */
+void zk_dsp_channel_merge_set_enabled(ZkDspChannelMerge *cm, int enabled);
+
+/** 就地处理交错 float32 PCM（samples = 每声道帧数）。 */
+void zk_dsp_channel_merge_process(ZkDspChannelMerge *cm, float *pcm, int samples);
+
+/** 释放多声道合并块；NULL 空操作。 */
+void zk_dsp_channel_merge_destroy(ZkDspChannelMerge *cm);
+
 /* ---- N4 流式 Reader 缓冲预算（__BRIDGE_STREAM_BUDGET__）----
  *
  * 每路 callback Reader 自持一个 peek 缓冲；内核按进程预算记账。
