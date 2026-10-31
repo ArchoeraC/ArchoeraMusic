@@ -1496,6 +1496,47 @@ export fn zk_dsp_lowfreq_destroy(lf: ?*dsp.lowfreq.EraLowFreq) void {
     dsp.lowfreq.era_lowfreq_destroy(x);
 }
 
+/// 多声道合并句柄（C 侧 `ZkDspChannelMerge`）；非法参数 / OOM 返回 NULL。
+export fn zk_dsp_channel_merge_create(channels: c_int) ?*dsp.channel_merge.EraChannelMerge {
+    if (channels <= 0 or channels > 64) return null;
+    return dsp.channel_merge.era_channel_merge_create(
+        std.heap.c_allocator,
+        @intCast(channels),
+    ) catch null;
+}
+
+/// 整块启用（enabled != 0）/ 禁用（默认禁用 = 逐位旁通）。
+export fn zk_dsp_channel_merge_set_enabled(
+    cm: ?*dsp.channel_merge.EraChannelMerge,
+    enabled: c_int,
+) void {
+    const x = cm orelse return;
+    dsp.channel_merge.era_channel_merge_set_enabled(x, enabled != 0);
+}
+
+/// 就地合并交错 float32 PCM（samples = 每声道帧数）。
+export fn zk_dsp_channel_merge_process(
+    cm: ?*dsp.channel_merge.EraChannelMerge,
+    pcm: ?[*]f32,
+    samples: c_int,
+) void {
+    const x = cm orelse return;
+    const p = pcm orelse return;
+    if (samples <= 0) return;
+    const frames: usize = @intCast(samples);
+    dsp.channel_merge.era_channel_merge_process(
+        x,
+        p[0 .. frames * @as(usize, x.channels)],
+        frames,
+    );
+}
+
+/// 释放多声道合并块；NULL 空操作。
+export fn zk_dsp_channel_merge_destroy(cm: ?*dsp.channel_merge.EraChannelMerge) void {
+    const x = cm orelse return;
+    dsp.channel_merge.era_channel_merge_destroy(x);
+}
+
 // ---- N4 流式 Reader 缓冲预算 ABI（__KERNEL_STREAM_BUDGET__）----
 /// 当前所有 callback Reader peek 缓冲已用字节（N4 预算记账）。
 export fn zk_stream_mem_used() c_ulonglong {

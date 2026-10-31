@@ -172,6 +172,7 @@ if errorlevel 1 exit /b 1
 cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src /I include\compat /I "%VCPKG_PREFIX%\include" ^
     src\mediaengine_lib.c src\tempo.c src\decoder.c src\resampler.c ^
     src\encoder.c src\equalizer.c src\parametric_eq.c src\lowfreq.c ^
+    src\channel_merge.c ^
     src\loudness.c src\limiter.c ^
     src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
     src\era_log.c ^
