@@ -111,7 +111,7 @@ pub async fn enrich_file(
         title: request.title.clone(),
         artist: request.artist.clone(),
         album: request.album.clone().unwrap_or_default(),
-        cover_url: None,
+        cover_url: request.cover_url.clone(),
         // 强制重写歌词：enqueue 传入的标准 LRC 视为权威（Dart 侧已从标准源取回）。
         lyrics: request.lyrics.clone().filter(|s| !s.trim().is_empty()),
     };
@@ -291,7 +291,7 @@ pub fn metadata_capability_for(source: SourcePlatform) -> &'static SourceMetadat
     match source {
         SourcePlatform::Kugou => &KUGOU_META,
         SourcePlatform::Netease => &NETEASE_META,
-        SourcePlatform::Qqmusic | SourcePlatform::Streaming | SourcePlatform::Unknown => {
+        SourcePlatform::Qqmusic | SourcePlatform::Streaming | SourcePlatform::Bilibili | SourcePlatform::Unknown => {
             &DEFAULT_META
         }
     }
@@ -1150,10 +1150,11 @@ mod tests {
             assert!(cap.provider.is_some(), "{src:?} 应有平台元数据实现");
             assert!(cap.trusted_lyrics, "{src:?} 歌词应可信");
         }
-        // QQ / Streaming / 未知：无平台实现，歌词可信（沿用内嵌/平台默认）。
+        // QQ / Streaming / Bilibili / 未知：无平台实现，歌词可信（沿用内嵌/平台默认）。
         for src in [
             SourcePlatform::Qqmusic,
             SourcePlatform::Streaming,
+            SourcePlatform::Bilibili,
             SourcePlatform::Unknown,
         ] {
             let cap = metadata_capability_for(src);

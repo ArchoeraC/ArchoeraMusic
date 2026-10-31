@@ -14,23 +14,30 @@ class _AccountsMenu extends ConsumerWidget {
     final netease = ref.watch(neteaseAuthProvider);
     final kugouApi = ref.read(kugouApiProvider);
     final qqApi = ref.read(qqMusicApiProvider);
+    final biliApi = ref.read(bilibiliApiProvider);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([kugouApi, qqApi]),
+      listenable: Listenable.merge([kugouApi, qqApi, biliApi]),
       builder: (context, _) {
         final kugou = kugouApi.session;
         final qqProfile = qqApi.profile;
         final qqLogged = qqApi.isLoggedIn;
+        final biliProfile = biliApi.profile;
+        final biliLogged = biliApi.isLoggedIn;
 
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
         final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
-        final anyLoggedIn = primaryNetease || primaryKugou || primaryQq;
+        final primaryBili =
+            !primaryNetease && !primaryKugou && !primaryQq && biliLogged;
+        final anyLoggedIn =
+            primaryNetease || primaryKugou || primaryQq || primaryBili;
 
         final avatarUrl = netease?.avatarUrl?.trim();
         final neteaseNick = netease?.nickname.trim() ?? '';
         final kugouNick = kugou?.nickname?.trim() ?? '';
         final qqNick = qqProfile?.nickname.trim() ?? '';
+        final biliNick = biliProfile?.nickname.trim() ?? '';
 
         Widget primary;
         if (primaryNetease) {
@@ -44,6 +51,11 @@ class _AccountsMenu extends ConsumerWidget {
           primary = _AccountAvatar(
             avatarUrl: qqProfile?.avatarUrl,
             nickname: qqNick.isEmpty ? qqApi.uin : qqNick,
+          );
+        } else if (primaryBili) {
+          primary = _AccountAvatar(
+            avatarUrl: biliProfile?.avatarUrl,
+            nickname: biliNick.isEmpty ? 'B' : biliNick,
           );
         } else {
           primary = Container(
@@ -84,7 +96,22 @@ class _AccountsMenu extends ConsumerWidget {
                 showQqMusicLoginDialog(context);
               case 'logout_qq':
                 ref.read(qqMusicApiProvider).logout();
-                toast(context.l10n.loginLoggedOut(platform: context.l10n.brandQqMusic));
+                toast(
+                  context.l10n.loginLoggedOut(
+                    platform: context.l10n.brandQqMusic,
+                  ),
+                );
+              case 'login_bilibili':
+                showBilibiliLoginDialog(context);
+              case 'logout_bilibili':
+                ref.read(bilibiliApiProvider).logout();
+                toast(
+                  context.l10n.loginLoggedOut(
+                    platform: context.l10n.brandBilibili,
+                  ),
+                );
+              case 'open_bilibili':
+                context.go('/bilibili');
             }
           },
           itemBuilder: (_) => [
@@ -127,6 +154,28 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderQqId(id: qqApi.uin)
                   : qqNick,
             ),
+            ..._platformSection(
+              l10n: l10n,
+              title: l10n.brandBilibili,
+              loggedIn: biliLogged,
+              loginValue: 'login_bilibili',
+              logoutValue: 'logout_bilibili',
+              nameValue: 'name_bilibili',
+              avatarUrl: biliProfile?.avatarUrl,
+              avatarName: biliNick.isEmpty ? 'B' : biliNick,
+              displayName: biliNick.isEmpty ? l10n.brandBilibili : biliNick,
+            ),
+            PopupMenuItem(
+              value: 'open_bilibili',
+              height: 36,
+              child: Row(
+                children: [
+                  const Icon(EtaIcons.music2Outline, size: 17),
+                  const SizedBox(width: 10),
+                  Text(l10n.bilibiliOpenLibrary),
+                ],
+              ),
+            ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -143,7 +192,9 @@ class _AccountsMenu extends ConsumerWidget {
                           ? neteaseNick
                           : primaryKugou
                           ? (kugouNick.isEmpty ? l10n.brandKugou : kugouNick)
-                          : (qqNick.isEmpty ? l10n.brandQqMusic : qqNick),
+                          : primaryQq
+                          ? (qqNick.isEmpty ? l10n.brandQqMusic : qqNick)
+                          : (biliNick.isEmpty ? l10n.brandBilibili : biliNick),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
