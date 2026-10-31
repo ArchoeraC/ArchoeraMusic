@@ -111,7 +111,7 @@ pub async fn enrich_file(
         title: request.title.clone(),
         artist: request.artist.clone(),
         album: request.album.clone().unwrap_or_default(),
-        cover_url: None,
+        cover_url: request.cover_url.clone(),
         // 强制重写歌词：enqueue 传入的标准 LRC 视为权威（Dart 侧已从标准源取回）。
         lyrics: request.lyrics.clone().filter(|s| !s.trim().is_empty()),
     };
@@ -292,15 +292,16 @@ static DEFAULT_META: SourceMetadataCapability = SourceMetadataCapability {
 ///
 /// - Kugou / Netease → 各自平台实现
 /// - Neko → 无平台实现 + 歌词不可信
-/// - Qqmusic / Streaming / 未知 → [DEFAULT_META]
+/// - Qqmusic / Streaming / Bilibili / 未知 → [DEFAULT_META]
 pub fn metadata_capability_for(source: SourcePlatform) -> &'static SourceMetadataCapability {
     match source {
         SourcePlatform::Kugou => &KUGOU_META,
         SourcePlatform::Netease => &NETEASE_META,
         SourcePlatform::Neko => &NEKO_META,
-        SourcePlatform::Qqmusic | SourcePlatform::Streaming | SourcePlatform::Unknown => {
-            &DEFAULT_META
-        }
+        SourcePlatform::Qqmusic
+        | SourcePlatform::Streaming
+        | SourcePlatform::Bilibili
+        | SourcePlatform::Unknown => &DEFAULT_META,
     }
 }
 
@@ -1161,10 +1162,11 @@ mod tests {
         let neko = metadata_capability_for(SourcePlatform::Neko);
         assert!(neko.provider.is_none());
         assert!(!neko.trusted_lyrics);
-        // QQ / Streaming / 未知：无平台实现，歌词可信（沿用内嵌/平台默认）。
+        // QQ / Streaming / Bilibili / 未知：无平台实现，歌词可信（沿用内嵌/平台默认）。
         for src in [
             SourcePlatform::Qqmusic,
             SourcePlatform::Streaming,
+            SourcePlatform::Bilibili,
             SourcePlatform::Unknown,
         ] {
             let cap = metadata_capability_for(src);

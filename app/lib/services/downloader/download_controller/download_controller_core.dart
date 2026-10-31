@@ -254,6 +254,14 @@ mixin _DownloadControllerCore on Notifier<DownloadState> {
         cookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
       );
     }
+    final biliCookies = getRuntime().sessionStore.get('bilibili');
+    try {
+      engine.setBilibiliCookie(
+        biliCookies.entries.map((e) => '${e.key}=${e.value}').join('; '),
+      );
+    } catch (_) {
+      // 旧版下载器无该符号：忽略，Dart 播放管线回退仍可用。
+    }
   }
 
   // ── §12.1 下载回退：Rust 解析失败 → 复用播放管线解析 URL 再下载 ──────────

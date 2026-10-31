@@ -119,9 +119,19 @@ void main() {
       ]);
     });
 
-    test('未知来源：无候选', () {
-      final engine = LyricsEngine([_FakeSource('netease')]);
-      expect(engine.orderedSources('unknown', ['netease']), isEmpty);
+    test('未知来源 / 无专属歌词源的视频源：按用户来源顺序在线补全', () {
+      final engine = LyricsEngine([
+        _FakeSource('netease'),
+        _FakeSource('kugou'),
+      ]);
+      expect(
+        engine.orderedSources('bilibili', ['netease', 'kugou']).map((s) => s.id),
+        ['netease', 'kugou'],
+      );
+      expect(
+        engine.orderedSources('unknown', ['kugou', 'netease']).map((s) => s.id),
+        ['kugou', 'netease'],
+      );
     });
   });
 

@@ -85,6 +85,8 @@ struct GlobalState {
     max_concurrent: usize,
     kugou: KugouState,
     netease_cookie: Option<MlockSecret>,
+    /// B 站会话 Cookie（SESSDATA 等；Dart 注入，会员/登录可见音轨解析用）。
+    bilibili_cookie: Option<MlockSecret>,
     /// 设备指纹（Dart 注入；见 [DownloaderIdentity]）
     identity: DownloaderIdentity,
     /// 连续失败计数（HTTP/网络层；成功清零）→ 指数退避（downloader-identity-plan §3.3）
@@ -117,6 +119,7 @@ impl Default for GlobalState {
             max_concurrent: 3,
             kugou: KugouState { mid: None, dfid: None, userid: MlockSecret::new(), token: MlockSecret::new() },
             netease_cookie: None,
+            bilibili_cookie: None,
             identity: DownloaderIdentity::default(),
             consecutive_failures: 0,
             request_window: VecDeque::new(),
@@ -430,6 +433,16 @@ pub(crate) fn kugou_session() -> (String, String) {
 
 pub(crate) fn netease_cookie() -> Option<String> {
     GLOBAL.lock().unwrap().netease_cookie.as_ref().map(|s| s.as_str().to_string())
+}
+
+/// B 站会话 Cookie（无登录态返回 None）。
+pub(crate) fn bilibili_cookie() -> Option<String> {
+    GLOBAL
+        .lock()
+        .unwrap()
+        .bilibili_cookie
+        .as_ref()
+        .map(|s| s.as_str().to_string())
 }
 
 /// 设备指纹（resolvers 生成网易 cookie / 酷狗 mid 时优先取注入值）
@@ -1848,6 +1861,27 @@ pub extern "C" fn archoera_downloader_set_netease_cookie(cookie_header: *const c
     0
 }
 
+/// 注入 B 站会话 Cookie（`SESSDATA=...; bili_jct=...`）；空串 = 清除。
+#[no_mangle]
+pub extern "C" fn archoera_downloader_set_bilibili_cookie(cookie_header: *const c_char) -> c_int {
+    if cookie_header.is_null() {
+        return -1;
+    }
+    let ck = match unsafe { CStr::from_ptr(cookie_header) }.to_str() {
+        Ok(s) => Zeroizing::new(s.to_string()),
+        Err(_) => return -2,
+    };
+    let mut g = GLOBAL.lock().unwrap();
+    if ck.trim().is_empty() {
+        g.bilibili_cookie = None;
+        return 0;
+    }
+    let mut sec = MlockSecret::new();
+    sec.set(&ck);
+    g.bilibili_cookie = Some(sec);
+    0
+}
+
 /// 注入设备指纹（Dart 持久化的 downloaderIdentity JSON，见 [DownloaderIdentity]）。
 ///
 /// 优先用注入值：酷狗 mid 显式给 `kgMid` 直接用，否则由 `kgGuid` 推导；
@@ -1908,6 +1942,7 @@ pub extern "C" fn archoera_downloader_destroy() {
     g.event_cb = None;
     g.kugou = KugouState { mid: None, dfid: None, userid: MlockSecret::new(), token: MlockSecret::new() };
     g.netease_cookie = None;
+    g.bilibili_cookie = None;
     g.tasks.clear();
     g.running = 0;
     g.root_dir = None;
