@@ -449,6 +449,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置多声道合并（单侧设备兜底；默认关）。
+  void setChannelMerge(bool value) {
+    state = state.copyWithChannelMerge(value);
+    state.save();
+  }
+
   /// 设置播放速度（0.5~2.0；变速不变调）。
   void setPlaybackSpeed(double value) {
     state = state.copyWithPlaybackSpeed(value);

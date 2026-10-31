@@ -39,6 +39,21 @@ void main() {
     });
   });
 
+  group('多声道合并偏好', () {
+    test('默认关闭（逐位旁通）', () {
+      expect(AppPrefs().channelMergeEnabled, isFalse);
+    });
+
+    test('copyWithChannelMerge 读写开关', () {
+      expect(AppPrefs().copyWithChannelMerge(true).channelMergeEnabled, isTrue);
+      expect(
+        AppPrefs().copyWithChannelMerge(true).copyWithChannelMerge(false)
+            .channelMergeEnabled,
+        isFalse,
+      );
+    });
+  });
+
   group('归一化兜底增益', () {
     test('无分析结果 / 非有限值 → 0', () {
       expect(normalizationGainDb(), 0.0);

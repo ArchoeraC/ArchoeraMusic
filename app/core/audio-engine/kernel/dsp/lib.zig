@@ -15,6 +15,7 @@
 //!   - `biquad.zig`   共享 Biquad 系数/状态（`era_biquad_*`）
 //!   - `parametric.zig` 参数化 EQ（`era_peq_*`；方向① D1）
 //!   - `lowfreq.zig`  次声/低频管理（`era_lowfreq_*`；方向① D2）
+//!   - `channel_merge.zig` 多声道合并（`era_channel_merge_*`；单侧设备兜底）
 //!   - `fft.zig` / `resampler.zig` / `tempo.zig`  移植计划占位（未导出）
 //!
 //! 已移植块经 `kernel/kernel.zig` 的 `zk_dsp_*` C ABI 暴露给 C 壳；
@@ -32,6 +33,7 @@ pub const loudness_measure = @import("loudness_measure.zig");
 pub const biquad = @import("biquad.zig");
 pub const parametric = @import("parametric.zig");
 pub const lowfreq = @import("lowfreq.zig");
+pub const channel_merge = @import("channel_merge.zig");
 
 /// 未移植模块的接口占位与移植计划（本轮不导出 C ABI）。
 pub const fft = @import("fft.zig");
@@ -49,6 +51,7 @@ test {
     _ = @import("biquad.zig");
     _ = @import("parametric.zig");
     _ = @import("lowfreq.zig");
+    _ = @import("channel_merge.zig");
     _ = @import("fft.zig");
     _ = @import("resampler.zig");
     _ = @import("tempo.zig");
