@@ -94,6 +94,9 @@ Icon化/
 # 本地问题截图（仅调试用，不入库）
 issuescreenshot/
 
+# 本地补丁归档（分支级 WIP / 回滚补丁；仅本机保留，绝不入库）
+patches/
+
 # Nix build result symlink
 /result
 /result-*
