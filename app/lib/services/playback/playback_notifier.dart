@@ -251,7 +251,7 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
     }
   }
 
-  /// 把音频效果偏好（EQ / 限幅 / 响度归一化 / 变速）下发到当前引擎会话。
+  /// 把音频效果偏好（EQ / 限幅 / 响度归一化 / 多声道合并 / 变速）下发到当前引擎会话。
   ///
   /// 引擎支持运行时命令，改动即时生效；无会话时忽略（偏好已落盘，
   /// 会话创建后会再下发）。
@@ -285,6 +285,10 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
         'bass_freq': p.lowfreqBassFreq,
       });
       await engine.sendCommand('set_limiter', {'enabled': p.limiterEnabled});
+      // 多声道合并：设备只有单侧发声时的兜底（默认关 = 逐位旁通）
+      await engine.sendCommand('set_channel_merge', {
+        'enabled': p.channelMergeEnabled,
+      });
       await engine.sendCommand('set_normalization', {
         'enabled': p.normalizationEnabled,
         // 兜底增益（本地扫描器离线分析）：仅当文件无 ReplayGain 标签时生效。
