@@ -507,6 +507,24 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.serverOutline,
       ),
       _SearchEntry(
+        SettingsCategory.experimentalSource,
+        l10n.settingsCatExperimentalSource,
+        l10n.settingsExperimentalSourceSubtitle,
+        EtaIcons.flaskOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.experimentalSource,
+        l10n.settingsEnable,
+        l10n.settingsEnableDesc,
+        EtaIcons.flaskOutline,
+      ),
+      _SearchEntry(
+        SettingsCategory.experimentalSource,
+        l10n.settingsTitle,
+        l10n.settingsNote,
+        EtaIcons.flaskOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.mcp,
         l10n.settingsMcpTitle,
         l10n.settingsMcpSubtitle,
@@ -685,6 +703,8 @@ extension _SettingsDialogView on _SettingsDialogState {
                   SettingsCategory.scanner => const ScansSection(),
                   SettingsCategory.searchIndex => const SearchSection(),
                   SettingsCategory.mediaSource => StreamingServerList(),
+                  SettingsCategory.experimentalSource =>
+                    const ExperimentalSourceSection(),
                   SettingsCategory.mcp => const McpSection(),
                   SettingsCategory.about => AboutSection(
                     version: _version,

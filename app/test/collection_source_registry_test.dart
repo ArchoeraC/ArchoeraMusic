@@ -6,9 +6,10 @@
 /// 「authSignal 以 dynamic 暴露」两类运行时错误再次让页面白屏。
 ///
 /// 背景（2026-09-23 修复）：
-/// - 适配器的 `enabled` 曾以 `dynamic ref` 调用
-///   `ref.read(appPrefsProvider).<扩展 getter>`。dynamic 调用
-///   不走扩展方法 → `NoSuchMethodError` → 「我喜欢 / 收藏 / 搜索」整页白屏。
+/// - `_Collection.enabled` / `_Source.enabled` 曾以 `dynamic ref`
+///   调用 `ref.read(appPrefsProvider).Enabled`（扩展 getter）。dynamic 调用
+///   不走扩展方法 → `NoSuchMethodError: Class 'AppPrefs' has no instance getter
+///   'Enabled'` → 「我喜欢 / 收藏 / 搜索」整页白屏。
 /// - `CollectionPlatform.authSignal` 曾声明为 `dynamic`，`ref.listen` 因而以
 ///   `T=dynamic` 实例化，Riverpod 订阅实现类型判定失败 → `_listenedElement`
 ///   NoSuchMethodError → 页面白屏。现类型为 `ProviderListenable<Object?>?`。
@@ -36,14 +37,14 @@ void main() {
 
   test('collectionPlatforms/sourcePlatforms 读取 enabled 不抛（dynamic ref + 扩展 getter）', () {
     final c = scoped();
-    // 修复前：enabled 动态读扩展 getter → NoSuchMethodError
+    // 修复前：_Collection.enabled 动态读扩展 getter → NoSuchMethodError
     // → collectionPlatforms 抛错 → 我喜欢/收藏页白屏。
     expect(() => collectionPlatforms(c), returnsNormally);
     expect(
       collectionPlatforms(c).map((p) => p.source),
       containsAll(<String>['netease', 'kugou', 'qqmusic']),
     );
-    // 修复前：同一问题也会让 sourcePlatforms 抛错 → 搜索页白屏。
+    // 修复前：_Source.enabled 同理 → sourcePlatforms 抛错 → 搜索页白屏。
     expect(() => sourcePlatforms(c), returnsNormally);
     expect(
       sourcePlatforms(c).map((p) => p.source),

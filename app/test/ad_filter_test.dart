@@ -12,9 +12,9 @@ import 'package:archoera_music/services/lyrics/lyric_line.dart';
 
 void main() {
   test('isAdMetadataText：命中站点推广，放过正规歌词', () {
-    expect(isAdMetadataText('资源来自某云音乐 Resources from Some Cloud Music'), isTrue);
-    expect(isAdMetadataText('获取更多无损音乐https://example.com/music/'), isTrue);
-    expect(isAdMetadataText('更多免费无损音乐就来某云音乐'), isTrue);
+    expect(isAdMetadataText('资源来自云音乐 Resources from  Cloud Music'), isTrue);
+    expect(isAdMetadataText('获取更多无损音乐https://music.core.cn/'), isTrue);
+    expect(isAdMetadataText('更多免费无损音乐就来云音乐'), isTrue);
     expect(isAdMetadataText('关注公众号：xxx'), isTrue);
     expect(isAdMetadataText('[00:12.34]晴天'), isFalse);
     expect(isAdMetadataText('故事的小黄花'), isFalse);
@@ -26,13 +26,13 @@ void main() {
       LyricGroup(
         original: LyricLine(
           timeMs: 50,
-          text: '资源来自某云音乐 Resources from Some Cloud Music',
+          text: '资源来自云音乐 Resources from  Cloud Music',
         ),
       ),
       LyricGroup(
         original: LyricLine(
           timeMs: 100,
-          text: '获取更多无损音乐https://example.com/music/',
+          text: '获取更多无损音乐https://music.core.cn/',
         ),
       ),
       LyricGroup(original: LyricLine(timeMs: 12340, text: '故事的小黄花')),

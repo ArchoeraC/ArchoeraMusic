@@ -14,9 +14,13 @@ class _AccountsMenu extends ConsumerWidget {
     final netease = ref.watch(neteaseAuthProvider);
     final kugouApi = ref.read(kugouApiProvider);
     final qqApi = ref.read(qqMusicApiProvider);
+    final Enabled = ref.watch(
+      appPrefsProvider.select(SourceUsable),
+    );
+    final Api = ref.read(ApiProvider);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([kugouApi, qqApi]),
+      listenable: Listenable.merge([kugouApi, qqApi, Api]),
       builder: (context, _) {
         final kugou = kugouApi.session;
         final qqProfile = qqApi.profile;
@@ -25,12 +29,20 @@ class _AccountsMenu extends ConsumerWidget {
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
         final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
-        final anyLoggedIn = primaryNetease || primaryKugou || primaryQq;
+        final primary =
+            !primaryNetease &&
+            !primaryKugou &&
+            !primaryQq &&
+            Enabled &&
+            Api.isLoggedIn;
+        final anyLoggedIn =
+            primaryNetease || primaryKugou || primaryQq || primary;
 
         final avatarUrl = netease?.avatarUrl?.trim();
         final neteaseNick = netease?.nickname.trim() ?? '';
         final kugouNick = kugou?.nickname?.trim() ?? '';
         final qqNick = qqProfile?.nickname.trim() ?? '';
+        final AvatarUrl = Api.userAvatarUrl(Api.account?.id);
 
         Widget primary;
         if (primaryNetease) {
@@ -44,6 +56,11 @@ class _AccountsMenu extends ConsumerWidget {
           primary = _AccountAvatar(
             avatarUrl: qqProfile?.avatarUrl,
             nickname: qqNick.isEmpty ? qqApi.uin : qqNick,
+          );
+        } else if (primary) {
+          primary = _AccountAvatar(
+            avatarUrl: AvatarUrl,
+            nickname: Api.account?.displayName ?? '',
           );
         } else {
           primary = Container(
@@ -85,6 +102,12 @@ class _AccountsMenu extends ConsumerWidget {
               case 'logout_qq':
                 ref.read(qqMusicApiProvider).logout();
                 toast(context.l10n.loginLoggedOut(platform: context.l10n.brandQqMusic));
+              case 'login_':
+                showLoginDialog(context);
+              case 'logout_':
+                Api.logout();
+                ref.read(likeControllerProvider).sync();
+                toast(context.l10n.loginLoggedOut(platform: l10n.settingsTitle));
             }
           },
           itemBuilder: (_) => [
@@ -127,6 +150,21 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderQqId(id: qqApi.uin)
                   : qqNick,
             ),
+            // 实验性音源 （仅启用时显示）。
+            if (Enabled)
+              ..._platformSection(
+                l10n: l10n,
+                title: l10n.settingsTitle,
+                loggedIn: Api.isLoggedIn,
+                loginValue: 'login_',
+                logoutValue: 'logout_',
+                nameValue: 'name_',
+                avatarUrl: Api.userAvatarUrl(Api.account?.id),
+                avatarName: Api.account?.displayName ?? '',
+                displayName:
+                    Api.account?.displayName ??
+                    l10n.settingsNotLoggedIn,
+              ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
