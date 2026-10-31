@@ -43,6 +43,8 @@ extension _PlayerPageView on _PlayerPageState {
       _coverPulse.forward(from: 0);
     });
     final canLike = current != null && sourceSupportsLike(current.source);
+    final canComment =
+        current != null && sourceSupportsComment(current.source);
     final liked = canLike
         ? ref.watch(likeControllerProvider).isLiked(current)
         : false;
@@ -231,6 +233,7 @@ extension _PlayerPageView on _PlayerPageState {
                             hasContent: hasContent,
                             hasQueue: hasQueue,
                             canLike: canLike,
+                            canComment: canComment,
                             liked: liked,
                             current: current,
                             shuffle: shuffle,
@@ -434,6 +437,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
     required this.hasContent,
     required this.hasQueue,
     required this.canLike,
+    required this.canComment,
     required this.liked,
     required this.current,
     required this.shuffle,
@@ -455,6 +459,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
   final bool hasContent;
   final bool hasQueue;
   final bool canLike;
+  final bool canComment;
   final bool liked;
   final Track? current;
   final bool shuffle;
@@ -515,6 +520,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
                     hasContent: hasContent,
                     hasQueue: hasQueue,
                     canLike: canLike,
+                    canComment: canComment,
                     liked: liked,
                     current: current,
                     shuffle: shuffle,

@@ -110,7 +110,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
     _tabs = TabController(
       length: 4,
       vsync: this,
-      initialIndex: ref.read(searchTabIndexProvider) ?? 0,
+      initialIndex: sourcePlatform(_platform).supportsCoverSearch
+          ? (ref.read(searchTabIndexProvider) ?? 0)
+          : 0,
     );
     _tabs.addListener(_onTabChanged);
     if (_query.isNotEmpty) {

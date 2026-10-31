@@ -212,6 +212,37 @@ class QqMusicTrackInfo {
       );
 }
 
+/// B 站视频信息（source == 'bilibili' 时存在）。
+class BilibiliTrackInfo {
+  const BilibiliTrackInfo({
+    required this.bvid,
+    this.cid,
+    this.pageTitle,
+  });
+
+  /// 视频 BV 号（`BV` + 10 位）。
+  final String bvid;
+
+  /// 当前分P cid（搜索阶段可能为空，播放/下载前补齐）。
+  final String? cid;
+
+  /// 分P标题（多P视频用于副标题）。
+  final String? pageTitle;
+
+  Map<String, dynamic> toJson() => {
+    'bvid': bvid,
+    'cid': cid,
+    'pageTitle': pageTitle,
+  };
+
+  factory BilibiliTrackInfo.fromJson(Map<String, dynamic> json) =>
+      BilibiliTrackInfo(
+        bvid: json['bvid']?.toString() ?? '',
+        cid: json['cid']?.toString(),
+        pageTitle: json['pageTitle']?.toString(),
+      );
+}
+
 /// QQ 封面 URL（albumMid → y.gtimg.cn 图床）。
 String qqCover(String? albumMid, [int size = 300]) {
   final mid = albumMid?.trim() ?? '';
@@ -323,6 +354,7 @@ class Track {
     this.source = 'netease',
     this.kugou,
     this.qqmusic,
+    this.bilibili,
     this.localPath,
     this.lyrics,
     this.serverId,
@@ -361,6 +393,9 @@ class Track {
 
   /// QM信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
   final QqMusicTrackInfo? qqmusic;
+
+  /// B 站视频信息（source == 'bilibili' 时存在；bvid/cid 解析用）。
+  final BilibiliTrackInfo? bilibili;
 
   /// 本地曲目文件路径（source == 'local' 时存在，直接作播放源）。
   final String? localPath;
@@ -408,6 +443,36 @@ class Track {
     source: source,
     kugou: kugou,
     qqmusic: qqmusic,
+    bilibili: bilibili,
+    localPath: localPath,
+    lyrics: lyrics,
+    serverId: serverId,
+    originalId: originalId,
+    coverOriginal: coverOriginal,
+    fileSize: fileSize,
+    quality: quality,
+    isOriginal: isOriginal,
+  );
+
+  /// 替换 B 站身份（补齐 cid / 分P标题时使用），其余字段原样保留。
+  Track copyWithBilibili(
+    BilibiliTrackInfo? bilibili, {
+    String? id,
+    String? comment,
+    int? duration,
+  }) => Track(
+    id: id ?? this.id,
+    title: title,
+    comment: comment ?? this.comment,
+    artists: artists,
+    album: album,
+    duration: duration ?? this.duration,
+    cover: cover,
+    fee: fee,
+    source: source,
+    kugou: kugou,
+    qqmusic: qqmusic,
+    bilibili: bilibili,
     localPath: localPath,
     lyrics: lyrics,
     serverId: serverId,
@@ -757,6 +822,7 @@ class Track {
     'source': source,
     'kugou': kugou?.toJson(),
     'qqmusic': qqmusic?.toJson(),
+    'bilibili': bilibili?.toJson(),
     'localPath': localPath,
     'lyrics': lyrics,
     'serverId': serverId,
@@ -771,6 +837,7 @@ class Track {
   factory Track.fromJson(Map<String, dynamic> json) {
     final kugou = json['kugou'];
     final qqmusic = json['qqmusic'];
+    final bilibili = json['bilibili'];
     final quality = json['quality'];
     return Track(
       id: json['id']?.toString() ?? '',
@@ -794,6 +861,9 @@ class Track {
           : null,
       qqmusic: qqmusic is Map
           ? QqMusicTrackInfo.fromJson(Map<String, dynamic>.from(qqmusic))
+          : null,
+      bilibili: bilibili is Map
+          ? BilibiliTrackInfo.fromJson(Map<String, dynamic>.from(bilibili))
           : null,
       localPath: json['localPath']?.toString(),
       lyrics: json['lyrics']?.toString(),

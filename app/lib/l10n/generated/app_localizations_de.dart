@@ -4389,6 +4389,69 @@ class AppLocalizationsDe extends AppLocalizations {
   String get platformQQMusic => 'QM';
 
   @override
+  String get bilibiliLibraryTitle => 'Bilibili';
+
+  @override
+  String get bilibiliOpenLibrary => 'Bilibili-Bibliothek';
+
+  @override
+  String get bilibiliNewSongs => 'Neue Songs';
+
+  @override
+  String get bilibiliRecommendations => 'Empfohlen';
+
+  @override
+  String get bilibiliPopular => 'Beliebt';
+
+  @override
+  String get bilibiliFollowing => 'Gefolgt';
+
+  @override
+  String get bilibiliLoginToView =>
+      'Anmelden, um Bilibili-Favoriten und -Verlauf zu sehen';
+
+  @override
+  String get bilibiliEmptyFavorites => 'Noch keine Favoriten';
+
+  @override
+  String get bilibiliEmptyHistory => 'Noch kein Verlauf';
+
+  @override
+  String get bilibiliFavoritesLogin =>
+      'Anmelden, um Bilibili-Favoriten zu sehen';
+
+  @override
+  String get bilibiliHistoryLogin =>
+      'Anmelden, um den Bilibili-Verlauf zu sehen';
+
+  @override
+  String get brandBilibili => 'Bilibili';
+
+  @override
+  String get platformBilibili => 'Bilibili';
+
+  @override
+  String get loginBilibiliScanHint => 'Mit der Bilibili-App scannen';
+
+  @override
+  String get bilibiliSelectPart => 'Videoteil wählen';
+
+  @override
+  String get bilibiliLoginRequired => 'Zuerst bei Bilibili anmelden';
+
+  @override
+  String get bilibiliVerificationRequired =>
+      'Bilibili verlangt eine Bestätigung auf der Website';
+
+  @override
+  String get bilibiliRateLimited =>
+      'Bilibili-Anfragelimit erreicht. Später erneut versuchen.';
+
+  @override
+  String get bilibiliUnavailable =>
+      'Dieses Video ist nicht verfügbar oder nicht zugänglich.';
+
+  @override
   String get loginQqQrLogin => 'Mit QQ-Music-QR-Code anmelden';
 
   @override

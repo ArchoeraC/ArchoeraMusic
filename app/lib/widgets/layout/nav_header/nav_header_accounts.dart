@@ -14,35 +14,45 @@ class _AccountsMenu extends ConsumerWidget {
     final netease = ref.watch(neteaseAuthProvider);
     final kugouApi = ref.read(kugouApiProvider);
     final qqApi = ref.read(qqMusicApiProvider);
-    final Enabled = ref.watch(
-      appPrefsProvider.select(SourceUsable),
-    );
+    final biliApi = ref.read(bilibiliApiProvider);
+    final Enabled = ref.watch(appPrefsProvider.select(SourceUsable));
     final Api = ref.read(ApiProvider);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([kugouApi, qqApi, Api]),
+      listenable: Listenable.merge([kugouApi, qqApi, biliApi, Api]),
       builder: (context, _) {
         final kugou = kugouApi.session;
         final qqProfile = qqApi.profile;
         final qqLogged = qqApi.isLoggedIn;
+        final biliProfile = biliApi.profile;
+        final biliLogged = biliApi.isLoggedIn;
+        final Logged = Api.isLoggedIn;
+        final AvatarUrl = Api.userAvatarUrl(Api.account?.id);
 
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
         final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
+        final primaryBili =
+            !primaryNetease && !primaryKugou && !primaryQq && biliLogged;
         final primary =
             !primaryNetease &&
             !primaryKugou &&
             !primaryQq &&
+            !primaryBili &&
             Enabled &&
-            Api.isLoggedIn;
+            Logged;
         final anyLoggedIn =
-            primaryNetease || primaryKugou || primaryQq || primary;
+            primaryNetease ||
+            primaryKugou ||
+            primaryQq ||
+            primaryBili ||
+            primary;
 
         final avatarUrl = netease?.avatarUrl?.trim();
         final neteaseNick = netease?.nickname.trim() ?? '';
         final kugouNick = kugou?.nickname?.trim() ?? '';
         final qqNick = qqProfile?.nickname.trim() ?? '';
-        final AvatarUrl = Api.userAvatarUrl(Api.account?.id);
+        final biliNick = biliProfile?.nickname.trim() ?? '';
 
         Widget primary;
         if (primaryNetease) {
@@ -56,6 +66,11 @@ class _AccountsMenu extends ConsumerWidget {
           primary = _AccountAvatar(
             avatarUrl: qqProfile?.avatarUrl,
             nickname: qqNick.isEmpty ? qqApi.uin : qqNick,
+          );
+        } else if (primaryBili) {
+          primary = _AccountAvatar(
+            avatarUrl: biliProfile?.avatarUrl,
+            nickname: biliNick.isEmpty ? 'B' : biliNick,
           );
         } else if (primary) {
           primary = _AccountAvatar(
@@ -101,13 +116,32 @@ class _AccountsMenu extends ConsumerWidget {
                 showQqMusicLoginDialog(context);
               case 'logout_qq':
                 ref.read(qqMusicApiProvider).logout();
-                toast(context.l10n.loginLoggedOut(platform: context.l10n.brandQqMusic));
+                toast(
+                  context.l10n.loginLoggedOut(
+                    platform: context.l10n.brandQqMusic,
+                  ),
+                );
+              case 'login_bilibili':
+                showBilibiliLoginDialog(context);
+              case 'logout_bilibili':
+                ref.read(bilibiliApiProvider).logout();
+                toast(
+                  context.l10n.loginLoggedOut(
+                    platform: context.l10n.brandBilibili,
+                  ),
+                );
+              case 'open_bilibili':
+                context.go('/bilibili');
               case 'login_':
                 showLoginDialog(context);
               case 'logout_':
                 Api.logout();
                 ref.read(likeControllerProvider).sync();
-                toast(context.l10n.loginLoggedOut(platform: l10n.settingsTitle));
+                toast(
+                  context.l10n.loginLoggedOut(
+                    platform: l10n.settingsTitle,
+                  ),
+                );
             }
           },
           itemBuilder: (_) => [
@@ -150,21 +184,43 @@ class _AccountsMenu extends ConsumerWidget {
                   ? l10n.navHeaderQqId(id: qqApi.uin)
                   : qqNick,
             ),
-            // 实验性音源 （仅启用时显示）。
+            ..._platformSection(
+              l10n: l10n,
+              title: l10n.brandBilibili,
+              loggedIn: biliLogged,
+              loginValue: 'login_bilibili',
+              logoutValue: 'logout_bilibili',
+              nameValue: 'name_bilibili',
+              avatarUrl: biliProfile?.avatarUrl,
+              avatarName: biliNick.isEmpty ? 'B' : biliNick,
+              displayName: biliNick.isEmpty ? l10n.brandBilibili : biliNick,
+            ),
+            // 实验性音源 （仅启用且配置了自有 client_id 时显示）。
             if (Enabled)
               ..._platformSection(
                 l10n: l10n,
                 title: l10n.settingsTitle,
-                loggedIn: Api.isLoggedIn,
+                loggedIn: Logged,
                 loginValue: 'login_',
                 logoutValue: 'logout_',
                 nameValue: 'name_',
-                avatarUrl: Api.userAvatarUrl(Api.account?.id),
+                avatarUrl: AvatarUrl,
                 avatarName: Api.account?.displayName ?? '',
                 displayName:
                     Api.account?.displayName ??
                     l10n.settingsNotLoggedIn,
               ),
+            PopupMenuItem(
+              value: 'open_bilibili',
+              height: 36,
+              child: Row(
+                children: [
+                  const Icon(EtaIcons.music2Outline, size: 17),
+                  const SizedBox(width: 10),
+                  Text(l10n.bilibiliOpenLibrary),
+                ],
+              ),
+            ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -181,7 +237,13 @@ class _AccountsMenu extends ConsumerWidget {
                           ? neteaseNick
                           : primaryKugou
                           ? (kugouNick.isEmpty ? l10n.brandKugou : kugouNick)
-                          : (qqNick.isEmpty ? l10n.brandQqMusic : qqNick),
+                          : primaryQq
+                          ? (qqNick.isEmpty ? l10n.brandQqMusic : qqNick)
+                          : primaryBili
+                          ? (biliNick.isEmpty ? l10n.brandBilibili : biliNick)
+                          : (Api.account?.displayName.isNotEmpty ?? false)
+                          ? Api.account!.displayName
+                          : l10n.settingsTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

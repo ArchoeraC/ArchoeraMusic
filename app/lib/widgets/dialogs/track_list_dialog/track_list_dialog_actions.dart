@@ -11,6 +11,11 @@ extension _TrackListDialogActions on _TrackListDialogState {
     if (_resolving) return;
     setState(() => _resolving = true);
     try {
+      // 分P选择 / 身份补齐（注册表默认原样返回；B 站多P在这里弹窗）。
+      final prepared = await sourcePlatform(track.source)
+          .preparePlay(context, ref, track);
+      if (!mounted || prepared == null) return;
+      track = prepared;
       final String? url = await sourcePlatform(track.source)
           .resolvePlayUrl(ref, track, quality: 'hq');
       if (!mounted) return;
