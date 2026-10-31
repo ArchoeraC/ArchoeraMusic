@@ -439,6 +439,7 @@ jobs:
         env:
           CPPWINRT_INCLUDE: C:\vcpkg\installed\x64-windows-release\include
           NEKO_CLIENT_ID: ${{ secrets.NEKO_CLIENT_ID }}
+        shell: pwsh
         run: |
           $buildArgs = @('--release')
           if ($env:NEKO_CLIENT_ID) {
