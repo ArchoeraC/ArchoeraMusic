@@ -28,6 +28,7 @@ import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../services/qqmusic/qq_liked_store.dart';
 import '../../services/qqmusic/qqmusic_api.dart';
+import '../../stores/app_prefs.dart';
 import '../../stores/providers.dart';
 import '../../stores/shell_page_state.dart';
 import '../../stores/user_playlists.dart';
@@ -38,6 +39,9 @@ import 'qqmusic_login_dialog.dart';
 import 'track_list_dialog.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../services/neko/neko_api.dart';
+import '../../services/neko/neko_types.dart';
+import 'neko_login_dialog.dart';
 
 /// 收藏页的一个分类 Tab。
 class CollectionTab {
@@ -291,6 +295,7 @@ final List<CollectionPlatform> _all = [
   _NeteaseCollection(),
   _KugouCollection(),
   _QqCollection(),
+  _NekoCollection(),
 ];
 
 final Map<String, CollectionPlatform> _registry = {
@@ -1033,4 +1038,318 @@ class _QqCollection extends CollectionPlatform {
 
   @override
   String favEmptyHint(AppLocalizations l10n) => l10n.pageFavEmptyHint;
+}
+
+// ── NK ─────────────────────────────────────────────────────────────────
+
+class _NekoCollection extends CollectionPlatform {
+  @override
+  String get source => 'neko';
+
+  @override
+  String label(AppLocalizations l10n) => l10n.platformNeko;
+
+  @override
+  ProviderListenable<Object?>? get authSignal =>
+      nekoApiProvider.select<Object?>((s) => s.isLoggedIn);
+
+  @override
+  String likeFailedText(AppLocalizations l10n) => l10n.toastLoginRequiredNeko;
+
+  @override
+  NotifierProvider<ShellPageSelection<String>, String?> get tabSelection =>
+      favoritesNekoTabProvider;
+
+  @override
+  List<String> get tabIds => const ['created', 'collectedPlaylist', 'liked'];
+
+  @override
+  bool enabled(dynamic ref) {
+    // `ref` 为 dynamic（注册表同时被 WidgetRef / Ref 调用）：dynamic 调用不走
+    // 扩展方法（extension getter 无法动态派发），必须显式转回 AppPrefs 再读，
+    // 否则运行时 NoSuchMethodError → 「我喜欢 / 收藏 / 搜索」整页白屏。
+    final prefs = ref.read(appPrefsProvider) as AppPrefs;
+    return nekoSourceUsable(prefs);
+  }
+
+  @override
+  bool loggedIn(dynamic ref) => ref.read(nekoApiProvider).isLoggedIn;
+
+  @override
+  Future<void> login(BuildContext context) => showNekoLoginDialog(context);
+
+  @override
+  String likeKey(Track t) => t.id;
+
+  @override
+  String? likedUserKey(dynamic ref) {
+    final id = ref.read(nekoApiProvider).userId;
+    return id.isEmpty ? null : id;
+  }
+
+  @override
+  Future<Set<String>> fetchLikedIds(dynamic ref) =>
+      ref.read(nekoApiProvider).likedIds();
+
+  @override
+  Future<List<Track>> fetchLikedTracks(dynamic ref) =>
+      ref.read(nekoApiProvider).likedTracks();
+
+  @override
+  Future<void> setLiked(dynamic ref, Track t, bool like) =>
+      ref.read(nekoApiProvider).like(t.id, like: like);
+
+  @override
+  LikedView likedView(dynamic ref) {
+    final store = ref.read(likedStoreProvider);
+    return LikedView(
+      tracks: store.tracks(source),
+      total: store.total(source),
+      loaded: store.loaded(source),
+      loading: store.loading(source),
+      error: store.error(source),
+      likeIds: ref.read(likeControllerProvider).idsFor(source),
+    );
+  }
+
+  @override
+  void resetLiked(dynamic ref) => ref.read(likedStoreProvider).reset(source);
+
+  @override
+  void ensureLikedLoaded(dynamic ref) {
+    if (!enabled(ref) || !loggedIn(ref)) return; // 关闭/未登录不发请求
+    ref.read(likedStoreProvider).ensureLoaded(source);
+  }
+
+  @override
+  Future<void> likedRefresh(BuildContext context, dynamic ref) =>
+      ref.read(likedStoreProvider).refresh(source, writeCache: true);
+
+  @override
+  String likedSubtitle(dynamic ref, AppLocalizations l10n, LikedView view) =>
+      likedAvailable(ref)
+      ? l10n.commonSongCountHint(count: view.total)
+      : l10n.pageLikedNekoLoginHint;
+
+  @override
+  String likedLoginDesc(AppLocalizations l10n) => l10n.pageLikedNekoLoginDesc;
+
+  @override
+  String likedEmptyHint(AppLocalizations l10n) => l10n.pageLikedNekoEmptyHint;
+
+  @override
+  List<CollectionTab> tabs(AppLocalizations l10n) => [
+    CollectionTab('created', (l) => l.pageFavKgCreated, EtaIcons.music2Outline),
+    CollectionTab(
+      'collectedPlaylist',
+      (l) => l.pageFavKgCollectedPlaylist,
+      EtaIcons.music2Outline,
+    ),
+    CollectionTab('liked', (l) => l.sidebarLiked, EtaIcons.music2Outline),
+  ];
+
+  @override
+  String get defaultTabId => 'created';
+
+  @override
+  Future<Map<String, List<CoverItem>>> fetchFavorites(
+    dynamic ref,
+    String tabId,
+  ) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    final lib = await api.userLibrary();
+    String? cover(String? path) {
+      if (path == null || path.isEmpty || path.contains('/avatar/default')) {
+        return null;
+      }
+      return api.resolveUrl(path);
+    }
+
+    CoverItem toItem(NekoPlaylist p) => CoverItem(
+      id: p.id,
+      title: p.name,
+      cover: cover(p.firstMusicCover),
+      subtitle: p.creator ?? '',
+      trackCount: p.musicCount,
+      source: 'neko',
+    );
+
+    var likedItems = const <CoverItem>[];
+    try {
+      final ids = await api.likedIds();
+      if (ids.isNotEmpty) {
+        likedItems = [
+          CoverItem(
+            id: 'profile:favorites',
+            title: '我喜欢',
+            trackCount: ids.length,
+            source: 'neko',
+          ),
+        ];
+      }
+    } catch (_) {
+      // 计数失败不影响歌单展示
+    }
+    return {
+      tabKey('created'): lib.createdPlaylists.map(toItem).toList(),
+      tabKey('collectedPlaylist'): lib.collectedPlaylists.map(toItem).toList(),
+      tabKey('liked'): likedItems,
+    };
+  }
+
+  @override
+  void openFavorite(
+    BuildContext context,
+    dynamic ref,
+    String tabId,
+    CoverItem item,
+  ) {
+    if (tabId == 'liked') {
+      showNekoTracksDialog(
+        context,
+        title: item.title,
+        cover: item.cover,
+        loadTracks: (r) => r.read(nekoApiProvider).likedTracks(),
+      );
+      return;
+    }
+    if (tabId == 'collectedPlaylist') {
+      showNekoFavoritePlaylistDialog(context, item);
+      return;
+    }
+    showNekoPlaylistDetailDialog(context, item);
+  }
+
+  @override
+  String favTabSubtitle(
+    AppLocalizations l10n,
+    String tabId,
+    int count,
+    bool loggedIn,
+  ) {
+    if (!loggedIn) {
+      return switch (tabId) {
+        'collectedPlaylist' => l10n.pageFavKgCollectedPlaylistLoginHint,
+        'liked' => l10n.pageFavKgCollectedAlbumLoginHint,
+        _ => l10n.pageFavKgCreatedLoginHint,
+      };
+    }
+    return switch (tabId) {
+      'collectedPlaylist' => l10n.pageFavKgCollectedPlaylistCount(count: count),
+      'liked' => l10n.pageFavKgCollectedAlbumCount(count: count),
+      _ => l10n.pageFavKgCreatedCount(count: count),
+    };
+  }
+
+  @override
+  String favLoginDesc(AppLocalizations l10n) => l10n.pageFavNekoLoginDesc;
+
+  @override
+  String favEmptyHint(AppLocalizations l10n) => l10n.pageFavNekoEmptyHint;
+
+  // ── 歌单管理 ──────────────────────────────────────────────────
+
+  @override
+  bool playlistManageSupported(dynamic ref) => true;
+
+  @override
+  Future<UserPlaylists> fetchUserPlaylists(dynamic ref) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    if (!api.isLoggedIn) return const UserPlaylists(loaded: true);
+    final created = await api.userPlaylists();
+    // 收藏歌单失败不影响自建展示。
+    var collected = const <NekoPlaylist>[];
+    try {
+      collected = await api.favoritePlaylists();
+    } catch (_) {
+      // 忽略：仅收藏为空
+    }
+    String? cover(String? path) {
+      if (path == null || path.isEmpty || path.contains('/avatar/default')) {
+        return null;
+      }
+      return api.resolveUrl(path);
+    }
+
+    UserPlaylist toItem(NekoPlaylist p, bool c) => UserPlaylist(
+      id: p.id,
+      name: p.name,
+      cover: cover(p.firstMusicCover),
+      trackCount: p.musicCount,
+      owner: p.creator,
+      description: p.description,
+      collected: c,
+    );
+
+    return UserPlaylists(
+      all: [
+        for (final p in created) toItem(p, false),
+        for (final p in collected) toItem(p, true),
+      ],
+      loaded: true,
+    );
+  }
+
+  @override
+  Future<void> setPlaylistCollected(
+    dynamic ref,
+    String id, {
+    required bool collected,
+  }) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    if (collected) {
+      await api.favoritePlaylist(id);
+    } else {
+      await api.unfavoritePlaylist(id);
+    }
+  }
+
+  @override
+  Future<String?> createPlaylist(
+    dynamic ref,
+    String name, {
+    String? description,
+    int privacy = 0,
+  }) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    final created = await api.createPlaylist(name, description: description);
+    return created?.id;
+  }
+
+  @override
+  Future<void> updatePlaylist(
+    dynamic ref,
+    String id, {
+    String? name,
+    String? description,
+  }) async {
+    final NekoApi api = ref.read(nekoApiProvider);
+    await api.updatePlaylist(id, name: name, description: description);
+  }
+
+  @override
+  Future<void> deletePlaylist(dynamic ref, String id) {
+    final NekoApi api = ref.read(nekoApiProvider);
+    return api.deletePlaylist(id);
+  }
+
+  @override
+  Future<int?> addTracksToPlaylist(
+    dynamic ref,
+    String id,
+    List<String> trackIds,
+  ) {
+    final NekoApi api = ref.read(nekoApiProvider);
+    return api.addMusicToPlaylist(id, trackIds);
+  }
+
+  @override
+  Future<void> removeTracksFromPlaylist(
+    dynamic ref,
+    String id,
+    List<String> trackIds,
+  ) {
+    final NekoApi api = ref.read(nekoApiProvider);
+    return api.removeMusicFromPlaylist(id, trackIds);
+  }
 }

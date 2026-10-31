@@ -27,8 +27,10 @@ import '../../services/netease/netease_api.dart';
 import '../../services/netease/track.dart';
 import '../../stores/providers.dart';
 import '../common/toast.dart';
+import 'neko_login_dialog.dart';
 import 'netease_login_dialog.dart';
 import 'qqmusic_login_dialog.dart';
+import '../../services/neko/neko_types.dart';
 
 /// 平台操作的可直接展示异常（消息已本地化）。弹窗原样 toast，不再套「发送失败：」。
 class CommentOperationException implements Exception {
@@ -100,6 +102,7 @@ final Map<String, CommentPlatform> _registry = {
     _NeteaseCommentPlatform(),
     _KugouCommentPlatform(),
     _QqCommentPlatform(),
+    _NekoCommentPlatform(),
     _BilibiliCommentPlatform(),
   ])
     p.source: p,
@@ -331,4 +334,97 @@ class _BilibiliCommentPlatform extends CommentPlatform {
       limit: 20,
     );
   }
+}
+
+// ── NK ─────────────────────────────────────────────────────────────────
+
+/// NK评论 → 通用展示模型。
+///
+/// 服务端不在评论里带头像，但提供 `GET /api/user/avatar/{userId}`；这里用
+/// [avatarOf] 按 userId 拼出头像地址（为空则走首字母占位）。
+NeteaseComment _nekoToTile(
+  NekoComment c, {
+  required String? Function(String? userId) avatarOf,
+}) => NeteaseComment(
+  id: c.id,
+  userId: c.userId,
+  userName: c.userName,
+  avatar: avatarOf(c.userId),
+  text: c.text,
+  location: c.location,
+  replyTotal: c.replyTotal,
+  time: c.time,
+  canDelete: c.canDelete,
+  replyToName: c.replyToName,
+  reply: c.replies.map((r) => _nekoToTile(r, avatarOf: avatarOf)).toList(),
+);
+
+class _NekoCommentPlatform extends CommentPlatform {
+  @override
+  String get source => 'neko';
+
+  @override
+  String label(AppLocalizations l10n) => l10n.platformNeko;
+
+  @override
+  bool get supportsSend => true;
+
+  @override
+  bool get supportsReply => true;
+
+  @override
+  bool get supportsDelete => true;
+
+  @override
+  bool get expandsReplies => true;
+
+  @override
+  Future<String?> resolveTarget(
+    BuildContext context,
+    WidgetRef ref,
+    Track track,
+  ) async => track.id.isEmpty ? null : track.id;
+
+  @override
+  Future<NeteaseCommentPage> fetchPage(
+    WidgetRef ref,
+    String targetId, {
+    required bool hot,
+    required int page,
+  }) async {
+    final api = ref.read(nekoApiProvider);
+    final p = await api.songComments(targetId, page: page);
+    return NeteaseCommentPage(
+      list: p.list
+          .map((NekoComment c) => _nekoToTile(c, avatarOf: api.userAvatarUrl))
+          .toList(),
+      total: p.total,
+      page: p.page,
+      limit: p.pageSize,
+    );
+  }
+
+  @override
+  Future<bool> send(
+    BuildContext context,
+    WidgetRef ref,
+    String targetId,
+    String content, {
+    String? parentId,
+  }) async {
+    final l10n = context.l10n;
+    if (!ref.read(nekoApiProvider).isLoggedIn) {
+      toast(l10n.commentLoginRequired(platform: l10n.platformNeko));
+      await showNekoLoginDialog(context);
+      return false;
+    }
+    await ref
+        .read(nekoApiProvider)
+        .sendComment(targetId, content, parentId: parentId);
+    return true;
+  }
+
+  @override
+  Future<void> delete(WidgetRef ref, String commentId) =>
+      ref.read(nekoApiProvider).deleteComment(commentId);
 }

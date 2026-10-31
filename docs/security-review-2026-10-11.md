@@ -105,7 +105,7 @@
 | SEC-17 | 低 | architecture 内部残留（`sessions` 表已废弃 vs cookie 落点） | architecture §7.4/§8 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-18 | 低 | 归档评分件与现行口径不一致（明文密码 / 无哈希 / GetUsers） | archive/archoera-robustness-score §6 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-19 | 低 | 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 无删除里程碑 | vault-security-notes §测试明文存储 | ⏳ 已声明计划 | 已修复（文档·第一批 ed17b5f1；**后门已删除·第七批 2026-10-12**：移除 `InsecureFileStore`，测试改用生产 `FileStore`） |
-| SEC-20 | 合规 | 声明禁止绕过访问控制，实现却利用服务端 UA 旁路 | software-declaration §五；audio-kernel-zig 2026-10-07 | ❌ 未提 | 已修复（文档·第一批，ed17b5f1）；**已消除（2026-10-27：相关音源支持整体移除）** |
+| SEC-20 | 合规 | 声明禁止绕过访问控制，实现却利用服务端 UA 旁路 | software-declaration §五；neko-source-identity；audio-kernel-zig 2026-10-07 | ❌ 未提 | 已修复（文档·第一批，ed17b5f1）；**2026-10-31 起改用第三方独立登记的自有 client_id（平台 `pc`），不再复用官方标识** |
 | SEC-21 | 中 | GitHub Actions 依赖按可变主版本标签固定、未 pin SHA（含签名作业） | build-all.yml；actions/build-linux | — | 已修复（第五批，8e0aee31，见 supply-chain.md） |
 | SEC-22 | 中 | 关键路径无强制评审（`protect-main` Required approvals=0，CODEOWNERS 不生效） | .github/CODEOWNERS；AGENTS.md §仓库保护 | — | 已修复（第五批，8e0aee31：ruleset 开启 Require review from Code Owners） |
 | SEC-23 | 高 | 发版 tag 可指向未评审提交 → CI 构建并签名攻击者代码 | build-all.yml（`on.push.tags`+release 构建 `github.ref`） | — | 已修复（第五批，8e0aee31：release 作业校验 tag 祖先） |
@@ -312,8 +312,11 @@
 - **影响**：与本软件自身用户声明相冲突，属披露 / 合规风险（非本地漏洞）。
 - **修复方向**：如实调整声明措辞或改用服务端认可的自报标识正向放行；
   文档明确「版本锚定形状仅通过正则锚定，不冒名品牌」的边界与风险。
-- **已消除（2026-10-27）**：相关实验性音源支持已整体移除（客户端身份、UA 形状与相关代码均删除），
-  本项不再适用；原证据文档已随删除下线。
+- **状态（2026-10-31）**：2026-10-27 的整体移除已回滚（revert `a1c261e1`），但**身份改为自有**：
+  `client_id` 由 NekoMusic 后台按 public client 第三方登记签发（平台 `pc`，归属 ArchoeraC），
+  每个安装实例持有自有 EC P-256 私钥与实例 ID；不再复用官方客户端的公开标识。
+  `User-Agent` / `X-Neko-Client` 采用服务端对原生客户端约定的格式（非品牌冒充），
+  来源在服务端按 `client_id` + `instance_id` 审计，详见 `docs/neko-source-identity.md`。
 
 ---
 

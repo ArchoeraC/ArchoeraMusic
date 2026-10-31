@@ -35,12 +35,14 @@
 |---|---|
 | 本地文件 | 本地路径 → `create(source)`（现状不变） |
 | 在线 + SongCache 命中（kugou/netease） | 本地缓存路径 → `create(source)` |
-| 在线 + 缓存关 / 未命中 / qqmusic | **Dart 拉流 → SegmentStore → 引擎内存源**（本稿） |
+| 在线 + 缓存关 / 未命中 / qqmusic / neko | **Dart 拉流 → SegmentStore → 引擎内存源**（本稿） |
 | **流媒体在线**（`streaming`(Subsonic/Jellyfin)） | **引擎 URL 直连流式**（不经 SegmentStore）：直链自带鉴权、支持 Range/206，引擎按需拉流（EraAudio 原生 HTTP / FFmpeg），起播快且 PCM 同样不落盘 |
 
 > 流媒体源跳过整首内存门的理由：其文件多为大体积无损，且无平台直链缓存兜底；
 > 若先整首拉进 SegmentStore 再解码，起播慢、大文件还会触发内存门禁弹窗。改为 URL 直连后
 > 与「不落盘」语义一致（`engineMemoryPlay` 只约束 PCM 是否落盘，与源形态正交）。
+> **Neko 已与 NT/KG/QQ 同等对待**（2026-10-06）：其直链 302→站内媒体、支持 Range/静态直传，
+> 走整首 SegmentStore 后引擎从内存解码，不再由引擎自联网（FFmpeg 或内核原生 HTTP）。
 >
 > **流媒体转码档位（2026-09-21）**：设置「媒体源」页可选 **原文件（默认）/ 高 320k / 中 192k / 低 128k**。
 > 仅使用**标准参数**以保证兼容——Subsonic 系（Navidrome/Airsonic/Subsonic…）用

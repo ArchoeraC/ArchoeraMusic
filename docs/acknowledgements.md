@@ -29,6 +29,11 @@
 - **[ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs)（WTFPL）** —— Rust 化签名实现方案
 - **[MoeKoeMusic](https://github.com/MoeKoeMusic/MoeKoeMusic)** —— 开源高颜值酷狗第三方客户端，桌面端体验与平台接入思路
 - **[Mineradio](https://github.com/XxHuberrr/Mineradio)** —— Windows 桌面沉浸式音乐播放器，歌词舞台与视觉呈现思路
+- **[NekoMusic / Neko 歌姬计划](https://github.com/FantasyNetworkCN/NekoMusicDocs)（服务端 GPL-3.0；PC 客户端 AGPL-3.0 并附 AGPLv3 §7 附加条款）** ——
+  **实验性第三方音源**（登录 / 搜索 / 收藏 / 歌单 / 直链 / 歌词）的 API 契约来源。本项目**仅经其公开 HTTP API 互操作，
+  未复制或链接其源代码**（下载扩展名按文件头魔数自行实现）；并依其附加条款在「设置 → 关于」页署名
+  「本程序由 Neko 歌姬计划 API 提供技术支持」、给出本项目仓库与 [其 API 文档](https://github.com/FantasyNetworkCN/NekoMusicDocs) 链接。
+  该音源**默认关闭**，仅用户显式开启后才会请求。
 
 **代码 / 参考实现致谢**（audio-engine 与 Zig 解码内核所依赖、参考或移植的第三方组件，许可证逐项见各模块 `THIRD-PARTY-LICENSES.md`）：
 

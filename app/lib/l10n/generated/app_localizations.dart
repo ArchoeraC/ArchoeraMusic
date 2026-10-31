@@ -2010,11 +2010,203 @@ abstract class AppLocalizations {
   /// **'无法定位文件（系统文件管理器不可用）'**
   String get toastRevealFileFailed;
 
+  /// No description provided for @settingsSectionThirdPartyService.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'第三方服务致谢'**
+  String get settingsSectionThirdPartyService;
+
+  /// No description provided for @settingsNekoAttribution.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'本程序由 Neko 歌姬计划 API 提供技术支持'**
+  String get settingsNekoAttribution;
+
+  /// No description provided for @settingsNekoApiDocs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'Neko 歌姬计划 API 文档'**
+  String get settingsNekoApiDocs;
+
   /// No description provided for @settingsSongCacheMemoryHint.
   ///
   /// In zh_CN, this message translates to:
   /// **'已开启「纯内存播放」，歌曲缓存不会写入磁盘'**
   String get settingsSongCacheMemoryHint;
+
+  /// No description provided for @platformNeko.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'NK'**
+  String get platformNeko;
+
+  /// No description provided for @settingsCatExperimentalSource.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'实验性音源'**
+  String get settingsCatExperimentalSource;
+
+  /// No description provided for @settingsExperimentalSourceSubtitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'第三方音源（默认关闭）'**
+  String get settingsExperimentalSourceSubtitle;
+
+  /// No description provided for @settingsNekoTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'NekoMusic'**
+  String get settingsNekoTitle;
+
+  /// No description provided for @settingsNekoNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'第三方实验音源，非官方接入；仅支持登录，不提供注册与 VIP 开通，接口可能随时失效。'**
+  String get settingsNekoNote;
+
+  /// No description provided for @settingsNekoEnable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用 NekoMusic'**
+  String get settingsNekoEnable;
+
+  /// No description provided for @settingsNekoEnableDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在搜索、我喜欢、收藏中显示 NK（默认关闭）'**
+  String get settingsNekoEnableDesc;
+
+  /// No description provided for @settingsNekoUnavailable.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未配置客户端标识（构建参数 NEKO_CLIENT_ID），NekoMusic 音源不可用。'**
+  String get settingsNekoUnavailable;
+
+  /// No description provided for @settingsNekoLogin.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录'**
+  String get settingsNekoLogin;
+
+  /// No description provided for @settingsNekoLogout.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'退出登录'**
+  String get settingsNekoLogout;
+
+  /// No description provided for @settingsNekoLoggedInAs.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已登录：{name}'**
+  String settingsNekoLoggedInAs({required Object name});
+
+  /// No description provided for @settingsNekoNotLoggedIn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'未登录'**
+  String get settingsNekoNotLoggedIn;
+
+  /// No description provided for @nekoLoginTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录 NekoMusic'**
+  String get nekoLoginTitle;
+
+  /// No description provided for @nekoLoginTabQr.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫码登录'**
+  String get nekoLoginTabQr;
+
+  /// No description provided for @nekoLoginTabPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'账号密码'**
+  String get nekoLoginTabPassword;
+
+  /// No description provided for @nekoLoginEmail.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'邮箱'**
+  String get nekoLoginEmail;
+
+  /// No description provided for @nekoLoginPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'密码'**
+  String get nekoLoginPassword;
+
+  /// No description provided for @nekoLoginPasswordHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入密码'**
+  String get nekoLoginPasswordHint;
+
+  /// No description provided for @nekoLoginSubmit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录'**
+  String get nekoLoginSubmit;
+
+  /// No description provided for @nekoLoginQrHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请使用 NekoMusic 手机 App 扫码登录'**
+  String get nekoLoginQrHint;
+
+  /// No description provided for @nekoQrScanned.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已扫码，请在手机上确认'**
+  String get nekoQrScanned;
+
+  /// No description provided for @nekoQrCanceled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已取消登录'**
+  String get nekoQrCanceled;
+
+  /// No description provided for @nekoQrExpired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'二维码已过期，请重新生成'**
+  String get nekoQrExpired;
+
+  /// No description provided for @toastLoginRequiredNeko.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'操作失败（请确认已登录 NK 账号）'**
+  String get toastLoginRequiredNeko;
+
+  /// No description provided for @pageLikedNekoLoginHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录 NK 后查看我喜欢'**
+  String get pageLikedNekoLoginHint;
+
+  /// No description provided for @pageLikedNekoLoginDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录 NekoMusic 后同步「我喜欢」收藏'**
+  String get pageLikedNekoLoginDesc;
+
+  /// No description provided for @pageLikedNekoEmptyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'还没有喜欢的歌曲，去搜索页点亮红心吧'**
+  String get pageLikedNekoEmptyHint;
+
+  /// No description provided for @pageFavNekoLoginDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录 NekoMusic 后查看歌单与收藏'**
+  String get pageFavNekoLoginDesc;
+
+  /// No description provided for @pageFavNekoEmptyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'还没有歌单或收藏'**
+  String get pageFavNekoEmptyHint;
 
   /// No description provided for @toastPlayedAll.
   ///
@@ -10038,7 +10230,7 @@ abstract class AppLocalizations {
   /// No description provided for @mcpShellHelpSearch.
   ///
   /// In zh_CN, this message translates to:
-  /// **'用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic\n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10'**
+  /// **'用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic | neko\n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10'**
   String get mcpShellHelpSearch;
 
   /// No description provided for @mcpShellHelpSearchAll.

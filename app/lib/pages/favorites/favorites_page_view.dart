@@ -23,6 +23,14 @@ extension _FavoritesPageView on _FavoritesPageState {
       _clearCacheState();
       if (_loggedIn) _fetch();
     });
+    // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
+    ref.watch(appPrefsProvider.select(nekoSourceUsable));
+    // 已启用平台集合变化（实验性音源开关）：当前平台被关闭则退回首个可用平台。
+    ref.listen(appPrefsProvider.select(nekoSourceUsable), (prev, next) {
+      if (collectionPlatform(_platform).enabled(ref)) return;
+      final enabled = collectionPlatforms(ref);
+      _switchPlatform(enabled.isEmpty ? 'netease' : enabled.first.source);
+    });
 
     final adapter = _adapter;
     final tabs = adapter.tabs(l10n);
@@ -99,7 +107,7 @@ extension _FavoritesPageView on _FavoritesPageState {
                   onChanged: _switchTab,
                 ),
                 const Spacer(),
-                // 新建歌单：由适配器声明是否支持歌单管理（如 NT）。
+                // 新建歌单：由适配器声明是否支持歌单管理（NT / Neko）。
                 if (loggedIn &&
                     _adapter.playlistManageSupported(ref) &&
                     _tab == 'created')

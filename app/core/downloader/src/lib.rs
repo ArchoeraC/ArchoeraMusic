@@ -763,7 +763,7 @@ async fn run_task(
     } else {
         let resolved_result = match resolver_for(request.source.as_str()) {
             Some(resolver) => resolver.resolve_play_url(&request, &cancel).await,
-            // QQ / Streaming / 未知音源：Rust 无自研解析 → 直接失败，
+            // QQ / Neko / Streaming / 未知音源：Rust 无自研解析 → 直接失败，
             // 交由 Dart 播放管线回退（§12.1）。
             None => Err(anyhow::anyhow!("执行部分操作时发生错误")),
         };

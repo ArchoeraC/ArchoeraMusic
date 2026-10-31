@@ -102,6 +102,7 @@ on:
 permissions:
   contents: read
 
+
 jobs:
   # =====================================================================
   #  preflight：解析「点菜」选择 → 各 job 开关 + build(macos/windows) matrix。
@@ -420,7 +421,15 @@ jobs:
         working-directory: app
         # 工程 Release 配置已用 ad-hoc 签名（CODE_SIGN_IDENTITY = "-"），CI 无需证书；
         # 现行 Flutter 的 build macos 不再支持 --no-codesign，去掉即可。
-        run: flutter build macos --release
+        # NekoMusic 客户端标识走 Secret（日志自动打码）；未配置时源默认禁用。
+        env:
+          NEKO_CLIENT_ID: ${{ secrets.NEKO_CLIENT_ID }}
+        run: |
+          args=(--release)
+          if [ -n "${NEKO_CLIENT_ID:-}" ]; then
+            args+=("--dart-define=NEKO_CLIENT_ID=${NEKO_CLIENT_ID}")
+          fi
+          flutter build macos "${args[@]}"
 
       - name: Build Flutter Windows
         if: matrix.os == 'windows'
@@ -429,7 +438,13 @@ jobs:
         # cppwinrt 头；缺头时 backend_windows.cpp 自动降级（SMTC 禁用）。
         env:
           CPPWINRT_INCLUDE: C:\vcpkg\installed\x64-windows-release\include
-        run: flutter build windows --release
+          NEKO_CLIENT_ID: ${{ secrets.NEKO_CLIENT_ID }}
+        run: |
+          $buildArgs = @('--release')
+          if ($env:NEKO_CLIENT_ID) {
+            $buildArgs += "--dart-define=NEKO_CLIENT_ID=$env:NEKO_CLIENT_ID"
+          }
+          flutter build windows @buildArgs
 
       # ─────────── Windows：Inno Setup 安装器（per-user 免 UAC）+ 便携 zip ───────────
       - name: Install Inno Setup (Windows)
@@ -607,6 +622,7 @@ jobs:
       - uses: ./.github/actions/build-linux
         with:
           cache_key_suffix: ubuntu2404
+          neko_client_id: ${{ secrets.NEKO_CLIENT_ID }}
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
@@ -669,6 +685,7 @@ jobs:
       - uses: ./.github/actions/build-linux
         with:
           cache_key_suffix: deepin25
+          neko_client_id: ${{ secrets.NEKO_CLIENT_ID }}
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
@@ -714,6 +731,7 @@ jobs:
       - uses: ./.github/actions/build-linux
         with:
           cache_key_suffix: fedora
+          neko_client_id: ${{ secrets.NEKO_CLIENT_ID }}
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
@@ -758,6 +776,7 @@ jobs:
       - uses: ./.github/actions/build-linux
         with:
           cache_key_suffix: arch
+          neko_client_id: ${{ secrets.NEKO_CLIENT_ID }}
       - name: Resolve version (from pubspec.yaml)
         id: version
         run: |
@@ -908,7 +927,11 @@ jobs:
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "resolved version: ${VER}"
       - name: Build NixOS (source flake)
-        run: nix build .#default --option sandbox false --print-build-logs
+        # NekoMusic 客户端标识来自 Secret；flake 内用 builtins.getEnv 读取，
+        # 因此需要 --impure。未配置时为空 → 该音源在 Nix 产物里禁用。
+        env:
+          NEKO_CLIENT_ID: ${{ secrets.NEKO_CLIENT_ID }}
+        run: nix build .#default --impure --option sandbox false --print-build-logs
       - name: Package result
         run: |
           mkdir -p dist/linux
@@ -951,6 +974,20 @@ jobs:
     steps:
       - name: Checkout (签名工具 + 公钥)
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # 发布产物必须内置 NekoMusic 客户端标识（公开值）。未配置说明上游 ID 尚未
+      # 签发或 Variables 漏配——此时发布出去的包会整源禁用，不如直接拦住。
+      - name: 校验 NekoMusic 客户端标识
+        shell: bash
+        # 只校验存在性，不打印值（Secret 本身在日志里会被打码，这里也不主动输出）。
+        env:
+          NEKO_CLIENT_ID: ${{ secrets.NEKO_CLIENT_ID }}
+        run: |
+          if [ -z "${NEKO_CLIENT_ID:-}" ]; then
+            echo "::error::发布构建缺少 Secret NEKO_CLIENT_ID（Settings → Secrets and variables → Actions → Secrets）"
+            exit 1
+          fi
+          echo "NekoMusic 客户端标识已配置（不打印）"
 
       # SEC-23：拒绝「tag 指向未评审提交」。发版 tag 必须指向受保护长分支
       # （main 或 ArchoeraOS）的祖先提交，否则不放行构建/签名。用 gh api compare

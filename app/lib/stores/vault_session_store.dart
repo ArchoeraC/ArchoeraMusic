@@ -29,6 +29,7 @@ class VaultSessionStore implements SessionStore {
     'kugou',
     'qqmusic',
     'bilibili',
+    'neko',
   ];
   static const String _uidPrefix = 'session:';
 
