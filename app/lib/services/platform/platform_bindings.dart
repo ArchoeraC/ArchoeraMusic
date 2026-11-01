@@ -45,6 +45,7 @@ const int aplCapDeepLink = 1 << 9;
 const int aplCapRevealPath = 1 << 10;
 const int aplCapTray = 1 << 11;
 const int aplCapSecureFile = 1 << 12;
+const int aplCapOpenUrl = 1 << 13;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -59,7 +60,7 @@ const int aplEventTrayDoubleClick = 10;
 const int aplEventTrayRightClick = 11;
 const int aplEventTrayMenuCommand = 12;
 
-const int aplAbiVersion = 4;
+const int aplAbiVersion = 5;
 
 /// 托盘菜单项（对齐 `AplTrayMenuItem`）：id==0 为分隔符；checked==-1 非复选。
 class AplTrayMenuItem {
@@ -202,6 +203,7 @@ typedef _AplWindowEventsC = Int32 Function(Int32 on);
 typedef _AplInstanceAcquireC = Int32 Function();
 typedef _AplNotifyC = Int32 Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplRevealPathC = Int32 Function(Pointer<Utf8> path);
+typedef _AplOpenUrlC = Int32 Function(Pointer<Utf8> url);
 typedef _AplSystemAccentC = Int32 Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsC = Int32 Function(Int32 on);
 typedef _AplSystemThemeSetEventsC = Int32 Function(Int32 on);
@@ -244,6 +246,7 @@ typedef _AplWindowEventsD = int Function(int on);
 typedef _AplInstanceAcquireD = int Function();
 typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplRevealPathD = int Function(Pointer<Utf8> path);
+typedef _AplOpenUrlD = int Function(Pointer<Utf8> url);
 typedef _AplSystemAccentD = int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
 typedef _AplSystemAccentSetEventsD = int Function(int on);
 typedef _AplSystemThemeSetEventsD = int Function(int on);
@@ -363,6 +366,7 @@ class PlatformBindings {
         _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
         _revealPath =
             lib.lookupFunction<_AplRevealPathC, _AplRevealPathD>('apl_reveal_path'),
+        _openUrl = lib.lookupFunction<_AplOpenUrlC, _AplOpenUrlD>('apl_open_url'),
         _systemAccent = lib
             .lookupFunction<_AplSystemAccentC, _AplSystemAccentD>('apl_system_accent'),
         _systemAccentSetEvents = lib.lookupFunction<_AplSystemAccentSetEventsC,
@@ -428,6 +432,7 @@ class PlatformBindings {
   final _AplInstanceAcquireD _instanceAcquire;
   final _AplNotifyD _notify;
   final _AplRevealPathD _revealPath;
+  final _AplOpenUrlD _openUrl;
   final _AplSystemAccentD _systemAccent;
   final _AplSystemAccentSetEventsD _systemAccentSetEvents;
   final _AplSystemThemeSetEventsD _systemThemeSetEvents;
@@ -500,6 +505,16 @@ class PlatformBindings {
     final p = path.toNativeUtf8();
     try {
       return _revealPath(p);
+    } finally {
+      malloc.free(p);
+    }
+  }
+
+  /// 系统默认方式打开 http(s) URL（浏览器）。
+  int openUrl(String url) {
+    final p = url.toNativeUtf8();
+    try {
+      return _openUrl(p);
     } finally {
       malloc.free(p);
     }

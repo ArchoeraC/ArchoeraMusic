@@ -1383,7 +1383,7 @@ uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
            CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
-           CAP_SECURE_FILE;
+           CAP_SECURE_FILE | CAP_OPEN_URL;
 }
 
 int32_t init() {
@@ -1624,6 +1624,16 @@ int32_t revealPath(const char* path) {
     const HRESULT hr = ::SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
     ::ILFree(pidl);
     return SUCCEEDED(hr) ? OK : ERR_BACKEND;
+}
+
+int32_t openUrl(const char* url) {
+    if (url == nullptr || *url == '\0') return ERR_STATE;
+    const std::wstring w = utf8ToWideLocal(url);
+    if (w.empty()) return ERR_BACKEND;
+    // 交给 shell 的默认 http(s) 处理器（浏览器）；不拼命令行、不执行其他内容。
+    const auto r = reinterpret_cast<INT_PTR>(::ShellExecuteW(
+        nullptr, L"open", w.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+    return r > 32 ? OK : ERR_BACKEND;
 }
 
 // ── 安全文件原语（Win32 CreateFileW；见 APL_CAP_SECURE_FILE）────────

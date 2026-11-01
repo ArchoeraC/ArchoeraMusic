@@ -18,8 +18,6 @@ import 'package:flutter/foundation.dart';
 import '../../apis/bilibili/core/request.dart';
 import '../../apis/bilibili/core/types.dart';
 import '../../apis/bilibili/modules/login_qr.dart';
-import '../../apis/bilibili/modules/discovery.dart';
-import '../../apis/bilibili/modules/library.dart';
 import '../../apis/bilibili/modules/playurl.dart';
 import '../../apis/bilibili/modules/reply.dart';
 import '../../apis/bilibili/modules/search.dart';
@@ -142,78 +140,6 @@ class BilibiliApi extends ChangeNotifier {
   Future<List<BilibiliPart>> partsFor(Track track) async =>
       (await detailForTrack(track)).parts;
 
-  // ── 发现 / 收藏夹 / 历史（只读） ─────────────────────────────────────
-
-  /// 公开发现区；`following` 需要登录。
-  Future<BilibiliTrackPage<Track>> discovery(
-    String section, {
-    String? cursor,
-  }) async {
-    if (section == 'following' && !isLoggedIn) {
-      throw const BilibiliApiException(
-        'Bilibili sign-in is required.',
-        kind: BilibiliErrorKind.authRequired,
-      );
-    }
-    final page = await bilibiliDiscovery(_request, section, cursor: cursor);
-    return BilibiliTrackPage(
-      items: [for (final item in page.items) _trackFromItem(item)],
-      nextCursor: page.nextCursor,
-    );
-  }
-
-  /// 当前账号的收藏夹列表（只读）。
-  Future<List<BilibiliFavFolder>> favoriteFolders() async {
-    final profile = _profile ?? await _requireProfile();
-    return bilibiliFavFolders(_request, profile.mid);
-  }
-
-  /// 收藏夹内视频（分页；`page` 从 1 开始）。
-  Future<BilibiliTrackPage<Track>> favoriteTracks(
-    String folderId, {
-    int page = 1,
-  }) async {
-    _requireSession();
-    final result = await bilibiliFavFolderTracks(
-      _request,
-      folderId,
-      page: page,
-    );
-    return BilibiliTrackPage(
-      items: [for (final item in result.items) _trackFromItem(item)],
-      nextCursor: result.nextCursor,
-    );
-  }
-
-  /// 收藏夹内视频全量（最多 20 页 / 400 条，供弹窗一次性展示）。
-  Future<List<Track>> favoriteTracksAll(String folderId) async {
-    final tracks = <Track>[];
-    final seen = <String>{};
-    var page = 1;
-    while (page <= 20) {
-      final result = await favoriteTracks(folderId, page: page);
-      for (final track in result.items) {
-        if (seen.add(track.id)) tracks.add(track);
-      }
-      final next = result.nextCursor;
-      if (next == null || next.isEmpty) break;
-      final nextPage = int.tryParse(next);
-      if (nextPage == null || nextPage <= page) break;
-      page = nextPage;
-    }
-    return tracks;
-  }
-
-  /// 账号观看历史（服务端游标分页，只读）。
-  Future<BilibiliTrackPage<Track>> history({String? cursor}) async {
-    _requireSession();
-    final result = await bilibiliHistory(_request, cursor: cursor);
-    return BilibiliTrackPage(
-      items: [for (final item in result.items) _trackFromItem(item)],
-      nextCursor: result.nextCursor,
-    );
-  }
-
   // ── 评论（只读） ─────────────────────────────────────────────────────
 
   /// 视频评论目标 id（评论接口使用 aid 而非 bvid）。
@@ -229,32 +155,8 @@ class BilibiliApi extends ChangeNotifier {
     int next = 0,
   }) => bilibiliVideoComments(_request, aid: aid, hot: hot, next: next);
 
-  void _requireSession() {
-    if (!_request.hasSession) {
-      throw const BilibiliApiException(
-        'Bilibili sign-in is required.',
-        kind: BilibiliErrorKind.authRequired,
-      );
-    }
-  }
-
-  Future<BilibiliAccount> _requireProfile() async {
-    _requireSession();
-    final current = _profile;
-    if (current != null) return current;
-    await refreshProfile();
-    final profile = _profile;
-    if (profile == null) {
-      throw const BilibiliApiException(
-        'Bilibili account identity is missing.',
-        kind: BilibiliErrorKind.authRequired,
-      );
-    }
-    return profile;
-  }
-
   /// 搜索条目 → Track（P1 身份，cid 在播放/下载前补齐）。
-  /// 搜索结果 / 收藏夹 / 历史 / 发现条目 → Track。
+  /// 搜索结果 → Track。
   Track _trackFromItem(BilibiliSearchItem item) {
     final cid = item.cid;
     final hasCid = cid != null && cid.isNotEmpty;

@@ -1917,7 +1917,7 @@ uint32_t caps() {
     uint32_t c = CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_MEDIA_SESSION |
                  CAP_MEDIA_SEEK | CAP_MEDIA_ARTWORK | CAP_APP_INSTANCE |
                  CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME | CAP_DEEP_LINK |
-                 CAP_REVEAL_PATH | CAP_TRAY | CAP_SECURE_FILE;
+                 CAP_REVEAL_PATH | CAP_TRAY | CAP_SECURE_FILE | CAP_OPEN_URL;
     const bool hasDisplay = std::getenv("WAYLAND_DISPLAY") != nullptr ||
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
@@ -2446,6 +2446,17 @@ int32_t revealPath(const char* path) {
     const std::string dir = isDir ? p : parentDir(p);
     if (!dir.empty() && gioOpenDir(dir)) return OK;
     return ERR_BACKEND;
+}
+
+int32_t openUrl(const char* url) {
+    if (url == nullptr || *url == '\0') return ERR_STATE;
+    // 同进程 GIO 拉起默认处理器（浏览器）：不自建子进程，不拼命令行。
+    const auto& gio = gioReveal();
+    if (!gio.ok() || gio.launch_default_for_uri == nullptr) return ERR_UNSUPPORTED;
+    void* err = nullptr;
+    const int ok = gio.launch_default_for_uri(url, nullptr, &err);
+    if (err != nullptr && gio.error_free != nullptr) gio.error_free(err);
+    return ok != 0 ? OK : ERR_BACKEND;
 }
 
 // ── 安全文件原语（POSIX open(2)）───────────────────────────────────
