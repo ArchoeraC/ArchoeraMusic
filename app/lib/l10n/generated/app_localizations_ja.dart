@@ -1116,6 +1116,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get ForgotFailed => 'リセットリンクの取得に失敗しました';
 
   @override
+  String get ForgotOpened => 'ブラウザで再設定ページを開きました';
+
+  @override
   String get LoginQrHint => ' アプリでスキャンしてログイン';
 
   @override

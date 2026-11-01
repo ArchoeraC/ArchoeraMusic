@@ -1148,6 +1148,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Échec de l\'obtention du lien de réinitialisation';
 
   @override
+  String get ForgotOpened =>
+      'Page de réinitialisation ouverte dans votre navigateur';
+
+  @override
   String get LoginQrHint =>
       'Scannez avec l\'application  pour vous connecter';
 

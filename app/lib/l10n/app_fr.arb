@@ -349,6 +349,7 @@
   "LoginForgotPassword": "Mot de passe oublié ?",
   "ForgotCopyHint": "Lien de réinitialisation copié — ouvrez-le dans votre navigateur pour réinitialiser",
   "ForgotFailed": "Échec de l''obtention du lien de réinitialisation",
+  "ForgotOpened": "Page de réinitialisation ouverte dans votre navigateur",
   "LoginQrHint": "Scannez avec l''application  pour vous connecter",
   "QrScanned": "Scanné, confirmez sur votre téléphone",
   "QrCanceled": "Connexion annulée",

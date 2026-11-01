@@ -349,6 +349,7 @@
   "LoginForgotPassword": "Forgot password?",
   "ForgotCopyHint": "Reset link copied — open it in your browser to reset",
   "ForgotFailed": "Failed to get reset link",
+  "ForgotOpened": "Reset page opened in your browser",
   "LoginQrHint": "Scan with the  mobile app to sign in",
   "QrScanned": "Scanned, confirm on your phone",
   "QrCanceled": "Sign-in canceled",

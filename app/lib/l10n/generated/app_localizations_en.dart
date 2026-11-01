@@ -1140,6 +1140,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ForgotFailed => 'Failed to get reset link';
 
   @override
+  String get ForgotOpened => 'Reset page opened in your browser';
+
+  @override
   String get LoginQrHint => 'Scan with the  mobile app to sign in';
 
   @override

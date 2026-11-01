@@ -349,6 +349,7 @@
   "LoginForgotPassword": "Passwort vergessen?",
   "ForgotCopyHint": "Link zum Zurücksetzen kopiert – im Browser öffnen und ändern",
   "ForgotFailed": "Link zum Zurücksetzen konnte nicht abgerufen werden",
+  "ForgotOpened": "Seite zum Zurücksetzen im Browser geöffnet",
   "LoginQrHint": "Mit der -App scannen und anmelden",
   "QrScanned": "Gescannt, bitte am Handy bestätigen",
   "QrCanceled": "Anmeldung abgebrochen",

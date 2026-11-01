@@ -1150,6 +1150,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo obtener el enlace de restablecimiento';
 
   @override
+  String get ForgotOpened =>
+      'Página de restablecimiento abierta en tu navegador';
+
+  @override
   String get LoginQrHint =>
       'Escanea con la app  para iniciar sesión';
 

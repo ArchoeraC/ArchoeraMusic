@@ -361,6 +361,7 @@
   "LoginForgotPassword": "忘记密码？",
   "ForgotCopyHint": "重置链接已复制，请在浏览器中打开并完成重置",
   "ForgotFailed": "获取重置链接失败",
+  "ForgotOpened": "已在浏览器中打开重置页",
   "LoginQrHint": "请使用  手机 App 扫码登录",
   "QrScanned": "已扫码，请在手机上确认",
   "QrCanceled": "已取消登录",

@@ -1118,6 +1118,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get ForgotFailed => '재설정 링크를 가져오지 못했습니다';
 
   @override
+  String get ForgotOpened => '브라우저에서 재설정 페이지를 열었습니다';
+
+  @override
   String get LoginQrHint => ' 모바일 앱으로 스캔하여 로그인';
 
   @override

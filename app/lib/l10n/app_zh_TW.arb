@@ -349,6 +349,7 @@
   "LoginForgotPassword": "忘記密碼？",
   "ForgotCopyHint": "重設連結已複製，請在瀏覽器中開啟並完成重設",
   "ForgotFailed": "取得重設連結失敗",
+  "ForgotOpened": "已在瀏覽器中開啟重設頁面",
   "LoginQrHint": "請使用  手機 App 掃碼登入",
   "QrScanned": "已掃碼，請在手機上確認",
   "QrCanceled": "已取消登入",

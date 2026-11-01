@@ -1151,6 +1151,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Link zum Zurücksetzen konnte nicht abgerufen werden';
 
   @override
+  String get ForgotOpened => 'Seite zum Zurücksetzen im Browser geöffnet';
+
+  @override
   String get LoginQrHint => 'Mit der -App scannen und anmelden';
 
   @override

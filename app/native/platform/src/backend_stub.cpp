@@ -45,6 +45,7 @@ int32_t systemThemeSetEvents(bool) { return ERR_UNSUPPORTED; }
 int32_t notify(const char*, const char*) { return ERR_UNSUPPORTED; }
 
 int32_t revealPath(const char*) { return ERR_UNSUPPORTED; }
+int32_t openUrl(const char*) { return ERR_UNSUPPORTED; }
 
 int32_t fileRead(const char*, bool, int64_t, uint8_t*, size_t*) { return ERR_UNSUPPORTED; }
 int32_t fileWriteAtomic(const char*, const uint8_t*, size_t) { return ERR_UNSUPPORTED; }

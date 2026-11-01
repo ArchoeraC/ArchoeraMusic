@@ -2166,6 +2166,12 @@ abstract class AppLocalizations {
   /// **'获取重置链接失败'**
   String get ForgotFailed;
 
+  /// No description provided for @ForgotOpened.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已在浏览器中打开重置页'**
+  String get ForgotOpened;
+
   /// No description provided for @LoginQrHint.
   ///
   /// In zh_CN, this message translates to:
