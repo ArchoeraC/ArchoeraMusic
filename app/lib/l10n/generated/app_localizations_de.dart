@@ -4395,7 +4395,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get platformBilibili => 'BL';
 
   @override
-  String get loginBilibiliScanHint => '请使用BL手机客户端扫码登录';
+  String get loginBilibiliScanHint => 'Mit der BL-App scannen';
 
   @override
   String get bilibiliSelectPart => 'Videoteil wählen';
