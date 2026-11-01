@@ -187,6 +187,48 @@ void decoder_apply_http_headers(AVDictionary **opts, const char *headers)
     if (extra[0]) av_dict_set(opts, "headers", extra, 0);
 }
 
+/* 文件可读（fopen 探测，跨平台、不引入 unistd.h）。 */
+static int decoder_file_readable(const char *path)
+{
+    if (!path || !path[0]) return 0;
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    fclose(f);
+    return 1;
+}
+
+const char *decoder_http_ca_file(void)
+{
+    static const char *cached = NULL;
+    static int resolved = 0;
+    if (resolved) return cached;
+    resolved = 1;
+
+    /* 发行版/用户显式指定优先（Flatpak/Snap/自定义安装常走这里）。 */
+    const char *env = getenv("SSL_CERT_FILE");
+    if (decoder_file_readable(env)) return cached = env;
+
+    static const char *candidates[] = {
+#if defined(_WIN32)
+        /* Windows 用 schannel（系统证书库），不需要 PEM 包。 */
+        NULL,
+#elif defined(__APPLE__)
+        "/etc/ssl/cert.pem",
+        "/usr/local/etc/openssl/cert.pem",
+        "/opt/homebrew/etc/openssl@3/cert.pem",
+#else
+        "/etc/ssl/certs/ca-certificates.crt",   /* Debian/Ubuntu/Arch */
+        "/etc/pki/tls/certs/ca-bundle.crt",     /* Fedora/RHEL */
+        "/etc/ssl/cert.pem",                    /* Alpine */
+        "/etc/ssl/certs/ca-bundle.crt",
+#endif
+    };
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+        if (decoder_file_readable(candidates[i])) return cached = candidates[i];
+    }
+    return NULL;
+}
+
 Decoder* decoder_open_headers(const char *url, const char *headers)
 {
     Decoder *d = calloc(1, sizeof(*d));
@@ -208,6 +250,12 @@ Decoder* decoder_open_headers(const char *url, const char *headers)
     av_dict_set(&fmt_opts, "analyzeduration", "500000", 0);
     /* 按源注入客户端标识头（如 NekoMusic；FFmpeg http 仅认 user_agent/headers）。 */
     decoder_apply_http_headers(&fmt_opts, headers);
+    /* https：mbedtls 后端没有内置信任库，必须显式给系统 CA 包
+     * （Windows schannel 忽略该选项，走系统证书库）。 */
+    {
+        const char *ca = decoder_http_ca_file();
+        if (ca) av_dict_set(&fmt_opts, "ca_file", ca, 0);
+    }
     int ret = avformat_open_input(&d->fmt_ctx, url, NULL, &fmt_opts);
     av_dict_free(&fmt_opts);
     if (ret < 0) {
