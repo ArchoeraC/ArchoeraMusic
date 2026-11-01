@@ -51,6 +51,9 @@ int32_t notify(const char* title, const char* body);
 // 文件管理器定位路径（文件 → 打开所在目录并选中；目录 → 打开）。
 int32_t revealPath(const char* path);
 
+// 系统默认方式打开 http(s) URL（见 include/archoera_platform.h APL_CAP_OPEN_URL）。
+int32_t openUrl(const char* url);
+
 // 安全文件原语（原生 open(2)；见 include/archoera_platform.h APL_CAP_SECURE_FILE）。
 // fileRead：out==NULL 探测大小（写 *inout_len）；否则读入 out（容量 *inout_len）。
 int32_t fileRead(const char* path, bool allow_symlink, int64_t max_bytes, uint8_t* out,

@@ -2166,6 +2166,12 @@ abstract class AppLocalizations {
   /// **'获取重置链接失败'**
   String get nekoForgotFailed;
 
+  /// No description provided for @nekoForgotOpened.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已在浏览器中打开重置页'**
+  String get nekoForgotOpened;
+
   /// No description provided for @nekoLoginQrHint.
   ///
   /// In zh_CN, this message translates to:

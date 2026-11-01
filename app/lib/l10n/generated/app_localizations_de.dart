@@ -1151,6 +1151,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Link zum Zurücksetzen konnte nicht abgerufen werden';
 
   @override
+  String get nekoForgotOpened => 'Seite zum Zurücksetzen im Browser geöffnet';
+
+  @override
   String get nekoLoginQrHint => 'Mit der NekoMusic-App scannen und anmelden';
 
   @override

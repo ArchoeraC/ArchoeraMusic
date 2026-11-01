@@ -1150,6 +1150,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo obtener el enlace de restablecimiento';
 
   @override
+  String get nekoForgotOpened =>
+      'Página de restablecimiento abierta en tu navegador';
+
+  @override
   String get nekoLoginQrHint =>
       'Escanea con la app NekoMusic para iniciar sesión';
 

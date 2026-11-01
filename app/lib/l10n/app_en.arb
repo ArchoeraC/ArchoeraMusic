@@ -349,6 +349,7 @@
   "nekoLoginForgotPassword": "Forgot password?",
   "nekoForgotCopyHint": "Reset link copied — open it in your browser to reset",
   "nekoForgotFailed": "Failed to get reset link",
+  "nekoForgotOpened": "Reset page opened in your browser",
   "nekoLoginQrHint": "Scan with the NekoMusic mobile app to sign in",
   "nekoQrScanned": "Scanned, confirm on your phone",
   "nekoQrCanceled": "Sign-in canceled",

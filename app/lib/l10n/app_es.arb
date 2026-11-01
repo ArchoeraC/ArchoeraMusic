@@ -349,6 +349,7 @@
   "nekoLoginForgotPassword": "¿Olvidaste la contraseña?",
   "nekoForgotCopyHint": "Enlace de restablecimiento copiado. Ábrelo en tu navegador para restablecerlo.",
   "nekoForgotFailed": "No se pudo obtener el enlace de restablecimiento",
+  "nekoForgotOpened": "Página de restablecimiento abierta en tu navegador",
   "nekoLoginQrHint": "Escanea con la app NekoMusic para iniciar sesión",
   "nekoQrScanned": "Escaneado, confirma en el teléfono",
   "nekoQrCanceled": "Inicio de sesión cancelado",
