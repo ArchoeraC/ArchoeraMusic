@@ -1122,7 +1122,7 @@ class _BilibiliSource extends SourcePlatform {
   String label(AppLocalizations l10n) => l10n.platformBilibili;
 
   @override
-  String get badgeLabel => 'B';
+  String get badgeLabel => 'BL';
 
   @override
   Color get badgeColor => const Color(0xFFFB7299);
