@@ -246,6 +246,25 @@ class NekoApi extends ChangeNotifier {
     }
   }
 
+  /// 找回密码：取一次性的 NekoAuth 网页重置链接。
+  ///
+  /// 对齐上游 PC 客户端（`9e9a3bb`）：重置流程统一由 NekoAuth 网页处理，
+  /// 客户端只取链接（`POST /api/user/sso/password-reset-url`）不内嵌表单。
+  /// 失败抛 [NekoApiException]。
+  Future<String> fetchPasswordResetUrl() async {
+    final body = await _client().postJson(
+      '/api/user/sso/password-reset-url',
+      body: const <String, dynamic>{},
+    );
+    if (body['success'] != true) {
+      throw NekoApiException(body['message']?.toString() ?? '获取重置链接失败');
+    }
+    final data = body['data'];
+    final url = data is Map ? data['url']?.toString() : null;
+    if (url == null || url.isEmpty) throw NekoApiException('响应缺少重置链接');
+    return url;
+  }
+
   /// 退出登录（Neko 无登出接口：仅清本地会话）。
   void logout() {
     _token = null;

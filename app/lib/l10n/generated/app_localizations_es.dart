@@ -1139,6 +1139,21 @@ class AppLocalizationsEs extends AppLocalizations {
   String get nekoLoginSubmit => 'Iniciar sesión';
 
   @override
+  String get nekoLoginForgotPassword => '¿Olvidaste la contraseña?';
+
+  @override
+  String get nekoForgotCopyHint =>
+      'Enlace de restablecimiento copiado. Ábrelo en tu navegador para restablecerlo.';
+
+  @override
+  String get nekoForgotFailed =>
+      'No se pudo obtener el enlace de restablecimiento';
+
+  @override
+  String get nekoForgotOpened =>
+      'Página de restablecimiento abierta en tu navegador';
+
+  @override
   String get nekoLoginQrHint =>
       'Escanea con la app NekoMusic para iniciar sesión';
 
@@ -4420,61 +4435,26 @@ class AppLocalizationsEs extends AppLocalizations {
   String get platformQQMusic => 'QM';
 
   @override
-  String get bilibiliLibraryTitle => 'Bilibili';
+  String get brandBilibili => 'BL';
 
   @override
-  String get bilibiliOpenLibrary => 'Biblioteca de Bilibili';
+  String get platformBilibili => 'BL';
 
   @override
-  String get bilibiliNewSongs => 'New songs';
-
-  @override
-  String get bilibiliRecommendations => 'Recommended';
-
-  @override
-  String get bilibiliPopular => 'Popular';
-
-  @override
-  String get bilibiliFollowing => 'Following';
-
-  @override
-  String get bilibiliLoginToView =>
-      'Sign in to view your Bilibili favorites and history';
-
-  @override
-  String get bilibiliEmptyFavorites => 'No favorites yet';
-
-  @override
-  String get bilibiliEmptyHistory => 'No watch history yet';
-
-  @override
-  String get bilibiliFavoritesLogin => 'Sign in to view Bilibili favorites';
-
-  @override
-  String get bilibiliHistoryLogin => 'Sign in to view Bilibili watch history';
-
-  @override
-  String get brandBilibili => 'Bilibili';
-
-  @override
-  String get platformBilibili => 'Bilibili';
-
-  @override
-  String get loginBilibiliScanHint => 'Scan with the Bilibili mobile app';
+  String get loginBilibiliScanHint => 'Scan with the BL mobile app';
 
   @override
   String get bilibiliSelectPart => 'Select video part';
 
   @override
-  String get bilibiliLoginRequired => 'Sign in to Bilibili first';
+  String get bilibiliLoginRequired => 'Sign in to BL first';
 
   @override
   String get bilibiliVerificationRequired =>
-      'Bilibili requires verification on its website';
+      'BL requires verification on its website';
 
   @override
-  String get bilibiliRateLimited =>
-      'Bilibili rate limit reached. Try again later.';
+  String get bilibiliRateLimited => 'BL rate limit reached. Try again later.';
 
   @override
   String get bilibiliUnavailable =>

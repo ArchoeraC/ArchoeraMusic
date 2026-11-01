@@ -1100,6 +1100,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nekoLoginSubmit => '登录';
 
   @override
+  String get nekoLoginForgotPassword => '忘记密码？';
+
+  @override
+  String get nekoForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
+
+  @override
+  String get nekoForgotFailed => '获取重置链接失败';
+
+  @override
+  String get nekoForgotOpened => '已在浏览器中打开重置页';
+
+  @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
 
   @override
@@ -4144,58 +4156,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get platformQQMusic => 'QM';
 
   @override
-  String get bilibiliLibraryTitle => '哔哩哔哩';
+  String get brandBilibili => 'BL';
 
   @override
-  String get bilibiliOpenLibrary => '哔哩哔哩资料库';
+  String get platformBilibili => 'BL';
 
   @override
-  String get bilibiliNewSongs => '新歌';
-
-  @override
-  String get bilibiliRecommendations => '推荐';
-
-  @override
-  String get bilibiliPopular => '热门';
-
-  @override
-  String get bilibiliFollowing => '关注';
-
-  @override
-  String get bilibiliLoginToView => '登录后可查看 B 站收藏与历史';
-
-  @override
-  String get bilibiliEmptyFavorites => '暂无收藏夹';
-
-  @override
-  String get bilibiliEmptyHistory => '暂无观看历史';
-
-  @override
-  String get bilibiliFavoritesLogin => '登录后查看 B 站收藏夹';
-
-  @override
-  String get bilibiliHistoryLogin => '登录后查看 B 站观看历史';
-
-  @override
-  String get brandBilibili => '哔哩哔哩';
-
-  @override
-  String get platformBilibili => '哔哩哔哩';
-
-  @override
-  String get loginBilibiliScanHint => '请使用哔哩哔哩手机客户端扫码登录';
+  String get loginBilibiliScanHint => '请使用BL手机客户端扫码登录';
 
   @override
   String get bilibiliSelectPart => '选择分P';
 
   @override
-  String get bilibiliLoginRequired => '请先登录哔哩哔哩';
+  String get bilibiliLoginRequired => '请先登录BL';
 
   @override
-  String get bilibiliVerificationRequired => '哔哩哔哩要求验证，请先在官网完成';
+  String get bilibiliVerificationRequired => 'BL要求验证，请先在官网完成';
 
   @override
-  String get bilibiliRateLimited => '哔哩哔哩请求过于频繁，请稍后重试';
+  String get bilibiliRateLimited => 'BL请求过于频繁，请稍后重试';
 
   @override
   String get bilibiliUnavailable => '该视频不可用或没有访问权限';
@@ -7093,6 +7072,18 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get nekoLoginSubmit => '登录';
+
+  @override
+  String get nekoLoginForgotPassword => '忘记密码？';
+
+  @override
+  String get nekoForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
+
+  @override
+  String get nekoForgotFailed => '获取重置链接失败';
+
+  @override
+  String get nekoForgotOpened => '已在浏览器中打开重置页';
 
   @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
@@ -10139,58 +10130,25 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get platformQQMusic => 'QM';
 
   @override
-  String get bilibiliLibraryTitle => '哔哩哔哩';
+  String get brandBilibili => 'BL';
 
   @override
-  String get bilibiliOpenLibrary => '哔哩哔哩资料库';
+  String get platformBilibili => 'BL';
 
   @override
-  String get bilibiliNewSongs => '新歌';
-
-  @override
-  String get bilibiliRecommendations => '推荐';
-
-  @override
-  String get bilibiliPopular => '热门';
-
-  @override
-  String get bilibiliFollowing => '关注';
-
-  @override
-  String get bilibiliLoginToView => '登录后可查看 B 站收藏与历史';
-
-  @override
-  String get bilibiliEmptyFavorites => '暂无收藏夹';
-
-  @override
-  String get bilibiliEmptyHistory => '暂无观看历史';
-
-  @override
-  String get bilibiliFavoritesLogin => '登录后查看 B 站收藏夹';
-
-  @override
-  String get bilibiliHistoryLogin => '登录后查看 B 站观看历史';
-
-  @override
-  String get brandBilibili => '哔哩哔哩';
-
-  @override
-  String get platformBilibili => '哔哩哔哩';
-
-  @override
-  String get loginBilibiliScanHint => '请使用哔哩哔哩手机客户端扫码登录';
+  String get loginBilibiliScanHint => '请使用BL手机客户端扫码登录';
 
   @override
   String get bilibiliSelectPart => '选择分P';
 
   @override
-  String get bilibiliLoginRequired => '请先登录哔哩哔哩';
+  String get bilibiliLoginRequired => '请先登录BL';
 
   @override
-  String get bilibiliVerificationRequired => '哔哩哔哩要求验证，请先在官网完成';
+  String get bilibiliVerificationRequired => 'BL要求验证，请先在官网完成';
 
   @override
-  String get bilibiliRateLimited => '哔哩哔哩请求过于频繁，请稍后重试';
+  String get bilibiliRateLimited => 'BL请求过于频繁，请稍后重试';
 
   @override
   String get bilibiliUnavailable => '该视频不可用或没有访问权限';
@@ -13088,6 +13046,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get nekoLoginSubmit => '登入';
+
+  @override
+  String get nekoLoginForgotPassword => '忘記密碼？';
+
+  @override
+  String get nekoForgotCopyHint => '重設連結已複製，請在瀏覽器中開啟並完成重設';
+
+  @override
+  String get nekoForgotFailed => '取得重設連結失敗';
+
+  @override
+  String get nekoForgotOpened => '已在瀏覽器中開啟重設頁面';
 
   @override
   String get nekoLoginQrHint => '請使用 NekoMusic 手機 App 掃碼登入';
@@ -16134,58 +16104,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get platformQQMusic => 'QM';
 
   @override
-  String get bilibiliLibraryTitle => '嗶哩嗶哩';
+  String get brandBilibili => 'BL';
 
   @override
-  String get bilibiliOpenLibrary => '嗶哩嗶哩資料庫';
+  String get platformBilibili => 'BL';
 
   @override
-  String get bilibiliNewSongs => '新歌';
-
-  @override
-  String get bilibiliRecommendations => '推薦';
-
-  @override
-  String get bilibiliPopular => '熱門';
-
-  @override
-  String get bilibiliFollowing => '關注';
-
-  @override
-  String get bilibiliLoginToView => '登入後可查看 B 站收藏與歷史';
-
-  @override
-  String get bilibiliEmptyFavorites => '尚無收藏夾';
-
-  @override
-  String get bilibiliEmptyHistory => '尚無觀看歷史';
-
-  @override
-  String get bilibiliFavoritesLogin => '登入後查看 B 站收藏夾';
-
-  @override
-  String get bilibiliHistoryLogin => '登入後查看 B 站觀看歷史';
-
-  @override
-  String get brandBilibili => '嗶哩嗶哩';
-
-  @override
-  String get platformBilibili => '嗶哩嗶哩';
-
-  @override
-  String get loginBilibiliScanHint => '請使用嗶哩嗶哩手機客戶端掃碼登入';
+  String get loginBilibiliScanHint => '請使用BL手機客戶端掃碼登入';
 
   @override
   String get bilibiliSelectPart => '選擇分P';
 
   @override
-  String get bilibiliLoginRequired => '請先登入嗶哩嗶哩';
+  String get bilibiliLoginRequired => '請先登入BL';
 
   @override
-  String get bilibiliVerificationRequired => '嗶哩嗶哩要求驗證，請先在官網完成';
+  String get bilibiliVerificationRequired => 'BL要求驗證，請先在官網完成';
 
   @override
-  String get bilibiliRateLimited => '嗶哩嗶哩請求過於頻繁，請稍後重試';
+  String get bilibiliRateLimited => 'BL請求過於頻繁，請稍後重試';
 
   @override
   String get bilibiliUnavailable => '該影片不可用或沒有存取權限';

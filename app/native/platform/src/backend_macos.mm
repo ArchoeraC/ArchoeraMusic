@@ -364,7 +364,7 @@ uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
            CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
-           CAP_SECURE_FILE;
+           CAP_SECURE_FILE | CAP_OPEN_URL;
 }
 
 
@@ -684,6 +684,18 @@ int32_t revealPath(const char* path) {
         }
     }
     return OK;
+}
+
+int32_t openUrl(const char* url) {
+    if (url == nullptr || *url == '\0') return ERR_STATE;
+    @autoreleasepool {
+        NSString* s = [NSString stringWithUTF8String:url];
+        if (s == nil) return ERR_STATE;
+        NSURL* u = [NSURL URLWithString:s];
+        if (u == nil) return ERR_STATE;
+        const BOOL ok = [[NSWorkspace sharedWorkspace] openURL:u];
+        return ok ? OK : ERR_BACKEND;
+    }
 }
 
 // ── 安全文件原语（POSIX open(2)）───────────────────────────────────
