@@ -336,6 +336,11 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
     av_dict_set(&opts, "reconnect_delay_max", "5", 0);
     /* 按源注入客户端标识头（如 NekoMusic）；FFmpeg http 仅认这些选项。 */
     decoder_apply_http_headers(&opts, p->headers);
+    /* https：mbedtls 后端需显式 CA 包（Windows schannel 忽略）。 */
+    {
+        const char *ca = decoder_http_ca_file();
+        if (ca) av_dict_set(&opts, "ca_file", ca, 0);
+    }
     int oret = avio_open2(&cb->avio, url, AVIO_FLAG_READ, &cb->interrupt, &opts);
     av_dict_free(&opts);
     if (oret < 0) {
