@@ -11,16 +11,21 @@
 /// - 扫码：`/api/user/qrlogin/create` 取**服务端渲染好的二维码 PNG**（`qrImage`
 ///   data URL，无须本地自绘）；状态经 SSE `/api/user/qrlogin/status` 推送，
 ///   confirmed 即落盘并关闭。
-/// - 账号密码：`/api/user/login`（请求体字段 `email` + `password`）。
+/// - 账号密码：`/api/user/login`（请求体字段 `email` + `password`）；
+///   忘记密码经 `/api/user/sso/password-reset-url` 取一次性链接交由
+///   NekoAuth 网页处理（对齐上游 PC 客户端 `9e9a3bb`，本项目不内嵌
+///   重置/注册表单）。
 ///
 /// **不含注册 / 邮箱验证码 / 滑块验证**（本项目不接入注册）。
 library;
 
 import 'dart:async';
 
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../apis/neko/neko_client.dart' show NekoApiException;
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/neko/neko_api.dart';
@@ -453,8 +458,39 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
             child: _busy ? _spinner() : Text(l10n.nekoLoginSubmit),
           ),
         ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _busy ? null : _forgotPassword,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              textStyle: const TextStyle(fontSize: 13),
+            ),
+            child: Text(l10n.nekoLoginForgotPassword),
+          ),
+        ),
       ],
     );
+  }
+
+  /// 忘记密码：取一次性 NekoAuth 重置链接并复制到剪贴板。
+  ///
+  /// 重置表单统一由 NekoAuth 网页处理（对齐上游 PC 客户端）；本项目
+  /// 不内嵌表单、也不调用系统「打开链接」，沿用既有的复制 + toast 模式。
+  Future<void> _forgotPassword() async {
+    try {
+      final url = await ref.read(nekoApiProvider).fetchPasswordResetUrl();
+      await Clipboard.setData(ClipboardData(text: url));
+      if (!mounted) return;
+      toast(context.l10n.nekoForgotCopyHint, type: ToastType.success);
+    } on NekoApiException catch (e) {
+      if (!mounted) return;
+      toast(e.message.isNotEmpty ? e.message : context.l10n.nekoForgotFailed);
+    } catch (_) {
+      if (!mounted) return;
+      toast(context.l10n.nekoForgotFailed);
+    }
   }
 
   Widget _errorText(String message, ColorScheme scheme) {

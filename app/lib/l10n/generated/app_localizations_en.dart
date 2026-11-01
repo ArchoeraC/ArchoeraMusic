@@ -1130,6 +1130,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nekoLoginSubmit => 'Sign in';
 
   @override
+  String get nekoLoginForgotPassword => 'Forgot password?';
+
+  @override
+  String get nekoForgotCopyHint =>
+      'Reset link copied — open it in your browser to reset';
+
+  @override
+  String get nekoForgotFailed => 'Failed to get reset link';
+
+  @override
   String get nekoLoginQrHint => 'Scan with the NekoMusic mobile app to sign in';
 
   @override
