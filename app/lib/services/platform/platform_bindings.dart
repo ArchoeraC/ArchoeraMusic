@@ -60,7 +60,7 @@ const int aplEventTrayDoubleClick = 10;
 const int aplEventTrayRightClick = 11;
 const int aplEventTrayMenuCommand = 12;
 
-const int aplAbiVersion = 4;
+const int aplAbiVersion = 5;
 
 /// 托盘菜单项（对齐 `AplTrayMenuItem`）：id==0 为分隔符；checked==-1 非复选。
 class AplTrayMenuItem {

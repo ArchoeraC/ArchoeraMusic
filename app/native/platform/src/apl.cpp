@@ -14,7 +14,7 @@
 #include <cstring>
 
 namespace {
-constexpr int32_t kAbiVersion = 4;
+constexpr int32_t kAbiVersion = 5;
 
 // SEC-31：reveal 路径输入契约——仅接受应用内已解析的**绝对本地路径**。
 // 拒绝空串、URI（`scheme://`，含 `file://`/`http://`）与相对路径；C 串天然在 NUL 截断。
