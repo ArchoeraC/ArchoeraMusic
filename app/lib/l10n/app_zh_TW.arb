@@ -349,6 +349,7 @@
   "nekoLoginForgotPassword": "忘記密碼？",
   "nekoForgotCopyHint": "重設連結已複製，請在瀏覽器中開啟並完成重設",
   "nekoForgotFailed": "取得重設連結失敗",
+  "nekoForgotOpened": "已在瀏覽器中開啟重設頁面",
   "nekoLoginQrHint": "請使用 NekoMusic 手機 App 掃碼登入",
   "nekoQrScanned": "已掃碼，請在手機上確認",
   "nekoQrCanceled": "已取消登入",

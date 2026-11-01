@@ -180,6 +180,17 @@ int32_t apl_reveal_path(const char* path) {
     return archoera::revealPath(path);
 }
 
+int32_t apl_open_url(const char* url) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    if (url == nullptr || *url == '\0') return archoera::ERR_STATE;
+    // 仅 http(s)：其余 scheme（file:/javascript:/自定义协议）拒绝，避免把
+    // 系统默认处理器当任意内容执行入口（与 reveal_path 的 URI 拒绝同理）。
+    const bool http = std::strncmp(url, "http://", 7) == 0;
+    const bool https = std::strncmp(url, "https://", 8) == 0;
+    if (!http && !https) return archoera::ERR_STATE;
+    return archoera::openUrl(url);
+}
+
 int32_t apl_file_read(const char* path, int32_t allow_symlink, int64_t max_bytes,
                       uint8_t* out, size_t* inout_len) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;

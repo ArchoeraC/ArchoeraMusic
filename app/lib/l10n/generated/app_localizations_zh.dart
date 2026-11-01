@@ -1109,6 +1109,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nekoForgotFailed => '获取重置链接失败';
 
   @override
+  String get nekoForgotOpened => '已在浏览器中打开重置页';
+
+  @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
 
   @override
@@ -7080,6 +7083,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get nekoForgotFailed => '获取重置链接失败';
 
   @override
+  String get nekoForgotOpened => '已在浏览器中打开重置页';
+
+  @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
 
   @override
@@ -13049,6 +13055,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get nekoForgotFailed => '取得重設連結失敗';
+
+  @override
+  String get nekoForgotOpened => '已在瀏覽器中開啟重設頁面';
 
   @override
   String get nekoLoginQrHint => '請使用 NekoMusic 手機 App 掃碼登入';

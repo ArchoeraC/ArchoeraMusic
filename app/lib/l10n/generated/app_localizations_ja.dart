@@ -1116,6 +1116,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get nekoForgotFailed => 'リセットリンクの取得に失敗しました';
 
   @override
+  String get nekoForgotOpened => 'ブラウザで再設定ページを開きました';
+
+  @override
   String get nekoLoginQrHint => 'NekoMusic アプリでスキャンしてログイン';
 
   @override

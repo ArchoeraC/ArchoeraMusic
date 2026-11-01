@@ -30,6 +30,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/neko/neko_api.dart';
 import '../../services/neko/neko_types.dart';
+import '../../services/platform/platform_capabilities.dart';
 import '../../stores/providers.dart';
 import '../common/glass_blur.dart';
 import '../common/toast.dart';
@@ -474,16 +475,23 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
     );
   }
 
-  /// 忘记密码：取一次性 NekoAuth 重置链接并复制到剪贴板。
+  /// 忘记密码：取一次性 NekoAuth 重置链接后交给系统浏览器打开。
   ///
-  /// 重置表单统一由 NekoAuth 网页处理（对齐上游 PC 客户端）；本项目
-  /// 不内嵌表单、也不调用系统「打开链接」，沿用既有的复制 + toast 模式。
+  /// 打开链接属系统能力：必须经 C++ 桥接器（`PlatformCapabilities.openUrl`，
+  /// 对齐「Dart 不直调平台 API」的架构约束）。桥接不可用（无默认浏览器 /
+  /// 平台未实现）时退回复制链接 + toast，用户可手动粘贴打开。
   Future<void> _forgotPassword() async {
     try {
       final url = await ref.read(nekoApiProvider).fetchPasswordResetUrl();
-      await Clipboard.setData(ClipboardData(text: url));
+      final rc = PlatformCapabilities.instance().openUrl(url);
+      if (rc != 0) {
+        await Clipboard.setData(ClipboardData(text: url));
+        if (!mounted) return;
+        toast(context.l10n.nekoForgotCopyHint, type: ToastType.success);
+        return;
+      }
       if (!mounted) return;
-      toast(context.l10n.nekoForgotCopyHint, type: ToastType.success);
+      toast(context.l10n.nekoForgotOpened, type: ToastType.success);
     } on NekoApiException catch (e) {
       if (!mounted) return;
       toast(e.message.isNotEmpty ? e.message : context.l10n.nekoForgotFailed);
