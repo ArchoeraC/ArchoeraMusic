@@ -588,7 +588,7 @@ NUGETCFG
             flutter config --no-analytics || true
             flutter pub get
             flutterArgs=(--release)
-            # Nix ''string 里 bash 的 ${...} 必须转义成 ''${...}（否则 Nix 当插值解析报语法错）。
+            # bash 的变量取值写法需在此字符串里转义后交给 bash（防 Nix 插值解析）。
             if [ -n "''${NEKO_CLIENT_ID:-}" ]; then
               flutterArgs+=("--dart-define=NEKO_CLIENT_ID=''${NEKO_CLIENT_ID}")
             fi
