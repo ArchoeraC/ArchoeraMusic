@@ -148,6 +148,7 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_REVEAL_PATH        (1u << 10)  /* 文件管理器定位路径（免提权、零子进程） */
 #define APL_CAP_TRAY               (1u << 11)  /* 系统托盘图标 + 上下文菜单（ABI v3） */
 #define APL_CAP_SECURE_FILE        (1u << 12)  /* 安全文件原语（原生 open(2)，ABI v4） */
+#define APL_CAP_OPEN_URL           (1u << 13)  /* 系统默认方式打开 http(s) URL（浏览器，ABI v5） */
 ```
 
 协议唤醒（`APL_CAP_DEEP_LINK`，ABI v2 起）：`apl_protocol_register/unregister`
@@ -167,6 +168,15 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 **不再起 `xdg-open`/`explorer` 等子进程**。Linux 走 `org.freedesktop.FileManager1`
 D-Bus（回退 GIO 默认应用打开所在目录）；Windows 走 `SHOpenFolderAndSelectItems` /
 `ShellExecute`；macOS 走 `NSWorkspace`。
+
+URL 打开（`APL_CAP_OPEN_URL`，ABI v5 起）：`apl_open_url(url)` 用系统默认应用
+（浏览器）打开 `http(s)` 链接（Neko 忘记密码 → NekoAuth 重置页等场景）。
+Linux 走 GIO `g_app_info_launch_default_for_uri`（同进程 dlopen，不自建子进程）；
+Windows 走 `ShellExecuteW`；macOS 走 `NSWorkspace openURL`。
+
+> **输入契约**：`apl_open_url` 只接受 `http://` / `https://` 绝对 URL，
+> 其他 scheme（`file:` / `javascript:` / 自定义协议）与相对路径在 `apl.cpp`
+> 边界直接 `APL_ERR_STATE`——本能力只把链接交给系统浏览器，不在进程内执行内容。
 
 > **输入契约（SEC-31）**：`apl_reveal_path` 只接受应用内已解析的**绝对本地路径**——
 > 在 `apl.cpp` 边界拒绝 URI（`scheme://`，含 `file://`/`http://`）与相对路径
