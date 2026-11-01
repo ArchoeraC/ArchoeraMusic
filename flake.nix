@@ -588,10 +588,11 @@ NUGETCFG
             flutter config --no-analytics || true
             flutter pub get
             flutterArgs=(--release)
-            if [ -n "${NEKO_CLIENT_ID:-}" ]; then
-              flutterArgs+=("--dart-define=NEKO_CLIENT_ID=$NEKO_CLIENT_ID")
+            # Nix ''string 里 bash 的 ${...} 必须转义成 ''${...}（否则 Nix 当插值解析报语法错）。
+            if [ -n "''${NEKO_CLIENT_ID:-}" ]; then
+              flutterArgs+=("--dart-define=NEKO_CLIENT_ID=''${NEKO_CLIENT_ID}")
             fi
-            flutter build linux "${flutterArgs[@]}" \
+            flutter build linux "''${flutterArgs[@]}" \
               > "$TMPDIR/flutter-build.log" 2>&1 || {
               echo "===== FLUTTER BUILD LOG ====="
               cat "$TMPDIR/flutter-build.log"
