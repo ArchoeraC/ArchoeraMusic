@@ -1100,6 +1100,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nekoLoginSubmit => '登录';
 
   @override
+  String get nekoLoginForgotPassword => '忘记密码？';
+
+  @override
+  String get nekoForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
+
+  @override
+  String get nekoForgotFailed => '获取重置链接失败';
+
+  @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
 
   @override
@@ -7062,6 +7071,15 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get nekoLoginSubmit => '登录';
 
   @override
+  String get nekoLoginForgotPassword => '忘记密码？';
+
+  @override
+  String get nekoForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
+
+  @override
+  String get nekoForgotFailed => '获取重置链接失败';
+
+  @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
 
   @override
@@ -13022,6 +13040,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get nekoLoginSubmit => '登入';
+
+  @override
+  String get nekoLoginForgotPassword => '忘記密碼？';
+
+  @override
+  String get nekoForgotCopyHint => '重設連結已複製，請在瀏覽器中開啟並完成重設';
+
+  @override
+  String get nekoForgotFailed => '取得重設連結失敗';
 
   @override
   String get nekoLoginQrHint => '請使用 NekoMusic 手機 App 掃碼登入';

@@ -2148,6 +2148,24 @@ abstract class AppLocalizations {
   /// **'登录'**
   String get nekoLoginSubmit;
 
+  /// No description provided for @nekoLoginForgotPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'忘记密码？'**
+  String get nekoLoginForgotPassword;
+
+  /// No description provided for @nekoForgotCopyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重置链接已复制，请在浏览器中打开并完成重置'**
+  String get nekoForgotCopyHint;
+
+  /// No description provided for @nekoForgotFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'获取重置链接失败'**
+  String get nekoForgotFailed;
+
   /// No description provided for @nekoLoginQrHint.
   ///
   /// In zh_CN, this message translates to:
