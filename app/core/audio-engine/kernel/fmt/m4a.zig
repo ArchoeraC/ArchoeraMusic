@@ -858,6 +858,18 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
         off += trak.size;
     }
     var p = parsed orelse return if (has_audio) error.UnsupportedFormat else error.Corrupt;
+
+    // 分片 MP4（fMP4，如 B 站 DASH `.m4s`）：moov 里样本表为空，媒体样本全部
+    // 在 moof 分片里。自研解复用以样本表为唯一解码依据（§1 定位：音频解复用，
+    // 不做分片组装），空表 open「成功」会静默产出 0 帧——端到端表现为
+    // 「时长 0.0s → 引擎秒判完成 → 自动跳歌」。这里显式判 UnsupportedFormat，
+    // 让引擎回退 FFmpeg（能完整解析 fMP4 分片）。
+    if (p.samples.len == 0) {
+        allocator.free(p.frame_offsets);
+        allocator.free(p.samples);
+        return error.UnsupportedFormat;
+    }
+
     // p 的样本表在 ctx 建立后转交 destroyCtx 释放；此 errdefer 只覆盖 ctx 建立前窗口
     errdefer {
         allocator.free(p.samples);
@@ -1098,7 +1110,6 @@ pub fn openMeta(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) E
     info.* = buildInfo(ctx, total_samples, duration_known);
     return .{ .ctx = @ptrCast(ctx), .deinit_fn = metaDeinit };
 }
-
 
 // ---------------------------------------------------------------------------
 // 委托 codec 初始化（flac/opus/ac3/eac3/mp3）：合成可解码流 + inner open
@@ -2410,6 +2421,28 @@ test "m4a 集成: 缺 stts / 缺 stco → open Corrupt" {
     try testing.expectError(error.Corrupt, openMem(testing.allocator, file, &info));
 }
 
+test "m4a 集成: 分片 MP4（fMP4 空样本表 → UnsupportedFormat)" {
+    const vals = [_]i32{ 1, 2, 3, 4 };
+    const fr = try writeUncompressedFrame(16, 1, &vals);
+    defer testing.allocator.free(fr);
+    const frames = [_][]const u8{fr};
+    const cookie = makeCookie(4096, 16, 1, 44100, 40, 10, 14);
+    const file = try buildAlacM4a(testing.allocator, .{ .alac = cookie }, 4, &frames, 0);
+    defer testing.allocator.free(file);
+
+    // 模拟 fMP4：moov 样本表清空（stts entry_count = 0、stsz sample_count = 0），
+    // 媒体样本全在 moof 分片里（B 站 DASH `.m4s` 形态）。空表 open 不能「成功」，
+    // 否则原生管线静默产出 0 帧 → 端到端表现为自动跳歌。
+    // 以 UnsupportedFormat 交回引擎 → 回退 FFmpeg（分片可完整解析）。
+    const pos_stts = std.mem.indexOf(u8, file, "stts").?;
+    @memset(file[pos_stts + 8 .. pos_stts + 12], 0);
+    const pos_stsz = std.mem.indexOf(u8, file, "stsz").?;
+    @memset(file[pos_stsz + 12 .. pos_stsz + 16], 0);
+
+    var info: decoder.Info = undefined;
+    try testing.expectError(error.UnsupportedFormat, openMem(testing.allocator, file, &info));
+}
+
 test "m4a 集成: 音频轨但 stsd 无 alac 条目 → open UnsupportedFormat（回退 FFmpeg）" {
     // 手工构建：stsd 只有一个 'mp4a' 条目（无 alac cookie）→ parseStsd 返回 false，
     // hdlr='soun' 已存在 → has_audio → UnsupportedFormat（引擎回退 FFmpeg 解 AAC）
@@ -2767,4 +2800,3 @@ test "m4a 委托: ALS 轨（BGMC，2ch 48k）== ffmpeg（bit-exact，全轨 MD5+
         .what = "als_05 conformance",
     });
 }
-

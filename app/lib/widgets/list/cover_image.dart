@@ -68,35 +68,36 @@ class CoverImage extends StatelessWidget {
     final targetW = (width * dpr).round().clamp(1, 2048);
     final targetH = (height * dpr).round().clamp(1, 2048);
 
-    final Widget image;
+    final ImageProvider base;
     if (!c.startsWith('http')) {
       // 本地文件：file:// 前缀剥离后按绝对路径读
       final filePath = c.startsWith('file://') ? c.substring(7) : c;
       final file = File(filePath);
       if (!file.existsSync()) return placeholder;
-      image = Image.file(
-        file,
-        width: width,
-        height: height,
-        fit: BoxFit.cover,
-        cacheWidth: targetW,
-        cacheHeight: targetH,
-        errorBuilder: (_, _, _) => placeholder,
-      );
+      base = FileImage(file);
     } else {
-      image = Image.network(
-        c,
-        width: width,
-        height: height,
-        fit: BoxFit.cover,
-        cacheWidth: targetW,
-        cacheHeight: targetH,
-        headers: mediaHeadersForUrl(c),
-        errorBuilder: (_, _, _) => placeholder,
-        loadingBuilder: (context, child, progress) =>
-            progress == null ? child : placeholder,
-      );
+      base = NetworkImage(c, headers: mediaHeadersForUrl(c));
     }
+
+    final Widget image = Image(
+      // 双边 target 解码必须保比例：ResizeImage 默认 policy=exact，非等比源
+      // 会被拉成 target 比例（16:9 视频封面在 1:1 卡片里「全幅内容 + 变形」，
+      // painting 的 cover 裁切无从谈起）。policy=fit 解码保比例（contain 语义），
+      // 裁切填框交给 painting 的 BoxFit.cover。
+      image: ResizeImage(
+        base,
+        width: targetW,
+        height: targetH,
+        policy: ResizeImagePolicy.fit,
+        allowUpscaling: false,
+      ),
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => placeholder,
+      loadingBuilder: (context, child, progress) =>
+          progress == null ? child : placeholder,
+    );
 
     return ClipRRect(borderRadius: BorderRadius.circular(radius), child: image);
   }

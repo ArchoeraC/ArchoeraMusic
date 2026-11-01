@@ -57,6 +57,7 @@ extern "C" {
 #define APL_CAP_REVEAL_PATH        (1u << 10) /* 文件管理器定位路径（定位文件/打开所在目录） */
 #define APL_CAP_TRAY               (1u << 11) /* 系统托盘图标 + 上下文菜单 */
 #define APL_CAP_SECURE_FILE        (1u << 12) /* 安全文件原语（原生 open(2)：免 TOCTOU 读/原子写） */
+#define APL_CAP_OPEN_URL           (1u << 13) /* 系统默认方式打开 http(s) URL（浏览器） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -151,6 +152,16 @@ APL_API int32_t apl_notify(const char *title, const char *body);
  * 相对路径被拒绝（ERR_STATE）。本能力只定位/打开，不执行目标。
  * 返回 APL_OK / 负错误码（路径不存在 / 无可用文件管理器）。 */
 APL_API int32_t apl_reveal_path(const char *path);
+
+/* ── 系统默认方式打开 URL（能力位 APL_CAP_OPEN_URL）─────────────────
+ * 用系统默认应用（通常是浏览器）打开 [url]（UTF-8）。
+ * 输入契约：仅接受 `http://` / `https://` 绝对 URL；其他 scheme（`file:` /
+ * `javascript:` / 自定义协议）与相对路径一律 ERR_STATE——本能力只交给
+ * 系统浏览器，不在进程内执行任何内容。
+ * Linux 走 GIO `g_app_info_launch_default_for_uri`（同进程 dlopen，零自建
+ * 子进程）；Windows 走 ShellExecuteW；macOS 走 NSWorkspace openURL。
+ * 返回 APL_OK / 负错误码（无默认浏览器 / 桥接未就绪）。 */
+APL_API int32_t apl_open_url(const char *url);
 
 /* ── 安全文件原语（原生 open(2)，能力位 APL_CAP_SECURE_FILE）──────────
  * 供 Dart `SafeFile`（app/lib/utils/safe_file.dart）消除纯 dart:io 的 TOCTOU 残余。
