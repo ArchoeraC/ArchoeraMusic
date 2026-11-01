@@ -896,6 +896,12 @@ const FragTable = struct {
 /// 分片解析的样本总数上限（防畸形 moof 撑爆内存；1 小时 192K 音频 ≈ 17 万帧）
 const max_frag_samples: usize = 4 * 1024 * 1024;
 
+/// 预扫描分片的文件大小上限。分片表在 open 时一次性扫描（顶层 moof 逐个
+/// 跳读），HTTP 前跳会丢弃/重连，文件过大等于 open 阶段先下载一遍。
+/// 超过该值直接交 FFmpeg（Linux/macOS 已注入系统 CA，Windows 用 schannel）。
+/// 12 MiB ≈ 192kbps 音频 8.5 分钟，覆盖绝大多数音乐稿件。
+const max_frag_scan_bytes: u64 = 12 * 1024 * 1024;
+
 fn parseTrex(r: *io.Reader, moov: Box, track_id: u32) Error!TrexDefaults {
     var d = TrexDefaults{};
     const mvex = (try findChild(r, moov, "mvex")) orelse return d;
@@ -930,6 +936,8 @@ fn parseFragments(
     fallback_dur: u32,
 ) Error!?FragTable {
     const file_size = try r.size();
+    // 超长分片流不做 open 期全量扫描（见 max_frag_scan_bytes 说明）。
+    if (file_size > max_frag_scan_bytes) return null;
     const trex = try parseTrex(r, moov, track_id);
 
     var samples = std.ArrayList(SampleEntry).empty;
