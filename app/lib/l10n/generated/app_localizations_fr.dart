@@ -1137,6 +1137,17 @@ class AppLocalizationsFr extends AppLocalizations {
   String get LoginSubmit => 'Se connecter';
 
   @override
+  String get LoginForgotPassword => 'Mot de passe oublié ?';
+
+  @override
+  String get ForgotCopyHint =>
+      'Lien de réinitialisation copié — ouvrez-le dans votre navigateur pour réinitialiser';
+
+  @override
+  String get ForgotFailed =>
+      'Échec de l\'obtention du lien de réinitialisation';
+
+  @override
   String get LoginQrHint =>
       'Scannez avec l\'application  pour vous connecter';
 

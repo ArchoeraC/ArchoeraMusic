@@ -1140,6 +1140,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get LoginSubmit => 'Anmelden';
 
   @override
+  String get LoginForgotPassword => 'Passwort vergessen?';
+
+  @override
+  String get ForgotCopyHint =>
+      'Link zum Zurücksetzen kopiert – im Browser öffnen und ändern';
+
+  @override
+  String get ForgotFailed =>
+      'Link zum Zurücksetzen konnte nicht abgerufen werden';
+
+  @override
   String get LoginQrHint => 'Mit der -App scannen und anmelden';
 
   @override

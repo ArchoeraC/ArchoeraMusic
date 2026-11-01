@@ -1107,6 +1107,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get LoginSubmit => 'ログイン';
 
   @override
+  String get LoginForgotPassword => 'パスワードをお忘れですか？';
+
+  @override
+  String get ForgotCopyHint => 'リセットリンクをコピーしました。ブラウザで開いて再設定してください';
+
+  @override
+  String get ForgotFailed => 'リセットリンクの取得に失敗しました';
+
+  @override
   String get LoginQrHint => ' アプリでスキャンしてログイン';
 
   @override

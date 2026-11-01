@@ -1109,6 +1109,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String get LoginSubmit => '로그인';
 
   @override
+  String get LoginForgotPassword => '비밀번호 찾기';
+
+  @override
+  String get ForgotCopyHint => '재설정 링크가 복사되었습니다. 브라우저에서 열어 재설정을 완료하세요.';
+
+  @override
+  String get ForgotFailed => '재설정 링크를 가져오지 못했습니다';
+
+  @override
   String get LoginQrHint => ' 모바일 앱으로 스캔하여 로그인';
 
   @override

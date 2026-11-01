@@ -1130,6 +1130,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get LoginSubmit => 'Sign in';
 
   @override
+  String get LoginForgotPassword => 'Forgot password?';
+
+  @override
+  String get ForgotCopyHint =>
+      'Reset link copied — open it in your browser to reset';
+
+  @override
+  String get ForgotFailed => 'Failed to get reset link';
+
+  @override
   String get LoginQrHint => 'Scan with the  mobile app to sign in';
 
   @override

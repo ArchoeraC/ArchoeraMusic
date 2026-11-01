@@ -1139,6 +1139,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get LoginSubmit => 'Iniciar sesión';
 
   @override
+  String get LoginForgotPassword => '¿Olvidaste la contraseña?';
+
+  @override
+  String get ForgotCopyHint =>
+      'Enlace de restablecimiento copiado. Ábrelo en tu navegador para restablecerlo.';
+
+  @override
+  String get ForgotFailed =>
+      'No se pudo obtener el enlace de restablecimiento';
+
+  @override
   String get LoginQrHint =>
       'Escanea con la app  para iniciar sesión';
 

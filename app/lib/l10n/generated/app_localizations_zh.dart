@@ -1100,6 +1100,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get LoginSubmit => '登录';
 
   @override
+  String get LoginForgotPassword => '忘记密码？';
+
+  @override
+  String get ForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
+
+  @override
+  String get ForgotFailed => '获取重置链接失败';
+
+  @override
   String get LoginQrHint => '请使用  手机 App 扫码登录';
 
   @override
@@ -7062,6 +7071,15 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get LoginSubmit => '登录';
 
   @override
+  String get LoginForgotPassword => '忘记密码？';
+
+  @override
+  String get ForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
+
+  @override
+  String get ForgotFailed => '获取重置链接失败';
+
+  @override
   String get LoginQrHint => '请使用  手机 App 扫码登录';
 
   @override
@@ -13022,6 +13040,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get LoginSubmit => '登入';
+
+  @override
+  String get LoginForgotPassword => '忘記密碼？';
+
+  @override
+  String get ForgotCopyHint => '重設連結已複製，請在瀏覽器中開啟並完成重設';
+
+  @override
+  String get ForgotFailed => '取得重設連結失敗';
 
   @override
   String get LoginQrHint => '請使用  手機 App 掃碼登入';

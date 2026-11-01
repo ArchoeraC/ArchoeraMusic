@@ -2148,6 +2148,24 @@ abstract class AppLocalizations {
   /// **'登录'**
   String get LoginSubmit;
 
+  /// No description provided for @LoginForgotPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'忘记密码？'**
+  String get LoginForgotPassword;
+
+  /// No description provided for @ForgotCopyHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重置链接已复制，请在浏览器中打开并完成重置'**
+  String get ForgotCopyHint;
+
+  /// No description provided for @ForgotFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'获取重置链接失败'**
+  String get ForgotFailed;
+
   /// No description provided for @LoginQrHint.
   ///
   /// In zh_CN, this message translates to:
