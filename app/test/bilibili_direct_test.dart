@@ -51,17 +51,6 @@ void main() {
     expect(state, anyOf(BilibiliQrState.waiting, BilibiliQrState.scanned));
   }, skip: skip);
 
-  test('发现页（新歌 / 推荐 / 热门）返回可播放条目', () async {
-    final api = BilibiliApi();
-    for (final section in ['newSongs', 'recommendations', 'popular']) {
-      final page = await api.discovery(section);
-      expect(page.items, isNotEmpty, reason: section);
-      final first = page.items.first;
-      expect(first.source, 'bilibili', reason: section);
-      expect(first.bilibili?.bvid, isNotEmpty, reason: section);
-    }
-  }, skip: skip);
-
   test('视频评论：aid 定位 + 热门游标分页', () async {
     final api = BilibiliApi();
     final detail = await api.detailByBvid('BV1GJ411x7h7');

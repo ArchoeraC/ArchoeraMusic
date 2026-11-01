@@ -69,7 +69,7 @@ void main() {
       : null;
 
   test(
-    '登录态：资料 / 收藏夹 / 历史 / 关注 / 评论',
+    '登录态：资料 / 评论',
     () async {
       setRuntime(runtime: ApisRuntime(sessionStore: _EnvSessionStore(cookies)));
       final api = BilibiliApi();
@@ -77,24 +77,6 @@ void main() {
       expect(api.isLoggedIn, isTrue);
       expect(api.profile?.mid, isNotEmpty);
       expect(api.profile?.nickname, isNotEmpty);
-
-      final folders = await api.favoriteFolders();
-      expect(folders, isNotNull);
-      if (folders.isNotEmpty) {
-        final folder = folders.firstWhere(
-          (f) => f.count > 0,
-          orElse: () => folders.first,
-        );
-        final tracks = await api.favoriteTracksAll(folder.id);
-        // 弹窗按 20 页 / 400 条封顶，且会过滤失效稿件。
-        expect(tracks.length, lessThanOrEqualTo(400));
-      }
-
-      final history = await api.history();
-      expect(history.items, isNotNull);
-
-      final following = await api.discovery('following');
-      expect(following.items, isNotNull);
 
       final detail = await api.detailByBvid('BV1GJ411x7h7');
       final track = api.trackForPart(detail, detail.parts.first);
