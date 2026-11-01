@@ -37,6 +37,11 @@ Decoder* decoder_open_headers(const char *url, const char *headers);
  */
 void decoder_apply_http_headers(AVDictionary **opts, const char *headers);
 
+/* 系统 CA bundle 路径（FFmpeg mbedtls 后端无内置信任库；Windows 用 schannel
+ * 走系统证书库，无需本函数）。优先 SSL_CERT_FILE，其次常见发行版路径；
+ * 未找到返回 NULL（http 不受影响）。结果进程内缓存。 */
+const char *decoder_http_ca_file(void);
+
 /**
  * 从自定义 AVIO（如内存源 SegStore 的 avio_alloc_context）打开解码器。
  * 不接管 avio 生命周期：调用方在 decoder_close 后自行释放 avio 与底层源。
