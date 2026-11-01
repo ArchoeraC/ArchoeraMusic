@@ -40,6 +40,11 @@
 //!   - stts run 展开为逐帧累计样本偏移（frame_offsets），支撑精确整帧 seek
 //!     与时长计算（总样本数 = frame_offsets[末位]）。
 //!
+//! 分片 MP4（fMP4，B 站 DASH `.m4s` 音轨）：moov 样本表为空，媒体样本全在
+//! moof 分片里。顶层扫描 moof → traf → tfhd/trun（trex 兜底默认时长/大小），
+//! 按 track_ID 匹配音频轨，生成与 stbl 路径同构的线性样本表（含逐帧时长 →
+//! frame_offsets），解码/seek 逻辑完全复用。无分片可解析 → UnsupportedFormat。
+//!
 //! 读取（VTable.read）：原生路径逐 sample 解码（坏帧 Corrupt → 跳过继续，
 //! 对齐 FLAC 重同步语义，§13.3；整段无产出时 Corrupt 透出）；委托路径从
 //! inner 拉帧并应用 elst priming/上限。EOF = sample 索引耗尽 / inner EOF。
@@ -153,6 +158,8 @@ const Parsed = struct {
     frame_offsets: []u64,
     /// stts 声明的总样本数（时长精确度判定用）
     stts_total: u64,
+    /// tkhd 轨道号（fMP4 分片按 traf/tfhd 的 track_ID 匹配；0 = 未声明）
+    track_id: u32 = 0,
     /// elst 段时长（输出样本上限；0 = 无 elst）
     elst_seg_dur: u64 = 0,
     /// elst media_time（需跳过的 priming 样本；0 = 无）
@@ -761,37 +768,44 @@ fn parseTrak(r: *io.Reader, trak: Box, allocator: Allocator, has_audio: *bool) E
     has_audio.* = true; // 音频轨
     if (entry == .other) return null; // 非自研 codec（AAC 轨 HE-AAC/多声道等）→ 回退 FFmpeg
 
-    const stts_box = (try findChild(r, stbl, "stts")) orelse return error.Corrupt;
-    const stsc_box = (try findChild(r, stbl, "stsc")) orelse return error.Corrupt;
-    const stsz_box = (try findChild(r, stbl, "stsz")) orelse return error.Corrupt;
-    const stco_box = (try findChild(r, stbl, "stco")) orelse
-        (try findChild(r, stbl, "co64")) orelse return error.Corrupt;
+    const track_id = try parseTrackId(r, trak);
 
+    // 样本表可能缺失或为空：fMP4（B 站 DASH `.m4s`）的 moov 只有初始化信息，
+    // 媒体样本全在 moof 分片里（open 内再扫描分片建表）。此处缺表不报 Corrupt，
+    // 由 open 统一判定「无样本表且无分片」→ UnsupportedFormat（交引擎回退）。
+    var samples: []SampleEntry = &.{};
+    var frame_offsets: []u64 = &.{};
     var stts_total: u64 = 0;
-    const stts_runs = try parseStts(r, stts_box, allocator, &stts_total);
-    defer allocator.free(stts_runs);
-    const stsc_runs = try parseStsc(r, stsc_box, allocator);
-    defer allocator.free(stsc_runs);
-    const chunk_offsets = try parseChunkOffsets(r, stco_box, allocator);
-    defer allocator.free(chunk_offsets);
-    const stsz = try parseStsz(r, stsz_box, allocator);
-    defer if (stsz.sizes.len > 0) allocator.free(stsz.sizes);
+    const max_frame_samples: u32 = frameSamplesForCodec(codec_cfg);
 
-    const samples = try buildSampleTable(allocator, stsc_runs, chunk_offsets, stsz);
+    if (try findChild(r, stbl, "stts")) |stts_box| {
+        if (try findChild(r, stbl, "stsc")) |stsc_box| {
+            if (try findChild(r, stbl, "stsz")) |stsz_box| {
+                if ((try findChild(r, stbl, "stco")) orelse
+                    (try findChild(r, stbl, "co64"))) |stco_box|
+                {
+                    const stts_runs = try parseStts(r, stts_box, allocator, &stts_total);
+                    defer allocator.free(stts_runs);
+                    const stsc_runs = try parseStsc(r, stsc_box, allocator);
+                    defer allocator.free(stsc_runs);
+                    const chunk_offsets = try parseChunkOffsets(r, stco_box, allocator);
+                    defer allocator.free(chunk_offsets);
+                    const stsz = try parseStsz(r, stsz_box, allocator);
+                    defer if (stsz.sizes.len > 0) allocator.free(stsz.sizes);
 
-    errdefer allocator.free(samples);
-    const max_frame_samples: u32 = switch (codec_cfg) {
-        .alac => |c| c.max_samples_per_frame,
-        .aac => |c| c.frame_length,
-        // 委托 codec：stts run 耗尽时的兜底每帧样本数（正常文件不会被用到）
-        .flac => |si| (std.mem.readInt(u16, si[2..4], .big)) & 0xFFFF,
-        .opus => 960,
-        .ac3, .eac3 => 1536,
-        .mp3 => 1152,
-        .als => |c| c.frame_length,
-    };
-    const frame_offsets = try buildFrameOffsets(allocator, stts_runs, samples.len, max_frame_samples);
-    errdefer allocator.free(frame_offsets);
+                    samples = try buildSampleTable(allocator, stsc_runs, chunk_offsets, stsz);
+                    errdefer allocator.free(samples);
+                    frame_offsets = try buildFrameOffsets(
+                        allocator,
+                        stts_runs,
+                        samples.len,
+                        max_frame_samples,
+                    );
+                    errdefer allocator.free(frame_offsets);
+                }
+            }
+        }
+    }
 
     // elst（trak→edts→elst）：media_time 为需跳过的 priming 样本，
     // segment_duration 为输出样本上限（时长轨以 timescale 计）。
@@ -830,9 +844,305 @@ fn parseTrak(r: *io.Reader, trak: Box, allocator: Allocator, has_audio: *bool) E
         .samples = samples,
         .frame_offsets = frame_offsets,
         .stts_total = stts_total,
+        .track_id = track_id,
         .elst_seg_dur = elst_seg_dur,
         .elst_media_time = elst_media_time,
     };
+}
+
+/// 每帧最大样本数（stts/trun 缺省时长时的兜底）。
+fn frameSamplesForCodec(codec_cfg: CodecCfg) u32 {
+    return switch (codec_cfg) {
+        .alac => |c| c.max_samples_per_frame,
+        .aac => |c| c.frame_length,
+        // 委托 codec：stts run 耗尽时的兜底每帧样本数（正常文件不会被用到）
+        .flac => |si| (std.mem.readInt(u16, si[2..4], .big)) & 0xFFFF,
+        .opus => 960,
+        .ac3, .eac3 => 1536,
+        .mp3 => 1152,
+        .als => |c| c.frame_length,
+    };
+}
+
+/// tkhd → track_ID（ISO 14496-12 §8.3.2；v0 偏移 12，v1 偏移 20）。
+fn parseTrackId(r: *io.Reader, trak: Box) Error!u32 {
+    const tkhd = (try findChild(r, trak, "tkhd")) orelse return 0;
+    var h: [24]u8 = undefined;
+    const n = try readAt(r, tkhd.data, &h);
+    if (n < 16) return 0;
+    if (h[0] == 1) {
+        if (n < 24) return 0;
+        return std.mem.readInt(u32, h[20..24], .big);
+    }
+    return std.mem.readInt(u32, h[12..16], .big);
+}
+
+// ---------------------------------------------------------------------------
+// fMP4 分片解析（moof / traf / tfhd / trun）
+// ---------------------------------------------------------------------------
+
+/// trex 默认样本参数（moov→mvex→trex；分片 trun 缺省时的兜底）
+const TrexDefaults = struct {
+    duration: u32 = 0,
+    size: u32 = 0,
+};
+
+/// 分片解析产出的线性样本表（与 stbl 路径同构）
+const FragTable = struct {
+    samples: []SampleEntry,
+    frame_offsets: []u64,
+};
+
+/// 分片解析的样本总数上限（防畸形 moof 撑爆内存；1 小时 192K 音频 ≈ 17 万帧）
+const max_frag_samples: usize = 4 * 1024 * 1024;
+
+fn parseTrex(r: *io.Reader, moov: Box, track_id: u32) Error!TrexDefaults {
+    var d = TrexDefaults{};
+    const mvex = (try findChild(r, moov, "mvex")) orelse return d;
+    const end = mvex.start + mvex.size;
+    var off = mvex.data;
+    while (off + 8 <= end) {
+        const b = (try parseBox(r, off, end)) orelse break;
+        if (std.mem.eql(u8, "trex", &b.type)) {
+            var h: [20]u8 = undefined;
+            const n = try readAt(r, b.data, &h);
+            if (n >= 20) {
+                const tid = std.mem.readInt(u32, h[4..8], .big);
+                if (track_id == 0 or tid == track_id) {
+                    d.duration = std.mem.readInt(u32, h[12..16], .big);
+                    d.size = std.mem.readInt(u32, h[16..20], .big);
+                }
+            }
+            return d;
+        }
+        if (b.size == 0) break;
+        off += b.size;
+    }
+    return d;
+}
+
+/// 扫描顶层 moof 分片，按 trun 构建线性样本表；无分片 → null。
+fn parseFragments(
+    allocator: Allocator,
+    r: *io.Reader,
+    moov: Box,
+    track_id: u32,
+    fallback_dur: u32,
+) Error!?FragTable {
+    const file_size = try r.size();
+    const trex = try parseTrex(r, moov, track_id);
+
+    var samples = std.ArrayList(SampleEntry).empty;
+    errdefer samples.deinit(allocator);
+    var offs = std.ArrayList(u64).empty;
+    errdefer offs.deinit(allocator);
+    try offs.append(allocator, 0);
+    var total: u64 = 0;
+
+    var off: u64 = 0;
+    while (off + 8 <= file_size) {
+        const b = (try parseBox(r, off, file_size)) orelse break;
+        if (std.mem.eql(u8, "moof", &b.type)) {
+            try parseMoof(
+                allocator,
+                r,
+                b,
+                track_id,
+                trex,
+                fallback_dur,
+                &samples,
+                &offs,
+                &total,
+            );
+        }
+        if (b.size == 0) break;
+        off += b.size;
+    }
+    if (samples.items.len == 0) {
+        samples.deinit(allocator);
+        offs.deinit(allocator);
+        return null;
+    }
+    return .{
+        .samples = try samples.toOwnedSlice(allocator),
+        .frame_offsets = try offs.toOwnedSlice(allocator),
+    };
+}
+
+fn parseMoof(
+    allocator: Allocator,
+    r: *io.Reader,
+    moof: Box,
+    track_id: u32,
+    trex: TrexDefaults,
+    fallback_dur: u32,
+    samples: *std.ArrayList(SampleEntry),
+    offs: *std.ArrayList(u64),
+    total: *u64,
+) Error!void {
+    const end = moof.start + moof.size;
+    var off = moof.data;
+    while (off + 8 <= end) {
+        const b = (try parseBox(r, off, end)) orelse break;
+        if (std.mem.eql(u8, "traf", &b.type)) {
+            try parseTraf(allocator, r, b, moof, track_id, trex, fallback_dur, samples, offs, total);
+        }
+        if (b.size == 0) break;
+        off += b.size;
+    }
+}
+
+fn parseTraf(
+    allocator: Allocator,
+    r: *io.Reader,
+    traf: Box,
+    moof: Box,
+    track_id: u32,
+    trex: TrexDefaults,
+    fallback_dur: u32,
+    samples: *std.ArrayList(SampleEntry),
+    offs: *std.ArrayList(u64),
+    total: *u64,
+) Error!void {
+    const tfhd = (try findChild(r, traf, "tfhd")) orelse return;
+    const hdr = try readBoxRest(r, tfhd, allocator, 0);
+    defer allocator.free(hdr);
+    if (hdr.len < 8) return;
+
+    const flags = std.mem.readInt(u32, hdr[0..4], .big) & 0x00FFFFFF;
+    const tid = std.mem.readInt(u32, hdr[4..8], .big);
+    if (track_id != 0 and tid != track_id) return;
+
+    var p: usize = 8;
+    var base: u64 = moof.start;
+    if (flags & 0x000001 != 0) { // base-data-offset-present
+        if (hdr.len < p + 8) return;
+        base = std.mem.readInt(u64, hdr[p..][0..8], .big);
+        p += 8;
+    } else if (flags & 0x020000 != 0) { // default-base-is-moof
+        base = moof.start;
+    }
+    if (flags & 0x000002 != 0) p += 4; // sample-description-index
+    var def_dur: u32 = 0;
+    if (flags & 0x000008 != 0) {
+        if (hdr.len < p + 4) return;
+        def_dur = std.mem.readInt(u32, hdr[p..][0..4], .big);
+        p += 4;
+    }
+    var def_size: u32 = 0;
+    if (flags & 0x000010 != 0) {
+        if (hdr.len < p + 4) return;
+        def_size = std.mem.readInt(u32, hdr[p..][0..4], .big);
+        p += 4;
+    }
+
+    var next_off: u64 = base;
+    var toff = traf.data;
+    const tend = traf.start + traf.size;
+    while (toff + 8 <= tend) {
+        const b = (try parseBox(r, toff, tend)) orelse break;
+        if (std.mem.eql(u8, "trun", &b.type)) {
+            try parseTrun(
+                allocator,
+                r,
+                b,
+                trex,
+                def_dur,
+                def_size,
+                fallback_dur,
+                &next_off,
+                samples,
+                offs,
+                total,
+            );
+        }
+        if (b.size == 0) break;
+        toff += b.size;
+    }
+}
+
+fn parseTrun(
+    allocator: Allocator,
+    r: *io.Reader,
+    trun: Box,
+    trex: TrexDefaults,
+    def_dur: u32,
+    def_size: u32,
+    fallback_dur: u32,
+    next_off: *u64,
+    samples: *std.ArrayList(SampleEntry),
+    offs: *std.ArrayList(u64),
+    total: *u64,
+) Error!void {
+    const raw = try readBoxRest(r, trun, allocator, 0);
+    defer allocator.free(raw);
+    if (raw.len < 8) return;
+
+    const flags = std.mem.readInt(u32, raw[0..4], .big) & 0x00FFFFFF;
+    var count: usize = std.mem.readInt(u32, raw[4..8], .big);
+    var p: usize = 8;
+
+    var data_off: i64 = 0;
+    var has_data_off = false;
+    if (flags & 0x000001 != 0) { // data-offset-present
+        if (raw.len < p + 4) return;
+        data_off = std.mem.readInt(i32, raw[p..][0..4], .big);
+        p += 4;
+        has_data_off = true;
+    }
+    if (flags & 0x000004 != 0) p += 4; // first-sample-flags
+
+    const per_dur = flags & 0x000100 != 0;
+    const per_size = flags & 0x000200 != 0;
+    const per_flags = flags & 0x000400 != 0;
+    const per_cto = flags & 0x000800 != 0;
+    const entry_size: usize = (if (per_dur) @as(usize, 4) else 0) +
+        (if (per_size) @as(usize, 4) else 0) +
+        (if (per_flags) @as(usize, 4) else 0) +
+        (if (per_cto) @as(usize, 4) else 0);
+    if (entry_size != 0) {
+        const avail = (raw.len - p) / entry_size;
+        if (count > avail) count = avail; // 截断：畸形分片不越界
+    }
+    if (count == 0) return;
+    if (samples.items.len + count > max_frag_samples) return error.Corrupt;
+
+    if (has_data_off) {
+        // 有符号偏移：base + data_offset（允许负值，对齐 ISO 14496-12 §8.8.8.1）
+        const signed: i128 = @as(i128, next_off.*) + data_off;
+        if (signed < 0) return error.Corrupt;
+        next_off.* = @intCast(signed);
+    }
+
+    const dur_default: u32 = if (def_dur != 0)
+        def_dur
+    else if (trex.duration != 0)
+        trex.duration
+    else
+        fallback_dur;
+    const size_default: u32 = if (def_size != 0) def_size else trex.size;
+
+    var q = p;
+    for (0..count) |_| {
+        var dur: u32 = dur_default;
+        var size: u32 = size_default;
+        if (per_dur) {
+            dur = std.mem.readInt(u32, raw[q..][0..4], .big);
+            q += 4;
+        }
+        if (per_size) {
+            size = std.mem.readInt(u32, raw[q..][0..4], .big);
+            q += 4;
+        }
+        if (per_flags) q += 4;
+        if (per_cto) q += 4;
+
+        samples.append(allocator, .{ .offset = next_off.*, .size = size }) catch
+            return error.OutOfMemory;
+        next_off.* += size;
+        total.* += dur;
+        offs.append(allocator, total.*) catch return error.OutOfMemory;
+    }
 }
 
 /// 从已打开 Reader 解析 M4A（decoder.open 与测试共用入口）。
@@ -860,14 +1170,27 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     var p = parsed orelse return if (has_audio) error.UnsupportedFormat else error.Corrupt;
 
     // 分片 MP4（fMP4，如 B 站 DASH `.m4s`）：moov 里样本表为空，媒体样本全部
-    // 在 moof 分片里。自研解复用以样本表为唯一解码依据（§1 定位：音频解复用，
-    // 不做分片组装），空表 open「成功」会静默产出 0 帧——端到端表现为
-    // 「时长 0.0s → 引擎秒判完成 → 自动跳歌」。这里显式判 UnsupportedFormat，
-    // 让引擎回退 FFmpeg（能完整解析 fMP4 分片）。
+    // 在 moof 分片里。音轨独立（B 站音视频线路分开）且体积可控：扫描顶层
+    // moof/traf/trun 建线性样本表，后续解码/seek 与 stbl 路径完全同构。
+    // 无分片可解析 → UnsupportedFormat（交引擎回退 FFmpeg）。
     if (p.samples.len == 0) {
+        const fallback_dur = frameSamplesForCodec(p.codec);
+        const frag = (try parseFragments(
+            allocator,
+            reader,
+            moov,
+            p.track_id,
+            fallback_dur,
+        )) orelse {
+            allocator.free(p.frame_offsets);
+            allocator.free(p.samples);
+            return error.UnsupportedFormat;
+        };
         allocator.free(p.frame_offsets);
         allocator.free(p.samples);
-        return error.UnsupportedFormat;
+        p.samples = frag.samples;
+        p.frame_offsets = frag.frame_offsets;
+        p.stts_total = p.samples.len;
     }
 
     // p 的样本表在 ctx 建立后转交 destroyCtx 释放；此 errdefer 只覆盖 ctx 建立前窗口
@@ -2399,7 +2722,7 @@ test "m4a 集成: mdat 截断（样本不足）→ Corrupt" {
     try testing.expectError(error.Corrupt, dec.read(&out, 8, &ch));
 }
 
-test "m4a 集成: 缺 stts / 缺 stco → open Corrupt" {
+test "m4a 集成: 缺 stts / 缺 stco → UnsupportedFormat（按分片 init 处理）" {
     const vals = [_]i32{ 1, 2, 3, 4 };
     const fr = try writeUncompressedFrame(16, 1, &vals);
     defer testing.allocator.free(fr);
@@ -2408,20 +2731,21 @@ test "m4a 集成: 缺 stts / 缺 stco → open Corrupt" {
     const file = try buildAlacM4a(testing.allocator, .{ .alac = cookie }, 4, &frames, 0);
     defer testing.allocator.free(file);
 
-    // stts type 改为 sttx → findChild 找不到 → Corrupt
+    // stts type 改为 sttx → findChild 找不到 → 样本表缺失：按 fMP4 init 段处理
+    // （无 moof 分片可解析）→ UnsupportedFormat，交引擎回退 FFmpeg。
     const pos_stts = std.mem.indexOf(u8, file, "stts").?;
     file[pos_stts + 3] = 'x';
     var info: decoder.Info = undefined;
-    try testing.expectError(error.Corrupt, openMem(testing.allocator, file, &info));
+    try testing.expectError(error.UnsupportedFormat, openMem(testing.allocator, file, &info));
 
-    // stco type 改为 stcx → findChild 找不到 → Corrupt
+    // stco type 改为 stcx → 同上
     file[pos_stts + 3] = 's';
     const pos_stco = std.mem.indexOf(u8, file, "stco").?;
     file[pos_stco + 3] = 'x';
-    try testing.expectError(error.Corrupt, openMem(testing.allocator, file, &info));
+    try testing.expectError(error.UnsupportedFormat, openMem(testing.allocator, file, &info));
 }
 
-test "m4a 集成: 分片 MP4（fMP4 空样本表 → UnsupportedFormat)" {
+test "m4a 集成: 分片 MP4 空表且无 moof → UnsupportedFormat" {
     const vals = [_]i32{ 1, 2, 3, 4 };
     const fr = try writeUncompressedFrame(16, 1, &vals);
     defer testing.allocator.free(fr);
@@ -2430,10 +2754,7 @@ test "m4a 集成: 分片 MP4（fMP4 空样本表 → UnsupportedFormat)" {
     const file = try buildAlacM4a(testing.allocator, .{ .alac = cookie }, 4, &frames, 0);
     defer testing.allocator.free(file);
 
-    // 模拟 fMP4：moov 样本表清空（stts entry_count = 0、stsz sample_count = 0），
-    // 媒体样本全在 moof 分片里（B 站 DASH `.m4s` 形态）。空表 open 不能「成功」，
-    // 否则原生管线静默产出 0 帧 → 端到端表现为自动跳歌。
-    // 以 UnsupportedFormat 交回引擎 → 回退 FFmpeg（分片可完整解析）。
+    // moov 样本表清空但没有 moof 分片：不是可解码的 fMP4，交引擎回退 FFmpeg。
     const pos_stts = std.mem.indexOf(u8, file, "stts").?;
     @memset(file[pos_stts + 8 .. pos_stts + 12], 0);
     const pos_stsz = std.mem.indexOf(u8, file, "stsz").?;
@@ -2441,6 +2762,85 @@ test "m4a 集成: 分片 MP4（fMP4 空样本表 → UnsupportedFormat)" {
 
     var info: decoder.Info = undefined;
     try testing.expectError(error.UnsupportedFormat, openMem(testing.allocator, file, &info));
+}
+
+test "m4a 集成: fMP4 分片（moof/trun）建表并解码" {
+    const vals = [_]i32{ 1, 2, 3, 4 };
+    const fr = try writeUncompressedFrame(16, 1, &vals);
+    defer testing.allocator.free(fr);
+    const frames = [_][]const u8{fr};
+    const cookie = makeCookie(4096, 16, 1, 44100, 40, 10, 14);
+    const file = try buildAlacM4a(testing.allocator, .{ .alac = cookie }, 4, &frames, 0);
+    defer testing.allocator.free(file);
+
+    // init 段：清空 moov 样本表
+    const pos_stts = std.mem.indexOf(u8, file, "stts").?;
+    @memset(file[pos_stts + 8 .. pos_stts + 12], 0);
+    const pos_stsz = std.mem.indexOf(u8, file, "stsz").?;
+    @memset(file[pos_stsz + 12 .. pos_stsz + 16], 0);
+
+    // 追加 moof(traf(tfhd + trun)) + mdat(fr)，即 B 站 DASH `.m4s` 形态：
+    // tfhd 带 default-base-is-moof + 默认时长/大小；trun 只给 data_offset。
+    var tfhd_payload = std.ArrayList(u8).empty;
+    defer tfhd_payload.deinit(testing.allocator);
+    try tfhd_payload.appendSlice(testing.allocator, &.{ 0x00, 0x02, 0x00, 0x18 });
+    try tfhd_payload.appendSlice(testing.allocator, &.{ 0, 0, 0, 1 }); // track_ID
+    var be: [4]u8 = undefined;
+    std.mem.writeInt(u32, &be, 4, .big); // default_sample_duration
+    try tfhd_payload.appendSlice(testing.allocator, &be);
+    std.mem.writeInt(u32, &be, @intCast(fr.len), .big); // default_sample_size
+    try tfhd_payload.appendSlice(testing.allocator, &be);
+    var tfhd = std.ArrayList(u8).empty;
+    defer tfhd.deinit(testing.allocator);
+    try appendBox(&tfhd, testing.allocator, "tfhd", tfhd_payload.items);
+
+    // moof = 8（头）+ mfhd(16) + traf(8 头 + tfhd + trun)
+    // trun 定长：flags + sample_count + data_offset = 12 字节 payload
+    const trun_box_len = 8 + 12;
+    const moof_size = 8 + 16 + 8 + tfhd.items.len + trun_box_len;
+    var trun_payload = std.ArrayList(u8).empty;
+    defer trun_payload.deinit(testing.allocator);
+    try trun_payload.appendSlice(testing.allocator, &.{ 0, 0, 0, 1 }); // data-offset-present
+    try trun_payload.appendSlice(testing.allocator, &.{ 0, 0, 0, 1 }); // sample_count
+    std.mem.writeInt(u32, &be, @intCast(moof_size + 8), .big); // mdat payload
+    try trun_payload.appendSlice(testing.allocator, &be);
+    var trun = std.ArrayList(u8).empty;
+    defer trun.deinit(testing.allocator);
+    try appendBox(&trun, testing.allocator, "trun", trun_payload.items);
+
+    var traf_payload = std.ArrayList(u8).empty;
+    defer traf_payload.deinit(testing.allocator);
+    try traf_payload.appendSlice(testing.allocator, tfhd.items);
+    try traf_payload.appendSlice(testing.allocator, trun.items);
+    var traf = std.ArrayList(u8).empty;
+    defer traf.deinit(testing.allocator);
+    try appendBox(&traf, testing.allocator, "traf", traf_payload.items);
+
+    var moof_payload = std.ArrayList(u8).empty;
+    defer moof_payload.deinit(testing.allocator);
+    try appendBox(&moof_payload, testing.allocator, "mfhd", &.{ 0, 0, 0, 0, 0, 0, 0, 1 });
+    try moof_payload.appendSlice(testing.allocator, traf.items);
+
+    var out = std.ArrayList(u8).empty;
+    defer out.deinit(testing.allocator);
+    try out.appendSlice(testing.allocator, file);
+    try appendBox(&out, testing.allocator, "moof", moof_payload.items);
+    try appendBox(&out, testing.allocator, "mdat", fr);
+
+    var info: decoder.Info = undefined;
+    var dec = try openMem(testing.allocator, out.items, &info);
+    defer dec.deinit();
+
+    try testing.expectEqualStrings("alac", info.codec_name);
+    try testing.expectEqual(@as(u32, 44100), info.sample_rate);
+    try testing.expectEqual(@as(i64, 90), info.duration_us); // 4/44100 s
+    try testing.expectEqual(decoder.DurationKnown.exact, info.duration_known);
+
+    var pcm: [8]u8 = undefined;
+    var ch: u8 = 0;
+    try testing.expectEqual(@as(usize, 4), try dec.read(&pcm, 4, &ch));
+    try testing.expectEqualSlices(u8, &.{ 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00 }, &pcm);
+    try testing.expectEqual(@as(usize, 0), try dec.read(&pcm, 4, &ch)); // EOF
 }
 
 test "m4a 集成: 音频轨但 stsd 无 alac 条目 → open UnsupportedFormat（回退 FFmpeg）" {
