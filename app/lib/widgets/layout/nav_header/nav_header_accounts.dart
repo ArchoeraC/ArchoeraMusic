@@ -130,8 +130,6 @@ class _AccountsMenu extends ConsumerWidget {
                     platform: context.l10n.brandBilibili,
                   ),
                 );
-              case 'open_bilibili':
-                context.go('/bilibili');
               case 'login_neko':
                 showNekoLoginDialog(context);
               case 'logout_neko':
@@ -210,17 +208,6 @@ class _AccountsMenu extends ConsumerWidget {
                     nekoApi.account?.displayName ??
                     l10n.settingsNekoNotLoggedIn,
               ),
-            PopupMenuItem(
-              value: 'open_bilibili',
-              height: 36,
-              child: Row(
-                children: [
-                  const Icon(EtaIcons.music2Outline, size: 17),
-                  const SizedBox(width: 10),
-                  Text(l10n.bilibiliOpenLibrary),
-                ],
-              ),
-            ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
