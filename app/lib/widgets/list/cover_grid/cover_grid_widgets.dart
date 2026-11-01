@@ -289,12 +289,17 @@ class CoverCard extends StatelessWidget {
           if (item.cover == null || item.cover!.isEmpty)
             placeholder
           else
-            Image.network(
-              item.cover!,
+            Image(
+              // 双边 target 解码必须保比例（见 lib/widgets/list/cover_image.dart）：
+              // ResizeImage 默认 policy=exact 会把 16:9 拉成 1:1（解码层变形）。
+              image: ResizeImage(
+                NetworkImage(item.cover!, headers: mediaHeadersForUrl(item.cover!)),
+                width: 320,
+                height: 320,
+                policy: ResizeImagePolicy.fit,
+                allowUpscaling: false,
+              ),
               fit: BoxFit.cover,
-              cacheWidth: 320,
-              cacheHeight: 320,
-              headers: mediaHeadersForUrl(item.cover!),
               errorBuilder: (_, _, _) => placeholder,
               loadingBuilder: (context, child, progress) =>
                   progress == null ? child : placeholder,
