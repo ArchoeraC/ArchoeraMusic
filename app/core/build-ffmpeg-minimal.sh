@@ -34,16 +34,18 @@
 # =====================================================================
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VER="${FFMPEG_VERSION:-9.0.1}"
 PREFIX="${FFMPEG_PREFIX:-$HOME/.local/ffmpeg-minimal}"
 MBEDTLS_VER="${MBEDTLS_VERSION:-3.6.2}"
 MBEDTLS_PREFIX="${MBEDTLS_PREFIX:-$HOME/.local/mbedtls-minimal}"
 if command -v nproc >/dev/null 2>&1; then JOBS="$(nproc)"; else JOBS="$(sysctl -n hw.ncpu)"; fi
 
-# TLS 标记：旧前缀（无 TLS）需重建，否则 https 仍不可用。
-TLS_MARKER="$PREFIX/.mbedtls-tls"
+# TLS 标记：旧前缀（无 TLS / 未含系统 CA 回退补丁）需重建，否则 https 仍不可用。
+# v2 = 含 `patches/ffmpeg-<ver>-mbedtls-system-ca.patch`（mbedTLS 回退系统信任库）。
+TLS_MARKER="$PREFIX/.mbedtls-system-ca"
 if [[ -f "$TLS_MARKER" && ( -f "$PREFIX/lib/libavformat.so" || -f "$PREFIX/lib/libavformat.dylib" ) ]]; then
-  echo "[build-ffmpeg-minimal] 已存在（含 TLS），跳过：$PREFIX"
+  echo "[build-ffmpeg-minimal] 已存在（含 TLS + 系统 CA 回退），跳过：$PREFIX"
   exit 0
 fi
 
@@ -55,6 +57,16 @@ curl -fsSL --retry 6 --retry-delay 3 --retry-all-errors \
   "https://ffmpeg.org/releases/ffmpeg-$VER.tar.xz" -o "$work/ffmpeg.tar.xz"
 tar -C "$work" -xf "$work/ffmpeg.tar.xz"
 cd "$work/ffmpeg-$VER"
+
+# 固定版本补丁：mbedTLS 后端在未给 `ca_file` 时回退系统信任库（OpenSSL/GnuTLS 语义）。
+# 版本固定 + 源码现场编译，补丁不会因系统更新失效；升级 FFmpeg 时同步重建该 patch。
+FFMPEG_PATCH="$ROOT/ffmpeg-patches/ffmpeg-$VER-mbedtls-system-ca.patch"
+if [[ -f "$FFMPEG_PATCH" ]]; then
+  echo "[build-ffmpeg-minimal] 应用补丁：$(basename "$FFMPEG_PATCH")"
+  patch -p1 --batch --forward < "$FFMPEG_PATCH"
+else
+  echo "[build-ffmpeg-minimal] 警告：缺少 $VER 的系统 CA 回退补丁（https 仅认显式 ca_file）" >&2
+fi
 
 # 有 nasm/yasm 则启用 x86 汇编加速；否则退化（仍可正常解码）
 x86asm=()
