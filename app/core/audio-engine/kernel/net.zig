@@ -37,6 +37,7 @@
 //!
 //! 命名：本文件符号为自有命名（`HttpStream` / `era_net_*`），不照搬上游标识符。
 
+const builtin = @import("builtin");
 const std = @import("std");
 const era_log = @import("log.zig");
 
@@ -103,12 +104,210 @@ fn globalIo() Io {
     return g_io;
 }
 
+// ── 进程级 CA bundle（https 信任根）─────────────────────────────────────
+//
+// 单例、惰性加载、**从不释放**（与 [globalIo] 同理，避免生命周期竞态）。
+// 每路流各持一份 bundle 会重复解析系统信任库（桌面发行版 ~120 张根证书），
+// 换曲即重扫一次；改为进程级共享后只在首次 https 时扫一遍。
+//
+// 发现顺序（跨发行版稳健，逐层降级，任一层拿到证书即停）：
+//   1. 显式环境变量：`SSL_CERT_FILE` / `NIX_SSL_CERT_FILE` / `CURL_CA_BUNDLE`、
+//      `SSL_CERT_DIR`（`:` 分隔，OpenSSL 语义）——宿主/用户/企业覆盖入口；
+//   2. 平台原生证书库：Windows CryptoAPI / macOS Keychain（含企业策略与用户导入）；
+//   3. 发行版生成的 bundle 文件（Debian/Fedora/SUSE/Alpine/NetBSD/Homebrew/沙箱宿主）；
+//   4. 管理员导入的锚点目录（发行版未必合并进 bundle）；
+//   5. 逐证书目录（哈希软链布局，如 `/etc/ssl/certs`）；
+//   6. std `rescan()` 兜底（覆盖 BSD / illumos / Haiku 等非主流布局）。
+// 每层都用 `catch {}` 吞掉单点失败（权限、损坏、非 PEM），不会因某个发行版的
+// 目录结构差异而让整次加载“爆炸”；全部为空才是「没有信任库」→ `TlsNoCa`。
+var g_ca_lock: std.Io.RwLock = .init;
+var g_ca_ready = std.atomic.Value(bool).init(false);
+var g_ca: std.crypto.Certificate.Bundle = .empty;
+
+const g_ca_gpa = std.heap.c_allocator;
+
+/// 发行版/发行包生成的 bundle 文件候选（按覆盖面排序，命中即停）。
+/// 新增布局只需加一行，不影响其它平台（不存在的路径直接跳过）。
+const ca_file_candidates = [_][]const u8{
+    "/etc/ssl/certs/ca-certificates.crt", // Debian/Ubuntu/Arch/Gentoo/NixOS 软链
+    "/etc/pki/tls/certs/ca-bundle.crt", // Fedora / RHEL 6
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // CentOS / RHEL 7+
+    "/etc/ssl/ca-bundle.pem", // openSUSE / SLES
+    "/etc/ssl/cert.pem", // Alpine / macOS / 部分 BSD
+    "/etc/ca-certificates/extracted/tls-ca-bundle.pem", // Arch（软链真实目标）
+    "/etc/ssl/certs/ca-bundle.crt", // 旧 SUSE / 其它
+    "/etc/ssl/cacert.pem", // illumos
+    "/etc/openssl/certs/ca-certificates.crt", // NetBSD
+    "/usr/local/etc/ssl/cert.pem", // FreeBSD / 自编译 OpenSSL
+    "/usr/local/etc/openssl/cert.pem", // macOS Homebrew (x86_64)
+    "/opt/homebrew/etc/openssl@3/cert.pem", // macOS Homebrew (arm64)
+    // 沙箱：Flatpak / Snap 内被显式放行的宿主根证书
+    "/run/host/etc/ssl/certs/ca-certificates.crt",
+    "/var/lib/snapd/hostfs/etc/ssl/certs/ca-certificates.crt",
+};
+
+/// 管理员/用户导入的锚点目录（发行版不一定把它们并入 bundle）。
+const ca_anchor_dirs = [_][]const u8{
+    "/usr/local/share/ca-certificates", // Debian 系 update-ca-certificates 源
+    "/etc/ca-certificates/trust-source/anchors", // Arch
+    "/etc/pki/ca-trust/source/anchors", // RHEL / Fedora
+    "/usr/share/pki/trust/anchors", // SUSE
+    "/etc/ssl/trust-source/anchors", // 旧 Arch
+};
+
+/// 逐证书目录（通常为哈希软链布局）；仅在 bundle 文件都不可用时才扫，避免重复解析。
+const ca_cert_dirs = [_][]const u8{
+    "/etc/ssl/certs",
+    "/etc/pki/tls/certs",
+    "/system/etc/security/cacerts", // Android
+};
+
+fn caAddFile(io: Io, now: Io.Timestamp, path: []const u8) void {
+    if (path.len == 0) return;
+    if (std.fs.path.isAbsolute(path)) {
+        _ = std.crypto.Certificate.Bundle.addCertsFromFilePathAbsolute(
+            &g_ca,
+            g_ca_gpa,
+            io,
+            now,
+            path,
+        ) catch {};
+    } else {
+        _ = std.crypto.Certificate.Bundle.addCertsFromFilePath(
+            &g_ca,
+            g_ca_gpa,
+            io,
+            now,
+            Io.Dir.cwd(),
+            path,
+        ) catch {};
+    }
+}
+
+fn caAddDir(io: Io, now: Io.Timestamp, path: []const u8) void {
+    if (path.len == 0) return;
+    if (std.fs.path.isAbsolute(path)) {
+        _ = std.crypto.Certificate.Bundle.addCertsFromDirPathAbsolute(
+            &g_ca,
+            g_ca_gpa,
+            io,
+            now,
+            path,
+        ) catch {};
+    } else {
+        _ = std.crypto.Certificate.Bundle.addCertsFromDirPath(
+            &g_ca,
+            g_ca_gpa,
+            io,
+            Io.Dir.cwd(),
+            path,
+        ) catch {};
+    }
+}
+
+/// 非空环境变量（去首尾空白；空串视为未设置）。
+fn envNonEmpty(name: [*:0]const u8) ?[]const u8 {
+    const v = envStr(name) orelse return null;
+    const t = std.mem.trim(u8, v, " \t");
+    return if (t.len == 0) null else t;
+}
+
+/// 逐层尝试系统信任源；命中即记录来源并返回。返回时 bundle 可能仍为空（调用方判错）。
+fn loadSystemCa(io: Io, now: Io.Timestamp, source: *[]const u8) void {
+    // 2) 平台原生证书库：包含企业策略 / 用户导入的根证书，比静态 PEM 更权威。
+    switch (builtin.os.tag) {
+        .windows, .maccatalyst, .macos => {
+            g_ca.rescan(g_ca_gpa, io, now) catch {};
+            if (g_ca.map.count() != 0) {
+                source.* = "platform-store";
+                return;
+            }
+        },
+        else => {},
+    }
+    // 3) 发行版 bundle 文件
+    for (ca_file_candidates) |path| {
+        caAddFile(io, now, path);
+        if (g_ca.map.count() != 0) {
+            source.* = path;
+            return;
+        }
+    }
+    // 4) 管理员导入的锚点
+    for (ca_anchor_dirs) |dir| {
+        caAddDir(io, now, dir);
+        if (g_ca.map.count() != 0) {
+            source.* = dir;
+            return;
+        }
+    }
+    // 5) 逐证书目录（哈希软链）
+    for (ca_cert_dirs) |dir| {
+        caAddDir(io, now, dir);
+        if (g_ca.map.count() != 0) {
+            source.* = dir;
+            return;
+        }
+    }
+    // 6) std 兜底扫描
+    g_ca.rescan(g_ca_gpa, io, now) catch {};
+    if (g_ca.map.count() != 0) source.* = "rescan";
+}
+
+/// 确保进程级 CA bundle 已加载（线程安全）。
+///
+/// 失败不缓存：下次 https 连接会重试（用户装好证书后无需重启应用）；
+/// 成功则永久复用。
+fn ensureCaBundle() NetError!void {
+    if (g_ca_ready.load(.acquire)) return;
+    const io = globalIo();
+    g_ca_lock.lockUncancelable(io);
+    defer g_ca_lock.unlock(io);
+    if (g_ca_ready.load(.monotonic)) return;
+
+    const now = Io.Clock.real.now(io);
+    g_ca.bytes.clearRetainingCapacity();
+    g_ca.map.clearRetainingCapacity();
+
+    var src: []const u8 = "none";
+
+    // 1) 显式覆盖（多套环境变量都认，Nix 用 NIX_SSL_CERT_FILE）。
+    if (envNonEmpty("SSL_CERT_FILE") orelse envNonEmpty("NIX_SSL_CERT_FILE") orelse
+        envNonEmpty("CURL_CA_BUNDLE")) |file|
+    {
+        caAddFile(io, now, file);
+        if (g_ca.map.count() != 0) src = "SSL_CERT_FILE";
+    }
+    if (envNonEmpty("SSL_CERT_DIR")) |dirs| {
+        var it = std.mem.splitScalar(u8, dirs, ':');
+        while (it.next()) |dir| {
+            const path = std.mem.trim(u8, dir, " \t");
+            if (path.len != 0) caAddDir(io, now, path);
+        }
+        if (g_ca.map.count() != 0 and std.mem.eql(u8, src, "none")) src = "SSL_CERT_DIR";
+    }
+
+    if (g_ca.map.count() == 0) loadSystemCa(io, now, &src);
+
+    const count = g_ca.map.count();
+    if (count == 0) return error.TlsNoCa;
+    // rescan 在“所有候选路径都不存在”时会**成功返回空 bundle**——那不是可用信任库。
+    era_log.emit(0, "net", "TLS 信任库：{s}（{d} 张根证书）", .{ src, count });
+    g_ca_ready.store(true, .release);
+}
+
 /// 网络传输错误（统一聚合，Engine 侧经 err.statusOf 映射为稳定状态码）
 pub const NetError = error{
     BadUrl,
     UnsupportedScheme,
     ConnectFailed,
+    /// TLS 握手 / 传输失败（非证书原因）
     TlsFailed,
+    /// 证书链校验失败（不受信任 / 主机名不符 / 过期 / 签名算法被拒）。
+    /// 与 [TlsFailed] 分开：宿主据此**换信任源**（如 Dart 侧整曲下载），
+    /// 而不是换解码引擎重试——两个引擎共用同一份系统信任库，换引擎必然同样失败。
+    TlsCertRejected,
+    /// 没有可用信任库（环境变量与系统标准位置都读不到任何证书）
     TlsNoCa,
     HttpStatus,
     HttpProtocol,
@@ -351,11 +550,6 @@ pub const HttpStream = struct {
     // IO 实例（全进程单一常驻；见 globalIo）
     io: Io,
 
-    // CA（https 首次连接时惰性扫描一次，之后复用）
-    ca_lock: std.Io.RwLock = .init,
-    ca: std.crypto.Certificate.Bundle = .empty,
-    ca_ready: bool = false,
-
     // 连接状态
     connected: bool = false,
     using_tls: bool = false,
@@ -461,7 +655,6 @@ pub const HttpStream = struct {
         errdefer {
             self.stopWatchdog();
             self.disconnect();
-            self.ca.deinit(gpa);
             self.url_scratch.deinit(gpa);
             gpa.free(self.headers);
             gpa.free(self.cur_url);
@@ -501,7 +694,6 @@ pub const HttpStream = struct {
     pub fn close(self: *HttpStream) void {
         self.stopWatchdog();
         self.disconnect();
-        self.ca.deinit(self.gpa);
         self.url_scratch.deinit(self.gpa);
         self.gpa.free(self.headers);
         self.gpa.free(self.cur_url);
@@ -572,14 +764,6 @@ pub const HttpStream = struct {
         self.chunk_remaining = 0;
         self.content_length = null;
         self.tls = undefined;
-    }
-
-    /// 加载 CA bundle（首次 https 连接时；失败返回 TlsNoCa，交由上层回退）。
-    fn ensureCa(self: *HttpStream) NetError!void {
-        if (self.ca_ready) return;
-        const now = Io.Clock.real.now(self.io);
-        self.ca.rescan(self.gpa, self.io, now) catch return error.TlsNoCa;
-        self.ca_ready = true;
     }
 
     // ── 读超时 watchdog（timeout_ms>0 时启用）──────────────────────────
@@ -766,7 +950,7 @@ pub const HttpStream = struct {
         self.stream_writer = self.stream.writer(self.io, &self.sock_write_buffer);
         self.stream_reader = self.stream.reader(self.io, &self.sock_read_buffer);
         if (tls) {
-            try self.ensureCa();
+            try ensureCaBundle();
             var entropy: [std.crypto.tls.Client.Options.entropy_len]u8 = undefined;
             self.io.random(&entropy);
             const now = Io.Clock.real.now(self.io);
@@ -776,10 +960,10 @@ pub const HttpStream = struct {
                 .{
                     .host = .{ .explicit = host },
                     .ca = .{ .bundle = .{
-                        .gpa = self.gpa,
+                        .gpa = g_ca_gpa,
                         .io = self.io,
-                        .lock = &self.ca_lock,
-                        .bundle = &self.ca,
+                        .lock = &g_ca_lock,
+                        .bundle = &g_ca,
                     } },
                     .read_buffer = &self.tls_read_buffer,
                     .write_buffer = &self.tls_write_buffer,
@@ -787,7 +971,12 @@ pub const HttpStream = struct {
                     .realtime_now = now,
                     .allow_truncation_attacks = true,
                 },
-            ) catch return error.TlsFailed;
+            ) catch |e| switch (e) {
+                // 证书链被拒（不受信任 / 主机名不符 / 过期 / 算法被拒）与传输失败
+                // 分开上报：宿主据此换**信任源**，而不是换引擎（两者共用系统信任库）。
+                error.TlsCertificateNotVerified => return error.TlsCertRejected,
+                else => return error.TlsFailed,
+            };
         }
         ok = true;
         self.connected = true;
@@ -1727,4 +1916,21 @@ test "HttpStream: 多路并存 + 关闭其一不影响另一路（常驻 Io 回�
     try testing.expectEqual(rest.len, try readAllInto(b, rest));
     try testing.expectEqualSlices(u8, payload[100..], rest);
     b.close();
+}
+
+test "CA：加载后不得是静默空信任库" {
+    // 回归点：rescan 在“所有候选路径都不存在”时会**成功返回空 bundle**，
+    // 若不校验，每条 https 都会以 TlsCertRejected 失败且无法与“用户证书问题”区分。
+    ensureCaBundle() catch |e| {
+        try std.testing.expect(e == error.TlsNoCa);
+        return;
+    };
+    try std.testing.expect(g_ca.map.count() > 0);
+}
+
+test "CA：SSL_CERT_FILE 指向不存在的文件 → 不污染已加载 bundle" {
+    ensureCaBundle() catch {};
+    const before = g_ca.map.count();
+    caAddFile(globalIo(), Io.Clock.real.now(globalIo()), "/nonexistent/ca-bundle.pem");
+    try std.testing.expectEqual(before, g_ca.map.count());
 }

@@ -1903,18 +1903,25 @@ static void *engine_thread(void *arg)
        对网络源是阻塞 IO，在 Dart isolate 线程执行会被 VM 中断信号打断（poll/recv
        返回 EINTR，FFmpeg 网络层直接失败）。pthread 线程不接收 Dart VM 信号，安全。
        store 会话（整曲已驻留内存）经 pipeline_create_store → AVIO-mem 解码。 */
+    int open_status = 0;
     e->p = e->store
         ? pipeline_create_store(e->store, &e->cfg, dummy_output, NULL)
-        : pipeline_create_with_headers(e->source, e->headers, &e->cfg, dummy_output, NULL);
+        : pipeline_create_with_headers_status(e->source, e->headers, &e->cfg,
+                                              dummy_output, NULL, &open_status);
     if (!e->p) {
-        char err[320];
+        char err[512];
         if (e->store) {
             snprintf(err, sizeof(err),
-                "{\"type\":\"error\",\"message\":\"pipeline create_store failed\"}");
+                "{\"type\":\"error\",\"message\":\"pipeline create_store failed\","
+                "\"status\":0}");
         } else {
+            /* 带稳定状态码：9=证书被拒 / 10=无信任库，宿主据此换信任源
+             * （Dart 整曲下载）而非换引擎重试。URL 走 JSON 转义（含签名参数）。 */
+            char esc[384];
+            json_escape_str(e->source, esc, sizeof(esc));
             snprintf(err, sizeof(err),
-                "{\"type\":\"error\",\"message\":\"pipeline create failed: %s\"}",
-                e->source);
+                "{\"type\":\"error\",\"message\":\"pipeline create failed\","
+                "\"status\":%d,\"url\":\"%s\"}", open_status, esc);
         }
         ev_enqueue(e, err);
         ev_enqueue(e, "{\"type\":\"exited\",\"code\":-1}");

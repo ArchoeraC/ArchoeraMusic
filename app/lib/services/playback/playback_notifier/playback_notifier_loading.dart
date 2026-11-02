@@ -155,43 +155,12 @@ mixin _PlaybackNotifierLoading
         var memoryTried = false;
         if (_memorySourceEligible(source, track)) {
           memoryTried = true;
-          try {
-            final mediaHeaders = track == null
-                ? const <String, String>{}
-                : sourcePlatform(track.source).mediaHeaders;
-            final fetch = prepareWholeTrackStore(source, headers: mediaHeaders);
-            _storeFetch = fetch;
-            final r = await fetch.done;
-            if (_storeFetch == fetch) _storeFetch = null;
-            store = r.store;
-            if (r.cancelled) {
-              // M2.3b：会话被取代（新 load 已取消本下载）→ 放弃本次，不启动/不回退。
-              _log('内存源下载已取消（会话被取代），放弃本次加载');
-              state = state.copyWith(buffering: false);
-              return;
-            }
-            if (r.ok) {
-              _log('内存源整首下载完成，驻留 ${r.bytes} 字节（SegStore）');
-            } else {
-              // M3（§13）：纯内存不可用时用红色 scrim 确认框（非 toast）。
-              // true=在线直连回退（仍可播）；false=停止本次播放。
-              final proceed = await confirmMemoryFallback(
-                r.fail,
-                rawReason: r.error,
-              );
-              _log(
-                '内存源不可用（${r.error ?? r.fail?.kind}）→ '
-                '${proceed ? '在线直连回退' : '停止播放'}',
-              );
-              if (!proceed) {
-                state = state.copyWith(buffering: false);
-                _destroyStore(store); // store==0 时为空操作
-                return;
-              }
-            }
-          } catch (e) {
-            _log('内存源整首下载异常，回退 URL 直连: $e');
+          final r = await _fetchWholeTrackStore(source, track);
+          if (r.abort) {
+            state = state.copyWith(buffering: false);
+            return;
           }
+          store = r.store;
           // COMPLETE：会话被取代时取消在途下载。当前每次下载为独立 store、
           // 无并发写同一句柄；被取代的下载完成后经下方 gen 校验销毁（浪费一次
           // 拉取，不影响正确性）。
@@ -225,6 +194,27 @@ mixin _PlaybackNotifierLoading
               bitrate: useBitrate,
               passthrough: passthrough,
               gen: gen,
+            );
+          } else if (!memoryTried && _tlsTrustRetryEligible(e, source)) {
+            // TLS 信任失败（9=证书被拒 / 10=无可用信任库）：内核与 FFmpeg 共用
+            // 同一份系统信任库，换解码引擎必然同样失败。改走 Dart 整曲下载——
+            // Dart SDK 内置 Mozilla 根证书，与系统 CA 布局/更新完全无关。
+            final status = (e as EngineStartError).status;
+            _log('引擎 TLS 信任失败（status=$status）→ 整曲下载后重试');
+            final r = await _fetchWholeTrackStore(source, track, quiet: true);
+            if (r.abort || r.store == 0 || gen != _loadGen) {
+              _destroyStore(r.store);
+              rethrow;
+            }
+            await _startSession(
+              source,
+              headers: engineHeaders,
+              offsetMs: offsetMs,
+              bitrate: useBitrate,
+              passthrough: passthrough,
+              gen: gen,
+              store: r.store,
+              memoryStore: true,
             );
           } else {
             rethrow;
@@ -289,6 +279,66 @@ mixin _PlaybackNotifierLoading
     if (src != null && sourcePlatform(src).streamDirectOnly) return false;
     if (!ref.read(appPrefsProvider).engineMemoryPlay) return false;
     return source.startsWith('http://') || source.startsWith('https://');
+  }
+
+  /// TLS 信任失败（内核状态 9=证书被拒 / 10=无可用信任库）能否用
+  /// 「Dart 整曲下载」兜底。
+  ///
+  /// 这类失败与解码引擎无关：内核与 FFmpeg 共用同一份系统信任库，换引擎必然
+  /// 同样失败；Dart 的根证书编译在 SDK 内，与系统 CA 布局/更新完全解耦，
+  /// 是唯一真正独立的信任源。仅在内存播放开启时启用（用户显式关闭则不绕过）。
+  bool _tlsTrustRetryEligible(Object e, String source) {
+    if (e is! EngineStartError) return false;
+    if (e.status != 9 && e.status != 10) return false;
+    if (!source.startsWith('http://') && !source.startsWith('https://')) {
+      return false;
+    }
+    return ref.read(appPrefsProvider).engineMemoryPlay;
+  }
+
+  /// 整曲下载进 SegStore（docs/audio-memory-source.md §2）。
+  ///
+  /// 返回 `(store, abort)`：
+  /// - `store != 0`：可用句柄，调用方负责在建会话后交给引擎；
+  /// - `store == 0, abort == false`：不可用（超阈值/下载失败）→ 回退 URL 直连；
+  /// - `abort == true`：本次加载整体放弃（被新 load 取代，或用户在告警框选停止）。
+  ///
+  /// [quiet] = true 时不弹「内存源不可用」确认框（TLS 失败后的自动重试用它）。
+  Future<({int store, bool abort})> _fetchWholeTrackStore(
+    String source,
+    Track? track, {
+    bool quiet = false,
+  }) async {
+    try {
+      final mediaHeaders = track == null
+          ? const <String, String>{}
+          : sourcePlatform(track.source).mediaHeaders;
+      final fetch = prepareWholeTrackStore(source, headers: mediaHeaders);
+      _storeFetch = fetch;
+      final r = await fetch.done;
+      if (_storeFetch == fetch) _storeFetch = null;
+      if (r.cancelled) {
+        // M2.3b：会话被取代（新 load 已取消本下载）→ 放弃本次，不启动/不回退。
+        _log('内存源下载已取消（会话被取代），放弃本次加载');
+        return (store: 0, abort: true);
+      }
+      if (r.ok) {
+        _log('内存源整首下载完成，驻留 ${r.bytes} 字节（SegStore）');
+        return (store: r.store, abort: false);
+      }
+      if (quiet) return (store: 0, abort: false);
+      // M3（§13）：纯内存不可用时用红色 scrim 确认框（非 toast）。
+      // true=在线直连回退（仍可播）；false=停止本次播放。
+      final proceed = await confirmMemoryFallback(r.fail, rawReason: r.error);
+      _log(
+        '内存源不可用（${r.error ?? r.fail?.kind}）→ '
+        '${proceed ? '在线直连回退' : '停止播放'}',
+      );
+      return (store: 0, abort: !proceed);
+    } catch (e) {
+      _log('内存源整首下载异常，回退 URL 直连: $e');
+      return (store: 0, abort: false);
+    }
   }
 
   Future<void> reload() async {

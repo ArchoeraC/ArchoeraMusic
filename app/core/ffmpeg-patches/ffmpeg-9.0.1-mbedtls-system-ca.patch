@@ -1,0 +1,92 @@
+--- a/libavformat/tls_mbedtls.c
++++ b/libavformat/tls_mbedtls.c
+@@ -32,10 +32,13 @@
+ #include <psa/crypto.h>
+ #endif
+ 
++#include <stdlib.h>
++
+ #include "config_components.h"
+ 
+ #include "avformat.h"
+ #include "internal.h"
++#include "libavutil/avstring.h"
+ #include "network.h"
+ #include "url.h"
+ #include "tls.h"
+@@ -506,6 +509,65 @@
+     return ret;
+ }
+ 
++
++/*
++ * Archoera: 系统信任库回退。
++ *
++ * mbedTLS 后端没有内置信任库，且仅认显式 ca_file：未指定时 https 一律失败于
++ * BADCERT_NOT_TRUSTED（与 OpenSSL/GnuTLS 后端行为不一致）。这里按 OpenSSL/curl
++ * 的语义回退到系统信任源，使各后端行为一致，并让企业/用户导入的根证书生效。
++ *
++ * 顺序：SSL_CERT_FILE → SSL_CERT_DIR（`:` 分隔）→ 发行版标准 bundle 文件 →
++ * 逐证书目录。全部失败时保持空信任库（握手照旧 fail-closed，不降级校验）。
++ */
++static void era_tls_load_system_ca(void *logctx, mbedtls_x509_crt *ca)
++{
++    static const char *const files[] = {
++        "/etc/ssl/certs/ca-certificates.crt",
++        "/etc/pki/tls/certs/ca-bundle.crt",
++        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
++        "/etc/ssl/ca-bundle.pem",
++        "/etc/ssl/cert.pem",
++        "/etc/ca-certificates/extracted/tls-ca-bundle.pem",
++    };
++    static const char *const dirs[] = {
++        "/etc/ssl/certs",
++        "/etc/pki/tls/certs",
++    };
++    const char *env;
++    size_t i;
++
++    if ((env = getenv("SSL_CERT_FILE")) && env[0] &&
++        mbedtls_x509_crt_parse_file(ca, env) >= 0 && ca->version)
++        return;
++
++    if ((env = getenv("SSL_CERT_DIR")) && env[0]) {
++        char *list = av_strdup(env);
++        if (list) {
++            char *p, *save = NULL;
++            for (p = av_strtok(list, ":", &save); p; p = av_strtok(NULL, ":", &save)) {
++                if (!p[0])
++                    continue;
++                if (mbedtls_x509_crt_parse_path(ca, p) >= 0 && ca->version)
++                    break;
++            }
++            av_free(list);
++        }
++        if (ca->version)
++            return;
++    }
++
++    for (i = 0; i < FF_ARRAY_ELEMS(files) && !ca->version; i++)
++        mbedtls_x509_crt_parse_file(ca, files[i]);
++
++    for (i = 0; i < FF_ARRAY_ELEMS(dirs) && !ca->version; i++)
++        mbedtls_x509_crt_parse_path(ca, dirs[i]);
++
++    if (!ca->version)
++        av_log(logctx, AV_LOG_WARNING,
++               "mbedTLS: no system CA bundle found; https verification will fail\n");
++}
++
+ static int tls_open(URLContext *h, const char *uri, int flags, AVDictionary **options)
+ {
+     TLSContext *tls_ctx = h->priv_data;
+@@ -555,6 +617,9 @@
+             av_log(h, AV_LOG_ERROR, "mbedtls_x509_crt_parse_file for CA cert returned %d\n", ret);
+             goto fail;
+         }
++    } else {
++        /* Archoera: 未显式指定 ca_file → 回退系统信任库（见 era_tls_load_system_ca）。 */
++        era_tls_load_system_ca(h, &tls_ctx->ca_cert);
+     }
+ 
+     // load own certificate
