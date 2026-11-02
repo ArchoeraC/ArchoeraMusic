@@ -715,7 +715,8 @@ pub const Reader = struct {
 >   形状 `NekoMusic-<平台>/<版本>`（不冒名 Android、不伪装浏览器）。`decoder_apply_http_headers`
 >   仍对空值写 `user_agent`，但 Neko 源不再发空 UA。详见 `docs/neko-source-identity.md`。
 > - FFmpeg 在线 TLS：Linux/macOS 由 `build-ffmpeg-minimal.sh` 构建**自包含 mbedTLS**
->   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-tls` 标记重建）；
+>   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-system-ca`
+>   标记重建，并应用 `patches/ffmpeg-9.0.1-mbedtls-system-ca.patch` 让其回退系统信任库）；
 >   Windows 经 vcpkg ffmpeg 端口的 **Schannel**（未启用 `openssl` 特性时自动
 >   `--enable-schannel`，无额外 DLL，保持 LGPL-2.1+）。
 > - 验收：`kernel/net.zig` 新增「自定义请求头随请求发送」用例，`zig build test` 731 项全绿；
@@ -736,6 +737,32 @@ pub const Reader = struct {
 >   归入 `io_error`（跨语言状态码表不变）。
 > - 验收：`kernel/net.zig` 新增 `isLocalHost` / `checkRedirectPolicy` 单测（回环/私网/链路本地/
 >   IPv4-mapped/公网、降级与公网→内网拒绝、自建源放行）；`zig build test` 744 项全绿。
+>
+> **落地（2026-11-02）：原生 HTTPS 信任源可诊断化**
+> - 背景：内核与 FFmpeg 共用同一份系统信任库；`TlsCertificateNotVerified` 此前被统一折叠成
+>   `TlsFailed`，宿主无法区分「网络抖动」与「证书不认」，只能换引擎重试——而换引擎并不会
+>   换信任源，必然同样失败（共模故障）。
+> - 内核（`kernel/net.zig`）：CA bundle 改为**进程级单例**（首次 https 惰性加载；失败不缓存，
+>   装好证书后无需重启）。发现顺序逐层降级、每层单点失败只 `catch {}`，不因发行版差异整体失败：
+>   ① `SSL_CERT_FILE` / `NIX_SSL_CERT_FILE` / `CURL_CA_BUNDLE`、`SSL_CERT_DIR`（`:` 分隔，OpenSSL 语义）
+>   ② 平台原生证书库（Windows CryptoAPI / macOS Keychain，含企业策略与用户导入）
+>   ③ 发行版 bundle 文件（Debian/Fedora/RHEL/openSUSE/Alpine/NetBSD/Homebrew/Flatpak·Snap 宿主）
+>   ④ 管理员锚点目录（`/usr/local/share/ca-certificates`、`/etc/pki/ca-trust/source/anchors` 等）
+>   ⑤ 逐证书目录（哈希软链布局）⑥ std `rescan()` 兜底（BSD/illumos/Haiku）。
+>   全部为空才报 `TlsNoCa`（`rescan` 返回空 bundle 不再算成功）；命中来源与根证书数量记 DEBUG 日志。
+>   握手把 `error.TlsCertificateNotVerified` 映射为新增的 `NetError.TlsCertRejected`。
+> - 跨语言契约：`error.zig` 新增 `Status.tls_cert_rejected = 9` / `tls_no_ca = 10`
+>   （`include/kernel_bridge.h` 的 `ZK_TLS_CERT_REJECTED` / `ZK_TLS_NO_CA` 同步）；`pipeline.c`
+>   在原生 HTTP 返回 9/10 时**不再回落 FFmpeg**（同一信任库，必然同样失败），
+>   `pipeline_create_with_headers_status` 把状态交给宿主，`mediaengine_lib` 在打开失败的
+>   `error` 事件里带上 `status`。
+> - 宿主（Dart）：`EngineStartError` 携带该状态码；播放链路收到 9/10 时绕过
+>   `streamDirectOnly`（如 B 站），改走 **Dart 整曲下载**（SDK 内置 Mozilla 根证书）重试一次，
+>   失败才报错——不再静默跳歌。
+> - 验收：`zig build test` 760 项全绿、`ctest` 38/38；B 站真实直链（`*.mcdn.bilivideo.cn:8082`）实测——
+>   系统库 → `status=0`；`SSL_CERT_FILE=<无关自签证书>` → `status=9`（日志确认「跳过 FFmpeg AVIO /
+>   不回落 FFmpeg」）；`SSL_CERT_FILE=<不存在>` → 回落系统库 `status=0`；空 `/etc/ssl`
+>   （mount namespace）→ `status=10`；`flutter test` 1090 项全绿。
 
 > **落地（2026-09-21）：callback 形态已从「预留」转为「已接入」**
 > - 内核：`io.Reader.openCallback` + `decoder.openReader`；新导出 `zk_decoder_open_cb`
