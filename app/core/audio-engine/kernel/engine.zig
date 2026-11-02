@@ -11,7 +11,7 @@
 //! 线程模型（§16.1，修订 2026-09-09）：本模块承载 `zk_*` **sync 直通**——**本身不持线程**，
 //! 纯 Sync 被调用线程驱动（C 壳 mediaengine_lib.c 引擎线程，作回归/调试基线，engine-master-
 //! pool-design.md §7）；内核整体的线程（Master 事件线程 + Pool worker）由 kernel_init 自持，
-//! 见 docs/engine-master-pool-design.md §2.1/§3.1。`Engine` 即 C 侧不透明指针 `ZkDecoder`。
+//! 见 docs/archive/engine-master-pool-design.md §2.1/§3.1。`Engine` 即 C 侧不透明指针 `ZkDecoder`。
 //!
 //! 内存：统一使用 `std.heap.c_allocator`（宿主 CRT 的 malloc/free），静态库
 //! 被 C 壳链接时符号由最终链接器解析，跨 CRT 安全（§16.2）。

@@ -40,7 +40,7 @@
 
 ### 目标（Goals）
 
-- ✅ **戒律 1：自第一行代码起，永久禁用轮询**。Dart `Timer.periodic` / Rust `Mutex<VecDeque<u8>>` 轮询缓冲 / `archoera_downloader_poll_event` 系列函数，一律不允许出现在下载模块的任何提交中。事件机制唯一解：`NativeCallable.listener` 注入回调指针（对齐 [library_scanner.dart](../app/lib/core/scanner/library_scanner.dart#L102-L103)）
+- ✅ **戒律 1：自第一行代码起，永久禁用轮询**。Dart `Timer.periodic` / Rust `Mutex<VecDeque<u8>>` 轮询缓冲 / `archoera_downloader_poll_event` 系列函数，一律不允许出现在下载模块的任何提交中。事件机制唯一解：`NativeCallable.listener` 注入回调指针（对齐 [library_scanner.dart](../app/lib/services/scanner/library_scanner.dart#L102-L103)）
 - ✅ **戒律 2：下载模块完全 FFI 化**。URL 解析 + 下载执行 + 调度 + 事件生成全在 Rust cdylib 内完成，与 audio-engine / subsonic / scanner 架构对齐，Dart 不介入任何业务逻辑
 - ✅ **真正事件驱动**：进度节流在 Rust 内部做（throttleMs=500），Dart 侧零空转、零 CPU 浪费
 - 支持 **Netease / Kugou** 多平台下载（后续可扩展 QQMusic）
@@ -319,7 +319,7 @@ Step 4  Rust download Future（tokio runtime 中执行，stream-download crate�
 
 ### 3.6 进度回调到 Dart（NativeCallable.listener 线程模型）
 
-这里**完全复用 library_scanner 的写法**（见 [library_scanner.dart#L193-L205](../app/lib/core/scanner/library_scanner.dart#L193-L205)）：
+这里**完全复用 library_scanner 的写法**（见 [library_scanner.dart#L193-L205](../app/lib/services/scanner/library_scanner.dart#L193-L205)）：
 
 ```dart
 // Dart 侧，_handleEvent 是 NativeCallable.listener 的回调函数
@@ -464,7 +464,7 @@ flowchart TB
 
 ### 6.1 Kugou（酷狗签名算法：MD5 + AES-CBC + RSA-PKCS1v1.5）
 
-Dart 现有实现（见 [kugou_crypto.dart](../app/lib/core/kugou/direct/kugou_crypto.dart)）里的算法，对应 Rust 全部有成熟 MIT/Apache 2.0 依赖：
+Dart 现有实现（见 [kugou_crypto.dart](../app/lib/services/kugou/kugou_crypto.dart)）里的算法，对应 Rust 全部有成熟 MIT/Apache 2.0 依赖：
 
 | Dart 方法 | 算法 | Rust 对应 crate | 说明 |
 |---|---|---|---|

@@ -69,7 +69,7 @@ app/native/platform/
 
 | 平台 | 产物 | 打包 |
 |---|---|---|
-| Linux | `libarchoera_platform.so` | 随 `native/` 布局（同 mediaengine，见 `ffi-libs-layout-plan.md`） |
+| Linux | `libarchoera_platform.so` | 随 `native/` 布局（同 mediaengine，见 `archive/ffi-libs-layout-plan.md`） |
 | Windows | `archoera_platform.dll` | 同上 |
 | macOS | `libarchoera_platform.dylib` | 同上 |
 

@@ -271,7 +271,7 @@ int zk_loudness_measure(const char *path, ZkLoudnessResult *out);
 
 /* ---- 常驻内核接入 seam（§7 async 主干；加法式，不改动既有路径）---- */
 
-/** 常驻内核句柄（不透明；内核池 + 定容任务槽，见 docs/engine-master-pool-design.md） */
+/** 常驻内核句柄（不透明；内核池 + 定容任务槽，见 docs/archive/engine-master-pool-design.md） */
 typedef struct ZkEngine ZkEngine;
 
 /**
