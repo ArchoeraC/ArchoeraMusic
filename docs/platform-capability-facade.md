@@ -4,7 +4,7 @@
 > 主题：播放器与 **OS 系统能力** 的统一接口层（防休眠 / 媒体会话与蓝牙耳机控制 / 系统定位等）。
 > 与 `docs/archive/engine-master-worker-scheduling.md`（主控/线程执行调度）主题分开；本层为 **App 侧外观**，
 > 引擎侧音频输出问题不在此层（见 §2 边界）。
-> 沿用原则：仓库 `docs/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md` 的「只有最底层原生原语按平台各写
+> 沿用原则：仓库 `docs/archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md` 的「只有最底层原生原语按平台各写
 > adapter，上面共享一份」论证。
 
 ---

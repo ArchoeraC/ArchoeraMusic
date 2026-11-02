@@ -3,7 +3,7 @@
 凭据保险库（`app/core/vault`）对登录会话与流媒体服务器密码做本地加密存储。以下说明对**测试构建**与**发布产物边界**作出声明，请勿在生产环境启用任何测试开关。
 
 > **安全漏洞请走私密渠道报告**（[SECURITY.md](../SECURITY.md)），禁止公开 Issue / PR / Discussion 讨论漏洞细节。
-> 设计与实施细节见 [credential-vault-plan.md](credential-vault-plan.md)；
+> 设计与实施细节见 [archive/credential-vault-plan.md](archive/credential-vault-plan.md)；
 > 增强方案的定稿与落地记录见 [vault-enhanced-scheme.md](vault-enhanced-scheme.md)。
 > **已知缺口与待修复项**见 [security-review-2026-10-11.md](security-review-2026-10-11.md)（本文档的补强台账）。
 
@@ -194,7 +194,7 @@ vault 进程**入口即硬化**（`main` 调 `guard::harden_process()`，**覆�
 - **应用层防线覆盖范围**：爆破主密钥（→ 强 KDF + 退避锁定 + 高熵因子）已纵深防护；**替换 vault 二进制**由 key1 签名清单覆盖（攻击者无 key1 不能同时改文件与清单），构建标记仅再兜「原样换成官方 TEST 产物 / 缺 marker」；
 - **同用户攻击者不在防线内**：父进程身份校验只保证「它确实是预期主程序 / 直接父进程」，无法保证「主程序未被篡改」；同用户攻击者可自行 spawn vault 并自选会话密钥 `H/C`——血缘 / 握手只防「无主进程上下文的误用与自动化」，**不防同用户进程**；
 - **边界**：信任根在主程序进程。攻击者**同时替换主程序（Dart 可执行 / FFI 库）** 或**在其内嵌主动联网上传程序段**时，vault 视主进程为合法握手对象、无法区分被篡改的主程序——此威胁（进程注入 / 信任根攻破）**超出应用层能力**；**OS 代码签名不推进**（见 [supply-chain.md §2](supply-chain.md) / [security-review SEC-25](security-review-2026-10-11.md)），故该缺口**如实保留**，仅靠应用层 key1 清单无法完全封堵；
-- 本方案无法承诺具有拦截「同用户权限下完全控制进程 / 按源码重实现的攻击者」的能力（Kerckhoffs 原则，见 [credential-vault-plan §1.2](credential-vault-plan.md)）。
+- 本方案无法承诺具有拦截「同用户权限下完全控制进程 / 按源码重实现的攻击者」的能力（Kerckhoffs 原则，见 [credential-vault-plan §1.2](archive/credential-vault-plan.md)）。
 
 ## 凭据存储与恢复
 
@@ -236,7 +236,7 @@ vault 进程**入口即硬化**（`main` 调 `guard::harden_process()`，**覆�
   注：`secret.key` 与 vault `file` 后端密钥文件同名且为同一文件，现仅服务 vault file 模式；Subsonic 凭据不再依赖它（2026-10-12 修复）；
 - **file 模式与主密钥 env**（SEC-02）：file 为单因子（K 落盘 `secret.key`，`ShareBundle` 容器），选用即显式降级；
   原 `ARCHOERA_VAULT_SECRET_KEY` **env 注入已移除**，改为 `init-file --key-stdin`（不经 argv/env）——
-  与 [credential-vault-plan.md](credential-vault-plan.md) §3.8「argv / 环境不携带任何凭据」一致；
+  与 [archive/credential-vault-plan.md](archive/credential-vault-plan.md) §3.8「argv / 环境不携带任何凭据」一致；
 - **启动预取明文驻留**（SEC-03，**已收敛**）：`StreamingStore.preloadSecrets()` **不再**逐服务器解密——
   仅做 vault 惰性初始化与模式探测；凭据由 `StreamingStore.loadSecret(id)` 在真正需要时**按需单条解密**，
   且**不写回长驻 UI 状态**（`StreamingState` 只保留非敏感元数据；带凭据配置仅临时构造给客户端）。

@@ -196,6 +196,6 @@ mediaEngine→ fft / ffmpeg（同一库内依赖，产物平铺于 `native/`，�
 ---
 
 ## 7. 关联文档
-- `ffi-libs-layout-plan.md`（已实施）：bundle/native 平铺 + 统一 `NativeLibPaths`，
+- `archive/ffi-libs-layout-plan.md`（已实施）：bundle/native 平铺 + 统一 `NativeLibPaths`，
   本计划的路径基座；
 - `lib/services/native_lib_paths.dart`：模块枚举与路径解析（本计划直接复用）。

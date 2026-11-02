@@ -155,6 +155,24 @@ AudioPipeline* pipeline_create_with_headers(const char *source,
                                             void *user);
 
 /**
+ * 同 [pipeline_create_with_headers]，另回传**源打开失败**的稳定状态码
+ * （`ZkStatus`：8=传输失败 / 9=证书被拒 / 10=无可用信任库 / 1=未接管…）。
+ *
+ * 语义：仅「源没有打开成功」时写 [open_status]；与源无关的失败（分配、处理模块
+ * 创建等）保持 0。宿主据此区分「网络问题」与「TLS 信任问题」，后者应换信任源
+ * （如 Dart 整曲下载走 SDK 内置根证书）或提示用户，而不是换解码引擎重试——
+ * 内核与 FFmpeg 共用同一份系统信任库。
+ *
+ * @param open_status 可空；非空时写入 `ZkStatus`（0 = 成功/与源无关）
+ */
+AudioPipeline* pipeline_create_with_headers_status(const char *source,
+                                                   const char *headers,
+                                                   const EngineConfig *cfg,
+                                                   OutputCallback output,
+                                                   void *user,
+                                                   int *open_status);
+
+/**
  * 从 SegStore 内存源（整首已在 store，可 seek）创建管线实例
  *
  * 语义对齐 pipeline_create，仅解码源不同：store 非空时为其构造一个

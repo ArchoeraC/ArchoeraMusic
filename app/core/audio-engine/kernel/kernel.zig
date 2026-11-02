@@ -813,7 +813,7 @@ fn zkSubmitImpl(h: ?*khost.Host, req: ?*const CSubmitReq) ?*SubmitTask {
         .meta_out = r.meta,
     };
     if (host.submit(&d.task) == null) {
-        // 池停机 / 任务槽满（满即拒，docs/engine-master-pool-design.md §5.4）
+        // 池停机 / 任务槽满（满即拒，docs/archive/engine-master-pool-design.md §5.4）
         d.build.release();
         std.heap.c_allocator.destroy(d);
         submitErrOut(r, @intFromEnum(err.Status.io_error));

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 常驻内核 Host（进程入口面；docs/engine-master-pool-design.md §3 宿主 → kernel_init/submit）
+//! 常驻内核 Host（进程入口面；docs/archive/engine-master-pool-design.md §3 宿主 → kernel_init/submit）
 //!
 //! 把 runtime（池）+ task（完工）收口为单一常驻内核对象：
 //!   - `init(cfg)`：bootstrap（线程按 cfg.eager/懒就绪，§3 启动预算）；
