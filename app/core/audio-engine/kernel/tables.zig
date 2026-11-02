@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 调度簿记内部表（docs/engine-master-pool-design.md §5 / §6.2）
+//! 调度簿记内部表（docs/archive/engine-master-pool-design.md §5 / §6.2）
 //!
 //! 两套"格子"的分工（§5，避免混淆）：
 //!   - `WorkerTable`（worker 状态注册表，键 = worker/线程）：state / idle_since /
