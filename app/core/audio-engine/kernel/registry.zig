@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 模块注册表（docs/engine-master-pool-design.md §1/§3：Registry = 只读 Module 能力表）
+//! 模块注册表（docs/archive/engine-master-pool-design.md §1/§3：Registry = 只读 Module 能力表）
 //!
 //! 本文件收敛 `decoder.open()` 的硬编码 switch（原 decoder.zig:194-224）为一张
 //! **comptime Module 描述符表 + 分派**，作为格式模块的唯一登记点（single source of

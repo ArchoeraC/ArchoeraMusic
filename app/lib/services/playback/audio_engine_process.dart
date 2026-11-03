@@ -110,9 +110,28 @@ class EnginePlayerEnded extends EngineEvent {
 
 /// 引擎错误（pipeline error）。
 class EngineError extends EngineEvent {
-  const EngineError(this.message);
+  const EngineError(this.message, {this.status = 0});
 
   final String message;
+
+  /// 内核稳定状态码（0 = 未知；8 传输失败 / 9 证书被拒 / 10 无可用信任库）。
+  /// 打开失败的 `error` 事件会带该字段，供上层区分「网络问题」与「TLS 信任问题」。
+  final int status;
+}
+
+/// 引擎启动失败（ready 之前收到 error 事件）。
+///
+/// 继承 [StateError]（既有调用方/测试以 `throwsStateError` 收敛），并携带内核
+/// 状态码，供播放链路选择降级策略（如 9/10 → 换信任源走整曲下载，而不是换
+/// 解码引擎重试）。
+class EngineStartError extends StateError {
+  EngineStartError(super.message, {this.status = 0});
+
+  /// 0 = 未知；8 传输失败 / 9 证书被拒 / 10 无可用信任库。
+  final int status;
+
+  @override
+  String toString() => message;
 }
 
 /// 引擎线程退出（stop 主动销毁也触发，code 为退出码）。
@@ -630,6 +649,7 @@ class AudioEngineProcess {
           _emit(const EngineDone());
         case 'error':
           final msg = map['message'] as String? ?? 'unknown';
+          final status = (map['status'] as num?)?.toInt() ?? 0;
           // done 兼容语义保留：引擎错误也终结「整曲转码」等待（done 仅在
           // 内容 EOF 完成；错误提前到达即失败）。
           if (!_doneCompleter.isCompleted) {
@@ -638,9 +658,11 @@ class AudioEngineProcess {
           // started 门槛：错误若先于 ready 到达（如管线创建失败）→ 启动失败；
           // ready 已到达后的运行期错误不重放门槛（由 EngineError 事件通知）。
           if (!_startedCompleter.isCompleted) {
-            _startedCompleter.completeError(StateError('引擎错误: $msg'));
+            _startedCompleter.completeError(
+              EngineStartError('引擎错误: $msg', status: status),
+            );
           }
-          _emit(EngineError(msg));
+          _emit(EngineError(msg, status: status));
         case 'exited':
           // 引擎线程退出：正常收尾时 done 已完成；若 ready/done 尚未到达就
           // 退出——如启动失败 / 解码异常 / 被 destroy 抢占（此时 _stopEngine

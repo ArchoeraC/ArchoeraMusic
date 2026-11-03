@@ -153,7 +153,7 @@ speed_strict(fmt) = 40 · (FFmpeg_wall / era_wall)     # >1 = era 更快；FFmpe
 | m4a | 775 | 376 | ≈20–35 |
 
 **结论（提速后）**：
-- **三格式首帧均快于 FFmpeg**（合计 498 vs 743、154 vs 182、354 vs 962），`engine-master-pool-design.md` §3 启动门禁**达成**。
+- **三格式首帧均快于 FFmpeg**（合计 498 vs 743、154 vs 182、354 vs 962），`archive/engine-master-pool-design.md` §3 启动门禁**达成**。
 - m4a 由「落后 ≈4.8×」转为「领先 ≈2.7×」：根因是 `parseStsz` **逐样本 `readAt`**（≈8600 次 seek+read 系统调用）→ 改为**整块读入再解析**后，`open` 从 **4.5ms → ~0.2ms**（冷启动 `begin+create` 11446 → 775µs）。
 
 复现：`./build/tests/bench_coldstart /tmp/eng/ind.flac 40 2>/dev/null`（`ind.mp3`/`ind.m4a` 同理）。

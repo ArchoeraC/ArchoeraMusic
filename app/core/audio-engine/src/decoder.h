@@ -37,9 +37,13 @@ Decoder* decoder_open_headers(const char *url, const char *headers);
  */
 void decoder_apply_http_headers(AVDictionary **opts, const char *headers);
 
-/* 系统 CA bundle 路径（FFmpeg mbedtls 后端无内置信任库；Windows 用 schannel
- * 走系统证书库，无需本函数）。优先 SSL_CERT_FILE，其次常见发行版路径；
- * 未找到返回 NULL（http 不受影响）。结果进程内缓存。 */
+/* 系统 CA bundle 路径（显式注入用；Windows 用 schannel 走系统证书库，无需本函数）。
+ * 优先 SSL_CERT_FILE，其次常见发行版路径；未找到返回 NULL（http 不受影响）。
+ * 结果进程内缓存。
+ *
+ * 自建 FFmpeg 还带 `app/core/ffmpeg-patches/ffmpeg-<ver>-mbedtls-system-ca.patch`（mbedTLS 未给
+ * ca_file 时自行回退系统信任库），故本函数只是**快速路径**：返回 NULL 不代表
+ * https 不可用，最终信任源由 TLS 后端决定。 */
 const char *decoder_http_ca_file(void);
 
 /**

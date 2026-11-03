@@ -45,6 +45,12 @@ pub const Status = enum(c_int) {
     seek_failed = 6,
     out_of_memory = 7,
     io_error = 8,
+    /// TLS 证书校验失败（链不受信任 / 主机名不符 / 过期）。
+    /// 宿主应换**信任源**（如 Dart 侧整曲下载走 SDK 内置根证书）或提示用户，
+    /// 不要换解码引擎重试：内核与 FFmpeg 共用同一份系统信任库。
+    tls_cert_rejected = 9,
+    /// 没有可用信任库（证书文件缺失 / 全部不可读）。
+    tls_no_ca = 10,
 };
 
 /// 将 Zig 错误映射为稳定状态码（未在 Error 集合内的错误按 io_error 处理）
@@ -58,6 +64,10 @@ pub fn statusOf(err: anyerror) Status {
         error.SeekFailed => .seek_failed,
         error.OutOfMemory => .out_of_memory,
         error.IoError => .io_error,
+        // 网络传输层（net.zig）的证书类错误单独暴露，供宿主选择降级策略；
+        // 其余网络/传输失败仍聚合为 io_error。
+        error.TlsCertRejected => .tls_cert_rejected,
+        error.TlsNoCa => .tls_no_ca,
         // std 底层错误（AccessDenied/FileNotFound/Unexpected 等）统一归为 io_error，
         // FFI 层只感知聚合后的语义，不泄露底层细节。
         else => .io_error,
@@ -76,6 +86,9 @@ pub fn errorOf(status: Status) Error {
         .seek_failed => error.SeekFailed,
         .out_of_memory => error.OutOfMemory,
         .io_error => error.IoError,
+        // 证书类状态码来自网络层（NetError），不属于解码错误集合 Error；
+        // 反向映射时归入 io_error（正向 statusOf 仍保留精确码）。
+        .tls_cert_rejected, .tls_no_ca => error.IoError,
     };
 }
 
@@ -90,6 +103,8 @@ pub fn messageOf(e: anyerror) []const u8 {
         error.SeekFailed => "seek failed",
         error.OutOfMemory => "out of memory",
         error.IoError => "io error",
+        error.TlsCertRejected => "tls certificate rejected",
+        error.TlsNoCa => "no usable CA bundle (system trust store not found)",
         // 底层 std 错误聚合为 io_error（与 statusOf 语义一致）
         else => "io error",
     };
@@ -114,4 +129,18 @@ test "错误 → 状态码 → 错误 往返一致" {
 test "未知错误聚合为 io_error" {
     try std.testing.expectEqual(Status.io_error, statusOf(error.FileNotFound));
     try std.testing.expectEqual(Status.io_error, statusOf(error.AccessDenied));
+}
+
+test "证书类错误单独暴露（不得折叠为 io_error）" {
+    // 宿主据此换信任源（Dart 整曲下载）而不是换引擎；两引擎共用同一系统信任库。
+    try std.testing.expectEqual(Status.tls_cert_rejected, statusOf(error.TlsCertRejected));
+    try std.testing.expectEqual(Status.tls_no_ca, statusOf(error.TlsNoCa));
+    try std.testing.expectEqualStrings("tls certificate rejected", messageOf(error.TlsCertRejected));
+    try std.testing.expectEqualStrings(
+        "no usable CA bundle (system trust store not found)",
+        messageOf(error.TlsNoCa),
+    );
+    // 传输类错误仍聚合为 io_error。
+    try std.testing.expectEqual(Status.io_error, statusOf(error.TlsFailed));
+    try std.testing.expectEqual(Status.io_error, statusOf(error.ConnectFailed));
 }

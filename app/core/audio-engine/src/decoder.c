@@ -217,9 +217,12 @@ const char *decoder_http_ca_file(void)
         "/usr/local/etc/openssl/cert.pem",
         "/opt/homebrew/etc/openssl@3/cert.pem",
 #else
-        "/etc/ssl/certs/ca-certificates.crt",   /* Debian/Ubuntu/Arch */
-        "/etc/pki/tls/certs/ca-bundle.crt",     /* Fedora/RHEL */
-        "/etc/ssl/cert.pem",                    /* Alpine */
+        "/etc/ssl/certs/ca-certificates.crt",            /* Debian/Ubuntu/Arch/Gentoo */
+        "/etc/pki/tls/certs/ca-bundle.crt",              /* Fedora/RHEL 6 */
+        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", /* CentOS/RHEL 7+ */
+        "/etc/ssl/ca-bundle.pem",                        /* openSUSE/SLES */
+        "/etc/ssl/cert.pem",                             /* Alpine */
+        "/etc/ca-certificates/extracted/tls-ca-bundle.pem", /* Arch 软链真实目标 */
         "/etc/ssl/certs/ca-bundle.crt",
 #endif
     };

@@ -54,7 +54,10 @@
     该脚本同时构建**自包含 mbedTLS**（Apache-2.0）并 `--enable-mbedtls` + `--enable-version3` +
     `https,tls`（mbedTLS 被 FFmpeg 列为 version3 依赖，故产物许可为 **LGPL-3.0-or-later**），
     使 FFmpeg 能直连 https（首次运行会联网下载并编译 mbedTLS/FFmpeg；旧的无 TLS 前缀会被
-    自动重建，判定标记 `$HOME/.local/ffmpeg-minimal/.mbedtls-tls`）。
+    自动重建，判定标记 `$HOME/.local/ffmpeg-minimal/.mbedtls-system-ca`）。
+    脚本会应用固定版本补丁 `app/core/ffmpeg-patches/ffmpeg-<版本>-mbedtls-system-ca.patch`：
+    mbedTLS 后端在未显式给 `ca_file` 时按 `SSL_CERT_FILE` → `SSL_CERT_DIR` → 发行版标准
+    位置回退系统信任库（与 OpenSSL/GnuTLS 语义一致；升级 FFmpeg 版本时需同步该补丁）。
     Windows 侧走 vcpkg（`app/vcpkg.json`）：FFmpeg 未启用 `openssl` 特性时由端口自动
     `--enable-schannel`，用 **Windows 原生 Schannel** 提供 https，无额外 DLL。
     引擎只链自建库（内嵌后仅依赖 libc/libm/libz），跨发行版可运行，且满足 LGPL 合规。

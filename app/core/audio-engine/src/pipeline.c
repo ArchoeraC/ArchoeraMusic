@@ -311,6 +311,14 @@ static int pipeline_era_url_open(AudioPipeline *p, const char *url)
                         ninfo.format_name ? ninfo.format_name : "?");
                 return 0;
             }
+            if (nst == 9 /* ZK_TLS_CERT_REJECTED */ || nst == 10 /* ZK_TLS_NO_CA */) {
+                /* 证书被拒 / 无信任库：FFmpeg AVIO 用同一份系统信任库，必然同样失败，
+                 * 不做无意义的重发（避免二次连接 + 掩盖真实原因）。 */
+                ERA_LOGW(NULL, "%s EraAudio: 原生 HTTP TLS 信任问题 (status=%d %s)"
+                                " → 跳过 FFmpeg AVIO\n",
+                        LOG_TAG, nst, p->native_err[0] ? p->native_err : "");
+                return -1;
+            }
             ERA_LOGW(NULL,
                     "%s EraAudio: 原生 HTTP 未接管 (status=%d %s)"
                     " → 回退 FFmpeg AVIO 宿主传输（将重新发起 HTTP 请求）\n",
@@ -422,13 +430,18 @@ static AudioPipeline* pipeline_create_impl(const char *source,
                                             SegStore *store,
                                             const EngineConfig *cfg,
                                             OutputCallback output,
-                                            void *user)
+                                            void *user,
+                                            int *open_status)
 {
+    if (open_status) *open_status = 0;
     if (!cfg || !output) return NULL;
     if (!store && !source) return NULL;
 
     AudioPipeline *p = calloc(1, sizeof(*p));
     if (!p) return NULL;
+    /* 源是否已成功打开：只有「源打开失败」才把 native_status 交给宿主
+     * （与源无关的失败——分配/处理模块创建——不写，避免误导降级策略）。 */
+    bool source_ready = false;
 
     p->cfg = *cfg;
     p->headers = headers;
@@ -488,6 +501,17 @@ static AudioPipeline* pipeline_create_impl(const char *source,
                 p->native_status = 1; /* ZK_UNSUPPORTED */
                 ERA_LOGW(NULL, "%s EraAudio: 扩展名未接管 → 直接 FFmpeg\n", LOG_TAG);
             } else if (pipeline_era_url_open(p, source) != 0) {
+                /* TLS 信任问题（证书被拒 / 无信任库）：FFmpeg 与内核共用同一份
+                 * 系统信任库，回落 FFmpeg 只会用同一原因再失败一次 → 直接上抛
+                 * 精确状态码，宿主据此换**信任源**（如 Dart 整曲下载）或提示用户。 */
+                if (p->native_status == 9 /* ZK_TLS_CERT_REJECTED */ ||
+                    p->native_status == 10 /* ZK_TLS_NO_CA */) {
+                    ERA_LOGW(NULL, "%s EraAudio: TLS 信任问题 (status=%d %s)"
+                                    " → 不回落 FFmpeg\n",
+                            LOG_TAG, p->native_status,
+                            p->native_err[0] ? p->native_err : "");
+                    goto fail;
+                }
                 ERA_LOGW(NULL, "%s EraAudio: 在线源不可用/未接管"
                                 " (status=%d %s) → 回退 FFmpeg（将重新发起 HTTP 请求）\n",
                         LOG_TAG, p->native_status,
@@ -544,6 +568,8 @@ static AudioPipeline* pipeline_create_impl(const char *source,
             goto fail;
         }
     }
+
+    source_ready = true;
 
     /* F5：记录实际解码后端（"zig" = 自研内核接管；"ffmpeg" = 兜底/未接管）。
      * 在解码器选定后立即落定，供 ready 事件上报与接管率监控。 */
@@ -744,6 +770,9 @@ static AudioPipeline* pipeline_create_impl(const char *source,
     return p;
 
 fail:
+    /* 源打开失败：把稳定状态码交给宿主（8=传输失败 / 9=证书被拒 / 10=无信任库 /
+     * 1=未接管…），供其选择降级策略（换信任源 / 提示）。与源无关的失败不写 0 以外的值。 */
+    if (open_status && p && !source_ready) *open_status = p->native_status;
     pipeline_destroy(p);
     return NULL;
 }
@@ -754,7 +783,7 @@ AudioPipeline* pipeline_create(const char *source,
                                 OutputCallback output,
                                 void *user)
 {
-    return pipeline_create_impl(source, NULL, NULL, cfg, output, user);
+    return pipeline_create_impl(source, NULL, NULL, cfg, output, user, NULL);
 }
 
 AudioPipeline* pipeline_create_with_headers(const char *source,
@@ -763,7 +792,17 @@ AudioPipeline* pipeline_create_with_headers(const char *source,
                                             OutputCallback output,
                                             void *user)
 {
-    return pipeline_create_impl(source, headers, NULL, cfg, output, user);
+    return pipeline_create_impl(source, headers, NULL, cfg, output, user, NULL);
+}
+
+AudioPipeline* pipeline_create_with_headers_status(const char *source,
+                                                   const char *headers,
+                                                   const EngineConfig *cfg,
+                                                   OutputCallback output,
+                                                   void *user,
+                                                   int *open_status)
+{
+    return pipeline_create_impl(source, headers, NULL, cfg, output, user, open_status);
 }
 
 /* SegStore 内存源（docs/audio-memory-source.md §7）：整曲已在 store、可 seek；
@@ -773,7 +812,7 @@ AudioPipeline* pipeline_create_store(SegStore *store,
                                       OutputCallback output,
                                       void *user)
 {
-    return pipeline_create_impl(NULL, NULL, store, cfg, output, user);
+    return pipeline_create_impl(NULL, NULL, store, cfg, output, user, NULL);
 }
 
 /* 处理链前段（不含 tempo/fft）：低频管理 → 参数化 EQ → 固定 EQ → 响度 →

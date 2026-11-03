@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 流式会话能力（docs/engine-master-pool-design.md §6.3 的池内内部形态，不接 C 壳）
+//! 流式会话能力（docs/archive/engine-master-pool-design.md §6.3 的池内内部形态，不接 C 壳）
 //!
 //! 长流（播放/长 decode）＝跨多次"拉块步骤"共享**同一解码器实例**的会话：
 //!   - `open(path)`：先分配会话壳；`start(rt)` 在池 worker 上做 probe+open（一次），

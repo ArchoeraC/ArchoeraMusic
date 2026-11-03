@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 常驻内核 runtime：Master 停机/懒就绪协调 + 同质 worker 池（docs/engine-master-pool-design.md §9 ②）
+//! 常驻内核 runtime：Master 停机/懒就绪协调 + 同质 worker 池（docs/archive/engine-master-pool-design.md §9 ②）
 //!
 //! 范围（用户定 2026-09-09：先完整修好内部、测试层可测，不接生产线）：
 //!   - `init(cfg)`：bootstrap 同步建 Master 事件线程；`min_workers>0` 同时建对应个

@@ -11,6 +11,8 @@
 ///   - `started` 在 ready 收敛（流式下首块 PCM 即出声前）；
 ///   - `done` 延后到曲尾，不得作为启动信号；
 ///   - ready 前的 error/exited 使 `started` 抛错收敛（启动失败可走失败分支）；
+///   - error 事件携带的 `status`（内核 ZkStatus）保留在 `EngineStartError` 上，
+///     供上层区分「网络问题」与「TLS 信任问题」（9/10 → 换信任源重试）；
 ///   - stop() 主动放弃会话时放行 pending started/done（切歌不挂等）。
 library;
 
@@ -106,5 +108,25 @@ void main() {
     // 均应在 stop 后立即正常完成（而非永远 pending / 抛错）。
     await engine.started.timeout(const Duration(seconds: 2));
     await engine.done.timeout(const Duration(seconds: 2));
+  });
+
+  test('error 事件带 status：EngineStartError 携带内核状态码（TLS 降级依据）', () async {
+    final engine = AudioEngineProcess.testHarness();
+    try {
+      // C 侧打开失败会带 "status"（9=证书被拒 / 10=无信任库）；上层据此换信任源。
+      engine.feedControlLine(
+        '{"type":"error","message":"pipeline create failed","status":9}',
+      );
+      await expectLater(
+        engine.started.timeout(const Duration(seconds: 2)),
+        throwsA(
+          isA<EngineStartError>()
+              .having((e) => e.status, 'status', 9)
+              .having((e) => e.message, 'message', contains('引擎错误')),
+        ),
+      );
+    } finally {
+      await engine.stop();
+    }
   });
 }
