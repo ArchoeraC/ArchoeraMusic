@@ -8,7 +8,7 @@
 > 第五批（发布供应链，SEC-21/22/23/24/25/26/27）已完成（8e0aee31）——CI/签名溯源加固见
 > [supply-chain.md](supply-chain.md)；SEC-22 经 GitHub ruleset 开启 Code Owners 评审。
 > **第六批（残留代码加固，2026-10-12）**：SEC-09 单字母查询键 `p/t/s` 上下文掩码（原生 `archoera_log_scrub` + Dart `Log.scrub`）、
-> SEC-05 退避状态内嵌 `master-share` 份额槽位（[ShareBundle](../app/core/vault/src/ShareBundle.cs)）、
+> SEC-05 退避状态内嵌 `master-share` 份额槽位（[ShareBundle](../app/core/vault-rs/src/share.rs)）、
 > SEC-08 构建期 FFI 库 SHA-256 完整性清单 + 运行期校验（[native_integrity.dart](../app/lib/services/native_integrity.dart)）、
 > SEC-10 MCP 访问密钥改由凭据保险库承载（`prefs.json` 不再落明文）。逐项状态见 §1。
 > **第七批（架构收敛，2026-10-12）**：SEC-19 删除测试明文后端 `InsecureFileStore` / `ARCHOERA_VAULT_INSECURE_FILE_STORE`
@@ -55,12 +55,12 @@
 > Dart 在桥接 `apl_init` 后立即调用；release 生效。复验：不再产 core。**`PR_SET_DUMPABLE=0` / `PT_DENY_ATTACH` 已撤回**
 > —— 实测会打断 vault 父进程血缘校验（读父 exe 被内核拒绝）致凭据库不可用；同用户读内存属 SEC-25 残余。
 > 证据与残余见 §8.6。**同批**：Linux `crypto`（LEGACY）后端由 V1 桩补为**纯 Rust D-Bus/Secret Service 真实现**
-> （兼容 KDE `CreateItem` 签名差异；无新依赖、沙箱未改；`crypto` 在 Linux 恢复可用）——补齐 [credential-vault-plan.md](credential-vault-plan.md) §8 的「libsecret 真机待验证」。
+> （兼容 KDE `CreateItem` 签名差异；无新依赖、沙箱未改；`crypto` 在 Linux 恢复可用）——补齐 [archive/credential-vault-plan.md](archive/credential-vault-plan.md) §8 的「libsecret 真机待验证」。
 > 修复后逐项把「状态」改为「已修复」并注明提交 / 版本
 > 范围：**文档层评审**——只读仓库文档与安全相关配置（CI 工作流 / 打包 / 工具脚本 / hooks），未做代码审计、未运行程序；
 > 重点为 **vault 文档未覆盖**的风险面，第二轮（2026-10-11）扩面到 **CI / 发布供应链** 与 **平台能力 / 子系统 / 文档一致性**。
-> 关联规范：[vault-security-notes.md](vault-security-notes.md)（vault 安全声明规范文本）· [credential-vault-plan.md](credential-vault-plan.md) ·
-> [device-bound-vault-plan.md](device-bound-vault-plan.md) · [vault-scheme-comparison.md](vault-scheme-comparison.md) · [SECURITY.md](../SECURITY.md)
+> 关联规范：[vault-security-notes.md](vault-security-notes.md)（vault 安全声明规范文本）· [archive/credential-vault-plan.md](archive/credential-vault-plan.md) ·
+> [archive/device-bound-vault-plan.md](archive/device-bound-vault-plan.md) · [vault-scheme-comparison.md](vault-scheme-comparison.md) · [SECURITY.md](../SECURITY.md)
 > 使用方式：修复以本表 ID 为准；新增发现追加编号，不删旧项（保留审计轨迹）。
 
 ---
@@ -74,7 +74,7 @@
   `.github/actions/build-linux/action.yml`、`.github/CODEOWNERS`）、打包（`packaging/windows/archoera_music.iss`、
   `packaging/linux/*`）、工具脚本（`app/tool/sign_release.sh` / `verify_release.sh` / `sign_watermark.sh`）、
   hooks（`.githooks/pre-commit`）、平台能力（`platform-native-bridge.md` / `platform-capability-facade.md` /
-  `CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md` / `module-on-demand-load-plan.md`）与内存稿
+  `archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md` / `module-on-demand-load-plan.md`）与内存稿
   （`MEMORY_AND_TRIMMING_DEEP_DIVE.md`）。
 - **边界**：本文档所述为**文档描述 / 配置可推出的风险**，是否真实可利用须经代码审计与真机验证确认；
   文档引用行号可能随后续编辑漂移，以**章节标题**为准。
@@ -113,7 +113,7 @@
 | SEC-25 | 中 | 无构建溯源 / SBOM；macOS 仅 ad-hoc、Windows 未签名（信任根承诺未兑现） | sign_release.sh；build-all.yml（ad-hoc 注释） | — | 已修复（第五批，8e0aee31：provenance+SBOM；**本轮重构 2026-10**：**OS 代码签名不推进**——应用层 **key1 签名清单（F5/SEC-08）为信任根**，分发渠道靠包管理器/外层 `.sig1`；替换主程序/同用户注入属**已声明硬上限残余**，见 supply-chain §2） |
 | SEC-26 | 中 | 无依赖漏洞扫描（无 dependabot / 各生态 audit） | .github；robustness-improvement-plan §3-12 | — | 已修复（第五批，8e0aee31：dependabot.yml + security-audit.yml） |
 | SEC-27 | 中 | CI 测试面过窄（仅 widget/vault 冒烟，非全量） | actions/build-linux §Test | — | 已修复（第五批，8e0aee31：完整 flutter test + 各模块单测） |
-| SEC-28 | 中 | 过时设计稿主张运行期提权 + JVM 核心（违反红线） | CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md | — | 已修复（文档·第一批，ed17b5f1） |
+| SEC-28 | 中 | 过时设计稿主张运行期提权 + JVM 核心（违反红线） | archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-29 | 低 | 平台能力文档与现行架构/红线冲突（纯 Dart/插件通道 vs 原生桥接） | platform-capability-facade.md §4 vs §7.3 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-30 | 低 | `SystemLocation` 敏感权限缺授权/可关闭语义 | platform-capability-facade.md §2.1/§3 | — | 已修复（文档·第四批，a39ffd41） |
 | SEC-31 | 中 | deep link 与 `apl_reveal_path` 外部输入校验未声明 | platform-native-bridge.md §3.1 | — | 已修复（第四批，57ff8c8c） |
@@ -225,7 +225,7 @@
 
 - **现象**：引擎等库按**文件名**加载（`DynamicLibrary.open('libarchoera_mediaengine.so')`，依赖系统搜索路径），
   另有 `NativeLibPaths` 祖先链查找。
-- **证据**：`ffi-libs-layout-plan.md`（Dart 路径解析条目）；`vault-security-notes.md` 仅覆盖 vault 本体二进制。
+- **证据**：`archive/ffi-libs-layout-plan.md`（Dart 路径解析条目）；`vault-security-notes.md` 仅覆盖 vault 本体二进制。
 - **影响**：`LD_LIBRARY_PATH` / exe 同目录可写 / Windows DLL 搜索顺序 → 库加载劫持（属 L2，非 L4）；
   主程序与其余 7 个 FFI 库无完整性校验，vault marker 保护亦依赖 Dart 侧解析路径可靠。
 - **修复方向**：文档补充「加载顺序劫持」威胁项；加载改绝对路径 / 校验摘要；纳入 §8.5 的完整性清单待办。
@@ -270,7 +270,7 @@
 
 - **现象**：v3 设备绑定采集 `machine-id` / `MachineGuid` / `IOPlatformUUID`；下载器持久化用户级设备身份（默认开启）。
 - **证据**：`CONTRIBUTING.md` §2.5 红线明文禁止「设备指纹、持久化设备 ID、跨会话跨启动追踪」能力；
-  `device-bound-vault-plan.md` §5.1（指纹采集表）；`downloader-identity-plan.md` §3.1（「同一用户 → 指纹稳定（首次生成后不变）」，prefs 持久化）；
+  `archive/device-bound-vault-plan.md` §5.1（指纹采集表）；`downloader-identity-plan.md` §3.1（「同一用户 → 指纹稳定（首次生成后不变）」，prefs 持久化）；
   `privacy.md` §二 仅在凭据描述里带「v3 设备绑定」字样，**未披露读取硬件设备标识或持久化设备身份**。
 - **影响**：文档层面自相矛盾 + 隐私披露缺口（v3 有 in-app 提示，downloader identity 默认开启且无披露）。
 - **修复方向**：统一口径——要么修订 §2.5 红线为「禁止**上传 / 跨应用追踪**，本地设备绑定属列举例外」并补隐私政策披露，
@@ -390,7 +390,7 @@
 
 ### SEC-28 · 过时设计稿主张运行期提权 + JVM 核心（违反红线）
 
-- **现象**：`docs/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md` §3/§4/§5 把 **提权触发（UAC / `osascript` / `AuthorizationServices` / `sudo` / `pkexec`）**
+- **现象**：`docs/archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md` §3/§4/§5 把 **提权触发（UAC / `osascript` / `AuthorizationServices` / `sudo` / `pkexec`）**
   与 `drop_caches`（需 root）列为能力，并建议核心逻辑用 **Kotlin Multiplatform（JVM）** 承载。
 - **冲突**：与 `AGENTS.md`「运行期一律不得请求提权…需要提权才能实现的能力**放弃或降级**」及
   `CONTRIBUTING.md` §2.2「禁止非 FFI 大运行时（Node/Python/**JVM**）」直接冲突；

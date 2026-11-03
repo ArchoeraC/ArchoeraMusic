@@ -715,7 +715,8 @@ pub const Reader = struct {
 >   形状 `NekoMusic-<平台>/<版本>`（不冒名 Android、不伪装浏览器）。`decoder_apply_http_headers`
 >   仍对空值写 `user_agent`，但 Neko 源不再发空 UA。详见 `docs/neko-source-identity.md`。
 > - FFmpeg 在线 TLS：Linux/macOS 由 `build-ffmpeg-minimal.sh` 构建**自包含 mbedTLS**
->   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-tls` 标记重建）；
+>   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-system-ca`
+>   标记重建，并应用 `patches/ffmpeg-9.0.1-mbedtls-system-ca.patch` 让其回退系统信任库）；
 >   Windows 经 vcpkg ffmpeg 端口的 **Schannel**（未启用 `openssl` 特性时自动
 >   `--enable-schannel`，无额外 DLL，保持 LGPL-2.1+）。
 > - 验收：`kernel/net.zig` 新增「自定义请求头随请求发送」用例，`zig build test` 731 项全绿；
@@ -736,6 +737,32 @@ pub const Reader = struct {
 >   归入 `io_error`（跨语言状态码表不变）。
 > - 验收：`kernel/net.zig` 新增 `isLocalHost` / `checkRedirectPolicy` 单测（回环/私网/链路本地/
 >   IPv4-mapped/公网、降级与公网→内网拒绝、自建源放行）；`zig build test` 744 项全绿。
+>
+> **落地（2026-11-02）：原生 HTTPS 信任源可诊断化**
+> - 背景：内核与 FFmpeg 共用同一份系统信任库；`TlsCertificateNotVerified` 此前被统一折叠成
+>   `TlsFailed`，宿主无法区分「网络抖动」与「证书不认」，只能换引擎重试——而换引擎并不会
+>   换信任源，必然同样失败（共模故障）。
+> - 内核（`kernel/net.zig`）：CA bundle 改为**进程级单例**（首次 https 惰性加载；失败不缓存，
+>   装好证书后无需重启）。发现顺序逐层降级、每层单点失败只 `catch {}`，不因发行版差异整体失败：
+>   ① `SSL_CERT_FILE` / `NIX_SSL_CERT_FILE` / `CURL_CA_BUNDLE`、`SSL_CERT_DIR`（`:` 分隔，OpenSSL 语义）
+>   ② 平台原生证书库（Windows CryptoAPI / macOS Keychain，含企业策略与用户导入）
+>   ③ 发行版 bundle 文件（Debian/Fedora/RHEL/openSUSE/Alpine/NetBSD/Homebrew/Flatpak·Snap 宿主）
+>   ④ 管理员锚点目录（`/usr/local/share/ca-certificates`、`/etc/pki/ca-trust/source/anchors` 等）
+>   ⑤ 逐证书目录（哈希软链布局）⑥ std `rescan()` 兜底（BSD/illumos/Haiku）。
+>   全部为空才报 `TlsNoCa`（`rescan` 返回空 bundle 不再算成功）；命中来源与根证书数量记 DEBUG 日志。
+>   握手把 `error.TlsCertificateNotVerified` 映射为新增的 `NetError.TlsCertRejected`。
+> - 跨语言契约：`error.zig` 新增 `Status.tls_cert_rejected = 9` / `tls_no_ca = 10`
+>   （`include/kernel_bridge.h` 的 `ZK_TLS_CERT_REJECTED` / `ZK_TLS_NO_CA` 同步）；`pipeline.c`
+>   在原生 HTTP 返回 9/10 时**不再回落 FFmpeg**（同一信任库，必然同样失败），
+>   `pipeline_create_with_headers_status` 把状态交给宿主，`mediaengine_lib` 在打开失败的
+>   `error` 事件里带上 `status`。
+> - 宿主（Dart）：`EngineStartError` 携带该状态码；播放链路收到 9/10 时绕过
+>   `streamDirectOnly`（如 B 站），改走 **Dart 整曲下载**（SDK 内置 Mozilla 根证书）重试一次，
+>   失败才报错——不再静默跳歌。
+> - 验收：`zig build test` 760 项全绿、`ctest` 38/38；B 站真实直链（`*.mcdn.bilivideo.cn:8082`）实测——
+>   系统库 → `status=0`；`SSL_CERT_FILE=<无关自签证书>` → `status=9`（日志确认「跳过 FFmpeg AVIO /
+>   不回落 FFmpeg」）；`SSL_CERT_FILE=<不存在>` → 回落系统库 `status=0`；空 `/etc/ssl`
+>   （mount namespace）→ `status=10`；`flutter test` 1090 项全绿。
 
 > **落地（2026-09-21）：callback 形态已从「预留」转为「已接入」**
 > - 内核：`io.Reader.openCallback` + `decoder.openReader`；新导出 `zk_decoder_open_cb`
@@ -890,7 +917,7 @@ fn open(path, info) !Decoder {
 
 ```
 宿主 / C 壳（FFI 调用面；内核已自持 Master + Pool 线程，§16.1 修订 2026-09-09，
-见 docs/engine-master-pool-design.md）
+见 docs/archive/engine-master-pool-design.md）
    │  open(src: path | memory | http://…)
    ▼
 kernel.Registry（主控：簿记 + 限额 + 懒加载，全局一份）
@@ -906,7 +933,7 @@ kernel.Registry（主控：簿记 + 限额 + 懒加载，全局一份）
    一切运行时状态（比特流游标、预测器、pts、Reader 位置）只存在于实例 ctx。实例绝不写模块共享区，
    否则 128 路互相污染 → 杂音/崩溃。现状 `fmt/*` 已是该形态，注册表不改变此约定。
 2. **内核自持调度线程（修订 2026-09-09，取代原不变量 2"内核不持线程"）**：主控 = Master 事件
-   线程 + Pool worker，**全归 Zig 内核持有**（`docs/engine-master-pool-design.md` §2.1/§3.1/§5.4）；
+   线程 + Pool worker，**全归 Zig 内核持有**（`docs/archive/engine-master-pool-design.md` §2.1/§3.1/§5.4）；
    主控只做"簿记 + 分派 + §5.5 容量调节"，运行期零堆分配、无失败路径、不做解码。并发执行在池内
    M 线程。簿记计数用原子量即可，无需锁。sync 直通（调用线程驱动单实例）保留为回归基线。
 3. **零拷贝边界**（PDF/方案共识）：`Sync-Direct` 单线程路径才可能零拷贝；一旦跨线程入队
@@ -930,7 +957,7 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 
 > 术语修订（2026-09-09，弃 await）：本小节「主控 Async」**不是语言级 async/await/协程**；
 > 内核采用阻塞 OS 线程 + 事件/状态驱动（`std.Io` condvar/信号 + 原子读格），解码恒 Sync。
-> 落地形态以 `docs/engine-master-pool-design.md` §3.1/§5.1 为准（Master 事件线程 = 事件驱动
+> 落地形态以 `docs/archive/engine-master-pool-design.md` §3.1/§5.1 为准（Master 事件线程 = 事件驱动
 > 编排，无 await；timed wait 仅低频兜底且由 `task.waitEventTimeout` 保证）。
 
 > **定位（2026-09-08 修订）：本小节属内核的「二次增强」，后置可选。** Phase G 核心（Registry +
@@ -944,7 +971,7 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 | 术语 | 含义 | 适用场景 | 不适用 / 注意 |
 |---|---|---|---|
 | **Sync 直解（Sync-Direct）** | 单线程、无队列、零拷贝：demux→decode→PCM 一步同步返回 | seek / 校验 / 单路精测 | 跨线程即失去零拷贝（§8.4 不变量 3） |
-| **Async 主控** | 主控事件驱动、非阻塞，只做派发 + 簿记 + §5.5 容量调节 | 高并发任务派发 | 修订 2026-09-09：主控落地为内核自持的 Master 事件线程（engine-master-pool-design.md §3.1），不再依赖宿主事件循环 |
+| **Async 主控** | 主控事件驱动、非阻塞，只做派发 + 簿记 + §5.5 容量调节 | 高并发任务派发 | 修订 2026-09-09：主控落地为内核自持的 Master 事件线程（archive/engine-master-pool-design.md §3.1），不再依赖宿主事件循环 |
 | **Sync 模块线** | 分到流的 OS 线程上同步逐帧解码（`Decoder.read()` 循环） | 一切解码执行 | 单流帧级串行；不做帧内并行 |
 | **完成即领（pull / eager-next）** | 短任务 Sync 线"干完一件立即向主控领下一件" | 批量 tag / 批量转码 / 扫描 | 需一次最小握手，不做"零同步" |
 | **按流分配 + 帧级分时驱动** | 长生命周期流每线持 1..K 路做帧级轮转 | 128 路播放 / HTTP 直连常驻 | 无"完成"事件；主控只管分配与回收 |
@@ -955,7 +982,7 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
    空闲线、接收"某线完工 / 某流待调度"事件、簿记。空闲时主控处于**等待事件**状态（事件循环 / 回调 /
    上层 async-await 语法糖），不占用任何解码线程。
    - Async 是主控的**逻辑形态**（修订 2026-09-09：主控落地为 Zig 内核自持的 Master 事件线程，
-     无需宿主提供事件循环/调度线程；见 `docs/engine-master-pool-design.md` §3.1/§5.4）。
+     无需宿主提供事件循环/调度线程；见 `docs/archive/engine-master-pool-design.md` §3.1/§5.4）。
 2. **模块工作线 = Sync（阻塞式顺序解码）**：每条"线"（宿主提供的 OS 线程）一旦分到流/任务，
    就在该线程内**同步**驱动实例逐帧解码（`Decoder.read()` 循环）。单流帧间有状态依赖（MP3 Huffman
    上下文 / FLAC 预测 / Opus 内部状态），必须串行——Sync 循环天然正确、零跨线同步。
@@ -1899,7 +1926,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   C ABI 需要时再扩展 `ZkInfo` 导出（不破坏既有字段布局）；
 - 线程模型（修订 2026-09-09，取代"内核本身不持线程，仅被 C 壳调用"）：**Zig 内核自持调度
   线程**——Master 事件线程 + Pool worker 由 `kernel_init` 创建、`kernel_shutdown` join（不变量
-  与设计见 `docs/engine-master-pool-design.md` §2.1/§3.1/§6）。`mediaengine_lib.c` 引擎线程与
+  与设计见 `docs/archive/engine-master-pool-design.md` §2.1/§3.1/§6）。`mediaengine_lib.c` 引擎线程与
   事件/命令 FIFO 原样保留——它驱动的 `zk_*` **sync 直通**退为回归/调试基线（该文档 §7）；
   生产播放迁池内流式会话（该文档 §6.3）。`fmt/*` 与 `Decoder` 仍保持纯 Sync 语义（无内部
   线程、无 async 状态机），由 Pool worker 或 sync 直通调用线程驱动。
@@ -1910,7 +1937,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   `max_frames` 帧 float32 交错到 `out` → 填 `info`（最小字段）」的池内任务，完工事件等待取
   结果（`task.Task`，无轮询）；返回语义与 `zk_engine_decode_once` 对齐（>=0 帧数（0=EOF）/
   <0 = -ZkStatus），解码体共用 `decodeInto`（单一来源）。任务槽满 / 停机 / 参数非法 → NULL
-  （`Host.submit` 满即拒 = `InstanceLimit`，`engine-master-pool-design.md` §5.4）。句柄与载体用
+  （`Host.submit` 满即拒 = `InstanceLimit`，`archive/engine-master-pool-design.md` §5.4）。句柄与载体用
   `std.heap.c_allocator`，`zk_task_free` 释放（内部先 wait 收尾，未 wait 直接 free 亦不悬垂；
   同一句柄只可 free 一次）。验收：`zig build test` 641/641；`tests/test_engine_pool.c`
   增补 submit==sync 逐样本对照 + cap=1 槽满拒绝（ctest 20/20）。
@@ -1935,9 +1962,9 @@ void        zk_dsp_destroy(ZkDspChain *d);
 - 解码来源切到 `zk_*` 桥接；SIGTERM → 桥接 `abort` + 优雅退出，UDS 生命周期与现状一致；
 - 不再需要 `cli.zig` / `std.getopts`（原设计作为 `main.c` 替代品，2026-08-16 架构调整后取消）。
 
-### 16.4 与 `engine-event-push-plan.md` 的衔接
+### 16.4 与 `archive/engine-event-push-plan.md` 的衔接
 
-> `engine-event-push-plan.md` 第一步「源头降频」（`set_event_interval` + position 合并）已落地；
+> `archive/engine-event-push-plan.md` 第一步「源头降频」（`set_event_interval` + position 合并）已落地；
 > 第二步「去轮询推送」（native port 唤醒替代 Dart 50ms 轮询）**尚未实施**。本次重构（C 壳保留、
 > Zig 内核接管解码/DSP）不改动事件 FIFO 与轮询契约（P5 不变量），第二步可在重构完成、输出层
 > 自研（§15 `device.zig`）期间一并评估——届时事件由设备音频帧驱动，天然具备推送能力。
@@ -2323,7 +2350,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
     （`kernel/net.zig` + `zk_decoder_open_url`，2026-10-01 落地，见 §6.1），宿主注入路径保留为回退。
      依据：FFmpeg 模型对高并发资源放大 + 用户对 FFmpeg 多线程/实例化开销不满（详见 §8.4 动机）。
      修订 2026-09-09：本项"主控不持线程、执行调度在宿主 worker 池"已被
-     `docs/engine-master-pool-design.md` 取代——执行调度线程（Master 事件线程 + Pool worker）
+     `docs/archive/engine-master-pool-design.md` 取代——执行调度线程（Master 事件线程 + Pool worker）
      内迁至 Zig 内核，主控仍只做簿记 / 分派 / §5.5 容量调节（详见该文档）。
 17. **执行与调度模型（2026-09-08，决策 #17）：主控 Async × 模块线 Sync + 完成即领（内核二次增强）**：
      定位为**后置可选**，Phase G 核心（Registry + §8.4.2 优先子项 #1–#4）不依赖，可先以纯 Sync 最小
@@ -2335,7 +2362,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
     + 每线 K 路帧级分时驱动，避免 1 流 = 1 线重模型。tag 批量确认适用完成即领。单流内不做帧级
     async/多线程（状态依赖 + 协程不适配 CPU 密集解码）。爆炸源（复用 FFmpeg 通用解码循环的 per-instance
      完整上下文）随逐格式接管消解，调度模型不放大开销（§8.4.1）。
-     修订 2026-09-09：本项执行形态已由 `docs/engine-master-pool-design.md` 落地为 Zig 内核内的
+     修订 2026-09-09：本项执行形态已由 `docs/archive/engine-master-pool-design.md` 落地为 Zig 内核内的
      Master async 事件线程 + M 条 Sync worker（worker 不自建、不自杀；线程创建/退出归 Master
      async 独占；任务切换仅限完全空闲边界）。"长流每线 K 路帧级分时"取消，改 **pinned 1:1
      流式会话**（该文档 §6.3）。
@@ -2365,7 +2392,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
     **③ 更多格式接管**（Musepack SV7 / Shorten / 白名单与内核 Info 兜底 / 接管门控）、
     **④ 性能/内存**（公共 PCM 地板 / 实例内存池 / B 档授权提速）、
     **⑤ A/Sync 执行模型**（结构化 `zk_submit` + 长流池化收尾 + 容量调节器完整化 + 调度/容错增强，
-    架构以 `engine-master-pool-design.md` 为准）。架构与不变量仍以本文为准；
+    架构以 `archive/engine-master-pool-design.md` 为准）。架构与不变量仍以本文为准；
     具体排期与优先级在下一步确定。对应 §19 **Phase H**。
 22. **内核职责边界：只解码，不整体接管 Subsonic 服务端转码（2026-09-22 澄清）**：
     内核（EraAudio）为**解码侧**内核——解容器/编解码、采样转换、DSP 与可选封装，

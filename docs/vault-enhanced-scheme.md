@@ -4,7 +4,7 @@
 > 结论先行：**砍掉 v1（OS 钥匙串）/ v3（设备熵）/ v4（文件密钥）的分层**，只保留
 > **①手动口令模式（m1）** 与 **②增强模式（m2a 双因子 + 恢复码 / m2b 设备单因子）**，另保留 **crypto（默认，OS 存储 / file）**；
 > 并如实划清"防爆/防替换/防注入"在**无 OS 代码签名、无硬件安全模块**前提下的**可行边界**。关联：[vault-security-notes.md](vault-security-notes.md) ·
-> [credential-vault-plan.md](credential-vault-plan.md) · [security-review-2026-10-11.md](security-review-2026-10-11.md)。
+> [archive/credential-vault-plan.md](archive/credential-vault-plan.md) · [security-review-2026-10-11.md](security-review-2026-10-11.md)。
 >
 > **落地说明**：本文的 §0–§4、§6 已按实施结果修订；§5 的评估项标注了「已落地 / 未采纳」；
 > **§8/§9 的部分工程建议（二进制帧 IPC、流式解密、旧 v1–v4 读兼容）实为未落地项**，已就地标注，勿据原文误判。

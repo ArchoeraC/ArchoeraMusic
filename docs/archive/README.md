@@ -19,3 +19,10 @@
 | `benchmark-2026-09-10.md` | 基准快照 | 解码 scorecard 已被 09-21 取代 | `../benchmark-2026-09-21.md` |
 | `benchmark-industry-2026-09-05.md` | 行业基准快照 | 更早历史快照 | `../benchmark-2026-09-21.md` |
 | `test-suite-2026-09-10.md` | 测试套件快照 | 历史快照 | `../benchmark-2026-09-21.md` |
+| `CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md` | 建议稿 · 已被取代 | 文件自述 SUPERSEDED，勿据此实施 | `../platform-native-bridge.md` |
+| `device-bound-vault-plan.md` | 规划稿 · 已废弃 | 设备绑定方案已移除，仅存历史 | `../vault-security-notes.md` |
+| `ffi-libs-layout-plan.md` | 规划稿 · 已实施 | 三步全部完成，产物已稳定 | `../architecture.md` |
+| `credential-vault-plan.md` | 规划稿 · 已实施 | vault-1~4 + 口令模式全部完成 | `../vault-enhanced-scheme.md` |
+| `engine-master-pool-design.md` | 设计稿 · 已被取代 | 常驻池已落地，实现与设计稿不再一致 | `../audio-kernel-zig.md` |
+| `engine-event-push-plan.md` | 规划稿 · 已实施 | 事件推送与降频协商已落地 | `../platform-native-bridge.md` |
+| `third-party-source-migration-report.md` | 调研稿 · 已完成 | 结论已采纳，相关音源已上线 | `../download-module.md` |

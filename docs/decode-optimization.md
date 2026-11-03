@@ -12,7 +12,7 @@
 > 被 50× 实时封顶遮住了。**
 > 关联：[archive/benchmark-industry-2026-09-05.md](archive/benchmark-industry-2026-09-05.md)（评分口径）、
 > [audio-kernel-zig.md](audio-kernel-zig.md) §8.4.2（Phase G 优先子项，含基准先行）、
-> [engine-master-pool-design.md](engine-master-pool-design.md)（调度/并发侧，本专项与之正交）。
+> [archive/engine-master-pool-design.md](archive/engine-master-pool-design.md)（调度/并发侧，本专项与之正交）。
 
 ---
 
@@ -142,7 +142,7 @@ SCORE 计分 `speed = 40·min(1, R/50)`：**达到 50× 实时即满分**，之�
 worker 先 prepare"，不是另开线程算。
 
 **启动/开销硬约束（2026-09-10 用户定）**：**即使做了预计算，启动与常驻开销仍必须优于
-FFmpeg**（engine-master-pool-design.md §3 启动预算：冷/热首帧 wall 均压 FFmpeg）。
+FFmpeg**（archive/engine-master-pool-design.md §3 启动预算：冷/热首帧 wall 均压 FFmpeg）。
 落地要求：
 - **comptime 表零运行期成本**（编译期生成、只读数据段）——首选手段，不占启动/内存增长；
 - **实例 `prepare` 必须 O(小)、open 时一次、与解码同 worker**，其耗时计入首帧预算；

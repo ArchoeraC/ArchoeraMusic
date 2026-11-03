@@ -406,7 +406,7 @@ PR 描述需包含：
 
 ## 8. 文档规范
 
-- **设计文档**放 `docs/`，命名 kebab-case（如 `engine-master-pool-design.md`）；文首带
+- **设计文档**放 `docs/`，命名 kebab-case（如 `player-render-optimization.md`）；文首带
   `> 状态：<稿次> · <日期>` 头部；决策变更用「修订块」注明日期与结论，不无痕改写历史结论
   （对齐 `docs/architecture.md` 的写法）。
 - **影响架构决策的 PR 必须同步文档**：`docs/architecture.md`（含「附：已确认决策记录」追加条目）、
@@ -462,7 +462,7 @@ PR 描述需包含：
   - 支持的模式只有 **crypto（默认，`'C'`）** 与 **slots（`'S'`：m1 / m2a / m2b）**；其中 **m2b 为本机级·较弱**（单因子、无口令无恢复，推荐 `m1`/`m2a`）；旧 v1/v2/v3 模式与
     `init`/`init-password`/`init-device`/`switch-mode` 等命令**已移除**，旧 vault 无迁移（重置）；
   - PROD marker 双重校验（`--version` + 握手 marker）逻辑不得削弱，改动需同步
-    `docs/vault-security-notes.md` 与 `docs/credential-vault-plan.md`；
+    `docs/vault-security-notes.md` 与 `docs/archive/credential-vault-plan.md`；
     **注意其定位是「防误用测试构建」而非二进制完整性防护**（marker 为可自报字符串，可被自编译后门伪造）；
     应用层二进制完整性由 **key1 签名的原生完整性清单（F5）** 承接；
   - 新增 env 开关遵循同一信任边界思路：显式 env 只服务测试/CI，生产路径不得设置

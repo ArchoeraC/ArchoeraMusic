@@ -11,7 +11,7 @@
 > 关联：
 > [architecture.md](architecture.md)、
 > [runtime-resource-optimization.md](runtime-resource-optimization.md)（跨框架机制 + 全局长效方案）、
-> [CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md](CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md)。
+> [archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md](archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md)。
 
 ---
 
