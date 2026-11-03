@@ -1,6 +1,6 @@
 # 凭据保护方案比对：vault 新容器 vs 业界通用方案
 
-> 2026-10-12（2026-10 重构后重写） · 关联规划：[credential-vault-plan.md](credential-vault-plan.md) · [vault-enhanced-scheme.md](vault-enhanced-scheme.md)
+> 2026-10-12（2026-10 重构后重写） · 关联规划：[archive/credential-vault-plan.md](archive/credential-vault-plan.md) · [vault-enhanced-scheme.md](vault-enhanced-scheme.md)
 > ⚠️ 已知缺口与待修复项见 [security-review-2026-10-11.md](security-review-2026-10-11.md)（含 file 单因子声明缺口 SEC-02、应用层信任根 SEC-08/SEC-25）。
 > **重构说明**：旧的 v1（OS 2-of-2）/ v2（口令）/ v3（设备密封多封装）/ v4-file 分层已**移除**，统一为
 > **crypto（默认，`'C'`）** 与 **slots（`'S'`）容器（m1 / m2a / m2b）**；旧 vault 文件报「vault 版本不兼容」，无迁移。

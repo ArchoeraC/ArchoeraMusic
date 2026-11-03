@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Task 提交/完工层（进程内雏形；docs/engine-master-pool-design.md §6.1）
+//! Task 提交/完工层（进程内雏形；docs/archive/engine-master-pool-design.md §6.1）
 //!
 //! 宿主最终形态 = `submit(Task)→Handle` + wait_event 推 `Event{handle, kind: done|error|fatal}`。
 //! 本文件实现**进程内等价物**（用户定 2026-09-09：可测不接生产线）：

@@ -35,7 +35,9 @@ enum ZkStatus {
     ZK_ABORTED          = 5,
     ZK_SEEK_FAILED      = 6,
     ZK_OUT_OF_MEMORY    = 7,
-    ZK_IO_ERROR         = 8
+    ZK_IO_ERROR         = 8,
+    ZK_TLS_CERT_REJECTED = 9, /**< TLS 证书校验失败：换信任源（如 Dart 整曲下载），勿换引擎重试 */
+    ZK_TLS_NO_CA        = 10   /**< 无可用系统信任库（证书文件缺失/全不可读） */
 };
 
 /** ── 统一日志 sink（宿主注入，见 app/native/log/include/archoera_log.h）──
@@ -269,7 +271,7 @@ int zk_loudness_measure(const char *path, ZkLoudnessResult *out);
 
 /* ---- 常驻内核接入 seam（§7 async 主干；加法式，不改动既有路径）---- */
 
-/** 常驻内核句柄（不透明；内核池 + 定容任务槽，见 docs/engine-master-pool-design.md） */
+/** 常驻内核句柄（不透明；内核池 + 定容任务槽，见 docs/archive/engine-master-pool-design.md） */
 typedef struct ZkEngine ZkEngine;
 
 /**

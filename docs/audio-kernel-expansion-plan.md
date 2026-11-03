@@ -36,8 +36,8 @@
 | ① | **可听频段 DSP** | 把 C DSP 下沉 Zig 内核，并在**非次声（可听）频段**提供更丰富的处理 | DSP 仍是 C（`src/equalizer.c` 等），`zk_dsp_*` 仅在 `kernel_bridge.h` 预留；内核无 `dsp/` | `audio-kernel-zig.md` §14；`libfft.so` ABI |
 | ② | **在线流 / 非本地源** | 自研内核直接消费远端流，覆盖 Subsonic 之外的音源 | `zk_decoder_open_cb` + `Reader.callback` 已落地（2026-09-21）；应用侧接线、Range seek、断流恢复待做 | `audio-kernel-zig.md` §6.1 / §8.4；`audio-memory-source.md` |
 | ③ | **更多格式接管** | 补齐剩余长尾格式、拉高生产引擎接管率、打通曲库白名单 | 常见格式 L1 已清零；余 SV7 / Shorten 等；L2/L3 有缺口 | `format-support-matrix.md`；`audio-kernel-zig.md` §3.3/§3.7 |
-| ④ | **性能 / 内存** | 在「零新增缓冲」纪律下继续砍指令、收口常驻内存与启动 | A 档已吃尽、B 档暂停；TTA/DTS RSS 已收口 | `decode-optimization.md`；`engine-master-pool-design.md` |
-| ⑤ | **A/Sync 执行模型** | 把内核常驻池（EraSync）完整接入生产线并增强调度/容量/容错 | 核内已落地（runtime/task/session/khost），**尚未完整接线**；播放池化在 `ARCHOERA_ERA_POOL` 门控后 | `engine-master-pool-design.md`；`audio-kernel-zig.md` §8.4.1 |
+| ④ | **性能 / 内存** | 在「零新增缓冲」纪律下继续砍指令、收口常驻内存与启动 | A 档已吃尽、B 档暂停；TTA/DTS RSS 已收口 | `decode-optimization.md`；`archive/engine-master-pool-design.md` |
+| ⑤ | **A/Sync 执行模型** | 把内核常驻池（EraSync）完整接入生产线并增强调度/容量/容错 | 核内已落地（runtime/task/session/khost），**尚未完整接线**；播放池化在 `ARCHOERA_ERA_POOL` 门控后 | `archive/engine-master-pool-design.md`；`audio-kernel-zig.md` §8.4.1 |
 
 > **「非 subsonic 区域」的界定（方向①）**：音频链常见的低频管理是先用**次声/高通滤波器**（subsonic，
 > 约 <20 Hz 去隆隆声）打底，再在**其余可听频段**做处理。本方向即在「subsonic 打底之外的可听频段」
@@ -176,7 +176,7 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 | P2 | **B 档提速（需授权）** | mp3 `synthGranule`/`imdct36`、aac MDCT 等；每步过 corr 门禁与启动硬约束 |
 | P3 | **实例内存池 / Reader 复用** | `audio-kernel-zig.md` §8.4.2 #4，128 并发下消 malloc/free 风暴 |
 | P4 | **冷/热首帧与常驻 RSS 持续看护** | 每次改动复测，回退即回滚（`decode-optimization.md` §4.2 硬约束） |
-| P5 | **并发/批量基准** | 128 路混合格式的 fd/内存/CPU 受控（`engine-master-pool-design.md`） |
+| P5 | **并发/批量基准** | 128 路混合格式的 fd/内存/CPU 受控（`archive/engine-master-pool-design.md`） |
 
 ### 5.3 纪律
 
@@ -189,8 +189,8 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 ## 6. 方向⑤ A/Sync 执行模型加强
 
-> 架构权威见 [`engine-master-pool-design.md`](engine-master-pool-design.md)（Master async × Pool Sync、
-> 完成即领、容量调节器、流式会话）；语义定义见 `audio-kernel-zig.md` §8.4.1。本节只列**加强项与接线收尾**。
+> 架构权威见 [`audio-kernel-zig.md`](audio-kernel-zig.md) §8.4.1（历史设计稿：[`archive/engine-master-pool-design.md`](archive/engine-master-pool-design.md)，
+> Master async × Pool Sync、完成即领、容量调节器、流式会话）。本节只列**加强项与接线收尾**。
 
 ### 6.1 现状（核内已落地，生产线未完整接入）
 
@@ -202,7 +202,7 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 - **接线**：`zk_engine_init/shutdown/decode_once` + 流式 `zk_engine_open/read/seek_ms/position_ms/close`
   已在 `kernel_bridge.h`；播放侧可在 `ARCHOERA_ERA_POOL` 门控下切流式 seam（headless A/B 逐位一致）；
   scanner 元数据快路径 `zk_metadata_*` 已直桥。
-- **未完成**（`engine-master-pool-design.md` §9 明细）：wait_event 推 + 每线程独立 Io 语义；
+- **未完成**（`archive/engine-master-pool-design.md` §9 明细）：wait_event 推 + 每线程独立 Io 语义；
   长流的 worker 亲和（pinned 1:1）/ ring 直推 / waiting 停滞排除；§5.5 完整容量调节器；
   §5.3 对抗性任务防御；128 路批量 tag 与「播放 + 批量混杂」压测；`zk_submit` 结构化 FFI；
   Windows/MSVC 链接验证。
@@ -307,5 +307,5 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 - [decode-optimization.md](decode-optimization.md) —— 解码提速专项（方向④）
 - [format-support-matrix.md](format-support-matrix.md) —— 格式支持三维矩阵（方向③）
 - [audio-memory-playback.md](audio-memory-playback.md) / [audio-memory-source.md](audio-memory-source.md) —— 内存播放与源（方向②④）
-- [engine-master-pool-design.md](engine-master-pool-design.md) —— 主控/线程池架构（方向⑤ A/Sync 权威）
+- [archive/engine-master-pool-design.md](archive/engine-master-pool-design.md) —— 主控/线程池架构（方向⑤ A/Sync 权威）
 - [benchmark-2026-09-21.md](benchmark-2026-09-21.md) —— 最新基准
