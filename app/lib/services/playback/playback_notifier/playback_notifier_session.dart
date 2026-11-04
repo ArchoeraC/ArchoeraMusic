@@ -191,6 +191,8 @@ mixin _PlaybackNotifierSession
           fft: FftFrame(
             ldata: event.ldata,
             rdata: event.rdata,
+            lpeak: event.lpeak,
+            rpeak: event.rpeak,
             beatStrength: event.beat,
             intervalMs: event.intervalMs > 0
                 ? event.intervalMs

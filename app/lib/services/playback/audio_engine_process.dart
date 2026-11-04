@@ -101,6 +101,8 @@ class EngineFft extends EngineEvent {
   const EngineFft({
     required this.ldata,
     required this.rdata,
+    required this.lpeak,
+    required this.rpeak,
     required this.beat,
     required this.seq,
     required this.intervalMs,
@@ -110,6 +112,10 @@ class EngineFft extends EngineEvent {
 
   final List<double> ldata;
   final List<double> rdata;
+
+  /// 峰值保持线（与 [ldata]/[rdata] 同长度，0~1）。
+  final List<double> lpeak;
+  final List<double> rpeak;
 
   /// 节拍/瞬态脉冲强度 0~1（无脉冲为 0）。
   final double beat;
@@ -454,8 +460,9 @@ class AudioEngineProcess {
     return engine;
   }
 
-  /// 事件缓冲容量（对齐 pollEvent；事件行上限 EV_LINE 511，留余量）。
-  static const _eventBufCap = 2048;
+  /// 事件缓冲容量（对齐 pollEvent；常规事件行上限 511，频谱事件含
+  /// ldata/rdata/lpeak/rpeak 四组 8-bit 数组，预留 4KB）。
+  static const _eventBufCap = 4096;
 
   /// 接收 isolate 就绪握手哨兵（主 isolate 收到的首条消息；其后均为事件串）。
   static const int _enginePumpHandshake = 0x50_4D_50_21; // 'PMP!'
@@ -642,6 +649,8 @@ class AudioEngineProcess {
             EngineFft(
               ldata: _bands(map['ldata']),
               rdata: _bands(map['rdata']),
+              lpeak: _bands(map['lpeak']),
+              rpeak: _bands(map['rpeak']),
               beat: _unitValue(map['beat']),
               seq: (map['seq'] as num?)?.toInt() ?? 0,
               intervalMs: (map['interval_ms'] as num?)?.toInt() ?? 50,

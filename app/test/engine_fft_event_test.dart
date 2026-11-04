@@ -20,6 +20,8 @@ void main() {
     try {
       final l = List<double>.generate(128, (i) => i / 128);
       final r = List<double>.generate(128, (i) => 1 - i / 128);
+      final lp = List<double>.generate(128, (i) => (i + 1) / 129);
+      final rp = List<double>.generate(128, (i) => (128 - i) / 129);
       final next = engine.events
           .where((e) => e is EngineFft)
           .cast<EngineFft>()
@@ -35,12 +37,16 @@ void main() {
           'max_hz': 16000,
           'ldata': l,
           'rdata': r,
+          'lpeak': lp,
+          'rpeak': rp,
           'beat': 0.32,
         }),
       );
       final event = await next.timeout(const Duration(seconds: 2));
       expect(event.ldata, l);
       expect(event.rdata, r);
+      expect(event.lpeak, lp);
+      expect(event.rpeak, rp);
       expect(event.beat, closeTo(0.32, 1e-9));
       expect(event.seq, 42);
       expect(event.intervalMs, 300);
@@ -62,8 +68,12 @@ void main() {
       final event = await next.timeout(const Duration(seconds: 2));
       expect(event.ldata, hasLength(128));
       expect(event.rdata, hasLength(128));
+      expect(event.lpeak, hasLength(128));
+      expect(event.rpeak, hasLength(128));
       expect(event.ldata.every((v) => v == 0), isTrue);
       expect(event.rdata.every((v) => v == 0), isTrue);
+      expect(event.lpeak.every((v) => v == 0), isTrue);
+      expect(event.rpeak.every((v) => v == 0), isTrue);
       expect(event.beat, 0);
       expect(event.seq, 0);
       expect(event.intervalMs, 50);
@@ -135,6 +145,8 @@ void main() {
     const frame = FftFrame(
       ldata: [0.1],
       rdata: [0.2],
+      lpeak: [0.3],
+      rpeak: [0.4],
       beatStrength: 0.5,
       intervalMs: 50,
       seq: 7,
@@ -149,5 +161,7 @@ void main() {
     expect(next.beatStrength, 0.5);
     expect(identical(next.ldata, frame.ldata), isTrue);
     expect(identical(next.rdata, frame.rdata), isTrue);
+    expect(identical(next.lpeak, frame.lpeak), isTrue);
+    expect(identical(next.rpeak, frame.rpeak), isTrue);
   });
 }

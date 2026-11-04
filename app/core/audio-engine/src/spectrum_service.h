@@ -6,11 +6,11 @@
  * spectrum_service.h — 频谱 v2 引擎侧推送服务（docs/spectrum-analyzer.md §3/§5）
  *
  * 职责：独立线程按固定间隔读取「已播放位置」的 PCM 窗口 → 调内核
- * `zk_dsp_spectrum_*` 做多分辨率分析 → 通过 emit 回调把 128 带结果交给引擎
+ * `zk_dsp_spectrum_*` 做 VQT 分析 → 通过 emit 回调把 128 带结果交给引擎
  * 事件队列。纯计算在 kernel/dsp/spectrum.zig；本文件只做取窗、线程与节流。
  *
  * 约束：
- *   - 懒初始化：create 只分配服务壳，不建 FFT 表；首次 start 才创建分析器；
+ *   - 懒初始化：create 只分配服务壳，不建 VQT 核；首次 start 才创建分析器；
  *   - 零每帧分配：输入/输出缓冲在 create 时一次性分配；
  *   - 独立线程：不占用解码 worker 池，不在音频回调做 FFT；
  *   - 可丢：取窗失败 / 消费端慢时直接跳过本帧，绝不反压音频线程；
@@ -41,10 +41,13 @@ typedef int (*EraSpectrumReadFn)(void *ctx, int end_pos_ms, int frames,
 typedef int (*EraSpectrumPositionFn)(void *ctx);
 
 /**
- * 每帧回调：l/r 长度 [bins]，值域 [0,1]；beat 0..1；seq 单调递增；
- * interval_ms 为目标间隔（50/300/1000）。回调运行在频谱线程，不得阻塞。
+ * 每帧回调：l/r/peak_l/peak_r 长度 [bins]，值域 [0,1]；beat 0..1；
+ * seq 单调递增；interval_ms 为目标间隔（50/300/1000）。回调运行在频谱线程，
+ * 不得阻塞。
  */
-typedef void (*EraSpectrumEmitFn)(void *ctx, const float *l, const float *r,
+typedef void (*EraSpectrumEmitFn)(void *ctx,
+                                  const float *l, const float *r,
+                                  const float *peak_l, const float *peak_r,
                                   int bins, float beat, int seq,
                                   int interval_ms);
 
@@ -54,7 +57,7 @@ typedef struct EraSpectrumServiceConfig {
     float min_hz;         /**< 40 */
     float max_hz;         /**< 16000 */
     int interval_ms;      /**< 0 → 50 */
-    int frames;           /**< 取窗样本数；0 → 8192（低频 FFT 窗口） */
+    int frames;           /**< 取窗样本数；0 → 12288（VQT 最长窗） */
     EraSpectrumReadFn read;         /**< 必填 */
     EraSpectrumPositionFn position; /**< 必填 */
     EraSpectrumEmitFn emit;         /**< 必填 */

@@ -384,7 +384,7 @@ app/core/audio-engine/                # C 壳保留 + Zig 内核（FFmpeg 依赖
 │   │   ├── equalizer.zig             # 10 段 Biquad（移植现状 C）
 │   │   ├── loudness.zig              # EBU R128 增益（移植）
 │   │   ├── limiter.zig               # 限幅（移植）
-│   │   ├── spectrum.zig              # 频谱 v2 纯计算核心（多分辨率/对数带/通量）
+│   │   ├── spectrum.zig              # 频谱 v2.1 纯计算核心（VQT/AGC/γ/倾斜/峰值/通量）
 │   ├── tempo.zig                     # 自研 WSOLA（目标）；tempo-rs FFI 兜底（§9.6）
 │   ├── encode/
 │   │   ├── opus_encoder.zig          # libopus 编码（可选模块）
@@ -1821,7 +1821,7 @@ pub const Error = error{
 >
 > **频谱 v2（2026-11-04 落地）**：不再只是「把 `src/fft.c` 逐函数搬进 Zig」，
 > 而是把频谱分析整体下沉为内核能力：`kernel/dsp/spectrum.zig`（纯计算）+
-> `zk_dsp_spectrum_*`（C 壳/引擎事件推送）。频率扩到 40–16kHz、多分辨率 FFT、
+> `zk_dsp_spectrum_*`（C 壳/引擎事件推送）。频率扩到 40–16kHz、VQT 可变 Q、
 > 引擎侧 50ms 推送；详见 [`spectrum-analyzer.md`](spectrum-analyzer.md)。
 > **硬约束**：懒初始化、会话内表复用、独立频谱线程、零每帧分配，不得拖慢
 > 冷/热启动与解码线程池。App 播放路径不再使用旧 `libfft.so` ABI；`src/fft.c`
@@ -1830,13 +1830,13 @@ pub const Error = error{
 - `equalizer/loudness/limiter` 三个 DSP 模块把现状 C 实现**逐函数移植到 Zig**
   （语义对照移植，配套测试直接复用 `tests/test_equalizer.c` 等黄金断言）；
 - 频谱不走「逐函数照搬」：`kernel/dsp/spectrum.zig` 是 v2 纯计算核心
-  （多分辨率 FFT / 对数带 / dB / 频谱通量），引擎推送经 `zk_dsp_spectrum_*`
+  （VQT / 对数带 / AGC / γ / 倾斜 / dB / 峰值 / 频谱通量），引擎推送经 `zk_dsp_spectrum_*`
   桥接；App 播放路径不再使用旧 `libfft.so` 的 `fft_*` ABI；
 - 移植后经 `kernel_bridge.h`（`zk_dsp_*`）被 C 壳 `pipeline.c` 调用；现状
   `equalizer.c/loudness.c/limiter.c` 在移植完成前保留为过渡实现（§4.1），
   移植完成后删除；`src/fft.c` 仅保留给未迁移的 CLI/测试，不属于 v2 契约；
 - `libfft.so` 的旧 `fft_*` ABI **不再属于 App 播放路径**：v2 的唯一计算入口是
-  `zk_dsp_spectrum_*`（40–16kHz、多分辨率、-72..0dB）。旧 `fft_*` 不承诺
+  `zk_dsp_spectrum_*`（40–16kHz、VQT、AGC/γ/倾斜/峰值、-72..0dB）。旧 `fft_*` 不承诺
   兼容；需要 v2 的消费者直接链接内核。
 - **启动/线程约束**：频谱表在首次 `set_fft` 时懒建（当前每会话一次，<1ms），
   `reset` 只清状态；分析在独立频谱线程，不提交解码 worker 任务、不在音频回调
@@ -2235,7 +2235,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
 
 ### 17.4 集成冒烟与安全
 
-- 桌面：本地 flac/mp3/wav/ogg + **T1 全格式（alac/wv/ape/dsd/aiff/vorbis）**播放 + seek + FFT 拉模式
+- 桌面：本地 flac/mp3/wav/ogg + **T1 全格式（alac/wv/ape/dsd/aiff/vorbis）**播放 + seek + VQT 频谱事件
   + EQ/tempo 实时调整（AUTOPLAY 回归）；
 - 在线：网易云（mp3/flac）、酷狗（mp3/flac）、QQ 音乐（P1：mp3 或 m4a）；
 - 中断：SIGTERM / stop 正确退出，ASan/LeakSanitizer（`-fsanitize` 或 Zig Debug 模式）回归；

@@ -146,7 +146,7 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
   → 事件：事件 FIFO（ready/status/done/playing/position/ended/error）→ Dart 50ms
      定时 pollEvent 轮询 → EngineEvent（position 只留最新；set_event_interval 降频协商）
   → seek：miniaudio 即时 seek（不重启引擎、不重转码）
-  → FFT：引擎 `EraSpectrumService` 按播放位置取窗 → 多分辨率 FFT → 50ms `fft` 事件（§10.1）
+  → FFT：引擎 `EraSpectrumService` 按播放位置取窗 → VQT + AGC/γ/倾斜/峰值 → 50ms `fft` 事件（§10.1）
   → 停止：archoera_mediaengine_destroy（join 引擎线程 + 清会话目录）
 ```
 
@@ -164,7 +164,7 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
 
 **Seek**：完整转码落盘后由 **miniaudio 即时 seek**——不重启引擎、不重转码、无毛刺（2026-08-07 落地，取代原「libmpv 本地 seek」方案）
 **EQ/音量/变速变调实时调整**：命令 FIFO（`archoera_mediaengine_command`，JSON 命令）——Flutter `AudioEngineProcess.sendCommand` 直连调用
-**FFT 频谱**：引擎侧 `EraSpectrumService` 按播放位置取窗 → 多分辨率 FFT → 50ms `fft` 事件推送 → UI 纯接收（§10.1 / `spectrum-analyzer.md`）；旧拉模式不再保留
+**FFT 频谱**：引擎侧 `EraSpectrumService` 按播放位置取窗 → VQT + 显示增强 → 50ms `fft` 事件推送 → UI 纯接收（§10.1 / `spectrum-analyzer.md`）；旧拉模式不再保留
 **进度/状态**：事件 FIFO `pollEvent`（50ms 轮询，position 事件合并只留最新；`set_event_interval` 降频协商）
 **切歌**：`archoera_mediaengine_destroy`（join 引擎线程）+ 新建引擎实例（库内，无进程切换）；预加载下一首为 Phase 3 优化项
 
@@ -187,7 +187,7 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
 
 **FFT 与输出格式无关**
 - 管线顺序 `decode → resample → eq → loudness → limiter → tempo → **fft** → encode（可选）`：FFT 分析在编码**之前**
-- 数据链路：库内 PCM → 引擎频谱线程按播放位置取窗 → 多分辨率 FFT → 50ms `fft` 事件（§10.1）——与输出格式无关
+- 数据链路：库内 PCM → 引擎频谱线程按播放位置取窗 → VQT + AGC/γ/倾斜/峰值 → 50ms `fft` 事件（§10.1）——与输出格式无关
 
 **带宽分析（在线场景）**
 - 外网带宽只消耗在**源下载**；桌面端转码输出即本地文件（无网络开销）——播放与网络解耦，源下载抖动仅影响转码完成时间
@@ -384,7 +384,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 
 ### 10.1 音频频谱（FFT 可视化）
 
-> **v2 已落地（2026-11-04，破坏性更新）**：频率扩展到 40–16kHz、多分辨率 FFT、
+> **v2 已落地（2026-11-04，破坏性更新）**：频率扩展到 40–16kHz、VQT 可变 Q、
 > 引擎侧 50ms 事件推送、前端改为纯接收端。完整规格/验收见
 > [`spectrum-analyzer.md`](spectrum-analyzer.md)。旧拉模式与旧 `libfft.so` ABI
 > **App 播放路径不保留兼容**，按该文档 §8 直接替换。
@@ -397,8 +397,8 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
   ├─ 文件模式：stream.pcm（独立 FILE* + 增量索引）
   └─ 内存模式：进程内 PCM 块列表
         → EraSpectrumService（引擎独立线程，50ms）
-        → 多分辨率 FFT（8192 低频 + 2048 高频）+ 128 对数带 + dB/软膝 + 频谱通量
-        → {"type":"fft", ldata, rdata, beat, seq, interval_ms, ...}（8-bit 量化）
+        → VQT（128 带复解调）+ AGC/γ/倾斜 + dB/软膝 + 峰值 + 频谱通量
+        → {"type":"fft", ldata, rdata, lpeak, rpeak, beat, seq, ...}（8-bit 量化）
         → Dart PlaybackNotifier（只解析事件 → state.fft）
         → SpectrumView（只做帧间插值/显示平滑/绘制）
 ```

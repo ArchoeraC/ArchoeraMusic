@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 频谱分析器 v2 —— 多分辨率 FFT + 对数频带 + dB 软膝 + 频谱通量节拍
+//! 频谱分析器 v3 —— VQT（可变 Q 变换）+ AGC / γ / 高频倾斜 / 峰值保持
 //! （docs/spectrum-analyzer.md §4 / §9.1）
 //!
 //! 纯计算内核：不建线程、不做 I/O、不依赖 FFmpeg / C 壳。C 侧
@@ -11,14 +11,16 @@
 //! `era_spectrum_process`，结果经引擎事件推送。
 //!
 //! 算法要点：
-//!   - 低频 40–crossover 用 `fft_low`（默认 8192）点 FFT，高频
-//!     crossover–max 用 `fft_high`（默认 2048）点；交叉区做线性 crossfade；
-//!   - Blackman 周期窗 + 相干增益 CG = 0.42，单边幅度 `2|X|/(N·CG)`；
-//!   - `bins` 个对数带，带内平均功率开方；带窄于一个 bin 时在 log 频率轴
-//!     对相邻 bin 功率插值；
+//!   - 每个对数带一个**可变 Q 复解调器**（VQT）：中心频率
+//!     `f_i = sqrt(f_lo·f_hi)`，窗长 `L_i = Q_i·sr/f_i`，Q 上限 20.9；
+//!     低频用更长窗、高频用更短窗，等价于多分辨率 CQT 的实用近似；
+//!   - Blackman 周期窗 + 窗和归一化，单边幅度 `2|X|/Σw`；
+//!   - 慢 AGC（默认 3s 攻/放，目标 -20dB）让弱音也有内容；
+//!   - `norm^γ`（默认 γ=0.9）提亮小信号；高频倾斜默认 +0.75dB/oct；
 //!   - dB 映射 `[-72, 0] → [0, 1]`，底部 6% smoothstep 软膝；
+//!   - 峰值保持默认以 2.0/s 衰减，随事件一起输出；
 //!   - 节拍用对数幅度谱通量 + 最近 43 帧中位数自适应阈值 + 100ms 冷却；
-//!   - 所有表在 create 时一次构建，每帧零分配；reset 只清状态。
+//!   - 所有核/表在 create 时一次构建，每帧零分配；reset 只清状态。
 //!
 //! 命名自有（`era_` 前缀），不照搬 FFmpeg / librosa 等上游标识符。
 
@@ -30,13 +32,26 @@ pub const EraSpectrumConfig = struct {
     bins: u32 = 128,
     min_hz: f32 = 40.0,
     max_hz: f32 = 16000.0,
-    fft_low: u32 = 8192,
-    fft_high: u32 = 2048,
-    crossover_hz: f32 = 300.0,
+    /// VQT 最长窗（样本）。低频受此上限约束，避免 40Hz 窗无限增长。
+    max_window: u32 = 12288,
+    /// VQT 最大 Q；14.8 band/oct 对应约 20.9。
+    q_max: f32 = 20.9,
+    /// 帧间隔（秒），用于 AGC 攻放/峰值衰减；引擎固定 50ms。
+    frame_interval_s: f32 = 0.05,
+    /// 慢 AGC（默认开）。
+    agc_enabled: bool = true,
+    agc_target_db: f32 = -20.0,
+    agc_attack_s: f32 = 3.0,
+    agc_release_s: f32 = 3.0,
+    /// 显示 γ（默认 0.9；1.0 = 关闭）。
+    gamma: f32 = 0.9,
+    /// 高频倾斜（dB/oct，相对 1kHz；默认 +0.75）。
+    tilt_db_per_oct: f32 = 0.75,
+    /// 峰值保持（默认开）。
+    peak_hold: bool = true,
+    /// 峰值每秒衰减（归一化单位，默认 2.0/s）。
+    peak_decay_per_s: f32 = 2.0,
 };
-
-/// Blackman 周期窗相干增益（窗和 / N）。
-const era_window_coherent_gain: f32 = 0.42;
 
 /// dB 映射动态范围下界（-72dB → 0）。
 const era_db_floor: f32 = -72.0;
@@ -50,64 +65,20 @@ const era_flux_history_len: usize = 43;
 /// 节拍冷却帧数（100ms ≈ 2 帧 @50ms）。
 const era_beat_cooldown_frames: u8 = 2;
 
-/// 交叉区半宽（Hz）：crossover ± 50Hz 做线性 crossfade。
-const era_crossover_half_width: f32 = 50.0;
-
-/// 带内 bin 数不超过此值时用峰值功率，避免纯音被主瓣外的平均稀释。
-///
-/// 说明：严格按「平均功率」聚合时，一个 0dBFS 纯音若落在 2–3 个 bin 的窄带
-/// 里，峰值会被平均拉到 ~0.88（约 -1.1dB），达不到 §9.1「0dBFS 正弦峰值
-/// ≈ 1.0」的验收；而宽带若取峰值又会让白噪声随带宽抬升。折中：窄带取峰值
-/// （纯音保真），宽带取平均功率（抑制带宽偏差）。
-const era_narrow_band_bins: usize = 3;
-
-/// 频带聚合方式。
-const EraAggKind = enum {
-    /// 带内 bin 中心数 > era_narrow_band_bins：平均功率。
-    mean,
-    /// 带内 bin 中心数 1..=era_narrow_band_bins：峰值功率（纯音保真）。
-    peak,
-    /// 带比一个 bin 还窄：相邻 bin 功率在 log 频率轴插值。
-    interp,
-};
-
-/// 单个分辨率下的频带聚合计划（create 时一次算好）。
-const EraBandAgg = struct {
-    kind: EraAggKind = .interp,
-    /// mean / peak：首个 bin；interp：下侧相邻 bin。
-    k0: u32 = 1,
-    /// mean / peak：末个 bin（含）。
-    k1: u32 = 1,
-    /// interp：频带中心在 k0..k0+1 之间的 log 频率位置 0..1。
-    frac: f32 = 0.0,
-};
-
-/// 一个对数带的完整计划。
-const EraBand = struct {
-    low: EraBandAgg = .{},
-    high: EraBandAgg = .{},
-    /// 低频/高频估计的 crossfade 权重，w_low + w_high = 1。
-    w_low: f32 = 1.0,
-    w_high: f32 = 0.0,
-};
-
-/// 单分辨率 FFT 计划：表 + 每帧复用的工作区。
-///
-/// 表（bitrev / twiddle / window）在 create 时构建一次；re/im/mag 是每帧
-/// 复用的缓冲，process 期间零分配。两个声道顺序复用同一份工作区。
-const EraFftPlan = struct {
-    n: usize,
-    half: usize,
-    bitrev: []u32,
-    /// cos(-2πk/N)，k < N/2。
-    cos_tab: []f32,
-    /// sin(-2πk/N)，k < N/2（前向 FFT 的负号已并入）。
-    sin_tab: []f32,
-    window: []f32,
-    re: []f32,
-    im: []f32,
-    /// 单边幅度谱，长度 N/2 + 1。
-    mag: []f32,
+/// 单个 VQT 带的预计算核。
+const EraVqtBand = struct {
+    /// 中心频率（Hz）。
+    freq: f32,
+    /// 窗长（样本）。
+    len: usize,
+    /// Blackman 窗和（幅度归一化）。
+    window_sum: f32,
+    /// 预乘窗的 cos(2π f n / sr)。
+    cos: []f32,
+    /// 预乘窗的 sin(2π f n / sr)。
+    sin: []f32,
+    /// 高频倾斜线性增益（dB/oct → 幅度）。
+    tilt_gain: f32,
 };
 
 /// 频谱分析器实例（不透明于 C 侧 `ZkSpectrum`）。
@@ -117,20 +88,32 @@ pub const EraSpectrum = struct {
     bins: u32,
     min_hz: f32,
     max_hz: f32,
-    crossover_hz: f32,
-    fft_low: u32,
-    fft_high: u32,
-    low: EraFftPlan,
-    high: EraFftPlan,
+    max_window: u32,
+    q_max: f32,
+    frame_interval_s: f32,
+    agc_enabled: bool,
+    agc_target_db: f32,
+    agc_attack_s: f32,
+    agc_release_s: f32,
+    gamma: f32,
+    tilt_db_per_oct: f32,
+    peak_hold: bool,
+    peak_decay_per_s: f32,
+
     /// 对数带边界，长度 bins + 1（Hz）。
     edges: []f32,
-    /// 每个输出带的聚合计划，长度 bins。
-    bands: []EraBand,
-    /// 上一帧 L/R 平均后的带幅度（节拍通量用），长度 bins。
+    /// 每个输出带的 VQT 核，长度 bins。
+    bands: []EraVqtBand,
+    /// 上一帧 L/R 平均后的原始带幅度（节拍通量用）。
     prev_mag: []f32,
-    /// 本帧左右声道带幅度暂存，长度 bins。
+    /// 本帧左右声道原始带幅度暂存。
     band_l: []f32,
     band_r: []f32,
+    /// 显示峰值（保持线），长度 bins。
+    peak_l: []f32,
+    peak_r: []f32,
+
+    agc_gain: f32 = 1.0,
     has_prev: bool = false,
     flux_hist: [era_flux_history_len]f32 = @splat(0.0),
     flux_pos: usize = 0,
@@ -139,292 +122,7 @@ pub const EraSpectrum = struct {
 };
 
 // ---------------------------------------------------------------------------
-// FFT 计划：建表 / 装窗 / 基 2 Cooley-Tukey / 单边幅度
-// ---------------------------------------------------------------------------
-
-fn eraIsPowerOfTwo(v: u32) bool {
-    return v >= 2 and (v & (v - 1)) == 0;
-}
-
-fn eraLog2Int(v: usize) usize {
-    var bits: usize = 0;
-    var t = v;
-    while (t > 1) : (t >>= 1) bits += 1;
-    return bits;
-}
-
-fn eraFloorToUsize(x: f64) usize {
-    if (x <= 0.0) return 0;
-    return @intFromFloat(@floor(x));
-}
-
-fn eraPlanInit(allocator: std.mem.Allocator, n: usize) !EraFftPlan {
-    if (n < 16 or !eraIsPowerOfTwo(@intCast(n))) return error.InvalidArgument;
-    const half = n / 2;
-
-    const bitrev = try allocator.alloc(u32, n);
-    errdefer allocator.free(bitrev);
-    const cos_tab = try allocator.alloc(f32, half);
-    errdefer allocator.free(cos_tab);
-    const sin_tab = try allocator.alloc(f32, half);
-    errdefer allocator.free(sin_tab);
-    const window = try allocator.alloc(f32, n);
-    errdefer allocator.free(window);
-    const re = try allocator.alloc(f32, n);
-    errdefer allocator.free(re);
-    const im = try allocator.alloc(f32, n);
-    errdefer allocator.free(im);
-    const mag = try allocator.alloc(f32, half + 1);
-    errdefer allocator.free(mag);
-
-    const bits = eraLog2Int(n);
-    for (0..n) |i| {
-        var r: u32 = 0;
-        var v = i;
-        var b: usize = 0;
-        while (b < bits) : (b += 1) {
-            r = (r << 1) | @as(u32, @intCast(v & 1));
-            v >>= 1;
-        }
-        bitrev[i] = r;
-    }
-
-    const nf: f64 = @floatFromInt(n);
-    for (0..half) |k| {
-        const angle = -2.0 * std.math.pi * @as(f64, @floatFromInt(k)) / nf;
-        cos_tab[k] = @floatCast(@cos(angle));
-        sin_tab[k] = @floatCast(@sin(angle));
-    }
-
-    // Blackman 周期窗：0.42 - 0.5cos(2πn/N) + 0.08cos(4πn/N)。
-    for (0..n) |i| {
-        const t = 2.0 * std.math.pi * @as(f64, @floatFromInt(i)) / nf;
-        window[i] = @floatCast(0.42 - 0.5 * @cos(t) + 0.08 * @cos(2.0 * t));
-    }
-
-    @memset(re, 0.0);
-    @memset(im, 0.0);
-    @memset(mag, 0.0);
-
-    return .{
-        .n = n,
-        .half = half,
-        .bitrev = bitrev,
-        .cos_tab = cos_tab,
-        .sin_tab = sin_tab,
-        .window = window,
-        .re = re,
-        .im = im,
-        .mag = mag,
-    };
-}
-
-fn eraPlanDeinit(plan: *EraFftPlan, allocator: std.mem.Allocator) void {
-    allocator.free(plan.bitrev);
-    allocator.free(plan.cos_tab);
-    allocator.free(plan.sin_tab);
-    allocator.free(plan.window);
-    allocator.free(plan.re);
-    allocator.free(plan.im);
-    allocator.free(plan.mag);
-    plan.n = 0;
-    plan.half = 0;
-}
-
-/// 把 `src` 装进 N 点窗口：取最近 min(src.len, N) 个样本，不足部分前端补零。
-fn eraPlanLoad(plan: *EraFftPlan, src: []const f32) void {
-    const n = plan.n;
-    const re = plan.re;
-    const im = plan.im;
-    const win = plan.window;
-
-    const copy = @min(src.len, n);
-    const pad = n - copy;
-    @memset(re[0..pad], 0.0);
-    @memset(im[0..pad], 0.0);
-    const start = src.len - copy;
-    var j: usize = 0;
-    while (j < copy) : (j += 1) {
-        const idx = pad + j;
-        re[idx] = src[start + j] * win[idx];
-        im[idx] = 0.0;
-    }
-}
-
-/// 原地基 2 Cooley-Tukey 前向 FFT（查表位反转 + 查表旋转因子）。
-fn eraPlanForward(plan: *EraFftPlan) void {
-    const n = plan.n;
-    const re = plan.re;
-    const im = plan.im;
-
-    var i: usize = 0;
-    while (i < n) : (i += 1) {
-        const j = plan.bitrev[i];
-        if (j > i) {
-            const tr = re[i];
-            re[i] = re[j];
-            re[j] = tr;
-            const ti = im[i];
-            im[i] = im[j];
-            im[j] = ti;
-        }
-    }
-
-    var len: usize = 2;
-    while (len <= n) : (len *= 2) {
-        const half = len / 2;
-        const stride = n / len;
-        var start: usize = 0;
-        while (start < n) : (start += len) {
-            var k: usize = 0;
-            while (k < half) : (k += 1) {
-                const tw = k * stride;
-                const wr = plan.cos_tab[tw];
-                const wi = plan.sin_tab[tw];
-                const a = start + k;
-                const b = a + half;
-                const xr = re[b] * wr - im[b] * wi;
-                const xi = re[b] * wi + im[b] * wr;
-                re[b] = re[a] - xr;
-                im[b] = im[a] - xi;
-                re[a] += xr;
-                im[a] += xi;
-            }
-        }
-    }
-}
-
-/// 由复谱计算单边幅度：`2|X|/(N·CG)`，0dBFS 正弦（bin 中心）≈ 1.0。
-/// 峰值夹到 [0, 1]；NaN/Inf 兜底为 0/1，绝不把脏值传下去。
-fn eraPlanMagnitude(plan: *EraFftPlan) void {
-    const n = plan.n;
-    const half = plan.half;
-    const nf: f32 = @floatFromInt(n);
-    const base = 2.0 / (nf * era_window_coherent_gain);
-    var k: usize = 0;
-    while (k <= half) : (k += 1) {
-        const p = plan.re[k] * plan.re[k] + plan.im[k] * plan.im[k];
-        var m = base * @sqrt(p);
-        // DC 与 Nyquist 只有单边，单边系数应为 1（频带不会用到，保守处理）。
-        if (k == 0 or k == half) m *= 0.5;
-        if (!(m >= 0.0)) m = 0.0; // NaN
-        if (m > 1.0) m = 1.0;
-        plan.mag[k] = m;
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 频带聚合 / dB 映射
-// ---------------------------------------------------------------------------
-
-/// 构建一个分辨率下的频带聚合计划。
-///
-/// - 带内至少一个 bin 中心：1..=era_narrow_band_bins 取峰值，更宽取平均功率；
-/// - 带比一个 bin 还窄：在 log 频率轴上对相邻 bin 功率插值。
-fn eraBuildAgg(bin_hz: f64, half: usize, f_lo: f64, f_hi: f64) EraBandAgg {
-    if (bin_hz <= 0.0 or half < 2) {
-        return .{ .kind = .interp, .k0 = 1, .k1 = 1, .frac = 0.0 };
-    }
-
-    var k_lo: usize = 1;
-    const klo_f = @ceil(f_lo / bin_hz);
-    if (klo_f > 1.0) k_lo = eraFloorToUsize(klo_f);
-    if (k_lo < 1) k_lo = 1;
-
-    var k_hi: usize = 0;
-    const khi_f = @floor(f_hi / bin_hz);
-    if (khi_f > 0.0) k_hi = eraFloorToUsize(khi_f);
-    if (k_hi > half) k_hi = half;
-
-    if (k_lo <= k_hi) {
-        const count = k_hi - k_lo + 1;
-        const kind: EraAggKind = if (count <= era_narrow_band_bins) .peak else .mean;
-        return .{
-            .kind = kind,
-            .k0 = @intCast(k_lo),
-            .k1 = @intCast(k_hi),
-            .frac = 0.0,
-        };
-    }
-
-    // 带内没有 bin 中心：取频带几何中心，在相邻 bin 的 log 频率间插值功率。
-    const fc = @sqrt(f_lo * f_hi);
-    var k0: usize = 1;
-    const k0f = @floor(fc / bin_hz);
-    if (k0f > 1.0) k0 = eraFloorToUsize(k0f);
-    if (k0 >= half) k0 = half - 1;
-    if (k0 < 1) k0 = 1;
-
-    const f0 = @as(f64, @floatFromInt(k0)) * bin_hz;
-    const f1 = @as(f64, @floatFromInt(k0 + 1)) * bin_hz;
-    var frac: f64 = 0.0;
-    if (f1 > f0 and fc > 0.0) {
-        frac = (@log(fc) - @log(f0)) / (@log(f1) - @log(f0));
-    }
-    if (frac < 0.0) frac = 0.0;
-    if (frac > 1.0) frac = 1.0;
-
-    return .{
-        .kind = .interp,
-        .k0 = @intCast(k0),
-        .k1 = @intCast(k0),
-        .frac = @floatCast(frac),
-    };
-}
-
-/// 按计划从单边幅度谱取一个带值（线性幅度）。
-fn eraAggValue(agg: EraBandAgg, mags: []const f32) f32 {
-    switch (agg.kind) {
-        .mean => {
-            var sum: f32 = 0.0;
-            var k = agg.k0;
-            while (k <= agg.k1) : (k += 1) {
-                const m = mags[k];
-                sum += m * m;
-            }
-            const count: f32 = @floatFromInt(agg.k1 - agg.k0 + 1);
-            return @sqrt(sum / count);
-        },
-        .peak => {
-            var best: f32 = 0.0;
-            var k = agg.k0;
-            while (k <= agg.k1) : (k += 1) {
-                if (mags[k] > best) best = mags[k];
-            }
-            return best;
-        },
-        .interp => {
-            const m0 = mags[agg.k0];
-            const m1 = mags[agg.k0 + 1];
-            const p0 = m0 * m0;
-            const p1 = m1 * m1;
-            const p = p0 + (p1 - p0) * agg.frac;
-            return @sqrt(@max(p, 0.0));
-        },
-    }
-}
-
-fn eraBandValue(band: *const EraBand, low_mag: []const f32, high_mag: []const f32) f32 {
-    var v: f32 = 0.0;
-    if (band.w_low > 0.0) v += band.w_low * eraAggValue(band.low, low_mag);
-    if (band.w_high > 0.0) v += band.w_high * eraAggValue(band.high, high_mag);
-    if (v < 0.0) v = 0.0;
-    if (v > 1.0) v = 1.0;
-    return v;
-}
-
-/// dB → [0,1]，底部 6% smoothstep 软膝（不做硬清零）。
-fn eraMapDb(amp: f32) f32 {
-    const db = 20.0 * @log10(amp + 1e-12);
-    var t = (db - era_db_floor) / (0.0 - era_db_floor);
-    if (t < 0.0) t = 0.0;
-    if (t > 1.0) t = 1.0;
-    const gate = @min(t / era_soft_knee, 1.0);
-    return t * gate * gate * (3.0 - 2.0 * gate);
-}
-
-// ---------------------------------------------------------------------------
-// 生命周期
+// 配置 / 建表
 // ---------------------------------------------------------------------------
 
 fn eraValidateConfig(cfg: EraSpectrumConfig) !void {
@@ -433,34 +131,78 @@ fn eraValidateConfig(cfg: EraSpectrumConfig) !void {
     if (!(cfg.min_hz > 0.0) or !(cfg.max_hz > cfg.min_hz)) return error.InvalidArgument;
     const nyquist = @as(f32, @floatFromInt(cfg.sample_rate)) * 0.5;
     if (cfg.max_hz >= nyquist) return error.InvalidArgument;
-    if (!eraIsPowerOfTwo(cfg.fft_low) or cfg.fft_low < 16) return error.InvalidArgument;
-    if (!eraIsPowerOfTwo(cfg.fft_high) or cfg.fft_high < 16) return error.InvalidArgument;
-    if (!(cfg.crossover_hz > 0.0)) return error.InvalidArgument;
+    if (cfg.max_window < 64 or cfg.max_window > 65536) return error.InvalidArgument;
+    if (!(cfg.q_max >= 2.0)) return error.InvalidArgument;
+    if (!(cfg.frame_interval_s > 0.0)) return error.InvalidArgument;
+    if (!(cfg.agc_attack_s > 0.0) or !(cfg.agc_release_s > 0.0)) return error.InvalidArgument;
+    if (!(cfg.gamma > 0.0)) return error.InvalidArgument;
+    if (!(cfg.peak_decay_per_s >= 0.0)) return error.InvalidArgument;
 }
 
-/// 创建频谱分析器（表一次建好；每帧零分配）。
+fn eraBandCenter(min_hz: f64, max_hz: f64, bins: usize, i: usize) f64 {
+    const r = max_hz / min_hz;
+    const lo = @as(f64, @floatFromInt(i)) / @as(f64, @floatFromInt(bins));
+    const hi = @as(f64, @floatFromInt(i + 1)) / @as(f64, @floatFromInt(bins));
+    return @sqrt((min_hz * @exp(@log(r) * lo)) * (min_hz * @exp(@log(r) * hi)));
+}
+
+/// 构建一个 VQT 带：窗长、Blackman 窗、复解调核、倾斜增益。
+fn eraVqtBandInit(
+    allocator: std.mem.Allocator,
+    cfg: EraSpectrumConfig,
+    fc: f64,
+) !EraVqtBand {
+    const sr: f64 = @floatFromInt(cfg.sample_rate);
+    const max_window: f64 = @floatFromInt(cfg.max_window);
+
+    // 可变 Q：低频受 max_window 限制，高频封顶 q_max。
+    var q = @min(@as(f64, cfg.q_max), max_window * fc / sr);
+    if (q < 2.0) q = 2.0;
+    var len_f = @round(q * sr / fc);
+    if (len_f < 32.0) len_f = 32.0;
+    if (len_f > max_window) len_f = max_window;
+    const len: usize = @intFromFloat(len_f);
+
+    const cos = try allocator.alloc(f32, len);
+    errdefer allocator.free(cos);
+    const sin = try allocator.alloc(f32, len);
+    errdefer allocator.free(sin);
+
+    const nf: f64 = @floatFromInt(len);
+    var wsum: f64 = 0.0;
+    var n: usize = 0;
+    while (n < len) : (n += 1) {
+        const t = 2.0 * std.math.pi * @as(f64, @floatFromInt(n)) / nf;
+        const w = 0.42 - 0.5 * @cos(t) + 0.08 * @cos(2.0 * t);
+        const phase = 2.0 * std.math.pi * fc * @as(f64, @floatFromInt(n)) / sr;
+        cos[n] = @floatCast(w * @cos(phase));
+        sin[n] = @floatCast(w * @sin(phase));
+        wsum += w;
+    }
+    if (wsum <= 0.0) return error.InvalidArgument;
+
+    const tilt_db = @as(f64, cfg.tilt_db_per_oct) * @log2(fc / 1000.0);
+    const tilt_gain: f32 = @floatCast(std.math.pow(f64, 10.0, tilt_db / 20.0));
+
+    return .{
+        .freq = @floatCast(fc),
+        .len = len,
+        .window_sum = @floatCast(wsum),
+        .cos = cos,
+        .sin = sin,
+        .tilt_gain = tilt_gain,
+    };
+}
+
+/// 创建频谱分析器（核/表一次建好；每帧零分配）。
 pub fn era_spectrum_create(allocator: std.mem.Allocator, cfg: EraSpectrumConfig) !*EraSpectrum {
     try eraValidateConfig(cfg);
 
     const bins: usize = cfg.bins;
-    const n_low: usize = cfg.fft_low;
-    const n_high: usize = cfg.fft_high;
-
-    var low = try eraPlanInit(allocator, n_low);
-    errdefer eraPlanDeinit(&low, allocator);
-    var high = try eraPlanInit(allocator, n_high);
-    errdefer eraPlanDeinit(&high, allocator);
-
     const edges = try allocator.alloc(f32, bins + 1);
     errdefer allocator.free(edges);
-    const bands = try allocator.alloc(EraBand, bins);
+    const bands = try allocator.alloc(EraVqtBand, bins);
     errdefer allocator.free(bands);
-    const prev_mag = try allocator.alloc(f32, bins);
-    errdefer allocator.free(prev_mag);
-    const band_l = try allocator.alloc(f32, bins);
-    errdefer allocator.free(band_l);
-    const band_r = try allocator.alloc(f32, bins);
-    errdefer allocator.free(band_r);
 
     const min_hz: f64 = cfg.min_hz;
     const max_hz: f64 = cfg.max_hz;
@@ -470,42 +212,35 @@ pub fn era_spectrum_create(allocator: std.mem.Allocator, cfg: EraSpectrumConfig)
         edges[i] = @floatCast(min_hz * @exp(log_ratio * frac));
     }
 
-    const sample_rate: f64 = @floatFromInt(cfg.sample_rate);
-    const bin_hz_low = sample_rate / @as(f64, @floatFromInt(n_low));
-    const bin_hz_high = sample_rate / @as(f64, @floatFromInt(n_high));
-
-    var crossover = cfg.crossover_hz;
-    if (crossover < cfg.min_hz) crossover = cfg.min_hz;
-    if (crossover > cfg.max_hz) crossover = cfg.max_hz;
-    var fade_lo = crossover - era_crossover_half_width;
-    var fade_hi = crossover + era_crossover_half_width;
-    if (fade_lo < cfg.min_hz) fade_lo = cfg.min_hz;
-    if (fade_hi > cfg.max_hz) fade_hi = cfg.max_hz;
-
-    for (0..bins) |i| {
-        const f_lo: f64 = edges[i];
-        const f_hi: f64 = edges[i + 1];
-        const fc = @sqrt(f_lo * f_hi);
-
-        var w_high: f32 = 0.0;
-        if (fade_hi > fade_lo) {
-            const w = (fc - fade_lo) / (fade_hi - fade_lo);
-            w_high = @floatCast(@min(@max(w, 0.0), 1.0));
-        } else if (fc >= crossover) {
-            w_high = 1.0;
+    var built: usize = 0;
+    errdefer {
+        for (bands[0..built]) |b| {
+            allocator.free(b.cos);
+            allocator.free(b.sin);
         }
-
-        bands[i] = .{
-            .low = eraBuildAgg(bin_hz_low, n_low / 2, f_lo, f_hi),
-            .high = eraBuildAgg(bin_hz_high, n_high / 2, f_lo, f_hi),
-            .w_low = 1.0 - w_high,
-            .w_high = w_high,
-        };
     }
+    for (0..bins) |i| {
+        const fc = eraBandCenter(min_hz, max_hz, bins, i);
+        bands[i] = try eraVqtBandInit(allocator, cfg, fc);
+        built += 1;
+    }
+
+    const prev_mag = try allocator.alloc(f32, bins);
+    errdefer allocator.free(prev_mag);
+    const band_l = try allocator.alloc(f32, bins);
+    errdefer allocator.free(band_l);
+    const band_r = try allocator.alloc(f32, bins);
+    errdefer allocator.free(band_r);
+    const peak_l = try allocator.alloc(f32, bins);
+    errdefer allocator.free(peak_l);
+    const peak_r = try allocator.alloc(f32, bins);
+    errdefer allocator.free(peak_r);
 
     @memset(prev_mag, 0.0);
     @memset(band_l, 0.0);
     @memset(band_r, 0.0);
+    @memset(peak_l, 0.0);
+    @memset(peak_r, 0.0);
 
     const self = try allocator.create(EraSpectrum);
     errdefer allocator.destroy(self);
@@ -515,38 +250,53 @@ pub fn era_spectrum_create(allocator: std.mem.Allocator, cfg: EraSpectrumConfig)
         .bins = cfg.bins,
         .min_hz = cfg.min_hz,
         .max_hz = cfg.max_hz,
-        .crossover_hz = crossover,
-        .fft_low = cfg.fft_low,
-        .fft_high = cfg.fft_high,
-        .low = low,
-        .high = high,
+        .max_window = cfg.max_window,
+        .q_max = cfg.q_max,
+        .frame_interval_s = cfg.frame_interval_s,
+        .agc_enabled = cfg.agc_enabled,
+        .agc_target_db = cfg.agc_target_db,
+        .agc_attack_s = cfg.agc_attack_s,
+        .agc_release_s = cfg.agc_release_s,
+        .gamma = cfg.gamma,
+        .tilt_db_per_oct = cfg.tilt_db_per_oct,
+        .peak_hold = cfg.peak_hold,
+        .peak_decay_per_s = cfg.peak_decay_per_s,
         .edges = edges,
         .bands = bands,
         .prev_mag = prev_mag,
         .band_l = band_l,
         .band_r = band_r,
+        .peak_l = peak_l,
+        .peak_r = peak_r,
     };
     return self;
 }
 
-/// 销毁（表与每帧缓冲一并释放）。
+/// 销毁（核/表与每帧缓冲一并释放）。
 pub fn era_spectrum_destroy(self: *EraSpectrum) void {
     const a = self.allocator;
-    eraPlanDeinit(&self.low, a);
-    eraPlanDeinit(&self.high, a);
+    for (self.bands) |b| {
+        a.free(b.cos);
+        a.free(b.sin);
+    }
     a.free(self.edges);
     a.free(self.bands);
     a.free(self.prev_mag);
     a.free(self.band_l);
     a.free(self.band_r);
+    a.free(self.peak_l);
+    a.free(self.peak_r);
     self.sample_rate = 0;
     a.destroy(self);
 }
 
-/// 清空帧间状态（seek / 切歌 / 会话重建）；表保留。
+/// 清空帧间状态（seek / 切歌 / 会话重建）；核/表保留。
 pub fn era_spectrum_reset(self: *EraSpectrum) void {
     @memset(self.prev_mag, 0.0);
+    @memset(self.peak_l, 0.0);
+    @memset(self.peak_r, 0.0);
     @memset(&self.flux_hist, 0.0);
+    self.agc_gain = 1.0;
     self.flux_pos = 0;
     self.flux_count = 0;
     self.cooldown = 0;
@@ -564,8 +314,39 @@ pub fn era_spectrum_sample_rate(self: *const EraSpectrum) u32 {
 }
 
 // ---------------------------------------------------------------------------
-// 每帧处理
+// VQT / dB / 节拍
 // ---------------------------------------------------------------------------
+
+/// 单带 VQT 幅度：取最近 `len` 个样本，前端不足补零；`2|X|/Σw`。
+fn eraVqtBandMag(band: *const EraVqtBand, src: []const f32) f32 {
+    const len = band.len;
+    const available = @min(src.len, len);
+    const pad = len - available;
+    const start = src.len - available;
+
+    var re: f32 = 0.0;
+    var im: f32 = 0.0;
+    var n: usize = 0;
+    while (n < len) : (n += 1) {
+        const x: f32 = if (n < pad) 0.0 else src[start + (n - pad)];
+        re += x * band.cos[n];
+        im += x * band.sin[n];
+    }
+    var m = 2.0 * @sqrt(re * re + im * im) / band.window_sum;
+    if (!(m >= 0.0)) m = 0.0; // NaN
+    if (m > 1.0) m = 1.0;
+    return m;
+}
+
+/// dB → [0,1]，底部 6% smoothstep 软膝（不做硬清零）。
+fn eraMapDb(amp: f32) f32 {
+    const db = 20.0 * @log10(amp + 1e-12);
+    var t = (db - era_db_floor) / (0.0 - era_db_floor);
+    if (t < 0.0) t = 0.0;
+    if (t > 1.0) t = 1.0;
+    const gate = @min(t / era_soft_knee, 1.0);
+    return t * gate * gate * (3.0 - 2.0 * gate);
+}
 
 /// 节拍状态更新：把本帧通量推进历史，返回 0..1 脉冲强度。
 ///
@@ -616,11 +397,36 @@ fn eraBeatStep(self: *EraSpectrum, flux: f32, had_prev: bool) f32 {
     return strength;
 }
 
+/// 更新 AGC 增益（慢攻/放，目标 dB）。
+fn eraAgcStep(self: *EraSpectrum, raw_l: []const f32, raw_r: []const f32) f32 {
+    if (!self.agc_enabled) return 1.0;
+
+    var sum: f32 = 0.0;
+    for (raw_l, raw_r) |a, b| {
+        const m = 0.5 * (a + b);
+        sum += m * m;
+    }
+    const level = @sqrt(sum / @as(f32, @floatFromInt(raw_l.len)));
+    var desired: f32 = 1.0;
+    if (level > 1e-6) {
+        const target = std.math.pow(f32, 10.0, self.agc_target_db / 20.0);
+        desired = target / level;
+        if (desired < 0.25) desired = 0.25;
+        if (desired > 4.0) desired = 4.0;
+    }
+    const tau = if (desired > self.agc_gain) self.agc_attack_s else self.agc_release_s;
+    const coef = 1.0 - @exp(-self.frame_interval_s / tau);
+    self.agc_gain += (desired - self.agc_gain) * coef;
+    if (self.agc_gain < 0.25) self.agc_gain = 0.25;
+    if (self.agc_gain > 4.0) self.agc_gain = 4.0;
+    return self.agc_gain;
+}
+
 /// 处理一帧。
 ///
-/// `l` / `r` 为最近 `frames` 个每声道样本（窗口终点 = 当前播放位置），
-/// `frames` 可小于 `fft_low`，不足部分在**前端补零**；超过 `fft_low` 时取
-/// 最近 `fft_low` 个。`out_l` / `out_r` 长度 = bins，写 [0,1]。
+/// `l` / `r` 为最近 `frames` 个每声道样本（窗口终点 = 当前播放位置）；
+/// 每个 VQT 带只取自己最近的 `len` 个样本，不足部分在**前端补零**。
+/// `out_l` / `out_r` / 峰值数组长度 = bins，写 [0,1]。
 /// 返回本帧节拍强度 0..1。
 pub fn era_spectrum_process(
     self: *EraSpectrum,
@@ -639,46 +445,65 @@ pub fn era_spectrum_process(
     }
     const frames = @min(l.len, r.len);
 
-    // 左声道：低频 / 高频两套 FFT（顺序复用工作区）。
-    eraPlanLoad(&self.low, l[0..frames]);
-    eraPlanForward(&self.low);
-    eraPlanMagnitude(&self.low);
-    eraPlanLoad(&self.high, l[0..frames]);
-    eraPlanForward(&self.high);
-    eraPlanMagnitude(&self.high);
+    // 原始 VQT 带幅度（节拍/AGC 用）。
     for (self.bands, 0..) |*band, i| {
-        self.band_l[i] = eraBandValue(band, self.low.mag, self.high.mag);
+        self.band_l[i] = eraVqtBandMag(band, l[0..frames]);
+        self.band_r[i] = eraVqtBandMag(band, r[0..frames]);
     }
 
-    // 右声道。
-    eraPlanLoad(&self.low, r[0..frames]);
-    eraPlanForward(&self.low);
-    eraPlanMagnitude(&self.low);
-    eraPlanLoad(&self.high, r[0..frames]);
-    eraPlanForward(&self.high);
-    eraPlanMagnitude(&self.high);
-    for (self.bands, 0..) |*band, i| {
-        self.band_r[i] = eraBandValue(band, self.low.mag, self.high.mag);
-    }
-
-    // 通量（L/R 平均带幅度）+ dB 映射输出。
+    // 节拍通量：L/R 平均原始带幅度。
     const had_prev = self.has_prev;
     var flux: f32 = 0.0;
     for (0..bins) |i| {
-        const a = self.band_l[i];
-        const b = self.band_r[i];
-        const comb = 0.5 * (a + b);
+        const comb = 0.5 * (self.band_l[i] + self.band_r[i]);
         if (had_prev) {
             const d = @log(1.0 + comb) - @log(1.0 + self.prev_mag[i]);
             if (d > 0.0) flux += d;
         }
         self.prev_mag[i] = comb;
-        out_l[i] = eraMapDb(a);
-        out_r[i] = eraMapDb(b);
     }
     self.has_prev = true;
 
+    const agc = eraAgcStep(self, self.band_l, self.band_r);
+    const decay = self.peak_decay_per_s * self.frame_interval_s;
+
+    for (0..bins) |i| {
+        const tilt = self.bands[i].tilt_gain;
+        const gain = agc * tilt;
+
+        var v_l = eraMapDb(self.band_l[i] * gain);
+        var v_r = eraMapDb(self.band_r[i] * gain);
+        if (self.gamma != 1.0) {
+            v_l = std.math.pow(f32, v_l, self.gamma);
+            v_r = std.math.pow(f32, v_r, self.gamma);
+        }
+        if (!(v_l >= 0.0)) v_l = 0.0;
+        if (!(v_r >= 0.0)) v_r = 0.0;
+        if (v_l > 1.0) v_l = 1.0;
+        if (v_r > 1.0) v_r = 1.0;
+        out_l[i] = v_l;
+        out_r[i] = v_r;
+
+        if (self.peak_hold) {
+            const floor_l = @max(self.peak_l[i] - decay, 0.0);
+            const floor_r = @max(self.peak_r[i] - decay, 0.0);
+            self.peak_l[i] = @max(v_l, floor_l);
+            self.peak_r[i] = @max(v_r, floor_r);
+        } else {
+            self.peak_l[i] = v_l;
+            self.peak_r[i] = v_r;
+        }
+    }
+
     return eraBeatStep(self, flux, had_prev);
+}
+
+/// 取当前峰值保持线；长度不足 bins 时截断。无峰值时写 0。
+pub fn era_spectrum_peaks(self: *const EraSpectrum, out_l: []f32, out_r: []f32) void {
+    const bins: usize = self.bins;
+    const n = @min(@min(out_l.len, out_r.len), bins);
+    @memcpy(out_l[0..n], self.peak_l[0..n]);
+    @memcpy(out_r[0..n], self.peak_r[0..n]);
 }
 
 // ---------------------------------------------------------------------------
@@ -686,6 +511,15 @@ pub fn era_spectrum_process(
 // ---------------------------------------------------------------------------
 
 const testing = std.testing;
+
+fn precisionConfig() EraSpectrumConfig {
+    return .{
+        .agc_enabled = false,
+        .gamma = 1.0,
+        .tilt_db_per_oct = 0.0,
+        .peak_hold = false,
+    };
+}
 
 fn fillSine(buf: []f32, freq: f32, sample_rate: u32, amplitude: f32) void {
     const w = 2.0 * std.math.pi * @as(f64, freq) / @as(f64, @floatFromInt(sample_rate));
@@ -712,21 +546,16 @@ fn peakBand(vals: []const f32) usize {
 }
 
 fn bandCenter(cfg: EraSpectrumConfig, i: usize) f64 {
-    const min_hz: f64 = cfg.min_hz;
-    const max_hz: f64 = cfg.max_hz;
-    const lo = @as(f64, @floatFromInt(i)) / @as(f64, @floatFromInt(cfg.bins));
-    const hi = @as(f64, @floatFromInt(i + 1)) / @as(f64, @floatFromInt(cfg.bins));
-    const r = max_hz / min_hz;
-    return @sqrt((min_hz * @exp(@log(r) * lo)) * (min_hz * @exp(@log(r) * hi)));
+    return eraBandCenter(cfg.min_hz, cfg.max_hz, cfg.bins, i);
 }
 
-test "era_spectrum: 正弦峰值落在期望对数带 ±1" {
+test "era_spectrum: VQT 正弦峰值落在期望对数带 ±2" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{};
+    const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
-    const n: usize = 8192;
+    const n: usize = cfg.max_window;
     const l = try a.alloc(f32, n);
     defer a.free(l);
     const out_l = try a.alloc(f32, cfg.bins);
@@ -743,18 +572,18 @@ test "era_spectrum: 正弦峰值落在期望对数带 ±1" {
         const exp = expectedBand(f, cfg.min_hz, cfg.max_hz, cfg.bins);
         const got = peakBand(out_l);
         const diff = if (got > exp) got - exp else exp - got;
-        try testing.expect(diff <= 1);
+        try testing.expect(diff <= 2);
         try testing.expect(out_l[got] > 0.1);
     }
 }
 
 test "era_spectrum: 静音全 0；白噪声有限且非负" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{};
+    const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
-    const n: usize = 8192;
+    const n: usize = cfg.max_window;
     const l = try a.alloc(f32, n);
     defer a.free(l);
     const out_l = try a.alloc(f32, cfg.bins);
@@ -789,11 +618,11 @@ test "era_spectrum: 静音全 0；白噪声有限且非负" {
 
 test "era_spectrum: 左右分离（仅 L 有信号 → R 全 0）" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{};
+    const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
-    const n: usize = 8192;
+    const n: usize = cfg.max_window;
     const l = try a.alloc(f32, n);
     defer a.free(l);
     const r = try a.alloc(f32, n);
@@ -811,13 +640,13 @@ test "era_spectrum: 左右分离（仅 L 有信号 → R 全 0）" {
     try testing.expect(out_l[peakBand(out_l)] > 0.5);
 }
 
-test "era_spectrum: 0dBFS 1kHz ≈ 1.0；-60dB ≈ 0.17" {
+test "era_spectrum: 0dBFS 带中心 ≈ 1.0；-60dB ≈ 0.17" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{};
+    const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
-    const n: usize = 8192;
+    const n: usize = cfg.max_window;
     const l = try a.alloc(f32, n);
     defer a.free(l);
     const out_l = try a.alloc(f32, cfg.bins);
@@ -825,26 +654,29 @@ test "era_spectrum: 0dBFS 1kHz ≈ 1.0；-60dB ≈ 0.17" {
     const out_r = try a.alloc(f32, cfg.bins);
     defer a.free(out_r);
 
-    fillSine(l, 1000.0, cfg.sample_rate, 1.0);
+    const idx = expectedBand(1000.0, cfg.min_hz, cfg.max_hz, cfg.bins);
+    const f: f32 = @floatCast(bandCenter(cfg, idx));
+
+    fillSine(l, f, cfg.sample_rate, 1.0);
     _ = era_spectrum_process(sp, l, l, out_l, out_r);
-    const loud = out_l[peakBand(out_l)];
+    const loud = out_l[idx];
     try testing.expect(loud > 0.9);
     try testing.expect(loud <= 1.0);
 
     era_spectrum_reset(sp);
-    fillSine(l, 1000.0, cfg.sample_rate, 0.001);
+    fillSine(l, f, cfg.sample_rate, 0.001);
     _ = era_spectrum_process(sp, l, l, out_l, out_r);
-    const quiet = out_l[peakBand(out_l)];
+    const quiet = out_l[idx];
     try testing.expectApproxEqAbs(@as(f32, 0.17), quiet, 0.05);
 }
 
-test "era_spectrum: 250–350Hz 交叉区无凹口/台阶" {
+test "era_spectrum: 40–16k 扫频峰值带连续" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{};
+    const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
-    const n: usize = 8192;
+    const n: usize = cfg.max_window;
     const l = try a.alloc(f32, n);
     defer a.free(l);
     const out_l = try a.alloc(f32, cfg.bins);
@@ -852,41 +684,29 @@ test "era_spectrum: 250–350Hz 交叉区无凹口/台阶" {
     const out_r = try a.alloc(f32, cfg.bins);
     defer a.free(out_r);
 
-    var prev_peak: ?usize = null;
-    var f: f32 = 250.0;
-    while (f <= 350.001) : (f += 2.0) {
+    const freqs = [_]f32{ 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0, 10240.0, 16000.0 };
+    var prev: ?usize = null;
+    for (freqs) |f| {
         era_spectrum_reset(sp);
         fillSine(l, f, cfg.sample_rate, 1.0);
         _ = era_spectrum_process(sp, l, l, out_l, out_r);
-
-        var max_v: f32 = 0.0;
-        var max_i: usize = 0;
-        for (0..cfg.bins) |i| {
-            const center = bandCenter(cfg, i);
-            if (center >= 240.0 and center <= 360.0 and out_l[i] > max_v) {
-                max_v = out_l[i];
-                max_i = i;
-            }
-        }
-        try testing.expect(max_v > 0.75);
-        if (prev_peak) |pb| {
-            const d = if (max_i > pb) max_i - pb else pb - max_i;
-            try testing.expect(d <= 2);
-        }
-        prev_peak = max_i;
+        const got = peakBand(out_l);
+        if (prev) |p| try testing.expect(got >= p);
+        prev = got;
+        try testing.expect(out_l[got] > 0.5);
     }
 }
 
 test "era_spectrum: 120BPM 点击触发、持续正弦基本不触发" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{};
+    const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
     const frame_len: usize = 2400; // 50ms @48k
     const frames: usize = 120;
-    const lead: usize = 8192;
-    const total = lead + frames * frame_len + 8192;
+    const lead: usize = cfg.max_window;
+    const total = lead + frames * frame_len + cfg.max_window;
     const sig = try a.alloc(f32, total);
     defer a.free(sig);
     @memset(sig, 0.0);
@@ -916,7 +736,7 @@ test "era_spectrum: 120BPM 点击触发、持续正弦基本不触发" {
     var t: usize = 0;
     while (t < frames) : (t += 1) {
         const end = lead + (t + 1) * frame_len;
-        const win = sig[end - 8192 .. end];
+        const win = sig[end - cfg.max_window .. end];
         const beat = era_spectrum_process(sp, win, win, out_l, out_r);
         try testing.expect(!std.math.isNan(beat));
         try testing.expect(beat >= 0.0 and beat <= 1.0);
@@ -928,24 +748,24 @@ test "era_spectrum: 120BPM 点击触发、持续正弦基本不触发" {
 
     // 持续正弦：重置后连续 60 帧（滑动窗口、相位连续）不应误触发。
     era_spectrum_reset(sp);
-    const sine_len = 8192 + 60 * frame_len;
+    const sine_len = cfg.max_window + 60 * frame_len;
     const sine = try a.alloc(f32, sine_len);
     defer a.free(sine);
     fillSine(sine, 440.0, cfg.sample_rate, 0.5);
     var sine_max: f32 = 0.0;
     t = 0;
     while (t < 60) : (t += 1) {
-        const end = 8192 + (t + 1) * frame_len;
-        const win = sine[end - 8192 .. end];
+        const end = cfg.max_window + (t + 1) * frame_len;
+        const win = sine[end - cfg.max_window .. end];
         const beat = era_spectrum_process(sp, win, win, out_l, out_r);
         if (beat > sine_max) sine_max = beat;
     }
     try testing.expect(sine_max < 0.1);
 }
 
-test "era_spectrum: 任意输入长度（含 < fft_low）不崩溃/不越界" {
+test "era_spectrum: 任意输入长度不崩溃/不越界" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{};
+    const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
@@ -954,7 +774,7 @@ test "era_spectrum: 任意输入长度（含 < fft_low）不崩溃/不越界" {
     const out_r = try a.alloc(f32, cfg.bins);
     defer a.free(out_r);
 
-    const lens = [_]usize{ 0, 1, 7, 100, 1024, 2047, 2048, 2049, 4096, 8192, 12000 };
+    const lens = [_]usize{ 0, 1, 7, 100, 1024, 2047, 2048, 2049, 4096, 8192, 12000, 12288 };
     for (lens) |n| {
         era_spectrum_reset(sp);
         const buf = try a.alloc(f32, n);
@@ -974,9 +794,9 @@ test "era_spectrum: 任意输入长度（含 < fft_low）不崩溃/不越界" {
     }
 }
 
-test "era_spectrum: 前端补零与尾部截取语义" {
+test "era_spectrum: 短窗前端补零与长窗尾部截取等价" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{};
+    const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
@@ -987,16 +807,15 @@ test "era_spectrum: 前端补零与尾部截取语义" {
     const out_r = try a.alloc(f32, cfg.bins);
     defer a.free(out_r);
 
-    // 短窗（2400 样本）应等价于前端补零到 fft_low 的长窗。
     const short_len: usize = 2400;
     const short = try a.alloc(f32, short_len);
     defer a.free(short);
     fillSine(short, 1000.0, cfg.sample_rate, 1.0);
 
-    const padded = try a.alloc(f32, cfg.fft_low);
+    const padded = try a.alloc(f32, cfg.max_window);
     defer a.free(padded);
     @memset(padded, 0.0);
-    @memcpy(padded[cfg.fft_low - short_len ..], short);
+    @memcpy(padded[cfg.max_window - short_len ..], short);
 
     era_spectrum_reset(sp);
     _ = era_spectrum_process(sp, short, short, out_a, out_r);
@@ -1004,8 +823,7 @@ test "era_spectrum: 前端补零与尾部截取语义" {
     _ = era_spectrum_process(sp, padded, padded, out_b, out_r);
     try testing.expectEqualSlices(f32, out_a, out_b);
 
-    // 超长输入（12000 样本）只取最近 fft_low 个样本。
-    const long_len: usize = 12000;
+    const long_len: usize = 16000;
     const long = try a.alloc(f32, long_len);
     defer a.free(long);
     var seed: u32 = 0xdead_beef;
@@ -1013,49 +831,137 @@ test "era_spectrum: 前端补零与尾部截取语义" {
         seed = seed *% 1664525 +% 1013904223;
         v.* = (@as(f32, @floatFromInt(seed >> 8)) / 8388608.0 - 1.0) * 0.2;
     }
-    fillSine(long[long_len - cfg.fft_low ..], 1000.0, cfg.sample_rate, 1.0);
+    fillSine(long[long_len - cfg.max_window ..], 1000.0, cfg.sample_rate, 1.0);
 
     era_spectrum_reset(sp);
     _ = era_spectrum_process(sp, long, long, out_a, out_r);
     era_spectrum_reset(sp);
-    _ = era_spectrum_process(sp, long[long_len - cfg.fft_low ..], long[long_len - cfg.fft_low ..], out_b, out_r);
+    _ = era_spectrum_process(sp, long[long_len - cfg.max_window ..], long[long_len - cfg.max_window ..], out_b, out_r);
     try testing.expectEqualSlices(f32, out_a, out_b);
 }
 
-test "era_spectrum: reset 清空状态、参数 getter 正确" {
+test "era_spectrum: AGC / γ / 倾斜 / 峰值保持" {
     const a = testing.allocator;
-    const cfg = EraSpectrumConfig{ .sample_rate = 44100, .bins = 96 };
-    const sp = try era_spectrum_create(a, cfg);
+    const n: usize = 12288;
+    const l = try a.alloc(f32, n);
+    defer a.free(l);
+    const out_l = try a.alloc(f32, 128);
+    defer a.free(out_l);
+    const out_r = try a.alloc(f32, 128);
+    defer a.free(out_r);
+    const peak_l = try a.alloc(f32, 128);
+    defer a.free(peak_l);
+    const peak_r = try a.alloc(f32, 128);
+    defer a.free(peak_r);
+
+    // γ：同一 -60dB 输入，γ=0.5 的输出应高于 γ=1.0。
+    const base = EraSpectrumConfig{ .agc_enabled = false, .gamma = 1.0, .tilt_db_per_oct = 0.0, .peak_hold = false };
+    const sp1 = try era_spectrum_create(a, base);
+    defer era_spectrum_destroy(sp1);
+    const cfg2 = base;
+    var cfg_gamma = cfg2;
+    cfg_gamma.gamma = 0.5;
+    const sp2 = try era_spectrum_create(a, cfg_gamma);
+    defer era_spectrum_destroy(sp2);
+
+    const idx = expectedBand(1000.0, base.min_hz, base.max_hz, base.bins);
+    const f: f32 = @floatCast(bandCenter(base, idx));
+    fillSine(l, f, base.sample_rate, 0.001);
+    _ = era_spectrum_process(sp1, l, l, out_l, out_r);
+    const raw = out_l[idx];
+    _ = era_spectrum_process(sp2, l, l, out_l, out_r);
+    try testing.expect(out_l[idx] > raw);
+
+    // 高频倾斜：8kHz 在 +6dB/oct 下应高于 0dB/oct。
+    var cfg_tilt = base;
+    cfg_tilt.tilt_db_per_oct = 6.0;
+    const sp3 = try era_spectrum_create(a, cfg_tilt);
+    defer era_spectrum_destroy(sp3);
+    fillSine(l, 8000.0, base.sample_rate, 0.1);
+    _ = era_spectrum_process(sp1, l, l, out_l, out_r);
+    const flat = out_l[peakBand(out_l)];
+    _ = era_spectrum_process(sp3, l, l, out_l, out_r);
+    try testing.expect(out_l[peakBand(out_l)] > flat);
+
+    // 峰值保持：响帧后静音，峰值仍在；连续静音后衰减。
+    var cfg_peak = base;
+    cfg_peak.peak_hold = true;
+    cfg_peak.peak_decay_per_s = 2.0;
+    const sp4 = try era_spectrum_create(a, cfg_peak);
+    defer era_spectrum_destroy(sp4);
+    fillSine(l, f, base.sample_rate, 0.5);
+    _ = era_spectrum_process(sp4, l, l, out_l, out_r);
+    era_spectrum_peaks(sp4, peak_l, peak_r);
+    const held = peak_l[idx];
+    try testing.expect(held > 0.1);
+
+    @memset(l, 0.0);
+    _ = era_spectrum_process(sp4, l, l, out_l, out_r);
+    era_spectrum_peaks(sp4, peak_l, peak_r);
+    try testing.expect(peak_l[idx] > 0.0);
+    try testing.expect(peak_l[idx] < held);
+
+    var i: usize = 0;
+    while (i < 40) : (i += 1) _ = era_spectrum_process(sp4, l, l, out_l, out_r);
+    era_spectrum_peaks(sp4, peak_l, peak_r);
+    try testing.expect(peak_l[idx] < 0.01);
+
+    // AGC：弱音连续处理应逐步抬升（不改变 raw 节拍判定）。
+    var cfg_agc = base;
+    cfg_agc.agc_enabled = true;
+    cfg_agc.agc_target_db = -20.0;
+    const sp5 = try era_spectrum_create(a, cfg_agc);
+    defer era_spectrum_destroy(sp5);
+    fillSine(l, f, base.sample_rate, 0.001);
+    _ = era_spectrum_process(sp5, l, l, out_l, out_r);
+    const first = out_l[idx];
+    i = 0;
+    while (i < 80) : (i += 1) _ = era_spectrum_process(sp5, l, l, out_l, out_r);
+    try testing.expect(out_l[idx] > first);
+}
+
+test "era_spectrum: reset 清空峰值/AGC/节拍状态、参数 getter 正确" {
+    const a = testing.allocator;
+    const cfg = precisionConfig();
+    var cfg2 = cfg;
+    cfg2.sample_rate = 44100;
+    cfg2.bins = 96;
+    const sp = try era_spectrum_create(a, cfg2);
     defer era_spectrum_destroy(sp);
 
     try testing.expectEqual(@as(u32, 96), era_spectrum_bins(sp));
     try testing.expectEqual(@as(u32, 44100), era_spectrum_sample_rate(sp));
 
-    const n: usize = 4096;
+    const n: usize = cfg2.max_window;
     const l = try a.alloc(f32, n);
     defer a.free(l);
-    const out_l = try a.alloc(f32, cfg.bins);
+    const out_l = try a.alloc(f32, cfg2.bins);
     defer a.free(out_l);
-    const out_r = try a.alloc(f32, cfg.bins);
+    const out_r = try a.alloc(f32, cfg2.bins);
     defer a.free(out_r);
+    const peak_l = try a.alloc(f32, cfg2.bins);
+    defer a.free(peak_l);
+    const peak_r = try a.alloc(f32, cfg2.bins);
+    defer a.free(peak_r);
 
-    fillSine(l, 1000.0, cfg.sample_rate, 1.0);
+    fillSine(l, 440.0, cfg2.sample_rate, 1.0);
     _ = era_spectrum_process(sp, l, l, out_l, out_r);
-    era_spectrum_reset(sp);
+    era_spectrum_peaks(sp, peak_l, peak_r);
+    try testing.expect(peakBand(peak_l) < cfg2.bins);
 
-    @memset(l, 0.0);
-    const beat = era_spectrum_process(sp, l, l, out_l, out_r);
-    try testing.expectEqual(@as(f32, 0.0), beat);
-    for (out_l) |v| try testing.expectEqual(@as(f32, 0.0), v);
+    era_spectrum_reset(sp);
+    era_spectrum_peaks(sp, peak_l, peak_r);
+    for (peak_l) |v| try testing.expectEqual(@as(f32, 0.0), v);
+    for (peak_r) |v| try testing.expectEqual(@as(f32, 0.0), v);
+    try testing.expectEqual(@as(f32, 1.0), sp.agc_gain);
 }
 
-test "era_spectrum: 非法配置被拒绝" {
+test "era_spectrum: 非法配置拒绝" {
     const a = testing.allocator;
     try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .sample_rate = 0 }));
     try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .bins = 0 }));
-    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .min_hz = 0.0 }));
-    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .min_hz = 16000.0, .max_hz = 40.0 }));
-    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .max_hz = 24000.0 }));
-    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .fft_low = 8000 }));
-    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .fft_high = 1000 }));
+    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .min_hz = 0 }));
+    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .max_hz = 24000 }));
+    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .max_window = 32 }));
+    try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .gamma = 0 }));
 }

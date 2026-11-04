@@ -30,6 +30,9 @@ class _SpectrumPainter extends CustomPainter {
     Float64List(fftSize),
   ];
   final Float64List _stereo = Float64List(fftSize * 2);
+  final Float64List _peakL = Float64List(fftSize);
+  final Float64List _peakR = Float64List(fftSize);
+  bool _hasPeak = false;
 
   /// 实测帧间隔（ms）：由 [FftFrame.intervalMs] 播种、按实际到达间隔平滑，
   /// 随引擎事件档位（50/300/1000ms）自适应。
@@ -45,7 +48,10 @@ class _SpectrumPainter extends CustomPainter {
       _prev[1][i] = _curr[1][i];
       _curr[0][i] = i < l.length ? _finite(l[i]) : 0.0;
       _curr[1][i] = i < r.length ? _finite(r[i]) : 0.0;
+      _peakL[i] = i < frame.lpeak.length ? _finite(frame.lpeak[i]) : 0.0;
+      _peakR[i] = i < frame.rpeak.length ? _finite(frame.rpeak[i]) : 0.0;
     }
+    _hasPeak = frame.lpeak.isNotEmpty || frame.rpeak.isNotEmpty;
     final measured = _lastUpdateMs > 0 ? nowMs - _lastUpdateMs : 0;
     _intervalMs = updateSpectrumInterval(
       _intervalMs,
@@ -68,6 +74,9 @@ class _SpectrumPainter extends CustomPainter {
       b.fillRange(0, fftSize, 0);
     }
     _stereo.fillRange(0, _stereo.length, 0);
+    _peakL.fillRange(0, fftSize, 0);
+    _peakR.fillRange(0, fftSize, 0);
+    _hasPeak = false;
     _lastUpdateMs = nowMs;
     _lastPaintMs = nowMs;
     _intervalMs = spectrumDefaultIntervalMs;
@@ -109,6 +118,39 @@ class _SpectrumPainter extends CustomPainter {
         radius: radius,
         color: color,
       ),
+    );
+    _drawPeakLine(canvas, size);
+  }
+
+  /// 峰值保持线：引擎算好，UI 只按双声道拼接布局描线（不做 DSP）。
+  void _drawPeakLine(Canvas canvas, Size size) {
+    if (!_hasPeak) return;
+    final channelLength = fftSize - skipLow;
+    final total = channelLength * 2;
+    if (total <= 1) return;
+    final path = Path();
+    for (var i = 0; i < total; i++) {
+      final isLeft = i < channelLength;
+      final src = isLeft ? (reverse ? (channelLength - 1 - i) : i) : i - channelLength;
+      final v = isLeft
+          ? _peakL[fftSize - 1 - src]
+          : _peakR[skipLow + src];
+      final x = size.width * i / (total - 1);
+      final y = size.height - v.clamp(0.0, 1.0) * size.height;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color.withValues(alpha: 0.85)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
     );
   }
 
