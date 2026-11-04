@@ -5306,6 +5306,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
 
   @override
+  String get settingsSpectrumPeakHold => 'Peak hold line';
+
+  @override
+  String get settingsSpectrumPeakHoldOn =>
+      'Show the engine-computed peak line above the spectrum';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'Peak line hidden';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

@@ -40,21 +40,25 @@ pub const EraSpectrumConfig = struct {
     frame_interval_s: f32 = 0.05,
     /// 慢 AGC（默认开）。
     agc_enabled: bool = true,
-    agc_target_db: f32 = -20.0,
+    agc_target_db: f32 = -24.0,
     agc_attack_s: f32 = 3.0,
     agc_release_s: f32 = 3.0,
-    /// 显示 γ（默认 0.9；1.0 = 关闭）。
-    gamma: f32 = 0.9,
-    /// 高频倾斜（dB/oct，相对 1kHz；默认 +0.75）。
-    tilt_db_per_oct: f32 = 0.75,
-    /// 峰值保持（默认开）。
-    peak_hold: bool = true,
+    /// 显示 γ（默认 1.0；<1 提亮小信号，>1 压暗）。
+    gamma: f32 = 1.0,
+    /// 高频倾斜（dB/oct，相对 1kHz；默认 +0.5）。
+    tilt_db_per_oct: f32 = 0.5,
+    /// 峰值保持（默认关；由 UI 设置通过 set_fft 打开）。
+    peak_hold: bool = false,
     /// 峰值每秒衰减（归一化单位，默认 2.0/s）。
     peak_decay_per_s: f32 = 2.0,
 };
 
 /// dB 映射动态范围下界（-72dB → 0）。
 const era_db_floor: f32 = -72.0;
+
+/// dB 映射上界：+6dB 才满量程，给 0dBFS 内容留约 8% 顶部余量，
+/// 避免母带/限幅后的音乐「一上来就顶满」。
+const era_db_ceiling: f32 = 6.0;
 
 /// 软膝宽度（映射后归一化坐标的底部 6%）。
 const era_soft_knee: f32 = 0.06;
@@ -303,6 +307,15 @@ pub fn era_spectrum_reset(self: *EraSpectrum) void {
     self.has_prev = false;
 }
 
+/// 设置峰值保持开关；关闭时清空峰值，避免残留线。
+pub fn era_spectrum_set_peak_hold(self: *EraSpectrum, enabled: bool) void {
+    self.peak_hold = enabled;
+    if (!enabled) {
+        @memset(self.peak_l, 0.0);
+        @memset(self.peak_r, 0.0);
+    }
+}
+
 /// 输出频段数。
 pub fn era_spectrum_bins(self: *const EraSpectrum) u32 {
     return self.bins;
@@ -338,10 +351,10 @@ fn eraVqtBandMag(band: *const EraVqtBand, src: []const f32) f32 {
     return m;
 }
 
-/// dB → [0,1]，底部 6% smoothstep 软膝（不做硬清零）。
+/// dB → [0,1]，顶部预留 +6dB，底部 6% smoothstep 软膝（不做硬清零）。
 fn eraMapDb(amp: f32) f32 {
     const db = 20.0 * @log10(amp + 1e-12);
-    var t = (db - era_db_floor) / (0.0 - era_db_floor);
+    var t = (db - era_db_floor) / (era_db_ceiling - era_db_floor);
     if (t < 0.0) t = 0.0;
     if (t > 1.0) t = 1.0;
     const gate = @min(t / era_soft_knee, 1.0);

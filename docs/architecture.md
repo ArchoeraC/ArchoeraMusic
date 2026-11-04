@@ -253,7 +253,7 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 | 音量 volume | — | `set_volume {gain}`（主音量在 miniaudio 侧，preamp 管余量） |
 | 响度归一化 | `--normalization` | `set_normalization {enabled}` |
 | 限幅器 | `--limiter-threshold`（默认启用） | `set_limiter {enabled}` |
-| 频谱显示 | `--fft` | `set_fft {enabled}` |
+| 频谱显示 | `--fft` | `set_fft {enabled, peak_hold}` |
 | 变速/变调 | `--tempo --tempo-speed --tempo-pitch` | `set_tempo_speed` / `set_tempo_pitch` |
 | seek | `-o --offset`（CLI 启动偏移） | `seek {position_ms}`（进程内，Phase 3+；桌面端由 miniaudio 即时 seek，§5.3） |
 
