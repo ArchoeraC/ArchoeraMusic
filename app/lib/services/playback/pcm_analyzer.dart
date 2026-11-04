@@ -15,8 +15,9 @@ import 'fft_frame.dart';
 
 /// 按播放位置取「最近一帧频谱」的拉模式源（文件版 / 内存播放版共用契约）。
 ///
-/// UI（playback_notifier `_pollSpectrum`）只依赖 [frameAt]；[dispose] 负责释放
-/// 各自资源。文件版为 [PcmAnalyzer]（读 stream.pcm），内存播放版为
+/// 保留给 CLI / 测试 / 外部集成；**App 播放路径已改为引擎 `fft` 事件推送**，
+/// 不再导入本文件（docs/spectrum-analyzer.md §7.2）。[dispose] 负责释放各自
+/// 资源。文件版为 [PcmAnalyzer]（读 stream.pcm），内存播放版为
 /// [MemoryPcmAnalyzer]（引擎内存块列表 + `pcm_window` FFI，见
 /// `docs/audio-memory-playback.md`）。
 abstract class PcmFftSource {

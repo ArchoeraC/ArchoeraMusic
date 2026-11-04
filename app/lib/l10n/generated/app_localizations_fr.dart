@@ -38,6 +38,22 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ne redessiner que les bandes d\'ondulations actives ; chemin CPU uniquement';
 
   @override
+  String get settingsLyricsEdgeFade => 'Fondu des bords des paroles';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      'Comment les bords haut et bas s’estompent : par ligne est le moins coûteux, masque le plus doux, désactivé sans fondu';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => 'Par ligne';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'Masque';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'Off';
+
+  @override
   String get menuTrackDetail => 'Détails du média';
 
   @override

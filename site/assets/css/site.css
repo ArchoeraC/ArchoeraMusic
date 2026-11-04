@@ -1244,6 +1244,14 @@ code {
   color: #6f6f6f;
 }
 
+.stats-note {
+  margin: 18px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #5e5e5e;
+}
+
 /* ── 滚动叙事 ─────────────────────────────────────────────────────────── */
 .showcase {
   padding: clamp(88px, 9vw, 140px) 0 clamp(60px, 6vw, 100px);
@@ -2980,6 +2988,197 @@ body.lightbox-open {
   border-color: #555;
 }
 
+/* ── 下载说明 / 平台识别 / 免责声明 ─────────────────────────────────── */
+.platform-note {
+  margin: 14px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: #6f6f6f;
+}
+
+.section-lede a,
+.faq-a a {
+  color: #c2c6ce;
+  border-bottom: 1px solid #3a3a3a;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+
+.section-lede a:hover,
+.faq-a a:hover {
+  color: #fff;
+  border-color: #777;
+}
+
+.download-card {
+  position: relative;
+}
+
+.download-card.is-detected {
+  border-color: #8d8d8d;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 46%),
+    #0b0b0b;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.09),
+    0 30px 80px -56px rgba(255, 255, 255, 0.6);
+}
+
+.download-card.is-detected .download-head h3::after {
+  content: "推荐";
+  display: inline-block;
+  margin-left: 9px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid #e8e8e8;
+  background: #f2f2f2;
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #080808;
+  vertical-align: 2px;
+}
+
+.download-card.is-detected .download-link {
+  color: #f2f2f2;
+}
+
+.install-note.is-detected {
+  border-color: #8d8d8d;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 55%),
+    #0c0c0c;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.install-note.is-detected h3::after {
+  content: "当前系统";
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid #e8e8e8;
+  background: #f2f2f2;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #080808;
+  vertical-align: 1px;
+}
+
+.install-notes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.install-note {
+  padding: 20px 22px;
+  border-radius: 12px;
+  border: 1px solid #202020;
+  background: #090909;
+}
+
+.install-note h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #d4d4d4;
+}
+
+.install-note p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.8;
+  color: #868686;
+}
+
+.install-note code {
+  white-space: normal;
+  word-break: break-all;
+}
+
+.disclaimer {
+  margin: 28px 0 0;
+  padding: 18px 22px;
+  border-left: 2px solid #333;
+  background: #070707;
+  font-size: 12px;
+  line-height: 1.85;
+  color: #818181;
+}
+
+/* ── 常见问题 ─────────────────────────────────────────────────────────── */
+.section-faq {
+  background:
+    radial-gradient(900px 420px at 20% 0%, rgba(206, 212, 224, 0.04), transparent 70%),
+    #000;
+}
+
+.faq-list {
+  border-top: 1px solid #1e1e1e;
+}
+
+.faq-list details {
+  border-bottom: 1px solid #191919;
+}
+
+.faq-list summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 0;
+  cursor: pointer;
+  list-style: none;
+  transition: color 180ms ease;
+}
+
+.faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-list summary:hover .faq-q {
+  color: #fff;
+}
+
+.faq-q {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #dedede;
+  transition: color 180ms ease;
+}
+
+.faq-plus {
+  flex: none;
+  color: #777;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  transition: transform 180ms ease, color 180ms ease;
+}
+
+.faq-list details[open] .faq-plus {
+  transform: rotate(45deg);
+  color: #cfcfcf;
+}
+
+.faq-a {
+  margin: 0;
+  padding: 0 0 22px;
+  max-width: 62em;
+  font-size: 13px;
+  line-height: 1.85;
+  color: #8d8d8d;
+}
+
+.faq-a code {
+  white-space: normal;
+}
+
 /* ── 响应式 ───────────────────────────────────────────────────────────── */
 @media (max-width: 1180px) {
   .chip-a { right: 18px; }
@@ -3059,6 +3258,10 @@ body.lightbox-open {
 
   .download-card {
     min-height: 0;
+  }
+
+  .install-notes {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .engine-diagram {
@@ -3451,6 +3654,18 @@ body.lightbox-open {
 
   .lightbox {
     padding: 16px;
+  }
+
+  .faq-list summary {
+    padding: 16px 0;
+  }
+
+  .faq-q {
+    font-size: 13.5px;
+  }
+
+  .disclaimer {
+    padding: 16px 18px;
   }
 }
 

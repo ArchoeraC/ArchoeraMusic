@@ -62,10 +62,13 @@ class PlaybackProgressSlider extends ConsumerWidget {
     final ms = (dragMs ?? s.pos.inMilliseconds)
         .clamp(0, durMs < 1 ? 1 : durMs)
         .toDouble();
+    // 切歌淡入进行中：已播放段发光（对齐 SPlayer 播放过渡发光）。
+    final glow = ref.watch(playbackProvider.select((s) => s.transitioning));
     final slider = PlaybackSlider(
       value: ms,
       max: durMs < 1 ? 1 : durMs.toDouble(),
       buffering: buffering,
+      glow: glow,
       showTooltip: prefs.showProgressTooltip,
       // 悬停/拖动：时间提示旁一并显示该位置的歌词行（时间显示的歌词定位）。
       tooltipLyric: prefs.showProgressTooltip

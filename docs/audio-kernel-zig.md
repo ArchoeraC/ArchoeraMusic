@@ -52,7 +52,7 @@
 11. [编码器与 OGG 封装（可选模块）](#11-编码器与-ogg-封装可选模块)
 12. [时长 / 定位 / Seek 语义](#12-时长--定位--seek-语义)
 13. [中断、错误与容错](#13-中断错误与容错)
-14. [DSP 移植与 libfft.so（保持 Dart ABI）](#14-dsp-移植与-libfftso保持-dart-abi)
+14. [DSP 移植与 libfft.so（频谱 v2 破坏性更新）](#14-dsp-移植与-libfftso频谱-v2-破坏性更新)
 15. [播放器输出层（跨平台难点）](#15-播放器输出层跨平台难点)
 16. [FFI 边界与 CLI](#16-ffi-边界与-cli)
 17. [测试与验证](#17-测试与验证)
@@ -73,7 +73,7 @@
 | **P2** | **自研优先（最小外部依赖）** | 内核核心（IO / 探测 / 解复用 / 采样转换 / DSP / 封装 / **播放输出层**）**全部自研 Zig**；只有"数学复杂度确实无法自研"的编解码器才引入外部实现，且必须是 **Permissive 单文件或可 vendored 源码**（源码入库，零二进制依赖、零构建期网络下载）。见 §3.3 裁决规则与 §3.7 最终裁决表 |
 | **P3** | **FFmpeg 默认主引擎，Zig 渐进替换** | **默认构建启用 FFmpeg 解码**（`-Duse-ffmpeg` 默认开启，链接 `libav*` / `libsw*`，行为同现状零回归）；Zig 内核逐格式成熟并验收后**按格式接管**（格式级开关如 `-Dzig-flac=true`）；未接管格式始终由 FFmpeg 提供；全部 T0/T1 验收后 Zig 可升为主（`-Dzig-main=true`，可选），FFmpeg 仍保留为主引擎选项（§8.3） |
 | **P4** | **纯音频、无视频** | 视频轨不处理、不支持、不探测；容器只解析音频轨 |
-| **P5** | **行为兼容（迁移护栏）** | `archoera_mediaengine.h` FFI 导出符号、事件/命令 JSON 协议、`libfft.so` 的 Dart ABI、`stream.wav` / `stream.pcm` 落盘格式**全部不变**；Dart 侧仅新增"在线源预下载"一步（本条为**文件模式基线**的不变量；2026-09-08 起桌面播放默认改「内存播放（不落盘）模式」——新增能力不破坏本护栏，见 `docs/audio-memory-playback.md`） |
+| **P5** | **行为兼容（迁移护栏）** | `archoera_mediaengine.h` FFI 导出符号、事件/命令 JSON 协议、`stream.wav` / `stream.pcm` 落盘格式**不变**；Dart 侧仅新增"在线源预下载"一步（本条为**文件模式基线**的不变量；2026-09-08 起桌面播放默认改「内存播放（不落盘）模式」——新增能力不破坏本护栏，见 `docs/audio-memory-playback.md`）。**例外（2026-11-04）**：频谱 v2 为破坏性更新，App 播放路径不再使用旧 `libfft.so` ABI，频谱事件与 App 接收端按 `docs/spectrum-analyzer.md` 直接替换，不保留旧兼容 |
 | **P6** | **格式广度（本地播放器兼容面）** | 作为本地播放器，应兼容尽可能多的音频类型（含 Hi-Res/无损收藏：FLAC/APE/WavPack/DSD/ALAC/AIFF 等）。通过**格式插件化**（comptime 特性开关）实现：默认构建只含核心格式保持轻量，需要时逐格式开启；每个格式模块独立实现/独立许可审查，互不拖累 |
 
 > **P2 与 P6 的调和**：P2 约束"依赖形态"（必须 Permissive 单文件 / vendored 源码、源码入库、零构建期下载），
@@ -349,7 +349,8 @@ app/core/audio-engine/                # C 壳保留 + Zig 内核（FFmpeg 依赖
 │   ├── player.c                      # miniaudio 自播（MINIAUDIO_IMPLEMENTATION 唯一实例化点）
 │   ├── decoder_ffmpeg.c              # 默认主后端：FFmpeg 解码（-Duse-ffmpeg 默认开，§8.3）
 │   ├── resampler_ffmpeg.c            # 默认主后端：FFmpeg SRC（同上）
-│   ├── encoder.c / pcm_uds.c / fft.c # 保留（Web/CLI 编码、UDS、libfft.so Dart ABI）
+│   ├── encoder.c / pcm_uds.c        # 保留（Web/CLI 编码、UDS）
+│   ├── fft.c                         # v2 实现期参考；v2 落地后删除（不保留兼容层）
 │   └── equalizer.c / loudness.c / limiter.c   # 保留（DSP 移植为 Zig 前的过渡；§14）
 ├── kernel/                           # Zig 内核（本次重写的主体）
 │   ├── kernel.zig                    # 桥接导出：export zk_*（C 壳经 kernel_bridge.h 调用，§16）
@@ -383,7 +384,7 @@ app/core/audio-engine/                # C 壳保留 + Zig 内核（FFmpeg 依赖
 │   │   ├── equalizer.zig             # 10 段 Biquad（移植现状 C）
 │   │   ├── loudness.zig              # EBU R128 增益（移植）
 │   │   ├── limiter.zig               # 限幅（移植）
-│   │   └── fft_abi.zig               # FFT 分析（移植；导出 libfft.so 的 Dart ABI）
+│   │   ├── spectrum.zig              # 频谱 v2 纯计算核心（多分辨率/对数带/通量）
 │   ├── tempo.zig                     # 自研 WSOLA（目标）；tempo-rs FFI 兜底（§9.6）
 │   ├── encode/
 │   │   ├── opus_encoder.zig          # libopus 编码（可选模块）
@@ -431,11 +432,12 @@ source（本地文件 / Dart 预下载临时文件）
 4. 采样率语义：player 模式 `output_sample_rate<=0` 跟随源（Hi-Res 直通）；
 5. DSP 顺序不变。
 
-> 6.（2026-09-08 新增）**内存播放（不落盘）模式**：桌面播放默认开启，解码 PCM 驻留进程内
->    「全量块列表」（达 cap 才滚动淘汰），频谱经新 FFI `archoera_mediaengine_pcm_window` 拉窗，
->    不写 `stream.wav`/`stream.pcm`；无设备 + 内存模式直接 error（不文件回退）。该能力为
->    **新增可选输出形态**，不破坏上述文件模式基线不变量；完整规格/验收见
->    `docs/audio-memory-playback.md`。
+> 6.（2026-09-08 新增，2026-11-04 频谱 v2 更新）**内存播放（不落盘）模式**：桌面播放默认开启，
+>   解码 PCM 驻留进程内「全量块列表」（达 cap 才滚动淘汰），频谱由引擎频谱线程直接读块列表并
+>   50ms 事件推送（旧 `archoera_mediaengine_pcm_window` FFI 拉窗随 v2 移除），不写
+>   `stream.wav`/`stream.pcm`；无设备 + 内存模式直接 error（不文件回退）。该能力为
+>   **新增可选输出形态**，不破坏上述文件模式基线不变量；完整规格/验收见
+>   `docs/audio-memory-playback.md` 与 `docs/spectrum-analyzer.md`。
 
 ---
 
@@ -1806,25 +1808,39 @@ pub const Error = error{
 
 ---
 
-## 14. DSP 移植与 libfft.so（保持 Dart ABI）
+## 14. DSP 移植与 libfft.so（频谱 v2 破坏性更新）
 
 > **能力扩张（2026-09-22）**：本节只定「把现有 C DSP 下沉 Zig」的地基；移植完成后的
 > **可听频段功能扩张**（参数化 EQ / 次声低频管理 / DRC / crossfeed / 等响度…）见
 > [`audio-kernel-expansion-plan.md`](audio-kernel-expansion-plan.md) §2（方向①）。
 >
-> **状态（2026-09-23）**：地基 + **D1/D2 已落**——`kernel/dsp/parametric.zig`
+> **状态（2026-11-04）**：地基 + **D1/D2 已落**——`kernel/dsp/parametric.zig`
 > （参数化 EQ）与 `kernel/dsp/lowfreq.zig`（次声 HPF + bass shelf）经
-> `zk_dsp_peq_*` / `zk_dsp_lowfreq_*` 被 C 壳调用，C 回退保留；`fft/resampler/tempo`
-> 仍为接口占位（`libfft.so` ABI 不变）。
+> `zk_dsp_peq_*` / `zk_dsp_lowfreq_*` 被 C 壳调用，C 回退保留；频谱 v2 已落
+> （见下），`resampler/tempo` 仍为接口占位。
+>
+> **频谱 v2（2026-11-04 落地）**：不再只是「把 `src/fft.c` 逐函数搬进 Zig」，
+> 而是把频谱分析整体下沉为内核能力：`kernel/dsp/spectrum.zig`（纯计算）+
+> `zk_dsp_spectrum_*`（C 壳/引擎事件推送）。频率扩到 40–16kHz、多分辨率 FFT、
+> 引擎侧 50ms 推送；详见 [`spectrum-analyzer.md`](spectrum-analyzer.md)。
+> **硬约束**：懒初始化、会话内表复用、独立频谱线程、零每帧分配，不得拖慢
+> 冷/热启动与解码线程池。App 播放路径不再使用旧 `libfft.so` ABI；`src/fft.c`
+> → `libfft.so` 仍保留给未迁移的 CLI/测试（不属于 v2 契约）。
 
-- `equalizer/loudness/limiter/fft` 四个 DSP 模块把现状 C 实现**逐函数移植到 Zig**
-  （现有 C 共 ~1200 行，语义对照移植，配套测试直接复用 `tests/test_equalizer.c` 等黄金断言）；
-- 移植后经 `kernel_bridge.h`（`zk_dsp_*`）被 C 壳 `pipeline.c` 调用；现状 `equalizer.c/loudness.c/
-  limiter.c` 在移植完成前保留为过渡实现（§4.1），移植完成后删除；
-- `libfft.so` 的 Dart ABI 必须保持不变：`fft_create/fft_set_enabled/fft_process_multi/
-  fft_get_spectrum_norm_stereo/...` 以 `export fn ... callconv(.C)` 从 `kernel/dsp/fft_abi.zig` 导出，
-  `fft_bindings.dart` **零改动**；移植期 `src/fft.c` 临时保留（`fft_abi.zig` 可先 `@cImport` 复用），
-  再逐模块替换，降低一次性移植风险。
+- `equalizer/loudness/limiter` 三个 DSP 模块把现状 C 实现**逐函数移植到 Zig**
+  （语义对照移植，配套测试直接复用 `tests/test_equalizer.c` 等黄金断言）；
+- 频谱不走「逐函数照搬」：`kernel/dsp/spectrum.zig` 是 v2 纯计算核心
+  （多分辨率 FFT / 对数带 / dB / 频谱通量），引擎推送经 `zk_dsp_spectrum_*`
+  桥接；App 播放路径不再使用旧 `libfft.so` 的 `fft_*` ABI；
+- 移植后经 `kernel_bridge.h`（`zk_dsp_*`）被 C 壳 `pipeline.c` 调用；现状
+  `equalizer.c/loudness.c/limiter.c` 在移植完成前保留为过渡实现（§4.1），
+  移植完成后删除；`src/fft.c` 仅保留给未迁移的 CLI/测试，不属于 v2 契约；
+- `libfft.so` 的旧 `fft_*` ABI **不再属于 App 播放路径**：v2 的唯一计算入口是
+  `zk_dsp_spectrum_*`（40–16kHz、多分辨率、-72..0dB）。旧 `fft_*` 不承诺
+  兼容；需要 v2 的消费者直接链接内核。
+- **启动/线程约束**：频谱表在首次 `set_fft` 时懒建（当前每会话一次，<1ms），
+  `reset` 只清状态；分析在独立频谱线程，不提交解码 worker 任务、不在音频回调
+  做 FFT、零每帧分配；频谱关闭时零额外工作（详见 `spectrum-analyzer.md` §5）。
 
 ---
 
@@ -1947,9 +1963,10 @@ void        zk_dsp_destroy(ZkDspChain *d);
 - `archoera_mediaengine_*` 6 个导出符号（`create/command/poll_event/session_dir/is_done/destroy`）
   **原样保留**，Dart `engine_bindings.dart` / `audio_engine_process.dart` **零改动**；
 - `create` 内部：解析 `EngineConfig` → 构造 `ZkDspChain`（如启用）→ 引擎线程内 `zk_decoder_open` +
-  `zk_decoder_read` 循环 → DSP → 落盘 `stream.wav`（player 模式）/ `stream.pcm`（FFT 拉模式）
-  （此落盘描述为**文件模式**基线；内存播放模式下解码产物驻留进程内内存块列表，频谱经
-  `archoera_mediaengine_pcm_window` FFI 拉取，见 `docs/audio-memory-playback.md`）；
+  `zk_decoder_read` 循环 → DSP → 落盘 `stream.wav`（player 模式）/ `stream.pcm`（文件模式）
+  （此落盘描述为**文件模式**基线；内存播放模式下解码产物驻留进程内内存块列表，频谱由
+  引擎频谱线程直接读块列表并 50ms 事件推送，旧 `archoera_mediaengine_pcm_window` FFI
+  拉取随 v2 移除，见 `docs/audio-memory-playback.md` / `docs/spectrum-analyzer.md`）；
 - 默认构建（`-Duse-ffmpeg` 默认开）时：`zk_decoder_open` 返回不可恢复错误（`UnsupportedFormat` /
   持续失败）→ C 壳切 `decoder_ffmpeg.c` 后端（默认主，§8.3），事件带 `backend` 字段；已接管格式
   优先 Zig，失败回退 FFmpeg；
@@ -2332,12 +2349,13 @@ void        zk_dsp_destroy(ZkDspChain *d);
     §17.2），系统 ffmpeg 99.99%+（残留 ±1 LSB 构建差异）。接线：`probe.formats.aac`、
     decoder 工厂、**M4A 内 AAC 轨**（mp4a+esds → ASC → 逐 sample 喂包）全部接入。
     ADTS/M4A seek 为整帧对齐（帧级精度，同现状 FFmpeg AVSEEK_FLAG_BACKWARD）。
-15. **内存播放（不落盘）模式（2026-09-08 决策）**：桌面播放**默认内存模式**（独立开关，
+15. **内存播放（不落盘）模式（2026-09-08 决策；2026-11-04 频谱 v2 更新）**：桌面播放**默认内存模式**（独立开关，
     与 Stable/EraAudio、SongCache 均独立）。解码 PCM 驻留进程内**全量块列表**（与 stream.pcm
-    文件块同构；达 cap 才滚动淘汰），频谱经新 FFI `archoera_mediaengine_pcm_window` / `_epoch`
-    拉窗，**不写 `stream.wav/.pcm`**；无设备 + 内存模式 → error（不文件回退）；`cap`：
+    文件块同构；达 cap 才滚动淘汰），频谱由引擎频谱线程直接读块列表并 50ms 事件推送
+    （旧 `archoera_mediaengine_pcm_window` / `_epoch` FFI 随 v2 移除），**不写 `stream.wav/.pcm`**；
+    无设备 + 内存模式 → error（不文件回退）；`cap`：
     auto（按可用内存均衡，**32 MiB 硬上限**：查询故障回落、append 后记账强制淘汰、绝不越过
-    用户设限；驻留仅供频谱 pcm_window，配 8 MiB 缓冲复用池）/ 自定义上限 / 无上限（须显式警告内存过载后果）。
+    用户设限；驻留仅供频谱取帧，配 8 MiB 缓冲复用池）/ 自定义上限 / 无上限（须显式警告内存过载后果）。
     文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为（PARITY 基准在
     文件模式下执行；内存模式按窗口比对）。规格与验收：`docs/audio-memory-playback.md`。
 16. **进程内模块化引擎（2026-09-08，用户决策；HTTP 直连并行开展）**：引擎向"1 主控 Registry →

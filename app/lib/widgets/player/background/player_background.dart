@@ -78,7 +78,11 @@ class PlayerBackground extends ConsumerWidget {
           fluid: FluidBackgroundConfig(
             animate: animate,
             flowSpeed: prefs.playerBgFlowSpeed,
-            renderScale: prefs.playerBgRenderScale,
+            // 自适应画质降档时同样降流体渲染比例（其内部夹到 0.25~2）。
+            renderScale: (prefs.playerBgRenderScale * adaptiveScale).clamp(
+              0.25,
+              2.0,
+            ),
             fps: prefs.playerBgFps,
             freezeOnPause: prefs.playerBgFreezeOnPause,
             beat: prefs.playerBgBeat,

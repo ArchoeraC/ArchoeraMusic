@@ -54,7 +54,7 @@
 | 均衡器 | C，**固定 10 段** ISO 频点（31.25…16k）+ preamp，±12 dB | `src/equalizer.c/.h`（`EQ_BANDS=10`） |
 | 响度 | C，EBU R128，扫描 / 应用两种模式 | `src/loudness.c/.h` |
 | 限幅 | C，阈值可设（默认 −1 dB） | `src/limiter.c/.h` |
-| 频谱 | C，`libfft.so`，Dart 经 FFI 拉窗 | `src/fft.c/.h` |
+| 频谱 | v2：内核多分辨率分析 + 引擎 50ms 事件推送（UI 纯接收）；App 不再用 `libfft.so` 拉窗 | `kernel/dsp/spectrum.zig`；`src/spectrum_service.c`；`src/fft.c`（旧 ABI，仅 CLI/测试） |
 | 变速变调 | Rust `tempo-rs`（signalsmith-stretch）过渡 | `src/tempo.c/.h` |
 | 重采样 | FFmpeg `libswresample` | `src/resampler.c/.h` |
 | 内核侧 | ✅ **地基 + D1/D2 已落**：`kernel/dsp/`（EQ/limiter/loudness 逐位一致）+ 参数化 EQ（`parametric.zig`，peak/low-shelf/high-shelf、freq/Q/gain）+ 次声低频管理（`lowfreq.zig`，HPF + bass shelf）；经 `zk_dsp_peq_*` / `zk_dsp_lowfreq_*` 被 C 壳调用 | `include/kernel_bridge.h`、`src/parametric_eq.c` / `src/lowfreq.c` |
@@ -64,8 +64,9 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 ### 2.2 目标
 
-1. **地基：DSP 下沉 Zig**（对齐 §14）——`equalizer/loudness/limiter/fft/resampler/tempo` 逐函数移植进
-   `kernel/dsp/`，经 `zk_dsp_*` 被 C 壳调用；`libfft.so` 的 Dart ABI **零改动**，`fft_bindings.dart` 不变。
+1. **地基：DSP 下沉 Zig**（对齐 §14）——`equalizer/loudness/limiter` 逐函数移植进
+   `kernel/dsp/`，经 `zk_dsp_*` 被 C 壳调用；频谱按 v2 重写（`spectrum.zig`），
+   App 播放路径不再使用旧 `libfft.so` ABI 与拉窗，前端改为纯事件接收（破坏性更新）。
 2. **扩张：可听频段新功能**——在既有 EQ/响度/限幅之上，按需增加处理块（候选见 2.3）。
 
 ### 2.3 候选功能清单（下一批内核实现候选，待定优先级）
@@ -79,11 +80,13 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 | D5 | **立体声宽度 / M-S** | 中侧宽度调节、声道平衡 | 简单、听感明显 | 通用 M/S |
 | D6 | **等响度（loudness contour）** | 随音量补偿低/高频 | 小音量补偿 | ISO 226 |
 | D7 | **Gapless / crossfade** | 曲间无缝 / 淡入淡出（偏管线，常与 DSP 同议） | 专辑连贯性 | — |
-| D8 | **频谱可视化增强** | 倍频程/更多 bin/峰值保持（`fft` 已有基础） | 播放页观感 | — |
+| D8 | **频谱可视化增强**（v2 已落地） | 频率扩到 40–16kHz、多分辨率 FFT（8192/2048）、128 对数带、功率聚合、软膝 dB、频谱通量节拍；引擎侧 50ms 事件推送，UI 改为纯接收端；详见 [`spectrum-analyzer.md`](spectrum-analyzer.md) | 播放页观感 + UI 线程减负 | Chromium AnalyserNode / SPlayer / 多分辨率 FFT |
 
 ### 2.4 约束与验收
 
-- **不破坏 P5 护栏**：`libfft.so` ABI、`zk_dsp_*` 契约、`stream.wav/.pcm` 格式不变；
+- **P5 护栏（频谱除外）**：`zk_dsp_*` 契约、`stream.wav/.pcm` 格式不变；频谱 v2 为
+  **破坏性更新**（`libfft.so` ABI / 事件 / 前端接收端按 `spectrum-analyzer.md` 直接替换，
+  不保留旧拉模式兼容）；
 - **精度纪律**：无损链路逐位；有损按 `decode-optimization.md` §4.2 门禁（`|corr|≥0.999` 且 ±≤1 LSB）；
 - **性能**：DSP 在解码侧 worker 完成，禁止回到 Dart 主 isolate 逐样本处理（对齐 AGENTS「重计算下沉」）；
 - **验收**：每个 DSP 块单独单测 + `tests/test_equalizer.c` 等黄金断言复用 + 与 C 实现逐位/逐块对照，
@@ -293,7 +296,9 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 
 ## 8. 不变量与红线（汇总）
 
-- `archoera_mediaengine.h` 导出符号 / JSON 协议 / `libfft.so` ABI / `stream.wav/.pcm` 格式**不变**（P5）；
+- `archoera_mediaengine.h` 导出符号 / JSON 协议 / `stream.wav/.pcm` 格式**不变**（P5）；
+  **例外**：频谱 v2 为破坏性更新，App 播放路径不再使用旧 `libfft.so` ABI /
+  拉窗；频谱事件与前端接收端按 `spectrum-analyzer.md` 直接替换；
 - 在线传输：宿主注入（FFmpeg AVIO）为**回退基线**，内核原生 HTTP(S)（`kernel/net.zig`，2026-10-01）为**可选优先**，`ARCHOERA_ERA_NATIVE_HTTP=0` 可关闭；视频解码不做（P4）；
 - 无损逐位、有损 corr 门禁；零新增缓冲；B 档需授权；
 - 内核符号 `era_` 前缀，不照搬上游标识符；

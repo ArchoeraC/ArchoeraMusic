@@ -24,6 +24,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/l10n.dart';
 import '../../../services/playback/playback_notifier.dart';
+import '../../../widgets/common/anim.dart';
 import '../../../widgets/list/cover_image.dart';
 import '../../../widgets/player/playback_progress_slider.dart';
 import '../../../widgets/player/player_lyrics_block.dart';
@@ -349,11 +350,12 @@ class _VutronVolume extends ConsumerWidget {
   }
 }
 
-/// 精简音量条：6px 圆角条（无圆点），铺满整条宽度。
+/// 精简音量条：6px 圆角条（无圆点），铺满整条宽度；悬停/拖动时轨道展开到
+/// 12px（280ms ease-out，对齐 SPlayer SSlider `hover-track-height` 的 AM 音量条）。
 ///
 /// 不使用 Material [Slider] 的圆点与高命中区，保留一条干净的整宽轨道；
 /// 拖动时只预览（引擎命令合并），松手落盘。
-class _VutronVolumeBar extends StatelessWidget {
+class _VutronVolumeBar extends StatefulWidget {
   const _VutronVolumeBar({
     required this.value,
     required this.onChanged,
@@ -365,60 +367,83 @@ class _VutronVolumeBar extends StatelessWidget {
   final ValueChanged<double> onChangeEnd;
 
   @override
+  State<_VutronVolumeBar> createState() => _VutronVolumeBarState();
+}
+
+class _VutronVolumeBarState extends State<_VutronVolumeBar> {
+  /// 静止/展开的轨道粗细。
+  static const double _trackHeight = 6;
+  static const double _hoverTrackHeight = 12;
+
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return LayoutBuilder(
-      builder: (context, box) {
-        double valueAt(Offset local) {
-          final usable = box.maxWidth.clamp(1.0, double.infinity);
-          return (local.dx / usable).clamp(0.0, 1.0);
-        }
-
-        return MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (d) {
-              final v = valueAt(d.localPosition);
-              onChanged(v);
-              onChangeEnd(v);
-            },
-            onHorizontalDragStart: (d) => onChanged(valueAt(d.localPosition)),
-            onHorizontalDragUpdate: (d) => onChanged(valueAt(d.localPosition)),
-            // 拖动期间父层已通过 previewVolume 更新 value，松手落盘当前值。
-            onHorizontalDragEnd: (_) => onChangeEnd(value),
-            child: SizedBox(
-              height: 20,
-              child: CustomPaint(
-                painter: _VutronVolumeBarPainter(
-                  value: value.clamp(0.0, 1.0),
-                  // 音量填充跟随主题色，底轨保持低对比中性色。
-                  active: scheme.primary,
-                  inactive: scheme.onSurface.withValues(alpha: 0.18),
-                ),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (d) {
+          widget.onChanged(valueAt(d.localPosition.dx, context));
+          widget.onChangeEnd(valueAt(d.localPosition.dx, context));
+        },
+        onHorizontalDragStart: (d) =>
+            widget.onChanged(valueAt(d.localPosition.dx, context)),
+        onHorizontalDragUpdate: (d) =>
+            widget.onChanged(valueAt(d.localPosition.dx, context)),
+        // 拖动期间父层已通过 previewVolume 更新 value，松手落盘当前值。
+        onHorizontalDragEnd: (_) => widget.onChangeEnd(widget.value),
+        child: SizedBox(
+          height: 20,
+          child: TweenAnimationBuilder<double>(
+            // 悬停/拖动展开轨道（拖动中 MouseRegion 保持 hover 态）。
+            tween: Tween(
+              begin: _trackHeight,
+              end: _hovered ? _hoverTrackHeight : _trackHeight,
+            ),
+            duration: animDuration(context, const Duration(milliseconds: 280)),
+            curve: Curves.easeOut,
+            builder: (context, trackHeight, _) => CustomPaint(
+              painter: _VutronVolumeBarPainter(
+                value: widget.value.clamp(0.0, 1.0),
+                trackHeight: trackHeight,
+                // 音量填充跟随主题色，底轨保持低对比中性色。
+                active: scheme.primary,
+                inactive: scheme.onSurface.withValues(alpha: 0.18),
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
+  }
+
+  /// 指针横坐标 → 音量值（轨道宽即组件宽）。
+  double valueAt(double dx, BuildContext context) {
+    final box = context.findRenderObject()! as RenderBox;
+    return (dx / box.size.width.clamp(1.0, double.infinity)).clamp(0.0, 1.0);
   }
 }
 
 class _VutronVolumeBarPainter extends CustomPainter {
   const _VutronVolumeBarPainter({
     required this.value,
+    required this.trackHeight,
     required this.active,
     required this.inactive,
   });
 
   final double value;
+  final double trackHeight;
   final Color active;
   final Color inactive;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const trackHeight = 6.0;
+    final trackHeight = this.trackHeight.clamp(1.0, size.height);
     final width = size.width;
     if (width <= 0) return;
     final cy = size.height / 2;
@@ -450,5 +475,8 @@ class _VutronVolumeBarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_VutronVolumeBarPainter old) =>
-      old.value != value || old.active != active || old.inactive != inactive;
+      old.value != value ||
+      old.trackHeight != trackHeight ||
+      old.active != active ||
+      old.inactive != inactive;
 }

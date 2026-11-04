@@ -62,16 +62,15 @@ mixin _PlaybackNotifierSession
       return;
     }
     _engine = engine;
+    _spectrumPushOn = false; /* 新引擎默认频谱关；EnginePlaying 后按偏好开启 */
     // store 所有权交给 _engineStore：此后由 _stopEngine（engine.stop join 之后）
     // 负责 destroy，本方法其余失败出口不再触碰（避免同句柄重复释放）。
     _engineStore = store;
     _engineSubs.add(engine.events.listen(_onEngineEvent));
-    _fftStarted = false;
     final sinkId = ref.read(appPrefsProvider).sink;
     if (sinkId.isNotEmpty) {
       unawaited(engine.sendCommand('set_sink', {'id': sinkId}));
     }
-    _lastSpectrumAtMs = -1000;
     // 会话起点音量（与建会话时传入的 initialVolume 一致；再发一次兜底，
     // 覆盖 sink 切换等重建路径）。
     unawaited(engine.setVolume(initialVolume));
@@ -105,6 +104,14 @@ mixin _PlaybackNotifierSession
     }
     _log(memoryStore ? '引擎 store 内存源会话就绪，开始播放' : '引擎会话就绪，开始播放');
     if (fadeIn) {
+      // 过渡提示窗口：与淡入同宽（对齐 SPlayer「播放过渡时进度条已播放部分
+      // 发光」）。新会话取代旧会话时重启定时器；stop/dispose 时取消。
+      _transitionTimer?.cancel();
+      state = state.copyWith(transitioning: true);
+      _transitionTimer = Timer(Duration(milliseconds: fadeMs), () {
+        _transitionTimer = null;
+        state = state.copyWith(transitioning: false);
+      });
       // ignore: discarded_futures
       _fadeVolume(from: 0, to: state.volume, durationMs: fadeMs);
     }
@@ -136,7 +143,7 @@ mixin _PlaybackNotifierSession
       case EngineStatus():
         if (event.playing != null) {
           state = state.copyWith(playing: event.playing!);
-          _syncFftActive();
+          _syncSpectrumPush();
         }
         if (event.positionMs > 0) {
           state = state.copyWith(
@@ -160,27 +167,41 @@ mixin _PlaybackNotifierSession
           _pendingPauseAfterReady = false;
           unawaited(_engine?.pause());
           state = state.copyWith(playing: false, buffering: false);
-          _syncFftActive();
+          _syncSpectrumPush();
           _log('播放器就绪: miniaudio 已加载（保持暂停）');
           return;
         }
         state = state.copyWith(playing: true, buffering: false);
-        _syncFftActive();
+        _syncSpectrumPush();
         _log('播放器就绪: miniaudio 播放 WAV');
         _recordHistoryOnce();
       case EnginePosition():
         final absMs = event.positionMs + _sessionOffsetMs;
         state = state.copyWith(position: Duration(milliseconds: absMs));
-        _pollSpectrum();
         if (_autoPlayLog &&
             absMs > 0 &&
             (_lastPosLogMs == null || absMs - _lastPosLogMs! >= 5000)) {
           _lastPosLogMs = absMs;
           _log('播放位置: ${absMs}ms / ${state.duration.inMilliseconds}ms');
         }
+      case EngineFft():
+        // 引擎推送是 state.fft 的唯一来源：UI 不再拉 PCM / 调 FFI，只解析事件。
+        // intervalMs 用于渲染端按实际推送节奏插值（50/300/1000ms）。
+        state = state.copyWith(
+          fft: FftFrame(
+            ldata: event.ldata,
+            rdata: event.rdata,
+            beatStrength: event.beat,
+            intervalMs: event.intervalMs > 0
+                ? event.intervalMs
+                : _engineIntervalMs,
+            seq: event.seq,
+            minHz: event.minHz,
+            maxHz: event.maxHz,
+          ),
+        );
       case EngineEventInterval():
         _engineIntervalMs = event.intervalMs;
-        _syncFftActive();
         _log('事件间隔已协商: ${event.intervalMs}ms');
       case EnginePlayerEnded():
         if (_stopAtTrackEnd) {
@@ -192,7 +213,7 @@ mixin _PlaybackNotifierSession
             buffering: false,
             trackEndStopCount: state.trackEndStopCount + 1,
           );
-          _syncFftActive();
+          _syncSpectrumPush();
           _log('播放完成（睡眠定时：停在当前曲末尾，不切下一曲）');
           // 引擎到达 EOF 后自身会退出：主动收尾销毁会话（含内存源 SegStore），
           // 之后按播放键由 [toggle] 走「无引擎」续播路径，从头重放本曲。
@@ -200,7 +221,7 @@ mixin _PlaybackNotifierSession
           return;
         }
         state = state.copyWith(playing: false, buffering: false);
-        _syncFftActive();
+        _syncSpectrumPush();
         _log('播放完成（miniaudio EOF）');
         unawaited(_onTrackEnded());
       case EngineError():
@@ -249,13 +270,13 @@ mixin _PlaybackNotifierSession
 
   @override
   Future<void> _stopEngine() async {
-    _fftActive = false;
     for (final s in _engineSubs) {
       s.cancel();
     }
     _engineSubs.clear();
     final engine = _engine;
     _engine = null;
+    _spectrumPushOn = false;
     final store = _engineStore;
     _engineStore = 0;
     if (engine != null) {
@@ -309,7 +330,6 @@ mixin _PlaybackNotifierSession
     }
 
     _qualitySwitchBusy = true;
-    _fftZeroOnMiss = true; // 切换期取帧样本不足 → 推全零频谱（避免可视化冻结）
     state = state.copyWith(buffering: true);
     try {
       // 1) 预打开 + 预解码新源到暂存缓冲（当前源继续播）。
@@ -353,7 +373,6 @@ mixin _PlaybackNotifierSession
       if (_engine != engine) return;
     } finally {
       _qualitySwitchBusy = false;
-      _fftZeroOnMiss = false;
     }
     state = state.copyWith(
       buffering: false,

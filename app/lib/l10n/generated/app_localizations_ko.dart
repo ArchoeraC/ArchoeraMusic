@@ -35,6 +35,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsRippleDamageClipDesc => '활성 물결 띠만 다시 그리기; CPU 대체 경로 전용';
 
   @override
+  String get settingsLyricsEdgeFade => '가사 가장자리 페이드';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '위/아래 가장자리 페이드 방식: 줄 단위가 가장 가볍고, 마스크가 가장 부드러우며, 끄면 페이드 없음';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '줄 단위';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => '마스크';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => '끔';
+
+  @override
   String get menuTrackDetail => '미디어 상세';
 
   @override

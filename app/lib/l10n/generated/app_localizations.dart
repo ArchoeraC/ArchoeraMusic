@@ -158,6 +158,36 @@ abstract class AppLocalizations {
   /// **'只重绘活动涟漪波带；仅 CPU 回退路径生效'**
   String get settingsRippleDamageClipDesc;
 
+  /// No description provided for @settingsLyricsEdgeFade.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词边缘渐隐'**
+  String get settingsLyricsEdgeFade;
+
+  /// No description provided for @settingsLyricsEdgeFadeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'上下边缘的淡出方式：逐行透明度最省 GPU，遮罩层最平滑，关闭则不淡出'**
+  String get settingsLyricsEdgeFadeDesc;
+
+  /// No description provided for @settingsLyricsEdgeFadeWall.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'逐行'**
+  String get settingsLyricsEdgeFadeWall;
+
+  /// No description provided for @settingsLyricsEdgeFadeShader.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'遮罩'**
+  String get settingsLyricsEdgeFadeShader;
+
+  /// No description provided for @settingsLyricsEdgeFadeOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭'**
+  String get settingsLyricsEdgeFadeOff;
+
   /// No description provided for @menuTrackDetail.
   ///
   /// In zh_CN, this message translates to:

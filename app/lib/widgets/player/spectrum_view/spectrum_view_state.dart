@@ -9,6 +9,10 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
   late final Ticker _ticker;
   int _clockMs = 0;
 
+  /// 帧计数与自适应画质下的重绘步长（1 = 每帧）。
+  int _frameNo = 0;
+  int _stride = 1;
+
   final ValueNotifier<int> _repaint = ValueNotifier<int>(0);
   late final _SpectrumPainter _painter;
   FftFrame? _lastPushed;
@@ -36,6 +40,9 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
     // 累加会让 nowMs 二次增长、帧间插值恒饱和（t=1）而失效。
     _clockMs = elapsed.inMilliseconds;
     _painter.nowMs = _clockMs;
+    _frameNo += 1;
+    // 自适应画质降档：降低重绘频率（频谱是装饰性动画，关掉会改变布局观感）。
+    if (!shouldRepaintOnFrame(_frameNo, _stride)) return;
     _repaint.value++;
   }
 
@@ -44,6 +51,10 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
     final fft = ref.watch(playbackProvider.select((s) => s.fft));
     final playing = ref.watch(playbackProvider.select((s) => s.playing));
     final prefs = ref.watch(appPrefsProvider);
+    // 自适应画质：降档时降低频谱重绘频率（关闭会改变布局观感，故不关闭）。
+    _stride = prefs.adaptiveRenderQuality
+        ? spectrumFrameStrideForTier(ref.watch(renderQualityProvider))
+        : 1;
     // 可见性（Offstage/TickerMode 关闭）：不可见时不 tick。否则 Consumer 仍会
     // 因播放态/位置变化重建，把 ticker 重新解除静音，白白持续出帧。
     final visible = TickerMode.valuesOf(context).enabled;

@@ -38,6 +38,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Redraw only active ripple bands; CPU fallback path only';
 
   @override
+  String get settingsLyricsEdgeFade => 'Lyrics edge fade';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      'How the top/bottom edges fade out: per-line alpha is cheapest, mask is smoothest, off disables the fade';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => 'Per-line';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'Mask';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'Off';
+
+  @override
   String get menuTrackDetail => 'Media details';
 
   @override

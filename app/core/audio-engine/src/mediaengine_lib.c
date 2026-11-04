@@ -27,6 +27,8 @@
 #include "native_decoder.h"
 #include "decoder.h"
 #include "era_log.h"
+#include "spectrum_service.h"
+#include "pcm_file_reader.h"
 #include "compat/qatomic.h"
 #if defined(HAS_ARCHOERA_KERNEL)
 #include "kernel_bridge.h"
@@ -99,6 +101,7 @@ void archoera_mediaengine_set_log_sink(ArchoeraMediaEngineLogFn fn,
 /* ── 队列容量 ────────────────────────────────────────────────── */
 #define EV_CAP 512      /* 事件队列条数 */
 #define EV_LINE 511     /* 事件行上限 */
+#define EV_FFT_LINE 2047 /* 频谱事件行上限（8-bit 量化 128×2 + 元数据 < 2KB） */
 #define CMD_CAP 256     /* 命令队列条数 */
 #define CMD_LINE 4095   /* 命令行上限 */
 
@@ -208,6 +211,29 @@ typedef struct ArchoeraMediaEngine {
     int     mem_pool_cap;
     int     mem_pool_len;
     int64_t mem_pool_bytes;    /* 池驻留字节（cap_samples×4 累计） */
+
+    /* ── 频谱 v2（引擎侧 50ms 推送；docs/spectrum-analyzer.md）──────
+       - spectrum：独立线程服务（懒启动；set_fft 控制）；
+       - spec_ring_*：流式播放的最近 PCM 环形缓冲（按播放位置取窗）；
+       - ev_fft：最新一帧频谱事件槽（大 JSON 不挤占 511B 常规事件队列，
+         只保留最新，读走即清）。 */
+    EraSpectrumService *spectrum;
+    int     spectrum_wanted;   /* set_fft enabled（可在管线 ready 前到达） */
+    int     spectrum_sr;       /* 输出采样率（环/事件换算） */
+    float   spec_min_hz;       /* 实际分析下限（40） */
+    float   spec_max_hz;       /* 实际分析上限（min(16k, 0.95·Nyquist)） */
+    EraPcmFileReader *pcm_reader; /* 文件模式 stream.pcm 读取器（频谱线程用） */
+    pthread_mutex_t pcm_reader_lock; /* 读取器生命周期/重置 vs 频谱线程读 */
+    float  *spec_ring_l;
+    float  *spec_ring_r;
+    int     spec_ring_cap;     /* 帧容量（约 0.5s，至少 8192） */
+    int     spec_ring_write;
+    int     spec_ring_count;
+    int64_t spec_ring_end;     /* 下一个写入帧的绝对样本号 */
+    pthread_mutex_t spec_ring_lock;
+    char    ev_fft[EV_FFT_LINE + 1];
+    int     ev_fft_pending;
+
     /* ── 单会话「暂存源」无缝切换（staged source swap）────────────
        音质切换：旧源照常出声，新源在**独立预取线程**内预开 + 预解码进 stage；
        commit_source 丢弃交叠段后把 stage 余量续喂同一 ring（设备/会话不重建）。
@@ -615,6 +641,200 @@ static int mem_window(ArchoeraMediaEngine *e, int end_pos_ms, int frames,
     return 0;
 }
 
+/* ── 频谱 v2：流式 PCM 环形缓冲 + 服务回调 ─────────────────────
+   流式播放解码按设备消费节奏推进，环只需保留最近约 0.5s；首块按**块起始**
+   位置建立绝对样本时间线，之后按实际输出样本连续推进；读取时按播放位置回退
+   frames。文件/内存模式走 mem_window 或 stream.pcm 读取器，不占用本环。 */
+
+static int spec_ring_alloc(ArchoeraMediaEngine *e, int sample_rate)
+{
+    int cap;
+    float *l, *r;
+    if (!e) return -1;
+    cap = sample_rate > 0 ? sample_rate / 2 : 24000;
+    if (cap < 8192) cap = 8192;
+    l = (float *)malloc((size_t)cap * sizeof(float));
+    r = (float *)malloc((size_t)cap * sizeof(float));
+    if (!l || !r) {
+        free(l);
+        free(r);
+        return -1;
+    }
+    pthread_mutex_lock(&e->spec_ring_lock);
+    free(e->spec_ring_l);
+    free(e->spec_ring_r);
+    e->spec_ring_l = l;
+    e->spec_ring_r = r;
+    e->spec_ring_cap = cap;
+    e->spec_ring_write = 0;
+    e->spec_ring_count = 0;
+    e->spec_ring_end = 0;
+    pthread_mutex_unlock(&e->spec_ring_lock);
+    return 0;
+}
+
+static void spec_ring_free(ArchoeraMediaEngine *e)
+{
+    if (!e) return;
+    pthread_mutex_lock(&e->spec_ring_lock);
+    free(e->spec_ring_l);
+    free(e->spec_ring_r);
+    e->spec_ring_l = NULL;
+    e->spec_ring_r = NULL;
+    e->spec_ring_cap = 0;
+    e->spec_ring_write = 0;
+    e->spec_ring_count = 0;
+    e->spec_ring_end = 0;
+    pthread_mutex_unlock(&e->spec_ring_lock);
+}
+
+static void spec_ring_reset(ArchoeraMediaEngine *e)
+{
+    if (!e) return;
+    pthread_mutex_lock(&e->spec_ring_lock);
+    e->spec_ring_write = 0;
+    e->spec_ring_count = 0;
+    e->spec_ring_end = 0;
+    pthread_mutex_unlock(&e->spec_ring_lock);
+}
+
+/* pos_ms = 块**起始**（pipeline.c 已按块头语义传递）。
+   时间线按实际输出样本连续推进，不逐块用 pos_ms 重定位：tempo 变速后每块
+   输出样本数与原始时间不再相等，逐块重定位会制造假跳段。seek/切歌/重建
+   由引擎线程显式 spec_ring_reset，下一块重新以 pos_ms 定基准。 */
+static void spec_ring_write(ArchoeraMediaEngine *e, const float *pcm,
+                            int samples, int channels, double pos_ms)
+{
+    int sr, i;
+    int64_t start_sample;
+    if (!e || !e->spec_ring_l || !pcm || samples <= 0 || channels <= 0) return;
+    sr = e->spectrum_sr;
+    if (sr <= 0) return;
+    start_sample = (int64_t)llround(pos_ms * (double)sr / 1000.0);
+
+    pthread_mutex_lock(&e->spec_ring_lock);
+    if (e->spec_ring_count == 0) {
+        /* 首块 / reset 后首块：以块起始位置建立时间线。 */
+        e->spec_ring_write = 0;
+        e->spec_ring_end = start_sample;
+    }
+    for (i = 0; i < samples; i++) {
+        float l, r;
+        mem_downmix_sample(pcm, i, channels, &l, &r);
+        e->spec_ring_l[e->spec_ring_write] = l;
+        e->spec_ring_r[e->spec_ring_write] = r;
+        e->spec_ring_write = (e->spec_ring_write + 1) % e->spec_ring_cap;
+        if (e->spec_ring_count < e->spec_ring_cap) e->spec_ring_count++;
+        e->spec_ring_end++;
+    }
+    pthread_mutex_unlock(&e->spec_ring_lock);
+}
+
+static int spec_ring_read(ArchoeraMediaEngine *e, int end_pos_ms, int frames,
+                          float *out_l, float *out_r)
+{
+    int sr, idx, i;
+    int64_t end_sample, start_sample, back, offset;
+    if (!e || !e->spec_ring_l || !out_l || !out_r || frames <= 0) return -1;
+    sr = e->spectrum_sr;
+    if (sr <= 0) return -1;
+    end_sample = (int64_t)llround((double)end_pos_ms * (double)sr / 1000.0);
+    start_sample = end_sample - frames;
+
+    if (pthread_mutex_trylock(&e->spec_ring_lock) != 0) return -1;
+    if (e->spec_ring_count <= 0 || end_sample > e->spec_ring_end ||
+        start_sample < e->spec_ring_end - e->spec_ring_count) {
+        pthread_mutex_unlock(&e->spec_ring_lock);
+        return -1;
+    }
+    back = e->spec_ring_end - end_sample;
+    offset = back + frames;
+    idx = e->spec_ring_write - (int)offset;
+    idx %= e->spec_ring_cap;
+    if (idx < 0) idx += e->spec_ring_cap;
+    for (i = 0; i < frames; i++) {
+        out_l[i] = e->spec_ring_l[idx];
+        out_r[i] = e->spec_ring_r[idx];
+        idx++;
+        if (idx == e->spec_ring_cap) idx = 0;
+    }
+    pthread_mutex_unlock(&e->spec_ring_lock);
+    return 0;
+}
+
+/* 绝对播放位置：流式 = session_offset + 设备已播；文件 = p_start + 播放器游标。
+   暂停时返回 -1（服务跳过本帧，不推重复频谱）。 */
+static int spec_position_cb(void *ctx)
+{
+    ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)ctx;
+    if (!e) return -1;
+    if (e->player) {
+        int playing = 0;
+        double pos_ms = 0.0;
+        float vol = 0.0f;
+        player_get_state(e->player, &playing, &pos_ms, &vol);
+        if (!playing) return -1;
+        if (e->player_stream_mode) {
+            return (int)llround((double)e->session_offset_ms
+                                + player_stream_played_ms(e->player));
+        }
+        return (int)llround((double)e->p_start_ms + pos_ms);
+    }
+    if (e->p) {
+        return (int)llround((double)e->p_start_ms
+                            + pipeline_get_position(e->p) * 1000.0);
+    }
+    return -1;
+}
+
+/* 取窗：内存模式走块列表（try_lock）；流式走环形缓冲；文件模式走
+   stream.pcm 读取器。拿不到锁/未命中直接跳过本帧。 */
+static int spec_read_cb(void *ctx, int end_pos_ms, int frames,
+                        float *out_l, float *out_r)
+{
+    ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)ctx;
+    if (!e) return -1;
+    if (e->mem_mode) {
+        int r;
+        if (pthread_mutex_trylock(&e->mem_lock) != 0) return -1;
+        r = mem_window(e, end_pos_ms, frames, out_l, out_r);
+        pthread_mutex_unlock(&e->mem_lock);
+        return r;
+    }
+    if (e->player_stream_mode && !e->mem_mode) {
+        return spec_ring_read(e, end_pos_ms, frames, out_l, out_r);
+    }
+    if (!e->mem_mode) {
+        /* 文件模式：stream.pcm 可能在 set_fft 之后才创建/重建，首次读时补开。
+           读取器只由频谱线程使用；与引擎线程的 reset/close 用锁互斥。 */
+        int rc = -1;
+        pthread_mutex_lock(&e->pcm_reader_lock);
+        if (!e->pcm_reader && e->pcm_file) {
+            e->pcm_reader = era_pcm_file_reader_open(e->pcm_file, e->spectrum_sr);
+        }
+        if (e->pcm_reader) {
+            rc = era_pcm_file_reader_read(e->pcm_reader, end_pos_ms, frames,
+                                          out_l, out_r);
+        }
+        pthread_mutex_unlock(&e->pcm_reader_lock);
+        return rc;
+    }
+    return -1;
+}
+
+/* 取走最新频谱事件（调用方须持 ev_mutex）；无则返回 0。 */
+static int ev_take_fft_locked(ArchoeraMediaEngine *e, char *buf, int cap)
+{
+    int len;
+    if (!e->ev_fft_pending) return 0;
+    len = (int)strlen(e->ev_fft);
+    if (len > cap - 1) len = cap - 1;
+    memcpy(buf, e->ev_fft, (size_t)len);
+    buf[len] = '\0';
+    e->ev_fft_pending = 0;
+    return len;
+}
+
 /* ── 事件/命令队列 ───────────────────────────────────────────── */
 
 static void ev_enqueue(ArchoeraMediaEngine *e, const char *line)
@@ -645,6 +865,56 @@ static void ev_enqueue(ArchoeraMediaEngine *e, const char *line)
     }
     if (wake) pthread_cond_signal(&e->ev_cond); /* 唤醒阻塞中的 wait_event */
     pthread_mutex_unlock(&e->ev_mutex);
+}
+
+/* 频谱事件：单独一个「最新帧」槽，不挤占 511B 常规事件队列；旧帧被新帧
+   覆盖（可丢），poll_event 读走即清。 */
+static void ev_enqueue_fft(ArchoeraMediaEngine *e, const char *line)
+{
+    if (!e || !line) return;
+    pthread_mutex_lock(&e->ev_mutex);
+    strncpy(e->ev_fft, line, EV_FFT_LINE);
+    e->ev_fft[EV_FFT_LINE] = '\0';
+    e->ev_fft_pending = 1;
+    pthread_cond_signal(&e->ev_cond);
+    pthread_mutex_unlock(&e->ev_mutex);
+}
+
+/* 频谱服务每帧回调：8-bit 量化 [0,255]（128×2 + 元数据 < 2KB），避免大 JSON
+   挤占事件队列；Dart 侧除以 255 还原 [0,1]。 */
+static void spec_emit_cb(void *ctx, const float *l, const float *r,
+                         int bins, float beat, int seq, int interval_ms)
+{
+    ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)ctx;
+    char buf[EV_FFT_LINE + 1];
+    int off, i;
+    if (!e || !l || !r || bins <= 0) return;
+    /* 事件槽按 128 带设计（8-bit 量化后约 1.2KB）；更大 bins 截断，保证
+       永不写穿 ev_fft 槽。 */
+    if (bins > 128) bins = 128;
+    off = snprintf(buf, sizeof(buf),
+                   "{\"type\":\"fft\",\"seq\":%d,\"interval_ms\":%d,"
+                   "\"sample_rate\":%d,\"bins\":%d,\"min_hz\":%.1f,\"max_hz\":%.1f,"
+                   "\"beat\":%d,\"ldata\":[",
+                   seq, interval_ms, e->spectrum_sr, bins,
+                   (double)e->spec_min_hz, (double)e->spec_max_hz,
+                   (int)(beat <= 0.0f ? 0.0f
+                                      : (beat >= 1.0f ? 255.0f : beat * 255.0f + 0.5f)));
+    for (i = 0; i < bins && off < (int)sizeof(buf) - 8; i++) {
+        int v = (int)(l[i] <= 0.0f ? 0.0f
+                                   : (l[i] >= 1.0f ? 255.0f : l[i] * 255.0f + 0.5f));
+        off += snprintf(buf + off, sizeof(buf) - (size_t)off,
+                        i ? ",%d" : "%d", v);
+    }
+    off += snprintf(buf + off, sizeof(buf) - (size_t)off, "],\"rdata\":[");
+    for (i = 0; i < bins && off < (int)sizeof(buf) - 8; i++) {
+        int v = (int)(r[i] <= 0.0f ? 0.0f
+                                   : (r[i] >= 1.0f ? 255.0f : r[i] * 255.0f + 0.5f));
+        off += snprintf(buf + off, sizeof(buf) - (size_t)off,
+                        i ? ",%d" : "%d", v);
+    }
+    snprintf(buf + off, sizeof(buf) - (size_t)off, "]}");
+    ev_enqueue_fft(e, buf);
 }
 
 static int cmd_enqueue(ArchoeraMediaEngine *e, const char *line)
@@ -816,6 +1086,12 @@ static void on_pcm_out(const float *pcm, int samples, int channels,
         }
     }
     if (e->player && e->player_stream_mode) {
+        /* 频谱环先于设备写入：保证按播放位置取窗时数据已在环内。
+           只在流式且非内存模式使用；内存模式走 mem_window，文件模式走
+           stream.pcm。 */
+        if (!e->mem_mode && e->spec_ring_l) {
+            spec_ring_write(e, pcm, samples, channels, position_ms);
+        }
         player_stream_write(e->player, pcm, samples);
     }
 }
@@ -1477,6 +1753,8 @@ static void handle_set_sink(ArchoeraMediaEngine *e, const char *id)
 static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_ms,
                                       double pos_base);
 static void mediaengine_stream_seek(ArchoeraMediaEngine *e, double rel_ms);
+static int mediaengine_spectrum_start(ArchoeraMediaEngine *e);
+static void mediaengine_spectrum_stop(ArchoeraMediaEngine *e);
 
 static void handle_command(ArchoeraMediaEngine *e, const char *line)
 {
@@ -1568,7 +1846,12 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
     } else if (strcmp(type, "set_fft") == 0) {
         bool enabled = true;
         if (json_get_bool(line, "enabled", &enabled) == 0) {
-            pipeline_set_fft_enabled(e->p, enabled);
+            if (enabled) {
+                e->spectrum_wanted = 1;
+                if (e->p) mediaengine_spectrum_start(e);
+            } else {
+                mediaengine_spectrum_stop(e);
+            }
         }
     } else if (strcmp(type, "set_tempo_speed") == 0) {
         double speed = 1.0;
@@ -1685,6 +1968,10 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
     if (e->wav) { fclose(e->wav); e->wav = NULL; }
     if (e->pcm) { fclose(e->pcm); e->pcm = NULL; }
     if (e->mem_mode) mem_reset(e); /* 内存模式：清块列表 + epoch++（对齐文件截断） */
+    spec_ring_reset(e);            /* 流式频谱环：seek 后旧窗口作废 */
+    pthread_mutex_lock(&e->pcm_reader_lock);
+    if (e->pcm_reader) era_pcm_file_reader_reset(e->pcm_reader); /* 文件截断重建 */
+    pthread_mutex_unlock(&e->pcm_reader_lock);
 
     e->p = np;
     e->p_start_ms = abs_start_ms; /* 新管线起点绝对 ms（prepare 的绝对 cursor 基准） */
@@ -1711,6 +1998,84 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
     return 0;
 }
 
+/* ── 频谱 v2：服务启动/停止（set_fft 与流式开始共用）──────────────
+   懒创建：首次 start 才建分析器/环/文件读取器；停止只停线程，保留表与
+   缓冲以便再次启用（切歌/暂停恢复零重建）。 */
+
+static int mediaengine_spectrum_start(ArchoeraMediaEngine *e)
+{
+    int sr;
+    float max_hz, nyquist;
+    if (!e || !e->p) return -1;
+
+    sr = pipeline_get_output_sample_rate(e->p);
+    if (sr <= 0) sr = 48000;
+
+    if (e->spectrum_sr != sr) {
+        /* 采样率变化：旧表/环/文件索引全部按旧率，直接丢弃重建。 */
+        if (e->spectrum) {
+            era_spectrum_service_stop(e->spectrum);
+            era_spectrum_service_destroy(e->spectrum);
+            e->spectrum = NULL;
+        }
+        spec_ring_free(e);
+        pthread_mutex_lock(&e->pcm_reader_lock);
+        if (e->pcm_reader) {
+            era_pcm_file_reader_close(e->pcm_reader);
+            e->pcm_reader = NULL;
+        }
+        pthread_mutex_unlock(&e->pcm_reader_lock);
+    }
+    e->spectrum_sr = sr;
+
+    /* 上限受 Nyquist 约束（低采样率源/输出时自动收窄，避免分析器创建失败）。 */
+    nyquist = (float)sr * 0.5f;
+    max_hz = 16000.0f;
+    if (max_hz >= nyquist) max_hz = nyquist * 0.95f;
+    if (max_hz <= 40.0f) return -1;
+    e->spec_min_hz = 40.0f;
+    e->spec_max_hz = max_hz;
+
+    if (e->player_stream_mode && !e->mem_mode) {
+        if (!e->spec_ring_l && spec_ring_alloc(e, sr) != 0) return -1;
+    } else if (!e->mem_mode) {
+        /* 文件模式：stream.pcm 可能尚未创建；打开失败不致命，读取时再试。 */
+        pthread_mutex_lock(&e->pcm_reader_lock);
+        if (!e->pcm_reader) {
+            e->pcm_reader = era_pcm_file_reader_open(e->pcm_file, sr);
+        }
+        pthread_mutex_unlock(&e->pcm_reader_lock);
+    }
+
+    if (!e->spectrum) {
+        EraSpectrumServiceConfig cfg;
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.sample_rate = sr;
+        cfg.bins = 128;
+        cfg.min_hz = e->spec_min_hz;
+        cfg.max_hz = e->spec_max_hz;
+        cfg.interval_ms = 50;
+        cfg.frames = 8192;
+        cfg.read = spec_read_cb;
+        cfg.position = spec_position_cb;
+        cfg.emit = spec_emit_cb;
+        cfg.ctx = e;
+        e->spectrum = era_spectrum_service_create(&cfg);
+        if (!e->spectrum) {
+            ERA_LOGW(NULL, "[mediaengine] 频谱服务创建失败（内核不可用/OOM）\n");
+            return -1;
+        }
+    }
+    return era_spectrum_service_start(e->spectrum);
+}
+
+static void mediaengine_spectrum_stop(ArchoeraMediaEngine *e)
+{
+    if (!e) return;
+    e->spectrum_wanted = 0;
+    if (e->spectrum) era_spectrum_service_stop(e->spectrum);
+}
+
 /* 会话开始时（已有管线/输出文件）尝试启动流式播放器。返回 1=流式已启动。 */
 static int mediaengine_stream_begin(ArchoeraMediaEngine *e)
 {
@@ -1732,6 +2097,8 @@ static int mediaengine_stream_begin(ArchoeraMediaEngine *e)
     pipeline_set_playback_streaming(e->p, true);
     player_stream_set_pos_base(e->player,
         (double)(e->cfg.start_offset_ms - e->session_offset_ms));
+    /* 频谱若已在 set_fft 中申请：此时才知道是流式，补建环形缓冲并启动。 */
+    if (e->spectrum_wanted) mediaengine_spectrum_start(e);
     if (e->pos_interval_ms > 0) {
         player_set_position_interval(e->player, e->pos_interval_ms);
     }
@@ -1945,7 +2312,7 @@ static void *engine_thread(void *arg)
 
     if (e->mem_mode) {
         /* 内存播放模式：不开 stream.wav / stream.pcm（PCM 入内存块列表）。
-           mem_sr 供 Dart 线程 pcm_window 换算，写入持 mem_lock。 */
+           mem_sr 供引擎频谱线程 mem_window 换算，写入持 mem_lock。 */
         int sr = pipeline_get_output_sample_rate(e->p);
         if (sr <= 0) sr = pipeline_get_source_sample_rate(e->p);
         pthread_mutex_lock(&e->mem_lock);
@@ -1960,6 +2327,12 @@ static void *engine_thread(void *arg)
         if (e->wav || e->pcm) {
             pipeline_set_pcm_out_cb(e->p, on_pcm_out, e);
         }
+    }
+
+    /* set_fft 可能在管线就绪前到达（e->p 尚空）：此时补启频谱服务。
+       流式会话由 mediaengine_stream_begin 在确认流式后启动。 */
+    if (e->spectrum_wanted && e->mem_mode) {
+        mediaengine_spectrum_start(e);
     }
 
     /* ready 事件（backend：F5 实际解码后端 "zig"/"ffmpeg"） */
@@ -2073,6 +2446,7 @@ static void *engine_thread(void *arg)
             }
 
             if (e->wav) wav_finalize(e); /* 转码完成，WAV 头回填后供播放器加载 */
+            if (e->pcm) fflush(e->pcm);  /* 频谱读取器需看到完整 stream.pcm */
             if (e->player_file && !QA_LOAD_ACQ(&e->stop_requested)) {
                 ERA_LOGI(NULL, "[mediaengine] 播放器启动 sink=\"%s\" (env/上次选择；"
                         "播放原生适配见 [player] 日志)\n",
@@ -2186,6 +2560,8 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
     pthread_mutex_init(&e->cmd_mutex, NULL);
     pthread_mutex_init(&e->mem_lock, NULL);
     pthread_mutex_init(&e->stage_lock, NULL);
+    pthread_mutex_init(&e->spec_ring_lock, NULL);
+    pthread_mutex_init(&e->pcm_reader_lock, NULL);
     pthread_cond_init(&e->cmd_cond, NULL);
     pthread_cond_init(&e->ev_cond, NULL);
     pthread_cond_init(&e->ev_drain_cond, NULL);
@@ -2231,6 +2607,8 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
         pthread_mutex_destroy(&e->cmd_mutex);
         pthread_mutex_destroy(&e->mem_lock);
         pthread_mutex_destroy(&e->stage_lock);
+        pthread_mutex_destroy(&e->spec_ring_lock);
+        pthread_mutex_destroy(&e->pcm_reader_lock);
         pthread_cond_destroy(&e->cmd_cond);
         pthread_cond_destroy(&e->ev_cond);
         pthread_cond_destroy(&e->ev_drain_cond);
@@ -2293,6 +2671,8 @@ int archoera_mediaengine_poll_event(ArchoeraMediaEngine *e, char *buf, int cap)
         e->ev_head = (e->ev_head + 1) % EV_CAP;
         e->ev_count--;
         r = 1;
+    } else if (ev_take_fft_locked(e, buf, cap) > 0) {
+        r = 1;
     }
     pthread_mutex_unlock(&e->ev_mutex);
     return r;
@@ -2350,6 +2730,10 @@ int archoera_mediaengine_wait_event(ArchoeraMediaEngine *e, char *buf, int cap,
             e->ev_head = (e->ev_head + 1) % EV_CAP;
             e->ev_count--;
             r = len;
+            break;
+        }
+        if (e->ev_fft_pending) {
+            r = ev_take_fft_locked(e, buf, cap);
             break;
         }
         if (use_timeout) {
@@ -2463,6 +2847,20 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
     }
     pthread_mutex_unlock(&e->ev_mutex);
 
+    /* 频谱服务先停线程再释放源/缓冲：避免频谱线程读已释放的环/块列表。 */
+    if (e->spectrum) {
+        era_spectrum_service_stop(e->spectrum);
+        era_spectrum_service_destroy(e->spectrum);
+        e->spectrum = NULL;
+    }
+    if (e->pcm_reader) {
+        pthread_mutex_lock(&e->pcm_reader_lock);
+        era_pcm_file_reader_close(e->pcm_reader);
+        e->pcm_reader = NULL;
+        pthread_mutex_unlock(&e->pcm_reader_lock);
+    }
+    spec_ring_free(e);
+
     mem_free(e); /* 内存播放模式的块列表（自持 mem_lock） */
 
     free(e->source);
@@ -2476,6 +2874,8 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
     pthread_mutex_destroy(&e->ev_mutex);
     pthread_mutex_destroy(&e->cmd_mutex);
     pthread_mutex_destroy(&e->stage_lock);
+    pthread_mutex_destroy(&e->spec_ring_lock);
+    pthread_mutex_destroy(&e->pcm_reader_lock);
     pthread_cond_destroy(&e->cmd_cond);
     pthread_cond_destroy(&e->ev_cond);
     pthread_cond_destroy(&e->ev_drain_cond);

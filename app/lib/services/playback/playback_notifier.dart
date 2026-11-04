@@ -80,9 +80,6 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// 完全一致；仅内部复用，不向外提供可变语义（外部无 logs 消费者）。
   final List<String> _logBuffer = <String>[];
 
-  /// 本会话是否已收到 FFT 帧（仅记录一次，诊断用）。
-  bool _fftStarted = false;
-
   /// 会话快照最近一次落盘位置（毫秒；位置漂移按 5s 节流写盘）。
   int _lastPersistPosMs = -1;
 
@@ -138,34 +135,36 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// 避免高频 FFI 命令风暴打扰引擎线程；prefs 仅在确定操作时落盘。
   Timer? _volumeApplyTimer;
 
-  /// FFT 拉模式（§10.1，事件驱动无轮询）：引擎每 50ms 音频发一条
-  /// EnginePosition 事件 → 更新 position 后立即按当前位置从本地 PCM
-  /// 分析器缓冲取一帧。暂停/seek 时位置事件天然对齐，无独立 Timer。
-  bool _fftActive = false;
-
-  /// 无缝音质切换进行中：若取帧位置样本不足（pcm_window 越界/未解码），
-  /// 先推一帧全零频谱，避免可视化在切换空档「冻住」；切换结束即恢复。
-  bool _fftZeroOnMiss = false;
-  FftFrame? _fftZeroFrame;
-
-  /// 诊断计数：无帧可取时周期性打印 PCM 状态。
-  int _diagCounter = 0;
-
-  /// 最近一次取帧位置（毫秒）：取帧节流基准（性能优化）。
-  ///
-  /// 引擎位置事件 ~50ms 一条，但频谱取帧含同步磁盘 IO + 下混 + FFT，
-  /// 按 [_fftPollIntervalMs] 节流后 UI 线程负担减半；插值/平滑由
-  /// _SpectrumPainter 承担，10Hz 推送下视觉依旧流畅（原 Web 端也是
-  /// 50ms 推送 + 帧间插值消除阶梯）。初始 -1000 保证首帧立即取。
-  int _lastSpectrumAtMs = -1000;
-
-  /// 频谱取帧节流间隔（ms）：默认 100ms 基线；节能模式开 → 300ms
-  /// 进一步降帧省电（见 _syncFftActive，随偏好实时更新）。
-  int _fftPollIntervalMs = 100;
+  /// 切歌淡入进行中的收尾定时器（[PlaybackState.transitioning] 置 false；
+  /// 新会话淡入重启时 cancel，dispose 时 cancel）。
+  Timer? _transitionTimer;
 
   /// 引擎当前实际生效的位置事件间隔（ms，降频协商回执 event_interval 更新；
-  /// 默认 50 = normal 档）。_fftPollIntervalMs 取帧节流跟随该档位。
+  /// 默认 50 = normal 档）。供歌词/进度降频与频谱事件缺省间隔兜底。
   int _engineIntervalMs = 50;
+
+  /// 引擎侧频谱推送开关（`set_fft` 已下发的状态；避免重复命令）。
+  /// UI 只消费 `EngineFft` 事件；这里仅负责按偏好/播放态启停引擎线程。
+  bool _spectrumPushOn = false;
+
+  /// 按「播放中 + 频谱消费者存在 + 非性能模式」同步引擎侧频谱推送。
+  ///
+  /// 与旧的 Dart 拉模式不同：FFT/取窗全部在引擎频谱线程完成，UI 不再
+  /// 拉 PCM/调 FFI；这里只发一个 `set_fft` 开关命令。
+  void _syncSpectrumPush() {
+    final engine = _engine;
+    if (engine == null) {
+      _spectrumPushOn = false;
+      return;
+    }
+    final prefs = ref.read(appPrefsProvider);
+    final wanted = !prefs.performanceMode &&
+        (prefs.enableSpectrum || prefs.barSpectrum) &&
+        state.playing;
+    if (wanted == _spectrumPushOn) return;
+    _spectrumPushOn = wanted;
+    unawaited(engine.sendCommand('set_fft', {'enabled': wanted}));
+  }
 
   /// 串行播放队列（见 [load]）。
   Future<void> _loadChain = Future<void>.value();
@@ -314,10 +313,6 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
     peak: track?.loudnessPeak,
   );
 
-  void _pollSpectrum();
-
-  void _syncFftActive();
-
   void _log(String line);
 }
 
@@ -325,10 +320,11 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
 ///
 /// 组合：AudioEngineProcess（直连 C 引擎：FFI create + 命令/事件 FIFO，
 /// 流式起播：边解码边出声）+ 引擎内置播放/出声。
-/// 输出形态（2026-09-08 起）：**默认内存播放模式**——解码 PCM 驻留引擎内存块列表、
-/// 频谱走 pcm_window FFI，不写 stream.wav/.pcm；**文件模式**（设置「内存播放」关 /
-/// env `ARCHOERA_ENGINE_FILE_MODE=1`）保留「PCM 落盘 WAV + 文件拉模式 FFT」旧路径
-/// （详见 docs/audio-memory-playback.md）。
+/// 输出形态（2026-09-08 起）：**默认内存播放模式**——解码 PCM 驻留引擎内存块列表，
+/// 不写 stream.wav/.pcm；**文件模式**（设置「内存播放」关 /
+/// env `ARCHOERA_ENGINE_FILE_MODE=1`）PCM 落盘 WAV（详见
+/// docs/audio-memory-playback.md）。频谱两种模式统一由引擎 `fft` 事件推送，
+/// UI 只消费（docs/spectrum-analyzer.md §3）。
 /// 会话启动门槛 = ready（见 [AudioEngineProcess.started]，done 在流式下只在
 /// 曲尾到达）；完整时长（ready/playing 事件回填）、seek 走引擎本地 seek
 /// （不重启引擎重转码）、位置/播放状态经引擎事件推送。文件模式无声设备回退旧路径：
@@ -348,7 +344,7 @@ class PlaybackNotifier extends _PlaybackNotifierBase
       _retryableSnapshot = null;
       _persistSession();
       _volumeApplyTimer?.cancel();
-      _fftActive = false;
+      _transitionTimer?.cancel();
       for (final s in _engineSubs) {
         s.cancel();
       }
@@ -380,11 +376,11 @@ class PlaybackNotifier extends _PlaybackNotifierBase
         _persistSession();
       }
     });
-    // 偏好变化时同步会话记忆缓存与 FFT 轮询启停，无需重启引擎。
+    // 偏好变化时同步会话记忆缓存，无需重启引擎。
     _sessionMemoryEnabled = ref.read(appPrefsProvider).sessionMemory;
     ref.listen(appPrefsProvider, (_, next) {
       _sessionMemoryEnabled = next.sessionMemory;
-      _syncFftActive();
+      _syncSpectrumPush();
     });
     // 初始音量 = 用户偏好（后续 setVolume 同步 prefs 与引擎）。
     return PlaybackState(volume: ref.read(appPrefsProvider).volume);
@@ -457,53 +453,6 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     unawaited(applyAudioEffects());
   }
 
-  /// 切换空档用的全零频谱帧（懒建一次；bins 与 C 契约一致 = 128）。
-  FftFrame _zeroFftFrame() =>
-      _fftZeroFrame ??= FftFrame(
-        ldata: List<double>.filled(128, 0),
-        rdata: List<double>.filled(128, 0),
-      );
-
-  @override
-  void _pollSpectrum() {
-    if (!_fftActive) return;
-    final posMs = state.position.inMilliseconds;
-    // 降帧协商：位置回退（seek 后退 / 切歌 / 会话重启）时视为节流基准
-    // 失效，立即重置并取帧——否则 posMs - _lastSpectrumAtMs 恒为负，
-    // FFT 被节流永久拦截（冻结到播放位置追平旧基准，表现如 FFT 崩溃）。
-    final sinceLast = posMs - _lastSpectrumAtMs;
-    if (sinceLast >= 0 && sinceLast < _fftPollIntervalMs) {
-      return; // 正常降帧节流（间隔由节能模式协商）
-    }
-    _lastSpectrumAtMs = posMs;
-    final pcm = _engine?.pcm;
-    if (pcm == null) return;
-    final frame = pcm.frameAt(posMs);
-    if (frame == null) {
-      _diagCounter++;
-      if (_diagCounter % 40 == 0) {
-        _log(
-          'FFT 诊断: pos=${state.position.inMilliseconds}ms '
-          '块=${pcm.blockCount} 字节=${pcm.bytesIn} epoch=${pcm.epoch}',
-        );
-      }
-      // 无缝切换造成的采样空档：推全零帧让可视化落零（而非停在上帧冻住）。
-      // 仅切换期间生效，正常起播/seek 的取帧失败仍保持原语义（静默）。
-      if (_fftZeroOnMiss) {
-        state = state.copyWith(fft: _zeroFftFrame());
-      }
-      return;
-    }
-    if (!_fftStarted) {
-      _fftStarted = true;
-      _log(
-        'FFT 频谱已启动: 本地 ${pcm.blockCount} 块，epoch=${pcm.epoch}，'
-        '位置事件驱动拉模式',
-      );
-    }
-    state = state.copyWith(fft: frame);
-  }
-
   // ── 会话记忆（关闭前最后一次现场：队列 + 位置 + 模式）───────────────
 
   /// seek：miniaudio 本地 seek（完整 WAV 已就绪，无需重启引擎重转码）。
@@ -563,7 +512,6 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     // 作废排队/在途的 load（含内存源整首下载完成后不再续播；见 loading.load 的
     // gen 校验）。注意 stop 后仍会经用户再触发 load，gen 单调递增无副作用。
     _loadGen++;
-    _fftActive = false;
     _sessionOffsetMs = 0;
     _pendingPauseAfterReady = false;
     // 用户主动停止：快照保护解除（paused 可落盘，覆盖自动续播现场）
@@ -584,30 +532,9 @@ class PlaybackNotifier extends _PlaybackNotifierBase
       position: Duration.zero,
       fft: null,
       buffering: false,
+      transitioning: false,
     );
     _log('已停止');
-  }
-
-  /// 同步 FFT 拉取开关（事件驱动，无 Timer）：仅在引擎存在、播放中且
-  /// 非性能模式时允许按 EnginePosition 事件取帧；暂停/停播即停（节能）。
-  /// 取帧节流间隔 = 基线（100ms / 节能 300ms）与引擎事件间隔的较大者——
-  /// 降频档位下 position 事件本身变稀，FFT 取帧跟随（engine-event-push-plan）。
-  @override
-  void _syncFftActive() {
-    final prefs = ref.read(appPrefsProvider);
-    _fftPollIntervalMs = math.max(
-      prefs.energySavingMode ? 300 : 100,
-      _engineIntervalMs,
-    );
-    // 无任何频谱消费者（播放页大频谱 enableSpectrum + 播放条迷你频谱
-    // barSpectrum 两者皆关）时不再取帧——旧实现只认 performanceMode，频谱全关
-    // 后仍每 100ms 拉一次 pcm_window 做无用 FFT。
-    final spectrumWanted = prefs.enableSpectrum || prefs.barSpectrum;
-    _fftActive =
-        !prefs.performanceMode &&
-        spectrumWanted &&
-        _engine != null &&
-        state.playing;
   }
 
   /// 降频协商（engine-event-push-plan §4.1）：按节能档位向引擎请求位置事件
@@ -649,7 +576,7 @@ class PlaybackNotifier extends _PlaybackNotifierBase
       engine.play();
       state = state.copyWith(playing: true);
     }
-    _syncFftActive();
+    _syncSpectrumPush();
   }
 
   /// 睡眠定时「播完当前曲再暂停」开关（见 [_stopAtTrackEnd]）。
@@ -669,7 +596,7 @@ class PlaybackNotifier extends _PlaybackNotifierBase
     if (!state.playing) return;
     _engine?.pause();
     state = state.copyWith(playing: false, buffering: false);
-    _syncFftActive();
+    _syncSpectrumPush();
   }
 
   @override

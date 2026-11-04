@@ -6,7 +6,7 @@ part of '../settings_sections.dart';
 
 // ── 性能 / 渲染 ───────────────────────────────────────────────────────
 
-/// 性能 / 渲染分类：水纹渲染器 / 动态层半分辨率 / 损伤区裁剪。
+/// 性能 / 渲染分类：水纹渲染器 / 动态层半分辨率 / 损伤区裁剪 / 歌词边缘渐隐。
 class RenderSection extends ConsumerWidget {
   const RenderSection({super.key});
 
@@ -14,6 +14,7 @@ class RenderSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final prefs = ref.watch(appPrefsProvider);
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -46,6 +47,41 @@ class RenderSection extends ConsumerWidget {
               onChanged: (value) => ref
                   .read(appPrefsProvider.notifier)
                   .setRippleRender(damageClip: value),
+            ),
+            SettingTile(
+              icon: EtaIcons.blurOnOutline,
+              title: l10n.settingsLyricsEdgeFade,
+              subtitle: l10n.settingsLyricsEdgeFadeDesc,
+              trailing: DropdownButton<String>(
+                value: prefs.lyricsEdgeFade,
+                isDense: true,
+                underline: const SizedBox.shrink(),
+                borderRadius: BorderRadius.circular(10),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
+                icon: Icon(EtaIcons.downSmall, color: scheme.onSurfaceVariant),
+                onChanged: (v) {
+                  if (v == null) return;
+                  ref.read(appPrefsProvider.notifier).setLyricsEdgeFade(v);
+                },
+                items: [
+                  DropdownMenuItem(
+                    value: 'wall',
+                    child: Text(l10n.settingsLyricsEdgeFadeWall),
+                  ),
+                  DropdownMenuItem(
+                    value: 'shader',
+                    child: Text(l10n.settingsLyricsEdgeFadeShader),
+                  ),
+                  DropdownMenuItem(
+                    value: 'off',
+                    child: Text(l10n.settingsLyricsEdgeFadeOff),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

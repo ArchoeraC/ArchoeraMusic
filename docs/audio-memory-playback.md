@@ -7,6 +7,11 @@
 > `pcm_analyzer.dart` / `audio_engine_process.dart` / `playback_notifier.dart`）配套改造。
 >
 > 关联：`docs/architecture.md` §5/§9/§10.1、`docs/audio-kernel-zig.md` P5/§15/§16.2。
+>
+> **v2 频谱（2026-11-04，破坏性更新）**：频谱分析改为引擎侧 50ms 事件推送
+> （[`spectrum-analyzer.md`](spectrum-analyzer.md)），内存模式直接读进程内块列表，
+> App 播放路径不再经 Dart `pcm_window` 拉窗；该 FFI 保留给 CLI/测试，引擎内部
+> 复用 `mem_window`。
 
 ## 1. 动机与目标语义
 
@@ -16,8 +21,9 @@
 `PcmAnalyzer` 拉模式做频谱。
 
 「内存播放」模式的目标：**播放会话的解码产物全部驻留进程内内存，不写任何会话文件**——
-流式出声照常；频谱可视化改走内存缓冲 + 新 FFI 拉取。仅当 **raw 设备流式无法启动**时按
-用户设定直接报错（见 §5.1），不再回退写盘。
+流式出声照常；频谱可视化改走内存缓冲（v1 经 `pcm_window` FFI 拉窗；v2 由引擎
+频谱线程直接读块列表并 50ms 事件推送，见 `spectrum-analyzer.md`）。仅当 **raw 设备
+流式无法启动**时按用户设定直接报错（见 §5.1），不再回退写盘。
 
 用户开关：
 - **「内存播放（不落盘解码）」（`engineMemoryPlay`）默认开启**（独立于引擎 Stable/EraAudio
@@ -103,9 +109,10 @@ cap   = clamp(可用内存 × 0.1, floor, 32 MiB)
 ```
 
 **硬性上限（32 MiB，不只停留在公式层，运行时强制）**：
-- **32 MiB 是自动模式不可逾越的封顶**：驻留 PCM 仅服务 `pcm_window`（频谱取帧，实际只需
-  最近 `fftSize≈2048` 样本 ≈ 46ms），全量整曲驻留没有消费者，故 auto 收敛为小窗口——
-  把单会话原生内存从「整曲（数百 MB，高解析更大）」压到有界 ≤32 MiB；
+- **32 MiB 是自动模式不可逾越的封顶**：驻留 PCM 仅服务频谱取帧（v1 `pcm_window` /
+  v2 引擎频谱线程直接读块列表，实际只需最近 `fftSize≈8192` 样本 ≈ 171ms），全量整曲
+  驻留没有消费者，故 auto 收敛为小窗口——把单会话原生内存从「整曲（数百 MB，高解析
+  更大）」压到有界 ≤32 MiB；
 - **计算故障回退**：可用内存查询失败或返回异常值 → 直接回落保守下限（8 MiB），
   绝不因“拿不到数值”而放大上限；
 - **超量强制**：每 append 一块后校验 `bytes > cap` → 立即自队头逐最旧直至 `≤ cap`
@@ -146,7 +153,11 @@ prefs 见 `app/lib/stores/prefs_player.dart`）：
 `engine_thread` 与 `mediaengine_stream_rebuild` 在 `no_disk_cache=1` 且流式成功时不调用
 `wav_begin()` / `fopen(stream.pcm)`；`on_pcm_out` 改写入内存块列表 + 喂设备 ring。
 
-### 5.3 新 FFI（append，不破坏既有符号）
+### 5.3 v1 FFI（App 不再使用，保留给 CLI/测试）
+
+> **v2（2026-11-04）**：App 播放路径的频谱改由引擎频谱线程直接读内存块列表并
+> 50ms 事件推送，不再调用下列 `pcm_window` / `pcm_epoch` FFI；FFI 本身保留给
+> CLI/测试（`test_memory_mode` 仍用它对照 PCM 内容），不属于 v2 频谱契约。
 
 ```
 int  archoera_mediaengine_pcm_window(ArchoeraMediaEngine *e,
@@ -163,6 +174,10 @@ int  archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e);
 `cfg.output_channels`（2），FFI 直接给 L/R。
 
 ## 6. Dart 配套
+
+> **v2 起 App 播放路径不再使用本节的双后端拉模式**：`PlaybackNotifier` 只消费
+> `EngineFft` 事件；`PcmAnalyzer` / `MemoryPcmAnalyzer` 仅作为未迁移 CLI/测试的
+> 历史实现保留。以下为 v1 规格。
 
 - `EngineConfigC`（`engine_bindings.dart`）追加 `noDiskCache` / `pcmMemCapKb` 两字段；
   create 传入。

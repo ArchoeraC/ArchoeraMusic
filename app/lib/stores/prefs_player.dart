@@ -168,7 +168,12 @@ const bool defaultPlayerBgBeat = false;
 /// 自适应画质（默认关，保持旧行为）。开启后 [RenderQualityService] 依据
 /// `FrameTiming` 在 full/balanced/performance 档位间切换，作为播放页水纹
 /// 背景的 `renderScale`（见 docs/runtime-resource-optimization.md §4.5 / R4）。
-const bool defaultAdaptiveRenderQuality = false;
+/// 自适应画质（帧时间驱动降档：动态背景渲染比例 / 频谱重绘频率）。
+///
+/// 默认**开**（2026-11-03，推广「帧预算守卫」思路）：只在机器真的持续
+/// 掉帧时降档（Governor 用 p90 总帧时间 > 20ms 判定，12ms 以下回升），
+/// 正常机器不受影响；用户可在内部偏好里关闭。
+const bool defaultAdaptiveRenderQuality = true;
 
 /// 进度条悬停提示（默认开；鼠标悬停显示对应时间）。
 const bool defaultShowProgressTooltip = true;

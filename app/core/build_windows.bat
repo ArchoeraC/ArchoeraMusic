@@ -177,7 +177,7 @@ cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src /I include\compat /I "%
     src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
     src\era_log.c ^
     src\audio_output.c src\audio_output_platform.c src\audio_output_windows.c ^
-    src\segstore.c ^
+    src\segstore.c src\pcm_file_reader.c src\spectrum_service.c ^
     "%VCPKG_PREFIX%\lib\avformat.lib" "%VCPKG_PREFIX%\lib\avcodec.lib" ^
     "%VCPKG_PREFIX%\lib\avutil.lib" "%VCPKG_PREFIX%\lib\swresample.lib" ^
     build\libaudio_tempo.lib %KERNEL_FLAG% %KERNEL_LIB% ntdll.lib ole32.lib ^

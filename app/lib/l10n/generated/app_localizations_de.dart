@@ -38,6 +38,22 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nur aktive Ripple-Bänder neu zeichnen; nur CPU-Fallback';
 
   @override
+  String get settingsLyricsEdgeFade => 'Lyrics-Randausblendung';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      'Wie die oberen/unteren Ränder ausblenden: pro Zeile ist am günstigsten, Maske am weichsten, aus deaktiviert';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => 'Pro Zeile';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'Maske';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'Aus';
+
+  @override
   String get menuTrackDetail => 'Mediadetails';
 
   @override

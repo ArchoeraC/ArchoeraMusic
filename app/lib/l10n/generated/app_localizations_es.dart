@@ -38,6 +38,22 @@ class AppLocalizationsEs extends AppLocalizations {
       'Redibujar solo las bandas de ondas activas; solo ruta CPU';
 
   @override
+  String get settingsLyricsEdgeFade => 'Desvanecido de bordes de la letra';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      'Cómo se desvanecen los bordes superior e inferior: por línea es lo más económico, máscara lo más suave, desactivado sin desvanecido';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => 'Por línea';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'Máscara';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'Off';
+
+  @override
   String get menuTrackDetail => 'Detalles del medio';
 
   @override
