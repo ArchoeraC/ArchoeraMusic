@@ -4,12 +4,12 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
-## [Unreleased]
+## [1.0.5+0] - 2026-11-04
 
-> 以下为已合入 main、待随下个版本发布的内容（渲染专项，见
+> 本版本已合入 main 的内容（渲染专项，见
 > `docs/player-render-optimization.md`）。
 >
-> ⚠ **破坏性更新**：本段包含频谱分析器 v2（第 7 条），旧频谱 ABI / 拉模式 /
+> ⚠ **破坏性更新**：本版本包含频谱分析器 v2（第 7 条），旧频谱 ABI / 拉模式 /
 > 前端接收方式不兼容，详见 `docs/spectrum-analyzer.md`。
 
 1、播放页歌词失焦（默认「整层」档）性能重写：非激活行的失焦外观在稳态下
