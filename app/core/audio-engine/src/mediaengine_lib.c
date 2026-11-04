@@ -1307,16 +1307,13 @@ static void mediaengine_flush_carry(ArchoeraMediaEngine *e)
     ch = e->stage_ch > 0 ? e->stage_ch : 2;
     frames = (int)(e->stage_len / (size_t)ch);
     if (frames > 0) {
-        /* 余量首块媒体时间 = commit 时的旧源写头（carry_start_ms）：内存播放模式下
-           必须走 on_pcm_out（mem_append + ring），否则该段只进 ring、不进 mem 块列表
-           → 内存 PCM 时间线在切档处**向前跳一段 remain**（频谱/歌词/分析错位）。 */
+        /* 余量首块媒体时间 = commit 时的旧源写头（carry_start_ms）。
+           必须统一走 on_pcm_out：内存模式追加 mem 块、流式模式回灌频谱环、
+           文件模式续写 stream.pcm。只写设备会绕过频谱源，热切音质后播放位置
+           已前进而环/块索引没前进 → 频谱短暂取不到窗口（表现为冻结）。 */
         const double pos = e->carry_start_ms > 0.0 ? e->carry_start_ms
                                                     : (double)e->p_start_ms;
-        if (e->player && e->player_stream_mode && !e->mem_mode) {
-            player_stream_write(e->player, e->stage, frames);
-        } else {
-            on_pcm_out(e->stage, frames, ch, pos, e);
-        }
+        on_pcm_out(e->stage, frames, ch, pos, e);
     }
     e->stage_len = 0;
     e->carry_pending = 0;
