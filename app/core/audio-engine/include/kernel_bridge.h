@@ -278,6 +278,16 @@ float zk_dsp_spectrum_process(ZkSpectrum *s,
                               const float *l, const float *r, int frames,
                               float *out_l, float *out_r);
 
+/**
+ * 处理一帧（窗口居中）：l/r 最后一个样本对应「当前播放位置 + future_samples」。
+ * 每个 VQT 带把窗口中心对准当前播放位置，消除长窗群延迟；future_samples=0
+ * 等价于因果窗口。源不可读未来样本时调用方应退回 zk_dsp_spectrum_process。
+ */
+float zk_dsp_spectrum_process_centered(ZkSpectrum *s,
+                                       const float *l, const float *r, int frames,
+                                       int future_samples,
+                                       float *out_l, float *out_r);
+
 /** 取当前峰值保持线（bins 个 [0,1]）；s/out 为空时空操作。 */
 void zk_dsp_spectrum_peaks(const ZkSpectrum *s,
                            float *out_l, float *out_r);

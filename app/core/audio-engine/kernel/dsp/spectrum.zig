@@ -361,12 +361,24 @@ pub fn era_spectrum_sample_rate(self: *const EraSpectrum) u32 {
 // VQT / dB / 节拍
 // ---------------------------------------------------------------------------
 
-/// 单带 VQT 幅度：取最近 `len` 个样本，前端不足补零；`2|X|/Σw`。
-fn eraVqtBandMag(band: *const EraVqtBand, src: []const f32) f32 {
+/// 单带 VQT 幅度：窗口以 `src.len - future_samples` 为中心。
+///
+/// `future_samples = 0` 时为传统因果窗口（窗口末端 = 最新样本，群延迟约
+/// `len/2`）；服务层在源可读未来样本时传入 `max_window/2`，让每个带的
+/// 窗口中心对准当前播放位置，消除低频长窗的群延迟。窗口越界部分前端补零。
+fn eraVqtBandMag(band: *const EraVqtBand, src: []const f32, future_samples: usize) f32 {
     const len = band.len;
-    const available = @min(src.len, len);
+    const half = len / 2;
+
+    // 窗口末端（开区间）：中心 = end - half = src.len - future_samples。
+    var end: usize = src.len;
+    if (future_samples > half) {
+        const shift = future_samples - half;
+        end = if (shift >= src.len) 0 else src.len - shift;
+    }
+    const available = @min(end, len);
     const pad = len - available;
-    const start = src.len - available;
+    const start = end - available;
 
     var re: f32 = 0.0;
     var im: f32 = 0.0;
@@ -466,16 +478,34 @@ fn eraAgcStep(self: *EraSpectrum, raw_l: []const f32, raw_r: []const f32) f32 {
     return self.agc_gain;
 }
 
-/// 处理一帧。
+/// 处理一帧（传统因果窗口）。
 ///
 /// `l` / `r` 为最近 `frames` 个每声道样本（窗口终点 = 当前播放位置）；
-/// 每个 VQT 带只取自己最近的 `len` 个样本，不足部分在**前端补零**。
+/// 每个 VQT 带取自己最近的 `len` 个样本，不足部分在**前端补零**。
+/// 低频长窗的群延迟约 `len/2`；需要对齐当前画面时用
+/// [era_spectrum_process_centered] 传入未来样本偏移。
 /// `out_l` / `out_r` / 峰值数组长度 = bins，写 [0,1]。
 /// 返回本帧节拍强度 0..1。
 pub fn era_spectrum_process(
     self: *EraSpectrum,
     l: []const f32,
     r: []const f32,
+    out_l: []f32,
+    out_r: []f32,
+) f32 {
+    return era_spectrum_process_centered(self, l, r, 0, out_l, out_r);
+}
+
+/// 处理一帧（窗口居中）。
+///
+/// `future_samples > 0` 时，`l`/`r` 的最后一个样本对应
+/// `当前播放位置 + future_samples`；每个带把窗口中心对准当前播放位置，
+/// 从而消除长窗群延迟。`future_samples = 0` 等价于因果窗口。
+pub fn era_spectrum_process_centered(
+    self: *EraSpectrum,
+    l: []const f32,
+    r: []const f32,
+    future_samples: usize,
     out_l: []f32,
     out_r: []f32,
 ) f32 {
@@ -491,8 +521,8 @@ pub fn era_spectrum_process(
 
     // 原始 VQT 带幅度（节拍/AGC 用）。
     for (self.bands, 0..) |*band, i| {
-        self.band_l[i] = eraVqtBandMag(band, l[0..frames]);
-        self.band_r[i] = eraVqtBandMag(band, r[0..frames]);
+        self.band_l[i] = eraVqtBandMag(band, l[0..frames], future_samples);
+        self.band_r[i] = eraVqtBandMag(band, r[0..frames], future_samples);
     }
 
     // 节拍通量：L/R 平均原始带幅度。
@@ -842,6 +872,37 @@ test "era_spectrum: 任意输入长度不崩溃/不越界" {
             try testing.expect(v >= 0.0 and v <= 1.0);
         }
     }
+}
+
+test "era_spectrum: 居中窗口消除长窗群延迟" {
+    const a = testing.allocator;
+    const cfg = precisionConfig();
+    const sp = try era_spectrum_create(a, cfg);
+    defer era_spectrum_destroy(sp);
+
+    const band = &sp.bands[0];
+    const len = band.len;
+    const future = len / 2;
+    const buf = try a.alloc(f32, len);
+    defer a.free(buf);
+    const out_l = try a.alloc(f32, cfg.bins);
+    defer a.free(out_l);
+    const out_r = try a.alloc(f32, cfg.bins);
+    defer a.free(out_r);
+
+    const f: f32 = @floatCast(bandCenter(cfg, 0));
+
+    // 当前时刻之后才有 40Hz 信号：居中窗口立即看到，因果窗口只看到末端
+    // 一个几乎被 Blackman 窗压到 0 的样本。
+    @memset(buf, 0.0);
+    fillSine(buf[len / 2 ..], f, cfg.sample_rate, 0.5);
+    _ = era_spectrum_process_centered(sp, buf, buf, future, out_l, out_r);
+    const centered = out_l[0];
+    try testing.expect(centered > 0.05);
+
+    @memset(buf, 0.0);
+    _ = era_spectrum_process(sp, buf, buf, out_l, out_r);
+    try testing.expect(out_l[0] < 0.01);
 }
 
 test "era_spectrum: 短窗前端补零与长窗尾部截取等价" {

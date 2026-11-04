@@ -800,6 +800,16 @@ static int spec_read_cb(void *ctx, int end_pos_ms, int frames,
     if (!e) return -1;
     if (e->mem_mode) {
         int r;
+        /* 频谱居中窗口会请求未来位置；尾部尚未解码时返回 -1，让服务层退回
+           因果窗口。`pcm_window` 的「远超曲尾截到末块」语义不受影响。 */
+        if (e->mem_block_count <= 0 || e->mem_sr <= 0) return -1;
+        {
+            const PcmMemBlock *last = &e->mem_blocks[e->mem_block_count - 1];
+            const int64_t last_end_ms =
+                (int64_t)last->pos_ms +
+                ((int64_t)last->frames * 1000 + e->mem_sr - 1) / e->mem_sr;
+            if ((int64_t)end_pos_ms > last_end_ms) return -1;
+        }
         if (pthread_mutex_trylock(&e->mem_lock) != 0) return -1;
         r = mem_window(e, end_pos_ms, frames, out_l, out_r);
         pthread_mutex_unlock(&e->mem_lock);
@@ -2088,6 +2098,7 @@ static int mediaengine_spectrum_start(ArchoeraMediaEngine *e)
         cfg.max_hz = e->spec_max_hz;
         cfg.interval_ms = 50;
         cfg.frames = 12288; /* VQT 最长窗 */
+        cfg.future_samples = cfg.frames / 2; /* 窗口居中：消除长窗群延迟 */
         cfg.read = spec_read_cb;
         cfg.position = spec_position_cb;
         cfg.emit = spec_emit_cb;

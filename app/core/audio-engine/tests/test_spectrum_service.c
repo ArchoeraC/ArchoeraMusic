@@ -46,6 +46,7 @@ typedef struct {
 } TestSink;
 
 static int g_fail;
+static int g_last_read_end = -1;
 
 static void check(int cond, const char *what)
 {
@@ -60,7 +61,7 @@ static int test_read(void *ctx, int end_pos_ms, int frames,
 {
     int i;
     (void)ctx;
-    (void)end_pos_ms;
+    g_last_read_end = end_pos_ms;
     if (!out_l || !out_r || frames <= 0) return -2;
     for (i = 0; i < frames; i++) {
         const float v = (float)sin(2.0 * TEST_PI * TEST_FREQ * (double)i / TEST_SR);
@@ -148,6 +149,7 @@ static long long now_ms(void)
 int main(void)
 {
     TestSink sink;
+    TestSink sink2;
     EraSpectrumServiceConfig cfg;
     EraSpectrumService *svc;
     int expected_band;
@@ -156,6 +158,9 @@ int main(void)
     memset(&sink, 0, sizeof(sink));
     pthread_mutex_init(&sink.lock, NULL);
     pthread_cond_init(&sink.cv, NULL);
+    memset(&sink2, 0, sizeof(sink2));
+    pthread_mutex_init(&sink2.lock, NULL);
+    pthread_cond_init(&sink2.cv, NULL);
 
     /* 非法配置：缺回调 / 非法频段。 */
     memset(&cfg, 0, sizeof(cfg));
@@ -216,8 +221,27 @@ int main(void)
     era_spectrum_service_stop(svc); /* 幂等 */
 
     era_spectrum_service_destroy(svc);
+
+    /* 居中窗口：future_samples 应让 read 的 end_pos 前移 half window
+       （6144 @48k = 128ms），从而把长窗中心对准当前播放位置。 */
+    cfg.future_samples = TEST_FRAMES / 2;
+    cfg.ctx = &sink2;
+    g_last_read_end = -1;
+    svc = era_spectrum_service_create(&cfg);
+    check(svc != NULL, "居中窗口服务应创建");
+    if (svc) {
+        check(era_spectrum_service_start(svc) == 0, "居中窗口服务应启动");
+        check(wait_frames(&sink2, 1, 3000), "居中窗口应推送至少 1 帧");
+        check(g_last_read_end == 1000 + 128,
+              "居中窗口应读取未来 128ms（1000 → 1128）");
+        era_spectrum_service_stop(svc);
+        era_spectrum_service_destroy(svc);
+    }
+
     pthread_mutex_destroy(&sink.lock);
     pthread_cond_destroy(&sink.cv);
+    pthread_mutex_destroy(&sink2.lock);
+    pthread_cond_destroy(&sink2.cv);
 
     if (g_fail) {
         fprintf(stderr, "test_spectrum_service: FAILED\n");
