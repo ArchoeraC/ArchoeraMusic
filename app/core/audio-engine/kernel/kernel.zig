@@ -302,6 +302,137 @@ export fn zk_dsp_loudness_destroy(l: ?*dsp.loudness.EraLoudness) void {
 }
 
 // ---------------------------------------------------------------------------
+// 频谱 v2（多分辨率 FFT；include/kernel_bridge.h 契约）
+//
+// 纯计算核心：kernel/dsp/spectrum.zig。内核不建线程、不做 I/O；C 壳在独立
+// 频谱线程按播放位置取窗后调用，结果经引擎事件推送。
+// ---------------------------------------------------------------------------
+
+/// 频谱句柄（C 侧 `ZkSpectrum`）；非法参数 / OOM 返回 NULL。
+export fn zk_dsp_spectrum_create(
+    sample_rate: c_int,
+    bins: c_int,
+    min_hz: f32,
+    max_hz: f32,
+) ?*dsp.spectrum.EraSpectrum {
+    if (sample_rate <= 0 or bins <= 0 or bins > 1024) return null;
+    if (min_hz <= 0.0 or max_hz <= min_hz) return null;
+    const nyquist = @as(f32, @floatFromInt(sample_rate)) * 0.5;
+    if (max_hz >= nyquist) return null;
+    return dsp.spectrum.era_spectrum_create(
+        std.heap.c_allocator,
+        .{
+            .sample_rate = @intCast(sample_rate),
+            .bins = @intCast(bins),
+            .min_hz = min_hz,
+            .max_hz = max_hz,
+        },
+    ) catch null;
+}
+
+/// 释放频谱句柄；s 为 NULL 时空操作。
+export fn zk_dsp_spectrum_destroy(s: ?*dsp.spectrum.EraSpectrum) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_destroy(sp);
+}
+
+/// 清空帧间状态（seek / 切歌 / 会话重建）；s 为 NULL 时空操作。
+export fn zk_dsp_spectrum_reset(s: ?*dsp.spectrum.EraSpectrum) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_reset(sp);
+}
+
+/// 处理一帧（因果窗口）：l/r 最近 frames 个每声道样本 → out_l/out_r。
+/// 每个 VQT 带只取自己最近的 len 个样本（不足前端补零），frames 上限
+/// 约 max_window（默认 12288）。返回本帧节拍强度 0..1；参数非法时返回 0
+/// 且不写输出。
+export fn zk_dsp_spectrum_process(
+    s: ?*dsp.spectrum.EraSpectrum,
+    l: ?[*]const f32,
+    r: ?[*]const f32,
+    frames: c_int,
+    out_l: ?[*]f32,
+    out_r: ?[*]f32,
+) f32 {
+    return zk_dsp_spectrum_process_centered(s, l, r, frames, 0, out_l, out_r);
+}
+
+/// 处理一帧（窗口居中）：l/r 的最后一个样本对应 `当前播放位置 +
+/// future_samples`；每个带把窗口中心对准当前播放位置，消除长窗群延迟。
+/// future_samples=0 等价于因果窗口。
+export fn zk_dsp_spectrum_process_centered(
+    s: ?*dsp.spectrum.EraSpectrum,
+    l: ?[*]const f32,
+    r: ?[*]const f32,
+    frames: c_int,
+    future_samples: c_int,
+    out_l: ?[*]f32,
+    out_r: ?[*]f32,
+) f32 {
+    const sp = s orelse return 0.0;
+    const lp = l orelse return 0.0;
+    const rp = r orelse return 0.0;
+    const ol = out_l orelse return 0.0;
+    const orr = out_r orelse return 0.0;
+    if (frames <= 0) return 0.0;
+    const n: usize = @intCast(frames);
+    const future: usize = if (future_samples > 0) @intCast(future_samples) else 0;
+    const bins = dsp.spectrum.era_spectrum_bins(sp);
+    if (bins == 0) return 0.0;
+    return dsp.spectrum.era_spectrum_process_centered(
+        sp,
+        lp[0..n],
+        rp[0..n],
+        future,
+        ol[0..bins],
+        orr[0..bins],
+    );
+}
+
+/// 设置峰值保持开关；关闭时清空峰值线。
+export fn zk_dsp_spectrum_set_peak_hold(s: ?*dsp.spectrum.EraSpectrum, enabled: c_int) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_set_peak_hold(sp, enabled != 0);
+}
+
+/// 运行时开关 AGC；s 为 NULL 时空操作。
+export fn zk_dsp_spectrum_set_agc(s: ?*dsp.spectrum.EraSpectrum, enabled: c_int) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_set_agc(sp, enabled != 0);
+}
+
+/// 运行时设置 γ（<=0/NaN/Inf 忽略）；s 为 NULL 时空操作。
+export fn zk_dsp_spectrum_set_gamma(s: ?*dsp.spectrum.EraSpectrum, gamma: f32) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_set_gamma(sp, gamma);
+}
+
+/// 运行时设置高频倾斜（dB/oct，NaN/Inf 忽略）；s 为 NULL 时空操作。
+export fn zk_dsp_spectrum_set_tilt(s: ?*dsp.spectrum.EraSpectrum, db_per_oct: f32) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_set_tilt(sp, db_per_oct);
+}
+
+/// 取当前峰值保持线（bins 个 [0,1]）；s/out 为空时空操作。
+export fn zk_dsp_spectrum_peaks(
+    s: ?*const dsp.spectrum.EraSpectrum,
+    out_l: ?[*]f32,
+    out_r: ?[*]f32,
+) void {
+    const sp = s orelse return;
+    const ol = out_l orelse return;
+    const orr = out_r orelse return;
+    const bins = dsp.spectrum.era_spectrum_bins(sp);
+    dsp.spectrum.era_spectrum_peaks(sp, ol[0..bins], orr[0..bins]);
+}
+
+/// 输出频段数；s 为 NULL 时返回 0。
+export fn zk_dsp_spectrum_bins(s: ?*const dsp.spectrum.EraSpectrum) c_int {
+    const sp = s orelse return 0;
+    return @intCast(dsp.spectrum.era_spectrum_bins(sp));
+}
+
+// ---------------------------------------------------------------------------
 // 离线 EBU R128 集成响度测量（scanner 直桥；include/kernel_bridge.h 契约）
 //
 // 同步解码 path → 有界块喂入 kernel/dsp/loudness_measure.zig 的测量器 →

@@ -17,6 +17,12 @@ const sleepFinishTrackKey = 'player.sleepTimerFinishTrack';
 const sleepTimerPresetsKey = 'player.sleepTimerPresets';
 const sleepTimerCustomMinutesKey = 'player.sleepTimerCustomMinutes';
 const enableSpectrumKey = 'player.enableSpectrum';
+const spectrumPeakHoldKey = 'player.spectrumPeakHold';
+const spectrumAgcKey = 'player.spectrumAgc';
+const spectrumGammaKey = 'player.spectrumGamma';
+const spectrumTiltKey = 'player.spectrumTilt';
+const spectrumGammaValueKey = 'player.spectrumGammaValue';
+const spectrumTiltValueKey = 'player.spectrumTiltValue';
 const coverBeatScaleKey = 'player.coverBeatScale';
 const spectrumBarWidthKey = 'player.spectrumBarWidth';
 const spectrumStyleKey = 'player.spectrumStyle';
@@ -117,6 +123,28 @@ const int maxSleepTimerMinutes = 600;
 /// 频谱可视化总开关（对齐原版 player.enableSpectrum，默认开）。
 const bool defaultEnableSpectrum = true;
 
+/// 频谱峰值保持线（引擎计算，UI 只绘制；默认关，避免默认画面过满）。
+const bool defaultSpectrumPeakHold = false;
+
+/// 频谱自动增益（AGC）：默认关，避免弱音被抬高后顶满。
+const bool defaultSpectrumAgc = false;
+
+/// 频谱小信号提亮（γ）：默认关，保持线性显示。
+const bool defaultSpectrumGamma = false;
+
+/// 频谱高频倾斜：默认关，保持平直频响。
+const bool defaultSpectrumTilt = false;
+
+/// γ 可调范围与默认值（<1 提亮，>1 压暗）。
+const double minSpectrumGammaValue = 0.5;
+const double maxSpectrumGammaValue = 1.5;
+const double defaultSpectrumGammaValue = 0.9;
+
+/// 高频倾斜可调范围与默认值（dB/oct，相对 1kHz）。
+const double minSpectrumTiltValue = -3.0;
+const double maxSpectrumTiltValue = 6.0;
+const double defaultSpectrumTiltValue = 0.5;
+
 /// 封面跟随节拍缩放（对齐原版 PlayerCover 播放/暂停缩放之上叠加的
 /// 鼓点脉冲；依赖 FFT 频谱数据，性能模式下自动停用，默认关）。
 const bool defaultCoverBeatScale = false;
@@ -168,7 +196,12 @@ const bool defaultPlayerBgBeat = false;
 /// 自适应画质（默认关，保持旧行为）。开启后 [RenderQualityService] 依据
 /// `FrameTiming` 在 full/balanced/performance 档位间切换，作为播放页水纹
 /// 背景的 `renderScale`（见 docs/runtime-resource-optimization.md §4.5 / R4）。
-const bool defaultAdaptiveRenderQuality = false;
+/// 自适应画质（帧时间驱动降档：动态背景渲染比例 / 频谱重绘频率）。
+///
+/// 默认**开**（2026-11-03，推广「帧预算守卫」思路）：只在机器真的持续
+/// 掉帧时降档（Governor 用 p90 总帧时间 > 20ms 判定，12ms 以下回升），
+/// 正常机器不受影响；用户可在内部偏好里关闭。
+const bool defaultAdaptiveRenderQuality = true;
 
 /// 进度条悬停提示（默认开；鼠标悬停显示对应时间）。
 const bool defaultShowProgressTooltip = true;
@@ -294,6 +327,40 @@ extension PlayerPrefs on AppPrefs {
 
   bool get enableSpectrum =>
       data[enableSpectrumKey] as bool? ?? defaultEnableSpectrum;
+
+  /// 频谱峰值保持线（默认关）。
+  bool get spectrumPeakHold =>
+      data[spectrumPeakHoldKey] as bool? ?? defaultSpectrumPeakHold;
+
+  /// 频谱自动增益（AGC，默认关）。
+  bool get spectrumAgc => data[spectrumAgcKey] as bool? ?? defaultSpectrumAgc;
+
+  /// 频谱小信号提亮（γ，默认关）。
+  bool get spectrumGamma =>
+      data[spectrumGammaKey] as bool? ?? defaultSpectrumGamma;
+
+  /// 频谱高频倾斜（默认关）。
+  bool get spectrumTilt => data[spectrumTiltKey] as bool? ?? defaultSpectrumTilt;
+
+  /// γ 数值（关闭时仍保留，供下次开启使用）。
+  double get spectrumGammaValue {
+    final v = data[spectrumGammaValueKey] as num?;
+    if (v == null) return defaultSpectrumGammaValue;
+    return v
+        .toDouble()
+        .clamp(minSpectrumGammaValue, maxSpectrumGammaValue)
+        .toDouble();
+  }
+
+  /// 高频倾斜数值（dB/oct，关闭时仍保留）。
+  double get spectrumTiltValue {
+    final v = data[spectrumTiltValueKey] as num?;
+    if (v == null) return defaultSpectrumTiltValue;
+    return v
+        .toDouble()
+        .clamp(minSpectrumTiltValue, maxSpectrumTiltValue)
+        .toDouble();
+  }
 
   /// 封面跟随节拍缩放（鼓点脉冲；性能模式下视为关闭）。
   bool get coverBeatScale =>
@@ -520,6 +587,32 @@ extension PlayerPrefs on AppPrefs {
       ...data,
       enableSpectrumKey: ?enable,
       spectrumBarWidthKey: ?barWidth?.clamp(1, 12),
+    },
+  );
+
+  /// 设置频谱峰值保持线开关。
+  AppPrefs copyWithSpectrumPeakHold(bool value) =>
+      AppPrefs(initialData: {...data, spectrumPeakHoldKey: value});
+
+  /// 设置频谱增强开关与数值（AGC / γ / 高频倾斜）。
+  AppPrefs copyWithSpectrumEnhance({
+    bool? agc,
+    bool? gamma,
+    bool? tilt,
+    double? gammaValue,
+    double? tiltValue,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      spectrumAgcKey: ?agc,
+      spectrumGammaKey: ?gamma,
+      spectrumTiltKey: ?tilt,
+      spectrumGammaValueKey: ?gammaValue
+          ?.clamp(minSpectrumGammaValue, maxSpectrumGammaValue)
+          .toDouble(),
+      spectrumTiltValueKey: ?tiltValue
+          ?.clamp(minSpectrumTiltValue, maxSpectrumTiltValue)
+          .toDouble(),
     },
   );
 

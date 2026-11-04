@@ -150,6 +150,8 @@ set(AUDIO_ENGINE_SOURCES
     src/loudness.c
     src/limiter.c
     src/fft.c
+    # 频谱 v2：引擎侧 50ms 推送服务（取窗/线程/事件；纯计算在 Zig 内核）
+    src/spectrum_service.c
     # 统一日志收口（sink 注入 + stderr 兜底）
     src/era_log.c
     # 方向① D1/D2：参数化 EQ + 次声/低频管理
@@ -163,6 +165,8 @@ set(AUDIO_ENGINE_SOURCES
     src/audio_output.c
     src/audio_output_platform.c
     src/segstore.c
+    # 文件模式 stream.pcm 按位置取窗（频谱线程；只建块索引）
+    src/pcm_file_reader.c
 )
 
 # 输出设备枚举平台后端（编译期单选；与 audio_output_platform.h 的约定一致）

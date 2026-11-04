@@ -15,6 +15,7 @@ import '../widgets/common/fps_monitor.dart';
 import '../widgets/layout/nav_header.dart';
 import '../widgets/layout/player_bar.dart';
 import '../widgets/layout/side_bar.dart';
+import '../widgets/common/offstage_when_complete.dart';
 import 'appearance_styles/appearance_style_registry.dart';
 import 'route_transitions/route_transition_registry.dart';
 import 'shell_expand_transition.dart';
@@ -84,9 +85,16 @@ class AppShell extends ConsumerWidget {
         ),
       ],
     );
+    // 播放页完全展开时（`/player` 路由为 opaque:false，壳层仍被绘制），
+    // 壳层背景与播放条被播放页整幅不透明背景完全盖住——用 Offstage 停绘
+    // （保留状态，返回时无重建闪烁），避免每帧白白重放全屏背景贴图与
+    // 播放条（遮挡显式隐藏，见 docs/rendering-reference-research.md D6）。
+    Widget occludedWhenPlayerOpen(Widget child) =>
+        OffstageWhenComplete(animation: playerRouteAnim, child: child);
     final body = Stack(
       children: [
-        if (background != null) Positioned.fill(child: background),
+        if (background != null)
+          Positioned.fill(child: occludedWhenPlayerOpen(background)),
         // 内容层（停靠模式且播放条可见时底部让位；悬浮模式占满全高）
         Positioned.fill(
           child: Padding(
@@ -109,7 +117,7 @@ class AppShell extends ConsumerWidget {
           left: floating ? (collapsed ? 64.0 : 240.0) + 1 : 0,
           right: 0,
           bottom: 0,
-          child: const PlayerBar(),
+          child: occludedWhenPlayerOpen(const PlayerBar()),
         ),
         // Dev 模式性能监控（右上角小窗；默认 SizedBox.shrink 零开销）
         const Positioned(top: 10, right: 10, child: FpsMonitorHost()),

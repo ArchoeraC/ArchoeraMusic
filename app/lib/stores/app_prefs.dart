@@ -217,6 +217,42 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置频谱峰值保持线（默认关）。
+  void setSpectrumPeakHold(bool value) {
+    state = state.copyWithSpectrumPeakHold(value);
+    state.save();
+  }
+
+  /// 设置频谱自动增益（AGC）。
+  void setSpectrumAgc(bool value) {
+    state = state.copyWithSpectrumEnhance(agc: value);
+    state.save();
+  }
+
+  /// 设置频谱小信号提亮（γ）。
+  void setSpectrumGamma(bool value) {
+    state = state.copyWithSpectrumEnhance(gamma: value);
+    state.save();
+  }
+
+  /// 设置频谱高频倾斜。
+  void setSpectrumTilt(bool value) {
+    state = state.copyWithSpectrumEnhance(tilt: value);
+    state.save();
+  }
+
+  /// 设置 γ 数值（关闭时仍保留）。
+  void setSpectrumGammaValue(double value) {
+    state = state.copyWithSpectrumEnhance(gammaValue: value);
+    state.save();
+  }
+
+  /// 设置高频倾斜数值（关闭时仍保留）。
+  void setSpectrumTiltValue(double value) {
+    state = state.copyWithSpectrumEnhance(tiltValue: value);
+    state.save();
+  }
+
   /// 设置封面跟随节拍缩放开关。
   void setCoverBeatScale(bool value) {
     state = state.copyWithCoverBeatScale(value);
@@ -477,6 +513,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       lowRes: lowRes,
       damageClip: damageClip,
     );
+    state.save();
+  }
+
+  /// 设置歌词区上下渐隐实现（`wall` / `shader` / `off`）。
+  void setLyricsEdgeFade(String value) {
+    state = state.copyWithLyricsEdgeFade(value);
     state.save();
   }
 

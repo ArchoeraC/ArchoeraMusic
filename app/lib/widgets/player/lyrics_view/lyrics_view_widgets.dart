@@ -15,17 +15,39 @@ extension _LyricsViewBuild on _LyricsViewState {
         // 用环境默认字体（含主题字体/回退链）实测，保证换行点与渲染一致。
         final baseStyle = DefaultTextStyle.of(context).style;
         final textScaler = MediaQuery.textScalerOf(context);
-        // 实测每行高度（长行换行后可变），用于滚动定位。
-        final heights = <double>[
-          for (var i = 0; i < widget.groups.length; i++)
-            _rowHeight(
-              widget.groups[i],
-              i == index,
-              maxWidth,
-              baseStyle,
-              textScaler,
-            ),
-        ];
+        // 行高列表按需重算：位置 tick（~20Hz）不改变行高，只有「当前行翻转 /
+        // 分组 / 宽度 / 样式 / 点击可用性」变化时才重算（换行约每几秒一次）。
+        final heightsKey = (
+          groups: widget.groups,
+          width: maxWidth,
+          fontSize: widget.fontSize,
+          lineHeight: widget.lineHeight,
+          showTranslation: widget.showTranslation,
+          showRomanization: widget.showRomanization,
+          fontWeight: widget.fontWeight,
+          currentFontSize: widget.currentFontSize,
+          inactiveFontWeight: widget.inactiveFontWeight,
+          baseStyle: baseStyle,
+          textScaler: textScaler,
+          index: index,
+          hasSeek: widget.onSeek != null,
+        );
+        if (_heightsKey != heightsKey) {
+          _heightsKey = heightsKey;
+          _heights = <double>[
+            for (var i = 0; i < widget.groups.length; i++)
+              _rowHeight(
+                widget.groups[i],
+                i == index,
+                maxWidth,
+                baseStyle,
+                textScaler,
+              ),
+          ];
+          // 当前行翻转 / 配置变化：非当前行的缓存实例一律作废。
+          _lineCache.clear();
+        }
+        final heights = _heights!;
         if (index != _current) {
           _current = index;
           // index < 0：播放位置早于第一句（循环回放 / 前奏）——锚定首行。
@@ -42,8 +64,18 @@ extension _LyricsViewBuild on _LyricsViewState {
             itemCount: widget.groups.length,
             // 不设固定 itemExtent：长行换行后行高可变（对齐 AMLL）。
             itemBuilder: (context, i) {
+              // 非当前行：命中缓存则返回同一实例——Element 对 identical
+              // widget 直接短路，位置 tick（~20Hz）不再重建/重绘这些行。
+              if (i != index) {
+                final cached = _lineCache[i];
+                if (cached != null) {
+                  _cacheHits += 1;
+                  return cached;
+                }
+              }
               final group = widget.groups[i];
-              return _Line(
+              _builtLines += 1;
+              final line = _Line(
                 group: group,
                 isCurrent: i == index,
                 positionMs: widget.positionMs,
@@ -63,6 +95,8 @@ extension _LyricsViewBuild on _LyricsViewState {
                     ? null
                     : () => widget.onSeek!(group.original.timeMs),
               );
+              if (i != index) _lineCache[i] = line;
+              return line;
             },
           ),
         );

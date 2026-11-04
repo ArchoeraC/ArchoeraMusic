@@ -11,6 +11,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   final _Repaint _repaint = _Repaint();
   int _lastUs = 0;
   List<Spring1D> _y = const [];
+
   /// 各行「滚动起点」（预滚后，ms；长度同 [AmllPhysicsWall.groups]）。
   List<int> _scrollStart = const [];
   List<double> _scale = const [];
@@ -148,6 +149,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _userReset?.cancel();
     _ticker.dispose();
     _repaint.dispose();
+    _c.bake.dispose();
     super.dispose();
   }
 
@@ -165,16 +167,17 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _c.fontWeight = widget.fontWeight;
     _c.enableScale = widget.enableScale;
     _c.textAlign = widget.textAlign;
+    _c.edgeFade = widget.edgeFade;
     _syncBlurMode();
     _c.wordFadeWidth = widget.wordFadeWidth;
   }
 
   /// 生效的失焦档位（不含悬停；悬停只压 [blurStrength] / 逐行目标为 0）。
   LyricsBlurMode get _blurModeResolved => resolveLyricsBlurMode(
-        quality: widget.blurQuality,
-        override: _debugModeOverride ?? lyricsBlurOverride,
-        autoDegraded: _blurDegraded,
-      );
+    quality: widget.blurQuality,
+    override: _debugModeOverride ?? lyricsBlurOverride,
+    autoDegraded: _blurDegraded,
+  );
 
   /// 把档位与整层强度同步到绘制上下文（每帧 build 都会调）。
   void _syncBlurMode() {
@@ -512,7 +515,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         } else {
           advance = kScrollPrerollOverlapMs;
           boundary =
-              prevStart + ((prevEnd - prevStart) * kScrollPrerollOverlapBoundary).round();
+              prevStart +
+              ((prevEnd - prevStart) * kScrollPrerollOverlapBoundary).round();
         }
       } else {
         advance = kScrollPrerollNoOverlapMs;
@@ -589,9 +593,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     if (i < 0 || i >= _fade.length) return;
     final active = i == _c.active;
     _fade[i] = active ? 1.0 : 0.0;
-    _scale[i] = !widget.enableScale
-        ? 1.0
-        : (1.0 - (1.0 - _fade[i]) * 0.03);
+    _scale[i] = !widget.enableScale ? 1.0 : (1.0 - (1.0 - _fade[i]) * 0.03);
     _blur[i] = _blurTargetFor(i);
   }
 
@@ -622,6 +624,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   void _setHovering(bool v) {
     if (_hovering == v) return;
     _hovering = v;
+    // 整层强度进入过渡期：烘焙暂停，直到强度重新落定（D2a）。
+    _c.blurStrengthSettled = false;
     // 整层档的强度归零/恢复要过渡，得把 ticker 拉起来（否则移出后停在 0）。
     _ensureTicker();
     _repaint.notify();
@@ -681,6 +685,9 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       seeking: seekSnap,
       interludeActive: interludeIdx >= 0,
     );
+    // 重定目标 → 非激活外观即将变化，烘焙暂停重建，
+    // 由后续 ticker 帧在静止时恢复（D2a）。
+    _c.staticIdle = false;
     // 锚点位移超过一屏视作跨屏跳转：所有行同步位移（无级联），
     // 保证行距不塌陷、不产生“炸动画”或重叠伪影。仅触摸拖拽/性能模式瞬移。
     final shift = (_c.centers[anchor] - _c.centers[oldAnchor]).abs();
@@ -746,6 +753,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 滚轮走弹簧（`DiscreteScroll`）。只处理视口窗口内的行。
   void _pushUserTargets({bool snap = false}) {
     if (_c.centers.isEmpty || _y.isEmpty) return;
+    // 用户浏览期间目标逐帧变化：暂停烘焙重建（回弹/静止后恢复）。
+    _c.staticIdle = false;
     final anchor = (_anchorIdx >= 0 && _anchorIdx < _c.centers.length)
         ? _anchorIdx
         : 0;
@@ -833,6 +842,15 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     if (visualsMoved) moving = true;
 
     if (!moving) _ticker.stop();
+    // 非激活外观静止 = 烘焙可重建（与 ticker 保活正交：播放中时钟常开，
+    // 但静态层早已停驻，见 D2a）。
+    final wasIdle = _c.staticIdle;
+    _c.staticIdle = !springsMoved && !visualsMoved;
+    if (!moving) {
+      // 收敛帧：动画刚停，补一次重绘，让 painter 在「静止 + 无过渡」状态
+      // 下重建烘焙图（此后贴图帧不再有 ticker 驱动）。
+      if (!wasIdle) _repaint.notify();
+    }
     // 只有真正会改变画面时才重绘：整行级歌词（无逐字片段）且弹簧/过渡静止时，
     // 时钟推进并不改变任何像素，没必要按 60fps 重绘整墙。
     final sweeping =
@@ -873,6 +891,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       final pt = _panelBlurTarget();
       if (_blurStrength != pt) changed = true;
       _blurStrength = pt;
+      _c.blurStrengthSettled = true;
       // ⚠ 重绘走 _repaint.notify()（不触发 build），所以上下文必须在这里同步，
       // 不能只靠 build 里的 _syncStyle（否则整层档在两次位置事件之间强度恒为 0）。
       _syncBlurMode();
@@ -889,6 +908,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     } else if (_blurStrength != pt) {
       _blurStrength = pt;
     }
+    _c.blurStrengthSettled = _blurStrength == pt;
     for (var i = _winStart; i < we; i++) {
       final active = i == _c.active;
       final ft = active ? 1.0 : 0.0;
@@ -927,9 +947,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         child: Icon(
           EtaIcons.fileMusicOutline,
           size: 64,
-          color: Theme.of(
-            context,
-          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+          color: Theme.of(context).colorScheme.onSurfaceVariant
+              .withValues(alpha: 0.3),
         ),
       );
     }
@@ -944,6 +963,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         final rawH = constraints.maxHeight;
         final w = (rawW.isFinite && rawW > 0) ? rawW : 400.0;
         final h = (rawH.isFinite && rawH > 0) ? rawH : 400.0;
+        // 烘焙采样用（见 _PaintCtx.dpr）。
+        _c.dpr = MediaQuery.devicePixelRatioOf(context);
         if (w != _c.w || h != _c.h || _metricsDirty) {
           _c.w = w;
           _c.h = h;
@@ -1103,6 +1124,25 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 间奏三点是否可见。
   @visibleForTesting
   bool debugDotsVisible() => _c.dots.visible;
+
+  /// 上一帧是否走了整层档稳态烘焙贴图路径（D2a）。
+  @visibleForTesting
+  bool debugBakeActive() => _c.lastFrameBaked;
+
+  /// 累计烘焙行数（换行不应使其大幅增长；新行首次进入视口才 +1）。
+  @visibleForTesting
+  int debugBakeCount() => _c.bake.bakedCount;
+
+  /// 当前缓存的烘焙图数量。
+  @visibleForTesting
+  int debugBakedLineCount() => _c.bake.cachedCount;
+
+  /// 开/关烘焙（A/B 对比用；默认开）。
+  @visibleForTesting
+  void debugSetBakeEnabled(bool value) {
+    _c.bakeEnabled = value;
+    _repaint.notify();
+  }
 
   /// 间奏三点的当帧亮度（3 个）。
   @visibleForTesting

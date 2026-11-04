@@ -477,6 +477,61 @@
     }
   );
 
+  /* ── 下载区：标出当前系统 ───────────────────────────────────────────── */
+
+  (function setupPlatformHint() {
+    var ua = window.navigator.userAgent || "";
+    var platform = "";
+    if (/Windows/i.test(ua)) platform = "windows";
+    else if (/Macintosh|Mac OS X/i.test(ua)) platform = "macos";
+    else if (/Linux|X11/i.test(ua)) platform = "linux";
+    if (!platform) return;
+
+    var label = { linux: "Linux", windows: "Windows", macos: "macOS" }[platform];
+    var formats = {
+      linux: ".deb / .rpm / .pkg.tar.zst / .AppImage / .flatpak",
+      windows: "安装包 / portable zip",
+      macos: ".app（Intel / Apple Silicon）"
+    };
+
+    var cards = Array.prototype.slice.call(
+      doc.querySelectorAll(".download-card[data-platform]")
+    );
+    var grid = doc.querySelector(".download-grid");
+    var recommendedCard = null;
+
+    cards.forEach(function (card) {
+      var match = card.getAttribute("data-platform") === platform;
+      card.classList.toggle("is-detected", match);
+      if (match) recommendedCard = card;
+    });
+
+    if (grid && recommendedCard) {
+      grid.insertBefore(recommendedCard, grid.firstChild);
+    }
+
+    var notes = Array.prototype.slice.call(
+      doc.querySelectorAll(".install-note[data-platform]")
+    );
+    var notesWrap = doc.querySelector(".install-notes");
+    var recommendedNote = null;
+
+    notes.forEach(function (noteEl) {
+      var match = noteEl.getAttribute("data-platform") === platform;
+      noteEl.classList.toggle("is-detected", match);
+      if (match) recommendedNote = noteEl;
+    });
+
+    if (notesWrap && recommendedNote) {
+      notesWrap.insertBefore(recommendedNote, notesWrap.firstChild);
+    }
+
+    var note = doc.querySelector("[data-platform-note]");
+    if (!note) return;
+    note.textContent =
+      "检测到当前系统：" + label + "。已把 " + label + " 版本排在最前（" + formats[platform] + "），下方安装说明同步高亮。";
+  })();
+
   /* ── 播放页布局切换 ───────────────────────────────────────────────── */
 
   (function setupLayoutTabs() {

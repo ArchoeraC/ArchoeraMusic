@@ -35,6 +35,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsRippleDamageClipDesc => '활성 물결 띠만 다시 그리기; CPU 대체 경로 전용';
 
   @override
+  String get settingsLyricsEdgeFade => '가사 가장자리 페이드';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '위/아래 가장자리 페이드 방식: 줄 단위가 가장 가볍고, 마스크가 가장 부드러우며, 끄면 페이드 없음';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '줄 단위';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => '마스크';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => '끔';
+
+  @override
   String get menuTrackDetail => '미디어 상세';
 
   @override
@@ -5124,6 +5140,58 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
+
+  @override
+  String get settingsSpectrumPeakHold => '피크 홀드 라인';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => '엔진이 계산한 피크 라인을 스펙트럼 위에 표시';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => '피크 라인 숨김';
+
+  @override
+  String get settingsSpectrumAgc => '자동 게인(AGC)';
+
+  @override
+  String get settingsSpectrumAgcOn => '조용한 구간을 끌어올려 최대치에 가까워질 수 있습니다';
+
+  @override
+  String get settingsSpectrumAgcOff => '원래 다이내믹 유지';
+
+  @override
+  String get settingsSpectrumGamma => '작은 신호 강조(γ)';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9, 약한 대역이 더 잘 보입니다';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0, 선형 표시';
+
+  @override
+  String get settingsSpectrumTilt => '고음 틸트';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct, 고음이 더 밝아집니다';
+
+  @override
+  String get settingsSpectrumTiltOff => '평탄한 주파수 응답';
+
+  @override
+  String get settingsSpectrumGammaValue => '강조량(γ)';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '현재 γ=$value; 1 미만은 작은 신호 강조, 1 초과는 어둡게';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => '틸트량';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '현재 $value dB/oct (1kHz 기준)';
+  }
 
   @override
   String get settingsAutoImmersive => 'Auto immersive';

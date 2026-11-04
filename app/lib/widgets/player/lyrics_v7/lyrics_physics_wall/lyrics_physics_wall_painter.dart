@@ -31,6 +31,7 @@ class _Painter extends CustomPainter {
     final visible = <int>{};
     final keepFrag = <int>{};
     final fades = <int, double>{};
+    final staticLines = <int>[];
     final hideBoundary = c.active >= 0 ? c.active : (c.anchor + 1);
     for (var i = 0; i < n; i++) {
       final cy = c.y[i];
@@ -42,22 +43,116 @@ class _Painter extends CustomPainter {
       // 淡出中的上一激活行仍需逐字渲染数据（否则会从扫亮态「啪」地变灰）。
       if (fade > 0.02) keepFrag.add(i);
       fades[i] = fade;
+      // 烘焙候选：可见且非激活（fade==0）——稳态时全部可见行除激活行外都在此。
+      if (i != c.active && fade <= 0.005) staticLines.add(i);
     }
     if (c.blurMode == LyricsBlurMode.panel && c.blurStrength > 0.02) {
-      // 整层档：所有非激活外观（含淡出中的上一激活行）画进**同一个**离屏层，
-      // 一次高斯（1/4 重采样）→ 层数与可见行数无关；激活外观随后清晰叠回。
-      canvas.saveLayer(
-        Rect.fromLTWH(0, 0, math.max(1.0, c.w), viewH),
-        Paint()..imageFilter = _panelFilter(c.blurStrength),
-      );
-      for (final i in visible) {
-        _drawBase(canvas, i, c.y[i], fades[i]!);
+      // 稳态判定：无动画、无过渡、无悬停渐变，激活外观已完整。
+      final steady = _panelSteady(visible, fades);
+      var baked = false;
+      if (c.bakeEnabled && steady) {
+        // 稳态贴图：整层高斯已在烘焙图里，每帧只剩逐行贴图。
+        // 烘焙缓存与位置无关：换行/滚动只对新进入视口的行烘一张，
+        // 其余行直接复用（避免换行后首帧的全量重烘焙尖峰）。
+        baked = true;
+        for (final i in staticLines) {
+          final line = c.bake.lookup(c, i);
+          if (line == null) {
+            // 尚未烘焙：本帧回退逐行高斯（观感等价），由下方预取摊到
+            // 后续稳态帧，绝不在同一帧批量烘焙。
+            _drawLine(
+              canvas,
+              i,
+              c.y[i],
+              0,
+              sigmaOverride: kPanelBlurSigma * c.blurStrength,
+            );
+            continue;
+          }
+          final alpha = (_alphaFor(i) * _edgeAlphaAt(c.y[i])).clamp(0.0, 1.0);
+          canvas.drawImageRect(
+            line.image,
+            Rect.fromLTWH(
+              0,
+              0,
+              line.image.width.toDouble(),
+              line.image.height.toDouble(),
+            ),
+            Rect.fromLTRB(
+              0,
+              c.y[i] + line.top,
+              math.max(1.0, c.w),
+              c.y[i] + line.bottom,
+            ),
+            Paint()
+              ..filterQuality = ui.FilterQuality.low
+              ..color = const Color(0xFFFFFFFF).withValues(alpha: alpha),
+          );
+        }
+        // 预取：每帧最多烘一张（视口上下各 2 行），把烘焙成本摊到稳态帧。
+        c.bake.prefetchOne(this, c, visible);
+      } else {
+        // 过渡帧：基座优先用位置无关的烘焙图（行在动，但模糊外观不变 →
+        // 贴图跟随 y 移动即可），无缓存/强度动画中才回退逐行高斯。
+        // 激活外观始终逐帧重绘（扫亮/上浮是真正逐帧变化的部分）。
+        final useCache = c.bakeEnabled && c.blurStrengthSettled;
+        for (final i in visible) {
+          final fade = fades[i]!;
+          final line = useCache ? c.bake.lookup(c, i) : null;
+          if (line == null) {
+            _drawLine(
+              canvas,
+              i,
+              c.y[i],
+              fade,
+              sigmaOverride: i == c.active
+                  ? 0
+                  : kPanelBlurSigma * c.blurStrength,
+            );
+            continue;
+          }
+          // 基座 = 烘焙图 × 实际 alpha ×（1 − fade）：与 _drawBase 的
+          // 交叉淡化同语义（高斯/透明度对 alpha 线性）。
+          final baseAlpha = _alphaFor(i) * (1 - fade) * _edgeAlphaAt(c.y[i]);
+          if (baseAlpha > 0.004) {
+            canvas.drawImageRect(
+              line.image,
+              Rect.fromLTWH(
+                0,
+                0,
+                line.image.width.toDouble(),
+                line.image.height.toDouble(),
+              ),
+              Rect.fromLTRB(
+                0,
+                c.y[i] + line.top,
+                math.max(1.0, c.w),
+                c.y[i] + line.bottom,
+              ),
+              Paint()
+                ..filterQuality = ui.FilterQuality.low
+                ..color = const Color(0xFFFFFFFF)
+                    .withValues(alpha: baseAlpha.clamp(0.0, 1.0)),
+            );
+          }
+          _drawActiveLayer(canvas, i, c.y[i], fade, edge: _edgeAlphaAt(c.y[i]));
+        }
       }
-      canvas.restore();
-      for (final i in visible) {
-        _drawActiveLayer(canvas, i, c.y[i], fades[i]!);
+      if (c.bakeEnabled && steady) {
+        // 稳态分支只贴静态行：激活外观在此统一叠回。
+        for (final i in visible) {
+          _drawActiveLayer(
+            canvas,
+            i,
+            c.y[i],
+            fades[i]!,
+            edge: _edgeAlphaAt(c.y[i]),
+          );
+        }
       }
+      c.lastFrameBaked = baked;
     } else {
+      c.lastFrameBaked = false;
       for (final i in visible) {
         _drawLine(canvas, i, c.y[i], fades[i]!);
       }
@@ -68,12 +163,35 @@ class _Painter extends CustomPainter {
     c.fragCache.pruneTo(keepFrag);
     c.transFragCache.pruneTo(keepFrag);
     c.romaFragCache.pruneTo(keepFrag);
+    c.bake.pruneTo(visible);
+  }
+
+  /// 整层档稳态判定：全部满足才允许使用/重建烘焙图——
+  /// 1. 无动画（弹簧/过渡/浏览由状态层的 `moving` 汇总）；
+  /// 2. 整层失焦强度已到目标（悬停/切档渐变结束）；
+  /// 3. 激活行外观完整（fade == 1），其余可见行 fade == 0；
+  /// 4. 缩放已落到终值（激活 1.0 / 非激活 0.97）。
+  ///
+  /// blur[]（逐行半径）只影响逐行档，不参与整层稳态判定。
+  bool _panelSteady(Set<int> visible, Map<int, double> fades) {
+    if (!c.staticIdle || !c.blurStrengthSettled) return false;
+    if (c.active >= c.groups.length) return false;
+    if (c.active >= 0 && (fades[c.active] ?? 0) < 0.995) return false;
+    final scaleTarget = c.enableScale ? 0.97 : 1.0;
+    for (final i in visible) {
+      if (i == c.active) continue;
+      if ((fades[i] ?? 0) > 0.005) return false;
+      if ((c.scale[i] - scaleTarget).abs() > 1e-4) return false;
+    }
+    return true;
   }
 
   /// 间奏三点（对齐 AMLL interlude-dots：依次点亮 + 呼吸缩放 + 两段式退场）。
   void _drawInterludeDots(Canvas canvas, double viewH) {
     final st = c.dots;
     if (!st.visible || st.opacity <= 0.001) return;
+    final edge = _edgeAlphaAt(c.dotsNaturalY);
+    if (edge <= 0.002) return;
     final fs = c.fontSize;
     final size = fs * 0.3;
     final gap = fs * 0.18;
@@ -93,7 +211,7 @@ class _Painter extends CustomPainter {
     canvas.translate(left, cy);
     canvas.scale(st.scale);
     for (var i = 0; i < 3 && i < st.dots.length; i++) {
-      final a = (st.dots[i] * st.opacity).clamp(0.0, 1.0);
+      final a = (st.dots[i] * st.opacity * edge).clamp(0.0, 1.0);
       if (a <= 0.002) continue;
       canvas.drawCircle(
         Offset(size / 2 + i * (size + gap), 0),
@@ -119,59 +237,29 @@ class _Painter extends CustomPainter {
 
   /// 当前行失焦等级（px，= AMLL 的 `blur()` 参数 = 高斯 σ）。
   ///
-  /// 只有逐行档才逐行取值；整层档由 [_panelFilter] 统一处理，关闭/降级档恒为 0。
+  /// 只有逐行档才逐行取值；整层档稳态由烘焙图承载失焦、过渡帧统一取
+  /// `kPanelBlurSigma × 强度`（见 [_drawLine] 的 `sigmaOverride`），
+  /// 关闭/降级档恒为 0。
   double _blurFor(int i) {
     if (c.blurMode != LyricsBlurMode.perLine) return 0;
     if (i >= c.blur.length) return 0;
     return c.blur[i];
   }
 
-  /// 整层档的失焦滤镜：在 1/[kPanelBlurDownsample] 尺寸上做等效高斯再放大回原尺寸。
-  ///
-  /// 用图像滤镜图（compose + matrix）实现，**不产生任何纹理缓存/显存占用**；
-  /// 非激活行本来就是模糊的，重采样肉眼不可辨（见 docs/player-render-optimization.md）。
-  /// [amount] 为 0~1 的强度（悬停/关闭时平滑归零），固定倍率下只与 σ 有关，做了 memo。
-  ui.ImageFilter _panelFilter(double amount) {
-    final sigma = kPanelBlurSigma * amount.clamp(0.0, 1.0);
-    if (_panelFilterCacheSigma == sigma) return _panelFilterCache!;
-    final filter = _buildPanelFilter(sigma);
-    _panelFilterCacheSigma = sigma;
-    _panelFilterCache = filter;
-    return filter;
-  }
-
-  static double? _panelFilterCacheSigma;
-  static ui.ImageFilter? _panelFilterCache;
-
-  static Float64List _scaleMatrix(double s) => Float64List.fromList(<double>[
-        s, 0, 0, 0, //
-        0, s, 0, 0, //
-        0, 0, 1, 0, //
-        0, 0, 0, 1, //
-      ]);
-
-  static ui.ImageFilter _buildPanelFilter(double sigma) {
-    final k = kPanelBlurDownsample;
-    if (k <= 0 || k >= 1) {
-      return ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
-    }
-    return ui.ImageFilter.compose(
-      outer: ui.ImageFilter.matrix(
-        _scaleMatrix(1 / k),
-        filterQuality: ui.FilterQuality.low,
-      ),
-      inner: ui.ImageFilter.compose(
-        outer: ui.ImageFilter.blur(sigmaX: sigma * k, sigmaY: sigma * k),
-        inner: ui.ImageFilter.matrix(
-          _scaleMatrix(k),
-          filterQuality: ui.FilterQuality.low,
-        ),
-      ),
-    );
-  }
-
   /// 当前缩放（激活 1.0，非激活 0.97）。
   double _scaleFor(int i) => i < c.scale.length ? c.scale[i] : 1.0;
+
+  /// 行中心处的上下渐隐保留量（[AmllPhysicsWall.edgeFade] 关闭时恒为 1）。
+  ///
+  /// 逐行模式把外层 `ShaderMask` 的面积级离屏层换成「绘制时乘 alpha」：
+  /// 零离屏层、零额外纹理，代价是阶梯式淡出（行中心取样）。与
+  /// [lyricsEdgeFadeAt] 同一曲线，保证两种实现的观感可比。
+  double _edgeAlphaAt(double cy) {
+    if (!c.edgeFade) return 1.0;
+    final viewH = c.h > 0 ? c.h : 0.0;
+    if (viewH <= 0) return 1.0;
+    return lyricsEdgeFadeAt(cy / viewH);
+  }
 
   /// 离屏层范围：主行以 [cy] 为中心，翻译小字挂在主行下方，因此有翻译时
   /// 需要向下扩一整个行高的余量（否则翻译底部会被裁掉）。
@@ -187,8 +275,17 @@ class _Painter extends CustomPainter {
   }
 
   /// 逐行档：一行一个离屏高斯（最贴 AMLL 的半径梯度，层数 ≈ 可见行数）。
-  void _drawLine(Canvas canvas, int index, double cy, double fade) {
-    final blur = _blurFor(index);
+  ///
+  /// [sigmaOverride] 非空时覆盖该行的失焦半径（整层档过渡帧用：全部非激活行
+  /// 统一取整层目标 σ，与稳态烘焙观感一致；激活行传 0 保持清晰）。
+  void _drawLine(
+    Canvas canvas,
+    int index,
+    double cy,
+    double fade, {
+    double? sigmaOverride,
+  }) {
+    final blur = sigmaOverride ?? _blurFor(index);
     final blurLayer = blur > 0.05;
     if (blurLayer) {
       // 失焦用离屏高斯：Flutter 无法给 drawParagraph 直接加 ImageFilter，
@@ -198,8 +295,8 @@ class _Painter extends CustomPainter {
         Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
       );
     }
-    _drawBase(canvas, index, cy, fade);
-    _drawActiveLayer(canvas, index, cy, fade);
+    _drawBase(canvas, index, cy, fade, edge: _edgeAlphaAt(cy));
+    _drawActiveLayer(canvas, index, cy, fade, edge: _edgeAlphaAt(cy));
     if (blurLayer) canvas.restore();
   }
 
@@ -207,13 +304,25 @@ class _Painter extends CustomPainter {
   ///
   /// `fade` 在 (0,1) 之间时给基础层乘 `(1-fade)`，与激活层的 `fade` 加权形成
   /// 真正的交叉淡化（否则两层叠加会在过渡中段整体偏亮）。
-  void _drawBase(Canvas canvas, int index, double cy, double fade) {
+  ///
+  /// [alphaOverride] / [scaleOverride] 供烘焙使用：把透明度归一为 1、缩放固定
+  /// 为稳态值后栅格一次，绘制时再乘实际 alpha（高斯对 alpha 线性，等价）。
+  void _drawBase(
+    Canvas canvas,
+    int index,
+    double cy,
+    double fade, {
+    double? alphaOverride,
+    double? scaleOverride,
+    double edge = 1.0,
+  }) {
     if (fade >= 0.995) return;
     final g = c.groups[index];
     final fs = g.isBG ? c.fontSize * kBgFontScale : c.fontSize;
     final maxWidth = math.max(40.0, c.w - _widthPad);
-    final alpha = _alphaFor(index);
-    final scale = _scaleFor(index);
+    final alpha = (alphaOverride ?? _alphaFor(index)) * edge;
+    if (alpha <= 0.002) return;
+    final scale = scaleOverride ?? _scaleFor(index);
     final base = _solidParagraph(
       index,
       g,
@@ -266,14 +375,32 @@ class _Painter extends CustomPainter {
   }
 
   /// 激活外观层：整层按 `fade` 调节透明度，实现「点亮/熄灭」交叉淡化。
-  void _drawActiveLayer(Canvas canvas, int index, double cy, double fade) {
-    if (fade <= 0.005) return;
+  ///
+  /// [edge] 为上下渐隐保留量（逐行渐隐模式），直接折进本层透明度。
+  void _drawActiveLayer(
+    Canvas canvas,
+    int index,
+    double cy,
+    double fade, {
+    double edge = 1.0,
+  }) {
+    final a = (fade * edge).clamp(0.0, 1.0);
+    if (a <= 0.005) return;
     final g = c.groups[index];
     final fs = g.isBG ? c.fontSize * kBgFontScale : c.fontSize;
     final maxWidth = math.max(40.0, c.w - _widthPad);
+    if (a >= 0.995) {
+      // 外观完整时 alpha=1 的 saveLayer 是纯开销：裁剪语义用 clipRect 保留
+      // （边界与原离屏层一致），内容直接绘制。
+      canvas.save();
+      canvas.clipRect(_lineBounds(index, cy));
+      _drawActive(canvas, index, g, cy, _scaleFor(index), fs, maxWidth);
+      canvas.restore();
+      return;
+    }
     canvas.saveLayer(
       _lineBounds(index, cy),
-      Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: fade),
+      Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: a),
     );
     _drawActive(canvas, index, g, cy, _scaleFor(index), fs, maxWidth);
     canvas.restore();
@@ -372,7 +499,17 @@ class _Painter extends CustomPainter {
         canvas.drawParagraph(fr.dim[k], Offset(box.left, box.top));
       } else {
         canvas.drawParagraph(fr.dim[k], Offset(box.left, box.top));
-        _drawSweepLit(canvas, fr, k, box, t / dur, fs, maxWidth, anim, lineHeightEm);
+        _drawSweepLit(
+          canvas,
+          fr,
+          k,
+          box,
+          t / dur,
+          fs,
+          maxWidth,
+          anim,
+          lineHeightEm,
+        );
       }
       canvas.restore();
     }
@@ -502,11 +639,12 @@ class _Painter extends CustomPainter {
   /// 整行段落（未激活 = 未唱色 × alpha × w400；激活 = 已唱色 × w600）。
   ui.Paragraph _solidParagraph(
     int index,
-    LyricGroup g,
-    {required bool active,
+    LyricGroup g, {
+    required bool active,
     required double alpha,
     required double fs,
-    required double maxWidth}) {
+    required double maxWidth,
+  }) {
     final weight = active ? c.fontWeight : FontWeight.w400;
     final color = active
         ? c.played.withValues(alpha: alpha)
@@ -540,11 +678,12 @@ class _Painter extends CustomPainter {
     Canvas canvas,
     int index,
     LyricGroup g,
-    double mainBottom,
-    {required bool active,
+    double mainBottom, {
+    required bool active,
     required double alpha,
     required double fs,
-    required double maxWidth}) {
+    required double maxWidth,
+  }) {
     final gap = fs * kLyricTranslationGapEm;
     var below = mainBottom;
     final subFs = lyricTranslationFontSize(fs);
@@ -568,7 +707,14 @@ class _Painter extends CustomPainter {
         canvas.restore();
         below += fr.height;
       } else {
-        final sub = _translationParagraph(index, tr, active, alpha, fs, maxWidth);
+        final sub = _translationParagraph(
+          index,
+          tr,
+          active,
+          alpha,
+          fs,
+          maxWidth,
+        );
         canvas.drawParagraph(sub, Offset(c.w / 2 - sub.width / 2, below));
         below += sub.height;
       }

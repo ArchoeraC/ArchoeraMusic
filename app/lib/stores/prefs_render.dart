@@ -11,6 +11,7 @@ import 'app_prefs.dart';
 const rippleShaderKey = 'render.rippleShader';
 const rippleLowResKey = 'render.rippleLowRes';
 const rippleDamageClipKey = 'render.rippleDamageClip';
+const lyricsEdgeFadeKey = 'render.lyricsEdgeFade';
 
 /// 水纹 GPU 着色器（默认开）。关闭则走 CPU 网格回退路径。
 ///
@@ -32,6 +33,16 @@ const double rippleLowResScale = 0.5;
 /// 开启后只重绘活动涟漪波带（`RippleBackground.damageClippedDynamic`）。
 const bool defaultRippleDamageClip = false;
 
+/// 歌词区上下渐隐的实现（默认 `wall`；见 `docs/player-render-optimization.md`
+/// §4.2d）。
+///
+/// - `wall`：逐行 alpha，零离屏层（最省 GPU；仅 amll 物理墙支持，simple 引擎
+///   自动回退 `shader`）；
+/// - `shader`：外层 `ShaderMask`，每帧一次歌词列面积的离屏层（最平滑）；
+/// - `off`：不做渐隐。
+const String defaultLyricsEdgeFade = 'wall';
+const Set<String> lyricsEdgeFadeValues = {'wall', 'shader', 'off'};
+
 /// 渲染 / 显卡加速域偏好。
 extension RenderPrefs on AppPrefs {
   /// 水纹 GPU 着色器（默认开）。
@@ -45,6 +56,23 @@ extension RenderPrefs on AppPrefs {
   /// 损伤区裁剪（默认关；仅 CPU 回退生效）。
   bool get rippleDamageClip =>
       data[rippleDamageClipKey] as bool? ?? defaultRippleDamageClip;
+
+  /// 歌词区上下渐隐实现（`wall` / `shader` / `off`；默认 `wall`）。
+  String get lyricsEdgeFade {
+    final v = data[lyricsEdgeFadeKey];
+    if (v is String && lyricsEdgeFadeValues.contains(v)) return v;
+    return defaultLyricsEdgeFade;
+  }
+
+  /// 设置歌词区上下渐隐实现（非法值回退默认）。
+  AppPrefs copyWithLyricsEdgeFade(String value) => AppPrefs(
+    initialData: {
+      ...data,
+      lyricsEdgeFadeKey: lyricsEdgeFadeValues.contains(value)
+          ? value
+          : defaultLyricsEdgeFade,
+    },
+  );
 
   /// 设置水纹渲染器 / 动态层降分辨率 / 损伤区裁剪开关。
   AppPrefs copyWithRippleRender({

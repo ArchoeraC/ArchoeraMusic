@@ -45,6 +45,18 @@ FftFrame _frame() {
   return FftFrame(ldata: l, rdata: l);
 }
 
+FftFrame _frameWithPeak() {
+  final l = List<double>.generate(128, (i) => (i % 16) / 16);
+  final p = List<double>.generate(128, (i) => ((i % 16) + 1) / 17);
+  return FftFrame(ldata: l, rdata: l, lpeak: p, rpeak: p);
+}
+
+/// 峰值保持线偏好打开（验证描线路径不抛异常）。
+class _PeakHoldPrefsNotifier extends AppPrefsNotifier {
+  @override
+  AppPrefs build() => AppPrefs().copyWithSpectrumPeakHold(true);
+}
+
 Widget _wrap(SpectrumStyle style) => ProviderScope(
   overrides: [
     appPrefsProvider.overrideWith(_NoSideEffectsPrefsNotifier.new),
@@ -78,6 +90,41 @@ void main() {
       expect(find.byType(ShaderMask), findsNothing);
     });
   }
+
+  testWidgets('峰值保持线：默认关不描线，开启后描线均无异常', (tester) async {
+    for (final prefs in <AppPrefsNotifier Function()>[
+      _NoSideEffectsPrefsNotifier.new,
+      _PeakHoldPrefsNotifier.new,
+    ]) {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appPrefsProvider.overrideWith(prefs),
+            playbackProvider.overrideWith(
+              () => _FakePlayback(
+                PlaybackState(playing: true, fft: _frameWithPeak()),
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 600,
+                  height: 90,
+                  child: SpectrumView(height: 80, enabled: true),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(tester.takeException(), isNull);
+    }
+  });
 
   testWidgets('暂停时频谱停表（不再持续出帧）', (tester) async {
     final fake = _MutablePlayback(

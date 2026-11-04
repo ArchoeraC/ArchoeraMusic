@@ -34,6 +34,27 @@ void main() {
     });
   });
 
+  group('spectrumFrameStrideForTier（纯映射）', () {
+    test('full → 每帧 / balanced → 30fps / performance → 20fps', () {
+      expect(spectrumFrameStrideForTier(RenderQualityTier.full), 1);
+      expect(spectrumFrameStrideForTier(RenderQualityTier.balanced), 2);
+      expect(spectrumFrameStrideForTier(RenderQualityTier.performance), 3);
+    });
+
+    test('shouldRepaintOnFrame：步长 1 每帧，步长 2/3 按余数', () {
+      expect(shouldRepaintOnFrame(1, 1), isTrue);
+      expect(shouldRepaintOnFrame(7, 1), isTrue);
+      // 步长 2：偶数帧重绘。
+      expect(shouldRepaintOnFrame(1, 2), isFalse);
+      expect(shouldRepaintOnFrame(2, 2), isTrue);
+      expect(shouldRepaintOnFrame(4, 2), isTrue);
+      // 步长 3：每 3 帧一次。
+      expect(shouldRepaintOnFrame(1, 3), isFalse);
+      expect(shouldRepaintOnFrame(2, 3), isFalse);
+      expect(shouldRepaintOnFrame(3, 3), isTrue);
+    });
+  });
+
   group('RenderQualityService', () {
     test('默认停用且档位为 full（不注册任何回调）', () {
       final service = RenderQualityService();
@@ -70,24 +91,24 @@ void main() {
       return c;
     }
 
-    test('默认关闭：服务停用且档位 full', () {
+    test('默认开启：服务启用且档位 full', () {
       final c = container();
       expect(c.read(renderQualityProvider), RenderQualityTier.full);
-      expect(c.read(renderQualityProvider.notifier).service.enabled, isFalse);
+      expect(c.read(renderQualityProvider.notifier).service.enabled, isTrue);
     });
 
     test('偏好切换即时启用 / 停用服务', () {
       final c = container();
       final controller = c.read(renderQualityProvider.notifier);
       final prefs = c.read(appPrefsProvider.notifier);
-      expect(controller.service.enabled, isFalse);
-
-      prefs.setAdaptiveRenderQuality(true);
       expect(controller.service.enabled, isTrue);
 
       prefs.setAdaptiveRenderQuality(false);
       expect(controller.service.enabled, isFalse);
       expect(c.read(renderQualityProvider), RenderQualityTier.full);
+
+      prefs.setAdaptiveRenderQuality(true);
+      expect(controller.service.enabled, isTrue);
     });
   });
 }

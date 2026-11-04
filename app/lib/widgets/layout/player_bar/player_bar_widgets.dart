@@ -109,12 +109,24 @@ class _BarLikeButtonState extends ConsumerState<_BarLikeButton> {
   }
 }
 
-Widget _glass(bool imageMode, {required Widget child}) {
+Widget _glass(
+  bool imageMode, {
+  required Widget child,
+  bool backdropIsBakedBlur = false,
+}) {
   if (!imageMode) return child;
   // ClipRect 把毛玻璃的模糊限制在本控件范围内——否则模糊会作用到
   // 整个 backdrop 层（图片背景模式下会糊住上方全部主界面）。
   // 性能模式下 GlassBlur 走无模糊降级（child 的 Material 底色即填充）。
-  return ClipRect(child: GlassBlur(sigma: 16, child: child));
+  // 停靠模式传 backdropIsBakedBlur：内容层已让位，条背后只有预烘焙的
+  // 模糊壁纸——复用背景那次模糊（共享模糊输入），免每帧整条离屏 pass。
+  return ClipRect(
+    child: GlassBlur(
+      sigma: 16,
+      backdropIsBakedBlur: backdropIsBakedBlur,
+      child: child,
+    ),
+  );
 }
 
 Rect? _anchorOf(BuildContext context) {

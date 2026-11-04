@@ -583,6 +583,26 @@
 | 图片按显示尺寸解码 + 解码缓存上限 | `cc` `image_decode_cache_utils.cc:20-38`；Skia `SkResourceCache.cpp:50-51` | 沿用 `CoverImage` `cacheWidth/Height` + `ImageCache` 上限 |
 | 生命周期 / Loader | Qt `Loader`+`destroy()`；WR `picture_textures.rs:254-274` | 页面分支卸载、模块注册表、图片缓存上限 |
 | 后台节流（连 ticker 一起停） | `cc` `scheduler_state_machine.cc:1481-1503`；Qt `qsgthreadedrenderloop.cpp:993-998` | `power_saver.dart` + `FrameGovernor` |
+| Impeller GLES 下 raster cache 关闭 → 缓存必须显式栅格化 | 参考合成器项目 `docs/MOBILE_RENDERING_OPTIMIZATION.md` §Shared SVG app icons（`EnableRasterCache` 返回 false，矢量层每帧重放） | 封面/背景已走预烘焙（对齐）；排查其它「包 `RepaintBoundary` 当缓存」的假设 |
+| 动画收敛到 render object（连续运动与结构状态分离） | 参考合成器项目 SDK 包 retained 三件套（ValueListenable→RenderTransform，每帧 0 build/0 layout，物理像素 snap） | 歌词墙滚动、封面切换、页面转场（见 `rendering-reference-research.md` D2） |
+| 多玻璃面共享一次模糊输入 | 参考合成器项目 `docs/research/MOBILE_GLASS_OPTIMIZATION_PROPOSAL.md` 方案 1/2（共享 frost 输入 + 收紧 demanded filter region） | `glass_blur.dart` 多调用点共享「下层合成+高斯」（见 `rendering-reference-research.md` D3） |
+| 冷路径解码并发限流 | 参考合成器项目图标组件的加载调度器（并发上限 2，队列排空） | 列表封面滚动冷启动尖峰（见 `rendering-reference-research.md` D5） |
+
+### 3.12 外部合成器参考（Flutter 原生 Wayland 合成器，2026-11-03 补录）
+
+某 Flutter 原生 Wayland 合成器项目（Rust + Smithay 内嵌 Flutter Engine：Embedder
+API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
+[acknowledgements.md](acknowledgements.md) 特别鸣谢）。以「低且稳定的帧时间」为
+一等工程目标。本仓已作专项调研：**详见
+[rendering-reference-research.md](rendering-reference-research.md)**（含互证结论与
+可迁移项 D1–D7）。要点：① Impeller GLES 的 raster cache 关闭，缓存必须显式栅格化；
+② 动画收敛到 render object；③ 模糊成本 = 离屏层数 × 像素量、σ 几乎无关
+（与本仓 §4.2.1 基准互证）；④ 渲染审计 + 「N 帧 0 构建」headless 回归方法论。
+
+> ⚠ **许可证红线**：参考项目为 GPL-3.0-or-later，本项目为 AGPL-3.0-or-later。
+> 只借鉴思想/方法/实测结论，**禁止移植/抄写其代码，禁止照搬其标识符命名**；
+> 本仓文档/模块不以参考项目命名，名称仅登记于 `acknowledgements.md`
+> （用户要求，2026-11-03）。
 
 ---
 
@@ -715,6 +735,9 @@
 - **歌词**：延续 P1（Paragraph 缓存 + 去 `saveLayer`）；P4（逐字符图集）对照 Qt 的
   distance-field 字形缓存评估，仅在实测仍为瓶颈时做。
 - **频谱**：已在 P3 合为单 `Path`；`drawAtlas` 作为进一步手段（大量同形精灵时最优）。
+  **v2（2026-11-04 设计）**：FFT/取窗整体下沉引擎独立频谱线程
+  （[`spectrum-analyzer.md`](spectrum-analyzer.md)），UI 只做事件接收 + 插值/绘制；
+  频谱线程不占解码 worker 池、不在音频回调做 FFT、零每帧分配，频谱关闭时零开销。
 
 ### 4.4 运行时生命周期 — 页面 / 模块
 
@@ -775,7 +798,11 @@
 
 ### 4.5 自适应画质
 
-- 帧时间滑动窗口 → 档位：着色器开/关、动态层降采样倍率、涟漪上限、频谱开关。
+- 帧时间滑动窗口 → 档位：动态层降采样倍率、频谱重绘频率（**已接线 2026-11-03**：
+  `QualityGovernor`（p90 总帧时间 > 20ms 降档、< 12ms 回升，滞回带）→
+  `renderQualityProvider` → 涟漪/流体 `renderScale`（1.0/0.85/0.7）与频谱重绘
+  步长（每帧/30fps/20fps，**不关闭**以免改变布局观感）；默认开启，内部偏好
+  `adaptiveRenderQuality` 可关。歌词失焦另有独立的 `LyricsBlurBudget` 守卫）。
 - 复用 `FrameGovernor`/`performanceMode`；不要新增互相冲突的开关（见 §8）。
 
 ### 4.6 全应用 UI 纪律（列表 / 图片 / 毛玻璃 / 转场）

@@ -18,8 +18,9 @@
  *     即睡眠，零轮询开销），`poll_event` 保留作轮询回退调试；
  *   - 控制命令（play/pause/seek/set_volume/get_status/stop 等）入命令 FIFO，
  *     引擎线程消费；
- *   - PCM 由引擎直写会话目录 stream.pcm（块格式，同 pcm_uds），Dart 按需
- *     读文件做 FFT；播放模式另落盘 stream.wav 供 miniaudio 自播。
+ *   - PCM 由引擎直写会话目录 stream.pcm（块格式，同 pcm_uds）；播放模式
+ *     另落盘 stream.wav 供 miniaudio 自播。频谱 v2 由引擎独立频谱线程按
+ *     播放位置取窗并 50ms 推送 `fft` 事件（App 不再读 PCM 做 FFT）。
  *
  * Web/CLI 路径（main.c + UDS/stdout）保持不变，仅桌面 FFI 客户端使用本库。
  */
@@ -144,6 +145,10 @@ ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_command(
 
 /**
  * 取一条事件（FIFO）。
+ *
+ * 优先交付常规事件（行上限 511B），无常规事件时交付最新一帧频谱事件
+ * （`{"type":"fft",...}`，8-bit 量化 128×2 + 元数据 < 2KB）。调用方缓冲
+ * 建议 ≥ 2048B；频谱事件只保留最新，读走即清。
  * @return 1 有事件（写入 buf，'\0' 结尾）；0 队列空。
  */
 ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_poll_event(

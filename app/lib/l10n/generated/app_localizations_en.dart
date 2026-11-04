@@ -38,6 +38,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Redraw only active ripple bands; CPU fallback path only';
 
   @override
+  String get settingsLyricsEdgeFade => 'Lyrics edge fade';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      'How the top/bottom edges fade out: per-line alpha is cheapest, mask is smoothest, off disables the fade';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => 'Per-line';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'Mask';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'Off';
+
+  @override
   String get menuTrackDetail => 'Media details';
 
   @override
@@ -5288,6 +5304,60 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
+
+  @override
+  String get settingsSpectrumPeakHold => 'Peak hold line';
+
+  @override
+  String get settingsSpectrumPeakHoldOn =>
+      'Show the engine-computed peak line above the spectrum';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'Peak line hidden';
+
+  @override
+  String get settingsSpectrumAgc => 'Automatic gain (AGC)';
+
+  @override
+  String get settingsSpectrumAgcOn =>
+      'Boosts quiet passages; may approach full scale more often';
+
+  @override
+  String get settingsSpectrumAgcOff => 'Keep the original level dynamics';
+
+  @override
+  String get settingsSpectrumGamma => 'Small-signal lift (γ)';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9, weak bands become more visible';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0, linear display';
+
+  @override
+  String get settingsSpectrumTilt => 'High-frequency tilt';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5 dB/oct, brighter highs';
+
+  @override
+  String get settingsSpectrumTiltOff => 'Flat frequency response';
+
+  @override
+  String get settingsSpectrumGammaValue => 'Lift amount (γ)';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return 'Current γ=$value; <1 lifts small signals, >1 darkens';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => 'Tilt amount';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return 'Current $value dB/oct (relative to 1 kHz)';
+  }
 
   @override
   String get settingsAutoImmersive => 'Auto immersive';
