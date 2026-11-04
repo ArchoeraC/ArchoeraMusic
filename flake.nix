@@ -118,6 +118,22 @@ NUGETCFG
         };
       });
 
+      # 预取源码：Nix 沙箱内直接 curl ffmpeg.org 在 CI 上会超时；固定输出
+      # derivation 会优先命中 cache.nixos.org，失败时再按 urls 顺序回退镜像。
+      ffmpegSrc = pkgs.fetchurl {
+        name = "ffmpeg-9.0.1.tar.xz";
+        urls = [
+          "https://mirrors.omnios.org/ffmpeg/ffmpeg-9.0.1.tar.xz"
+          "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz"
+        ];
+        hash = "sha256-zzjg4ox+VgWULEp3dVNJsBRYBKOXrzfrH7THfLI39jU=";
+      };
+      mbedtlsSrc = pkgs.fetchurl {
+        name = "mbedtls-3.6.2.tar.bz2";
+        url = "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.2/mbedtls-3.6.2.tar.bz2";
+        hash = "sha256-i1T7m89NWnB4Ao4FIKzd77eQCz5m/sf3F1u1t9hczco=";
+      };
+
       # ── 1. 最小纯 LGPL·仅音频 FFmpeg ─────────────────────────────────────
       ffmpegMinimal = pkgs.stdenv.mkDerivation {
         pname = "archoera-ffmpeg-minimal";
@@ -147,6 +163,8 @@ NUGETCFG
           export HOME="$TMPDIR/home"
           mkdir -p "$HOME"
           export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+          export FFMPEG_SRC_ARCHIVE="${ffmpegSrc}"
+          export MBEDTLS_SRC_ARCHIVE="${mbedtlsSrc}"
           bash build-ffmpeg-minimal.sh
           runHook postBuild
         '';

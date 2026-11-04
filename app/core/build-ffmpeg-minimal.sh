@@ -52,9 +52,14 @@ fi
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-echo "[build-ffmpeg-minimal] 下载 FFmpeg $VER 源码…"
-curl -fsSL --retry 6 --retry-delay 3 --retry-all-errors \
-  "https://ffmpeg.org/releases/ffmpeg-$VER.tar.xz" -o "$work/ffmpeg.tar.xz"
+echo "[build-ffmpeg-minimal] 准备 FFmpeg $VER 源码…"
+if [[ -n "${FFMPEG_SRC_ARCHIVE:-}" ]]; then
+  echo "[build-ffmpeg-minimal] 使用预取归档：$FFMPEG_SRC_ARCHIVE"
+  cp "$FFMPEG_SRC_ARCHIVE" "$work/ffmpeg.tar.xz"
+else
+  curl -fsSL --retry 6 --retry-delay 3 --retry-all-errors \
+    "https://ffmpeg.org/releases/ffmpeg-$VER.tar.xz" -o "$work/ffmpeg.tar.xz"
+fi
 tar -C "$work" -xf "$work/ffmpeg.tar.xz"
 cd "$work/ffmpeg-$VER"
 
@@ -107,9 +112,14 @@ PROTOCOLS="file,pipe,http,https,tls,httpproxy,tcp,udp,rtp,srtp,crypto,data,cache
 if [[ ! -f "$MBEDTLS_PREFIX/lib/libmbedtls.a" || ! -f "$MBEDTLS_PREFIX/.pic" ]]; then
   echo "[build-ffmpeg-minimal] 构建自包含 mbedTLS ${MBEDTLS_VER}（PIC 静态库）→ $MBEDTLS_PREFIX"
   # 注意：Mbed TLS 的 release tag 形如 `mbedtls-3.6.2`（无 `v` 前缀），资产名同。
-  curl -fsSL --retry 6 --retry-delay 3 --retry-all-errors \
-    "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-$MBEDTLS_VER/mbedtls-$MBEDTLS_VER.tar.bz2" \
-    -o "$work/mbedtls.tar.bz2"
+  if [[ -n "${MBEDTLS_SRC_ARCHIVE:-}" ]]; then
+    echo "[build-ffmpeg-minimal] 使用预取 mbedTLS 归档：$MBEDTLS_SRC_ARCHIVE"
+    cp "$MBEDTLS_SRC_ARCHIVE" "$work/mbedtls.tar.bz2"
+  else
+    curl -fsSL --retry 6 --retry-delay 3 --retry-all-errors \
+      "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-$MBEDTLS_VER/mbedtls-$MBEDTLS_VER.tar.bz2" \
+      -o "$work/mbedtls.tar.bz2"
+  fi
   tar -C "$work" -xf "$work/mbedtls.tar.bz2"
   cmake -S "$work/mbedtls-$MBEDTLS_VER" -B "$work/mbedtls-build" \
     -DCMAKE_BUILD_TYPE=Release \
