@@ -6,6 +6,7 @@
 
 ## [1.0.5+0] - 2026-11-04
 
+> [!NOTE]
 > 本版本已合入 main 的内容（渲染专项，见
 > `docs/player-render-optimization.md`）。
 >
