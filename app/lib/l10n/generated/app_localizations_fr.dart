@@ -5408,6 +5408,34 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSpectrumPeakHoldOff => 'Ligne de crête masquée';
 
   @override
+  String get settingsSpectrumAgc => 'Gain automatique (AGC)';
+
+  @override
+  String get settingsSpectrumAgcOn =>
+      'Renforce les passages faibles ; peut plus facilement saturer l’échelle';
+
+  @override
+  String get settingsSpectrumAgcOff => 'Conserver la dynamique d’origine';
+
+  @override
+  String get settingsSpectrumGamma => 'Mise en avant des petits signaux (γ)';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0,9, bandes faibles plus visibles';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1,0, affichage linéaire';
+
+  @override
+  String get settingsSpectrumTilt => 'Inclinaison des aigus';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0,5 dB/oct, aigus plus brillants';
+
+  @override
+  String get settingsSpectrumTiltOff => 'Réponse plate';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

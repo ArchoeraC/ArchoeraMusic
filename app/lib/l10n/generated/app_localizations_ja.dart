@@ -5147,6 +5147,33 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsSpectrumPeakHoldOff => 'ピーク線は非表示';
 
   @override
+  String get settingsSpectrumAgc => '自動ゲイン（AGC）';
+
+  @override
+  String get settingsSpectrumAgcOn => '小さい音を持ち上げるため、満量程に近づきやすくなります';
+
+  @override
+  String get settingsSpectrumAgcOff => '元のダイナミクスを維持';
+
+  @override
+  String get settingsSpectrumGamma => '小信号の持ち上げ（γ）';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9、弱い帯域が見やすくなります';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0、リニア表示';
+
+  @override
+  String get settingsSpectrumTilt => '高域チルト';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct、高域が明るくなります';
+
+  @override
+  String get settingsSpectrumTiltOff => 'フラットな周波数特性';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

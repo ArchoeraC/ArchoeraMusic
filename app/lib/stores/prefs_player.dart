@@ -18,6 +18,9 @@ const sleepTimerPresetsKey = 'player.sleepTimerPresets';
 const sleepTimerCustomMinutesKey = 'player.sleepTimerCustomMinutes';
 const enableSpectrumKey = 'player.enableSpectrum';
 const spectrumPeakHoldKey = 'player.spectrumPeakHold';
+const spectrumAgcKey = 'player.spectrumAgc';
+const spectrumGammaKey = 'player.spectrumGamma';
+const spectrumTiltKey = 'player.spectrumTilt';
 const coverBeatScaleKey = 'player.coverBeatScale';
 const spectrumBarWidthKey = 'player.spectrumBarWidth';
 const spectrumStyleKey = 'player.spectrumStyle';
@@ -120,6 +123,15 @@ const bool defaultEnableSpectrum = true;
 
 /// 频谱峰值保持线（引擎计算，UI 只绘制；默认关，避免默认画面过满）。
 const bool defaultSpectrumPeakHold = false;
+
+/// 频谱自动增益（AGC）：默认关，避免弱音被抬高后顶满。
+const bool defaultSpectrumAgc = false;
+
+/// 频谱小信号提亮（γ=0.9）：默认关，保持线性显示。
+const bool defaultSpectrumGamma = false;
+
+/// 频谱高频倾斜（+0.5dB/oct）：默认关，保持平直频响。
+const bool defaultSpectrumTilt = false;
 
 /// 封面跟随节拍缩放（对齐原版 PlayerCover 播放/暂停缩放之上叠加的
 /// 鼓点脉冲；依赖 FFT 频谱数据，性能模式下自动停用，默认关）。
@@ -307,6 +319,16 @@ extension PlayerPrefs on AppPrefs {
   /// 频谱峰值保持线（默认关）。
   bool get spectrumPeakHold =>
       data[spectrumPeakHoldKey] as bool? ?? defaultSpectrumPeakHold;
+
+  /// 频谱自动增益（AGC，默认关）。
+  bool get spectrumAgc => data[spectrumAgcKey] as bool? ?? defaultSpectrumAgc;
+
+  /// 频谱小信号提亮（γ=0.9，默认关）。
+  bool get spectrumGamma =>
+      data[spectrumGammaKey] as bool? ?? defaultSpectrumGamma;
+
+  /// 频谱高频倾斜（+0.5dB/oct，默认关）。
+  bool get spectrumTilt => data[spectrumTiltKey] as bool? ?? defaultSpectrumTilt;
 
   /// 封面跟随节拍缩放（鼓点脉冲；性能模式下视为关闭）。
   bool get coverBeatScale =>
@@ -539,6 +561,17 @@ extension PlayerPrefs on AppPrefs {
   /// 设置频谱峰值保持线开关。
   AppPrefs copyWithSpectrumPeakHold(bool value) =>
       AppPrefs(initialData: {...data, spectrumPeakHoldKey: value});
+
+  /// 设置频谱增强开关（AGC / γ / 高频倾斜）。
+  AppPrefs copyWithSpectrumEnhance({bool? agc, bool? gamma, bool? tilt}) =>
+      AppPrefs(
+        initialData: {
+          ...data,
+          spectrumAgcKey: ?agc,
+          spectrumGammaKey: ?gamma,
+          spectrumTiltKey: ?tilt,
+        },
+      );
 
   /// 设置频谱可视化样式（非法值不写入，getter 回退默认 bars）。
   AppPrefs copyWithSpectrumStyle(String value) => AppPrefs(

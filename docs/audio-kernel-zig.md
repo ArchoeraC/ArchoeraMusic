@@ -1836,7 +1836,8 @@ pub const Error = error{
   `equalizer.c/loudness.c/limiter.c` 在移植完成前保留为过渡实现（§4.1），
   移植完成后删除；`src/fft.c` 仅保留给未迁移的 CLI/测试，不属于 v2 契约；
 - `libfft.so` 的旧 `fft_*` ABI **不再属于 App 播放路径**：v2 的唯一计算入口是
-  `zk_dsp_spectrum_*`（40–16kHz、VQT、AGC/γ/倾斜/峰值、-72..0dB）。旧 `fft_*` 不承诺
+  `zk_dsp_spectrum_*`（40–16kHz、VQT、AGC/γ/倾斜/峰值、-60..0dB；含
+  `set_peak_hold/set_agc/set_gamma/set_tilt` 运行时开关）。旧 `fft_*` 不承诺
   兼容；需要 v2 的消费者直接链接内核。
 - **启动/线程约束**：频谱表在首次 `set_fft` 时懒建（当前每会话一次，<1ms），
   `reset` 只清状态；分析在独立频谱线程，不提交解码 worker 任务、不在音频回调

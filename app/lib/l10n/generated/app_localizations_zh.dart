@@ -5066,6 +5066,33 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSpectrumPeakHoldOff => '不显示峰值线';
 
   @override
+  String get settingsSpectrumAgc => '自动增益（AGC）';
+
+  @override
+  String get settingsSpectrumAgcOn => '弱音自动抬升，可能更容易接近满量程';
+
+  @override
+  String get settingsSpectrumAgcOff => '保持原始电平动态';
+
+  @override
+  String get settingsSpectrumGamma => '小信号提亮（γ）';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9，弱频段更明显';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0，线性显示';
+
+  @override
+  String get settingsSpectrumTilt => '高频倾斜';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct，高频更亮';
+
+  @override
+  String get settingsSpectrumTiltOff => '不平滑频响';
+
+  @override
   String get settingsAutoImmersive => '自动沉浸';
 
   @override
@@ -11063,6 +11090,33 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSpectrumPeakHoldOff => '不显示峰值线';
+
+  @override
+  String get settingsSpectrumAgc => '自动增益（AGC）';
+
+  @override
+  String get settingsSpectrumAgcOn => '弱音自动抬升，可能更容易接近满量程';
+
+  @override
+  String get settingsSpectrumAgcOff => '保持原始电平动态';
+
+  @override
+  String get settingsSpectrumGamma => '小信号提亮（γ）';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9，弱频段更明显';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0，线性显示';
+
+  @override
+  String get settingsSpectrumTilt => '高频倾斜';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct，高频更亮';
+
+  @override
+  String get settingsSpectrumTiltOff => '不平滑频响';
 
   @override
   String get settingsAutoImmersive => '自动沉浸';
@@ -17063,6 +17117,33 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSpectrumPeakHoldOff => '不顯示峰值線';
+
+  @override
+  String get settingsSpectrumAgc => '自動增益（AGC）';
+
+  @override
+  String get settingsSpectrumAgcOn => '弱音自動抬升，可能更容易接近滿量程';
+
+  @override
+  String get settingsSpectrumAgcOff => '保持原始電平動態';
+
+  @override
+  String get settingsSpectrumGamma => '小訊號提亮（γ）';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9，弱頻段更明顯';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0，線性顯示';
+
+  @override
+  String get settingsSpectrumTilt => '高頻傾斜';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct，高頻更亮';
+
+  @override
+  String get settingsSpectrumTiltOff => '不平滑頻響';
 
   @override
   String get settingsAutoImmersive => '自动沉浸';

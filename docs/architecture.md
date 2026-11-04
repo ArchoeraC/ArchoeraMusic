@@ -253,7 +253,7 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 | 音量 volume | — | `set_volume {gain}`（主音量在 miniaudio 侧，preamp 管余量） |
 | 响度归一化 | `--normalization` | `set_normalization {enabled}` |
 | 限幅器 | `--limiter-threshold`（默认启用） | `set_limiter {enabled}` |
-| 频谱显示 | `--fft` | `set_fft {enabled, peak_hold}` |
+| 频谱显示 | `--fft` | `set_fft {enabled, peak_hold, agc, gamma, tilt}` |
 | 变速/变调 | `--tempo --tempo-speed --tempo-pitch` | `set_tempo_speed` / `set_tempo_pitch` |
 | seek | `-o --offset`（CLI 启动偏移） | `seek {position_ms}`（进程内，Phase 3+；桌面端由 miniaudio 即时 seek，§5.3） |
 
@@ -409,14 +409,15 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - **冷/热启动与线程池**：懒初始化、表跨曲目复用、独立频谱线程、零每帧分配；
   频谱关闭时零额外工作。
 
-**v2 算法要点**
+**v2.1 算法要点**
 
 - 40Hz–16kHz、128 个对数带（约 14.5 band/oct）。
-- 低频 40–300Hz 用 8192 点 FFT（5.86Hz/bin @48k），高频 300–16kHz 用 2048 点；
-  交叉区 250–350Hz crossfade。
-- Blackman 周期窗 + 相干增益补偿；0dBFS 正弦 → 1.0。
-- 频带平均功率 → 开方；窄带用对数频率插值，避免低频块状。
-- -72..0dB + 底部软膝，去掉硬清零。
+- **VQT（可变 Q）**：每带独立复解调，低频长窗、高频短窗；最长窗 12288 样本，
+  Q 上限 20.9，不再需要两级 FFT 与交叉区。
+- Blackman 周期窗 + 窗和归一化；显示量程按 `|X|/N × 0.28` 口径，
+  0dBFS 正弦约 0.82，顶部留余量。
+- -60..0dB + 底部软膝，去掉硬清零。
+- AGC / `norm^γ` / 高频倾斜 / 峰值保持线均由内核计算，默认关闭，可在设置页开关。
 - 节拍用对数谱通量 + 自适应中位阈值 + 100ms 冷却。
 - 立体声独立；多声道下混沿用 ITU-R BS.775。
 

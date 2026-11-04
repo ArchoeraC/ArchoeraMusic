@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 频谱峰值保持线偏好：默认关、可开关、不污染其它频谱设置。
+/// 频谱增强偏好：峰值保持线、AGC、γ、高频倾斜的默认值与开关。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +31,41 @@ void main() {
 
     test('缺省键回落到默认关', () {
       expect(AppPrefs(initialData: const {}).spectrumPeakHold, isFalse);
+    });
+  });
+
+  group('spectrumAgc / spectrumGamma / spectrumTilt', () {
+    test('默认全部关闭', () {
+      final p = AppPrefs();
+      expect(p.spectrumAgc, isFalse);
+      expect(p.spectrumGamma, isFalse);
+      expect(p.spectrumTilt, isFalse);
+    });
+
+    test('可独立开关，且互不影响', () {
+      final agc = AppPrefs().copyWithSpectrumEnhance(agc: true);
+      expect(agc.spectrumAgc, isTrue);
+      expect(agc.spectrumGamma, isFalse);
+      expect(agc.spectrumTilt, isFalse);
+
+      final gamma = agc.copyWithSpectrumEnhance(gamma: true);
+      expect(gamma.spectrumAgc, isTrue);
+      expect(gamma.spectrumGamma, isTrue);
+      expect(gamma.spectrumTilt, isFalse);
+
+      final tilt = gamma.copyWithSpectrumEnhance(tilt: true);
+      expect(tilt.spectrumAgc, isTrue);
+      expect(tilt.spectrumGamma, isTrue);
+      expect(tilt.spectrumTilt, isTrue);
+
+      final off = tilt.copyWithSpectrumEnhance(
+        agc: false,
+        gamma: false,
+        tilt: false,
+      );
+      expect(off.spectrumAgc, isFalse);
+      expect(off.spectrumGamma, isFalse);
+      expect(off.spectrumTilt, isFalse);
     });
   });
 }
