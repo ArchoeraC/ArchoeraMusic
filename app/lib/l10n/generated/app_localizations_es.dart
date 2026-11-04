@@ -5396,6 +5396,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
 
   @override
+  String get settingsSpectrumPeakHold => 'Línea de retención de picos';
+
+  @override
+  String get settingsSpectrumPeakHoldOn =>
+      'Mostrar sobre el espectro la línea de picos calculada por el motor';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'Línea de picos oculta';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

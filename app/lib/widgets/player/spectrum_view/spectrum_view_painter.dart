@@ -21,6 +21,9 @@ class _SpectrumPainter extends CustomPainter {
   Color color = Colors.transparent;
   SpectrumStyleRenderer style = spectrumStyleRendererFor('bars');
   bool reverse = false;
+
+  /// 是否绘制峰值保持线（由偏好控制，默认关）。
+  bool showPeak = false;
   int nowMs = 0;
 
   final List<Float64List> _prev = [Float64List(fftSize), Float64List(fftSize)];
@@ -124,7 +127,7 @@ class _SpectrumPainter extends CustomPainter {
 
   /// 峰值保持线：引擎算好，UI 只按双声道拼接布局描线（不做 DSP）。
   void _drawPeakLine(Canvas canvas, Size size) {
-    if (!_hasPeak) return;
+    if (!showPeak || !_hasPeak) return;
     final channelLength = fftSize - skipLow;
     final total = channelLength * 2;
     if (total <= 1) return;
@@ -171,5 +174,6 @@ class _SpectrumPainter extends CustomPainter {
       old.radius != radius ||
       old.color != color ||
       old.style.id != style.id ||
-      old.reverse != reverse;
+      old.reverse != reverse ||
+      old.showPeak != showPeak;
 }

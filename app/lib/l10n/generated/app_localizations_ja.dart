@@ -5138,6 +5138,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
 
   @override
+  String get settingsSpectrumPeakHold => 'ピークホールド線';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => 'エンジンが計算したピーク線をスペクトル上に表示';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'ピーク線は非表示';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override
