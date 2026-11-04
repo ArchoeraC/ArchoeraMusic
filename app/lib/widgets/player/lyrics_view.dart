@@ -118,6 +118,42 @@ class _LyricsViewState extends State<LyricsView> {
   /// 宽度 / 字号 / 文本缩放 / 默认字体样式变化时键失配自然失效。
   final _rowHeightCache = <_LyricsRowHeightKey, double>{};
 
+  /// 行高列表（按需重算；见 [_heightsKey]）。
+  ///
+  /// 位置 tick（~20Hz）不改变任何行高——只有「当前行翻转 / 分组 / 宽度 /
+  /// 样式」变化才需要重算（换行约每几秒一次），避免每 tick 跑 O(行数)。
+  List<double>? _heights;
+  Object? _heightsKey;
+
+  /// 非当前行 widget 实例缓存。
+  ///
+  /// 返回**同一实例**时 Flutter 的 `Element.updateChild` 会直接跳过该子树的
+  /// 重建与重绘（identical widget 短路）；当前行因逐字扫亮每 tick 变化，
+  /// 不入缓存。缓存随当前行翻转 / 配置 / 主题变化整体作废。
+  final _lineCache = <int, Widget>{};
+
+  // ---- 测试探针（仅统计用，不参与运行逻辑）----
+
+  /// 实际构造的 `_Line` 实例数（含当前行与首次进入视口的行）。
+  int _builtLines = 0;
+
+  /// 非当前行命中缓存实例的次数。
+  int _cacheHits = 0;
+
+  @visibleForTesting
+  int debugBuiltLines() => _builtLines;
+
+  @visibleForTesting
+  int debugLineCacheHits() => _cacheHits;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 主题（颜色）/ 文本缩放 / 默认字体样式可能已变：缓存实例与行高作废。
+    _lineCache.clear();
+    _heightsKey = null;
+  }
+
   @override
   void dispose() {
     _controller.dispose();

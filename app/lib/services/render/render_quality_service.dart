@@ -22,6 +22,20 @@ double renderScaleForTier(RenderQualityTier tier) => switch (tier) {
   RenderQualityTier.performance => 0.7,
 };
 
+/// 档位 → 频谱重绘步长（`1` = 每帧；`2` ≈ 30fps；`3` ≈ 20fps）。
+///
+/// 频谱是装饰性动画：降档时**降低重绘频率而不是关闭功能**（关掉会改变
+/// 布局观感）。纯函数，便于单测。
+int spectrumFrameStrideForTier(RenderQualityTier tier) => switch (tier) {
+  RenderQualityTier.full => 1,
+  RenderQualityTier.balanced => 2,
+  RenderQualityTier.performance => 3,
+};
+
+/// 按步长判定本帧是否重绘（`stride <= 1` 时每帧重绘）。纯函数，便于单测。
+bool shouldRepaintOnFrame(int frameNo, int stride) =>
+    stride <= 1 || frameNo % stride == 0;
+
 /// 自适应画质服务：把真实 [FrameTiming] 喂给 [QualityGovernor]，并把当前档位
 /// 以 [tierListenable] 暴露给 UI（`player_background.dart` 据此设置
 /// `RippleBackground.renderScale`）。

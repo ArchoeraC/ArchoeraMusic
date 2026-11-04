@@ -34,6 +34,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsRippleDamageClipDesc => '只重绘活动涟漪波带；仅 CPU 回退路径生效';
 
   @override
+  String get settingsLyricsEdgeFade => '歌词边缘渐隐';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '上下边缘的淡出方式：逐行透明度最省 GPU，遮罩层最平滑，关闭则不淡出';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '逐行';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => '遮罩';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => '关闭';
+
+  @override
   String get menuTrackDetail => '媒体详细信息';
 
   @override
@@ -5041,6 +5057,58 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
 
   @override
+  String get settingsSpectrumPeakHold => '峰值保持线';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => '在频谱上方显示由引擎计算的峰值包络线';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => '不显示峰值线';
+
+  @override
+  String get settingsSpectrumAgc => '自动增益（AGC）';
+
+  @override
+  String get settingsSpectrumAgcOn => '弱音自动抬升，可能更容易接近满量程';
+
+  @override
+  String get settingsSpectrumAgcOff => '保持原始电平动态';
+
+  @override
+  String get settingsSpectrumGamma => '小信号提亮（γ）';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9，弱频段更明显';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0，线性显示';
+
+  @override
+  String get settingsSpectrumTilt => '高频倾斜';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct，高频更亮';
+
+  @override
+  String get settingsSpectrumTiltOff => '不平滑频响';
+
+  @override
+  String get settingsSpectrumGammaValue => '提亮强度（γ）';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '当前 γ=$value；小于 1 提亮小信号，大于 1 压暗';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => '倾斜量';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '当前 $value dB/oct（相对 1kHz）';
+  }
+
+  @override
   String get settingsAutoImmersive => '自动沉浸';
 
   @override
@@ -6006,6 +6074,22 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsRippleDamageClipDesc => '只重绘活动涟漪波带；仅 CPU 回退路径生效';
+
+  @override
+  String get settingsLyricsEdgeFade => '歌词边缘渐隐';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '上下边缘的淡出方式：逐行透明度最省 GPU，遮罩层最平滑，关闭则不淡出';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '逐行';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => '遮罩';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => '关闭';
 
   @override
   String get menuTrackDetail => '媒体详细信息';
@@ -11015,6 +11099,58 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
 
   @override
+  String get settingsSpectrumPeakHold => '峰值保持线';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => '在频谱上方显示由引擎计算的峰值包络线';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => '不显示峰值线';
+
+  @override
+  String get settingsSpectrumAgc => '自动增益（AGC）';
+
+  @override
+  String get settingsSpectrumAgcOn => '弱音自动抬升，可能更容易接近满量程';
+
+  @override
+  String get settingsSpectrumAgcOff => '保持原始电平动态';
+
+  @override
+  String get settingsSpectrumGamma => '小信号提亮（γ）';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9，弱频段更明显';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0，线性显示';
+
+  @override
+  String get settingsSpectrumTilt => '高频倾斜';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct，高频更亮';
+
+  @override
+  String get settingsSpectrumTiltOff => '不平滑频响';
+
+  @override
+  String get settingsSpectrumGammaValue => '提亮强度（γ）';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '当前 γ=$value；小于 1 提亮小信号，大于 1 压暗';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => '倾斜量';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '当前 $value dB/oct（相对 1kHz）';
+  }
+
+  @override
   String get settingsAutoImmersive => '自动沉浸';
 
   @override
@@ -11980,6 +12116,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsRippleDamageClipDesc => '只重繪活動漣漪波帶；僅 CPU 回退路徑生效';
+
+  @override
+  String get settingsLyricsEdgeFade => '歌詞邊緣漸隱';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '上下邊緣的淡出方式：逐行透明度最省 GPU，遮罩層最平滑，關閉則不淡出';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '逐行';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => '遮罩';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => '關閉';
 
   @override
   String get menuTrackDetail => '媒體詳細資訊';
@@ -16988,6 +17140,58 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
+
+  @override
+  String get settingsSpectrumPeakHold => '峰值保持線';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => '在頻譜上方顯示由引擎計算的峰值包絡線';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => '不顯示峰值線';
+
+  @override
+  String get settingsSpectrumAgc => '自動增益（AGC）';
+
+  @override
+  String get settingsSpectrumAgcOn => '弱音自動抬升，可能更容易接近滿量程';
+
+  @override
+  String get settingsSpectrumAgcOff => '保持原始電平動態';
+
+  @override
+  String get settingsSpectrumGamma => '小訊號提亮（γ）';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9，弱頻段更明顯';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0，線性顯示';
+
+  @override
+  String get settingsSpectrumTilt => '高頻傾斜';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct，高頻更亮';
+
+  @override
+  String get settingsSpectrumTiltOff => '不平滑頻響';
+
+  @override
+  String get settingsSpectrumGammaValue => '提亮強度（γ）';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '目前 γ=$value；小於 1 提亮小訊號，大於 1 壓暗';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => '傾斜量';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '目前 $value dB/oct（相對 1kHz）';
+  }
 
   @override
   String get settingsAutoImmersive => '自动沉浸';

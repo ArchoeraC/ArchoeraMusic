@@ -249,6 +249,8 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
 | `lyrics.fontSize` | `18`（14–**60**） | 字号上限提到 60px |
 | `amll.blurQuality` | `auto` | 失焦档位：`auto` 自动（整层档起步 + 帧预算兜底）/ `fast` 流畅（固定整层档，1 层 + 1/4 重采样）/ `lite` 轻量（零高斯伪散焦，弱核显可用）/ `quality` 画质（固定逐行 σ=`min(5,1+距离)`，最贴上游、最吃 GPU）/ `off` 关闭。**显式档位不吃自动降级**（决定权交给用户）。旧键 `amll.enableBlur=false` 自动迁移为 `off` |
 | `ARCHOERA_LYRICS_BLUR` | 未设 | 诊断/AB 用环境变量：`perline` / `panel` / `off`。显式指定时会**禁用自动降级**（便于对比真机手感） |
+| `render.lyricsEdgeFade` | `wall` | 歌词区上下渐隐实现（设置页「性能 / 渲染 → 歌词边缘渐隐」）：`wall` 逐行 alpha（零离屏层）/ `shader` 遮罩层 / `off` |
+| `ARCHOERA_LYRICS_FADE` | 未设 | 覆盖设置页「性能 / 渲染 → 歌词边缘渐隐」：`wall` / `shader` / `off`（优先级更高，便于现场 A/B） |
 | `amll.enableScale` | `true` | 关掉非激活行缩放 |
 | `amll.inactiveAlpha` | `0.45` | 非激活行透明度下限 |
 | `amll.wordSweep` | `true` | 关掉后激活行走整行模式（无逐字） |

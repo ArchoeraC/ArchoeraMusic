@@ -121,7 +121,15 @@ class PlayerLyricsBlock extends ConsumerWidget {
     // 全屏播放器始终显示翻译：设置项「显示翻译」仅作用于播放条迷你歌词
     // （见 bar_lyric_text_widgets.dart），不在此处受其控制。
     const showTranslation = true;
-    // 引擎切换：simple（旧实现）/ amll（AMLL 歌词墙）
+    // 上下渐隐实现（设置页「性能 / 渲染」，环境变量可覆盖，见
+    // `LyricsEdgeFadeMode`）：
+    // - wall（默认）：物理墙自己按行透明度渐隐（零离屏层），仅 amll 引擎支持；
+    // - shader：外层 `ShaderMask`，任意子树都正确，但每帧一次**面积级离屏层**
+    //   （全屏时成本随面积线性增长）；
+    // - off：不渐隐。
+    final fadeMode = resolveLyricsEdgeFadeMode(prefs.lyricsEdgeFade);
+    final wallEdgeFade =
+        fadeEdges && engine == 'amll' && fadeMode == LyricsEdgeFadeMode.wall;
     final wall = engine == 'amll'
         ? AmllPhysicsWall(
             groups: groups,
@@ -145,6 +153,7 @@ class PlayerLyricsBlock extends ConsumerWidget {
             springPreset: prefs.amllSpringPreset,
             textAlign: textAlign,
             animate: !ref.read(appPrefsProvider).performanceMode,
+            edgeFade: wallEdgeFade,
             onSeek: onSeek ?? (_) {},
           )
         : LyricsView(
@@ -164,7 +173,10 @@ class PlayerLyricsBlock extends ConsumerWidget {
             onSeek: onSeek,
           );
     return ClipRect(
-      child: fadeEdges ? LyricsEdgeFade(child: wall) : wall,
+      // 逐行渐隐模式由墙自身完成，不能再套 ShaderMask（会叠两次）。
+      child: fadeEdges && !wallEdgeFade && fadeMode != LyricsEdgeFadeMode.off
+          ? LyricsEdgeFade(child: wall)
+          : wall,
     );
   }
 }

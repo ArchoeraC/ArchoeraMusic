@@ -481,6 +481,8 @@ SSL_CERT_DIR=/path/to/certs            # 目录列表，`:` 分隔
 | `ARCHOERA_RIPPLE_SHADER=0` | 关闭水纹 GPU 着色器（回退 CPU 网格） |
 | `ARCHOERA_FLUID_SHADER=0` | 关闭流体背景着色器 |
 | `ARCHOERA_LYRICS_BLUR` | 歌词模糊：`perline` / `panel` / `off` |
+| `ARCHOERA_LYRICS_FADE` | 歌词上下渐隐：`wall`（逐行 alpha）/ `shader`（遮罩）/ `off`；覆盖设置页同名选项 |
+| `ARCHOERA_COVER_MASK=off` | 跳过全屏封面右缘渗入遮罩（诊断用，右缘会露出硬边） |
 | `ARCHOERA_EVENT_POLL_FALLBACK=1` | 引擎事件回退到 50ms 轮询（排查推送问题） |
 
 > 环境变量是排障 / 开发用的后门，不是正式设置项；优先用设置页。
