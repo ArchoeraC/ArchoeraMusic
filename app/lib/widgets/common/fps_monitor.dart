@@ -10,6 +10,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../stores/app_prefs.dart';
+import '../../services/render/frame_timing_stats.dart';
+import '../../services/render/quality_governor.dart';
+import '../../services/render/render_quality_service.dart';
 
 part 'fps_monitor/fps_monitor_overlay.dart';
 
@@ -31,12 +34,20 @@ class FpsMonitorHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(appPrefsProvider);
     final show = prefs.developerMode && prefs.devFpsMonitor;
-    return show ? const _FpsOverlay() : const SizedBox.shrink();
+    if (!show) return const SizedBox.shrink();
+    // 自适应画质档位（仅启用时显示；见 adaptive_render_quality 服务）。
+    final tier = prefs.adaptiveRenderQuality
+        ? ref.watch(renderQualityProvider)
+        : null;
+    return _FpsOverlay(tier: tier);
   }
 }
 
 class _FpsOverlay extends StatefulWidget {
-  const _FpsOverlay();
+  const _FpsOverlay({this.tier});
+
+  /// 自适应画质当前档位（null = 未启用）。
+  final RenderQualityTier? tier;
 
   @override
   State<_FpsOverlay> createState() => _FpsOverlayState();
@@ -58,6 +69,9 @@ class _FpsOverlayState extends State<_FpsOverlay> {
   /// 本窗口内各帧总耗时（用于平均帧时间）。
   Duration _frameSum = Duration.zero;
 
+  /// 帧耗时分组统计（环形保留最近 600 帧；仅展开态采样，收起态零开销）。
+  final FrameTimingStats _stats = FrameTimingStats();
+
   /// 是否空闲（本窗口没有实际渲染帧）。
   bool _idle = true;
 
@@ -76,6 +90,7 @@ class _FpsOverlayState extends State<_FpsOverlay> {
     _frameCount += timings.length;
     for (final t in timings) {
       _frameSum += t.totalSpan;
+      _stats.add(t);
     }
   }
 

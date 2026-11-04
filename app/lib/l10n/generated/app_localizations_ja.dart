@@ -36,6 +36,22 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsRippleDamageClipDesc => 'アクティブな波紋帯のみ再描画；CPU フォールバック時のみ有効';
 
   @override
+  String get settingsLyricsEdgeFade => '歌詞の上下フェード';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '上下端のフェード方式：行単位が最も軽量、マスクが最も滑らか、オフでフェードなし';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '行単位';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'マスク';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'オフ';
+
+  @override
   String get menuTrackDetail => 'メディア詳細';
 
   @override

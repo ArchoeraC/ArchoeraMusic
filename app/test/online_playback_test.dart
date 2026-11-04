@@ -14,7 +14,6 @@ import 'package:archoera_music/services/netease/apis_netease_caller.dart';
 import 'package:archoera_music/services/netease/netease_api.dart';
 import 'package:archoera_music/services/netease/track.dart';
 import 'package:archoera_music/services/playback/audio_engine_process.dart';
-import 'package:archoera_music/services/playback/pcm_analyzer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -57,26 +56,25 @@ void main() {
         // ignore: avoid_print
         print('[e2e] WAV 完整: ${size ~/ 1024}KB');
 
-        // 3) PCM 块文件 + 按需 FFT（PcmAnalyzer 纯文件读取，拉模式）
+        // 3) 频谱：引擎事件推送（App 不再拉 PCM / 调 FFI）
         final pcmFile = File(engine.pcmFilePath);
         expect(pcmFile.existsSync(), isTrue, reason: 'PCM 块文件应存在');
         expect(pcmFile.lengthSync(), greaterThan(0), reason: 'PCM 应有内容');
-        PcmFftSource? analyzer;
-        final deadline = DateTime.now().add(const Duration(seconds: 10));
-        while (analyzer == null && DateTime.now().isBefore(deadline)) {
-          analyzer = engine.pcm;
-          if (analyzer == null) {
-            await Future<void>.delayed(const Duration(milliseconds: 100));
-          }
-        }
-        expect(analyzer, isNotNull, reason: 'PCM 分析器应在 ready 事件后打开');
-        // 歌曲 ~45s，取 15s 处一帧：应能二分到块并完成 FFT（128 bins）
-        final frame = analyzer!.frameAt(15000);
-        expect(frame, isNotNull, reason: '15s 处应有 PCM 帧');
-        expect(frame!.ldata.length, 128, reason: 'FFT 输出 128 bins');
+        await engine.sendCommand('set_fft', {'enabled': true});
+        final frame = await engine.events
+            .where((e) => e is EngineFft)
+            .cast<EngineFft>()
+            .first
+            .timeout(const Duration(seconds: 10));
+        expect(frame.ldata.length, 128, reason: 'FFT 事件 128 bins');
         expect(frame.rdata.length, 128);
+        expect(frame.minHz, 40);
+        expect(frame.maxHz, 16000);
         // ignore: avoid_print
-        print('[e2e] PCM 块=${analyzer.blockCount} FFT 128 bins @15s');
+        print(
+          '[e2e] FFT 事件 seq=${frame.seq} interval=${frame.intervalMs}ms '
+          '${frame.minHz}-${frame.maxHz}Hz',
+        );
       } finally {
         await engine.stop();
       }

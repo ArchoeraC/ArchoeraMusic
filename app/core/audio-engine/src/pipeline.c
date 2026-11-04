@@ -833,6 +833,10 @@ static void process_pre_tempo(AudioPipeline *p, float *pcm, int samples)
  * samples 为其帧数。 */
 static int process_dsp_chain(AudioPipeline *p, float *pcm, int samples)
 {
+    /* 重采样输出帧数（原速时间基准）：pcm_out_cb 的块**起始**位置用它反推。
+       tempo 可能改变后续 samples，不能用 tempo 后的样本数换算时间轴。 */
+    const int in_samples = samples;
+
     process_pre_tempo(p, pcm, samples);
 
     /* tempo: 变速变调（改变样本数，就地写回 pcm） */
@@ -858,9 +862,10 @@ static int process_dsp_chain(AudioPipeline *p, float *pcm, int samples)
     /* FFT 分析（自适应声道数，含 5.1，内部下混为左右声道） */
     fft_process_multi(p->fft, pcm, samples, p->cfg.output_channels);
 
-    /* PCM 流出：位置 = 原速音频时间（resampler 输出样本 / 采样率，含起始偏移） */
+    /* PCM 流出：位置 = **块起始**的原速音频时间（resampler 累计输出 - 本块输入
+       帧数，含起始偏移）。块头语义与 mem_window / stream.pcm 读取器一致。 */
     if (p->pcm_out_cb) {
-        double pos_ms = (double)resampler_get_output_samples(p->resampler)
+        double pos_ms = (double)(resampler_get_output_samples(p->resampler) - in_samples)
                         / (double)p->cfg.output_sample_rate * 1000.0
                         + (double)p->cfg.start_offset_ms;
         p->pcm_out_cb(pcm, samples, p->cfg.output_channels, pos_ms, p->pcm_out_user);
@@ -1060,6 +1065,7 @@ int pipeline_run(AudioPipeline *p)
     if (!p->flushed) {
         int out = resampler_flush(p->resampler, p->pcm_temp, p->pcm_temp_capacity);
         if (out > 0) {
+            const int in_samples = out; /* 重采样 flush 输出（原速时间基准） */
             process_pre_tempo(p, p->pcm_temp, out);
 
             if (!tempo_is_bypass(p->tempo)) {
@@ -1070,7 +1076,7 @@ int pipeline_run(AudioPipeline *p)
 
             fft_process_multi(p->fft, p->pcm_temp, out, p->cfg.output_channels);
             if (p->pcm_out_cb) {
-                double pos_ms = (double)resampler_get_output_samples(p->resampler)
+                double pos_ms = (double)(resampler_get_output_samples(p->resampler) - in_samples)
                                 / (double)p->cfg.output_sample_rate * 1000.0
                                 + (double)p->cfg.start_offset_ms;
                 p->pcm_out_cb(p->pcm_temp, out, p->cfg.output_channels, pos_ms, p->pcm_out_user);

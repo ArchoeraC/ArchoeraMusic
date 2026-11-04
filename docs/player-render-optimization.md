@@ -1,6 +1,11 @@
 # 播放页渲染优化专项（Player Render Optimization）
 
-> 状态：**进行中（2026-09-11；2026-09-20 更新）**——P1（歌词缓存）、P3（频谱批处理）**已实现**；
+> 状态：**进行中（2026-09-11；2026-09-20 更新；2026-11-03 更新）**——P1（歌词缓存）、P3（频谱批处理）**已实现**；
+> **P0 测量基建已实现（2026-11-03）**：帧耗时分组统计（`frame_timing_stats.dart`）、
+> build/paint 探针（`build_paint_probe.dart`）与「零构建」headless 回归
+> （`test/frame_probe_test.dart`），见 §5.1/D1；**真机基线仍待**（本机 WSL 无 GPU）；
+> **D2a 歌词墙稳态烘焙已实现（2026-11-03）**：整层档稳态每帧只贴图 + 激活行，
+> 见 §4.2c；
 > **歌词表现层已对齐 AMLL（§4.2b：时钟插值/羽化扫亮/景深/逐词动画/间奏点/背景人声）**；
 > P2 背景：封面预烘焙 + CPU 网格已优化并生效，**全分辨率 GLSL 因集显扛不住默认关闭**；
 > **P2b 由 `runtime-resource-optimization.md` R1 细化并取代**（不是单一半分辨率，
@@ -11,6 +16,7 @@
 > 关联：
 > [architecture.md](architecture.md)、
 > [runtime-resource-optimization.md](runtime-resource-optimization.md)（跨框架机制 + 全局长效方案）、
+> [rendering-reference-research.md](rendering-reference-research.md)（外部合成器渲染参考调研，2026-11-03）、
 > [archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md](archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md)。
 
 ---
@@ -225,6 +231,18 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
    - 半分辨率、单 pass。
 
 - 简单引擎 `LyricsView` 的 O(N) 每 build 全量测高同样按 1 收敛。
+- **简单引擎（默认档）位置 tick 只重建当前行（2026-11-03）**：位置 tick（~20Hz）
+  原先会让整个 `ListView` 重建全部可见行；现非当前行返回**缓存的同一 widget
+  实例**（`Element.updateChild` 对 identical widget 短路 → 不重建、不重绘），
+  行高列表也只在「当前行翻转 / 分组 / 宽度 / 样式」变化时重算（换行约每几秒
+  一次，而非每 tick 跑 O(行数)）。当前行因逐字扫亮仍每 tick 重建（必要）。
+  回归：`test/lyrics_view_rebuild_test.dart`（20 tick 内构造 ≤ 当前行数、缓存
+  命中 ≥ tick 数；跨行翻转不串行）。
+- **歌词上下渐隐 / 全屏封面右缘渗入：保持 `ShaderMask`（dstIn）**。
+  2026-11-03 曾尝试「`RepaintBoundary` + dstOut 叠加」免每帧离屏层——软件
+  光栅下逐像素等价（差 ≤ 2/255）、测试通过，但**真机上 dstOut 未被边界
+  隔离，把歌词列下层页面背景擦成深色块**，已回退。教训：跨图层混合模式
+  的等价性不能只靠软件光栅像素测试验证，真机必须过一遍。
 
 #### 4.2b 表现层：AMLL 效果对齐（2026-09-20 已实现）
 
@@ -249,6 +267,108 @@ Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐
 - **性能纪律**：所有新效果都受 `animate`（性能模式）与 `amll.enableBlur` /
   `amll.enableScale` 开关约束；性能模式下直接吸附目标值、无 ticker。
 - 详细设计/对齐清单/刻意简化项见 [lyrics-amll-alignment.md](lyrics-amll-alignment.md)。
+
+### 4.2c 整层档稳态烘焙（D2a，2026-11-03 已实现）
+
+> 思路参考外部合成器渲染调研的「显式栅格化」纪律（Impeller GLES 下 raster cache
+> 关闭）与「模糊成本 = 离屏层数 × 像素量」结论；自研实现，出处与许可证边界见
+> [rendering-reference-research.md](rendering-reference-research.md) D2/D4。
+
+**问题**：整层档（默认）每帧执行「整层 saveLayer（物理分辨率离屏 target）→
+compose 滤镜链（降采样 → blur → 升采样）」，且非激活行段落全部重放——这是
+播放页稳态最大的单项 raster 开销，但稳态下非激活外观**完全不变**。
+
+**方案**（`lyrics_physics_wall_bake.dart` `_WallBake`）：
+
+1. **稳态判定**：非激活外观静止（弹簧/过渡/浏览均无变化，`staticIdle`）+
+   整层强度已落定（`blurStrengthSettled`）+ 激活外观完整（fade==1）+ 缩放终值。
+2. **逐行烘焙**（保观感是硬要求）：每静态行独立走
+   「行内容**物理分辨率**栅格 → 双线性降采样到 1/4 逻辑网格 → blur(σ·k) →
+   存 1/4 小图」——与旧滤镜链的采样步长逐像素同源；单行全分辨率中间图
+   随建随弃（峰值数 MB），**不做整墙全分辨率中间图**（4K ~75MB，红线）。
+   常驻内存 ≈ 视口/16（1080p≈0.5MB、4K≈2MB），O(视口)。
+   **缓存与位置无关（2026-11-03 修正）**：烘焙内容只取决于行内容/样式，
+   y / 激活行 / 淡入权重都在绘制时应用（y → 贴图目标矩形、alpha → 贴图
+   着色；高斯对 alpha 线性，故可后乘）。换行/滚动**不使缓存失效**——每次
+   换行只为新进入视口的行烘 1~2 张，不再把可见十几行全量重烘（那会在换行
+   后首帧造成一次明显尖峰，真机 FrameTiming 图可见）。
+3. **稳态每帧**：逐行 `drawImageRect` 贴图 + 激活行（clipRect 替代 α=1 的
+   saveLayer）+ 间奏三点。**整层高斯 saveLayer 与全部非激活段落重放消失**。
+4. **过渡帧**（换行级联/悬停/seek/浏览）：**基座同样复用烘焙图**（行在动，
+   但模糊外观不变 → 贴图跟随 y 移动即可；激活外观仍逐帧重绘），
+   仅在强度动画中（悬停渐变）回退逐行统一 σ 高斯。观感等价实测：过渡帧
+   「缓存贴图 vs 逐行高斯」mean 差 **1.20**/255、高差像素 **0.50%**。
+5. **失效判定 = 样式键**：缓存键只含**影响非激活外观**的量（行内容/样式、
+   字号/字重/字体、颜色、行距相关的行高、σ、缩放终值、DPR），不含 y / 激活行 /
+   淡入权重 / 可见集合——这些都在绘制时应用，因此换行、滚动、seek 都不失效。
+6. **烘焙摊帧**：绘制路径**只查不烘**（`lookup`），缺失的行本帧回退逐行高斯
+   （观感等价）；稳态帧用 `prefetchOne` 每帧最多烘 1 张，预取视口上下各 2 行。
+   这样「新行进入视口的那一帧」不再有 3 次 `toImageSync` 与光栅线程串行。
+7. 逐行档 / 轻量档 / 关闭档不烘焙（逐行档的稳态优化可后续按同思路做）。
+
+**观感变化（需在发版说明注明）**：标定发现旧整层滤镜链在 Impeller 下的实际
+渲染**带各向异性拖影伪影、等效模糊约 3× 于设计值**（blur σ 按「矩阵变换后
+空间的物理像素」解析所致；2026-09-21 的 σ 3.0→4.0 调参是在该伪影基础上做的）。
+现整层档统一为**干净的 σ=4 单峰高斯**（对齐 AMLL 设计值），静止歌词明显
+更清晰；标定数据：旧链 vs 干净高斯逐像素 mean 差 2.89、>32/255 像素 3.57%
+（无法用任何对称高斯复刻旧伪影，故放弃「逐像素复刻」目标）。
+
+**验收**（`test/lyrics_bake_test.dart`，headless 可复现）：
+
+- 稳态帧走烘焙贴图（`debugBakeActive()`）；换行过渡回退逐行、收敛后恢复；
+- 观感等价（统计口径）：烘焙贴图帧 vs 过渡逐行帧 mean 差 ≤ 8/255 实测
+  **0.98~1.18**、高差(>32)像素 ≤10% 实测 **0.35%**；
+- 既有歌词墙回归（锚点/换行/seek/浏览/缓存有界）全绿。
+
+**真机验证（待办）**：带 GPU 的 Windows/Linux 上 A/B（`ARCHOERA_LYRICS_BLUR=panel`
++ 烘焙开关）确认帧时间与观感；弱机确认 LyricsBlurBudget 行为不变。
+
+### 4.2d 上下渐隐：逐行 alpha（默认）vs ShaderMask（2026-11-03）
+
+**问题**：歌词列上下渐隐用外层 `ShaderMask`（dstIn），每帧对**歌词列面积**
+创建一次离屏层（全屏 2K/4K 下面积线性增长）；全屏封面右缘渗入是第二处同类
+开销。这两处是播放页里仅剩的「每帧 × 面积」离屏层（其余背景/歌词/频谱都已
+改成预烘焙贴图或单 pass）。
+
+**结论**：默认改为 `wall`（逐行 alpha，零离屏层）。等价性实测（400×500、
+默认字号、`test/lyrics_edge_fade_test.dart`）：逐行 vs `ShaderMask` 逐像素
+**mean 0.07/255、最大差 9/255、>32 像素 0%**——差异只在最上/最下 1~2 行的
+行内梯度，肉眼不可辨；而省掉的是一整个歌词列面积的离屏层（全屏约占半屏）。
+
+**开关**：设置页「性能 / 渲染 → 歌词边缘渐隐」（偏好键 `render.lyricsEdgeFade`，
+默认 `wall`，可切「逐行 / 遮罩 / 关闭」）。环境变量 `ARCHOERA_LYRICS_FADE`
+优先级更高，用于现场 A/B（不改设置、不重编译）：
+
+```bash
+ARCHOERA_LYRICS_FADE=wall     # 默认：物理墙逐行 alpha（仅 amll 引擎）
+ARCHOERA_LYRICS_FADE=shader   # 回退：外层 ShaderMask（任意引擎都正确）
+ARCHOERA_LYRICS_FADE=off      # 不渐隐（仅诊断，会露硬边）
+
+ARCHOERA_COVER_MASK=off       # 跳过全屏封面右缘渗入遮罩（仅诊断，会露硬边）
+```
+
+- `wall` 由 `AmllPhysicsWall.edgeFade` 驱动：每行按**行中心**取
+  `lyricsEdgeFadeAt(y/h)`，乘进该行的基础层/激活层透明度（贴图路径乘
+  `Paint.color` alpha，与烘焙的位置无关缓存天然兼容）。
+- 曲线与 `LyricsEdgeFade` 的停点逐段一致（`test/lyrics_edge_fade_test.dart`
+  断言停点、夹紧、中段恒 1）。
+- simple 引擎未接入逐行模式（列表项是独立 widget，需逐项传 alpha），自动回退
+  `shader`。
+
+**成本模型（为什么全屏才严重）**：
+
+| 元素 | 每帧成本 |
+|---|---|
+| 歌词墙稳态（烘焙） | 可见行数 × 行贴图面积 ≈ 视口/16 的采样 + 一次填充 |
+| 歌词渐隐（默认 `wall`） | 0（逐行 alpha 乘进绘制颜色） |
+| 歌词渐隐（`shader` 回退） | 歌词列面积 × 2（写入离屏 + 合成） |
+| 封面渗入 `ShaderMask` | 封面面板面积 × 2 |
+| 背景（gradient/blur 烘焙） | 1 次全屏贴图 |
+| 频谱 | 90px 高条带，按帧步长重绘 |
+
+窗口态下 `ShaderMask` 的面积只有全屏的 1/4~1/16，所以「窗口看着没事、
+全屏极为严重」正是它们的特征。剩下的封面遮罩可用 `ARCHOERA_COVER_MASK=off`
+单独测占比（下一步候选：把「封面 + 遮罩」一次性烘焙成贴图，见 §5.1）。
 
 ### 4.2.1 失焦策略基准与选择（2026-09-20）
 
@@ -295,6 +415,10 @@ Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐
 
 ### 4.3 频谱 → 批处理（P3 已实现）
 
+> **v2（2026-11-04 设计）**：频谱分析整体下沉引擎（[`spectrum-analyzer.md`](spectrum-analyzer.md)），
+> UI 只做事件接收 + 插值/显示平滑/绘制，不再拉 PCM/调 FFI；本节 P3 的
+> 单 Path 批处理与画笔渐隐继续有效。
+
 - FFT 平滑仍在 CPU（廉价，且需跨帧状态）；
 - `bars`：所有柱子合成**单个 `Path`（多个 RRect）一次性 `drawPath`**，替代 N 次 `drawRRect`；
   保留圆角与几何，视觉不变；
@@ -307,6 +431,21 @@ Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐
 - `FragmentProgram` 加载 + `FragmentShader` 实例缓存（背景、歌词后处理共用）。
 - 统一性能开关与「不可见即停表」。
 - 统一 `RepaintBoundary`/图层隔离策略。
+- 帧测量基建（2026-11-03）：`frame_timing_stats.dart`（分位数分组）+
+  `build_paint_probe.dart`（build/paint 探针）；歌词墙已建立「0 build」基线
+  （`test/frame_probe_test.dart`），D2 Retained 化改造前后共用同一断言。
+- **共享模糊输入（D3，2026-11-03 已实现）**：`GlassBlur.backdropIsBakedBlur`
+  ——调用方保证面板背后只有预烘焙的模糊背景（图片风格壳层背景是一次烘焙的
+  模糊壁纸）且无动态内容穿过时，免掉 `BackdropFilter`（对已模糊图再做 σ16
+  高斯视觉近乎无差，却每帧付整条离屏 pass）。**落点：停靠播放条**（内容层
+  已让位 82px，`player_bar_sections.dart`）。悬浮播放条 / 搜索下拉 / 队列
+  面板 / 登录弹窗背后有动态内容，**保留真毛玻璃**（正确性优先）。
+- **遮挡显式隐藏（D6，2026-11-03 已实现）**：`/player` 路由是
+  `opaque: false`，播放页完全展开后壳层仍会被绘制——壳层背景（全屏贴图）
+  与停靠播放条被播放页整幅不透明背景完全盖住。用 `OffstageWhenComplete`
+  （`widgets/common/offstage_when_complete.dart`）在路由动画完成（≥0.999）
+  后停绘二者，**保留 element/state**（返回无重建闪烁）；播放页收起过渡期间
+  自动恢复绘制。
 - 统一自适应画质控制器（帧时间滑动窗口 → 档位）：**首个落地是歌词失焦**
   （`lyrics_blur_budget.dart`，§4.2.1），后续频谱/背景可复用同一守卫。
 
@@ -316,15 +455,31 @@ Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐
 
 | 阶段 | 内容 | 验收 |
 |---|---|---|
-| **P0** | profile 基线：全屏 2K/4K、120Hz，记录 UI/raster 线程帧时间 | 产出基线与瓶颈归属报告 |
+| **P0 部分✅** | 测量基建（2026-11-03）：`FrameTimingStats`（build/raster/队列/vsync 分组，avg/p50/p95/p99/max，环形 600 帧）+ `BuildPaintProbe`（build ≠ paint 分开计数）+ `test/frame_probe_test.dart`（歌词墙连续滚动 60 帧 **0 build** 基线）；FPS 浮层展开态显示 UI/R/队列 p50/p95。**真机 profile 基线仍待**：全屏 2K/4K、120Hz | 产出基线与瓶颈归属报告 |
 | **P1 ✅** | 歌词：Paragraph 缓存（可见窗口）+ 去 `saveLayer` | 全屏歌词区 UI 线程帧时间显著下降；歌词回归测试全绿；常驻内存符合 §3.4 |
 | **P2 ✅** | 背景：`FragmentProgram`（单 pass + 封面模糊预烘焙；CPU 仅失败兜底） | 着色器四后端（SKSL/GLES3/Vulkan/Metal）编译通过；CPU 回退可用；三端视觉/帧时间待真机 |
 | **P2b** | 半分辨率离屏降采样（仅当实测 iGPU 仍不足） | 帧时间进一步下降、视觉可接受 |
 | **P3 ✅** | 频谱：单 Path 批量 + 渐隐并入画笔 | 无 `ShaderMask` 离屏层；三样式冒烟测试绿 |
 | **P4** | 逐字符精灵图集（公开 API 限制，见 §4.2；待 P1–P3 实测后定） | 歌词区 UI 线程≈常数（与行数弱相关） |
-| **P5** | 自适应画质 + 档位 | iGPU 机器稳定达帧预算；无独显依赖 |
+| **P5** | 自适应画质 + 档位 | **部分✅（2026-11-03）**：`QualityGovernor` 接线——涟漪/流体 `renderScale` 按档位降采样、频谱降重绘频率（不关闭）；默认开启。歌词失焦仍由 `LyricsBlurBudget` 独立守卫。**真机验证待做** |
 
 > 顺序原则：**先 P1（收益最大且不依赖渲染后端）→ 再 P2**；P3 随时可插；P4/P5 视 P1/P2 后剩余瓶颈决定。
+
+### 5.1 补充候选（2026-11-03，源自外部合成器渲染调研）
+
+> 来源与许可证边界见 [rendering-reference-research.md](rendering-reference-research.md)
+> （参考项目 GPL-3.0：只借鉴思想/方法/实测结论，**自研实现，不抄代码、不照搬命名**；
+> 项目名称仅登记于 `acknowledgements.md`，本仓文档/模块不以之命名）。
+> 均为**候选**，是否排期由 P0 实测决定。
+
+| 项 | 内容 | 对应调研条目 |
+|---|---|---|
+| **P0 补全** | 帧指标分组（FrameTiming avg/p50/p95/p99；UI / raster / build→raster 排队三段）+ build/paint 计数（**build ≠ paint**）+「N 帧 0 构建 / paint 计数不变」headless 回归测试；空闲零开销 | D1 |
+| **P-R（Retained 化）** | **部分✅（D2a，2026-11-03）**：整层档稳态烘焙已实现（稳态每帧只贴图 + 激活行，整层高斯 saveLayer 移除；**缓存与位置无关**，换行/滚动不重烘焙、过渡帧也复用贴图、烘焙摊帧预取；`lyrics_physics_wall_bake.dart`）。**观感有变化**（旧链含引擎伪影、实际 ~3× 过模糊 → 干净 σ4），发版需注明。剩余：逐行档烘焙、逐行 Retained 化（ValueListenable 直连变换）视 P0 真机实测决定 | D2/D4 |
+| **P-Mask（封面渗入烘焙）** | 全屏封面「图片 + 右缘遮罩」一次性烘焙成 `ui.Image`（与背景模糊同一套：物理分辨率长边封顶 2048、封面/尺寸变化时重烘、失败回退 `ShaderMask`），去掉每帧封面面板面积的离屏层；先用 `ARCHOERA_COVER_MASK=off` 测占比（§4.2d） | D4 |
+| **P-G（玻璃共享输入）** | **✅（2026-11-03）**：`GlassBlur.backdropIsBakedBlur`——背后只有预烘焙模糊背景的面板免 `BackdropFilter`（共享背景那次高斯）；落点为停靠播放条（内容层已让位、无动态内容穿过）。其余玻璃面背后有动态内容，保留真模糊 | D3 |
+| **P-Cover（封面限流）** | 列表封面解码并发上限 ~2 的队列调度，平滑冷启动尖峰 | D5 |
+| **纪律修正** | 「包 `RepaintBoundary` = 已缓存」在 Impeller GLES 下不成立（raster cache 关闭）；需缓存处一律显式栅格化（预烘焙已对齐） | D1（§3.1） |
 
 ---
 

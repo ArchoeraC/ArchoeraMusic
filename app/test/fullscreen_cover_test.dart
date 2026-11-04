@@ -31,6 +31,7 @@ void main() {
       tester.getSize(find.byType(PlayerFullscreenCover)),
       const Size(240, 320),
     );
+    // 遮罩保持 ShaderMask（dstIn）：dstOut 免离屏方案在真机会擦穿背景，已回退。
     expect(find.byType(ShaderMask), findsOneWidget);
   });
 }

@@ -24,7 +24,6 @@ library;
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart' show PointerScrollEvent;
@@ -32,6 +31,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart' show SchedulerBinding, Ticker;
 
 import '../../../services/lyrics/lyric_line.dart';
+import '../lyrics_edge_fade.dart' show lyricsEdgeFadeAt;
 import 'interlude_dots.dart';
 import 'lyric_clock.dart';
 import 'lyrics_blur_budget.dart';
@@ -41,10 +41,12 @@ import 'lyrics_paragraph_cache.dart';
 import 'lyrics_word_anim.dart';
 import 'spring.dart';
 import 'spring_policy.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'lyrics_physics_wall/lyrics_physics_wall_state.dart';
 part 'lyrics_physics_wall/lyrics_physics_wall_painter.dart';
+part 'lyrics_physics_wall/lyrics_physics_wall_bake.dart';
 
 /// 级联延迟步长（毫秒/距离）。
 const double kCascadeStepMs = 50; // 与上游 AMLL 的 0.05s base 级联一致
@@ -58,10 +60,11 @@ const double kMaxBlurPx = 5.0;
 
 /// 非激活行失焦的实现档位：观感目标相同，成本差一个量级。
 enum LyricsBlurMode {
-  /// 整层一次失焦（**默认**）：所有非激活行画进同一个离屏层，一次高斯，
-  /// 且在 1/4 尺寸上做（[kPanelBlurDownsample]）。
+  /// 整层一次失焦（**默认**）：非激活外观稳态下**烘焙**成 1/4 尺寸的
+  /// [ui.Image]（[kPanelBlurDownsample]），每帧只贴图——整层高斯只在每次
+  /// 换行后的首个稳态帧算一次；过渡帧逐行取统一 σ（见 [_WallBake]）。
   ///
-  /// 层数恒定、与可见行数无关；半径统一为 [kPanelBlurSigma]，不区分距离
+  /// 层数与可见行数无关；半径统一为 [kPanelBlurSigma]，不区分距离
   /// （AMLL 是每行独立 σ 2~5，这里取中值近似——刻意差异，见
   /// docs/lyrics-amll-alignment.md §3.10）。
   panel,
@@ -124,10 +127,13 @@ enum LyricsBlurQuality {
 /// 悬停清除时观感变化不够）。整层档仍在 1/4 尺寸上做高斯，开销可忽略。
 const double kPanelBlurSigma = 4.0;
 
-/// 整层失焦的降采样倍率：模糊在 1/4 尺寸上做（模糊像素量 1/4），再放大回原尺寸。
+/// 整层失焦的降采样倍率：非激活外观的失焦在 1/4 尺寸上烘焙
+/// （模糊像素量 1/16 常驻），再放大回原尺寸贴图。
 ///
 /// 非激活行本来就是模糊的，重采样几乎看不出差别；这是「保留观感、砍掉成本」
 /// 的关键一步（同一场景基准：整层 1/1 = 39.4ms，1/4 = 16.2ms）。
+/// 2026-11-03 起（D2a）：由「每帧整层滤镜链」改为「稳态逐行烘焙」，见
+/// [_WallBake]；每帧的整层离屏 target 与滤镜链随之移除。
 const double kPanelBlurDownsample = 0.25;
 
 /// 诊断用环境变量：`ARCHOERA_LYRICS_BLUR=perline|panel|off`。
@@ -153,8 +159,9 @@ LyricsBlurMode? lyricsBlurOverrideFrom(String? raw) {
 }
 
 /// 进程启动时的环境变量覆盖（只读一次；见 [lyricsBlurOverrideFrom]）。
-final LyricsBlurMode? lyricsBlurOverride =
-    lyricsBlurOverrideFrom(Platform.environment['ARCHOERA_LYRICS_BLUR']);
+final LyricsBlurMode? lyricsBlurOverride = lyricsBlurOverrideFrom(
+  Platform.environment['ARCHOERA_LYRICS_BLUR'],
+);
 
 /// 解析最终生效的失焦画法。
 ///
@@ -250,6 +257,7 @@ class AmllPhysicsWall extends StatefulWidget {
     this.springPreset = 'default',
     this.textAlign = TextAlign.center,
     this.animate = true,
+    this.edgeFade = false,
   });
 
   final List<LyricGroup> groups;
@@ -297,6 +305,13 @@ class AmllPhysicsWall extends StatefulWidget {
 
   final bool animate;
 
+  /// 上下渐隐由墙体自身按行透明度实现（零离屏层）。
+  ///
+  /// 开启后调用方**不要**再在外层套 `LyricsEdgeFade`（ShaderMask），否则
+  /// 会叠加两次渐隐。逐行取「行中心」处的渐隐值，是阶梯式淡出（见
+  /// `LyricsEdgeFadeMode.wall`）。
+  final bool edgeFade;
+
   @override
   State<AmllPhysicsWall> createState() => _AmllPhysicsWallState();
 }
@@ -315,6 +330,9 @@ class _PaintCtx {
   double h = 0;
   double align = 0.5;
   double fontSize = 18;
+
+  /// 设备像素比（仅烘焙采样用；见 [_WallBake]）。
+  double dpr = 1;
   String? fontFamily;
   double inactiveAlpha = 0.45;
   bool wordSweep = true;
@@ -340,6 +358,9 @@ class _PaintCtx {
   /// 当前布局锚点（间奏/无覆盖时用于景深与透明度的「焦点」）。
   int anchor = -1;
 
+  /// 上下渐隐由墙体自身按行透明度实现（见 [AmllPhysicsWall.edgeFade]）。
+  bool edgeFade = false;
+
   /// 间奏三点动画的当帧状态。
   InterludeDotsState dots = InterludeDotsState.hidden;
 
@@ -355,4 +376,25 @@ class _PaintCtx {
   /// 翻译 / 音译小字的合成扫亮缓存（各自独立，避免同索引互相覆盖）。
   final LyricsFragmentCache transFragCache = LyricsFragmentCache();
   final LyricsFragmentCache romaFragCache = LyricsFragmentCache();
+
+  // ---- 整层档稳态烘焙（D2a）----
+
+  /// 稳态静态层烘焙（默认档 panel 专用；见 [_WallBake]）。
+  final _WallBake bake = _WallBake();
+
+  /// 烘焙开关（默认开；测试可关，用于 A/B 像素等价对比）。
+  bool bakeEnabled = true;
+
+  /// 上一帧是否走了烘焙贴图路径（测试探针读这里）。
+  bool lastFrameBaked = false;
+
+  /// 非激活外观是否完全静止（弹簧/过渡/浏览均无变化）。
+  ///
+  /// 由状态层每帧维护。注意与「ticker 是否在跑」正交：播放中时钟常开
+  /// （ticker 保活），但非激活外观早已静止——烘焙按本标志判定重建时机，
+  /// 不影响正确性（正确性由快照比对保证）。
+  bool staticIdle = false;
+
+  /// 整层失焦强度是否已到目标（悬停 / 切档的过渡期间为 false）。
+  bool blurStrengthSettled = false;
 }

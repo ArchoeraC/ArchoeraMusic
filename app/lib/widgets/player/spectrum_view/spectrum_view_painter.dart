@@ -12,7 +12,6 @@ class _SpectrumPainter extends CustomPainter {
   });
 
   static const int fftSize = 128;
-  static const int pushIntervalMs = 50;
   static const int skipLow = 8;
   static const double attack = 0.4;
   static const double decay = 0.88;
@@ -32,7 +31,11 @@ class _SpectrumPainter extends CustomPainter {
   ];
   final Float64List _stereo = Float64List(fftSize * 2);
 
+  /// 实测帧间隔（ms）：由 [FftFrame.intervalMs] 播种、按实际到达间隔平滑，
+  /// 随引擎事件档位（50/300/1000ms）自适应。
+  double _intervalMs = spectrumDefaultIntervalMs;
   int _lastUpdateMs = 0;
+  int _lastPaintMs = 0;
 
   void pushFrame(FftFrame frame, int nowMs) {
     final l = frame.ldata;
@@ -43,6 +46,12 @@ class _SpectrumPainter extends CustomPainter {
       _curr[0][i] = i < l.length ? _finite(l[i]) : 0.0;
       _curr[1][i] = i < r.length ? _finite(r[i]) : 0.0;
     }
+    final measured = _lastUpdateMs > 0 ? nowMs - _lastUpdateMs : 0;
+    _intervalMs = updateSpectrumInterval(
+      _intervalMs,
+      measured,
+      configuredMs: frame.intervalMs.toDouble(),
+    );
     _lastUpdateMs = nowMs;
   }
 
@@ -60,13 +69,19 @@ class _SpectrumPainter extends CustomPainter {
     }
     _stereo.fillRange(0, _stereo.length, 0);
     _lastUpdateMs = nowMs;
+    _lastPaintMs = nowMs;
+    _intervalMs = spectrumDefaultIntervalMs;
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final t = math
-        .min((nowMs - _lastUpdateMs) / pushIntervalMs, 1.0)
-        .clamp(0.0, 1.0);
+    final t = spectrumInterpolationProgress(nowMs, _lastUpdateMs, _intervalMs);
+    final dtMs = _lastPaintMs > 0
+        ? (nowMs - _lastPaintMs).toDouble()
+        : spectrumFrameMs;
+    _lastPaintMs = nowMs;
+    final attackK = spectrumAttackFactor(dtMs, attack: attack);
+    final decayK = spectrumDecayFactor(dtMs, decay: decay);
     for (var c = 0; c < 2; c++) {
       final prev = _prev[c];
       final curr = _curr[c];
@@ -74,9 +89,9 @@ class _SpectrumPainter extends CustomPainter {
       for (var i = 0; i < fftSize; i++) {
         final target = _finite(prev[i] + (curr[i] - prev[i]) * t);
         if (target > disp[i]) {
-          disp[i] += (target - disp[i]) * attack;
+          disp[i] += (target - disp[i]) * attackK;
         } else {
-          disp[i] = disp[i] * decay + target * (1 - decay);
+          disp[i] = disp[i] * decayK + target * (1 - decayK);
         }
       }
     }
