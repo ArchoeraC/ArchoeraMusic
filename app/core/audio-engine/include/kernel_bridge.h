@@ -253,9 +253,11 @@ void zk_dsp_loudness_destroy(ZkDspLoudness *l);
  * 契约：
  *   - create：sample_rate>0、bins 1..1024、min_hz>0、max_hz>min_hz 且
  *     max_hz < sample_rate/2；非法参数 / OOM 返回 NULL；
- *   - process：l/r 为最近 frames 个每声道样本（frames ≤ 8192；不足由内核
- *     前补零），out_l/out_r 长度 = bins，值域 [0,1]；返回本帧节拍强度 0..1；
- *   - reset：清空频谱通量/节拍状态（seek / 切歌 / 会话重建）；
+ *   - process：l/r 为最近 frames 个每声道样本（VQT 每带只取自己最近 len 个，
+ *     不足前端补零；frames 上限约 max_window=12288），out_l/out_r 长度 = bins，
+ *     值域 [0,1]；返回本帧节拍强度 0..1；
+ *   - peaks：取当前峰值保持线（长度 bins，值域 [0,1]）；
+ *   - reset：清空频谱通量/节拍/AGC/峰值状态（seek / 切歌 / 会话重建）；
  *   - 线程：内核不建线程，由调用方在独立频谱线程调用；零每帧分配；
  *   - destroy：NULL 空操作。
  */
@@ -275,6 +277,10 @@ void zk_dsp_spectrum_reset(ZkSpectrum *s);
 float zk_dsp_spectrum_process(ZkSpectrum *s,
                               const float *l, const float *r, int frames,
                               float *out_l, float *out_r);
+
+/** 取当前峰值保持线（bins 个 [0,1]）；s/out 为空时空操作。 */
+void zk_dsp_spectrum_peaks(const ZkSpectrum *s,
+                           float *out_l, float *out_r);
 
 /** 输出频段数（bins）；s 为空时返回 0。 */
 int zk_dsp_spectrum_bins(const ZkSpectrum *s);

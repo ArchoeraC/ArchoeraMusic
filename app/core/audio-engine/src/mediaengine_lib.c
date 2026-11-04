@@ -101,7 +101,7 @@ void archoera_mediaengine_set_log_sink(ArchoeraMediaEngineLogFn fn,
 /* ── 队列容量 ────────────────────────────────────────────────── */
 #define EV_CAP 512      /* 事件队列条数 */
 #define EV_LINE 511     /* 事件行上限 */
-#define EV_FFT_LINE 2047 /* 频谱事件行上限（8-bit 量化 128×2 + 元数据 < 2KB） */
+#define EV_FFT_LINE 4095 /* 频谱事件行上限（8-bit 量化 4×128 带 + 元数据 < 4KB） */
 #define CMD_CAP 256     /* 命令队列条数 */
 #define CMD_LINE 4095   /* 命令行上限 */
 
@@ -652,7 +652,7 @@ static int spec_ring_alloc(ArchoeraMediaEngine *e, int sample_rate)
     float *l, *r;
     if (!e) return -1;
     cap = sample_rate > 0 ? sample_rate / 2 : 24000;
-    if (cap < 8192) cap = 8192;
+    if (cap < 16384) cap = 16384; /* VQT 最长窗 12288 + 余量 */
     l = (float *)malloc((size_t)cap * sizeof(float));
     r = (float *)malloc((size_t)cap * sizeof(float));
     if (!l || !r) {
@@ -880,40 +880,45 @@ static void ev_enqueue_fft(ArchoeraMediaEngine *e, const char *line)
     pthread_mutex_unlock(&e->ev_mutex);
 }
 
-/* 频谱服务每帧回调：8-bit 量化 [0,255]（128×2 + 元数据 < 2KB），避免大 JSON
-   挤占事件队列；Dart 侧除以 255 还原 [0,1]。 */
+/* 频谱服务每帧回调：8-bit 量化 [0,255]（4×128 带 + 元数据 < 4KB），避免大
+   JSON 挤占常规事件队列；Dart 侧除以 255 还原 [0,1]。 */
+static void spec_append_bands(char *buf, int cap, int *off, const char *key,
+                              const float *v, int bins)
+{
+    int i;
+    *off += snprintf(buf + *off, (size_t)(cap - *off), ",\"%s\":[", key);
+    for (i = 0; i < bins && *off < cap - 8; i++) {
+        int q = (int)(v[i] <= 0.0f ? 0.0f
+                                   : (v[i] >= 1.0f ? 255.0f : v[i] * 255.0f + 0.5f));
+        *off += snprintf(buf + *off, (size_t)(cap - *off),
+                         i ? ",%d" : "%d", q);
+    }
+    *off += snprintf(buf + *off, (size_t)(cap - *off), "]");
+}
+
 static void spec_emit_cb(void *ctx, const float *l, const float *r,
+                         const float *peak_l, const float *peak_r,
                          int bins, float beat, int seq, int interval_ms)
 {
     ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)ctx;
     char buf[EV_FFT_LINE + 1];
-    int off, i;
-    if (!e || !l || !r || bins <= 0) return;
-    /* 事件槽按 128 带设计（8-bit 量化后约 1.2KB）；更大 bins 截断，保证
-       永不写穿 ev_fft 槽。 */
+    int off;
+    if (!e || !l || !r || !peak_l || !peak_r || bins <= 0) return;
+    /* 事件槽按 128 带设计；更大 bins 截断，保证永不写穿 ev_fft 槽。 */
     if (bins > 128) bins = 128;
     off = snprintf(buf, sizeof(buf),
                    "{\"type\":\"fft\",\"seq\":%d,\"interval_ms\":%d,"
                    "\"sample_rate\":%d,\"bins\":%d,\"min_hz\":%.1f,\"max_hz\":%.1f,"
-                   "\"beat\":%d,\"ldata\":[",
+                   "\"beat\":%d",
                    seq, interval_ms, e->spectrum_sr, bins,
                    (double)e->spec_min_hz, (double)e->spec_max_hz,
                    (int)(beat <= 0.0f ? 0.0f
                                       : (beat >= 1.0f ? 255.0f : beat * 255.0f + 0.5f)));
-    for (i = 0; i < bins && off < (int)sizeof(buf) - 8; i++) {
-        int v = (int)(l[i] <= 0.0f ? 0.0f
-                                   : (l[i] >= 1.0f ? 255.0f : l[i] * 255.0f + 0.5f));
-        off += snprintf(buf + off, sizeof(buf) - (size_t)off,
-                        i ? ",%d" : "%d", v);
-    }
-    off += snprintf(buf + off, sizeof(buf) - (size_t)off, "],\"rdata\":[");
-    for (i = 0; i < bins && off < (int)sizeof(buf) - 8; i++) {
-        int v = (int)(r[i] <= 0.0f ? 0.0f
-                                   : (r[i] >= 1.0f ? 255.0f : r[i] * 255.0f + 0.5f));
-        off += snprintf(buf + off, sizeof(buf) - (size_t)off,
-                        i ? ",%d" : "%d", v);
-    }
-    snprintf(buf + off, sizeof(buf) - (size_t)off, "]}");
+    spec_append_bands(buf, (int)sizeof(buf), &off, "ldata", l, bins);
+    spec_append_bands(buf, (int)sizeof(buf), &off, "rdata", r, bins);
+    spec_append_bands(buf, (int)sizeof(buf), &off, "lpeak", peak_l, bins);
+    spec_append_bands(buf, (int)sizeof(buf), &off, "rpeak", peak_r, bins);
+    snprintf(buf + off, sizeof(buf) - (size_t)off, "}");
     ev_enqueue_fft(e, buf);
 }
 
@@ -2052,7 +2057,7 @@ static int mediaengine_spectrum_start(ArchoeraMediaEngine *e)
         cfg.min_hz = e->spec_min_hz;
         cfg.max_hz = e->spec_max_hz;
         cfg.interval_ms = 50;
-        cfg.frames = 8192;
+        cfg.frames = 12288; /* VQT 最长窗 */
         cfg.read = spec_read_cb;
         cfg.position = spec_position_cb;
         cfg.emit = spec_emit_cb;

@@ -343,7 +343,9 @@ export fn zk_dsp_spectrum_reset(s: ?*dsp.spectrum.EraSpectrum) void {
 }
 
 /// 处理一帧：l/r 最近 frames 个每声道样本 → out_l/out_r（bins 个 [0,1]）。
-/// 返回本帧节拍强度 0..1；参数非法时返回 0 且不写输出。
+/// 每个 VQT 带只取自己最近的 len 个样本（不足前端补零），frames 上限
+/// 约 max_window（默认 12288）。返回本帧节拍强度 0..1；参数非法时返回 0
+/// 且不写输出。
 export fn zk_dsp_spectrum_process(
     s: ?*dsp.spectrum.EraSpectrum,
     l: ?[*]const f32,
@@ -368,6 +370,19 @@ export fn zk_dsp_spectrum_process(
         ol[0..bins],
         orr[0..bins],
     );
+}
+
+/// 取当前峰值保持线（bins 个 [0,1]）；s/out 为空时空操作。
+export fn zk_dsp_spectrum_peaks(
+    s: ?*const dsp.spectrum.EraSpectrum,
+    out_l: ?[*]f32,
+    out_r: ?[*]f32,
+) void {
+    const sp = s orelse return;
+    const ol = out_l orelse return;
+    const orr = out_r orelse return;
+    const bins = dsp.spectrum.era_spectrum_bins(sp);
+    dsp.spectrum.era_spectrum_peaks(sp, ol[0..bins], orr[0..bins]);
 }
 
 /// 输出频段数；s 为 NULL 时返回 0。

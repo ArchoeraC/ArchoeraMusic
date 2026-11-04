@@ -421,8 +421,8 @@ class EngineBindings {
 
   /// 取一条事件；返回事件文本或 null（队列空）。
   String? pollEvent(Pointer<Opaque> handle) {
-    final buf = calloc<Uint8>(2048);
-    final r = _pollEvent(handle, buf, 2048);
+    final buf = calloc<Uint8>(4096);
+    final r = _pollEvent(handle, buf, 4096);
     if (r == 0) {
       calloc.free(buf);
       return null;
