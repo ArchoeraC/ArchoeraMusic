@@ -158,6 +158,36 @@ abstract class AppLocalizations {
   /// **'只重绘活动涟漪波带；仅 CPU 回退路径生效'**
   String get settingsRippleDamageClipDesc;
 
+  /// No description provided for @settingsLyricsEdgeFade.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'歌词边缘渐隐'**
+  String get settingsLyricsEdgeFade;
+
+  /// No description provided for @settingsLyricsEdgeFadeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'上下边缘的淡出方式：逐行透明度最省 GPU，遮罩层最平滑，关闭则不淡出'**
+  String get settingsLyricsEdgeFadeDesc;
+
+  /// No description provided for @settingsLyricsEdgeFadeWall.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'逐行'**
+  String get settingsLyricsEdgeFadeWall;
+
+  /// No description provided for @settingsLyricsEdgeFadeShader.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'遮罩'**
+  String get settingsLyricsEdgeFadeShader;
+
+  /// No description provided for @settingsLyricsEdgeFadeOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭'**
+  String get settingsLyricsEdgeFadeOff;
+
   /// No description provided for @menuTrackDetail.
   ///
   /// In zh_CN, this message translates to:
@@ -9392,6 +9422,102 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'频谱水平翻转显示'**
   String get settingsReverseSpectrumDesc;
+
+  /// No description provided for @settingsSpectrumPeakHold.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'峰值保持线'**
+  String get settingsSpectrumPeakHold;
+
+  /// No description provided for @settingsSpectrumPeakHoldOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在频谱上方显示由引擎计算的峰值包络线'**
+  String get settingsSpectrumPeakHoldOn;
+
+  /// No description provided for @settingsSpectrumPeakHoldOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不显示峰值线'**
+  String get settingsSpectrumPeakHoldOff;
+
+  /// No description provided for @settingsSpectrumAgc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动增益（AGC）'**
+  String get settingsSpectrumAgc;
+
+  /// No description provided for @settingsSpectrumAgcOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'弱音自动抬升，可能更容易接近满量程'**
+  String get settingsSpectrumAgcOn;
+
+  /// No description provided for @settingsSpectrumAgcOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'保持原始电平动态'**
+  String get settingsSpectrumAgcOff;
+
+  /// No description provided for @settingsSpectrumGamma.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'小信号提亮（γ）'**
+  String get settingsSpectrumGamma;
+
+  /// No description provided for @settingsSpectrumGammaOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'γ=0.9，弱频段更明显'**
+  String get settingsSpectrumGammaOn;
+
+  /// No description provided for @settingsSpectrumGammaOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'γ=1.0，线性显示'**
+  String get settingsSpectrumGammaOff;
+
+  /// No description provided for @settingsSpectrumTilt.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高频倾斜'**
+  String get settingsSpectrumTilt;
+
+  /// No description provided for @settingsSpectrumTiltOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'+0.5dB/oct，高频更亮'**
+  String get settingsSpectrumTiltOn;
+
+  /// No description provided for @settingsSpectrumTiltOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不平滑频响'**
+  String get settingsSpectrumTiltOff;
+
+  /// No description provided for @settingsSpectrumGammaValue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'提亮强度（γ）'**
+  String get settingsSpectrumGammaValue;
+
+  /// No description provided for @settingsSpectrumGammaValueDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前 γ={value}；小于 1 提亮小信号，大于 1 压暗'**
+  String settingsSpectrumGammaValueDesc({required Object value});
+
+  /// No description provided for @settingsSpectrumTiltValue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'倾斜量'**
+  String get settingsSpectrumTiltValue;
+
+  /// No description provided for @settingsSpectrumTiltValueDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前 {value} dB/oct（相对 1kHz）'**
+  String settingsSpectrumTiltValueDesc({required Object value});
 
   /// No description provided for @settingsAutoImmersive.
   ///

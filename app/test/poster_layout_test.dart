@@ -2,9 +2,10 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 整幅封面布局：关闭歌词时的排版回归。
-/// - 不再构建歌词组件；
-/// - 曲目信息在 autoCenterCover 开启时垂直居中，关闭时保持顶部。
+/// 整幅封面布局回归：歌词不可关闭 + 几何对齐 SPlayer `FullCoverLayout`。
+/// - 顶栏歌词开关在该布局下禁用（`lyricsToggleable == false`）；
+/// - 无歌词时右栏显示「暂无歌词」占位（`showLyrics` 偏好不影响该布局）；
+/// - 文字/歌词列从整页 50% 处开始（封面渐隐尾部延伸到其下方）。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -13,10 +14,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/pages/player/layouts/player_layout.dart';
 import 'package:archoera_music/pages/player/layouts/poster_layout.dart';
-import 'package:archoera_music/widgets/player/lyrics_view.dart';
+import 'package:archoera_music/pages/player/layouts/split_layout.dart';
+import 'package:archoera_music/pages/player/layouts/vutron_layout.dart';
 
 PlayerLayoutContext _ctx({
-  required bool autoCenterCover,
+  required bool hasLyrics,
+  bool showLyrics = false,
   required AnimationController pulse,
 }) => PlayerLayoutContext(
   current: null,
@@ -25,18 +28,18 @@ PlayerLayoutContext _ctx({
   subtitle: '测试歌手',
   playing: false,
   hasContent: true,
-  hasLyrics: true,
-  showLyrics: false,
+  hasLyrics: hasLyrics,
+  showLyrics: showLyrics,
   contentMounted: true,
   transitionStyle: 'scale',
   coverLyricRatio: 0.45,
-  autoCenterCover: autoCenterCover,
+  autoCenterCover: true,
   slideNext: true,
   coverPulse: pulse,
   beatStrength: 1,
   pageWidth: 1200,
   pageHeight: 720,
-  fullscreenCoverWidth: 624,
+  fullscreenCoverWidth: 720,
   chromeOpacity: 1,
   buffering: false,
   hasSource: true,
@@ -47,13 +50,17 @@ PlayerLayoutContext _ctx({
   dragMs: null,
 );
 
-Future<void> _pump(WidgetTester tester, {required bool autoCenterCover}) async {
+Future<void> _pump(
+  WidgetTester tester, {
+  required bool hasLyrics,
+  bool showLyrics = false,
+}) async {
   final pulse = AnimationController(
     vsync: const TestVSync(),
     duration: const Duration(milliseconds: 100),
   );
   addTearDown(pulse.dispose);
-  final ctx = _ctx(autoCenterCover: autoCenterCover, pulse: pulse);
+  final ctx = _ctx(hasLyrics: hasLyrics, showLyrics: showLyrics, pulse: pulse);
   await tester.pumpWidget(
     MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -75,21 +82,27 @@ Future<void> _pump(WidgetTester tester, {required bool autoCenterCover}) async {
 }
 
 void main() {
-  testWidgets('关闭歌词：不构建歌词，信息留在右栏', (tester) async {
-    await _pump(tester, autoCenterCover: true);
-    expect(find.byType(LyricsView), findsNothing);
+  test('全屏封面布局：歌词开关不可用（歌词常驻，无关闭入口）', () {
+    expect(const PosterPlayerLayout().lyricsToggleable, isFalse);
+    expect(const SplitPlayerLayout().lyricsToggleable, isTrue);
+    expect(const VutronPlayerLayout().lyricsToggleable, isTrue);
+  });
+
+  testWidgets('关闭歌词偏好也照常渲染右栏（该布局无歌词开关）', (tester) async {
+    // hasLyrics=false 时右栏给占位提示（不依赖歌词引擎，可直接泵）；
+    // hasLyrics=true 的常驻路径由 PlayerLyricsSlot 的 enabled 保证。
+    await _pump(tester, hasLyrics: false, showLyrics: false);
+    expect(find.text('暂无歌词'), findsOneWidget);
     expect(find.text('测试曲目'), findsOneWidget);
   });
 
-  testWidgets('关闭歌词 + 自动居中：信息垂直居中', (tester) async {
-    await _pump(tester, autoCenterCover: true);
-    final center = tester.getCenter(find.text('测试曲目'));
-    expect(center.dy, greaterThan(280));
-    expect(center.dy, lessThan(440));
-  });
-
-  testWidgets('关闭歌词 + 关闭自动居中：信息保持顶部', (tester) async {
-    await _pump(tester, autoCenterCover: false);
+  testWidgets('曲目信息从整页 50% 处开始（渐隐尾部延伸到其下方）', (tester) async {
+    await _pump(tester, hasLyrics: false);
+    // coverInset = 1200 * 0.5 - 32 = 568；信息块左内边距 4。
+    final left = tester.getTopLeft(find.text('测试曲目')).dx;
+    expect(left, greaterThan(560));
+    expect(left, lessThan(590));
+    // 信息保持在顶部（无歌词时不再垂直居中）。
     final center = tester.getCenter(find.text('测试曲目'));
     expect(center.dy, lessThan(180));
   });

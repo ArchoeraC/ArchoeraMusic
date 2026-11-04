@@ -38,6 +38,22 @@ class AppLocalizationsEs extends AppLocalizations {
       'Redibujar solo las bandas de ondas activas; solo ruta CPU';
 
   @override
+  String get settingsLyricsEdgeFade => 'Desvanecido de bordes de la letra';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      'Cómo se desvanecen los bordes superior e inferior: por línea es lo más económico, máscara lo más suave, desactivado sin desvanecido';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => 'Por línea';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'Máscara';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'Off';
+
+  @override
   String get menuTrackDetail => 'Detalles del medio';
 
   @override
@@ -5378,6 +5394,60 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
+
+  @override
+  String get settingsSpectrumPeakHold => 'Línea de retención de picos';
+
+  @override
+  String get settingsSpectrumPeakHoldOn =>
+      'Mostrar sobre el espectro la línea de picos calculada por el motor';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'Línea de picos oculta';
+
+  @override
+  String get settingsSpectrumAgc => 'Ganancia automática (AGC)';
+
+  @override
+  String get settingsSpectrumAgcOn =>
+      'Realza pasajes suaves; puede acercarse más al fondo de escala';
+
+  @override
+  String get settingsSpectrumAgcOff => 'Mantener la dinámica original';
+
+  @override
+  String get settingsSpectrumGamma => 'Realce de señales débiles (γ)';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0,9, bandas débiles más visibles';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1,0, visualización lineal';
+
+  @override
+  String get settingsSpectrumTilt => 'Inclinación de agudos';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0,5 dB/oct, agudos más brillantes';
+
+  @override
+  String get settingsSpectrumTiltOff => 'Respuesta plana';
+
+  @override
+  String get settingsSpectrumGammaValue => 'Intensidad de realce (γ)';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return 'Actual γ=$value; <1 realza señales débiles, >1 oscurece';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => 'Intensidad de inclinación';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return 'Actual $value dB/oct (respecto a 1 kHz)';
+  }
 
   @override
   String get settingsAutoImmersive => 'Auto immersive';

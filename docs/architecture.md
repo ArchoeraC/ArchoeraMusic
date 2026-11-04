@@ -15,10 +15,11 @@
 > （FFI/CLI）**（详见 `docs/audio-kernel-zig.md`）；Dart/FFI 契约不变，行为零回归。
 >
 > **播放输出（2026-09-08）**：桌面播放新增「**内存播放（不落盘）模式**」（默认开启，独立于
-> Stable/EraAudio 引擎选择与 SongCache）；解码 PCM 驻留进程内块列表，频谱经 `pcm_window` FFI
-> 拉取，不写 `stream.wav/.pcm`。本文 §5/§9/§10.1 中「PCM 落盘 `stream.wav` + miniaudio 自播」
-> 等描述均指**文件模式**（显式开关 / env `ARCHOERA_ENGINE_FILE_MODE=1` 保留）。详见
-> `docs/audio-memory-playback.md`。
+> Stable/EraAudio 引擎选择与 SongCache）；解码 PCM 驻留进程内块列表，频谱由引擎
+> 频谱线程直接读块列表并 50ms 事件推送（见 `spectrum-analyzer.md`；破坏性更新，
+> App 不再使用 `pcm_window` 拉取），不写 `stream.wav/.pcm`。本文 §5/§9/§10.1 中
+> 「PCM 落盘 `stream.wav` + miniaudio 自播」等描述均指**文件模式**（显式开关 /
+> env `ARCHOERA_ENGINE_FILE_MODE=1` 保留）。详见 `docs/audio-memory-playback.md`。
 >
 > 定位：独立开发的 Flutter 混合架构音乐播放器（桌面为主），以 AGPL-3.0 开源
 >
@@ -94,7 +95,7 @@ SQLite 写入经 `/api/db/*` 代理串行化），2026-09-06 随去侧车化整�
 │    ├─ libarchoera_mediaengine（C 引擎：转码+miniaudio 自播） │
 │    ├─ archoera-scanner / scraper / downloader（原生模块）    │
 │    ├─ libarchoera_subsonic（Go c-shared，可选启用）          │
-│    └─ libfft.so（频谱拉模式分析，§10.1）                     │
+│    └─ libfft.so（旧 ABI，仅未迁移的 CLI/测试；App 不用，§10.1）  │
 └─────────────────────────────────────────────────────────────┘
 子进程：仅 archoera-vault（凭据保险库，安全边界，§8）。
 原则：桌面端零 TCP 端口、无 Node 运行时（历史侧车方案见 §2/§4 简注）。
@@ -121,6 +122,11 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
 > **引擎路线（2026-08-16 决策）**：主引擎采用 **FFmpeg 默认主 + Zig 内核渐进替换 + C 壳（FFI/CLI
 > 保留）**（详见 `docs/audio-kernel-zig.md`）；本节描述为 C 引擎现状，迁移过程中默认仍 FFmpeg
 > （零回归），Zig 逐格式验收后接管（Dart/FFI 契约不变）。
+>
+> **频谱与引擎选择无关**：`EraSpectrumService` 挂在 MediaEngine 层，读取 `on_pcm_out`
+> 产物（内存块 / `stream.pcm`），按**播放位置**取窗；标准 FFmpeg 与
+> EraAudio 共用同一条链路，不调用 FFmpeg 的 `libavfilter/showspectrum` 或 `av_fft`
+> （见 `spectrum-analyzer.md` §3.1）。
 
 > **播放输出（2026-09-08 变更）**：桌面播放**默认内存模式**（不写 `stream.wav/.pcm`，独立开关，
 > 与 Stable/EraAudio 及 SongCache 均独立）；本小节及 §9/§10.1 的「PCM 落盘 + miniaudio 自播」
@@ -140,7 +146,7 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
   → 事件：事件 FIFO（ready/status/done/playing/position/ended/error）→ Dart 50ms
      定时 pollEvent 轮询 → EngineEvent（position 只留最新；set_event_interval 降频协商）
   → seek：miniaudio 即时 seek（不重启引擎、不重转码）
-  → FFT：UI 按播放位置从本地 PCM 索引按需读帧 → libfft.so（FFI）分析 → 128 bins（拉模式，§10.1）
+  → FFT：引擎 `EraSpectrumService` 按播放位置取窗 → VQT + AGC/γ/倾斜/峰值 → 50ms `fft` 事件（§10.1）
   → 停止：archoera_mediaengine_destroy（join 引擎线程 + 清会话目录）
 ```
 
@@ -158,7 +164,7 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
 
 **Seek**：完整转码落盘后由 **miniaudio 即时 seek**——不重启引擎、不重转码、无毛刺（2026-08-07 落地，取代原「libmpv 本地 seek」方案）
 **EQ/音量/变速变调实时调整**：命令 FIFO（`archoera_mediaengine_command`，JSON 命令）——Flutter `AudioEngineProcess.sendCommand` 直连调用
-**FFT 频谱**：库内 PCM 输出 → 本地落盘索引 → 按播放位置 `frameAt(pos)` 按需读帧 → FFI `libfft.so`（拉模式，§10.1）
+**FFT 频谱**：引擎侧 `EraSpectrumService` 按播放位置取窗 → VQT + 显示增强 → 50ms `fft` 事件推送 → UI 纯接收（§10.1 / `spectrum-analyzer.md`）；旧拉模式不再保留
 **进度/状态**：事件 FIFO `pollEvent`（50ms 轮询，position 事件合并只留最新；`set_event_interval` 降频协商）
 **切歌**：`archoera_mediaengine_destroy`（join 引擎线程）+ 新建引擎实例（库内，无进程切换）；预加载下一首为 Phase 3 优化项
 
@@ -181,7 +187,7 @@ Web 兼容 OGG 流播放服务），Phase 0/1 短暂实施（spawn + `/api/healt
 
 **FFT 与输出格式无关**
 - 管线顺序 `decode → resample → eq → loudness → limiter → tempo → **fft** → encode（可选）`：FFT 分析在编码**之前**
-- 数据链路：库内 PCM → PcmAnalyzer 落盘索引 → `frameAt(pos)` → FFI libfft.so（§10.1）——与输出格式无关
+- 数据链路：库内 PCM → 引擎频谱线程按播放位置取窗 → VQT + AGC/γ/倾斜/峰值 → 50ms `fft` 事件（§10.1）——与输出格式无关
 
 **带宽分析（在线场景）**
 - 外网带宽只消耗在**源下载**；桌面端转码输出即本地文件（无网络开销）——播放与网络解耦，源下载抖动仅影响转码完成时间
@@ -224,7 +230,7 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 | `--interactive` + `--control-fd 3` + `--fft-fd 4` | 关 | 交互模式：fd3 写控制命令、fd4 读 FFT JSON |
 | `--keep-alive-ms <n>` | 0 | 转码完成（EOF）后保持进程存活 n ms 等待迟到消费者（默认 10s），避免短音频 done 前消费者未连上 |
 | `--stream-uds <path>` | — | OGG/Opus 流输出到 UDS（替代 stdout）；引擎**等待消费者连上（15s）后才开始转码**，保证 OGG 从头完整 |
-| `--pcm-uds <path>` | — | 原始 float PCM 块输出到 UDS：`[pos_ms|samples|channels] + float`（小端，4096 samples/帧），供 FFT 拉模式（§10.1） |
+| `--pcm-uds <path>` | — | 原始 float PCM 块输出到 UDS：`[pos_ms|samples|channels] + float`（小端，4096 samples/帧），供外部 PCM 消费（v2 频谱不再走该路径） |
 | `--control-uds <path>` | — | 控制事件 JSON 行输出到 UDS（替代 fd3；Dart `Process` 无法传额外 fd）；`control_send_line()` 优先 UDS，否则 fd3 |
 | stdout / stderr | — | 无 UDS 时 OGG/Opus 走 stdout；stderr 日志 |
 
@@ -247,7 +253,7 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 | 音量 volume | — | `set_volume {gain}`（主音量在 miniaudio 侧，preamp 管余量） |
 | 响度归一化 | `--normalization` | `set_normalization {enabled}` |
 | 限幅器 | `--limiter-threshold`（默认启用） | `set_limiter {enabled}` |
-| 频谱显示 | `--fft` | `set_fft {enabled}` |
+| 频谱显示 | `--fft` | `set_fft {enabled, peak_hold, agc, gamma, tilt}` |
 | 变速/变调 | `--tempo --tempo-speed --tempo-pitch` | `set_tempo_speed` / `set_tempo_pitch` |
 | seek | `-o --offset`（CLI 启动偏移） | `seek {position_ms}`（进程内，Phase 3+；桌面端由 miniaudio 即时 seek，§5.3） |
 
@@ -378,47 +384,62 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 
 ### 10.1 音频频谱（FFT 可视化）
 
-**数据链路（桌面端：库内 PCM 落盘 → 本地索引 → 拉模式，2026-08-07 更新）**
+> **v2 已落地（2026-11-04，破坏性更新）**：频率扩展到 40–16kHz、VQT 可变 Q、
+> 引擎侧 50ms 事件推送、前端改为纯接收端。完整规格/验收见
+> [`spectrum-analyzer.md`](spectrum-analyzer.md)。旧拉模式与旧 `libfft.so` ABI
+> **App 播放路径不保留兼容**，按该文档 §8 直接替换。
+
+**v2 链路（已落地，事件推送）**
 
 ```
-C 引擎 fft 阶段（管线内 DSP 之后、编码之前，与输出格式无关，见 §5.4）
-  └─ 库内 PCM 输出 → 会话目录落盘（stream.pcm / stream.wav 同源）
-        → PcmAnalyzer 建 (posMs → fileOffset) 内存索引
-        → UI 按 miniaudio 实际播放位置（EnginePosition 事件）frameAt(posMs) 二分定位 → 按需读文件
-        → FFI libfft.so（fft_process_multi / fft_get_spectrum_norm_stereo）→ 128 bins
-        → 频谱组件（CustomPainter，RepaintBoundary 局部重绘）
+解码 / 播放位置
+  ├─ 流式模式：最近 PCM 环形缓冲（App 默认）
+  ├─ 文件模式：stream.pcm（独立 FILE* + 增量索引）
+  └─ 内存模式：进程内 PCM 块列表
+        → EraSpectrumService（引擎独立线程，50ms）
+        → VQT（128 带复解调）+ AGC/γ/倾斜 + dB/软膝 + 峰值 + 频谱通量
+        → {"type":"fft", ldata, rdata, lpeak, rpeak, beat, seq, ...}（8-bit 量化）
+        → Dart PlaybackNotifier（只解析事件 → state.fft）
+        → SpectrumView（只做帧间插值/显示平滑/绘制）
 ```
-- **拉模式原因**：引擎全速转码可快于实时，UI 必须以播放位置取帧而非顺序消费；任意位置（含回退 seek）可回溯
-- 引擎转码期间即可用（缓冲已落盘的块）；帧间插值沿用原 BottomSpectrum.vue 算法（见下）
 
-**FFI 细节（fft_bindings.dart）**
-- 加载 `build/libfft.so`（EnginePaths 同规则解析）；`fft_create(sampleRate, fftSize)` + **`fft_set_enabled(1)` 必须显式调用**（默认 disabled，否则输出全 0）
-- `fft_process_multi(interleaved, samples, channels)` → `fft_get_spectrum_norm_stereo` 128 bins（dB 归一化 [0,1]）
-- **输入缓冲 fftSize×32 float 防越界**（引擎块 4096×2ch=8192 float > 旧 6144 缓冲，曾致段错误）；samples 截断到 fftSize 与 C 侧一致
+- **生产者是引擎**：UI 不再拉 PCM、不再调 FFI、不做 FFT。
+- **取播放位置而非解码位置**：解码可快于实时，频谱必须跟耳朵。
+- **事件可丢**：消费端慢时丢弃旧帧，绝不反压音频线程。
+- **冷/热启动与线程池**：懒初始化、表跨曲目复用、独立频谱线程、零每帧分配；
+  频谱关闭时零额外工作。
 
-**C 引擎 FFT 能力（复用）**
-- 立体声独立分析（ldata/rdata）；Hann 窗 + 指数平滑（EMA）+ 峰值保持衰减 + 对数 dB（-60dB 截断）
-- **自适应多声道（1~6ch，含 5.1）**：`fft_process_multi` 按声道数自动下混为 L/R，ITU-R BS.775 系数——
-  `5.1（FL FR C LFE BL BR）→ L = FL + 0.707·C + 0.707·BL，R = FR + 0.707·C + 0.707·BR，LFE 不入下混`
-- 频段任意聚合（对齐 Web 用 128 bins，`--fft-size 1024`）；`--fft-interval-ms`（Web 用 50ms ≈ 20Hz；桌面端拉模式不受其约束）
+**v2.1 算法要点**
 
-**Flutter 渲染（复刻原项目 `BottomSpectrum.vue` 算法）**
-- 帧间时间插值：`t = min((now - lastUpdate)/PUSH_INTERVAL, 1)`；上行 attack `0.4` / 下行 decay `0.88`——上行灵敏、下行柔和，消除 20Hz 阶梯感
-- `SKIP_LOW` 跳过低频 bin（去 DC 噪声）
-- mirror / split 双声道显示模式（L 镜像左、R 右——数据天然立体声，非同相重复）
-- bar 空间平滑：每 bar 聚合区间 `[start-1, end+1]` bin 均值；bar 宽度 `spectrumBarWidth`（默认 4px）
-- 配置映射：`enableSpectrum` / `spectrumBarWidth` / `spectrumDisplayMode(mirror|split)`——存 Dart 本地 `config/settings.json`（§10.6）
+- 40Hz–16kHz、128 个对数带（约 14.5 band/oct）。
+- **VQT（可变 Q）**：每带独立复解调，低频长窗、高频短窗；最长窗 12288 样本，
+  Q 上限 20.9，不再需要两级 FFT 与交叉区。
+- 分析窗口以播放位置为中心（读取 `pos + max_window/2`），消除低频长窗群延迟。
+- Blackman 周期窗 + 窗和归一化；显示量程按 `|X|/N × 0.28` 口径，
+  0dBFS 正弦约 0.82，顶部留余量。
+- -60..0dB + 底部软膝，去掉硬清零。
+- AGC / `norm^γ` / 高频倾斜 / 峰值保持线均由内核计算，默认关闭，可在设置页开关。
+- 节拍用对数谱通量 + 自适应中位阈值 + 100ms 冷却。
+- 立体声独立；多声道下混沿用 ITU-R BS.775。
 
-**节能（隐藏即静默）**
-- 频谱可见才开启 `_pollSpectrum` Ticker，不可见停止轮询；本地文件拉帧无订阅/推流开销，「隐藏即静默」= 停止 UI 轮询
+**前端显示层**
 
-**实现（2026-08-06 已落地）**
-- `pcm_analyzer.dart`：PCM 落盘 + 二分索引；`frameAt(posMs)` 按需读文件做 FFT（长音频零内存全量缓冲）；`isDone/bytesIn/frameCount` 诊断字段
-- `fft_bindings.dart`：`FftAnalyzer` FFI 封装（`fft_set_enabled(1)` 显式；缓冲 fftSize×32 修复段错误）
-- `playback_notifier.dart`：`_pollSpectrum()` 按 `state.position` 每 50ms 拉帧；`PlaybackState.fft`（`FftFrame{ldata,rdata}`，copyWith 哨兵支持置空）；`stop()` 清空 `state.fft`
-- `widgets/spectrum_view.dart`：CustomPainter + Ticker（~16ms 重绘）复刻 `BottomSpectrum.vue`——帧间插值、ATTACK 0.4/DECAY 0.88、SKIP_LOW=8、双声道镜像拼接（左倒序 + 右正序，usableLen 240）、bar 空间平滑（±1 邻居）、barWidth 4/gap 3/radius 2、底部对齐
-- 消费端：播放页大频谱 + 播放条迷你频谱；`stop()` 清空 `state.fft`（频谱归零）
-- 已验证：AUTOPLAY 全链路 `FFT 频谱已启动: 本地 N 帧 @50ms 拉模式`；440Hz 校准 `bin67 val=0.793`
+- 帧间时间插值：`t = min((now - lastUpdate)/intervalMs, 1)`，`intervalMs` 由
+  `FftFrame.intervalMs`（50/300/1000ms）播种、按实测到达间隔平滑；上行 attack
+  `0.4` / 下行 decay `0.88` 按帧时长归一化（60fps 基准）。
+- `SKIP_LOW` 跳过低频 bin；mirror/split 双声道显示；bar 空间平滑（±1 邻居）；
+  bar 宽度 `spectrumBarWidth`（默认 4px）。
+- 配置映射：`enableSpectrum` / `spectrumBarWidth` / `spectrumDisplayMode`。
+
+**破坏性更新：删除 v1 拉模式**
+
+- `PcmAnalyzer` / `MemoryPcmAnalyzer` / `_pollSpectrum` / `fft_bindings.dart` 从
+  App 播放路径直接删除，不保留 A/B 回退或兼容层。
+- App 播放路径不再调用 `archoera_mediaengine_pcm_window`；该 FFI 保留给
+  CLI/测试，引擎频谱内部走 `mem_window`。
+- App 不再使用旧 `libfft.so` 的 `fft_*` ABI；v2 的唯一计算入口是内核
+  `zk_dsp_spectrum_*`。`libfft.so` 仍按旧实现构建，仅供未迁移的 CLI/测试。
+- 频谱事件/数据契约以 `spectrum-analyzer.md` §6 为准。
 
 ### 10.2 歌词流水线（获取 → 匹配 → 标准化 → 渲染）
 
@@ -642,7 +663,7 @@ ArchoeraMusic/
 16. **核心处理逻辑必要时可用 C/C++**：性能瓶颈/算法密集时下沉原生（FFI）；下沉需 **profile 证据驱动**，不主动重写
 17. **桌面端零 TCP 端口（§9）**：控制面为纯 Dart 直连；媒体面由**库内线程直接转码落盘（PCM → `stream.wav`）+ miniaudio 自播**承载（无 loopback 媒体口、无 UDS）
 18. Flutter 原生能力直接用：i18n 走 `flutter_localizations` + `intl`/`gen_l10n`（ARB，非自研）；Dart 侧 `EventBus` 作为应用层统一事件通道（引擎事件 + 本地事件），UI 不直连传输层
-19. **桌面端 FFI 直连引擎（2026-08-07，取代 08-06 spawn+UDS 与更早侧车播放链路）**：Dart 加载 `libarchoera_mediaengine`，库内线程**全速完整转码 PCM 落盘 `stream.wav` → miniaudio 自播**（player 模式 `skip_encoder=true`，不再 Opus 编码）——「完整时长 + 任意 seek」语义；seek 走 miniaudio 即时 seek（不重启引擎、不重转码）；事件 FIFO 50ms 轮询 `pollEvent`（position 只留最新，`set_event_interval` 降频协商）；FFT 为拉模式（按播放位置从本地 PCM 索引读帧 + FFI libfft.so）
+19. **桌面端 FFI 直连引擎（2026-08-07，取代 08-06 spawn+UDS 与更早侧车播放链路）**：Dart 加载 `libarchoera_mediaengine`，库内线程**全速完整转码 PCM 落盘 `stream.wav` → miniaudio 自播**（player 模式 `skip_encoder=true`，不再 Opus 编码）——「完整时长 + 任意 seek」语义；seek 走 miniaudio 即时 seek（不重启引擎、不重转码）；事件 FIFO 50ms 轮询 `pollEvent`（position 只留最新，`set_event_interval` 降频协商）；FFT 为拉模式（按播放位置从本地 PCM 索引读帧 + FFI libfft.so；2026-11-04 v2 起改为引擎 50ms 事件推送，App 不再拉窗）
 20. ~~sidecar 播放路径收窄~~（已随 2026-09-06 去侧车化整体废弃）
-21. **内存播放（不落盘）模式（2026-09-08 决策；S1 引擎 C / S2 Dart 接线与设置已实现，S3 基准收尾待办）**：桌面播放**默认内存模式**（独立开关，与 Stable/EraAudio、SongCache 均独立）；解码 PCM 驻留进程内「全量块列表」（与 `stream.pcm` 文件块同构，达 cap 才滚动淘汰），频谱经新 FFI `archoera_mediaengine_pcm_window`/`_epoch` 拉窗，不写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）；`cap`：auto（按可用内存均衡，**32 MiB 硬上限**，查询故障回落、append 后记账强制淘汰、绝不越过用户设限；驻留仅供频谱 `pcm_window`，另配 8 MiB 块缓冲复用池，`destroy` 时 `malloc_trim` 归还 OS）/ 自定义 / 无上限（须显式警告内存过载后果）。文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为。规格与验收：`docs/audio-memory-playback.md`。
+21. **内存播放（不落盘）模式（2026-09-08 决策；S1 引擎 C / S2 Dart 接线与设置已实现，S3 基准收尾待办）**：桌面播放**默认内存模式**（独立开关，与 Stable/EraAudio、SongCache 均独立）；解码 PCM 驻留进程内「全量块列表」（与 `stream.pcm` 文件块同构，达 cap 才滚动淘汰），频谱由引擎频谱线程直接读块列表并 50ms 事件推送（v2 破坏性更新；App 不再使用 `pcm_window` FFI 拉窗），不写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）；`cap`：auto（按可用内存均衡，**32 MiB 硬上限**，查询故障回落、append 后记账强制淘汰、绝不越过用户设限；驻留仅供频谱取帧，另配 8 MiB 块缓冲复用池，`destroy` 时 `malloc_trim` 归还 OS）/ 自定义 / 无上限（须显式警告内存过载后果）。文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为。规格与验收：`docs/audio-memory-playback.md`。
 22. **MCP 控制服务（2026-10-07，可选）**：默认关闭；开启后默认仅绑定回环 `127.0.0.1`（非特权端口），可手动开启「允许局域网访问」绑定 `0.0.0.0`（默认关、需用户确认 + 仍要求密钥）。以标准协议（MCP Streamable HTTP / REST / WebSocket，均 JSON-RPC 2.0 / HTTP+JSON）暴露播放/队列/搜索/曲库/偏好只读/外观/收藏/历史/歌词/下载能力；默认要求访问密钥、能力组默认全关。纯 Dart 实现（`dart:io`，事件循环驱动、无轮询），不参与播放链路（仍为进程内 FFI），是对「桌面端零 TCP 端口」的显式可选例外。另随二进制内置命令行客户端 `archoera_music archoerashell ...`（类 Unix 语法，经 REST 与运行实例通信，不启动 GUI）。详见 `docs/mcp.md`。

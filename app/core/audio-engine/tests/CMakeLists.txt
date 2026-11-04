@@ -23,6 +23,12 @@ add_engine_test(test_limiter test_limiter.c)
 add_engine_test(test_fft test_fft.c)
 add_engine_test(test_loudness test_loudness.c)
 
+# 文件模式 stream.pcm 按位置取窗：增量索引 / 跨块 / 前缀补零 / 下混 /
+# 截断重建（headless，临时文件自建自删）。
+add_engine_test(test_pcm_file_reader test_pcm_file_reader.c)
+set_tests_properties(test_pcm_file_reader PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # 内核 DSP（zk_dsp_*）vs 纯 C 实现逐块对照（方向① 地基，docs/audio-kernel-zig.md
 # §14）：dsp_ref/*.c 以重命名符号**再编译一份生产线 C 源码**作为参考（无复制
 # 漂移），与内核 EQ/限幅/响度对拍。依赖 HAS_ARCHOERA_KERNEL（内核静态库在场）。
@@ -45,6 +51,26 @@ if(HAS_ARCHOERA_KERNEL)
     )
     add_test(NAME test_dsp_kernel COMMAND test_dsp_kernel)
     set_tests_properties(test_dsp_kernel PROPERTIES
+        PASS_REGULAR_EXPRESSION "ALL PASS")
+endif()
+
+# 频谱 v2 推送服务：独立线程 / 50ms 节流 / 440Hz 峰值带 / 快速 stop
+# （headless：read 回调现场生成正弦，不依赖设备与文件）。
+if(HAS_ARCHOERA_KERNEL)
+    add_executable(test_spectrum_service test_spectrum_service.c)
+    target_link_libraries(test_spectrum_service PRIVATE audio_engine_static)
+    if(TARGET Threads::Threads)
+        target_link_libraries(test_spectrum_service PRIVATE Threads::Threads)
+    endif()
+    if(UNIX)
+        target_link_libraries(test_spectrum_service PRIVATE m)
+    endif()
+    target_include_directories(test_spectrum_service PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    )
+    add_test(NAME test_spectrum_service COMMAND test_spectrum_service)
+    set_tests_properties(test_spectrum_service PROPERTIES
         PASS_REGULAR_EXPRESSION "ALL PASS")
 endif()
 

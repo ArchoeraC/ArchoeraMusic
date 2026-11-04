@@ -12,9 +12,7 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../../stores/app_prefs.dart';
-import '../log/log.dart';
 import 'engine_bindings.dart';
-import 'pcm_analyzer.dart';
 
 /// 引擎控制事件（事件驱动推送 / 回退轮询接收的 JSON 行）。
 sealed class EngineEvent {
@@ -88,11 +86,51 @@ class EngineSinkChanged extends EngineEvent {
   final String? err;
 }
 
-/// 播放位置事件（播放模式，每 50ms 音频 1 帧；驱动 FFT 事件取帧）。
+/// 播放位置事件（播放模式，每 50ms 音频 1 帧；驱动进度/歌词/封面）。
 class EnginePosition extends EngineEvent {
   const EnginePosition({required this.positionMs});
 
   final int positionMs;
+}
+
+/// 频谱帧事件（引擎 `EraSpectrumService` 每 `interval_ms` 推送一帧）。
+///
+/// 数据契约见 docs/spectrum-analyzer.md §6.1：`ldata`/`rdata` 各 128 个
+/// [0,1]，对数频带覆盖 40~16000Hz；事件可丢，UI 以最新一帧为准。
+class EngineFft extends EngineEvent {
+  const EngineFft({
+    required this.ldata,
+    required this.rdata,
+    required this.lpeak,
+    required this.rpeak,
+    required this.beat,
+    required this.seq,
+    required this.intervalMs,
+    required this.minHz,
+    required this.maxHz,
+  });
+
+  final List<double> ldata;
+  final List<double> rdata;
+
+  /// 峰值保持线（与 [ldata]/[rdata] 同长度，0~1）。
+  final List<double> lpeak;
+  final List<double> rpeak;
+
+  /// 节拍/瞬态脉冲强度 0~1（无脉冲为 0）。
+  final double beat;
+
+  /// 单调递增的帧序号。
+  final int seq;
+
+  /// 生产端目标推送间隔（ms）。
+  final int intervalMs;
+
+  /// 频谱覆盖的最低频率（Hz）。
+  final int minHz;
+
+  /// 频谱覆盖的最高频率（Hz）。
+  final int maxHz;
 }
 
 /// 降频协商回执（set_event_interval 的 C 侧确认，engine-event-push-plan §4.2）。
@@ -186,10 +224,8 @@ class EngineSinkStall extends EngineEvent {
 ///   - 事件经线程安全 FIFO，Dart 侧用**独立接收 isolate 阻塞等待**
 ///     `wait_event(..., -1)` 推送到主 isolate（空闲零唤醒/零轮询开销）；
 ///   - 控制命令（play/pause/seek/...）经 [sendCommand] 入命令 FIFO；
-///   - PCM 取用（2026-09-08）：默认**内存播放模式**——引擎内存块列表经
-///     `pcm_window` FFI（[MemoryPcmAnalyzer]）；文件模式下引擎直写
-///     `stream.pcm`，[PcmAnalyzer] 按需读文件。见 [memoryMode] 与
-///     `docs/audio-memory-playback.md`。
+///   - 频谱由引擎独立线程分析并经 [EngineFft] 事件推送（2026-11-04 起），
+///     Dart 侧不再拉 PCM / 调 FFI（docs/spectrum-analyzer.md §3）。
 ///
 /// 事件驱动失败/调试可用 `ARCHOERA_EVENT_POLL_FALLBACK=1` 切回旧的 50ms
 /// `pollEvent` 轮询（[AudioEngineProcess.start] 时读取，需冷启动生效）。
@@ -245,11 +281,10 @@ class AudioEngineProcess {
   final int outSampleRate;
 
   /// 内存播放模式（EngineConfig.no_disk_cache=1）：PCM 驻留引擎内存块列表，
-  /// 频谱走 [MemoryPcmAnalyzer]（`pcm_window` FFI），不写 stream.wav/.pcm。
+  /// 不写 stream.wav/.pcm（频谱由引擎事件推送，与文件模式一致）。
   final bool memoryMode;
 
   late final StreamController<EngineEvent> _eventsCtrl;
-  PcmFftSource? _pcm;
   Timer? _pollTimer;
   bool _stopped = false;
 
@@ -278,19 +313,15 @@ class AudioEngineProcess {
   /// 会话已就绪（收到引擎 ready）或已失败/被 [stop] 放弃。
   Future<void> get started => _startedCompleter.future;
 
-  /// 引擎控制事件流（ready/status/done/playing/position/player:ended/error/exited）。
+  /// 引擎控制事件流（ready/status/done/playing/position/fft/player:ended/error/exited）。
   Stream<EngineEvent> get events => _eventsCtrl.stream;
-
-  /// PCM 拉模式源（文件版 [PcmAnalyzer] 读 stream.pcm / 内存版
-  /// [MemoryPcmAnalyzer] 走引擎 pcm_window FFI；UI 拉模式取帧）。
-  PcmFftSource? get pcm => _pcm;
 
   /// 播放器 WAV 文件路径（**仅文件模式**使用；内存模式下引擎不写盘，
   /// 此值仅为会话目录占位，见 [memoryMode] / audio-memory-playback.md）。
   String get wavFilePath => '${sockDir.path}/stream.wav';
 
-  /// 原始 PCM 文件路径（**仅文件模式**：引擎直写、[PcmAnalyzer.frameAt] 按需读取；
-  /// 内存模式无此文件）。
+  /// 原始 PCM 文件路径（**仅文件模式**：引擎直写，供引擎频谱线程按播放位置
+  /// `pread`；内存模式无此文件）。
   String get pcmFilePath => '${sockDir.path}/stream.pcm';
 
   /// 内容完整解码到 EOF（引擎发 done；WAV/PCM 文件完整）。
@@ -329,7 +360,7 @@ class AudioEngineProcess {
   /// store 内存源（M2，docs/audio-memory-source.md）：[store] 非 0 时走
   /// `archoera_mediaengine_create_store`（source 忽略，引擎 AVIO-mem 解码）；
   /// 为 0 时走 [source] 的 `create`（现状）。[memoryStore] 标记 store 会话为
-  /// 纯内存源（PCM 走 MemoryPcmAnalyzer）；EngineConfig.noDisk 仍由 prefs 注入。
+  /// 纯内存源；EngineConfig.noDisk 仍由 prefs 注入。
   static Future<AudioEngineProcess> start({
     required String source,
     String? headers,
@@ -346,8 +377,8 @@ class AudioEngineProcess {
     double initialVolume = 1.0,
   }) async {
     // 会话目录统一走系统临时目录（Windows %TEMP% / POSIX /tmp）。
-    // 文件模式：引擎 WAV/PCM 落盘 + PcmAnalyzer 按需读取在此；
-    // 内存模式：仅作会话句柄目录（引擎不落盘，PCM 走 pcm_window FFI）。
+    // 文件模式：引擎 WAV/PCM 落盘（引擎频谱线程按播放位置 pread）；
+    // 内存模式：仅作会话句柄目录（引擎不落盘，频谱走内存块窗口）。
     // 无缝切换会短时并存两个会话，故目录名用「微秒 + 单调序号」保证唯一
     //（避免同毫秒并发导致互相删目录/写同一 stream.wav）。
     final sockDir = Directory(
@@ -429,8 +460,9 @@ class AudioEngineProcess {
     return engine;
   }
 
-  /// 事件缓冲容量（对齐 pollEvent；事件行上限 EV_LINE 511，留余量）。
-  static const _eventBufCap = 2048;
+  /// 事件缓冲容量（对齐 pollEvent；常规事件行上限 511，频谱事件含
+  /// ldata/rdata/lpeak/rpeak 四组 8-bit 数组，预留 4KB）。
+  static const _eventBufCap = 4096;
 
   /// 接收 isolate 就绪握手哨兵（主 isolate 收到的首条消息；其后均为事件串）。
   static const int _enginePumpHandshake = 0x50_4D_50_21; // 'PMP!'
@@ -582,8 +614,6 @@ class AudioEngineProcess {
               backend: map['backend'] as String?,
             ),
           );
-          // PCM 分析器按管线实际输出采样率打开（FFI 频轴正确）
-          unawaited(_openPcm(outRate));
           // 会话启动门槛：ready（管线建立、开始解码/出声）即放行。流式起播
           // 下此处后紧跟 playing（首块 PCM），done 仍在曲尾；启动收敛必须
           // 以 ready 为准（_startSession 由 `await done` 改为 `await started`）。
@@ -609,6 +639,23 @@ class AudioEngineProcess {
           _emit(
             EnginePosition(
               positionMs: (map['position_ms'] as num?)?.toInt() ?? 0,
+            ),
+          );
+        case 'fft':
+          // 引擎推送的频谱帧（docs/spectrum-analyzer.md §6.1）。缺字段按
+          // 契约默认值兜底（128 个 0 / 50ms / 40–16kHz / seq 0），单条坏帧
+          // 不得影响播放。
+          _emit(
+            EngineFft(
+              ldata: _bands(map['ldata']),
+              rdata: _bands(map['rdata']),
+              lpeak: _bands(map['lpeak']),
+              rpeak: _bands(map['rpeak']),
+              beat: _unitValue(map['beat']),
+              seq: (map['seq'] as num?)?.toInt() ?? 0,
+              intervalMs: (map['interval_ms'] as num?)?.toInt() ?? 50,
+              minHz: (map['min_hz'] as num?)?.toInt() ?? 40,
+              maxHz: (map['max_hz'] as num?)?.toInt() ?? 16000,
             ),
           );
         case 'event_interval':
@@ -682,23 +729,33 @@ class AudioEngineProcess {
     }
   }
 
-  /// 打开 PCM 拉模式源（ready 后调用）：
-  ///   内存模式 → MemoryPcmAnalyzer（引擎 pcm_window，无文件）；
-  ///   文件模式 → PcmAnalyzer（读 stream.pcm，scan 增量补索引）。
-  Future<void> _openPcm(int sampleRate) async {
-    if (_pcm != null) return;
-    final rate = sampleRate > 0 ? sampleRate : 48000;
-    try {
-      if (memoryMode) {
-        _pcm = MemoryPcmAnalyzer(handle: handle, sampleRate: rate);
-      } else {
-        _pcm = await PcmAnalyzer.open(pcmFilePath, sampleRate: rate);
+  /// 解析 `fft` 事件的 0..1 标量（如 `beat`）：整数按 0..255 编码还原，
+  /// 浮点按契约原值；缺失/非法项按 0 兜底。
+  static double _unitValue(Object? raw) {
+    if (raw is int) return (raw / 255.0).clamp(0.0, 1.0).toDouble();
+    if (raw is num) return raw.toDouble().clamp(0.0, 1.0).toDouble();
+    return 0;
+  }
+
+  /// 解析 `fft` 事件的频带数组：固定 128 个 `[0,1]`，缺失/非法项按 0 兜底。
+  ///
+  /// 引擎为压缩事件体积用 0..255 整数编码（mediaengine_lib.c `spec_emit_cb`），
+  /// 这里按元素类型还原：整数 / 255，浮点按契约原值。每次事件新建 List
+  /// （不复用跨事件缓冲），避免 UI 持有被下一帧覆盖的数据。
+  static List<double> _bands(Object? raw, {int bins = 128}) {
+    final out = List<double>.filled(bins, 0);
+    if (raw is List) {
+      final n = raw.length < bins ? raw.length : bins;
+      for (var i = 0; i < n; i++) {
+        final v = raw[i];
+        if (v is int) {
+          out[i] = (v / 255.0).clamp(0.0, 1.0).toDouble();
+        } else if (v is num) {
+          out[i] = v.toDouble().clamp(0.0, 1.0).toDouble();
+        }
       }
-    } catch (e) {
-      // PCM 源不可用：频谱不可用，不影响播放。记录根因便于排查
-      // （如 libfft.so 缺失/符号隐藏导致的 FftAnalyzer 构造失败）。
-      Log.w('audio-engine', 'PCM 分析器打开失败（频谱不可用）: $e');
     }
+    return out;
   }
 
   void _emit(EngineEvent event) {
@@ -746,8 +803,6 @@ class AudioEngineProcess {
   Future<void> stop() async {
     if (_stopped) return;
     _stopped = true;
-    _pcm?.dispose();
-    _pcm = null;
     _pollTimer?.cancel();
     _pollTimer = null;
     // 放行 pending started/done：stop 由新 load 抢占触发（缓冲中切歌）时，

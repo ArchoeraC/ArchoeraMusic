@@ -36,6 +36,22 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsRippleDamageClipDesc => 'アクティブな波紋帯のみ再描画；CPU フォールバック時のみ有効';
 
   @override
+  String get settingsLyricsEdgeFade => '歌詞の上下フェード';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '上下端のフェード方式：行単位が最も軽量、マスクが最も滑らか、オフでフェードなし';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '行単位';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'マスク';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'オフ';
+
+  @override
   String get menuTrackDetail => 'メディア詳細';
 
   @override
@@ -5120,6 +5136,58 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
+
+  @override
+  String get settingsSpectrumPeakHold => 'ピークホールド線';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => 'エンジンが計算したピーク線をスペクトル上に表示';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'ピーク線は非表示';
+
+  @override
+  String get settingsSpectrumAgc => '自動ゲイン（AGC）';
+
+  @override
+  String get settingsSpectrumAgcOn => '小さい音を持ち上げるため、満量程に近づきやすくなります';
+
+  @override
+  String get settingsSpectrumAgcOff => '元のダイナミクスを維持';
+
+  @override
+  String get settingsSpectrumGamma => '小信号の持ち上げ（γ）';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9、弱い帯域が見やすくなります';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0、リニア表示';
+
+  @override
+  String get settingsSpectrumTilt => '高域チルト';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct、高域が明るくなります';
+
+  @override
+  String get settingsSpectrumTiltOff => 'フラットな周波数特性';
+
+  @override
+  String get settingsSpectrumGammaValue => '持ち上げ量（γ）';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '現在 γ=$value。1 未満で小信号を強調、1 超で暗くします';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => 'チルト量';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '現在 $value dB/oct（1kHz 基準）';
+  }
 
   @override
   String get settingsAutoImmersive => 'Auto immersive';

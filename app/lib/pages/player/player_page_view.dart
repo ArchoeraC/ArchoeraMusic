@@ -206,7 +206,7 @@ extension _PlayerPageView on _PlayerPageState {
                               qualityLevels: qualityLevels,
                               isFullScreen: _isFullScreen,
                               onClose: () => context.pop(),
-                              onToggleLyrics: hasLyrics
+                              onToggleLyrics: hasLyrics && layout.lyricsToggleable
                                   ? () => ref
                                         .read(appPrefsProvider.notifier)
                                         .setShowLyricsInPlayer(!showLyrics)
@@ -320,7 +320,11 @@ class _PlayerTopBar extends StatelessWidget {
                       (showLyrics
                               ? colorScheme.primary
                               : colorScheme.onSurfaceVariant)
-                          .withValues(alpha: hasLyrics ? 1 : 0.35),
+                          .withValues(
+                            alpha: onToggleLyrics == null
+                                ? 0.35
+                                : (hasLyrics ? 1 : 0.35),
+                          ),
                 ),
               ),
             ),

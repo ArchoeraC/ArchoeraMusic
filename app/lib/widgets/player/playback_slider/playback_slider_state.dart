@@ -4,11 +4,60 @@
 
 part of '../playback_slider.dart';
 
-class _PlaybackSliderState extends State<PlaybackSlider> {
+class _PlaybackSliderState extends State<PlaybackSlider>
+    with SingleTickerProviderStateMixin {
   bool _hovered = false;
   bool _dragging = false;
   bool _barDragging = false;
   double _barValue = 0;
+
+  /// 过渡发光呼吸（对齐 SPlayer `s-slider-breathe`：1.4s 往返）；仅
+  /// [PlaybackSlider.glow] 为真时运转，性能模式（noAnim）下停在中间值。
+  /// 时长在 [_syncGlow] 里按性能模式赋值（late 初始化时不得读 MediaQuery）。
+  late final AnimationController _glowCtrl = AnimationController(vsync: this);
+
+  @override
+  void initState() {
+    super.initState();
+    _glowCtrl.value = widget.glow ? 0.5 : 0;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncGlow();
+  }
+
+  @override
+  void didUpdateWidget(covariant PlaybackSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.glow != widget.glow) _syncGlow();
+  }
+
+  /// 依当前 [PlaybackSlider.glow] 启停呼吸动画。
+  void _syncGlow() {
+    _glowCtrl.duration = animDuration(
+      context,
+      const Duration(milliseconds: 1400),
+    );
+    if (widget.glow) {
+      if (noAnim(context)) {
+        _glowCtrl.stop();
+        _glowCtrl.value = 0.5;
+      } else {
+        _glowCtrl.repeat(reverse: true);
+      }
+    } else {
+      _glowCtrl.stop();
+      _glowCtrl.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _glowCtrl.dispose();
+    super.dispose();
+  }
 
   /// 悬停指针相对本组件左缘的 x（用于时间提示定位）。
   double? _hoverDx;
@@ -274,6 +323,36 @@ class _PlaybackSliderState extends State<PlaybackSlider> {
             child: ColoredBox(color: trackColor),
           ),
         ),
+        // 切歌过渡发光：已播放段外围双层柔光 + 呼吸（对齐 SPlayer
+        // `.s-slider--glow`，发光画在填充同矩形、靠 Stack 不裁剪溢出）。
+        if (widget.glow && !widget.buffering && ratio > 0)
+          Positioned.fromRect(
+            rect: progressRect(),
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _glowCtrl,
+                builder: (context, _) {
+                  // 呼吸系数 1.0 → 1.25（对齐 0.8→0.95 / 0.35→0.5 的比例）。
+                  final k = 1.0 + 0.25 * Curves.easeInOut.transform(_glowCtrl.value);
+                  return DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: scheme.primary.withValues(alpha: 0.8 * k),
+                          blurRadius: 3,
+                        ),
+                        BoxShadow(
+                          color: scheme.primary.withValues(alpha: 0.35 * k),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
         Positioned.fromRect(
           rect: progressRect(),
           child: ClipRRect(

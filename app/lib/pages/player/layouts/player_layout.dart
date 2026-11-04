@@ -134,6 +134,9 @@ abstract class PlayerLayout {
   /// 布局把控制放在封面下方）。
   bool get usesDefaultBottomBar => true;
 
+  /// 顶栏歌词开关是否可用（整幅封面布局固定常驻歌词，不可关闭）。
+  bool get lyricsToggleable => true;
+
   /// 歌词水平对齐（居中 / 靠左 / 靠右）。布局注册表按需覆盖：
   /// simple 列表与 AMLL 物理墙都会按此对齐。
   TextAlign get lyricsAlign => TextAlign.center;

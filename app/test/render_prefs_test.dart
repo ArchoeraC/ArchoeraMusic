@@ -37,5 +37,29 @@ void main() {
       expect(next.rippleLowRes, isTrue);
       expect(next.rippleDamageClip, isFalse);
     });
+
+    test('歌词边缘渐隐：默认逐行（wall），非法值回退默认', () {
+      expect(AppPrefs().lyricsEdgeFade, 'wall');
+      expect(AppPrefs().lyricsEdgeFade, defaultLyricsEdgeFade);
+
+      final shader = AppPrefs().copyWithLyricsEdgeFade('shader');
+      expect(shader.lyricsEdgeFade, 'shader');
+      expect(shader.copyWithLyricsEdgeFade('off').lyricsEdgeFade, 'off');
+
+      // 非法值（含旧版本残留/手改配置）一律回退默认，不抛错。
+      expect(AppPrefs().copyWithLyricsEdgeFade('nope').lyricsEdgeFade, 'wall');
+      expect(
+        AppPrefs(initialData: const {lyricsEdgeFadeKey: 42}).lyricsEdgeFade,
+        'wall',
+      );
+    });
+
+    test('歌词边缘渐隐不影响其它渲染开关', () {
+      final p = AppPrefs()
+          .copyWithRippleRender(shader: false)
+          .copyWithLyricsEdgeFade('off');
+      expect(p.rippleShaderEnabled, isFalse);
+      expect(p.lyricsEdgeFade, 'off');
+    });
   });
 }

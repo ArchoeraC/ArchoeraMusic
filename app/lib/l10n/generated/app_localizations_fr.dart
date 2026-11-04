@@ -38,6 +38,22 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ne redessiner que les bandes d\'ondulations actives ; chemin CPU uniquement';
 
   @override
+  String get settingsLyricsEdgeFade => 'Fondu des bords des paroles';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      'Comment les bords haut et bas s’estompent : par ligne est le moins coûteux, masque le plus doux, désactivé sans fondu';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => 'Par ligne';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => 'Masque';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => 'Off';
+
+  @override
   String get menuTrackDetail => 'Détails du média';
 
   @override
@@ -5380,6 +5396,60 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
+
+  @override
+  String get settingsSpectrumPeakHold => 'Ligne de crête';
+
+  @override
+  String get settingsSpectrumPeakHoldOn =>
+      'Afficher au-dessus du spectre la ligne de crête calculée par le moteur';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'Ligne de crête masquée';
+
+  @override
+  String get settingsSpectrumAgc => 'Gain automatique (AGC)';
+
+  @override
+  String get settingsSpectrumAgcOn =>
+      'Renforce les passages faibles ; peut plus facilement saturer l’échelle';
+
+  @override
+  String get settingsSpectrumAgcOff => 'Conserver la dynamique d’origine';
+
+  @override
+  String get settingsSpectrumGamma => 'Mise en avant des petits signaux (γ)';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0,9, bandes faibles plus visibles';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1,0, affichage linéaire';
+
+  @override
+  String get settingsSpectrumTilt => 'Inclinaison des aigus';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0,5 dB/oct, aigus plus brillants';
+
+  @override
+  String get settingsSpectrumTiltOff => 'Réponse plate';
+
+  @override
+  String get settingsSpectrumGammaValue => 'Intensité du rehaussement (γ)';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return 'Actuel γ=$value ; <1 rehausse les petits signaux, >1 assombrit';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => 'Intensité de l’inclinaison';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return 'Actuel $value dB/oct (par rapport à 1 kHz)';
+  }
 
   @override
   String get settingsAutoImmersive => 'Auto immersive';

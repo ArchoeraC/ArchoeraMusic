@@ -183,8 +183,8 @@ void zk_decoder_abort(ZkDecoder *d);
  *   - destroy：NULL 空操作；
  *   - 指针（句柄）生命周期归调用方，错误路径不置全局状态。
  *
- * fft / resampler / tempo 本轮仅内核侧接口占位，导出保持 C 现状（尤其
- * libfft.so 的 Dart ABI 零改动）。
+ * fft / resampler / tempo 本轮仅内核侧接口占位；频谱 v2 见下方
+ * `zk_dsp_spectrum_*`（App 不再使用旧 libfft.so 的 Dart ABI）。
  */
 
 /** 均衡器句柄（内核 10 段 Biquad；不透明） */
@@ -246,6 +246,66 @@ void zk_dsp_loudness_process(ZkDspLoudness *l, float *pcm, int samples);
 
 /** 释放响度实例；NULL 空操作。 */
 void zk_dsp_loudness_destroy(ZkDspLoudness *l);
+
+/* ---- 频谱 v2（多分辨率 FFT；引擎 50ms 事件推送）----
+ *
+ * 纯计算核心位于 kernel/dsp/spectrum.zig；C 壳负责取窗、独立线程与事件。
+ * 契约：
+ *   - create：sample_rate>0、bins 1..1024、min_hz>0、max_hz>min_hz 且
+ *     max_hz < sample_rate/2；非法参数 / OOM 返回 NULL；
+ *   - process：l/r 为最近 frames 个每声道样本（VQT 每带只取自己最近 len 个，
+ *     不足前端补零；frames 上限约 max_window=12288），out_l/out_r 长度 = bins，
+ *     值域 [0,1]；返回本帧节拍强度 0..1；
+ *   - peaks：取当前峰值保持线（长度 bins，值域 [0,1]）；
+ *   - reset：清空频谱通量/节拍/AGC/峰值状态（seek / 切歌 / 会话重建）；
+ *   - 线程：内核不建线程，由调用方在独立频谱线程调用；零每帧分配；
+ *   - destroy：NULL 空操作。
+ */
+typedef struct ZkSpectrum ZkSpectrum;
+
+/** 创建频谱分析器（40–16kHz / 128 bins 为默认调用参数）。失败返回 NULL。 */
+ZkSpectrum *zk_dsp_spectrum_create(int sample_rate, int bins,
+                                   float min_hz, float max_hz);
+
+/** 释放频谱分析器；NULL 空操作。 */
+void zk_dsp_spectrum_destroy(ZkSpectrum *s);
+
+/** 清空帧间状态（seek / 切歌 / 会话重建）；NULL 空操作。 */
+void zk_dsp_spectrum_reset(ZkSpectrum *s);
+
+/** 处理一帧：l/r 最近 frames 个样本 → out_l/out_r（bins 个 [0,1]）。 */
+float zk_dsp_spectrum_process(ZkSpectrum *s,
+                              const float *l, const float *r, int frames,
+                              float *out_l, float *out_r);
+
+/**
+ * 处理一帧（窗口居中）：l/r 最后一个样本对应「当前播放位置 + future_samples」。
+ * 每个 VQT 带把窗口中心对准当前播放位置，消除长窗群延迟；future_samples=0
+ * 等价于因果窗口。源不可读未来样本时调用方应退回 zk_dsp_spectrum_process。
+ */
+float zk_dsp_spectrum_process_centered(ZkSpectrum *s,
+                                       const float *l, const float *r, int frames,
+                                       int future_samples,
+                                       float *out_l, float *out_r);
+
+/** 取当前峰值保持线（bins 个 [0,1]）；s/out 为空时空操作。 */
+void zk_dsp_spectrum_peaks(const ZkSpectrum *s,
+                           float *out_l, float *out_r);
+
+/** 设置峰值保持开关；关闭时清空峰值线。 */
+void zk_dsp_spectrum_set_peak_hold(ZkSpectrum *s, int enabled);
+
+/** 运行时开关 AGC；s 为空时空操作。 */
+void zk_dsp_spectrum_set_agc(ZkSpectrum *s, int enabled);
+
+/** 运行时设置 γ（<=0/NaN/Inf 忽略）；s 为空时空操作。 */
+void zk_dsp_spectrum_set_gamma(ZkSpectrum *s, float gamma);
+
+/** 运行时设置高频倾斜（dB/oct，NaN/Inf 忽略）；s 为空时空操作。 */
+void zk_dsp_spectrum_set_tilt(ZkSpectrum *s, float db_per_oct);
+
+/** 输出频段数（bins）；s 为空时返回 0。 */
+int zk_dsp_spectrum_bins(const ZkSpectrum *s);
 
 /* ---- 离线 EBU R128 集成响度测量（scanner 直桥；ITU-R BS.1770-4）----
  *

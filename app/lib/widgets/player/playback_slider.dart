@@ -33,6 +33,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../easter_egg/april_fools_state.dart';
 import '../../utils/format.dart';
+import '../common/anim.dart';
 
 part 'playback_slider/playback_slider_state.dart';
 
@@ -42,6 +43,7 @@ class PlaybackSlider extends StatefulWidget {
     required this.value,
     required this.max,
     required this.buffering,
+    this.glow = false,
     this.showTooltip = true,
     this.tooltipLyric,
     this.onChanged,
@@ -53,6 +55,10 @@ class PlaybackSlider extends StatefulWidget {
 
   /// 缓冲中：轨道叠加流动指示条（进度样式自动降透明）。
   final bool buffering;
+
+  /// 切歌过渡中：已播放段外围叠加呼吸发光（对齐 SPlayer「播放过渡时进度条
+  /// 已播放部分发光」）；缓冲态下不叠加（流动指示本身已提示活动）。
+  final bool glow;
 
   /// 悬停时在轨道上方显示对应时间提示（默认开）。
   final bool showTooltip;

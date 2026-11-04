@@ -34,6 +34,7 @@ pub const biquad = @import("biquad.zig");
 pub const parametric = @import("parametric.zig");
 pub const lowfreq = @import("lowfreq.zig");
 pub const channel_merge = @import("channel_merge.zig");
+pub const spectrum = @import("spectrum.zig");
 
 /// 未移植模块的接口占位与移植计划（本轮不导出 C ABI）。
 pub const fft = @import("fft.zig");
@@ -52,6 +53,7 @@ test {
     _ = @import("parametric.zig");
     _ = @import("lowfreq.zig");
     _ = @import("channel_merge.zig");
+    _ = @import("spectrum.zig");
     _ = @import("fft.zig");
     _ = @import("resampler.zig");
     _ = @import("tempo.zig");

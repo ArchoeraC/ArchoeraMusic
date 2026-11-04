@@ -791,6 +791,87 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   ref.read(appPrefsProvider.notifier).setReverseSpectrum(value),
             ),
             SettingSwitchTile(
+              icon: prefs.spectrumAgc
+                  ? EtaIcons.magic2
+                  : EtaIcons.magic2Outline,
+              title: l10n.settingsSpectrumAgc,
+              subtitle: prefs.spectrumAgc
+                  ? l10n.settingsSpectrumAgcOn
+                  : l10n.settingsSpectrumAgcOff,
+              value: prefs.spectrumAgc,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setSpectrumAgc(value),
+            ),
+            SettingSwitchTile(
+              icon: prefs.spectrumGamma ? EtaIcons.sun : EtaIcons.sunOutline,
+              title: l10n.settingsSpectrumGamma,
+              subtitle: prefs.spectrumGamma
+                  ? l10n.settingsSpectrumGammaOn
+                  : l10n.settingsSpectrumGammaOff,
+              value: prefs.spectrumGamma,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setSpectrumGamma(value),
+            ),
+            SettingSliderTile(
+              icon: EtaIcons.sunOutline,
+              title: l10n.settingsSpectrumGammaValue,
+              subtitle: l10n.settingsSpectrumGammaValueDesc(
+                value: prefs.spectrumGammaValue.toStringAsFixed(2),
+              ),
+              value: prefs.spectrumGammaValue,
+              min: minSpectrumGammaValue,
+              max: maxSpectrumGammaValue,
+              divisions: 20,
+              label: 'γ ${prefs.spectrumGammaValue.toStringAsFixed(2)}',
+              enabled: prefs.spectrumGamma,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setSpectrumGammaValue(v),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.chartLine,
+              title: l10n.settingsSpectrumTilt,
+              subtitle: prefs.spectrumTilt
+                  ? l10n.settingsSpectrumTiltOn
+                  : l10n.settingsSpectrumTiltOff,
+              value: prefs.spectrumTilt,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setSpectrumTilt(value),
+            ),
+            SettingSliderTile(
+              icon: EtaIcons.chartLine,
+              title: l10n.settingsSpectrumTiltValue,
+              subtitle: l10n.settingsSpectrumTiltValueDesc(
+                value:
+                    '${prefs.spectrumTiltValue >= 0 ? '+' : ''}'
+                    '${prefs.spectrumTiltValue.toStringAsFixed(1)}',
+              ),
+              value: prefs.spectrumTiltValue,
+              min: minSpectrumTiltValue,
+              max: maxSpectrumTiltValue,
+              divisions: 90,
+              label:
+                  '${prefs.spectrumTiltValue >= 0 ? '+' : ''}'
+                  '${prefs.spectrumTiltValue.toStringAsFixed(1)} dB/oct',
+              enabled: prefs.spectrumTilt,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setSpectrumTiltValue(v),
+            ),
+            SettingSwitchTile(
+              icon: prefs.spectrumPeakHold
+                  ? EtaIcons.soundLine
+                  : EtaIcons.soundLineOutline,
+              title: l10n.settingsSpectrumPeakHold,
+              subtitle: prefs.spectrumPeakHold
+                  ? l10n.settingsSpectrumPeakHoldOn
+                  : l10n.settingsSpectrumPeakHoldOff,
+              value: prefs.spectrumPeakHold,
+              onChanged: (value) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setSpectrumPeakHold(value),
+            ),
+            SettingSwitchTile(
               icon: prefs.barSpectrum
                   ? EtaIcons.chartBar
                   : EtaIcons.chartBarOutline,
