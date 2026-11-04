@@ -35,11 +35,43 @@ void main() {
   });
 
   group('spectrumAgc / spectrumGamma / spectrumTilt', () {
-    test('默认全部关闭', () {
+    test('默认全部关闭，数值保留默认值', () {
       final p = AppPrefs();
       expect(p.spectrumAgc, isFalse);
       expect(p.spectrumGamma, isFalse);
       expect(p.spectrumTilt, isFalse);
+      expect(p.spectrumGammaValue, 0.9);
+      expect(p.spectrumTiltValue, 0.5);
+    });
+
+    test('关闭时数值仍保留，重新开启后恢复', () {
+      final p = AppPrefs().copyWithSpectrumEnhance(
+        gamma: true,
+        tilt: true,
+        gammaValue: 0.75,
+        tiltValue: 2.3,
+      );
+      expect(p.spectrumGammaValue, 0.75);
+      expect(p.spectrumTiltValue, 2.3);
+
+      final off = p.copyWithSpectrumEnhance(gamma: false, tilt: false);
+      expect(off.spectrumGamma, isFalse);
+      expect(off.spectrumTilt, isFalse);
+      expect(off.spectrumGammaValue, 0.75);
+      expect(off.spectrumTiltValue, 2.3);
+
+      final on = off.copyWithSpectrumEnhance(gamma: true, tilt: true);
+      expect(on.spectrumGammaValue, 0.75);
+      expect(on.spectrumTiltValue, 2.3);
+    });
+
+    test('数值越界时按范围收敛', () {
+      final p = AppPrefs().copyWithSpectrumEnhance(
+        gammaValue: 99,
+        tiltValue: -99,
+      );
+      expect(p.spectrumGammaValue, maxSpectrumGammaValue);
+      expect(p.spectrumTiltValue, minSpectrumTiltValue);
     });
 
     test('可独立开关，且互不影响', () {

@@ -148,8 +148,8 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   bool _spectrumPushOn = false;
   bool _spectrumPeakHoldOn = false;
   bool _spectrumAgcOn = false;
-  bool _spectrumGammaOn = false;
-  bool _spectrumTiltOn = false;
+  double _spectrumGammaValue = 1.0;
+  double _spectrumTiltValue = 0.0;
 
   /// 按「播放中 + 频谱消费者存在 + 非性能模式」同步引擎侧频谱推送。
   ///
@@ -161,8 +161,8 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
       _spectrumPushOn = false;
       _spectrumPeakHoldOn = false;
       _spectrumAgcOn = false;
-      _spectrumGammaOn = false;
-      _spectrumTiltOn = false;
+      _spectrumGammaValue = 1.0;
+      _spectrumTiltValue = 0.0;
       return;
     }
     final prefs = ref.read(appPrefsProvider);
@@ -171,27 +171,28 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
         state.playing;
     final peak = prefs.spectrumPeakHold;
     final agc = prefs.spectrumAgc;
-    final gamma = prefs.spectrumGamma;
-    final tilt = prefs.spectrumTilt;
+    // 关闭时下发中性值（γ=1.0 / tilt=0），但偏好里保留用户设定的数值。
+    final gamma = prefs.spectrumGamma ? prefs.spectrumGammaValue : 1.0;
+    final tilt = prefs.spectrumTilt ? prefs.spectrumTiltValue : 0.0;
     if (wanted == _spectrumPushOn &&
         peak == _spectrumPeakHoldOn &&
         agc == _spectrumAgcOn &&
-        gamma == _spectrumGammaOn &&
-        tilt == _spectrumTiltOn) {
+        gamma == _spectrumGammaValue &&
+        tilt == _spectrumTiltValue) {
       return;
     }
     _spectrumPushOn = wanted;
     _spectrumPeakHoldOn = peak;
     _spectrumAgcOn = agc;
-    _spectrumGammaOn = gamma;
-    _spectrumTiltOn = tilt;
+    _spectrumGammaValue = gamma;
+    _spectrumTiltValue = tilt;
     unawaited(
       engine.sendCommand('set_fft', {
         'enabled': wanted,
         'peak_hold': peak,
         'agc': agc,
-        'gamma': gamma ? 0.9 : 1.0,
-        'tilt': tilt ? 0.5 : 0.0,
+        'gamma': gamma,
+        'tilt': tilt,
       }),
     );
   }

@@ -5178,6 +5178,22 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsSpectrumTiltOff => '평탄한 주파수 응답';
 
   @override
+  String get settingsSpectrumGammaValue => '강조량(γ)';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '현재 γ=$value; 1 미만은 작은 신호 강조, 1 초과는 어둡게';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => '틸트량';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '현재 $value dB/oct (1kHz 기준)';
+  }
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

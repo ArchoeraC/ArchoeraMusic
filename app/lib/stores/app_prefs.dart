@@ -241,6 +241,18 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置 γ 数值（关闭时仍保留）。
+  void setSpectrumGammaValue(double value) {
+    state = state.copyWithSpectrumEnhance(gammaValue: value);
+    state.save();
+  }
+
+  /// 设置高频倾斜数值（关闭时仍保留）。
+  void setSpectrumTiltValue(double value) {
+    state = state.copyWithSpectrumEnhance(tiltValue: value);
+    state.save();
+  }
+
   /// 设置封面跟随节拍缩放开关。
   void setCoverBeatScale(bool value) {
     state = state.copyWithCoverBeatScale(value);

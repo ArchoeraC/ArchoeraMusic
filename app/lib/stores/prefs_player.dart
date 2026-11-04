@@ -21,6 +21,8 @@ const spectrumPeakHoldKey = 'player.spectrumPeakHold';
 const spectrumAgcKey = 'player.spectrumAgc';
 const spectrumGammaKey = 'player.spectrumGamma';
 const spectrumTiltKey = 'player.spectrumTilt';
+const spectrumGammaValueKey = 'player.spectrumGammaValue';
+const spectrumTiltValueKey = 'player.spectrumTiltValue';
 const coverBeatScaleKey = 'player.coverBeatScale';
 const spectrumBarWidthKey = 'player.spectrumBarWidth';
 const spectrumStyleKey = 'player.spectrumStyle';
@@ -127,11 +129,21 @@ const bool defaultSpectrumPeakHold = false;
 /// 频谱自动增益（AGC）：默认关，避免弱音被抬高后顶满。
 const bool defaultSpectrumAgc = false;
 
-/// 频谱小信号提亮（γ=0.9）：默认关，保持线性显示。
+/// 频谱小信号提亮（γ）：默认关，保持线性显示。
 const bool defaultSpectrumGamma = false;
 
-/// 频谱高频倾斜（+0.5dB/oct）：默认关，保持平直频响。
+/// 频谱高频倾斜：默认关，保持平直频响。
 const bool defaultSpectrumTilt = false;
+
+/// γ 可调范围与默认值（<1 提亮，>1 压暗）。
+const double minSpectrumGammaValue = 0.5;
+const double maxSpectrumGammaValue = 1.5;
+const double defaultSpectrumGammaValue = 0.9;
+
+/// 高频倾斜可调范围与默认值（dB/oct，相对 1kHz）。
+const double minSpectrumTiltValue = -3.0;
+const double maxSpectrumTiltValue = 6.0;
+const double defaultSpectrumTiltValue = 0.5;
 
 /// 封面跟随节拍缩放（对齐原版 PlayerCover 播放/暂停缩放之上叠加的
 /// 鼓点脉冲；依赖 FFT 频谱数据，性能模式下自动停用，默认关）。
@@ -323,12 +335,32 @@ extension PlayerPrefs on AppPrefs {
   /// 频谱自动增益（AGC，默认关）。
   bool get spectrumAgc => data[spectrumAgcKey] as bool? ?? defaultSpectrumAgc;
 
-  /// 频谱小信号提亮（γ=0.9，默认关）。
+  /// 频谱小信号提亮（γ，默认关）。
   bool get spectrumGamma =>
       data[spectrumGammaKey] as bool? ?? defaultSpectrumGamma;
 
-  /// 频谱高频倾斜（+0.5dB/oct，默认关）。
+  /// 频谱高频倾斜（默认关）。
   bool get spectrumTilt => data[spectrumTiltKey] as bool? ?? defaultSpectrumTilt;
+
+  /// γ 数值（关闭时仍保留，供下次开启使用）。
+  double get spectrumGammaValue {
+    final v = data[spectrumGammaValueKey] as num?;
+    if (v == null) return defaultSpectrumGammaValue;
+    return v
+        .toDouble()
+        .clamp(minSpectrumGammaValue, maxSpectrumGammaValue)
+        .toDouble();
+  }
+
+  /// 高频倾斜数值（dB/oct，关闭时仍保留）。
+  double get spectrumTiltValue {
+    final v = data[spectrumTiltValueKey] as num?;
+    if (v == null) return defaultSpectrumTiltValue;
+    return v
+        .toDouble()
+        .clamp(minSpectrumTiltValue, maxSpectrumTiltValue)
+        .toDouble();
+  }
 
   /// 封面跟随节拍缩放（鼓点脉冲；性能模式下视为关闭）。
   bool get coverBeatScale =>
@@ -562,16 +594,27 @@ extension PlayerPrefs on AppPrefs {
   AppPrefs copyWithSpectrumPeakHold(bool value) =>
       AppPrefs(initialData: {...data, spectrumPeakHoldKey: value});
 
-  /// 设置频谱增强开关（AGC / γ / 高频倾斜）。
-  AppPrefs copyWithSpectrumEnhance({bool? agc, bool? gamma, bool? tilt}) =>
-      AppPrefs(
-        initialData: {
-          ...data,
-          spectrumAgcKey: ?agc,
-          spectrumGammaKey: ?gamma,
-          spectrumTiltKey: ?tilt,
-        },
-      );
+  /// 设置频谱增强开关与数值（AGC / γ / 高频倾斜）。
+  AppPrefs copyWithSpectrumEnhance({
+    bool? agc,
+    bool? gamma,
+    bool? tilt,
+    double? gammaValue,
+    double? tiltValue,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      spectrumAgcKey: ?agc,
+      spectrumGammaKey: ?gamma,
+      spectrumTiltKey: ?tilt,
+      spectrumGammaValueKey: ?gammaValue
+          ?.clamp(minSpectrumGammaValue, maxSpectrumGammaValue)
+          .toDouble(),
+      spectrumTiltValueKey: ?tiltValue
+          ?.clamp(minSpectrumTiltValue, maxSpectrumTiltValue)
+          .toDouble(),
+    },
+  );
 
   /// 设置频谱可视化样式（非法值不写入，getter 回退默认 bars）。
   AppPrefs copyWithSpectrumStyle(String value) => AppPrefs(
