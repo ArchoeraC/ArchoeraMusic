@@ -17,6 +17,7 @@
 #include "spectrum_service.h"
 
 #include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -85,12 +86,25 @@ static void *era_spectrum_thread(void *arg)
             }
             s->last_pos = pos;
             pthread_mutex_unlock(&s->lock);
-            const int rc = s->cfg.read(s->cfg.ctx, pos, s->frames,
-                                       s->l, s->r);
+            const int future = s->cfg.future_samples;
+            int read_pos = pos;
+            if (future > 0) {
+                read_pos = pos + (int)(((int64_t)future * 1000
+                                        + s->cfg.sample_rate / 2)
+                                       / s->cfg.sample_rate);
+            }
+            int rc = s->cfg.read(s->cfg.ctx, read_pos, s->frames,
+                                 s->l, s->r);
+            int used_future = future;
+            if (rc != 0 && future > 0) {
+                /* 源还没解码到未来位置（启动/欠载）：退回因果窗口。 */
+                used_future = 0;
+                rc = s->cfg.read(s->cfg.ctx, pos, s->frames, s->l, s->r);
+            }
             if (rc == 0) {
                 pthread_mutex_lock(&s->lock);
-                const float beat = zk_dsp_spectrum_process(
-                    s->spectrum, s->l, s->r, s->frames,
+                const float beat = zk_dsp_spectrum_process_centered(
+                    s->spectrum, s->l, s->r, s->frames, used_future,
                     s->out_l, s->out_r);
                 zk_dsp_spectrum_peaks(s->spectrum, s->peak_l, s->peak_r);
                 pthread_mutex_unlock(&s->lock);
@@ -134,6 +148,10 @@ EraSpectrumService *era_spectrum_service_create(
     s->cfg = *cfg;
     s->frames = cfg->frames > 0 ? cfg->frames : 12288;
     if (s->frames > 16384) s->frames = 16384;
+    if (s->cfg.future_samples < 0) s->cfg.future_samples = 0;
+    if (s->cfg.future_samples > s->frames / 2) {
+        s->cfg.future_samples = s->frames / 2;
+    }
     s->bins = cfg->bins;
     s->interval_ms = cfg->interval_ms > 0 ? cfg->interval_ms : 50;
     s->last_pos = -1;

@@ -58,6 +58,7 @@ typedef struct EraSpectrumServiceConfig {
     float max_hz;         /**< 16000 */
     int interval_ms;      /**< 0 → 50 */
     int frames;           /**< 取窗样本数；0 → 12288（VQT 最长窗） */
+    int future_samples;   /**< >0：用未来样本把窗口居中（0 = 因果窗口） */
     EraSpectrumReadFn read;         /**< 必填 */
     EraSpectrumPositionFn position; /**< 必填 */
     EraSpectrumEmitFn emit;         /**< 必填 */

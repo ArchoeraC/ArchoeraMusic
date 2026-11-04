@@ -342,7 +342,7 @@ export fn zk_dsp_spectrum_reset(s: ?*dsp.spectrum.EraSpectrum) void {
     dsp.spectrum.era_spectrum_reset(sp);
 }
 
-/// 处理一帧：l/r 最近 frames 个每声道样本 → out_l/out_r（bins 个 [0,1]）。
+/// 处理一帧（因果窗口）：l/r 最近 frames 个每声道样本 → out_l/out_r。
 /// 每个 VQT 带只取自己最近的 len 个样本（不足前端补零），frames 上限
 /// 约 max_window（默认 12288）。返回本帧节拍强度 0..1；参数非法时返回 0
 /// 且不写输出。
@@ -354,6 +354,21 @@ export fn zk_dsp_spectrum_process(
     out_l: ?[*]f32,
     out_r: ?[*]f32,
 ) f32 {
+    return zk_dsp_spectrum_process_centered(s, l, r, frames, 0, out_l, out_r);
+}
+
+/// 处理一帧（窗口居中）：l/r 的最后一个样本对应 `当前播放位置 +
+/// future_samples`；每个带把窗口中心对准当前播放位置，消除长窗群延迟。
+/// future_samples=0 等价于因果窗口。
+export fn zk_dsp_spectrum_process_centered(
+    s: ?*dsp.spectrum.EraSpectrum,
+    l: ?[*]const f32,
+    r: ?[*]const f32,
+    frames: c_int,
+    future_samples: c_int,
+    out_l: ?[*]f32,
+    out_r: ?[*]f32,
+) f32 {
     const sp = s orelse return 0.0;
     const lp = l orelse return 0.0;
     const rp = r orelse return 0.0;
@@ -361,12 +376,14 @@ export fn zk_dsp_spectrum_process(
     const orr = out_r orelse return 0.0;
     if (frames <= 0) return 0.0;
     const n: usize = @intCast(frames);
+    const future: usize = if (future_samples > 0) @intCast(future_samples) else 0;
     const bins = dsp.spectrum.era_spectrum_bins(sp);
     if (bins == 0) return 0.0;
-    return dsp.spectrum.era_spectrum_process(
+    return dsp.spectrum.era_spectrum_process_centered(
         sp,
         lp[0..n],
         rp[0..n],
+        future,
         ol[0..bins],
         orr[0..bins],
     );
