@@ -5093,6 +5093,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSpectrumTiltOff => '不平滑频响';
 
   @override
+  String get settingsSpectrumGammaValue => '提亮强度（γ）';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '当前 γ=$value；小于 1 提亮小信号，大于 1 压暗';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => '倾斜量';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '当前 $value dB/oct（相对 1kHz）';
+  }
+
+  @override
   String get settingsAutoImmersive => '自动沉浸';
 
   @override
@@ -11117,6 +11133,22 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSpectrumTiltOff => '不平滑频响';
+
+  @override
+  String get settingsSpectrumGammaValue => '提亮强度（γ）';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '当前 γ=$value；小于 1 提亮小信号，大于 1 压暗';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => '倾斜量';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '当前 $value dB/oct（相对 1kHz）';
+  }
 
   @override
   String get settingsAutoImmersive => '自动沉浸';
@@ -17144,6 +17176,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSpectrumTiltOff => '不平滑頻響';
+
+  @override
+  String get settingsSpectrumGammaValue => '提亮強度（γ）';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '目前 γ=$value；小於 1 提亮小訊號，大於 1 壓暗';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => '傾斜量';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '目前 $value dB/oct（相對 1kHz）';
+  }
 
   @override
   String get settingsAutoImmersive => '自动沉浸';

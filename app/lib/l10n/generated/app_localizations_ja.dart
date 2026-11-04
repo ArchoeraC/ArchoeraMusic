@@ -5174,6 +5174,22 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsSpectrumTiltOff => 'フラットな周波数特性';
 
   @override
+  String get settingsSpectrumGammaValue => '持ち上げ量（γ）';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return '現在 γ=$value。1 未満で小信号を強調、1 超で暗くします';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => 'チルト量';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return '現在 $value dB/oct（1kHz 基準）';
+  }
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

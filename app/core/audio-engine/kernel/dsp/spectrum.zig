@@ -331,18 +331,19 @@ pub fn era_spectrum_set_agc(self: *EraSpectrum, enabled: bool) void {
     if (!enabled) self.agc_gain = 1.0;
 }
 
-/// 运行时设置 γ；非法值（<=0 / NaN / Inf）忽略。
+/// 运行时设置 γ；非法值（<=0 / NaN / Inf）忽略，范围收敛到 [0.25, 4.0]。
 pub fn era_spectrum_set_gamma(self: *EraSpectrum, gamma: f32) void {
     if (!std.math.isFinite(gamma) or gamma <= 0.0) return;
-    self.gamma = gamma;
+    self.gamma = std.math.clamp(gamma, 0.25, 4.0);
 }
 
-/// 运行时设置高频倾斜（dB/oct）；非法值忽略，并重算全部带的增益。
+/// 运行时设置高频倾斜（dB/oct）；非法值忽略，范围收敛到 [-24, 24]。
 pub fn era_spectrum_set_tilt(self: *EraSpectrum, db_per_oct: f32) void {
     if (!std.math.isFinite(db_per_oct)) return;
-    self.tilt_db_per_oct = db_per_oct;
+    const clamped = std.math.clamp(db_per_oct, -24.0, 24.0);
+    self.tilt_db_per_oct = clamped;
     for (self.bands) |*band| {
-        band.tilt_gain = eraTiltGain(db_per_oct, band.freq);
+        band.tilt_gain = eraTiltGain(clamped, band.freq);
     }
 }
 
@@ -975,17 +976,21 @@ test "era_spectrum: 运行时开关 AGC / γ / 倾斜" {
     const sp = try era_spectrum_create(a, cfg);
     defer era_spectrum_destroy(sp);
 
-    // γ：合法值写入，非法值忽略。
+    // γ：合法值写入，非法值忽略，越界收敛。
     era_spectrum_set_gamma(sp, 0.5);
     try testing.expectApproxEqAbs(@as(f32, 0.5), sp.gamma, 1e-6);
     era_spectrum_set_gamma(sp, 0.0);
     try testing.expectApproxEqAbs(@as(f32, 0.5), sp.gamma, 1e-6);
+    era_spectrum_set_gamma(sp, 99.0);
+    try testing.expectApproxEqAbs(@as(f32, 4.0), sp.gamma, 1e-6);
 
-    // 倾斜：重算全部带，8kHz 带增益应 > 1。
+    // 倾斜：重算全部带，8kHz 带增益应 > 1；越界收敛。
     era_spectrum_set_tilt(sp, 6.0);
     try testing.expectApproxEqAbs(@as(f32, 6.0), sp.tilt_db_per_oct, 1e-6);
     const idx8 = expectedBand(8000.0, cfg.min_hz, cfg.max_hz, cfg.bins);
     try testing.expect(sp.bands[idx8].tilt_gain > 1.0);
+    era_spectrum_set_tilt(sp, 99.0);
+    try testing.expectApproxEqAbs(@as(f32, 24.0), sp.tilt_db_per_oct, 1e-6);
 
     // AGC：开关切换，关闭时增益复位。
     era_spectrum_set_agc(sp, true);
