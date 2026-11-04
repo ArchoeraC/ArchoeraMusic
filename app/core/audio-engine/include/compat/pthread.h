@@ -7,7 +7,7 @@
  *
  * 桌面端 FFI 库在 Windows（MSVC）编译时无系统 pthread.h，这里用 Win32
  * 原语实现其用到的最小子集：
- *   - mutex        → CRITICAL_SECTION
+ *   - mutex        → CRITICAL_SECTION（含 trylock）
  *   - cond         → CONDITION_VARIABLE（仅 signal/broadcast/wait，无 destroy 语义）
  *   - thread       → CreateThread / WaitForSingleObject（pthread_create / join）
  *   - nanosleep    → Sleep（供引擎线程 50ms 节流）
@@ -28,6 +28,7 @@
 #endif
 #include <windows.h>
 #include <stdlib.h>
+#include <errno.h>  /* EBUSY（pthread_mutex_trylock 失败码） */
 #include <time.h> /* struct timespec（UCRT 自 VS2013 起提供） */
 
 typedef HANDLE pthread_t;
@@ -59,6 +60,9 @@ static void pthread_once(pthread_once_t *once, void (*fn)(void))
 #define pthread_mutex_destroy(m) (DeleteCriticalSection((m)), 0)
 #define pthread_mutex_lock(m) (EnterCriticalSection((m)), 0)
 #define pthread_mutex_unlock(m) (LeaveCriticalSection((m)), 0)
+/* 非阻塞加锁：TryEnterCriticalSection 失败返回 EBUSY（调用方只判 != 0）。 */
+#define pthread_mutex_trylock(m) \
+    (TryEnterCriticalSection((m)) ? 0 : EBUSY)
 
 /* ── cond（Win32 条件变量无需显式销毁）──────────────────────── */
 #define pthread_cond_init(c, a) (InitializeConditionVariable((c)), 0)
