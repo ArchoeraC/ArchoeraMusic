@@ -50,6 +50,7 @@ class PlaybackState {
     this.repeatMode = 'list',
     this.shuffle = false,
     this.buffering = false,
+    this.transitioning = false,
     this.volume = 1.0,
   });
 
@@ -83,7 +84,9 @@ class PlaybackState {
 
   final List<String> logs;
 
-  /// 最近一帧 FFT 频谱（128 bins [0,1]，对数映射 80~2000Hz）。
+  /// 最近一帧 FFT 频谱（128 bins [0,1]，对数映射 40~16000Hz）。
+  ///
+  /// 只由引擎 `fft` 事件更新；UI 不拉 PCM / 不调 FFI。
   final FftFrame? fft;
 
   /// 播放队列（当前列表，UI 只读；原项目 queue store 对应物）。
@@ -100,6 +103,12 @@ class PlaybackState {
 
   /// 缓冲/加载中（引擎转码、音源解析期间为 true，进入播放后置 false）。
   final bool buffering;
+
+  /// 切歌淡入进行中（`player.fade` 开启时新会话就绪后的淡入窗口）。
+  ///
+  /// UI 层用于「过渡进行中」的视觉提示（如进度条已播放段发光），与
+  /// [buffering]（加载）语义分开：淡入期间缓冲往往已结束。
+  final bool transitioning;
 
   /// 播放音量（0~1；用户音量落
   /// AppPrefs，退出确认弹窗的 duck 为临时值，关闭弹窗即恢复）。
@@ -134,6 +143,7 @@ class PlaybackState {
     String? repeatMode,
     bool? shuffle,
     bool? buffering,
+    bool? transitioning,
     double? volume,
   }) {
     return PlaybackState(
@@ -161,6 +171,7 @@ class PlaybackState {
       repeatMode: repeatMode ?? this.repeatMode,
       shuffle: shuffle ?? this.shuffle,
       buffering: buffering ?? this.buffering,
+      transitioning: transitioning ?? this.transitioning,
       volume: volume ?? this.volume,
     );
   }

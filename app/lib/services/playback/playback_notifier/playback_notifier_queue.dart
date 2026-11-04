@@ -303,7 +303,6 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
       if (engine != null && !state.playing) {
         engine.play();
         state = state.copyWith(playing: true);
-        _syncFftActive();
       }
       return;
     }
@@ -508,7 +507,6 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     // 「无引擎」续播路径，从头重放本曲（与睡眠定时收尾同款处理）。
     if (isSequentialQueueEnd(state.repeatMode, state.queueIndex, q.length)) {
       state = state.copyWith(playing: false, buffering: false);
-      _syncFftActive();
       _log('顺序播放：已到队列末尾，自动暂停');
       unawaited(_stopEngine());
       // 明确提示用户「已播完」（顺序播放不会静默地停在队尾）。

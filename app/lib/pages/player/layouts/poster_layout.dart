@@ -5,12 +5,17 @@
 /// 整幅封面布局（`fullscreen`）：左侧封面铺满整页高度、右缘横向渐隐，
 /// 曲目信息（标题/副标题）左对齐放在右侧歌词上方。
 ///
-/// 封面实际绘制宽度比文字栏起点多 [PosterPlayerLayout.coverFadeExtensionFraction]
-/// 页宽：渐隐区延伸到歌词区下方，不再被一条与文字对齐的竖线截断；文字
-/// 起点处的封面 alpha 已很低，不足以明显影响可读性。
+/// 几何对齐 SPlayer-Next `FullCoverLayout`：封面绘制宽度为整页的
+/// [PosterPlayerLayout.coverWidthFraction]（60%），右缘的**多段非线性 alpha
+/// 渐变**在该宽度内缓缓收零；文字/歌词列从整页
+/// [PosterPlayerLayout.textStartFraction]（50%）处开始——渐隐尾部延伸到
+/// 文字列下方，不被一条与文字对齐的竖线截断。
 ///
-/// 参考 SPlayer-Next 的全屏封面：封面画在**页面层**（顶栏/底栏背后），
-/// 主体只排右栏，避免与顶栏/底部控制互相挤压。
+/// 该布局下**歌词不可关闭**（对齐 SPlayer：全屏封面没有隐藏歌词的入口，
+/// 顶栏歌词开关禁用）：有歌词时歌词常驻右栏，无歌词时显示占位提示。
+///
+/// 封面画在**页面层**（顶栏/底栏背后），主体只排右栏，避免与顶栏/底部
+/// 控制互相挤压。
 library;
 
 import 'package:material_ui/material_ui.dart';
@@ -27,35 +32,40 @@ class PosterPlayerLayout extends PlayerLayout {
 
   static const String layoutId = 'fullscreen';
 
-  /// 封面占整页宽度的比例（文字栏从封面右缘开始）。
-  static const double coverWidthFraction = 0.52;
+  /// 封面绘制宽度占整页宽度的比例（右缘渐变在此收零；对齐 SPlayer `w-[60%]`）。
+  static const double coverWidthFraction = 0.60;
 
-  /// 封面实际绘制宽度在文字栏起点之外**多出**的页宽比例。
+  /// 文字/歌词列起点占整页宽度的比例（对齐 SPlayer 右列 `w-1/2`）。
   ///
-  /// 多出的部分让封面右缘的渐隐延伸到文字区下方，渐变不再被一条固定
-  /// 竖线截断；文字仍从 [coverWidthFraction] 处开始。
-  static const double coverFadeExtensionFraction = 0.08;
+  /// 渐隐尾部（50%→60%）延伸到文字列下方；起点处封面 alpha 已降到 ≈0.5
+  /// 且继续下降，不足以明显影响可读性。
+  static const double textStartFraction = 0.50;
 
-  /// 右侧信息/歌词区的最小宽度（窗口过窄时收缩封面）。
+  /// 文字/歌词列的最小宽度（窗口过窄时兜底）。
   static const double lyricsMinWidth = 340;
 
   @override
   String get id => layoutId;
+
+  /// 全屏封面布局：歌词不可关闭（顶栏歌词开关禁用，见库注释）。
+  @override
+  bool get lyricsToggleable => false;
+
+  /// 歌词靠左对齐：与顶栏曲目信息共享视觉左缘（封面强不对称构图下，
+  /// 居中会在右栏再造一个对称中心，信息块与歌词两条轴线对不上）。
+  @override
+  TextAlign get lyricsAlign => TextAlign.left;
 
   @override
   Widget? buildBackdrop(BuildContext context, PlayerLayoutContext c) {
     if (c.fullscreenCoverWidth <= 0) return null;
     return Stack(
       children: [
-        // 绘制宽度比文字栏起点多 6% 页宽：渐隐区延伸到歌词区下方。
         Positioned(
           left: 0,
           top: 0,
           bottom: 0,
-          width:
-              (c.fullscreenCoverWidth +
-                      c.pageWidth * coverFadeExtensionFraction)
-                  .clamp(0.0, c.pageWidth),
+          width: c.fullscreenCoverWidth.clamp(0.0, c.pageWidth),
           child: RepaintBoundary(
             child: CoverSwitcher(
               coverKey: c.coverKey,
@@ -81,12 +91,10 @@ class PosterPlayerLayout extends PlayerLayout {
           0.85,
           1.6,
         );
+        // 文字/歌词列从整页 50% 处开始（渐隐尾部延伸到其下方）。
         final coverInset =
-            (c.fullscreenCoverWidth - kPlayerPageHorizontalPadding).clamp(
-              0.0,
-              box.maxWidth,
-            );
-        final showLyrics = c.showLyrics && c.hasLyrics;
+            (c.pageWidth * textStartFraction - kPlayerPageHorizontalPadding)
+                .clamp(0.0, box.maxWidth);
         final info = _PosterTrackInfo(
           hasContent: c.hasContent,
           title: c.title,
@@ -102,44 +110,40 @@ class PosterPlayerLayout extends PlayerLayout {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (showLyrics) ...[
-                      const SizedBox(height: 2),
-                      info,
-                      const SizedBox(height: 22),
-                      Expanded(
-                        child: PlayerLyricsSlot(
-                          visible: c.showLyrics,
-                          enabled: c.contentMounted && c.hasLyrics,
-                          builder: (context) => Padding(
-                            // 右栏原本留 64px，全屏封面模式下歌词偏窄；收到 24px。
-                            padding: const EdgeInsets.only(right: 24),
-                            child: RepaintBoundary(
-                              child: PlayerLyricsBlock(
-                                hasLyrics: c.hasLyrics,
-                                lyricScale: lyricScale,
-                                textAlign: lyricsAlign,
-                                fadeEdges: true,
-                                onSeek: c.onSeekLyric,
-                                dragMs: c.dragMs,
+                    const SizedBox(height: 2),
+                    info,
+                    const SizedBox(height: 22),
+                    Expanded(
+                      // 全屏封面布局歌词不可关闭：有歌词常驻；无歌词时滑出
+                      // 露出居中占位（对齐 SPlayer 右栏「暂无歌词」）。
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // 占位仅在内容挂载后出现（对齐 SPlayer 的
+                          // lyricMounted 条件）：进入动画期间保持素底。
+                          if (c.contentMounted && !c.hasLyrics)
+                            _NoLyricsHint(l10n: c.l10n),
+                          PlayerLyricsSlot(
+                            visible: true,
+                            enabled: c.contentMounted && c.hasLyrics,
+                            builder: (context) => Padding(
+                              // 右栏原本留 64px，全屏封面模式下歌词偏窄；收到 24px。
+                              padding: const EdgeInsets.only(right: 24),
+                              child: RepaintBoundary(
+                                child: PlayerLyricsBlock(
+                                  hasLyrics: c.hasLyrics,
+                                  lyricScale: lyricScale,
+                                  textAlign: lyricsAlign,
+                                  fadeEdges: true,
+                                  onSeek: c.onSeekLyric,
+                                  dragMs: c.dragMs,
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ] else if (c.autoCenterCover)
-                      // 关闭歌词：曲目信息移到右栏垂直居中，不留顶部孤零零一块。
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: info,
-                        ),
-                      )
-                    else ...[
-                      const SizedBox(height: 2),
-                      info,
-                      const SizedBox(height: 22),
-                      const Expanded(child: SizedBox.shrink()),
-                    ],
+                    ),
                   ],
                 ),
               ),
@@ -147,6 +151,27 @@ class PosterPlayerLayout extends PlayerLayout {
           ),
         );
       },
+    );
+  }
+}
+
+/// 无歌词时的居中占位（对齐 SPlayer 全屏封面右栏的「暂无歌词」）。
+class _NoLyricsHint extends StatelessWidget {
+  const _NoLyricsHint({required this.l10n});
+
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Text(
+        l10n.commonNoLyrics,
+        style: TextStyle(
+          color: scheme.onSurface.withValues(alpha: 0.35),
+          fontSize: 16,
+        ),
+      ),
     );
   }
 }

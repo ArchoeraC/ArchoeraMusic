@@ -480,6 +480,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置歌词区上下渐隐实现（`wall` / `shader` / `off`）。
+  void setLyricsEdgeFade(String value) {
+    state = state.copyWithLyricsEdgeFade(value);
+    state.save();
+  }
+
   /// 设置自定义主色（null = 恢复默认亮蓝）。
   void setAccent(int? accent) {
     state = state.copyWithAccent(accent);

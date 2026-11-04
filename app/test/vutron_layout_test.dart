@@ -171,7 +171,9 @@ void main() {
     expect(wall.unplayedColor, const Color(_unplayed));
     // 注册表声明的左对齐同样作用于 AMLL 物理墙。
     expect(wall.textAlign, TextAlign.left);
-    expect(find.byType(LyricsEdgeFade), findsOneWidget);
+    // 上下渐隐默认走逐行 alpha（零离屏层）→ 墙体自身承担，不再套 ShaderMask。
+    expect(wall.edgeFade, isTrue);
+    expect(find.byType(LyricsEdgeFade), findsNothing);
     expect(find.byType(LyricsView), findsNothing);
   });
 

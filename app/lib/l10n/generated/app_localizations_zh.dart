@@ -34,6 +34,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsRippleDamageClipDesc => '只重绘活动涟漪波带；仅 CPU 回退路径生效';
 
   @override
+  String get settingsLyricsEdgeFade => '歌词边缘渐隐';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '上下边缘的淡出方式：逐行透明度最省 GPU，遮罩层最平滑，关闭则不淡出';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '逐行';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => '遮罩';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => '关闭';
+
+  @override
   String get menuTrackDetail => '媒体详细信息';
 
   @override
@@ -6008,6 +6024,22 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsRippleDamageClipDesc => '只重绘活动涟漪波带；仅 CPU 回退路径生效';
 
   @override
+  String get settingsLyricsEdgeFade => '歌词边缘渐隐';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '上下边缘的淡出方式：逐行透明度最省 GPU，遮罩层最平滑，关闭则不淡出';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '逐行';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => '遮罩';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => '关闭';
+
+  @override
   String get menuTrackDetail => '媒体详细信息';
 
   @override
@@ -11980,6 +12012,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsRippleDamageClipDesc => '只重繪活動漣漪波帶；僅 CPU 回退路徑生效';
+
+  @override
+  String get settingsLyricsEdgeFade => '歌詞邊緣漸隱';
+
+  @override
+  String get settingsLyricsEdgeFadeDesc =>
+      '上下邊緣的淡出方式：逐行透明度最省 GPU，遮罩層最平滑，關閉則不淡出';
+
+  @override
+  String get settingsLyricsEdgeFadeWall => '逐行';
+
+  @override
+  String get settingsLyricsEdgeFadeShader => '遮罩';
+
+  @override
+  String get settingsLyricsEdgeFadeOff => '關閉';
 
   @override
   String get menuTrackDetail => '媒體詳細資訊';

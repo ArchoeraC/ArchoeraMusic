@@ -313,8 +313,11 @@ extension _PlayerBarSections on _PlayerBarState {
     required bool imageMode,
     required Widget bar,
   }) {
+    // 停靠模式：内容层底部已让位 82px（shell.dart），条背后只有壳层的
+    // 预烘焙模糊壁纸，无动态内容穿过 → 共享背景那次模糊（D3）。
     return _glass(
       imageMode,
+      backdropIsBakedBlur: true,
       child: Material(
         color: chrome.playerBarBackground,
         elevation: 8,
