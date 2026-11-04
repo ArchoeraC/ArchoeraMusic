@@ -812,6 +812,22 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               onChanged: (value) =>
                   ref.read(appPrefsProvider.notifier).setSpectrumGamma(value),
             ),
+            SettingSliderTile(
+              icon: EtaIcons.sunOutline,
+              title: l10n.settingsSpectrumGammaValue,
+              subtitle: l10n.settingsSpectrumGammaValueDesc(
+                value: prefs.spectrumGammaValue.toStringAsFixed(2),
+              ),
+              value: prefs.spectrumGammaValue,
+              min: minSpectrumGammaValue,
+              max: maxSpectrumGammaValue,
+              divisions: 20,
+              label: 'γ ${prefs.spectrumGammaValue.toStringAsFixed(2)}',
+              enabled: prefs.spectrumGamma,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setSpectrumGammaValue(v),
+            ),
             SettingSwitchTile(
               icon: EtaIcons.chartLine,
               title: l10n.settingsSpectrumTilt,
@@ -821,6 +837,26 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               value: prefs.spectrumTilt,
               onChanged: (value) =>
                   ref.read(appPrefsProvider.notifier).setSpectrumTilt(value),
+            ),
+            SettingSliderTile(
+              icon: EtaIcons.chartLine,
+              title: l10n.settingsSpectrumTiltValue,
+              subtitle: l10n.settingsSpectrumTiltValueDesc(
+                value:
+                    '${prefs.spectrumTiltValue >= 0 ? '+' : ''}'
+                    '${prefs.spectrumTiltValue.toStringAsFixed(1)}',
+              ),
+              value: prefs.spectrumTiltValue,
+              min: minSpectrumTiltValue,
+              max: maxSpectrumTiltValue,
+              divisions: 90,
+              label:
+                  '${prefs.spectrumTiltValue >= 0 ? '+' : ''}'
+                  '${prefs.spectrumTiltValue.toStringAsFixed(1)} dB/oct',
+              enabled: prefs.spectrumTilt,
+              onChanged: (v) => ref
+                  .read(appPrefsProvider.notifier)
+                  .setSpectrumTiltValue(v),
             ),
             SettingSwitchTile(
               icon: prefs.spectrumPeakHold

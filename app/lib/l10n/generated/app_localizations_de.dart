@@ -5401,6 +5401,22 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSpectrumTiltOff => 'Linearer Frequenzgang';
 
   @override
+  String get settingsSpectrumGammaValue => 'Anhebungsstärke (γ)';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return 'Aktuell γ=$value; <1 hebt kleine Signale an, >1 dunkelt ab';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => 'Tilt-Stärke';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return 'Aktuell $value dB/Okt (relativ zu 1 kHz)';
+  }
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

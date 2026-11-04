@@ -9495,6 +9495,30 @@ abstract class AppLocalizations {
   /// **'不平滑频响'**
   String get settingsSpectrumTiltOff;
 
+  /// No description provided for @settingsSpectrumGammaValue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'提亮强度（γ）'**
+  String get settingsSpectrumGammaValue;
+
+  /// No description provided for @settingsSpectrumGammaValueDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前 γ={value}；小于 1 提亮小信号，大于 1 压暗'**
+  String settingsSpectrumGammaValueDesc({required Object value});
+
+  /// No description provided for @settingsSpectrumTiltValue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'倾斜量'**
+  String get settingsSpectrumTiltValue;
+
+  /// No description provided for @settingsSpectrumTiltValueDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前 {value} dB/oct（相对 1kHz）'**
+  String settingsSpectrumTiltValueDesc({required Object value});
+
   /// No description provided for @settingsAutoImmersive.
   ///
   /// In zh_CN, this message translates to:

@@ -144,6 +144,7 @@ class SettingSliderTile extends StatelessWidget {
     this.divisions,
     this.label,
     this.width = 140,
+    this.enabled = true,
     this.onChangeEnd,
     required this.onChanged,
   });
@@ -157,6 +158,9 @@ class SettingSliderTile extends StatelessWidget {
   final int? divisions;
   final String? label;
   final double width;
+
+  /// 是否可拖动；关闭时仍显示当前值（保留用户设置）。
+  final bool enabled;
   final ValueChanged<double>? onChangeEnd;
   final ValueChanged<double> onChanged;
 
@@ -166,16 +170,19 @@ class SettingSliderTile extends StatelessWidget {
       icon: icon,
       title: title,
       subtitle: subtitle,
-      trailing: SizedBox(
-        width: width,
-        child: Slider(
-          value: value,
-          min: min,
-          max: max,
-          divisions: divisions,
-          label: label,
-          onChangeEnd: onChangeEnd,
-          onChanged: onChanged,
+      trailing: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: SizedBox(
+          width: width,
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            label: label,
+            onChangeEnd: enabled ? onChangeEnd : null,
+            onChanged: enabled ? onChanged : null,
+          ),
         ),
       ),
     );

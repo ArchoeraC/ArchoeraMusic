@@ -5436,6 +5436,22 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSpectrumTiltOff => 'Réponse plate';
 
   @override
+  String get settingsSpectrumGammaValue => 'Intensité du rehaussement (γ)';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return 'Actuel γ=$value ; <1 rehausse les petits signaux, >1 assombrit';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => 'Intensité de l’inclinaison';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return 'Actuel $value dB/oct (par rapport à 1 kHz)';
+  }
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

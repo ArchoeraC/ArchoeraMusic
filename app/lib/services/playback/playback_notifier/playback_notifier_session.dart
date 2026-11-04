@@ -65,8 +65,8 @@ mixin _PlaybackNotifierSession
     _spectrumPushOn = false; /* 新引擎默认频谱关；EnginePlaying 后按偏好开启 */
     _spectrumPeakHoldOn = false;
     _spectrumAgcOn = false;
-    _spectrumGammaOn = false;
-    _spectrumTiltOn = false;
+    _spectrumGammaValue = 1.0;
+    _spectrumTiltValue = 0.0;
     // store 所有权交给 _engineStore：此后由 _stopEngine（engine.stop join 之后）
     // 负责 destroy，本方法其余失败出口不再触碰（避免同句柄重复释放）。
     _engineStore = store;
@@ -285,8 +285,8 @@ mixin _PlaybackNotifierSession
     _spectrumPushOn = false;
     _spectrumPeakHoldOn = false;
     _spectrumAgcOn = false;
-    _spectrumGammaOn = false;
-    _spectrumTiltOn = false;
+    _spectrumGammaValue = 1.0;
+    _spectrumTiltValue = 0.0;
     final store = _engineStore;
     _engineStore = 0;
     if (engine != null) {

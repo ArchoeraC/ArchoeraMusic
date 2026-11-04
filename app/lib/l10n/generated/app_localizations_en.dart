@@ -5344,6 +5344,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSpectrumTiltOff => 'Flat frequency response';
 
   @override
+  String get settingsSpectrumGammaValue => 'Lift amount (γ)';
+
+  @override
+  String settingsSpectrumGammaValueDesc({required Object value}) {
+    return 'Current γ=$value; <1 lifts small signals, >1 darkens';
+  }
+
+  @override
+  String get settingsSpectrumTiltValue => 'Tilt amount';
+
+  @override
+  String settingsSpectrumTiltValueDesc({required Object value}) {
+    return 'Current $value dB/oct (relative to 1 kHz)';
+  }
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override
