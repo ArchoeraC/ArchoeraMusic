@@ -15,10 +15,10 @@
 //!     `f_i = sqrt(f_lo·f_hi)`，窗长 `L_i = Q_i·sr/f_i`，Q 上限 20.9；
 //!     低频用更长窗、高频用更短窗，等价于多分辨率 CQT 的实用近似；
 //!   - Blackman 周期窗 + 窗和归一化，单边幅度 `2|X|/Σw`；
-//!   - 慢 AGC（默认 3s 攻/放，目标 -20dB）让弱音也有内容；
-//!   - `norm^γ`（默认 γ=0.9）提亮小信号；高频倾斜默认 +0.75dB/oct；
-//!   - dB 映射 `[-72, 0] → [0, 1]`，底部 6% smoothstep 软膝；
-//!   - 峰值保持默认以 2.0/s 衰减，随事件一起输出；
+//!   - 显示量程采用常见的 `|X|/N` 口径：再乘 0.27，dB 映射
+//!     `[-60, 0] → [0, 1]`；0dBFS 正弦约 0.81，顶部留余量；
+//!   - AGC / `norm^γ` / 高频倾斜默认关闭，需要时可在配置中开启；
+//!   - 峰值保持默认关闭，由 UI 设置经 `set_fft` 打开；
 //!   - 节拍用对数幅度谱通量 + 最近 43 帧中位数自适应阈值 + 100ms 冷却；
 //!   - 所有核/表在 create 时一次构建，每帧零分配；reset 只清状态。
 //!
@@ -38,27 +38,31 @@ pub const EraSpectrumConfig = struct {
     q_max: f32 = 20.9,
     /// 帧间隔（秒），用于 AGC 攻放/峰值衰减；引擎固定 50ms。
     frame_interval_s: f32 = 0.05,
-    /// 慢 AGC（默认开）。
-    agc_enabled: bool = true,
+    /// 慢 AGC（默认关；开启会抬高弱音，可能重新顶满）。
+    agc_enabled: bool = false,
     agc_target_db: f32 = -24.0,
     agc_attack_s: f32 = 3.0,
     agc_release_s: f32 = 3.0,
     /// 显示 γ（默认 1.0；<1 提亮小信号，>1 压暗）。
     gamma: f32 = 1.0,
-    /// 高频倾斜（dB/oct，相对 1kHz；默认 +0.5）。
-    tilt_db_per_oct: f32 = 0.5,
+    /// 高频倾斜（dB/oct，相对 1kHz；默认 0，保持常见频谱量程）。
+    tilt_db_per_oct: f32 = 0.0,
     /// 峰值保持（默认关；由 UI 设置通过 set_fft 打开）。
     peak_hold: bool = false,
     /// 峰值每秒衰减（归一化单位，默认 2.0/s）。
     peak_decay_per_s: f32 = 2.0,
 };
 
-/// dB 映射动态范围下界（-72dB → 0）。
-const era_db_floor: f32 = -72.0;
+/// dB 映射动态范围下界（-60dB → 0，与常见频谱一致）。
+const era_db_floor: f32 = -60.0;
 
-/// dB 映射上界：+6dB 才满量程，给 0dBFS 内容留约 8% 顶部余量，
-/// 避免母带/限幅后的音乐「一上来就顶满」。
-const era_db_ceiling: f32 = 6.0;
+/// dB 映射上界（0dB → 1）。
+const era_db_ceiling: f32 = 0.0;
+
+/// 显示量程增益：常见频谱实现用 `|X|/N` 且不做相干增益补偿，
+/// 满幅正弦约 0.27（-11.4dB）。我们的 VQT 已把满幅正弦归一到 1.0，
+/// 这里乘同一口径的 0.27，使 0dBFS → 约 0.81，顶部保留余量。
+const era_display_gain: f32 = 0.27;
 
 /// 软膝宽度（映射后归一化坐标的底部 6%）。
 const era_soft_knee: f32 = 0.06;
@@ -351,7 +355,7 @@ fn eraVqtBandMag(band: *const EraVqtBand, src: []const f32) f32 {
     return m;
 }
 
-/// dB → [0,1]，顶部预留 +6dB，底部 6% smoothstep 软膝（不做硬清零）。
+/// dB → [0,1]，-60..0dB 线性映射，底部 6% smoothstep 软膝（不做硬清零）。
 fn eraMapDb(amp: f32) f32 {
     const db = 20.0 * @log10(amp + 1e-12);
     var t = (db - era_db_floor) / (era_db_ceiling - era_db_floor);
@@ -482,7 +486,7 @@ pub fn era_spectrum_process(
 
     for (0..bins) |i| {
         const tilt = self.bands[i].tilt_gain;
-        const gain = agc * tilt;
+        const gain = agc * tilt * era_display_gain;
 
         var v_l = eraMapDb(self.band_l[i] * gain);
         var v_r = eraMapDb(self.band_r[i] * gain);
@@ -653,7 +657,7 @@ test "era_spectrum: 左右分离（仅 L 有信号 → R 全 0）" {
     try testing.expect(out_l[peakBand(out_l)] > 0.5);
 }
 
-test "era_spectrum: 0dBFS 带中心 ≈ 1.0；-60dB ≈ 0.17" {
+test "era_spectrum: 量程校准（0dBFS ≈ 0.81）" {
     const a = testing.allocator;
     const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
@@ -670,17 +674,23 @@ test "era_spectrum: 0dBFS 带中心 ≈ 1.0；-60dB ≈ 0.17" {
     const idx = expectedBand(1000.0, cfg.min_hz, cfg.max_hz, cfg.bins);
     const f: f32 = @floatCast(bandCenter(cfg, idx));
 
+    // 满幅正弦：|X|/N 口径约 0.27（-11.4dB），映射后约 0.81。
     fillSine(l, f, cfg.sample_rate, 1.0);
     _ = era_spectrum_process(sp, l, l, out_l, out_r);
     const loud = out_l[idx];
-    try testing.expect(loud > 0.9);
-    try testing.expect(loud <= 1.0);
+    try testing.expectApproxEqAbs(@as(f32, 0.81), loud, 0.02);
 
+    // -30dB：约 0.31，仍保留明显动态。
+    era_spectrum_reset(sp);
+    fillSine(l, f, cfg.sample_rate, 0.0316228);
+    _ = era_spectrum_process(sp, l, l, out_l, out_r);
+    try testing.expectApproxEqAbs(@as(f32, 0.31), out_l[idx], 0.03);
+
+    // -60dB：低于 -60dB 下界，归零。
     era_spectrum_reset(sp);
     fillSine(l, f, cfg.sample_rate, 0.001);
     _ = era_spectrum_process(sp, l, l, out_l, out_r);
-    const quiet = out_l[idx];
-    try testing.expectApproxEqAbs(@as(f32, 0.17), quiet, 0.05);
+    try testing.expect(out_l[idx] < 0.01);
 }
 
 test "era_spectrum: 40–16k 扫频峰值带连续" {
@@ -867,7 +877,7 @@ test "era_spectrum: AGC / γ / 倾斜 / 峰值保持" {
     const peak_r = try a.alloc(f32, 128);
     defer a.free(peak_r);
 
-    // γ：同一 -60dB 输入，γ=0.5 的输出应高于 γ=1.0。
+    // γ：同一 -30dB 输入，γ=0.5 的输出应高于 γ=1.0。
     const base = EraSpectrumConfig{ .agc_enabled = false, .gamma = 1.0, .tilt_db_per_oct = 0.0, .peak_hold = false };
     const sp1 = try era_spectrum_create(a, base);
     defer era_spectrum_destroy(sp1);
@@ -879,7 +889,7 @@ test "era_spectrum: AGC / γ / 倾斜 / 峰值保持" {
 
     const idx = expectedBand(1000.0, base.min_hz, base.max_hz, base.bins);
     const f: f32 = @floatCast(bandCenter(base, idx));
-    fillSine(l, f, base.sample_rate, 0.001);
+    fillSine(l, f, base.sample_rate, 0.0316228);
     _ = era_spectrum_process(sp1, l, l, out_l, out_r);
     const raw = out_l[idx];
     _ = era_spectrum_process(sp2, l, l, out_l, out_r);
@@ -925,7 +935,7 @@ test "era_spectrum: AGC / γ / 倾斜 / 峰值保持" {
     cfg_agc.agc_target_db = -20.0;
     const sp5 = try era_spectrum_create(a, cfg_agc);
     defer era_spectrum_destroy(sp5);
-    fillSine(l, f, base.sample_rate, 0.001);
+    fillSine(l, f, base.sample_rate, 0.01);
     _ = era_spectrum_process(sp5, l, l, out_l, out_r);
     const first = out_l[idx];
     i = 0;
