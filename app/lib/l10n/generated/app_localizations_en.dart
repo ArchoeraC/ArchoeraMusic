@@ -5316,6 +5316,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSpectrumPeakHoldOff => 'Peak line hidden';
 
   @override
+  String get settingsSpectrumAgc => 'Automatic gain (AGC)';
+
+  @override
+  String get settingsSpectrumAgcOn =>
+      'Boosts quiet passages; may approach full scale more often';
+
+  @override
+  String get settingsSpectrumAgcOff => 'Keep the original level dynamics';
+
+  @override
+  String get settingsSpectrumGamma => 'Small-signal lift (γ)';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9, weak bands become more visible';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0, linear display';
+
+  @override
+  String get settingsSpectrumTilt => 'High-frequency tilt';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5 dB/oct, brighter highs';
+
+  @override
+  String get settingsSpectrumTiltOff => 'Flat frequency response';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

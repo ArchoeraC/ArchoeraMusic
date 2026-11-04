@@ -220,6 +220,9 @@ typedef struct ArchoeraMediaEngine {
     EraSpectrumService *spectrum;
     int     spectrum_wanted;   /* set_fft enabled（可在管线 ready 前到达） */
     int     spectrum_peak_hold;/* set_fft peak_hold（默认关） */
+    int     spectrum_agc;      /* set_fft agc（默认关） */
+    float   spectrum_gamma;    /* set_fft gamma（默认 1.0） */
+    float   spectrum_tilt;     /* set_fft tilt（默认 0dB/oct） */
     int     spectrum_sr;       /* 输出采样率（环/事件换算） */
     float   spec_min_hz;       /* 实际分析下限（40） */
     float   spec_max_hz;       /* 实际分析上限（min(16k, 0.95·Nyquist)） */
@@ -1849,10 +1852,29 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
     } else if (strcmp(type, "set_fft") == 0) {
         bool enabled = true;
         bool peak_hold = false;
+        bool agc = false;
+        double gamma = 1.0;
+        double tilt = 0.0;
         if (json_get_bool(line, "peak_hold", &peak_hold) == 0) {
             e->spectrum_peak_hold = peak_hold ? 1 : 0;
             if (e->spectrum) {
                 era_spectrum_service_set_peak_hold(e->spectrum, peak_hold);
+            }
+        }
+        if (json_get_bool(line, "agc", &agc) == 0) {
+            e->spectrum_agc = agc ? 1 : 0;
+            if (e->spectrum) era_spectrum_service_set_agc(e->spectrum, agc);
+        }
+        if (json_get_number(line, "gamma", &gamma) == 0) {
+            e->spectrum_gamma = (float)gamma;
+            if (e->spectrum) {
+                era_spectrum_service_set_gamma(e->spectrum, (float)gamma);
+            }
+        }
+        if (json_get_number(line, "tilt", &tilt) == 0) {
+            e->spectrum_tilt = (float)tilt;
+            if (e->spectrum) {
+                era_spectrum_service_set_tilt(e->spectrum, (float)tilt);
             }
         }
         if (json_get_bool(line, "enabled", &enabled) == 0) {
@@ -2077,6 +2099,9 @@ static int mediaengine_spectrum_start(ArchoeraMediaEngine *e)
         }
     }
     era_spectrum_service_set_peak_hold(e->spectrum, e->spectrum_peak_hold != 0);
+    era_spectrum_service_set_agc(e->spectrum, e->spectrum_agc != 0);
+    era_spectrum_service_set_gamma(e->spectrum, e->spectrum_gamma);
+    era_spectrum_service_set_tilt(e->spectrum, e->spectrum_tilt);
     return era_spectrum_service_start(e->spectrum);
 }
 
@@ -2536,6 +2561,8 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
 
     ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)calloc(1, sizeof(ArchoeraMediaEngine));
     if (!e) return NULL;
+    e->spectrum_gamma = 1.0f; /* 默认 γ=1.0（关闭） */
+    e->spectrum_tilt = 0.0f;  /* 默认无高频倾斜 */
 
     e->store = store; /* 非空 = store 内存源会话；生命周期归调用方，destroy 不释放 */
     e->source = source ? strdup(source) : NULL;

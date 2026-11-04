@@ -131,7 +131,8 @@ v2 链路（已落地，事件推送）：
   触发 `reset()`，丢弃旧帧；不重建解码器。
 - **`set_fft` 语义变更（破坏性）**：App 的 `set_fft {enabled}` 改为启停
   `EraSpectrumService`（事件推送），不再切 `pipeline_set_fft_enabled`；可选
-  `peak_hold` 运行时开关峰值保持线（默认关）；CLI 的
+  `peak_hold` / `agc`（bool）、`gamma` / `tilt`（数值）实时下发显示增强参数
+  （默认全部关闭）；CLI 的
   `--fft` 仍走 `pipeline` 内的 `fft_process_multi`（v2 核心、按解码位置推送），
   两者互不复用、互不干扰；CLI 输出同样按 40–16kHz/128 带变更（破坏性）。
 - 启动/线程：`set_fft` 只启停独立频谱线程，不触碰 FFmpeg 的 decode worker 池；
@@ -229,8 +230,8 @@ VQT 直接输出每个带的线性幅度 `band[i]`，随后在**引擎侧**依�
 2. **高频倾斜**（默认 0dB/oct，相对 1kHz）：
    - `gain_db = tilt_db_per_oct · log2(f_i / 1000)`；
    - 可选项，不做完整 A-weighting。
-3. **显示量程增益**（固定 0.27）：
-   - 采用常见的 `|X|/N` 口径；0dBFS 正弦 → 约 0.81；
+3. **显示量程增益**（固定 0.28）：
+   - 采用常见的 `|X|/N` 口径；0dBFS 正弦 → 约 0.82；
    - 不随窗口长度/采样率变化。
 4. **dB 映射 + 软膝**（见 §4.5）。
 5. **`norm^γ`**（默认 γ=1.0，即关闭；<1 提亮小信号）：
@@ -242,21 +243,21 @@ VQT 直接输出每个带的线性幅度 `band[i]`，随后在**引擎侧**依�
      渲染端也不描线（`player.spectrumPeakHold` 偏好，默认 false）。
 
 - AGC/γ/倾斜/峰值均在 `kernel/dsp/spectrum.zig` 计算，UI 不参与。
-- 默认值可在 `EraSpectrumConfig` 调整；后续如需设置项，只需把参数透传到
-  `set_fft`，不改变事件结构。
+- 设置页「频谱」提供 **AGC / 小信号提亮（γ）/ 高频倾斜 / 峰值保持线**
+  四个开关，默认全关；变更经 `set_fft` 实时下发，不改变事件结构。
 
 ### 4.5 dB 映射与软膝
 
 ```text
 band = 2·|X| / Σw                         // VQT 已把满幅正弦归一到 1.0
-band = band · 0.27                        // 常见 |X|/N 量程口径
+band = band · 0.28                        // 常见 |X|/N 量程口径
 db = 20·log10(band + 1e-12)
 t  = clamp((db + 60) / 60, 0, 1)         // -60dB → 0，0dB → 1
 gate = clamp(t / 0.06, 0, 1)             // 底部 6% 做软膝
 t  = t * gate² * (3 - 2·gate)            // smoothstep 淡入
 ```
 
-- 量程采用常见的 `|X|/N` + `-60..0dB` 口径；0dBFS 正弦 → 约 **0.81**，
+- 量程采用常见的 `|X|/N` + `-60..0dB` 口径；0dBFS 正弦 → 约 **0.82**，
   顶部天然留约 19% 余量，不再「一上来就顶满」。
 - 去掉 `≤0.04` 硬清零；小信号连续淡出到 0，不再「啪」地消失。
 - 软膝只影响最底部约 4.3dB（-60..-55.7dB），不影响主体动态。
@@ -481,7 +482,7 @@ class FftFrame {
 | 源适配 | 流式环形缓冲 / 内存 `mem_window` / 文件 `src/pcm_file_reader.c/h` |
 | 事件 | 独立 `ev_fft` 最新帧槽；8-bit 量化 `ldata/rdata/lpeak/rpeak` |
 | 前端 | `EngineFft` → `PlaybackState.fft`；峰值线只描线；删除 `_pollSpectrum` / `PcmAnalyzer` 拉模式 |
-| 启停 | `set_fft {enabled}` 启停引擎频谱线程（不再切 `pipeline_set_fft_enabled`） |
+| 启停/增强 | `set_fft {enabled, peak_hold, agc, gamma, tilt}` 启停频谱线程并实时下发显示增强 |
 | 文档 | 本文件 + `architecture.md` / `audio-kernel-zig.md` / `audio-memory-playback.md` / `CHANGELOG.md` |
 
 **验证结果**
@@ -495,8 +496,8 @@ class FftFrame {
 **后续优化项**
 
 - 进程级跨曲目 VQT 核缓存：当前按会话建核，后续可缓存复用。
-- 峰值保持线已通过设置页 / `set_fft {peak_hold}` 暴露；AGC/γ/倾斜参数目前
-  使用内核默认值，如需设置页可再透传 `set_fft` 参数。
+- 峰值保持线、AGC、γ、高频倾斜均可在设置页开关，并通过 `set_fft`
+  实时下发；后续如需连续调节 γ/倾斜量，可把开关换成滑块。
 
 ## 9. 验收
 
@@ -507,7 +508,7 @@ class FftFrame {
 - 静音：全 0。
 - 立体声分离：仅 L 有信号 → R 全 0。
 - 5.1 中央声道：L=R；LFE 不影响输出。
-- 0dBFS 正弦（带中心）：约 **0.81**；-30dB：约 0.31；-60dB：≈ 0。
+- 0dBFS 正弦（带中心）：约 **0.82**；-30dB：约 0.32；-60dB：≈ 0。
 - 40–16k 扫频：峰值带单调连续，无空带/凹口。
 - 节拍：120BPM 点击轨 → 命中数 ≈ 预期；持续正弦不误触发。
 - AGC（开启时）：弱音连续处理后抬升；γ：小信号提亮；倾斜：高频相对提升；
@@ -547,7 +548,7 @@ class FftFrame {
 - **2026-11-04**：频率范围扩展为 40–16kHz；v2 采用多分辨率 FFT，随后 v2.1
   升级为 **VQT（可变 Q）** + 引擎侧 AGC / `norm^γ` / 高频倾斜 / 峰值保持；
   引擎侧 50ms 推送，UI 改为纯事件接收端；频谱线程独立于解码线程池；
-  显示量程采用常见 `|X|/N` 口径（× 0.27 + `-60..0dB`，AGC/γ/倾斜
+  显示量程采用常见 `|X|/N` 口径（× 0.28 + `-60..0dB`，AGC/γ/倾斜
   默认关，峰值保持默认关）；**本次为破坏性更新**——App 播放路径不保留
   旧拉模式与旧 `libfft.so` ABI 兼容；旧 `fft_*` 共享库仅保留给未迁移的
   CLI/测试。

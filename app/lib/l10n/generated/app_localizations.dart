@@ -9441,6 +9441,60 @@ abstract class AppLocalizations {
   /// **'不显示峰值线'**
   String get settingsSpectrumPeakHoldOff;
 
+  /// No description provided for @settingsSpectrumAgc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动增益（AGC）'**
+  String get settingsSpectrumAgc;
+
+  /// No description provided for @settingsSpectrumAgcOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'弱音自动抬升，可能更容易接近满量程'**
+  String get settingsSpectrumAgcOn;
+
+  /// No description provided for @settingsSpectrumAgcOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'保持原始电平动态'**
+  String get settingsSpectrumAgcOff;
+
+  /// No description provided for @settingsSpectrumGamma.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'小信号提亮（γ）'**
+  String get settingsSpectrumGamma;
+
+  /// No description provided for @settingsSpectrumGammaOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'γ=0.9，弱频段更明显'**
+  String get settingsSpectrumGammaOn;
+
+  /// No description provided for @settingsSpectrumGammaOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'γ=1.0，线性显示'**
+  String get settingsSpectrumGammaOff;
+
+  /// No description provided for @settingsSpectrumTilt.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高频倾斜'**
+  String get settingsSpectrumTilt;
+
+  /// No description provided for @settingsSpectrumTiltOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'+0.5dB/oct，高频更亮'**
+  String get settingsSpectrumTiltOn;
+
+  /// No description provided for @settingsSpectrumTiltOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不平滑频响'**
+  String get settingsSpectrumTiltOff;
+
   /// No description provided for @settingsAutoImmersive.
   ///
   /// In zh_CN, this message translates to:

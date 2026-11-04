@@ -378,6 +378,24 @@ export fn zk_dsp_spectrum_set_peak_hold(s: ?*dsp.spectrum.EraSpectrum, enabled: 
     dsp.spectrum.era_spectrum_set_peak_hold(sp, enabled != 0);
 }
 
+/// 运行时开关 AGC；s 为 NULL 时空操作。
+export fn zk_dsp_spectrum_set_agc(s: ?*dsp.spectrum.EraSpectrum, enabled: c_int) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_set_agc(sp, enabled != 0);
+}
+
+/// 运行时设置 γ（<=0/NaN/Inf 忽略）；s 为 NULL 时空操作。
+export fn zk_dsp_spectrum_set_gamma(s: ?*dsp.spectrum.EraSpectrum, gamma: f32) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_set_gamma(sp, gamma);
+}
+
+/// 运行时设置高频倾斜（dB/oct，NaN/Inf 忽略）；s 为 NULL 时空操作。
+export fn zk_dsp_spectrum_set_tilt(s: ?*dsp.spectrum.EraSpectrum, db_per_oct: f32) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_set_tilt(sp, db_per_oct);
+}
+
 /// 取当前峰值保持线（bins 个 [0,1]）；s/out 为空时空操作。
 export fn zk_dsp_spectrum_peaks(
     s: ?*const dsp.spectrum.EraSpectrum,

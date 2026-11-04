@@ -285,6 +285,15 @@ void zk_dsp_spectrum_peaks(const ZkSpectrum *s,
 /** 设置峰值保持开关；关闭时清空峰值线。 */
 void zk_dsp_spectrum_set_peak_hold(ZkSpectrum *s, int enabled);
 
+/** 运行时开关 AGC；s 为空时空操作。 */
+void zk_dsp_spectrum_set_agc(ZkSpectrum *s, int enabled);
+
+/** 运行时设置 γ（<=0/NaN/Inf 忽略）；s 为空时空操作。 */
+void zk_dsp_spectrum_set_gamma(ZkSpectrum *s, float gamma);
+
+/** 运行时设置高频倾斜（dB/oct，NaN/Inf 忽略）；s 为空时空操作。 */
+void zk_dsp_spectrum_set_tilt(ZkSpectrum *s, float db_per_oct);
+
 /** 输出频段数（bins）；s 为空时返回 0。 */
 int zk_dsp_spectrum_bins(const ZkSpectrum *s);
 
