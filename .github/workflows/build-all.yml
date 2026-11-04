@@ -711,7 +711,9 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.linux_rpm == 'true'
     runs-on: ubuntu-24.04
-    container: fedora:latest
+    # 固定 Fedora 43（OpenSSL 3.5）：fedora:latest 已升到 OpenSSL 4.x，
+    # .NET 10 NativeAOT 目前不识别 4.x，会报 "No usable version of libssl was found"。
+    container: fedora:43
     env:
       BUILD_BASE: fedora
     steps:
