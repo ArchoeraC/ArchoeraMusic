@@ -5398,6 +5398,16 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
 
   @override
+  String get settingsSpectrumPeakHold => 'Ligne de crête';
+
+  @override
+  String get settingsSpectrumPeakHoldOn =>
+      'Afficher au-dessus du spectre la ligne de crête calculée par le moteur';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'Ligne de crête masquée';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

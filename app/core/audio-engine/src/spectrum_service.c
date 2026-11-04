@@ -207,6 +207,17 @@ void era_spectrum_service_reset(EraSpectrumService *s)
 #endif
 }
 
+void era_spectrum_service_set_peak_hold(EraSpectrumService *s, bool enabled)
+{
+#if defined(HAS_ARCHOERA_KERNEL)
+    if (!s || !s->spectrum) return;
+    zk_dsp_spectrum_set_peak_hold(s->spectrum, enabled ? 1 : 0);
+#else
+    (void)s;
+    (void)enabled;
+#endif
+}
+
 bool era_spectrum_service_is_running(const EraSpectrumService *s)
 {
     return s && s->running;

@@ -5142,6 +5142,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
 
   @override
+  String get settingsSpectrumPeakHold => '피크 홀드 라인';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => '엔진이 계산한 피크 라인을 스펙트럼 위에 표시';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => '피크 라인 숨김';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

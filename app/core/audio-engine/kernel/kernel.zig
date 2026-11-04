@@ -372,6 +372,12 @@ export fn zk_dsp_spectrum_process(
     );
 }
 
+/// 设置峰值保持开关；关闭时清空峰值线。
+export fn zk_dsp_spectrum_set_peak_hold(s: ?*dsp.spectrum.EraSpectrum, enabled: c_int) void {
+    const sp = s orelse return;
+    dsp.spectrum.era_spectrum_set_peak_hold(sp, enabled != 0);
+}
+
 /// 取当前峰值保持线（bins 个 [0,1]）；s/out 为空时空操作。
 export fn zk_dsp_spectrum_peaks(
     s: ?*const dsp.spectrum.EraSpectrum,

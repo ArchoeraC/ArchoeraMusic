@@ -5362,6 +5362,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsReverseSpectrumDesc => 'Flip the spectrum horizontally';
 
   @override
+  String get settingsSpectrumPeakHold => 'Peak-Hold-Linie';
+
+  @override
+  String get settingsSpectrumPeakHoldOn =>
+      'Vom Audio-Engine berechnete Spitzenlinie über dem Spektrum anzeigen';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => 'Spitzenlinie ausgeblendet';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

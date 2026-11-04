@@ -217,6 +217,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置频谱峰值保持线（默认关）。
+  void setSpectrumPeakHold(bool value) {
+    state = state.copyWithSpectrumPeakHold(value);
+    state.save();
+  }
+
   /// 设置封面跟随节拍缩放开关。
   void setCoverBeatScale(bool value) {
     state = state.copyWithCoverBeatScale(value);

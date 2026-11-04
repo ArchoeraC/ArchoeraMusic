@@ -79,6 +79,9 @@ void era_spectrum_service_stop(EraSpectrumService *s);
 /** 清空帧间状态（seek / 切歌 / 会话重建）；不停止线程。 */
 void era_spectrum_service_reset(EraSpectrumService *s);
 
+/** 设置峰值保持开关（默认关）；关闭时清空峰值线。 */
+void era_spectrum_service_set_peak_hold(EraSpectrumService *s, bool enabled);
+
 /** 是否运行中。 */
 bool era_spectrum_service_is_running(const EraSpectrumService *s);
 

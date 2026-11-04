@@ -282,6 +282,9 @@ float zk_dsp_spectrum_process(ZkSpectrum *s,
 void zk_dsp_spectrum_peaks(const ZkSpectrum *s,
                            float *out_l, float *out_r);
 
+/** 设置峰值保持开关；关闭时清空峰值线。 */
+void zk_dsp_spectrum_set_peak_hold(ZkSpectrum *s, int enabled);
+
 /** 输出频段数（bins）；s 为空时返回 0。 */
 int zk_dsp_spectrum_bins(const ZkSpectrum *s);
 

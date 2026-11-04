@@ -219,6 +219,7 @@ typedef struct ArchoeraMediaEngine {
          只保留最新，读走即清）。 */
     EraSpectrumService *spectrum;
     int     spectrum_wanted;   /* set_fft enabled（可在管线 ready 前到达） */
+    int     spectrum_peak_hold;/* set_fft peak_hold（默认关） */
     int     spectrum_sr;       /* 输出采样率（环/事件换算） */
     float   spec_min_hz;       /* 实际分析下限（40） */
     float   spec_max_hz;       /* 实际分析上限（min(16k, 0.95·Nyquist)） */
@@ -1847,6 +1848,13 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
         }
     } else if (strcmp(type, "set_fft") == 0) {
         bool enabled = true;
+        bool peak_hold = false;
+        if (json_get_bool(line, "peak_hold", &peak_hold) == 0) {
+            e->spectrum_peak_hold = peak_hold ? 1 : 0;
+            if (e->spectrum) {
+                era_spectrum_service_set_peak_hold(e->spectrum, peak_hold);
+            }
+        }
         if (json_get_bool(line, "enabled", &enabled) == 0) {
             if (enabled) {
                 e->spectrum_wanted = 1;
@@ -2068,6 +2076,7 @@ static int mediaengine_spectrum_start(ArchoeraMediaEngine *e)
             return -1;
         }
     }
+    era_spectrum_service_set_peak_hold(e->spectrum, e->spectrum_peak_hold != 0);
     return era_spectrum_service_start(e->spectrum);
 }
 

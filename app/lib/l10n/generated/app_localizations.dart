@@ -9423,6 +9423,24 @@ abstract class AppLocalizations {
   /// **'频谱水平翻转显示'**
   String get settingsReverseSpectrumDesc;
 
+  /// No description provided for @settingsSpectrumPeakHold.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'峰值保持线'**
+  String get settingsSpectrumPeakHold;
+
+  /// No description provided for @settingsSpectrumPeakHoldOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在频谱上方显示由引擎计算的峰值包络线'**
+  String get settingsSpectrumPeakHoldOn;
+
+  /// No description provided for @settingsSpectrumPeakHoldOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'不显示峰值线'**
+  String get settingsSpectrumPeakHoldOff;
+
   /// No description provided for @settingsAutoImmersive.
   ///
   /// In zh_CN, this message translates to:

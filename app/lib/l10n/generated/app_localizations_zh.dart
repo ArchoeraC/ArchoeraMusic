@@ -5057,6 +5057,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
 
   @override
+  String get settingsSpectrumPeakHold => '峰值保持线';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => '在频谱上方显示由引擎计算的峰值包络线';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => '不显示峰值线';
+
+  @override
   String get settingsAutoImmersive => '自动沉浸';
 
   @override
@@ -11045,6 +11054,15 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
+
+  @override
+  String get settingsSpectrumPeakHold => '峰值保持线';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => '在频谱上方显示由引擎计算的峰值包络线';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => '不显示峰值线';
 
   @override
   String get settingsAutoImmersive => '自动沉浸';
@@ -17036,6 +17054,15 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsReverseSpectrumDesc => '频谱水平翻转显示';
+
+  @override
+  String get settingsSpectrumPeakHold => '峰值保持線';
+
+  @override
+  String get settingsSpectrumPeakHoldOn => '在頻譜上方顯示由引擎計算的峰值包絡線';
+
+  @override
+  String get settingsSpectrumPeakHoldOff => '不顯示峰值線';
 
   @override
   String get settingsAutoImmersive => '自动沉浸';

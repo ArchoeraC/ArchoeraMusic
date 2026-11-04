@@ -17,6 +17,7 @@ const sleepFinishTrackKey = 'player.sleepTimerFinishTrack';
 const sleepTimerPresetsKey = 'player.sleepTimerPresets';
 const sleepTimerCustomMinutesKey = 'player.sleepTimerCustomMinutes';
 const enableSpectrumKey = 'player.enableSpectrum';
+const spectrumPeakHoldKey = 'player.spectrumPeakHold';
 const coverBeatScaleKey = 'player.coverBeatScale';
 const spectrumBarWidthKey = 'player.spectrumBarWidth';
 const spectrumStyleKey = 'player.spectrumStyle';
@@ -116,6 +117,9 @@ const int maxSleepTimerMinutes = 600;
 
 /// 频谱可视化总开关（对齐原版 player.enableSpectrum，默认开）。
 const bool defaultEnableSpectrum = true;
+
+/// 频谱峰值保持线（引擎计算，UI 只绘制；默认关，避免默认画面过满）。
+const bool defaultSpectrumPeakHold = false;
 
 /// 封面跟随节拍缩放（对齐原版 PlayerCover 播放/暂停缩放之上叠加的
 /// 鼓点脉冲；依赖 FFT 频谱数据，性能模式下自动停用，默认关）。
@@ -299,6 +303,10 @@ extension PlayerPrefs on AppPrefs {
 
   bool get enableSpectrum =>
       data[enableSpectrumKey] as bool? ?? defaultEnableSpectrum;
+
+  /// 频谱峰值保持线（默认关）。
+  bool get spectrumPeakHold =>
+      data[spectrumPeakHoldKey] as bool? ?? defaultSpectrumPeakHold;
 
   /// 封面跟随节拍缩放（鼓点脉冲；性能模式下视为关闭）。
   bool get coverBeatScale =>
@@ -527,6 +535,10 @@ extension PlayerPrefs on AppPrefs {
       spectrumBarWidthKey: ?barWidth?.clamp(1, 12),
     },
   );
+
+  /// 设置频谱峰值保持线开关。
+  AppPrefs copyWithSpectrumPeakHold(bool value) =>
+      AppPrefs(initialData: {...data, spectrumPeakHoldKey: value});
 
   /// 设置频谱可视化样式（非法值不写入，getter 回退默认 bars）。
   AppPrefs copyWithSpectrumStyle(String value) => AppPrefs(

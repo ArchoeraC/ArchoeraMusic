@@ -146,24 +146,33 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// 引擎侧频谱推送开关（`set_fft` 已下发的状态；避免重复命令）。
   /// UI 只消费 `EngineFft` 事件；这里仅负责按偏好/播放态启停引擎线程。
   bool _spectrumPushOn = false;
+  bool _spectrumPeakHoldOn = false;
 
   /// 按「播放中 + 频谱消费者存在 + 非性能模式」同步引擎侧频谱推送。
   ///
   /// 与旧的 Dart 拉模式不同：FFT/取窗全部在引擎频谱线程完成，UI 不再
-  /// 拉 PCM/调 FFI；这里只发一个 `set_fft` 开关命令。
+  /// 拉 PCM/调 FFI；这里只发 `set_fft` 开关 + 峰值保持设置。
   void _syncSpectrumPush() {
     final engine = _engine;
     if (engine == null) {
       _spectrumPushOn = false;
+      _spectrumPeakHoldOn = false;
       return;
     }
     final prefs = ref.read(appPrefsProvider);
     final wanted = !prefs.performanceMode &&
         (prefs.enableSpectrum || prefs.barSpectrum) &&
         state.playing;
-    if (wanted == _spectrumPushOn) return;
+    final peak = prefs.spectrumPeakHold;
+    if (wanted == _spectrumPushOn && peak == _spectrumPeakHoldOn) return;
     _spectrumPushOn = wanted;
-    unawaited(engine.sendCommand('set_fft', {'enabled': wanted}));
+    _spectrumPeakHoldOn = peak;
+    unawaited(
+      engine.sendCommand('set_fft', {
+        'enabled': wanted,
+        'peak_hold': peak,
+      }),
+    );
   }
 
   /// 串行播放队列（见 [load]）。
