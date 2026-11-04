@@ -80,7 +80,7 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 | D5 | **立体声宽度 / M-S** | 中侧宽度调节、声道平衡 | 简单、听感明显 | 通用 M/S |
 | D6 | **等响度（loudness contour）** | 随音量补偿低/高频 | 小音量补偿 | ISO 226 |
 | D7 | **Gapless / crossfade** | 曲间无缝 / 淡入淡出（偏管线，常与 DSP 同议） | 专辑连贯性 | — |
-| D8 | **频谱可视化增强**（v2 已落地） | 频率扩到 40–16kHz、多分辨率 FFT（8192/2048）、128 对数带、功率聚合、软膝 dB、频谱通量节拍；引擎侧 50ms 事件推送，UI 改为纯接收端；详见 [`spectrum-analyzer.md`](spectrum-analyzer.md) | 播放页观感 + UI 线程减负 | Chromium AnalyserNode / SPlayer / 多分辨率 FFT |
+| D8 | **频谱可视化增强**（v2.1 已落地） | 频率扩到 40–16kHz、VQT 可变 Q、128 对数带、AGC/γ/倾斜/峰值、软膝 dB、频谱通量节拍；引擎侧 50ms 事件推送，UI 改为纯接收端；详见 [`spectrum-analyzer.md`](spectrum-analyzer.md) | 播放页观感 + UI 线程减负 | Chromium AnalyserNode / SPlayer / VQT |
 
 ### 2.4 约束与验收
 

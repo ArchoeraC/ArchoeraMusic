@@ -24,7 +24,7 @@
 #include "spectrum_service.h"
 
 #define TEST_SR 48000
-#define TEST_FRAMES 8192
+#define TEST_FRAMES 12288
 #define TEST_BINS 128
 #define TEST_FREQ 440.0
 #define TEST_PI 3.14159265358979323846
@@ -77,6 +77,7 @@ static int test_position(void *ctx)
 }
 
 static void test_emit(void *ctx, const float *l, const float *r,
+                      const float *pl, const float *pr,
                       int bins, float beat, int seq, int interval_ms)
 {
     TestSink *s = (TestSink *)ctx;
@@ -87,7 +88,9 @@ static void test_emit(void *ctx, const float *l, const float *r,
 
     for (i = 0; i < bins; i++) {
         if (!isfinite(l[i]) || !isfinite(r[i]) ||
-            l[i] < 0.0f || l[i] > 1.0f || r[i] < 0.0f || r[i] > 1.0f) {
+            !isfinite(pl[i]) || !isfinite(pr[i]) ||
+            l[i] < 0.0f || l[i] > 1.0f || r[i] < 0.0f || r[i] > 1.0f ||
+            pl[i] < 0.0f || pl[i] > 1.0f || pr[i] < 0.0f || pr[i] > 1.0f) {
             bad = 1;
         }
         if (l[i] < min_l) min_l = l[i];

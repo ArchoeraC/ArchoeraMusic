@@ -11,6 +11,8 @@ class FftFrame {
   const FftFrame({
     required this.ldata,
     required this.rdata,
+    this.lpeak = const <double>[],
+    this.rpeak = const <double>[],
     this.beatStrength = 0,
     this.intervalMs = 50,
     this.seq = 0,
@@ -20,6 +22,10 @@ class FftFrame {
 
   final List<double> ldata;
   final List<double> rdata;
+
+  /// 引擎计算的峰值保持线（与 [ldata]/[rdata] 同长度；空 = 无峰值数据）。
+  final List<double> lpeak;
+  final List<double> rpeak;
 
   /// 生产端的目标推送间隔（ms，50/300/1000）。渲染端据此计算帧间插值
   /// 进度，不再写死 50ms（否则插值提前走完、后段停住）。
@@ -45,6 +51,8 @@ class FftFrame {
   FftFrame withIntervalMs(int intervalMs) => FftFrame(
     ldata: ldata,
     rdata: rdata,
+    lpeak: lpeak,
+    rpeak: rpeak,
     beatStrength: beatStrength,
     intervalMs: intervalMs,
     seq: seq,

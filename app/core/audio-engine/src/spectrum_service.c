@@ -6,7 +6,7 @@
  * spectrum_service.c — 频谱 v2 引擎侧推送服务（docs/spectrum-analyzer.md §5）
  *
  * 线程模型：
- *   - create 只分配服务壳 + 输入/输出缓冲，不建 FFT 表、不建线程；
+ *   - create 只分配服务壳 + 输入/输出缓冲，不建 VQT 核、不建线程；
  *   - start 首次创建内核分析器（懒初始化）并启动独立线程；
  *   - 线程每 interval_ms 读一次「已播放位置」窗口 → zk_dsp_spectrum_process
  *     → emit（可丢）；
@@ -45,6 +45,8 @@ struct EraSpectrumService {
     float *r;
     float *out_l;
     float *out_r;
+    float *peak_l;
+    float *peak_r;
 
     pthread_t thread;
     qa_size stop;   /* 0 = 运行，1 = 停止（跨线程标志） */
@@ -86,8 +88,10 @@ static void *era_spectrum_thread(void *arg)
                 const float beat = zk_dsp_spectrum_process(
                     s->spectrum, s->l, s->r, s->frames,
                     s->out_l, s->out_r);
+                zk_dsp_spectrum_peaks(s->spectrum, s->peak_l, s->peak_r);
                 if (s->cfg.emit) {
-                    s->cfg.emit(s->cfg.ctx, s->out_l, s->out_r, s->bins,
+                    s->cfg.emit(s->cfg.ctx, s->out_l, s->out_r,
+                                s->peak_l, s->peak_r, s->bins,
                                 beat, s->seq++, s->interval_ms);
                 }
             }
@@ -122,8 +126,8 @@ EraSpectrumService *era_spectrum_service_create(
     if (!s) return NULL;
 
     s->cfg = *cfg;
-    s->frames = cfg->frames > 0 ? cfg->frames : 8192;
-    if (s->frames > 8192) s->frames = 8192;
+    s->frames = cfg->frames > 0 ? cfg->frames : 12288;
+    if (s->frames > 16384) s->frames = 16384;
     s->bins = cfg->bins;
     s->interval_ms = cfg->interval_ms > 0 ? cfg->interval_ms : 50;
     s->last_pos = -1;
@@ -133,7 +137,10 @@ EraSpectrumService *era_spectrum_service_create(
     s->r = (float *)malloc((size_t)s->frames * sizeof(float));
     s->out_l = (float *)malloc((size_t)s->bins * sizeof(float));
     s->out_r = (float *)malloc((size_t)s->bins * sizeof(float));
-    if (!s->l || !s->r || !s->out_l || !s->out_r) {
+    s->peak_l = (float *)malloc((size_t)s->bins * sizeof(float));
+    s->peak_r = (float *)malloc((size_t)s->bins * sizeof(float));
+    if (!s->l || !s->r || !s->out_l || !s->out_r ||
+        !s->peak_l || !s->peak_r) {
         era_spectrum_service_destroy(s);
         return NULL;
     }
@@ -218,6 +225,8 @@ void era_spectrum_service_destroy(EraSpectrumService *s)
     free(s->r);
     free(s->out_l);
     free(s->out_r);
+    free(s->peak_l);
+    free(s->peak_r);
     free(s);
 #else
     (void)s;
