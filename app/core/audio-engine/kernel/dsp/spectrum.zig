@@ -15,8 +15,8 @@
 //!     `f_i = sqrt(f_lo·f_hi)`，窗长 `L_i = Q_i·sr/f_i`，Q 上限 20.9；
 //!     低频用更长窗、高频用更短窗，等价于多分辨率 CQT 的实用近似；
 //!   - Blackman 周期窗 + 窗和归一化，单边幅度 `2|X|/Σw`；
-//!   - 显示量程采用常见的 `|X|/N` 口径：再乘 0.27，dB 映射
-//!     `[-60, 0] → [0, 1]`；0dBFS 正弦约 0.81，顶部留余量；
+//!   - 显示量程采用常见的 `|X|/N` 口径：再乘 0.28，dB 映射
+//!     `[-60, 0] → [0, 1]`；0dBFS 正弦约 0.82，顶部留余量；
 //!   - AGC / `norm^γ` / 高频倾斜默认关闭，需要时可在配置中开启；
 //!   - 峰值保持默认关闭，由 UI 设置经 `set_fft` 打开；
 //!   - 节拍用对数幅度谱通量 + 最近 43 帧中位数自适应阈值 + 100ms 冷却；
@@ -61,8 +61,8 @@ const era_db_ceiling: f32 = 0.0;
 
 /// 显示量程增益：常见频谱实现用 `|X|/N` 且不做相干增益补偿，
 /// 满幅正弦约 0.27（-11.4dB）。我们的 VQT 已把满幅正弦归一到 1.0，
-/// 这里乘同一口径的 0.27，使 0dBFS → 约 0.81，顶部保留余量。
-const era_display_gain: f32 = 0.27;
+/// 这里乘 0.28，使 0dBFS → 约 0.82，顶部保留余量。
+const era_display_gain: f32 = 0.28;
 
 /// 软膝宽度（映射后归一化坐标的底部 6%）。
 const era_soft_knee: f32 = 0.06;
@@ -154,6 +154,12 @@ fn eraBandCenter(min_hz: f64, max_hz: f64, bins: usize, i: usize) f64 {
     return @sqrt((min_hz * @exp(@log(r) * lo)) * (min_hz * @exp(@log(r) * hi)));
 }
 
+/// 高频倾斜线性增益（dB/oct，相对 1kHz）。
+fn eraTiltGain(db_per_oct: f32, freq: f32) f32 {
+    const tilt_db = @as(f64, db_per_oct) * @log2(@as(f64, freq) / 1000.0);
+    return @floatCast(std.math.pow(f64, 10.0, tilt_db / 20.0));
+}
+
 /// 构建一个 VQT 带：窗长、Blackman 窗、复解调核、倾斜增益。
 fn eraVqtBandInit(
     allocator: std.mem.Allocator,
@@ -189,8 +195,7 @@ fn eraVqtBandInit(
     }
     if (wsum <= 0.0) return error.InvalidArgument;
 
-    const tilt_db = @as(f64, cfg.tilt_db_per_oct) * @log2(fc / 1000.0);
-    const tilt_gain: f32 = @floatCast(std.math.pow(f64, 10.0, tilt_db / 20.0));
+    const tilt_gain: f32 = eraTiltGain(cfg.tilt_db_per_oct, @floatCast(fc));
 
     return .{
         .freq = @floatCast(fc),
@@ -317,6 +322,27 @@ pub fn era_spectrum_set_peak_hold(self: *EraSpectrum, enabled: bool) void {
     if (!enabled) {
         @memset(self.peak_l, 0.0);
         @memset(self.peak_r, 0.0);
+    }
+}
+
+/// 运行时开关 AGC；关闭时把增益复位到 1.0。
+pub fn era_spectrum_set_agc(self: *EraSpectrum, enabled: bool) void {
+    self.agc_enabled = enabled;
+    if (!enabled) self.agc_gain = 1.0;
+}
+
+/// 运行时设置 γ；非法值（<=0 / NaN / Inf）忽略。
+pub fn era_spectrum_set_gamma(self: *EraSpectrum, gamma: f32) void {
+    if (!std.math.isFinite(gamma) or gamma <= 0.0) return;
+    self.gamma = gamma;
+}
+
+/// 运行时设置高频倾斜（dB/oct）；非法值忽略，并重算全部带的增益。
+pub fn era_spectrum_set_tilt(self: *EraSpectrum, db_per_oct: f32) void {
+    if (!std.math.isFinite(db_per_oct)) return;
+    self.tilt_db_per_oct = db_per_oct;
+    for (self.bands) |*band| {
+        band.tilt_gain = eraTiltGain(db_per_oct, band.freq);
     }
 }
 
@@ -657,7 +683,7 @@ test "era_spectrum: 左右分离（仅 L 有信号 → R 全 0）" {
     try testing.expect(out_l[peakBand(out_l)] > 0.5);
 }
 
-test "era_spectrum: 量程校准（0dBFS ≈ 0.81）" {
+test "era_spectrum: 量程校准（0dBFS ≈ 0.82）" {
     const a = testing.allocator;
     const cfg = precisionConfig();
     const sp = try era_spectrum_create(a, cfg);
@@ -674,11 +700,11 @@ test "era_spectrum: 量程校准（0dBFS ≈ 0.81）" {
     const idx = expectedBand(1000.0, cfg.min_hz, cfg.max_hz, cfg.bins);
     const f: f32 = @floatCast(bandCenter(cfg, idx));
 
-    // 满幅正弦：|X|/N 口径约 0.27（-11.4dB），映射后约 0.81。
+    // 满幅正弦：|X|/N 口径约 0.27（-11.4dB），乘 0.28 后约 0.82。
     fillSine(l, f, cfg.sample_rate, 1.0);
     _ = era_spectrum_process(sp, l, l, out_l, out_r);
     const loud = out_l[idx];
-    try testing.expectApproxEqAbs(@as(f32, 0.81), loud, 0.02);
+    try testing.expectApproxEqAbs(@as(f32, 0.82), loud, 0.02);
 
     // -30dB：约 0.31，仍保留明显动态。
     era_spectrum_reset(sp);
@@ -941,6 +967,33 @@ test "era_spectrum: AGC / γ / 倾斜 / 峰值保持" {
     i = 0;
     while (i < 80) : (i += 1) _ = era_spectrum_process(sp5, l, l, out_l, out_r);
     try testing.expect(out_l[idx] > first);
+}
+
+test "era_spectrum: 运行时开关 AGC / γ / 倾斜" {
+    const a = testing.allocator;
+    const cfg = precisionConfig();
+    const sp = try era_spectrum_create(a, cfg);
+    defer era_spectrum_destroy(sp);
+
+    // γ：合法值写入，非法值忽略。
+    era_spectrum_set_gamma(sp, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 0.5), sp.gamma, 1e-6);
+    era_spectrum_set_gamma(sp, 0.0);
+    try testing.expectApproxEqAbs(@as(f32, 0.5), sp.gamma, 1e-6);
+
+    // 倾斜：重算全部带，8kHz 带增益应 > 1。
+    era_spectrum_set_tilt(sp, 6.0);
+    try testing.expectApproxEqAbs(@as(f32, 6.0), sp.tilt_db_per_oct, 1e-6);
+    const idx8 = expectedBand(8000.0, cfg.min_hz, cfg.max_hz, cfg.bins);
+    try testing.expect(sp.bands[idx8].tilt_gain > 1.0);
+
+    // AGC：开关切换，关闭时增益复位。
+    era_spectrum_set_agc(sp, true);
+    try testing.expect(sp.agc_enabled);
+    sp.agc_gain = 2.0;
+    era_spectrum_set_agc(sp, false);
+    try testing.expect(!sp.agc_enabled);
+    try testing.expectEqual(@as(f32, 1.0), sp.agc_gain);
 }
 
 test "era_spectrum: reset 清空峰值/AGC/节拍状态、参数 getter 正确" {

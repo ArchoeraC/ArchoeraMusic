@@ -5151,6 +5151,33 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsSpectrumPeakHoldOff => '피크 라인 숨김';
 
   @override
+  String get settingsSpectrumAgc => '자동 게인(AGC)';
+
+  @override
+  String get settingsSpectrumAgcOn => '조용한 구간을 끌어올려 최대치에 가까워질 수 있습니다';
+
+  @override
+  String get settingsSpectrumAgcOff => '원래 다이내믹 유지';
+
+  @override
+  String get settingsSpectrumGamma => '작은 신호 강조(γ)';
+
+  @override
+  String get settingsSpectrumGammaOn => 'γ=0.9, 약한 대역이 더 잘 보입니다';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1.0, 선형 표시';
+
+  @override
+  String get settingsSpectrumTilt => '고음 틸트';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0.5dB/oct, 고음이 더 밝아집니다';
+
+  @override
+  String get settingsSpectrumTiltOff => '평탄한 주파수 응답';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

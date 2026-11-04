@@ -791,6 +791,38 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   ref.read(appPrefsProvider.notifier).setReverseSpectrum(value),
             ),
             SettingSwitchTile(
+              icon: prefs.spectrumAgc
+                  ? EtaIcons.magic2
+                  : EtaIcons.magic2Outline,
+              title: l10n.settingsSpectrumAgc,
+              subtitle: prefs.spectrumAgc
+                  ? l10n.settingsSpectrumAgcOn
+                  : l10n.settingsSpectrumAgcOff,
+              value: prefs.spectrumAgc,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setSpectrumAgc(value),
+            ),
+            SettingSwitchTile(
+              icon: prefs.spectrumGamma ? EtaIcons.sun : EtaIcons.sunOutline,
+              title: l10n.settingsSpectrumGamma,
+              subtitle: prefs.spectrumGamma
+                  ? l10n.settingsSpectrumGammaOn
+                  : l10n.settingsSpectrumGammaOff,
+              value: prefs.spectrumGamma,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setSpectrumGamma(value),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.chartLine,
+              title: l10n.settingsSpectrumTilt,
+              subtitle: prefs.spectrumTilt
+                  ? l10n.settingsSpectrumTiltOn
+                  : l10n.settingsSpectrumTiltOff,
+              value: prefs.spectrumTilt,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setSpectrumTilt(value),
+            ),
+            SettingSwitchTile(
               icon: prefs.spectrumPeakHold
                   ? EtaIcons.soundLine
                   : EtaIcons.soundLineOutline,

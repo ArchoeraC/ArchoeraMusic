@@ -5372,6 +5372,35 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSpectrumPeakHoldOff => 'Spitzenlinie ausgeblendet';
 
   @override
+  String get settingsSpectrumAgc => 'Automatische Verstärkung (AGC)';
+
+  @override
+  String get settingsSpectrumAgcOn =>
+      'Leise Passagen werden angehoben; kann eher den Vollausschlag erreichen';
+
+  @override
+  String get settingsSpectrumAgcOff => 'Originaldynamik beibehalten';
+
+  @override
+  String get settingsSpectrumGamma => 'Kleine Signale anheben (γ)';
+
+  @override
+  String get settingsSpectrumGammaOn =>
+      'γ=0,9, schwache Bänder werden sichtbarer';
+
+  @override
+  String get settingsSpectrumGammaOff => 'γ=1,0, lineare Anzeige';
+
+  @override
+  String get settingsSpectrumTilt => 'Höhen-Tilt';
+
+  @override
+  String get settingsSpectrumTiltOn => '+0,5 dB/Okt, hellere Höhen';
+
+  @override
+  String get settingsSpectrumTiltOff => 'Linearer Frequenzgang';
+
+  @override
   String get settingsAutoImmersive => 'Auto immersive';
 
   @override

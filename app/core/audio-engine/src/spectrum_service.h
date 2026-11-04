@@ -82,6 +82,15 @@ void era_spectrum_service_reset(EraSpectrumService *s);
 /** 设置峰值保持开关（默认关）；关闭时清空峰值线。 */
 void era_spectrum_service_set_peak_hold(EraSpectrumService *s, bool enabled);
 
+/** 运行时开关 AGC（默认关）。 */
+void era_spectrum_service_set_agc(EraSpectrumService *s, bool enabled);
+
+/** 运行时设置 γ（默认 1.0；<=0/NaN/Inf 忽略）。 */
+void era_spectrum_service_set_gamma(EraSpectrumService *s, float gamma);
+
+/** 运行时设置高频倾斜（默认 0dB/oct；NaN/Inf 忽略）。 */
+void era_spectrum_service_set_tilt(EraSpectrumService *s, float db_per_oct);
+
 /** 是否运行中。 */
 bool era_spectrum_service_is_running(const EraSpectrumService *s);
 
