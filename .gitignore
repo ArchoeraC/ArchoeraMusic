@@ -110,3 +110,6 @@ app/test/*_manual_test.dart
 *.swo
 *~
 *.bak
+
+# Trae IDE 本地分享包（Agent 工具产物，仅本机保留，不入库）
+.trae-html-share-packages/
