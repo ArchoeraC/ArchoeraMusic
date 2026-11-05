@@ -360,14 +360,14 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 > 规格：`docs/audio-memory-playback.md`（S1 引擎 C / S2 Dart 接线+设置 已实现；S3 本文定稿）。
 > 用户开关「内存播放」（`audio.engineMemory`，默认**开**）；策略 `audio.pcmMemPolicy`
 > （auto / limit / unlimited，无上限须显式警告）。PCM 驻留进程内块列表（auto 32 MiB 硬上限 /
-> 用户上限优先 / 查询故障回落 / append 记账强制淘汰），频谱经 `pcm_window` FFI 拉窗，
+> 用户上限优先 / 查询故障回落 / append 记账强制淘汰），频谱经引擎内部取窗（`era_mediaengine_read_window`），
 > 不再写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）。
 
 ### 20.1 双模式 PARITY 语义
 
 | 模式 | 触发 | PCM 输出形态 | PARITY/验证基线 |
 |---|---|---|---|
-| **内存模式**（默认） | `engineMemoryPlay=true` | 内存块列表（与 stream.pcm 同构） | 以同源解码的**内存窗口比对**：`pcm_window(pos)` 窗口与参考解码 ≤1e-4（`test_memory_mode`）；不产生会话文件 |
+| **内存模式**（默认） | `engineMemoryPlay=true` | 内存块列表（与 stream.pcm 同构） | 以同源解码的**内存窗口比对**：`era_mediaengine_read_window(pos)` 与参考解码 ≤1e-4（`test_memory_mode`）；不产生会话文件 |
 | **文件模式**（legacy） | 设置关 / `ARCHOERA_ENGINE_FILE_MODE=1` | `stream.wav` + `stream.pcm` 落盘 | 现状字节级行为不变：Stable/EraAudio 双路径 SHA PARITY、FFT 文件拉模式全部原样 |
 
 - Stable/EraAudio 的解码后端差异只在 pipeline 内部（Zig vs FFmpeg），与「写文件 or 内存」正交；
@@ -381,8 +381,8 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 ```
 同一输入同一 cfg（skip_encoder，DSP 默认一致）：
   A. 文件模式（ARCHOERA_ENGINE_FILE_MODE=1）会话 → stream.pcm 作真值（SHA 基线保留）；
-  B. 内存模式会话 → pcm_window(end_pos_ms, fftSize, l, r)；
-  断言 max|A_window - B_window| ≤ 1e-4（float），窗口语义 = PcmAnalyzer.frameAt（块内取整 /
+  B. 内存模式会话 → era_mediaengine_read_window(end_pos_ms, fftSize, l, r)；
+  断言 max|A_window - B_window| ≤ 1e-4（float），窗口语义 = 引擎频谱取窗（块内取整 /
   前缀补零 / 越出保留窗或未解码 → null/-1）。
 ```
 headless 驱动：引擎内存模式 `ARCHOERA_MEMORY_HEADLESS=1` 走「无设备解码到内存」分支，

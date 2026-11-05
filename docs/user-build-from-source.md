@@ -22,15 +22,16 @@
 
 | 模块 | 语言 | 产物 | 用途 |
 |---|---|---|---|
-| `audio-engine` | C / Zig 内核 | `archoera-audio-engine`、`libarchoera_mediaengine.so`、**`libfft.so`** | 解码→DSP（EQ/响度/限幅/FFT 频谱/变速）→Opus |
+| `audio-engine` | C / Zig 内核 | `archoera-audio-engine`、`libarchoera_mediaengine.so` | 解码→DSP（EQ/响度/限幅/频谱/变速）→Opus |
 | `scanner` | C#（NativeAOT） | `scanner-ffi.so` + `libe_sqlite3.so` | 本地音乐库扫描建库 |
 | `scraper` | C++ | `libarchoera_scraper.so` | 多源元数据刮削 + 仅目录整理 |
 | `downloader` | Rust（cdylib） | `libarchoera_downloader.so` | Kugou / Netease 下载引擎 |
 | `subsonic` | Go + Rust | `libarchoera_subsonic.so`、`libarchoera_transcoder.so` | 可选 Subsonic 服务端与转码器 |
 | `vault` | C#（NativeAOT） | `archoera-vault` | 凭据保险库（crypto / slots m1·m2a·m2b；m2b 本机级·较弱） |
 
-> “FFT 部分”指 audio-engine 的 `libfft.so`（Dart 侧频谱分析用，纯 libm、无外部依赖）——
-> 它在 `build-linux.sh` 里随 audio-engine 一起被 CMake 编译，无需单独步骤。
+> 频谱分析已内置在引擎里（`src/spectrum_service.c`）：链接 Zig 内核时用 VQT，
+> 纯 FFmpeg 构建用 `libavutil/tx` 的 FFT 后端；v1 的 `libfft.so` 已删除。
+> 用 `-DARCHOERA_SPECTRUM_ANALYZER=auto|zig|fft` 可显式选择后端。
 
 ## 1. 前置环境
 
@@ -82,7 +83,7 @@ bash app/core/build-linux.sh
 脚本按序做六件事（幂等，可重复执行；`set -euo pipefail`，任一步失败即退出并报错）：
 1. **Zig EraAudio 内核**：`zig build -Doptimize=ReleaseFast`（输出 `audio-engine/zig-out/` 与本地缓存
    `.zig-cache/`；内核改动后必须先重跑本步，否则链接陈旧产物）
-2. **audio-engine（含 libfft.so）**：`cmake -S ... -B audio-engine/build -DCMAKE_BUILD_TYPE=Release` +
+2. **audio-engine**：`cmake -S ... -B audio-engine/build -DCMAKE_BUILD_TYPE=Release` +
    `cmake --build`
 3. **scraper（C++）**：同上 CMake 构建 `libarchoera_scraper.so`
 4. **scanner（C# NativeAOT）**：`bash app/core/scanner/build.sh linux-x64`（产出

@@ -171,8 +171,8 @@ export fn zk_set_log_sink(fn_ptr: ?log.Sink, min_level: c_int) void {
 //
 // C 壳 equalizer.c / limiter.c / loudness.c 优先路由本内核实现；内核库缺失
 // （C 侧 HAS_ARCHOERA_KERNEL 未定义）或 create 失败时回退 C 实现。
-// 对外 C 头契约见 include/kernel_bridge.h；Dart 侧 libfft.so ABI 不受影响
-// （fft/resampler/tempo 本轮仅内核侧接口占位，未导出任何符号）。
+// 对外 C 头契约见 include/kernel_bridge.h；resampler/tempo 本轮仅内核侧
+// 接口占位，未导出任何符号。
 // ---------------------------------------------------------------------------
 
 /// 均衡器句柄（C 侧 `ZkDspEq`）；非法参数 / OOM 返回 NULL（C 壳回退）。

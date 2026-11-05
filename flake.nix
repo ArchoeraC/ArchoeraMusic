@@ -238,8 +238,7 @@ NUGETCFG
           runHook preInstall
           mkdir -p $out
           cp -a app/core/audio-engine/build/archoera-audio-engine \
-                app/core/audio-engine/build/libarchoera_mediaengine.so \
-                app/core/audio-engine/build/libfft.so $out/
+                app/core/audio-engine/build/libarchoera_mediaengine.so $out/
           cp -a app/core/audio-engine/build/ffmpeg $out/
           runHook postInstall
         '';
