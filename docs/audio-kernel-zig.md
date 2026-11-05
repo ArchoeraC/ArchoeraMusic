@@ -1828,6 +1828,14 @@ pub const Error = error{
 - 频谱入口只有 `zk_dsp_spectrum_*`（40–16kHz、VQT、AGC/γ/倾斜/峰值、
   -60..0dB；含 `set_peak_hold/set_agc/set_gamma/set_tilt` 运行时开关）。
   无内核构建用 `era_fft_spectrum_*`（libavutil/tx）镜像同一契约。
+- **统一 DSP Stage（2026-11-05）**：`kernel/dsp/spectrum.zig` 新增
+  `era_spectrum_stage` / `era_spectrum_process_interleaved` /
+  `era_spectrum_stage_frame`，按 `dsp/stage.zig` 的 `Stage` vtable 接收
+  **交错 float32**（只读不改），与 `eq / limiter / loudness / parametric /
+  lowfreq / channel_merge` 同级可挂进内核主处理链；交错声道直接在
+  VQT 核上按步长取值，不拆平面、零每帧分配。Stage 无返回值，结果留在实例内
+  由 `era_spectrum_stage_frame`（128 带 + 节拍）与 `era_spectrum_peaks`
+  （峰值线）读取。C 壳仍走 `zk_dsp_spectrum_*`，ABI 不变。
 - **启动/线程约束**：频谱表在首次 `set_fft` 时懒建（当前每会话一次，<1ms），
   `reset` 只清状态；分析在独立频谱线程，不提交解码 worker 任务、不在音频回调
   做 FFT、零每帧分配；频谱关闭时零额外工作（详见 `spectrum-analyzer.md` §5）。
