@@ -604,10 +604,9 @@ NUGETCFG
           # 的 hook 用 pkg-config 找 GTK/X11/Xi，故在 PATH 前部放一个薄包装，
           # 把当前 Nix 构建期的搜索路径显式带进 hook。
           mkdir -p "$TMPDIR/hook-bin"
-          real_pkg_config="$(
-            cat ${pkgs.pkg-config}/nix-support/orig-pkg-config 2>/dev/null \
-              || echo ${pkgs.pkg-config}
-          )/bin/pkg-config"
+          # 用 pkg-config-wrapper 的 passthru 取未包装二进制，避免 wrapper 再按
+          # Nix 角色变量改写 PKG_CONFIG_PATH。
+          real_pkg_config="${pkgs.pkg-config.pkg-config or pkgs.pkg-config}/bin/pkg-config"
           cat > "$TMPDIR/hook-bin/pkg-config" <<HOOKPC
 #!${pkgs.runtimeShell}
 export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
