@@ -72,24 +72,32 @@ const Map<PowerSaverReason, Duration> _intervalByReason = {
 /// - 「禁用系统休眠」仅**在媒体播放中**通过平台能力外观（原生桥接）保持系统
 ///   唤醒，暂停 / 停止时立即释放，后台播放不中断。
 ///
-/// 全程事件驱动：window_manager 窗口事件 + D-Bus 信号订阅 + Timer 帧合并，
+/// 全程事件驱动：nativeapi 窗口事件 + D-Bus 信号订阅 + Timer 帧合并，
 /// 不使用轮询。窗口隐藏 / 屏幕关闭时若引擎已内建停帧（GTK 无 vsync、
 /// 显示器关闭等），以引擎内建节能为准，本服务设置的帧率上限只是兜底。
-class PowerSaverService with WindowListener {
+class PowerSaverService {
   PowerSaverService(this._ref, this._power, this._window);
 
   final Ref _ref;
 
+  /// 应用窗口句柄（nativeapi；无窗口环境为 null）。
+  Window? _appWindow;
+
+  /// 窗口事件监听句柄（dispose 时按 id 注销）。
+  ListenerId? _windowListenerId;
+
   /// 平台能力外观（原生桥接）：熄屏订阅 + 休眠抑制（facade §7.2）。
   final SystemPower _power;
 
-  /// 平台能力外观：窗口最小化/失焦事件（桥接可用时优先，否则 window_manager）。
+  /// 平台能力外观：窗口最小化/失焦事件（桥接可用时优先，否则 nativeapi 窗口事件）。
   final SystemWindow _window;
 
   /// 节能模式总开关（设置持久化，默认开）。
   bool _enabled = true;
 
   bool _minimized = false;
+  /// 托盘隐藏（nativeapi 无 hide/show 事件，由托盘集成显式置位）。
+  bool _hidden = false;
   bool _focused = true;
   bool _screenOff = false;
 
@@ -185,27 +193,31 @@ class PowerSaverService with WindowListener {
   }
 
   /// 开始监听窗口状态（并异步订阅平台熄屏/窗口状态）。
-  /// window_manager 监听保留：托盘 hide/show 事件 + 桥接未覆盖时的兜底。
+  /// nativeapi 窗口监听：焦点/最小化/还原 + 桥接未覆盖时的兜底。
   void attach() {
-    windowManager.addListener(this);
+    if (_windowListenerId == null) {
+      final window = WindowManager.instance.getCurrent();
+      _appWindow = window;
+      _windowListenerId = window?.addListener(_onWindowEvent);
+    }
     unawaited(_attachWindowWatcher());
     unawaited(_attachScreenWatcher());
   }
 
   /// 经平台能力外观订阅窗口最小化/失焦（桥接 WINDOW_STATE 能力位存在时）。
-  /// 失败/缺能力静默回落 window_manager 监听（后台优化类，不打断用户）。
+  /// 失败/缺能力静默回落 nativeapi 窗口监听（后台优化类，不打断用户）。
   Future<void> _attachWindowWatcher() async {
     if (_windowSub != null) return;
     final ok = await _window.setEvents(true);
     if (!ok) {
-      Log.w('power', '桥接窗口状态不可用（回退 window_manager）');
+      Log.w('power', '桥接窗口状态不可用（回退 nativeapi 窗口事件）');
       return;
     }
     _windowSub = _window.state.listen((s) {
       // **只置位、不清除** minimized：部分合成器把「GTK hide 到托盘」报告为
       // minimized=false，若在此覆盖会把后台态闪回前台，导致后台释放/停帧被
       // 立刻取消（并让「持续后台才释放」的判定永不成立）。清除交给显式的
-      // show/restore 事件（onWindowEvent('show') / onWindowRestore）。
+      // setHidden(false) / WindowRestoredEvent。
       if (s.minimized) _minimized = true;
       _focused = s.focused;
       // 重新聚焦窗口 ⇒ **强制重建**：屏幕必然点亮/未锁屏。修正解锁后丢失的
@@ -274,51 +286,45 @@ class PowerSaverService with WindowListener {
     }
   }
 
-  // ── WindowListener ────────────────────────────────────────────
+  // ── 窗口事件（nativeapi）──────────────────────────────────────
 
-  @override
-  void onWindowMinimize() {
-    _minimized = true;
+  /// 托盘隐藏 / 重新显示（nativeapi 不派发 hide/show 事件，由
+  /// TrayIntegration 显式通知）。隐藏与最小化同属「不可见后台」档。
+  void setHidden(bool hidden) {
+    _hidden = hidden;
+    if (!hidden) {
+      // 显式显示即恢复：清除最小化/熄屏残留（部分合成器把 hide 报成
+      // minimized，且恢复时不回报 restore 事件）。
+      _minimized = false;
+      _screenOff = false;
+    }
     _apply();
   }
 
-  @override
-  void onWindowRestore() {
-    _minimized = false;
-    _screenOff = false; // 恢复 ⇒ 屏幕点亮
-    _apply();
-  }
-
-  @override
-  void onWindowFocus() {
-    _focused = true;
-    _screenOff = false; // 窗口获得焦点 ⇒ 屏幕必然点亮/未锁屏（修正丢失的熄屏复位）
-    _apply();
-  }
-
-  @override
-  void onWindowBlur() {
-    _focused = false;
-    _apply();
-  }
-
-  @override
-  void onWindowEvent(String eventName) {
-    // 关闭到托盘（后台播放）按最小化语义降帧；重新显示恢复
-    switch (eventName) {
-      case 'hide':
+  void _onWindowEvent(WindowEvent event) {
+    switch (event) {
+      case WindowMinimizedEvent():
         _minimized = true;
         _apply();
-      case 'show':
+      case WindowRestoredEvent():
         _minimized = false;
-        _screenOff = false; // 重新显示 ⇒ 屏幕点亮
+        _screenOff = false; // 恢复 ⇒ 屏幕点亮
         _apply();
+      case WindowFocusedEvent():
+        _focused = true;
+        _screenOff = false; // 窗口获得焦点 ⇒ 屏幕必然点亮/未锁屏
+        _apply();
+      case WindowBlurredEvent():
+        _focused = false;
+        _apply();
+      default:
+        break;
     }
   }
 
   PowerSaverReason get _reason {
     if (!_enabled) return PowerSaverReason.none;
-    if (_minimized) return PowerSaverReason.minimized;
+    if (_minimized || _hidden) return PowerSaverReason.minimized;
     if (!_focused) return PowerSaverReason.unfocused;
     if (_screenOff) return PowerSaverReason.screenOff;
     return PowerSaverReason.none;
@@ -407,7 +413,9 @@ class PowerSaverService with WindowListener {
   Future<void> dispose() async {
     _unloadTimer?.cancel();
     _unloadTimer = null;
-    windowManager.removeListener(this);
+    final listenerId = _windowListenerId;
+    if (listenerId != null) _appWindow?.removeListener(listenerId);
+    _windowListenerId = null;
     await _screenSub?.cancel();
     await _failSub?.cancel();
     await _windowSub?.cancel();

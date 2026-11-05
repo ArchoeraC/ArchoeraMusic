@@ -41,7 +41,7 @@ Future<void> main(List<String> args) async {
   // 同目录的 `archoerashell.exe`，不经过本 Dart 入口（Dart 版 CLI 已删除）。
   //
   // 全局帧节流 Binding（节能模式渲染层）：必须最先初始化——既是 Flutter
-  // binding，也让后续 windowManager（MethodChannel）可用（单实例分支要用）。
+  // binding，也让后续窗口操作（nativeapi FFI / 单实例分支）可用。
   PowerSavingFrameBinding.ensureInitialized();
   // 防伪锚点：把 'ARCHOERA DESIGNED' 编译进内核/AOT 快照字符串表
   // （见 app/watermark.dart；勿删，反编译识别非官方重新打包）。
@@ -88,10 +88,10 @@ Future<void> main(List<String> args) async {
         ? Locale(parts[0], parts[1])
         : Locale(parts[0]);
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
-    await windowManager.ensureInitialized();
-    await windowManager.setSize(const Size(420, 260));
-    await windowManager.center();
-    await windowManager.show();
+    final window = WindowManager.instance.getCurrent();
+    window?.setSize(const Size(420, 260).toNative(), false);
+    window?.center();
+    window?.show();
     final l10n = lookupAppLocalizations(locale);
     runApp(
       _AlreadyRunningApp(
@@ -153,8 +153,8 @@ Future<void> main(List<String> args) async {
   // 「封面图片缓存上限」动态控制（默认下限 8 MiB，见 ArchoeraMusicApp，
   // null = 无上限仅按张数约束）。
   PaintingBinding.instance.imageCache.maximumSize = 1000;
-  // 窗口管理（后台常驻：关闭到托盘需拦截窗口关闭事件）
-  await windowManager.ensureInitialized();
+  // 窗口管理（后台常驻：关闭到托盘需拦截窗口关闭事件，由 TrayIntegration
+  // 在挂载后注册 nativeapi 窗口监听；nativeapi 无需显式初始化）。
   // 协议唤醒：启动前按偏好注册 archoera://（仅当前用户，免提权）。
   if (platformCaps.deepLinkAvailable && prefs.registerProtocol) {
     unawaited(platformCaps.deepLink.register('archoera'));
