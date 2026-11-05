@@ -20,9 +20,8 @@
 
 ## 1. 背景与问题
 
-频谱部分一直是**独立实现**（`src/fft.c` / `libfft.so`），不依赖 FFmpeg 或其它
-第三方 DSP。当前链路是「Dart 按播放位置拉 PCM 窗口 → FFI 做 FFT → UI 插值」，
-存在以下结构性问题：
+频谱 v1 曾是**独立实现**（`src/fft.c` / `libfft.so`），链路是「Dart 按播放
+位置拉 PCM 窗口 → FFI 做 FFT → UI 插值」，存在以下结构性问题：
 
 | # | 问题 | 影响 |
 |---|---|---|
@@ -48,9 +47,9 @@ P0 已修掉 1 和「插值窗口写死 50ms」；本规格处理 2–6。
 5. **不拖慢冷/热启动与线程池**：频谱线程独立、懒初始化、零每帧分配、可丢弃。
 6. **显示增强在引擎侧完成**：慢 AGC、`norm^γ`、高频倾斜、峰值保持均由内核
    计算，事件直接携带最终显示值与峰值线。
-7. **破坏性更新**：不保留旧拉模式/旧 ABI 兼容；App 播放路径不再使用
-   `libfft.so` 的 `fft_*` 与 `fft_bindings.dart`，v2 唯一入口是内核
-   `zk_dsp_spectrum_*`；旧 `libfft.so` 仅留给未迁移的 CLI/测试。
+7. **破坏性更新**：不保留旧拉模式/旧 ABI 兼容；v1 的 `src/fft.c`、
+   `libfft.so`、`fft_bindings.dart`、`pcm_analyzer.dart`、CLI `--fft*` 已于
+   2026-11-05 **全部删除**，v2 的唯一入口是引擎频谱服务。
 
 ### 2.2 非目标
 
@@ -105,10 +104,14 @@ v2 链路（已落地，事件推送）：
 
 - 两个后端都经 `pipeline_set_pcm_out_cb` 输出 PCM；频谱服务只依赖这个回调的
   产物，因此 **切换引擎不影响频谱**。
-- **不使用 FFmpeg 的频谱能力**：不引入 `libavfilter/showspectrum`、`av_fft`、
-  `swr` 等；FFmpeg 只负责解码，频谱是独立实现（`kernel/dsp/spectrum.zig`）。
-- `pipeline.c` 里已有的 `fft_process_multi` 仅服务 CLI/流式推送，**不是 App 的
-  频谱源**；App 统一走 `EraSpectrumService`。
+- **分析器按构建能力二选一**（`src/spectrum_dsp.c`）：
+  - 链接 Zig 内核 → `kernel/dsp/spectrum.zig` 的 VQT（`zk_dsp_spectrum_*`）；
+  - 纯 FFmpeg 构建（无内核静态库）→ `src/spectrum_fft.c` 的 libavutil/tx
+    多分辨率 FFT，显示增强在 C 侧镜像 Zig 口径（§4.9）。
+  - 不引入 `libavfilter/showspectrum`/`showcqt`（输出视频帧、拿不到数值）；
+    `libavutil/tx` 属于 avutil 核心，最小 FFmpeg 构建也可用。
+- `pipeline.c` 不再内置频谱分析器（v1 的 `fft_process_multi` 已删除）；
+  App 统一走 `EraSpectrumService`。
 - 读取位置 = **播放位置**（`ma_sound_get_cursor_in_pcm_frames` /
   `player_stream_played_ms`），不是解码回调的 `position_ms`；FFmpeg 解码可快于
   实时，按解码位置取窗会「超前」。
@@ -309,6 +312,23 @@ flux[t] = Σ_k max(0, log(1 + band[t][k]) - log(1 + band[t-1][k]))
 
 - 单声道时 L=R；5.1 的 LFE 不参与，避免低频能量虚高。
 
+### 4.9 FFmpeg 后端（libavutil/tx，纯 FFmpeg 构建）
+
+不链接 Zig 内核时，`src/spectrum_fft.c` 用 FFmpeg avutil 的 RDFT 做分析：
+
+| 项 | 值 |
+|---|---|
+| 窗长阶梯 | 12288 / 4096 / 1024 / 256（Blackman 周期窗） |
+| 选窗规则 | 每个带取「bin 宽度 ≤ 带宽度」的最小窗；低频长窗、高频短窗 |
+| 带内聚合 | 取带内 bin 幅度最大值（保持 0dBFS 正弦 → 1.0 的校准口径） |
+| 居中窗口 | 与 VQT 一致：窗中心对准播放位置，`future_samples` 语义相同 |
+| 显示增强 | AGC / 倾斜 / ×0.28 / `-60..0dB` + 软膝 / γ / 峰值 / 通量节拍逐条镜像 §4.4–4.7 |
+| 成本 | 每帧 4 档 × 2 声道 FFT（约 3.5 万点），48kHz 下约 1–3% 单核 @20Hz |
+
+已知差异：FFT 的线性 bin + 带内 max 在 40–80Hz 的选择性弱于 VQT
+（48kHz 下最长窗 3.9Hz/bin），听感上低频块状略明显；这是纯 FFmpeg 构建的
+降级路径，链接内核时仍用 VQT。
+
 ## 5. 线程、启动与性能
 
 ### 5.1 线程模型
@@ -427,16 +447,19 @@ class FftFrame {
 - 事件解析时创建新 List；**不复用**跨事件缓冲（避免 UI 持有被下一帧覆盖的数据）。
 - `PlaybackState.fft` 只由 `EngineFft` 事件更新；峰值线由引擎计算，UI 只绘制。
 
-### 6.3 `libfft.so`（旧 ABI 不再属于 App 播放路径）
+### 6.3 分析器后端（Zig VQT / FFmpeg FFT）
 
-- App 播放路径**不再加载** `libfft.so`，也不再使用 `fft_create` 等旧 `fft_*`
-  ABI；v2 的唯一对外计算入口是内核 C ABI `zk_dsp_spectrum_*`
-  （`include/kernel_bridge.h`）。
-- 源码树仍保留 `src/fft.c` → `libfft.so` 的构建，供尚未迁移的 CLI/外部集成
-  使用；它**不是** v2 契约，行为仍为旧的 80–2000Hz / -60..0 实现。
-- 需要 v2 的消费者应直接链接/加载内核 `zk_dsp_spectrum_*`，不要依赖旧
-  `fft_*`。这是**破坏性更新**：不承诺旧版调用方二进制/源码兼容；CHANGELOG
-  与发布说明必须显式标注。
+- 对外契约只有一种：`zk_dsp_spectrum_*`（内核后端）或 `era_fft_spectrum_*`
+  （FFmpeg 后端），由 `src/spectrum_dsp.c` 在编译期选择；两者输出同一
+  `EraSpectrumFrame`（128 带 + 峰值 + 节拍），`EraSpectrumService` 与前端
+  完全无感。
+- CMake 选项：`-DARCHOERA_SPECTRUM_ANALYZER=auto|zig|fft`
+  - `auto`（默认）：有内核用 `zig-vqt`，无内核用 `ffmpeg-fft`；
+  - `zig`：强制 VQT（无内核时报配置错误）；
+  - `fft`：强制 libavutil/tx（本地对拍 / 纯 FFmpeg 构建验证）。
+- 启动日志会打印实际后端：`... / 12288 样本窗 / zig-vqt|ffmpeg-fft`。
+- 旧的 `libfft.so` / `fft_*` ABI / `libfftPath` / CLI `--fft*` 已整体删除，
+  不提供兼容层。
 
 ## 7. 前端重构
 
@@ -449,13 +472,18 @@ class FftFrame {
 | `SpectrumView` / Painter | 帧间插值、攻/放显示平滑、绘制频谱与峰值线 |
 | `spectrum_timing.dart` | 纯时间学（P0 已落） |
 
-### 7.2 删除
+### 7.2 已删除（2026-11-05 收尾）
 
-- `_pollSpectrum()`、`PcmFftSource`、`PcmAnalyzer`、`MemoryPcmAnalyzer`、
-  `fft_bindings.dart` 从 App 播放路径**直接删除**，不保留 A/B 回退。
-- `fft_bindings.dart` / `pcm_analyzer.dart` 文件可保留给未迁移的 CLI/测试，
-  但 App 播放路径不得导入；`libfft.so` 继续按旧实现构建，不参与 v2。
-- `EnginePaths.libfftPath` 可移除，或仅留给 CLI/测试。
+- Dart：`pcm_analyzer.dart`（`PcmAnalyzer` / `MemoryPcmAnalyzer` /
+  `PcmFftSource`）、`fft_bindings.dart`、`pcm_analyzer_seek_reset_test.dart`、
+  `NativeModule.fft` / `libfftPath`，以及 `engine_bindings` 中仅供拉模式用的
+  `pcmWindow` / `pcmEpoch` FFI 绑定。
+- C：`src/fft.c` / `src/fft.h`、`libfft` 构建目标、`pipeline` 的
+  `fft_*` 字段/API、CLI `--fft` / `--fft-size` / `--fft-fd` /
+  `--fft-interval-ms` 与 `set_fft` 命令、`tests/test_fft.c`。
+- 内核：`kernel/dsp/fft.zig`（旧 ABI 移植占位）。
+- 构建/打包：Linux/Windows/macOS/Nix 的 `libfft` 产物安装与 Windows
+  `fft.dll` 编译；`libfft.so` 不再随包分发。
 - 旧拉模式相关测试同步替换为 v2 事件/核心测试。
 
 ### 7.3 渲染端
@@ -467,6 +495,9 @@ class FftFrame {
   - 按 `lpeak/rpeak` 叠加峰值保持线；
   - 做帧间插值与攻/放显示平滑。
 - UI 不做 AGC、不做 `pow`、不做频率倾斜、不计算峰值。
+- 绘制覆盖全部 128 带（40–16kHz）：`SpectrumView` 不再跳过最低频带
+  （旧实现的 `skipLow = 8` 会把 40–58Hz 整段裁掉，与 v2 频率范围矛盾，
+  现已移除）。
 
 ## 8. 实施阶段
 
@@ -477,7 +508,7 @@ class FftFrame {
 | **P2 ✅** | 引擎 `EraSpectrumService` + `fft` 事件 + Dart 接收端（直接切换） | 20Hz 稳定、UI 无 FFI |
 | **P3 ✅** | 移除 App 拉模式；旧测试替换；文档收尾 | 冷/热启动与线程池门禁 |
 | **P4 ✅** | VQT + 引擎侧 AGC/γ/高频倾斜/峰值保持线 | 算法单测 + UI 只描线 |
-| **P5 ✅（App 路径）** | App 不再使用旧拉模式与旧 `libfft.so` ABI；`libfft.so` 仍构建给 CLI/测试 | 破坏性更新标注 |
+| **P5 ✅** | 删除 v1 分析器全部代码（Dart 拉模式 / `libfft` / CLI `--fft` / 内核占位） | 破坏性更新标注 |
 
 ### 8.1 交付状态与验证（2026-11-04）
 
@@ -485,7 +516,9 @@ class FftFrame {
 
 | 层 | 实现 |
 |---|---|
-| 纯计算核心 | `kernel/dsp/spectrum.zig`（VQT / 对数带 / AGC / γ / 倾斜 / dB 软膝 / 峰值 / 频谱通量） |
+| 纯计算核心（内核） | `kernel/dsp/spectrum.zig`（VQT / 对数带 / AGC / γ / 倾斜 / dB 软膝 / 峰值 / 频谱通量） |
+| 纯计算核心（纯 FFmpeg） | `src/spectrum_fft.c`（libavutil/tx 多分辨率 FFT + 同口径显示增强） |
+| 后端选择 | `src/spectrum_dsp.c`（`ARCHOERA_SPECTRUM_ANALYZER=auto|zig|fft`） |
 | C ABI | `zk_dsp_spectrum_*`（含 `zk_dsp_spectrum_peaks`；`kernel/kernel.zig`、`include/kernel_bridge.h`） |
 | 引擎服务 | `src/spectrum_service.c/h`（独立线程、50ms、懒启动、快速 stop、峰值下发） |
 | 源适配 | 流式环形缓冲 / 内存 `mem_window` / 文件 `src/pcm_file_reader.c/h` |
@@ -568,3 +601,7 @@ class FftFrame {
   只读 `on_pcm_out` 产物（mem blocks / `stream.pcm`），按播放位置取窗；
   SegStore 只是在线源的编码输入、不是频谱源；不引入 FFmpeg
   `showspectrum`/`av_fft`，`set_fft` 改为启停频谱服务。
+- **2026-11-05**：删除 v1 分析器全部遗留（`src/fft.c`/`libfft`/Dart 拉模式/
+  CLI `--fft`/内核 `dsp/fft.zig`）；纯 FFmpeg 构建改用 **libavutil/tx** 的
+  多分辨率 FFT（`src/spectrum_fft.c`），与 VQT 后端通过
+  `ARCHOERA_SPECTRUM_ANALYZER` 编译期二选一，事件/前端契约不变。

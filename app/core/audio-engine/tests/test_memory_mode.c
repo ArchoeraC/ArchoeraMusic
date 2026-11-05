@@ -7,7 +7,8 @@
  *
  * 规格：docs/audio-memory-playback.md §8
  *  1. 内存模式会话（headless 全速解码到 EOF）会话目录**不产生** stream.wav/.pcm；
- *  2. pcm_window 与参考解码（测试内另建 pipeline + 同构捕获）窗口一致（≤1e-4）；
+ *  2. 频谱取窗（era_mediaengine_read_window）与参考解码
+ *     （测试内另建 pipeline + 同构捕获）窗口一致（≤1e-4）；
  *  3. cap 语义：-1（无上限）整曲可回访；>0 达 cap 滚动淘汰（旧视窗 -1、近尾仍 0，
  *     且近尾窗口与无上限会话一致——记账淘汰未篡改保留数据）；
  *  4. 参数错误返回 -2（NULL 句柄 / frames<=0）；
@@ -35,6 +36,7 @@
 
 #include "audio_engine.h"
 #include "archoera_mediaengine.h"
+#include "mediaengine_internal.h"
 #include "segstore.h"
 
 static int g_fail = 0;
@@ -389,10 +391,10 @@ int main(void)
     if (efull) {
         const long probes[4] = { 200, 1500, 5000, total_ms - 60 };
         ok = 1;
-        CHECK(archoera_mediaengine_pcm_epoch(efull) >= 0, "pcm_epoch 可用（>=0）");
+        CHECK(era_mediaengine_mem_epoch(efull) >= 0, "mem_epoch 可用（>=0）");
         for (int i = 0; i < 4; i++) {
             double md;
-            if (archoera_mediaengine_pcm_window(efull, (int)probes[i], frames,
+            if (era_mediaengine_read_window(efull, (int)probes[i], frames,
                                                 l, r) != 0 ||
                 ref_window(sr, (int)probes[i], frames, l2, r2) != 0) {
                 ok = 0;
@@ -403,15 +405,15 @@ int main(void)
             max_diff(r, r2, frames, &md);
             if (md > 1e-4) ok = 0;
         }
-        CHECK(ok, "无上限会话 pcm_window 与参考一致（4 处，≤1e-4）");
+        CHECK(ok, "无上限会话取窗与参考一致（4 处，≤1e-4）");
         CHECK(!dir_has_stream_files(dir_full),
               "无上限会话不落盘（无 stream.wav/.pcm）");
-        CHECK(archoera_mediaengine_pcm_window(efull, 1500, 0, l, r) == -2,
+        CHECK(era_mediaengine_read_window(efull, 1500, 0, l, r) == -2,
               "frames<=0 → -2");
-        CHECK(archoera_mediaengine_pcm_window(NULL, 1500, frames, l, r) == -2,
+        CHECK(era_mediaengine_read_window(NULL, 1500, frames, l, r) == -2,
               "NULL 句柄 → -2");
         /* 保存尾部窗口，供小 cap 会话对比（淘汰后近尾仍一致） */
-        archoera_mediaengine_pcm_window(efull, (int)(total_ms - 60), frames,
+        era_mediaengine_read_window(efull, (int)(total_ms - 60), frames,
                                         l2, r2);
     }
 
@@ -421,10 +423,10 @@ int main(void)
     if (eev) {
         CHECK(!dir_has_stream_files(dir_ev),
               "cap 会话同样不落盘（无 stream.wav/.pcm）");
-        CHECK(archoera_mediaengine_pcm_window(eev, (int)(total_ms - 60), frames,
+        CHECK(era_mediaengine_read_window(eev, (int)(total_ms - 60), frames,
                                               l, r) == 0,
               "cap 会话近尾窗口可命中（保留尾部）");
-        CHECK(archoera_mediaengine_pcm_window(eev, 200, frames, l, r) == -1,
+        CHECK(era_mediaengine_read_window(eev, 200, frames, l, r) == -1,
               "cap 会话早期窗口 -1（已滚动淘汰）");
         if (efull) {
             double md;
@@ -446,7 +448,7 @@ int main(void)
               "store 会话不落盘（无 stream.wav/.pcm）");
         for (int i = 0; i < 4; i++) {
             double md;
-            if (archoera_mediaengine_pcm_window(est, (int)probes[i], frames,
+            if (era_mediaengine_read_window(est, (int)probes[i], frames,
                                                 l, r) != 0 ||
                 ref_window(sr, (int)probes[i], frames, l2, r2) != 0) {
                 ok = 0;
@@ -457,8 +459,8 @@ int main(void)
             max_diff(r, r2, frames, &md);
             if (md > 1e-4) ok = 0;
         }
-        CHECK(ok, "store 会话 pcm_window 与参考一致（4 处，≤1e-4）");
-        CHECK(archoera_mediaengine_pcm_epoch(est) >= 0, "store 会话 pcm_epoch 可用");
+        CHECK(ok, "store 会话取窗与参考一致（4 处，≤1e-4）");
+        CHECK(era_mediaengine_mem_epoch(est) >= 0, "store 会话 mem_epoch 可用");
     }
 
     /* 4) 播放会话的 initial_volume **不得**落到管线：pipeline_set_volume 的实现
@@ -470,7 +472,7 @@ int main(void)
     CHECK(evol != NULL, "内存模式（initial_volume=0.4）会话可创建");
     if (evol) {
         double md = 0.0;
-        ok = archoera_mediaengine_pcm_window(evol, 1500, frames, l, r) == 0 &&
+        ok = era_mediaengine_read_window(evol, 1500, frames, l, r) == 0 &&
              ref_window(sr, 1500, frames, l2, r2) == 0;
         if (ok) {
             max_diff(l, l2, frames, &md);

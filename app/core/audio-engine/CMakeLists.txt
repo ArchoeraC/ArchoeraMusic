@@ -149,9 +149,11 @@ set(AUDIO_ENGINE_SOURCES
     src/equalizer.c
     src/loudness.c
     src/limiter.c
-    src/fft.c
-    # 频谱 v2：引擎侧 50ms 推送服务（取窗/线程/事件；纯计算在 Zig 内核）
+    # 频谱 v2：引擎侧 50ms 推送服务（取窗/线程/事件）
     src/spectrum_service.c
+    # 分析器后端：Zig VQT（内核）或 FFmpeg FFT（libavutil/tx）
+    src/spectrum_dsp.c
+    src/spectrum_fft.c
     # 统一日志收口（sink 注入 + stderr 兜底）
     src/era_log.c
     # 方向① D1/D2：参数化 EQ + 次声/低频管理
@@ -221,6 +223,37 @@ if(HAS_ARCHOERA_KERNEL)
     target_link_libraries(audio_engine_static PUBLIC ${ZK_LIB})
 endif()
 
+# ── 频谱分析后端：Zig VQT / FFmpeg FFT ─────────────────────────────
+# auto（默认）：链接了 Zig 内核用 VQT，纯 FFmpeg 构建用 libavutil/tx FFT；
+# zig：强制 VQT（无内核时报错）；fft：强制 FFT（本地对拍/无内核构建验证用）。
+set(ARCHOERA_SPECTRUM_ANALYZER "auto" CACHE STRING
+    "频谱分析后端：auto（有内核用 zig，否则 fft）| zig | fft")
+set_property(CACHE ARCHOERA_SPECTRUM_ANALYZER PROPERTY STRINGS auto zig fft)
+
+if(ARCHOERA_SPECTRUM_ANALYZER STREQUAL "zig")
+    if(NOT HAS_ARCHOERA_KERNEL)
+        message(FATAL_ERROR
+            "ARCHOERA_SPECTRUM_ANALYZER=zig 但未找到 Zig 内核静态库（libarchoera_kernel.a）")
+    endif()
+    set(ERA_SPECTRUM_USE_FFT FALSE)
+elseif(ARCHOERA_SPECTRUM_ANALYZER STREQUAL "fft")
+    set(ERA_SPECTRUM_USE_FFT TRUE)
+else()
+    if(HAS_ARCHOERA_KERNEL)
+        set(ERA_SPECTRUM_USE_FFT FALSE)
+    else()
+        set(ERA_SPECTRUM_USE_FFT TRUE)
+    endif()
+endif()
+
+if(ERA_SPECTRUM_USE_FFT)
+    target_compile_definitions(audio_engine_static PRIVATE ERA_SPECTRUM_USE_FFT=1)
+    set(ERA_SPECTRUM_BACKEND_NAME "ffmpeg-fft（libavutil/tx）")
+else()
+    set(ERA_SPECTRUM_BACKEND_NAME "zig-vqt（kernel/dsp/spectrum.zig）")
+endif()
+message(STATUS "频谱分析后端: ${ERA_SPECTRUM_BACKEND_NAME}")
+
 # ── 数学库（必须排在内核静态库之后）──────────────────────────────
 # 内核库引用 cos/exp2/log10f/sincos/... 等 libm 符号；Ubuntu 的 gcc 默认
 # 传 --as-needed，若 -lm 出现在内核库之前，扫描时尚未出现未定义符号 → libm
@@ -228,22 +261,6 @@ endif()
 # --as-needed，故本机不复现）。置于内核库之后可确保符号被解析。
 if(MATH_LIBRARY)
     target_link_libraries(audio_engine_static PUBLIC ${MATH_LIBRARY})
-endif()
-
-# ── FFT 共享库（Dart FFI 客户端频谱分析；EnginePaths.libfftPath）──────────
-# 独立编译 src/fft.c（无外部依赖，仅 libm）。注意全局 -fvisibility=hidden
-# 会隐藏所有导出符号，此目标需恢复 default 可见性，否则 Dart 侧
-# DynamicLibrary.lookup('fft_create') 等将找不到符号。
-add_library(fft SHARED src/fft.c src/era_log.c)
-set_target_properties(fft PROPERTIES C_VISIBILITY_PRESET default)
-# 全局 add_compile_options(-fvisibility=hidden) 位于编译参数末尾，会覆盖
-# C_VISIBILITY_PRESET；需在此目标显式追加 default（GCC/Clang 后者生效）。
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(fft PRIVATE -fvisibility=default)
-endif()
-target_include_directories(fft PRIVATE ${AUDIO_ENGINE_INCLUDES})
-if(MATH_LIBRARY)
-    target_link_libraries(fft PRIVATE ${MATH_LIBRARY})
 endif()
 
 # ── CLI 二进制（仅 Linux/macOS：main.c 深度依赖 POSIX——

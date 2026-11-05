@@ -5,8 +5,7 @@
 /**
  * pcm_file_reader.c — stream.pcm 按位置取窗（L/R 下混）
  *
- * 实现说明见 pcm_file_reader.h。扫描 / 二分 / 跨块读取 / 下混系数逐条对齐
- * Dart PcmAnalyzer（app/lib/services/playback/pcm_analyzer.dart），并与内存
+ * 实现说明见 pcm_file_reader.h。扫描 / 二分 / 跨块读取 / 下混系数与内存
  * 播放版 mem_window（mediaengine_lib.c）保持同一取窗语义：
  *   终点样本 = 定位块起点 + (end_pos_ms - pos_ms) × sample_rate / 1000（四舍五入）
  *   窗口     = [终点 - frames + 1, 终点]，前缀不足补零，尾部未解码返回 -1。
@@ -43,7 +42,7 @@
 /* 块头字节数：pos_ms / samples / channels 各 int32 */
 #define ERA_PCM_BLOCK_HEADER 12
 
-/* 单块声道数上限（与 PcmAnalyzer.scan 的 channels > 8 判定一致） */
+/* 单块声道数上限（channels > 8 视为非法块头） */
 #define ERA_PCM_MAX_CHANNELS 8
 
 struct EraPcmFileReader {
@@ -183,7 +182,7 @@ static int64_t era_file_size(FILE *fp)
     return total;
 }
 
-/* 增量扫描（对齐 PcmAnalyzer.scan）：
+/* 增量扫描：
  *   - 文件变短 → 已截断重建，清空重扫；
  *   - 块头非法 / pos_ms 回退 → 文件被重写（长度探测失效的竞态兜底），
  *     清空重扫一次，仍异常则停止；

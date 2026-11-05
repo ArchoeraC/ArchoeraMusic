@@ -4,7 +4,7 @@ rem  ArchoeraMusic Windows 全模块一站式构建引导（bat 全量接管）
 rem
 rem  在单个 cmd 会话内完成：
 rem    1. vswhere 定位 VS + call vcvars64.bat（MSVC/cl.exe/link.exe 环境）
-rem    2. audio-engine : cargo tempo staticlib + cl 直编 fft.dll / archoera_mediaengine.dll
+rem    2. audio-engine : cargo tempo staticlib + cl 直编 archoera_mediaengine.dll
 rem    3. scraper      : CMake + vcpkg toolchain（Windows 保留 CMake）
 rem    4. scanner      : dotnet publish (NativeAOT) + e_sqlite3.dll
 rem    4b. indexer     : dotnet publish (NativeAOT, indexer-ffi) + e_sqlite3.dll
@@ -71,7 +71,7 @@ echo [build_windows] Visual Studio: %VSROOT%
 call "%VSROOT%\VC\Auxiliary\Build\vcvars64.bat" >nul
 
 rem =====================================================================
-rem  2. audio-engine：tempo staticlib + fft.dll + archoera_mediaengine.dll
+rem  2. audio-engine：tempo staticlib + archoera_mediaengine.dll
 rem =====================================================================
 echo [build_windows] ===== audio-engine =====
 pushd "%ROOT%audio-engine"
@@ -110,24 +110,6 @@ rem （Dart DynamicLibrary lookup；segstore.c 源见下，.so 内 segstore 函�
 >> build\archoera_mediaengine.def echo     segstore_fill
 >> build\archoera_mediaengine.def echo     segstore_set_total
 >> build\archoera_mediaengine.def echo     segstore_destroy
-> build\fft.def echo EXPORTS
->> build\fft.def echo     fft_create
->> build\fft.def echo     fft_set_enabled
->> build\fft.def echo     fft_process_frame
->> build\fft.def echo     fft_get_spectrum_norm_stereo
->> build\fft.def echo     fft_take_beat_strength
->> build\fft.def echo     fft_destroy
->> build\fft.def echo     fft_set_log_sink
-
-echo [build_windows] 编译 fft.dll...
-:: /utf-8：源码为无 BOM 的 UTF-8，含中文字符串字面量；不带该开关时 MSVC 按本地
-:: 代码页（非 UTF-8 环境，如英文 CI）解析会报 C2001（与 native/platform 一致）。
-call :write_version_rc "build\fft.rc" "fft.dll" "ArchoeraMusic FFT" "fft" "2"
-rc /nologo /fo build\fft.res build\fft.rc
-if errorlevel 1 exit /b 1
-cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src src\fft.c src\era_log.c /Fe:build\fft.dll /link /DEF:build\fft.def build\fft.res
-if errorlevel 1 exit /b 1
-
 rem --- 自研解码内核（EraAudio, Zig 静态库, windows-msvc ReleaseFast）---
 rem 有 zig 才启用（/DHAS_ARCHOERA_KERNEL=1 + 链 archoera_kernel）；否则 native_decoder
 rem 走编译期空实现（Stable/FFmpeg）。顺序：先 zig build 再 cl 链接。
@@ -165,7 +147,7 @@ rem   加 `--enable-schannel`（系统原生 TLS，无额外 DLL；亦保持 LGP
 rem Zig 内核（EraAudio 原生 HTTP(S)/TLS）在 Windows 依赖系统库：crypt32（系统根证书
 rem 枚举/校验）、ws2_32（Winsock）、bcrypt（std.crypto.random）；MSVC 不会自动带上，
 rem 须在最终链接显式补齐（FFmpeg 覆盖了 ws2_32/bcrypt，但不含 crypt32）。
-:: /utf-8：见上方 fft.dll 说明（源码含中文字符串字面量，须显式声明 UTF-8）。
+:: /utf-8：源码含中文字符串字面量，须显式声明 UTF-8（与 native/platform 一致）。
 call :write_version_rc "build\archoera_mediaengine.rc" "archoera_mediaengine.dll" "ArchoeraMusic audio engine" "archoera_mediaengine" "2"
 rc /nologo /fo build\archoera_mediaengine.res build\archoera_mediaengine.rc
 if errorlevel 1 exit /b 1
@@ -174,10 +156,11 @@ cl /nologo /O2 /std:c11 /MD /LD /utf-8 /I include /I src /I include\compat /I "%
     src\encoder.c src\equalizer.c src\parametric_eq.c src\lowfreq.c ^
     src\channel_merge.c ^
     src\loudness.c src\limiter.c ^
-    src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c src\fft.c ^
+    src\native_decoder.c src\pipeline.c src\pcm_uds.c src\player.c ^
     src\era_log.c ^
     src\audio_output.c src\audio_output_platform.c src\audio_output_windows.c ^
-    src\segstore.c src\pcm_file_reader.c src\spectrum_service.c ^
+    src\segstore.c src\pcm_file_reader.c ^
+    src\spectrum_service.c src\spectrum_dsp.c src\spectrum_fft.c ^
     "%VCPKG_PREFIX%\lib\avformat.lib" "%VCPKG_PREFIX%\lib\avcodec.lib" ^
     "%VCPKG_PREFIX%\lib\avutil.lib" "%VCPKG_PREFIX%\lib\swresample.lib" ^
     build\libaudio_tempo.lib %KERNEL_FLAG% %KERNEL_LIB% ntdll.lib ole32.lib ^

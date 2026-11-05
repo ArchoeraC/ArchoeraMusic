@@ -11,9 +11,8 @@
  *     一次性转码，stdout 输出 OGG/Opus 流
  *
  *   交互模式（Phase 3）：
- *     archoera-audio-engine <输入文件/URL> --interactive --control-fd 3 [--fft-fd 4] [选项]
+ *     archoera-audio-engine <输入文件/URL> --interactive --control-fd 3 [选项]
  *     stdin 接收 JSON 控制命令，stdout 输出 OGG/Opus 流，control-fd 输出状态/响应的 JSON 行
- *     --fft-fd 指定的 fd 输出 FFT 频谱 JSON 行
  *
  *   播放模式（Phase 4，自写播放器，§10.8 替代 libmpv）：
  *     archoera-audio-engine <输入文件/URL> --interactive --control-uds <path> \
@@ -27,7 +26,6 @@
  *   {"type":"set_volume","gain":0.8}
  *   {"type":"set_normalization","enabled":true}
  *   {"type":"set_limiter","enabled":true}
- *   {"type":"set_fft","enabled":true}
  *   {"type":"get_status"}
  *   {"type":"stop"}   // 请求退出（keep-alive/播放等待循环据此退出）
  *   {"type":"play"} / {"type":"pause"}   // 播放模式：播放/暂停（g_player 非空时）
@@ -43,13 +41,7 @@
  *   {"type":"player:ended"}  // 播放模式：播放自然结束
  *   {"type":"error","message":"..."}
  *
- * fft-fd 频谱数据（JSON，每行一个，由 --fft-fd 指定 fd 输出）：
- *   {"type":"fft","bins":128,"offsetMs":12345,"ldata":[0.0,0.5,...],"rdata":[0.0,0.5,...]}
- *   固定 128 bins，对数频段映射（80~2000Hz），值归一化到 [0,1]（对齐 Electron Rust 端契约）；
- *   offsetMs = 起始偏移 + 已处理音频位置，供前端按播放位置取帧（拉模式）
- *
- *   桌面端（Flutter 直连）用 --pcm-uds <path> 替代：原始 float PCM 经 UDS 流出，
- *   频谱分析由客户端完成（FFT 客户端化），引擎只负责解码/处理/转码。
+ *   桌面端（Flutter 直连）用 --pcm-uds <path> 接收原始 float PCM。
  */
 #define _POSIX_C_SOURCE 200809L
 #define _GNU_SOURCE
@@ -77,17 +69,13 @@ static volatile sig_atomic_t g_sigterm_received = 0;
 /* stdin stop 命令已收到（keep-alive 等待循环据此退出） */
 static volatile sig_atomic_t g_want_exit = 0;
 
-/* FFT 推送（回调驱动）：目标 fd / 间隔（音频秒）/ 上次推送位置 */
-static int g_fft_fd = -1;
-static double g_fft_interval_sec = 0.1;
-static double g_last_fft_pos = -1.0;
-/* seek/CUE 起始偏移（ms）：FFT offsetMs = 起始偏移 + 引擎内已处理位置 */
+/* seek/CUE 起始偏移（ms） */
 static long g_offset_ms = 0;
 
 /* 流消费者等待超时（ms）：桌面 Flutter 转发桥连接延迟远小于此值 */
 #define STREAM_WAIT_MS 15000
 
-/* PCM 流出 UDS 服务器（Flutter 直连收取原始 PCM，FFT 客户端化） */
+/* PCM 流出 UDS 服务器（Flutter 直连收取原始 PCM） */
 static PcmUds *g_pcm_uds = NULL;
 /* OGG 流 UDS 服务器（libmpv unix:// 直连，替代 stdout，零 TCP） */
 static PcmUds *g_stream_uds = NULL;
@@ -386,8 +374,6 @@ static void print_usage(const char *prog)
         "  --normalization-gain <dB> 预计算响度增益（dB），默认 0\n"
         "  --no-limiter            禁用限幅器\n"
         "  --limiter-threshold <dB> 限幅器阈值（dB），默认 -1.0\n"
-        "  --fft                   启用 FFT 频谱分析\n"
-        "  --fft-size <n>          FFT 点数（默认 1024）\n"
         "\n"
         "Phase 4 变速变调选项:\n"
         "  --tempo                 启用变速变调\n"
@@ -398,16 +384,13 @@ static void print_usage(const char *prog)
         "Phase 3 交互模式选项:\n"
         "  --interactive           启用交互模式（stdin JSON 控制）\n"
         "  --control-fd <n>        控制协议 fd（默认 3）\n"
-        "  --fft-fd <n>            FFT 数据输出 fd（默认 4），需同时启用 --fft\n"
-        "  --fft-interval-ms <n>   FFT 推送间隔（默认 100ms）\n"
         "  --keep-alive-ms <n>     转码完成后保持进程存活 n 毫秒，等待迟到消费者\n"
         "                          （默认 0 = 立即退出；仅播放服务显式启用）\n"
         "\n"
-        "FFT 客户端化选项（桌面端 Flutter 直连，替代 --fft-fd）:\n"
+        "流式输出选项（桌面端 Flutter 直连）:\n"
         "  --stream-uds <path>    OGG 流经 UDS 输出（Flutter 转发桥/libmpv 直连；\n"
         "                          引擎等待消费者连上后才开始转码，保证流从头完整）\n"
         "  --pcm-uds <path>       原始 float PCM 经 UDS 流出（块头 [pos_ms|samples|channels]）\n"
-        "                          Flutter 连接后自行分析频谱；无需 --fft\n"
         "  --control-uds <path>   控制事件（ready/status/done/error JSON 行）经 UDS 输出，\n"
         "                          替代 fd3（Dart Process 无法传额外 fd，桌面端必用）\n"
         "\n"
@@ -500,11 +483,6 @@ static void handle_command(AudioPipeline *p, const char *line) {
         if (json_get_bool(line, "enabled", &enabled) == 0) {
             pipeline_set_limiter_enabled(p, enabled);
         }
-    } else if (strcmp(type, "set_fft") == 0) {
-        bool enabled = true;
-        if (json_get_bool(line, "enabled", &enabled) == 0) {
-            pipeline_set_fft_enabled(p, enabled);
-        }
     } else if (strcmp(type, "set_tempo_speed") == 0) {
         double speed = 1.0;
         if (json_get_number(line, "speed", &speed) == 0) {
@@ -562,80 +540,6 @@ static void handle_command(AudioPipeline *p, const char *line) {
 
 /* ── 交互模式主循环 ────────────────────────────────────────────── */
 
-/* 前端渲染契约：固定 128 bins 归一化频谱（[0,1] 对数映射，对齐 Electron Rust 端） */
-#define FFT_PUSH_BINS 128
-
-/* 追加一段 JSON。snprintf 返回值是「空间足够时应写入的长度」，截断时会
- * ≥ 剩余空间；若直接拿它做下一次 sizeof(buf) - off，减法会下溢成巨大的
- * size_t 并越界写。这里统一校验，返回新偏移（-1 = 失败）。 */
-static int json_append(char *buf, size_t cap, int off, const char *fmt, ...)
-{
-    if (off < 0 || (size_t)off >= cap) return -1;
-    size_t remaining = cap - (size_t)off;
-    va_list ap;
-    va_start(ap, fmt);
-    int n = vsnprintf(buf + off, remaining, fmt, ap);
-    va_end(ap);
-    if (n < 0 || (size_t)n >= remaining) return -1;
-    return off + n;
-}
-
-/* 推送一帧 FFT 频谱到 fft_fd（JSON 行，双声道归一化 [0,1] bins） */
-static int push_fft_frame(AudioPipeline *p, int fft_fd)
-{
-    if (fft_fd < 0) return 0;
-    if (pipeline_get_fft_size(p) <= 0) return 0;
-    int bins = FFT_PUSH_BINS;
-    float fft_data[FFT_PUSH_BINS];
-    float fft_data_r[FFT_PUSH_BINS];
-    pipeline_get_fft_spectrum_norm_stereo(p, fft_data, fft_data_r, bins);
-
-    /* 构造 JSON（双声道独立数据；offsetMs=起始偏移+已处理位置，供前端按播放位置取帧） */
-    char fft_json[16384];
-    int off = json_append(fft_json, sizeof(fft_json), 0,
-        "{\"type\":\"fft\",\"bins\":%d,\"offsetMs\":%.0f,\"ldata\":[",
-        bins, (double)g_offset_ms + pipeline_get_fft_processed_seconds(p) * 1000.0);
-    if (off < 0) return -1;
-    for (int i = 0; i < bins; i++) {
-        off = json_append(fft_json, sizeof(fft_json), off,
-            "%.1f%s", fft_data[i], i < bins - 1 ? "," : "");
-        if (off < 0) return -1;
-    }
-    off = json_append(fft_json, sizeof(fft_json), off, "],\"rdata\":[");
-    if (off < 0) return -1;
-    for (int i = 0; i < bins; i++) {
-        off = json_append(fft_json, sizeof(fft_json), off,
-            "%.1f%s", fft_data_r[i], i < bins - 1 ? "," : "");
-        if (off < 0) return -1;
-    }
-    off = json_append(fft_json, sizeof(fft_json), off, "]}");
-    if (off < 0) return -1;
-
-    int ret = write_fd(fft_fd, fft_json, off);
-    if (ret < 0) return ret;
-    return write_fd(fft_fd, "\n", 1);
-}
-
-/* FFT 帧回调：每次频谱计算完成即触发（fft 内部同步调用）。
- * 按已处理音频位置推进推送——转码速度随管道背压变化（真实播放≈实时、
- * CLI 无背压时秒级完成），墙钟间隔不可靠，音频位置恒定。 */
-static void on_fft_frame(void *user_data, int fft_size)
-{
-    (void)fft_size;
-    if (g_fft_fd < 0) return;
-    AudioPipeline *p = (AudioPipeline *)user_data;
-    if (!p) return;
-    double pos = pipeline_get_fft_processed_seconds(p);
-    if (g_last_fft_pos < 0) {
-        g_last_fft_pos = pos;
-        return;
-    }
-    if (pos - g_last_fft_pos >= g_fft_interval_sec) {
-        push_fft_frame(p, g_fft_fd);
-        g_last_fft_pos = pos; /* 追踪最新位置，避免误差累积 */
-    }
-}
-
 /* 流式 seek/重开：销毁旧管线并按目标偏移重建（解码内容从 abs = g_offset + rel
  * 继续），重开 WAV/PCM 落盘与播放器缓冲；事件位置继续为「相对会话起点」。
  * rel 相对会话起点（session offset = g_offset_ms）。返回 0 成功。 */
@@ -675,18 +579,16 @@ static int cli_stream_rebuild(double rel_ms)
                   g_cli_cfg.output_channels);
     }
     pipeline_set_pcm_out_cb(np, on_pcm_out, NULL);
-    pipeline_set_fft_frame_cb(np, on_fft_frame, np);
-    g_last_fft_pos = -1.0;
     g_pipeline = np;
     return 0;
 }
 
-static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
-                           int keep_alive_ms, const char *player_file)
+static int run_interactive(AudioPipeline *p, int keep_alive_ms,
+                           const char *player_file)
 {
     /* 发送就绪消息（经 control UDS / fd3）：
      * sample_rate 为源采样率（诊断/兼容）；out_sample_rate 为管线实际输出采样率
-     * （player 模式跟随源时即源采样率，Flutter FFT 客户端按此建分析器） */
+     * （player 模式跟随源时即源采样率） */
     char ready[320];
     snprintf(ready, sizeof(ready),
         "{\"type\":\"ready\",\"version\":\"%s\",\"duration_ms\":%.0f,"
@@ -705,12 +607,6 @@ static int run_interactive(AudioPipeline *p, int fft_fd, int fft_interval_ms,
     /* stdin 读取缓冲区 */
     char stdin_buf[4096];
     int stdin_pos = 0;
-
-    /* FFT 推送：帧回调按已处理音频位置驱动（每 fft_interval_ms 音频 1 帧） */
-    g_fft_fd = fft_fd;
-    g_fft_interval_sec = (fft_interval_ms > 0 ? fft_interval_ms : 100) / 1000.0;
-    g_last_fft_pos = -1.0;
-    pipeline_set_fft_frame_cb(p, on_fft_frame, p);
 
     /* ── 流式播放初始化（--player-file：首块 PCM 即出声，解码按设备消费节奏推进）。
      *    无声/设备不可用时回退旧路径（全速解码 → 文件播放器）。
@@ -1024,8 +920,6 @@ int main(int argc, char *argv[])
     /* Phase 3: 交互模式选项 */
     bool interactive = false;
     int control_fd = 3;
-    int fft_fd = -1;
-    int fft_interval_ms = 100;
     int keep_alive_ms = 0;
 
     static struct option long_opts[] = {
@@ -1040,8 +934,6 @@ int main(int argc, char *argv[])
         {"normalization-gain",required_argument, 0, 'g'},
         {"no-limiter",        no_argument,       0, 'L'},
         {"limiter-threshold", required_argument, 0, 'l'},
-        {"fft",               no_argument,       0, 'F'},
-        {"fft-size",          required_argument, 0, 's'},
         /* Phase 4 */
         {"tempo",             no_argument,       0, 'P'},
         {"tempo-speed",       required_argument, 0, 'Q'},
@@ -1050,8 +942,6 @@ int main(int argc, char *argv[])
         /* Phase 3 */
         {"interactive",       no_argument,       0, 'I'},
         {"control-fd",        required_argument, 0, 'C'},
-        {"fft-fd",            required_argument, 0, 'D'},
-        {"fft-interval-ms",   required_argument, 0, 'T'},
         {"keep-alive-ms",     required_argument, 0, 'K'},
         {"pcm-uds",           required_argument, 0, 'U'},
         {"stream-uds",        required_argument, 0, 'W'},
@@ -1084,8 +974,6 @@ int main(int argc, char *argv[])
         case 'g': cfg.normalization_gain = atof(optarg); break;
         case 'L': cfg.limiter_enabled = false; break;
         case 'l': cfg.limiter_threshold_db = atof(optarg); break;
-        case 'F': cfg.fft_enabled = true; break;
-        case 's': cfg.fft_size = atoi(optarg); break;
         /* Phase 4 */
         case 'P': cfg.tempo_enabled = true; break;
         case 'Q': cfg.tempo_speed = atof(optarg); break;
@@ -1094,8 +982,6 @@ int main(int argc, char *argv[])
         /* Phase 3 */
         case 'I': interactive = true; break;
         case 'C': control_fd = atoi(optarg); break;
-        case 'D': fft_fd = atoi(optarg); break;
-        case 'T': fft_interval_ms = atoi(optarg); break;
         case 'K': keep_alive_ms = atoi(optarg); break;
         case 'U': pcm_uds_path = optarg; break;
         case 'W': stream_uds_path = optarg; break;
@@ -1197,12 +1083,11 @@ int main(int argc, char *argv[])
     }
     if (cfg.normalization) ERA_LOGI(NULL, "[audio-engine] 响度归一化: %.1fdB\n", cfg.normalization_gain);
     if (cfg.limiter_enabled) ERA_LOGI(NULL, "[audio-engine] 限幅器: %.1fdB\n", cfg.limiter_threshold_db);
-    if (cfg.fft_enabled) ERA_LOGI(NULL, "[audio-engine] FFT: %d 点\n", cfg.fft_size);
 
     /* UDS 服务器统一创建（listen fd 非阻塞，连接惰性 accept）。
      * 桌面端（Flutter 直连）三路：
      *   --stream-uds  OGG/Opus 流（Flutter 转发桥连上后驱动转码）
-     *   --pcm-uds     原始 float PCM（Flutter 做 FFT 分析）
+     *   --pcm-uds     原始 float PCM（原始 PCM 直通）
      *   --control-uds 控制事件 JSON 行（ready/status/done/error） */
     signal(SIGPIPE, SIG_IGN); /* UDS 写断开连接时避免 SIGPIPE 杀进程 */
 
@@ -1252,8 +1137,8 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-    /* PCM 流出（FFT 客户端化 / 播放模式 WAV 落盘）：
-     *   - g_pcm_uds：Flutter 直连收取原始 PCM 做 FFT
+    /* PCM 流出（PCM UDS / 播放模式 WAV 落盘）：
+     *   - g_pcm_uds：Flutter 直连收取原始 PCM
      *   - g_wav_file：--player-file 模式，转码 PCM 落盘 WAV 供 miniaudio 播放 */
     if (player_file) {
         /* WAV 头用实际输出采样率/声道（跟随源时即源采样率，原生直通） */
@@ -1278,8 +1163,7 @@ int main(int argc, char *argv[])
 
     int ret;
     if (interactive) {
-        ret = run_interactive(p, fft_fd, fft_interval_ms, keep_alive_ms,
-                              player_file);
+        ret = run_interactive(p, keep_alive_ms, player_file);
     } else {
         /* 批量模式：阻塞处理 */
         ret = pipeline_run(p);
