@@ -25,6 +25,7 @@
 //! 命名自有（`era_` 前缀），不照搬 FFmpeg / librosa 等上游标识符。
 
 const std = @import("std");
+const Stage = @import("stage.zig").Stage;
 
 /// 分析器配置。字段与 `kernel/kernel.zig` 的 C 桥接调用逐字对齐。
 pub const EraSpectrumConfig = struct {
@@ -120,6 +121,14 @@ pub const EraSpectrum = struct {
     /// 显示峰值（保持线），长度 bins。
     peak_l: []f32,
     peak_r: []f32,
+    /// Stage 模式最近一帧的显示频谱（长度 bins）。
+    frame_l: []f32,
+    frame_r: []f32,
+
+    /// Stage 模式：交错输入声道数（仅取前两声道；1 = 单声道镜像）。
+    stage_channels: u8 = 2,
+    /// Stage 模式最近一帧的节拍强度 0..1。
+    stage_beat: f32 = 0.0,
 
     agc_gain: f32 = 1.0,
     has_prev: bool = false,
@@ -248,12 +257,18 @@ pub fn era_spectrum_create(allocator: std.mem.Allocator, cfg: EraSpectrumConfig)
     errdefer allocator.free(peak_l);
     const peak_r = try allocator.alloc(f32, bins);
     errdefer allocator.free(peak_r);
+    const frame_l = try allocator.alloc(f32, bins);
+    errdefer allocator.free(frame_l);
+    const frame_r = try allocator.alloc(f32, bins);
+    errdefer allocator.free(frame_r);
 
     @memset(prev_mag, 0.0);
     @memset(band_l, 0.0);
     @memset(band_r, 0.0);
     @memset(peak_l, 0.0);
     @memset(peak_r, 0.0);
+    @memset(frame_l, 0.0);
+    @memset(frame_r, 0.0);
 
     const self = try allocator.create(EraSpectrum);
     errdefer allocator.destroy(self);
@@ -281,6 +296,8 @@ pub fn era_spectrum_create(allocator: std.mem.Allocator, cfg: EraSpectrumConfig)
         .band_r = band_r,
         .peak_l = peak_l,
         .peak_r = peak_r,
+        .frame_l = frame_l,
+        .frame_r = frame_r,
     };
     return self;
 }
@@ -299,6 +316,8 @@ pub fn era_spectrum_destroy(self: *EraSpectrum) void {
     a.free(self.band_r);
     a.free(self.peak_l);
     a.free(self.peak_r);
+    a.free(self.frame_l);
+    a.free(self.frame_r);
     self.sample_rate = 0;
     a.destroy(self);
 }
@@ -308,12 +327,15 @@ pub fn era_spectrum_reset(self: *EraSpectrum) void {
     @memset(self.prev_mag, 0.0);
     @memset(self.peak_l, 0.0);
     @memset(self.peak_r, 0.0);
+    @memset(self.frame_l, 0.0);
+    @memset(self.frame_r, 0.0);
     @memset(&self.flux_hist, 0.0);
     self.agc_gain = 1.0;
     self.flux_pos = 0;
     self.flux_count = 0;
     self.cooldown = 0;
     self.has_prev = false;
+    self.stage_beat = 0.0;
 }
 
 /// 设置峰值保持开关；关闭时清空峰值，避免残留线。
@@ -361,20 +383,30 @@ pub fn era_spectrum_sample_rate(self: *const EraSpectrum) u32 {
 // VQT / dB / 节拍
 // ---------------------------------------------------------------------------
 
-/// 单带 VQT 幅度：窗口以 `src.len - future_samples` 为中心。
+/// 单带 VQT 幅度：窗口以 `frames - future_samples` 为中心。
 ///
 /// `future_samples = 0` 时为传统因果窗口（窗口末端 = 最新样本，群延迟约
 /// `len/2`）；服务层在源可读未来样本时传入 `max_window/2`，让每个带的
 /// 窗口中心对准当前播放位置，消除低频长窗的群延迟。窗口越界部分前端补零。
-fn eraVqtBandMag(band: *const EraVqtBand, src: []const f32, future_samples: usize) f32 {
+///
+/// 采样按 `src[frame * stride + offset]` 读取：平面缓冲传 `stride = 1`，
+/// 交错缓冲直接传声道数与声道偏移，避免每帧拆平面（Stage 路径）。
+fn eraVqtBandMag(
+    band: *const EraVqtBand,
+    src: []const f32,
+    frames: usize,
+    stride: usize,
+    offset: usize,
+    future_samples: usize,
+) f32 {
     const len = band.len;
     const half = len / 2;
 
-    // 窗口末端（开区间）：中心 = end - half = src.len - future_samples。
-    var end: usize = src.len;
+    // 窗口末端（开区间）：中心 = end - half = frames - future_samples。
+    var end: usize = frames;
     if (future_samples > half) {
         const shift = future_samples - half;
-        end = if (shift >= src.len) 0 else src.len - shift;
+        end = if (shift >= frames) 0 else frames - shift;
     }
     const available = @min(end, len);
     const pad = len - available;
@@ -384,7 +416,7 @@ fn eraVqtBandMag(band: *const EraVqtBand, src: []const f32, future_samples: usiz
     var im: f32 = 0.0;
     var n: usize = 0;
     while (n < len) : (n += 1) {
-        const x: f32 = if (n < pad) 0.0 else src[start + (n - pad)];
+        const x: f32 = if (n < pad) 0.0 else src[(start + (n - pad)) * stride + offset];
         re += x * band.cos[n];
         im += x * band.sin[n];
     }
@@ -509,20 +541,42 @@ pub fn era_spectrum_process_centered(
     out_l: []f32,
     out_r: []f32,
 ) f32 {
+    return eraSpectrumFrame(self, l, 1, 0, r, 1, 0, future_samples, out_l, out_r);
+}
+
+/// 单帧计算核心：两个声道按任意步长/偏移读取。
+///
+/// 平面缓冲（C 壳 / 单元测试）传 `stride = 1, offset = 0`；
+/// Stage 路径直接传交错声道数与声道偏移，省掉每帧拆平面的拷贝。
+/// `l.len / l_stride` 与 `r.len / r_stride` 取小者为有效帧数。
+fn eraSpectrumFrame(
+    self: *EraSpectrum,
+    l: []const f32,
+    l_stride: usize,
+    l_offset: usize,
+    r: []const f32,
+    r_stride: usize,
+    r_offset: usize,
+    future_samples: usize,
+    out_l: []f32,
+    out_r: []f32,
+) f32 {
     const bins: usize = self.bins;
     if (out_l.len < bins or out_r.len < bins) return 0.0;
 
-    if (l.len == 0 or r.len == 0) {
+    const l_step = @max(l_stride, 1);
+    const r_step = @max(r_stride, 1);
+    const frames = @min(l.len / l_step, r.len / r_step);
+    if (frames == 0) {
         @memset(out_l[0..bins], 0.0);
         @memset(out_r[0..bins], 0.0);
         return 0.0;
     }
-    const frames = @min(l.len, r.len);
 
     // 原始 VQT 带幅度（节拍/AGC 用）。
     for (self.bands, 0..) |*band, i| {
-        self.band_l[i] = eraVqtBandMag(band, l[0..frames], future_samples);
-        self.band_r[i] = eraVqtBandMag(band, r[0..frames], future_samples);
+        self.band_l[i] = eraVqtBandMag(band, l, frames, l_step, l_offset, future_samples);
+        self.band_r[i] = eraVqtBandMag(band, r, frames, r_step, r_offset, future_samples);
     }
 
     // 节拍通量：L/R 平均原始带幅度。
@@ -578,6 +632,81 @@ pub fn era_spectrum_peaks(self: *const EraSpectrum, out_l: []f32, out_r: []f32) 
     const n = @min(@min(out_l.len, out_r.len), bins);
     @memcpy(out_l[0..n], self.peak_l[0..n]);
     @memcpy(out_r[0..n], self.peak_r[0..n]);
+}
+
+// ---------------------------------------------------------------------------
+// 统一 DSP Stage 适配（docs/audio-kernel-zig.md §14）
+// ---------------------------------------------------------------------------
+
+/// 把分析器适配为内核统一 `Stage`（`dsp/stage.zig`）。
+///
+/// 输入是**交错** float32 PCM（`pcm.len == frames * channels`），只读不改，
+/// 与 EQ / 限幅 / 响度同级可挂进主处理链。`channels == 1` 时左右镜像；
+/// 其余声道布局只取前两声道（L/R），多声道下混由链路前级负责。
+///
+/// Stage 的 `process` 没有返回值，分析结果留在实例内，用
+/// [era_spectrum_stage_frame]（128 带 + 节拍）与 [era_spectrum_peaks]
+/// （峰值保持线）读取。每帧零分配；核/表仍在 create 时一次建好。
+///
+/// 声道数写在实例上：同一实例同一时刻只应存在一个 Stage（重新调用本函数
+/// 会更新声道数，先前取出的 Stage 句柄随之按新声道数解释输入）。
+pub fn era_spectrum_stage(self: *EraSpectrum, channels: u8) Stage {
+    self.stage_channels = if (channels == 0) 1 else channels;
+    return .{
+        .ctx = @ptrCast(self),
+        .vtable = &stage_vtable,
+        .channels = self.stage_channels,
+    };
+}
+
+const stage_vtable = Stage.VTable{ .process = stageProcessThunk };
+
+fn stageProcessThunk(ctx: *anyopaque, pcm: []f32, frames: usize) void {
+    const self: *EraSpectrum = @ptrCast(@alignCast(ctx));
+    _ = era_spectrum_process_interleaved(self, pcm, frames);
+}
+
+/// Stage 路径的显式入口（不经 vtable；供测试与链内直调）。
+///
+/// 交错 float32 就地只读；返回本帧节拍强度 0..1。`frames == 0` 或缓冲
+/// 长度不足为空操作（不清空上一帧结果）。
+pub fn era_spectrum_process_interleaved(
+    self: *EraSpectrum,
+    pcm: []f32,
+    frames: usize,
+) f32 {
+    const channels = @max(self.stage_channels, 1);
+    const need = frames * @as(usize, channels);
+    if (frames == 0 or need > pcm.len) return 0.0;
+
+    const r_offset: usize = if (channels >= 2) 1 else 0;
+    const beat = eraSpectrumFrame(
+        self,
+        pcm,
+        channels,
+        0,
+        pcm,
+        channels,
+        r_offset,
+        0,
+        self.frame_l,
+        self.frame_r,
+    );
+    self.stage_beat = beat;
+    return beat;
+}
+
+/// 取 Stage 路径最近一帧的显示频谱（[0,1]，长度 bins，不足截断）。
+///
+/// 返回该帧节拍强度 0..1；从未处理过帧时输出全 0、返回 0。
+pub fn era_spectrum_stage_frame(self: *const EraSpectrum, out_l: []f32, out_r: []f32) f32 {
+    const bins: usize = self.bins;
+    const n = @min(@min(out_l.len, out_r.len), bins);
+    if (n > 0) {
+        @memcpy(out_l[0..n], self.frame_l[0..n]);
+        @memcpy(out_r[0..n], self.frame_r[0..n]);
+    }
+    return self.stage_beat;
 }
 
 // ---------------------------------------------------------------------------
@@ -1106,4 +1235,146 @@ test "era_spectrum: 非法配置拒绝" {
     try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .max_hz = 24000 }));
     try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .max_window = 32 }));
     try testing.expectError(error.InvalidArgument, era_spectrum_create(a, .{ .gamma = 0 }));
+}
+
+// ---------------------------------------------------------------------------
+// Stage 适配测试
+// ---------------------------------------------------------------------------
+
+// 交错缓冲（前两声道）与平面缓冲走同一核心，结果应逐带一致。
+test "era_spectrum: Stage 交错立体声与平面路径一致" {
+    const a = testing.allocator;
+    var cfg = precisionConfig();
+    cfg.max_window = 4096;
+    const sp_stage = try era_spectrum_create(a, cfg);
+    defer era_spectrum_destroy(sp_stage);
+    const sp_planar = try era_spectrum_create(a, cfg);
+    defer era_spectrum_destroy(sp_planar);
+
+    const frames: usize = cfg.max_window;
+    const l = try a.alloc(f32, frames);
+    defer a.free(l);
+    const r = try a.alloc(f32, frames);
+    defer a.free(r);
+    fillSine(l, 440.0, cfg.sample_rate, 0.8);
+    fillSine(r, 1000.0, cfg.sample_rate, 0.4);
+
+    const inter = try a.alloc(f32, frames * 2);
+    defer a.free(inter);
+    for (0..frames) |i| {
+        inter[2 * i] = l[i];
+        inter[2 * i + 1] = r[i];
+    }
+
+    const bins: usize = cfg.bins;
+    const pl = try a.alloc(f32, bins);
+    defer a.free(pl);
+    const pr = try a.alloc(f32, bins);
+    defer a.free(pr);
+    const sl = try a.alloc(f32, bins);
+    defer a.free(sl);
+    const sr = try a.alloc(f32, bins);
+    defer a.free(sr);
+
+    _ = era_spectrum_process(sp_planar, l, r, pl, pr);
+
+    const stage = era_spectrum_stage(sp_stage, 2);
+    try testing.expectEqual(@as(u8, 2), stage.channels);
+    stage.process(inter, frames);
+    _ = era_spectrum_stage_frame(sp_stage, sl, sr);
+
+    for (0..bins) |i| {
+        try testing.expectApproxEqAbs(pl[i], sl[i], 1e-5);
+        try testing.expectApproxEqAbs(pr[i], sr[i], 1e-5);
+    }
+    try testing.expectEqual(expectedBand(440.0, cfg.min_hz, cfg.max_hz, cfg.bins), peakBand(sl));
+    try testing.expectEqual(expectedBand(1000.0, cfg.min_hz, cfg.max_hz, cfg.bins), peakBand(sr));
+}
+
+// 单声道输入左右镜像；峰值保持线与主路径共用同一状态。
+test "era_spectrum: Stage 单声道左右镜像" {
+    const a = testing.allocator;
+    var cfg = precisionConfig();
+    cfg.max_window = 4096;
+    cfg.peak_hold = true;
+    const sp = try era_spectrum_create(a, cfg);
+    defer era_spectrum_destroy(sp);
+
+    const frames: usize = cfg.max_window;
+    const pcm = try a.alloc(f32, frames);
+    defer a.free(pcm);
+    fillSine(pcm, 440.0, cfg.sample_rate, 0.8);
+
+    const stage = era_spectrum_stage(sp, 1);
+    try testing.expectEqual(@as(u8, 1), stage.channels);
+    stage.process(pcm, frames);
+
+    const bins: usize = cfg.bins;
+    const l = try a.alloc(f32, bins);
+    defer a.free(l);
+    const r = try a.alloc(f32, bins);
+    defer a.free(r);
+    _ = era_spectrum_stage_frame(sp, l, r);
+
+    const band = expectedBand(440.0, cfg.min_hz, cfg.max_hz, cfg.bins);
+    try testing.expect(l[band] > 0.3);
+    for (0..bins) |i| try testing.expectApproxEqAbs(l[i], r[i], 1e-6);
+
+    const peak_l = try a.alloc(f32, bins);
+    defer a.free(peak_l);
+    const peak_r = try a.alloc(f32, bins);
+    defer a.free(peak_r);
+    era_spectrum_peaks(sp, peak_l, peak_r);
+    try testing.expectApproxEqAbs(l[band], peak_l[band], 1e-6);
+    try testing.expectApproxEqAbs(r[band], peak_r[band], 1e-6);
+}
+
+// 空帧为无操作（保留上一帧），reset 清空输出与节拍。
+test "era_spectrum: Stage 空帧与 reset" {
+    const a = testing.allocator;
+    var cfg = precisionConfig();
+    cfg.max_window = 2048;
+    const sp = try era_spectrum_create(a, cfg);
+    defer era_spectrum_destroy(sp);
+
+    const bins: usize = cfg.bins;
+    const l = try a.alloc(f32, bins);
+    defer a.free(l);
+    const r = try a.alloc(f32, bins);
+    defer a.free(r);
+
+    // 从未处理：输出全 0。
+    try testing.expectEqual(@as(f32, 0.0), era_spectrum_stage_frame(sp, l, r));
+    for (l) |v| try testing.expectEqual(@as(f32, 0.0), v);
+
+    const frames: usize = cfg.max_window;
+    const pcm = try a.alloc(f32, frames * 2);
+    defer a.free(pcm);
+    // 交错双声道同信号：直接对整块填正弦会等效降采样（1kHz → 2kHz）。
+    {
+        const w = 2.0 * std.math.pi * 1000.0 / @as(f64, @floatFromInt(cfg.sample_rate));
+        for (0..frames) |i| {
+            const v: f32 = 0.8 * @as(f32, @floatCast(@sin(w * @as(f64, @floatFromInt(i)))));
+            pcm[2 * i] = v;
+            pcm[2 * i + 1] = v;
+        }
+    }
+    const stage = era_spectrum_stage(sp, 2);
+    stage.process(pcm, frames);
+    _ = era_spectrum_stage_frame(sp, l, r);
+    try testing.expect(l[expectedBand(1000.0, cfg.min_hz, cfg.max_hz, cfg.bins)] > 0.3);
+
+    // 空帧不改变上一帧结果。
+    stage.process(pcm[0..0], 0);
+    const pl = try a.alloc(f32, bins);
+    defer a.free(pl);
+    const pr = try a.alloc(f32, bins);
+    defer a.free(pr);
+    _ = era_spectrum_stage_frame(sp, pl, pr);
+    try testing.expectEqualSlices(f32, l, pl);
+
+    era_spectrum_reset(sp);
+    try testing.expectEqual(@as(f32, 0.0), era_spectrum_stage_frame(sp, l, r));
+    for (l) |v| try testing.expectEqual(@as(f32, 0.0), v);
+    for (r) |v| try testing.expectEqual(@as(f32, 0.0), v);
 }

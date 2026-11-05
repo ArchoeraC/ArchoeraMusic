@@ -9789,6 +9789,42 @@ abstract class AppLocalizations {
   /// **'半音'**
   String get settingsPitchUnit;
 
+  /// No description provided for @settingsSectionChannels.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'声道'**
+  String get settingsSectionChannels;
+
+  /// No description provided for @settingsSectionChannelsDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'设备实际只有左/右一侧发声（单只耳机、单声道音箱等）时开启；合并后两侧都能听到完整内容，正常立体声设备建议保持关闭。'**
+  String get settingsSectionChannelsDesc;
+
+  /// No description provided for @settingsChannelMerge.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'多声道合并'**
+  String get settingsChannelMerge;
+
+  /// No description provided for @settingsChannelMergeDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'所有声道按等功率合并为单声道后复制到每个输出声道'**
+  String get settingsChannelMergeDesc;
+
+  /// No description provided for @settingsChannelMergeOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已启用（所有声道合并为单声道输出）'**
+  String get settingsChannelMergeOn;
+
+  /// No description provided for @settingsChannelMergeOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已停用（保持原始立体声）'**
+  String get settingsChannelMergeOff;
+
   /// No description provided for @settingsSectionSystem.
   ///
   /// In zh_CN, this message translates to:

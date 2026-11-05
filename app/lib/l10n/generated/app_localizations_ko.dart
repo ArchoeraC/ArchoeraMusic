@@ -5334,6 +5334,26 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsPitchUnit => '반음';
 
   @override
+  String get settingsSectionChannels => '채널';
+
+  @override
+  String get settingsSectionChannelsDesc =>
+      '기기의 왼쪽 또는 오른쪽에서만 소리가 나는 경우(한쪽 이어폰, 모노 스피커 등)에 켜세요. 켜면 양쪽에서 전체 소리를 들을 수 있습니다. 일반 스테레오 기기에서는 꺼 두세요.';
+
+  @override
+  String get settingsChannelMerge => '채널 병합';
+
+  @override
+  String get settingsChannelMergeDesc =>
+      '모든 채널을 동일 전력으로 모노로 합산한 뒤 각 출력 채널에 복사합니다';
+
+  @override
+  String get settingsChannelMergeOn => '켜짐(모든 채널을 모노로 병합)';
+
+  @override
+  String get settingsChannelMergeOff => '꺼짐(원래 스테레오 유지)';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override

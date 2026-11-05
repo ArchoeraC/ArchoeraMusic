@@ -461,6 +461,29 @@ class FftFrame {
 - 旧的 `libfft.so` / `fft_*` ABI / `libfftPath` / CLI `--fft*` 已整体删除，
   不提供兼容层。
 
+### 6.4 内核 Stage 适配（2026-11-05）
+
+分析器在内核侧同时提供统一 DSP `Stage` 形态，与 EQ / 限幅 / 响度 / 参数化 EQ /
+次声管理 / 多声道合并同级，可挂进内核主处理链：
+
+```zig
+const stage = era_spectrum_stage(sp, 2);   // 2 = 交错声道数（1 为单声道镜像）
+stage.process(interleaved_pcm, frames);    // 只读，不修改 PCM
+const beat = era_spectrum_stage_frame(sp, out_l, out_r); // 128 带 + 节拍
+era_spectrum_peaks(sp, peak_l, peak_r);    // 峰值保持线
+```
+
+- **输入契约**：交错 float32（`pcm.len == frames * channels`），只读不改；
+  只取前两声道，多声道下混由链路前级负责；`channels == 1` 时左右镜像。
+- **零拷贝**：VQT 核按 `stride / offset` 直接读交错缓冲，不拆平面；每帧零分配。
+- **状态与 C 壳共用**：AGC / γ / 倾斜 / 峰值保持 / 节拍状态都在 `EraSpectrum`
+  实例上，Stage 路径与 `zk_dsp_spectrum_*` 路径互斥使用同一实例即可（同一时刻
+  只走一条路径，否则帧间状态会互相污染）。
+- **C ABI 不变**：`zk_dsp_spectrum_*` 仍是 C 壳入口；Stage 是内核内部统一接口，
+  不新增对外导出。
+- 测试：`Stage 交错立体声与平面路径一致`（与平面路径逐带对拍）、
+  `Stage 单声道左右镜像`、`Stage 空帧与 reset`。
+
 ## 7. 前端重构
 
 ### 7.1 职责边界
@@ -517,6 +540,7 @@ class FftFrame {
 | 层 | 实现 |
 |---|---|
 | 纯计算核心（内核） | `kernel/dsp/spectrum.zig`（VQT / 对数带 / AGC / γ / 倾斜 / dB 软膝 / 峰值 / 频谱通量） |
+| 内核 Stage 适配 | `era_spectrum_stage` / `era_spectrum_process_interleaved` / `era_spectrum_stage_frame`（交错只读、零拷贝、零每帧分配） |
 | 纯计算核心（纯 FFmpeg） | `src/spectrum_fft.c`（libavutil/tx 多分辨率 FFT + 同口径显示增强） |
 | 后端选择 | `src/spectrum_dsp.c`（`ARCHOERA_SPECTRUM_ANALYZER=auto|zig|fft`） |
 | C ABI | `zk_dsp_spectrum_*`（含 `zk_dsp_spectrum_peaks`；`kernel/kernel.zig`、`include/kernel_bridge.h`） |
@@ -529,7 +553,7 @@ class FftFrame {
 
 **验证结果**
 
-- `zig build test`：771/771 通过（含 VQT 精度/扫频/节拍/左右分离/AGC/γ/倾斜/峰值测试）。
+- `zig build test`：775/775 通过（含 VQT 精度/扫频/节拍/左右分离/AGC/γ/倾斜/峰值测试，以及 Stage 交错/单声道/空帧用例）。
 - CMake 构建 + `ctest`：40/40 通过（含 `test_pcm_file_reader`、
   `test_spectrum_service`）。
 - `dart analyze lib`：0 issue。
@@ -605,3 +629,6 @@ class FftFrame {
   CLI `--fft`/内核 `dsp/fft.zig`）；纯 FFmpeg 构建改用 **libavutil/tx** 的
   多分辨率 FFT（`src/spectrum_fft.c`），与 VQT 后端通过
   `ARCHOERA_SPECTRUM_ANALYZER` 编译期二选一，事件/前端契约不变。
+- **2026-11-05**：VQT 分析器补齐内核统一 `Stage` 形态（`dsp/stage.zig`），
+  与 EQ / 限幅 / 响度同级可挂主处理链；交错输入按步长直读，零拷贝、
+  零每帧分配；`zk_dsp_spectrum_*` C ABI 与前端契约不变。

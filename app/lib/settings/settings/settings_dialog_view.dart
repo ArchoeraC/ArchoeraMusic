@@ -297,6 +297,12 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.music2Outline,
       ),
       _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsChannelMerge,
+        l10n.settingsChannelMergeDesc,
+        EtaIcons.speakerOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.lyrics,
         l10n.settingsPlayerLyrics,
         l10n.settingsSearchPlayerLyricsSubtitle,
