@@ -149,6 +149,7 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_TRAY               (1u << 11)  /* 系统托盘图标 + 上下文菜单（ABI v3） */
 #define APL_CAP_SECURE_FILE        (1u << 12)  /* 安全文件原语（原生 open(2)，ABI v4） */
 #define APL_CAP_OPEN_URL           (1u << 13)  /* 系统默认方式打开 http(s) URL（浏览器，ABI v5） */
+#define APL_CAP_ELEVATION          (1u << 14)  /* 提权探测：root / 管理员（只读，ABI v6） */
 ```
 
 协议唤醒（`APL_CAP_DEEP_LINK`，ABI v2 起）：`apl_protocol_register/unregister`
@@ -177,6 +178,14 @@ Windows 走 `ShellExecuteW`；macOS 走 `NSWorkspace openURL`。
 > **输入契约**：`apl_open_url` 只接受 `http://` / `https://` 绝对 URL，
 > 其他 scheme（`file:` / `javascript:` / 自定义协议）与相对路径在 `apl.cpp`
 > 边界直接 `APL_ERR_STATE`——本能力只把链接交给系统浏览器，不在进程内执行内容。
+
+提权探测（`APL_CAP_ELEVATION`，ABI v6 起）：`apl_process_elevation()` **只读**返回
+`APL_ELEVATION_NONE` / `ROOT` / `ADMIN`——Linux / POSIX 与 macOS 查 `geteuid() == 0`
+（sudo、root 登录、setuid 均命中）；Windows 用令牌 `TokenElevation`（UAC 未提权的
+管理员账户返回 `NONE`）。桥接不做任何提权/降权。提权启动门
+`app/lib/app/elevation_gate.dart` 在单实例仲裁、凭据保险库与 SQLite 预加载**之前**
+拦截：默认退出，用户显式选择「仍要继续」才放行；探测失败（桥接缺失 / 后端错误）
+按 `NONE` 降级，不让防呆机制本身变成启动故障源。
 
 > **输入契约（SEC-31）**：`apl_reveal_path` 只接受应用内已解析的**绝对本地路径**——
 > 在 `apl.cpp` 边界拒绝 URI（`scheme://`，含 `file://`/`http://`）与相对路径

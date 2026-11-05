@@ -1757,6 +1757,7 @@
   "mcpShellUsageError": "用法错误",
   "mcpShellErrorPrefix": "错误",
   "mcpShellDisabled": "archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。",
+  "mcpShellElevatedRefused": "拒绝以 root / 管理员身份运行 archoerashell：命令行与 MCP 凭据都不需要提权，提权会放大配置/日志的属主风险。请以普通用户重新运行；容器/CI 确需提权时显式设置 ARCHOERA_ALLOW_ELEVATED=1。",
   "mcpShellHelpStatus": "用法: archoerashell status\n\n显示当前播放状态：播放/暂停、当前曲目、进度、音量、循环/随机。",
   "mcpShellHelpNowPlaying": "用法: archoerashell now-playing\n\n只显示当前曲目与进度。",
   "mcpShellHelpPlay": "用法: archoerashell play\n\n开始/继续播放。",
@@ -1934,5 +1935,18 @@
   "settingsKdfPasswordTitle": "验证当前口令",
   "settingsKdfPasswordDesc": "更改 Argon2id 强度需要重新封装口令槽（主密钥与已存凭据保持不变）。请输入当前解锁口令。",
   "settingsKdfPasswordHint": "当前口令",
-  "toastKdfRepacked": "已重封装，不丢数据"
+  "toastKdfRepacked": "已重封装，不丢数据",
+  "elevationGateTitle": "检测到以高权限身份启动",
+  "elevationGateBody": "ArchoeraMusic 正以{kind}身份运行。播放、下载与凭据保险库都不需要提权：以提权身份继续，任何一处远程代码执行或供应链问题都会波及整台机器，偏好、缓存与日志也会以{kind}权限落盘，普通用户可能无法读取或清理。\n\n建议退出，然后以当前普通用户身份重新启动。",
+  "@elevationGateBody": {
+    "placeholders": {
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "elevationGateKindRoot": "root（超级用户）",
+  "elevationGateKindAdministrator": "管理员",
+  "elevationGateExit": "退出应用",
+  "elevationGateContinue": "我已知晓风险，仍要继续"
 }

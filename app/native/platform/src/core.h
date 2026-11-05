@@ -39,6 +39,7 @@ constexpr uint32_t CAP_REVEAL_PATH = 1u << 10;
 constexpr uint32_t CAP_TRAY = 1u << 11;
 constexpr uint32_t CAP_SECURE_FILE = 1u << 12;
 constexpr uint32_t CAP_OPEN_URL = 1u << 13;
+constexpr uint32_t CAP_ELEVATION = 1u << 14;
 
 // ── 事件类型 / 命令 ───────────────────────────────────────────────
 constexpr int32_t EVENT_MEDIA_COMMAND = 1;

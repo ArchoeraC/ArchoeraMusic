@@ -23,6 +23,7 @@ import 'ffi_system_window.dart';
 import 'ffi_system_tray.dart';
 import 'native_safe_file.dart';
 import 'platform_bindings.dart';
+import 'process_elevation.dart';
 import 'system_deep_link.dart';
 import 'system_media.dart';
 import 'system_power.dart';
@@ -64,6 +65,18 @@ class PlatformCapabilities {
 
   /// 是否具备「安全文件原语」能力（原生 `open(2)`，收口 SafeFile 的 TOCTOU 残余）。
   bool get secureFileAvailable => caps & aplCapSecureFile != 0;
+
+  /// 是否具备「提权探测」能力（只读 root / 管理员判定）。
+  bool get processElevationAvailable => caps & aplCapElevation != 0;
+
+  /// 探测当前进程是否以 root / 管理员身份运行。
+  /// 桥接不可用 / 无该能力 / 后端探测失败 → null（调用方按「未提权」处理，
+  /// 不让桥接异常阻断启动）。只读，不做任何提权或降权。
+  ProcessElevation? processElevation() {
+    final b = _bindings;
+    if (b == null || caps & aplCapElevation == 0) return null;
+    return ProcessElevation.fromNative(b.processElevation());
+  }
 
   /// 单实例仲裁：返回 true = 首实例（继续启动）；false = 已有实例（应退出）。
   /// 桥接不可用 / 无该能力 → 抛 [StateError]：**不再静默放行多开**

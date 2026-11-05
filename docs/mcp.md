@@ -227,6 +227,12 @@ archoerashell.exe [全局选项] <命令> [参数...]             # Windows（�
 实现自包含：参数解析、回环 REST（`std::net`）、TUI 渲染；帮助文案由 `build.rs`
 从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源（ARB 仍由 Dart 本地化体系维护）。
 
+> **提权拦截**：三端入口在进入 CLI 前都做只读提权探测（POSIX `geteuid() == 0`、
+> Windows 令牌 `TokenElevation`）。命中后直接拒绝并以 **77** 退出（stderr 说明原因），
+> 与 GUI 启动门（`app/lib/app/elevation_gate.dart`）同一策略——配置、日志与 MCP
+> 凭据都不需要超级用户权限。容器 / CI 确需提权时用 `ARCHOERA_ALLOW_ELEVATED=1`
+> 显式放行。
+
 三端都通过本机 MCP 服务的 REST 接口与**运行中的实例**通信——目标端口取自应用设置
 （`prefs.json`）；**密钥**（SEC-10 起不在 `prefs.json`）优先取 `ARCHOERA_MCP_KEY` 环境变量，
 其次回退历史 `prefs.json` 明文，均可被全局选项 `-k/--key` 覆盖。

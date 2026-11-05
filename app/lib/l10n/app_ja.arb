@@ -1729,6 +1729,7 @@
   "mcpShellUsageError": "使い方エラー",
   "mcpShellErrorPrefix": "エラー",
   "mcpShellDisabled": "archoerashell は設定で無効になっています（MCP 連携 → コマンドライン shell）。",
+  "mcpShellElevatedRefused": "archoerashell を root / 管理者として実行することを拒否しました。CLI と MCP の認証情報に管理者権限は不要で、昇格すると設定・ログの所有者リスクが大きくなります。通常のユーザーで再実行してください。コンテナ / CI で本当に必要な場合のみ ARCHOERA_ALLOW_ELEVATED=1 を明示してください。",
   "mcpShellHelpStatus": "使い方: archoerashell status\n\n再生状態を表示：再生/一時停止・曲・位置・音量・リピート/シャッフル。",
   "mcpShellHelpNowPlaying": "使い方: archoerashell now-playing\n\n現在の曲と位置のみ表示。",
   "mcpShellHelpPlay": "使い方: archoerashell play\n\n再生を開始/再開。",
@@ -1899,5 +1900,11 @@
   "settingsKdfPasswordTitle": "現在のパスワードを確認",
   "settingsKdfPasswordDesc": "Argon2id 強度の変更はパスワードスロットを再ラップします（マスターキーと保存済みの資格情報は変わりません）。現在の解錠パスワードを入力してください。",
   "settingsKdfPasswordHint": "現在のパスワード",
-  "toastKdfRepacked": "再ラップ完了、データは失われません"
+  "toastKdfRepacked": "再ラップ完了、データは失われません",
+  "elevationGateTitle": "管理者権限での起動を検出しました",
+  "elevationGateBody": "ArchoeraMusic は{kind}として実行されています。再生・ダウンロード・認証情報ボールトに管理者権限は不要です。昇格したまま続行すると、このアプリの脆弱性（リモートコード実行やサプライチェーン侵害）がマシン全体に影響し、設定・キャッシュ・ログも{kind}権限で書き込まれるため、一般ユーザーが読めない／削除できないファイルが残ります。\n\n終了して、通常のユーザーで起動し直してください。",
+  "elevationGateKindRoot": "root（スーパーユーザー）",
+  "elevationGateKindAdministrator": "管理者",
+  "elevationGateExit": "終了",
+  "elevationGateContinue": "リスクを理解して続行"
 }

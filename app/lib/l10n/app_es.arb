@@ -1729,6 +1729,7 @@
   "mcpShellUsageError": "Error de uso",
   "mcpShellErrorPrefix": "Error",
   "mcpShellDisabled": "archoerashell está desactivado en los ajustes (Acceso MCP → Shell de línea de comandos).",
+  "mcpShellElevatedRefused": "Se rechaza ejecutar archoerashell como root/administrador: la CLI y las credenciales MCP nunca necesitan privilegios elevados, y ejecutarlo así aumenta los riesgos de propiedad de la configuración y los registros. Vuelve a ejecutarlo como usuario normal; si un contenedor o la CI realmente lo requiere, define ARCHOERA_ALLOW_ELEVATED=1 explícitamente.",
   "mcpShellHelpStatus": "Uso: archoerashell status\n\nMuestra el estado: reproducción/pausa, pista, posición, volumen, repetir/aleatorio.",
   "mcpShellHelpNowPlaying": "Uso: archoerashell now-playing\n\nMuestra solo la pista actual y la posición.",
   "mcpShellHelpPlay": "Uso: archoerashell play\n\nIniciar/reanudar la reproducción.",
@@ -1899,5 +1900,11 @@
   "settingsKdfPasswordTitle": "Verificar contraseña actual",
   "settingsKdfPasswordDesc": "Cambiar la fuerza de Argon2id vuelve a envolver la ranura de contraseña (la clave maestra y las credenciales guardadas no cambian). Introduce tu contraseña de desbloqueo actual.",
   "settingsKdfPasswordHint": "Contraseña actual",
-  "toastKdfRepacked": "Reenvuelto sin pérdida de datos"
+  "toastKdfRepacked": "Reenvuelto sin pérdida de datos",
+  "elevationGateTitle": "Se detectó un inicio con privilegios elevados",
+  "elevationGateBody": "ArchoeraMusic se está ejecutando como {kind}. La reproducción, las descargas y la bóveda de credenciales nunca necesitan privilegios elevados. Si continúas así, cualquier fallo de la aplicación (ejecución remota de código o un problema en la cadena de suministro) puede afectar a todo el equipo, y las preferencias, cachés y registros se escribirán con permisos de {kind}, de modo que un usuario normal quizá no pueda leerlos ni eliminarlos.\n\nSal y vuelve a iniciar ArchoeraMusic como tu usuario normal.",
+  "elevationGateKindRoot": "root (superusuario)",
+  "elevationGateKindAdministrator": "administrador",
+  "elevationGateExit": "Salir",
+  "elevationGateContinue": "Entiendo el riesgo; continuar"
 }

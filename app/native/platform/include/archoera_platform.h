@@ -58,6 +58,7 @@ extern "C" {
 #define APL_CAP_TRAY               (1u << 11) /* 系统托盘图标 + 上下文菜单 */
 #define APL_CAP_SECURE_FILE        (1u << 12) /* 安全文件原语（原生 open(2)：免 TOCTOU 读/原子写） */
 #define APL_CAP_OPEN_URL           (1u << 13) /* 系统默认方式打开 http(s) URL（浏览器） */
+#define APL_CAP_ELEVATION          (1u << 14) /* 超级用户探测（root / administrator，只读） */
 
 /* ── 生命周期 ───────────────────────────────────────────────────── */
 APL_API int32_t apl_abi_version(void);   /* 契约版本 */
@@ -78,6 +79,20 @@ APL_API uint32_t apl_capabilities(void); /* 能力位图；未 init 亦可查询
  * `task_for_pid` 默认需 root/entitlement 阻断。
  * 幂等；**release 构建生效**（debug 保留调试/产核能力）。 */
 APL_API int32_t apl_harden_process(void);
+
+/* ── 提权探测（能力位 APL_CAP_ELEVATION）───────────────────────────
+ * 只读探测当前进程是否持有 root / 管理员权限，**不做任何提权或降权**：
+ *   - Linux / 其它 POSIX：`geteuid() == 0`（含 sudo、root 登录、setuid）；
+ *   - macOS：`geteuid() == 0`（无 Win32 式令牌提权）；
+ *   - Windows：令牌 `TokenElevation`（UAC 未提权的管理员账户返回 NONE）。
+ * 返回 APL_ELEVATION_*（>=0）；APL_ERR_UNSUPPORTED / APL_ERR_BACKEND 表示探测失败
+ * （调用方按「未提权」降级，避免桥接缺失直接阻断启动）。
+ * 启动门在 Dart 侧（app/lib/app/elevation_gate.dart）：提权启动先警告并默认退出，
+ * 用户显式确认后才继续。 */
+#define APL_ELEVATION_NONE  0 /* 普通用户（支持、默认的启动方式） */
+#define APL_ELEVATION_ROOT  1 /* POSIX root / sudo */
+#define APL_ELEVATION_ADMIN 2 /* Windows 管理员令牌 */
+APL_API int32_t apl_process_elevation(void);
 
 /* ── 统一日志 sink（宿主注入）───────────────────────────────────── */
 /* 宿主（Dart）载入 archoera_log 后，把其 archoera_log_write 指针注入本模块，

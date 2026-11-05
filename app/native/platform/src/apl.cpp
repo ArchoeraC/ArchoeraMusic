@@ -14,7 +14,7 @@
 #include <cstring>
 
 namespace {
-constexpr int32_t kAbiVersion = 5;
+constexpr int32_t kAbiVersion = 6;
 
 // SEC-31：reveal 路径输入契约——仅接受应用内已解析的**绝对本地路径**。
 // 拒绝空串、URI（`scheme://`，含 `file://`/`http://`）与相对路径；C 串天然在 NUL 截断。
@@ -73,6 +73,11 @@ int32_t apl_shutdown(void) {
 int32_t apl_harden_process(void) {
     if (!archoera::isInitialized()) return archoera::ERR_STATE;
     return archoera::hardenProcess();
+}
+
+int32_t apl_process_elevation(void) {
+    if (!archoera::isInitialized()) return archoera::ERR_STATE;
+    return archoera::processElevation();
 }
 
 uint32_t apl_capabilities(void) { return archoera::caps(); }
