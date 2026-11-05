@@ -5558,6 +5558,28 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPitchUnit => 'st';
 
   @override
+  String get settingsSectionChannels => 'Kanäle';
+
+  @override
+  String get settingsSectionChannelsDesc =>
+      'Aktivieren, wenn nur die linke oder rechte Seite des Geräts tatsächlich Ton ausgibt (einzelner Ohrhörer, Mono-Lautsprecher usw.). Danach hören beide Seiten die vollständige Mischung. Bei normalen Stereo-Geräten ausgeschaltet lassen.';
+
+  @override
+  String get settingsChannelMerge => 'Kanäle zusammenführen';
+
+  @override
+  String get settingsChannelMergeDesc =>
+      'Alle Kanäle gleichleistungsmäßig zu Mono summieren und auf jeden Ausgangskanal kopieren';
+
+  @override
+  String get settingsChannelMergeOn =>
+      'Aktiviert (alle Kanäle zu Mono zusammengeführt)';
+
+  @override
+  String get settingsChannelMergeOff =>
+      'Deaktiviert (Original-Stereo bleibt erhalten)';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override
