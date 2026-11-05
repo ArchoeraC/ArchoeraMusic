@@ -2,7 +2,8 @@
 
 > 状态：**部分实施（2026-10-01，含实测安全边界）**——统一可关闭注册表
 > `lib/services/native_library_registry.dart` 已上线。
-> **实际 unload：仅 mediaengine（停止播放后）与 libfft（释放后）**，均已运行时验证且进程存活。
+> **实际 unload：仅 mediaengine（停止播放后）**，已运行时验证且进程存活；
+> v1 的 libfft 已随分析器删除（2026-11-05）。
 > 其余模块经实测/推断**不可安全 dlclose**，保持常驻：
 > - **scanner-ffi（.NET NativeAOT）**：`scanner_scan` 返回后仍有后台线程（写库/线程池）且无
 >   模块级 join —— 实测扫描后 `close()` **导致进程崩溃**，故不卸载；
@@ -132,7 +133,7 @@ mediaEngine→ fft / ffmpeg（同一库内依赖，产物平铺于 `native/`，�
 | scraper | **有**：`ScraperController.dispose()` → `archoera_scraper_destroy(handle)` ✅ | `ScraperBindings.instance` 惰性单例（库句柄常驻，接受）+ 每会话一个 `ScraperController` | `ScrapeController._cleanup()`（done/error/empty/run 失败）——**已完善**；仅剩注册表引用计数接入 | `state.scraping` 单会话；start 前先 `_scraper?.dispose()` 清残留 | 无 |
 | subsonic | **有**：`SubsonicController.dispose()` → `archoera_subsonic_destroy(handle)` ✅ | `SubsonicBindings.instance` 惰性单例；**Dart 侧当前无任何创建点**（Controller/Admin 定义了但未接入 UI） | 无会话可释放；唯一运行时路径 `goShredFiles`（handle=0，Go 全局单例，一次性销毁操作） | — | 按需已天然满足，阶段②无需接入点；`SubsonicAdmin` 接入 UI 后另行评估 |
 | mediaEngine | **库内销毁** ✅：`archoera_mediaengine_destroy`（join 引擎线程 + 释放）；FFI 直连（2026-08-07 起，非进程 spawn） | `AudioEngineProcess`（`Isolate.run` 包裹 create/destroy；50ms 轮询 `pollEvent`） | `stop()` → destroy；库句柄保留（dart:ffi 无法 unload，.so 常驻可接受） | 播放会话 | 引擎线程 join 需在 Isolate 内执行（已实现），避免阻塞 UI isolate |
-| fft | **有**：`FftAnalyzer.dispose()` → `fft_destroy` ✅ | **每次播放会话新建 `FftAnalyzer`**（无句柄缓存），`PcmAnalyzer` 持用，`AudioEngineProcess._pcm` 生命周期绑定会话 | `AudioEngineProcess.stop` 时 `_pcm.dispose()`（native handle 归还）；库句柄重复 dlopen 引用计数累积（dart:ffi 无法归还） | 播放会话 | 阶段①注册表接入后改为复用句柄 + 引用计数管理 |
+| ~~fft~~ | **已删除**（v1 分析器，2026-11-05）：Dart 不再加载 `libfft`，频谱由引擎线程内部完成 | — | — | — | — |
 | sqlite | **常驻**（共享实例契约） | `preloadBundledSqlite` | 永不释放 | — | — |
 
 #### ②.1 关键结论（实测修正原规划）

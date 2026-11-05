@@ -33,7 +33,7 @@
 
 | # | 方向 | 一句话目标 | 现状 | 主要依托 |
 |---|---|---|---|---|
-| ① | **可听频段 DSP** | 把 C DSP 下沉 Zig 内核，并在**非次声（可听）频段**提供更丰富的处理 | DSP 仍是 C（`src/equalizer.c` 等），`zk_dsp_*` 仅在 `kernel_bridge.h` 预留；内核无 `dsp/` | `audio-kernel-zig.md` §14；`libfft.so` ABI |
+| ① | **可听频段 DSP** | 把 C DSP 下沉 Zig 内核，并在**非次声（可听）频段**提供更丰富的处理 | DSP 仍是 C（`src/equalizer.c` 等），`zk_dsp_*` 仅在 `kernel_bridge.h` 预留；内核无 `dsp/` | `audio-kernel-zig.md` §14；`spectrum-analyzer.md` |
 | ② | **在线流 / 非本地源** | 自研内核直接消费远端流，覆盖 Subsonic 之外的音源 | `zk_decoder_open_cb` + `Reader.callback` 已落地（2026-09-21）；应用侧接线、Range seek、断流恢复待做 | `audio-kernel-zig.md` §6.1 / §8.4；`audio-memory-source.md` |
 | ③ | **更多格式接管** | 补齐剩余长尾格式、拉高生产引擎接管率、打通曲库白名单 | 常见格式 L1 已清零；余 SV7 / Shorten 等；L2/L3 有缺口 | `format-support-matrix.md`；`audio-kernel-zig.md` §3.3/§3.7 |
 | ④ | **性能 / 内存** | 在「零新增缓冲」纪律下继续砍指令、收口常驻内存与启动 | A 档已吃尽、B 档暂停；TTA/DTS RSS 已收口 | `decode-optimization.md`；`archive/engine-master-pool-design.md` |
@@ -54,7 +54,7 @@
 | 均衡器 | C，**固定 10 段** ISO 频点（31.25…16k）+ preamp，±12 dB | `src/equalizer.c/.h`（`EQ_BANDS=10`） |
 | 响度 | C，EBU R128，扫描 / 应用两种模式 | `src/loudness.c/.h` |
 | 限幅 | C，阈值可设（默认 −1 dB） | `src/limiter.c/.h` |
-| 频谱 | v2：内核多分辨率分析 + 引擎 50ms 事件推送（UI 纯接收）；App 不再用 `libfft.so` 拉窗 | `kernel/dsp/spectrum.zig`；`src/spectrum_service.c`；`src/fft.c`（旧 ABI，仅 CLI/测试） |
+| 频谱 | v2：内核实 VQT + 引擎 50ms 事件推送（UI 纯接收）；纯 FFmpeg 构建用 libavutil/tx FFT；v1 拉模式/libfft 已删除 | `kernel/dsp/spectrum.zig`；`src/spectrum_service.c`；`src/spectrum_dsp.c`；`src/spectrum_fft.c` |
 | 变速变调 | Rust `tempo-rs`（signalsmith-stretch）过渡 | `src/tempo.c/.h` |
 | 重采样 | FFmpeg `libswresample` | `src/resampler.c/.h` |
 | 内核侧 | ✅ **地基 + D1/D2 已落**：`kernel/dsp/`（EQ/limiter/loudness 逐位一致）+ 参数化 EQ（`parametric.zig`，peak/low-shelf/high-shelf、freq/Q/gain）+ 次声低频管理（`lowfreq.zig`，HPF + bass shelf）；经 `zk_dsp_peq_*` / `zk_dsp_lowfreq_*` 被 C 壳调用 | `include/kernel_bridge.h`、`src/parametric_eq.c` / `src/lowfreq.c` |
@@ -297,8 +297,8 @@ App 侧只暴露「EQ 开关 / 10 段增益 / preamp」（`app/lib/stores/prefs_
 ## 8. 不变量与红线（汇总）
 
 - `archoera_mediaengine.h` 导出符号 / JSON 协议 / `stream.wav/.pcm` 格式**不变**（P5）；
-  **例外**：频谱 v2 为破坏性更新，App 播放路径不再使用旧 `libfft.so` ABI /
-  拉窗；频谱事件与前端接收端按 `spectrum-analyzer.md` 直接替换；
+  **例外**：频谱 v2 为破坏性更新；v1 拉模式与 `libfft` 已于 2026-11-05
+  全部删除；频谱事件与前端接收端按 `spectrum-analyzer.md` 直接替换；
 - 在线传输：宿主注入（FFmpeg AVIO）为**回退基线**，内核原生 HTTP(S)（`kernel/net.zig`，2026-10-01）为**可选优先**，`ARCHOERA_ERA_NATIVE_HTTP=0` 可关闭；视频解码不做（P4）；
 - 无损逐位、有损 corr 门禁；零新增缓冲；B 档需授权；
 - 内核符号 `era_` 前缀，不照搬上游标识符；

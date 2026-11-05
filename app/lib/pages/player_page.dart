@@ -84,8 +84,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   PlayerRouteAnimationNotifier? _routeAnimNotifier;
 
   /// 封面节拍脉冲动画：鼓点命中 → forward(from: 0) 驱动 1 → 1.03 → 1 回弹。
-  /// 脉冲检测在 C 引擎（fft.c detect_beat 三频段）完成，Dart 侧消费
-  /// FftFrame.beatStrength（0~1）区分脉冲大小。
+  /// 脉冲检测在引擎侧完成（Dart 只消费 FftFrame.beatStrength，0~1）。
   late final AnimationController _coverPulse;
 
   /// 最近一次脉冲强度（0~1；脉冲按此缩放幅度，无脉冲帧不更新）。

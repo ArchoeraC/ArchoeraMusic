@@ -14,7 +14,7 @@
  *
  * 解码侧（zk_decoder_*）为本阶段已实现符号；DSP 侧（zk_dsp_eq_* /
  * zk_dsp_limiter_* / zk_dsp_loudness_*）已随 kernel/dsp 落地（方向① 地基），
- * fft / resampler / tempo 仍为内核侧接口占位（未导出，见 kernel/dsp/）。
+ * resampler / tempo 仍为内核侧接口占位（未导出，见 kernel/dsp/）。
  */
 #ifndef ARCHOERA_KERNEL_BRIDGE_H
 #define ARCHOERA_KERNEL_BRIDGE_H
@@ -183,8 +183,8 @@ void zk_decoder_abort(ZkDecoder *d);
  *   - destroy：NULL 空操作；
  *   - 指针（句柄）生命周期归调用方，错误路径不置全局状态。
  *
- * fft / resampler / tempo 本轮仅内核侧接口占位；频谱 v2 见下方
- * `zk_dsp_spectrum_*`（App 不再使用旧 libfft.so 的 Dart ABI）。
+ * resampler / tempo 本轮仅内核侧接口占位；频谱 v2 见下方
+ * `zk_dsp_spectrum_*`（App 唯一频谱计算入口）。
  */
 
 /** 均衡器句柄（内核 10 段 Biquad；不透明） */

@@ -20,7 +20,6 @@ endmacro()
 # 各模块单元测试
 add_engine_test(test_equalizer test_equalizer.c)
 add_engine_test(test_limiter test_limiter.c)
-add_engine_test(test_fft test_fft.c)
 add_engine_test(test_loudness test_loudness.c)
 
 # 文件模式 stream.pcm 按位置取窗：增量索引 / 跨块 / 前缀补零 / 下混 /
@@ -55,24 +54,38 @@ if(HAS_ARCHOERA_KERNEL)
 endif()
 
 # 频谱 v2 推送服务：独立线程 / 50ms 节流 / 440Hz 峰值带 / 快速 stop
-# （headless：read 回调现场生成正弦，不依赖设备与文件）。
-if(HAS_ARCHOERA_KERNEL)
-    add_executable(test_spectrum_service test_spectrum_service.c)
-    target_link_libraries(test_spectrum_service PRIVATE audio_engine_static)
-    if(TARGET Threads::Threads)
-        target_link_libraries(test_spectrum_service PRIVATE Threads::Threads)
-    endif()
-    if(UNIX)
-        target_link_libraries(test_spectrum_service PRIVATE m)
-    endif()
-    target_include_directories(test_spectrum_service PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../src
-    )
-    add_test(NAME test_spectrum_service COMMAND test_spectrum_service)
-    set_tests_properties(test_spectrum_service PROPERTIES
-        PASS_REGULAR_EXPRESSION "ALL PASS")
+# （headless：read 回调现场生成正弦，不依赖设备与文件）。两种分析器后端
+# （Zig VQT / FFmpeg FFT）都走同一服务契约，故不再按内核开关裁剪。
+add_executable(test_spectrum_service test_spectrum_service.c)
+target_link_libraries(test_spectrum_service PRIVATE audio_engine_static)
+if(TARGET Threads::Threads)
+    target_link_libraries(test_spectrum_service PRIVATE Threads::Threads)
 endif()
+if(UNIX)
+    target_link_libraries(test_spectrum_service PRIVATE m)
+endif()
+target_include_directories(test_spectrum_service PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_spectrum_service COMMAND test_spectrum_service)
+set_tests_properties(test_spectrum_service PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# FFmpeg FFT 分析器（libavutil/tx）：正弦落带 / 静音 / 左右分离 /
+# 0dBFS 校准 / 峰值保持 / 非法参数。直接测 provider，与默认后端选择无关。
+add_executable(test_spectrum_fft test_spectrum_fft.c)
+target_link_libraries(test_spectrum_fft PRIVATE audio_engine_static)
+if(UNIX)
+    target_link_libraries(test_spectrum_fft PRIVATE m)
+endif()
+target_include_directories(test_spectrum_fft PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_spectrum_fft COMMAND test_spectrum_fft)
+set_tests_properties(test_spectrum_fft PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
 
 # 输出设备枚举：名称启发式分类 / ALSA 虚拟设备标记（纯函数，headless，无设备依赖）
 add_engine_test(test_audio_output test_audio_output.c)
