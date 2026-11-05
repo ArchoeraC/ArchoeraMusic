@@ -603,15 +603,20 @@ NUGETCFG
           # 白名单（PATH/HOME/NIX_* 等），PKG_CONFIG_PATH 会被丢弃。cnativeapi
           # 的 hook 用 pkg-config 找 GTK/X11/Xi，故在 PATH 前部放一个薄包装，
           # 把当前 Nix 构建期的搜索路径显式带进 hook。
+          system_pkg_config="$(command -v pkg-config)"
           mkdir -p "$TMPDIR/hook-bin"
-          # 用 pkg-config-wrapper 的 passthru 取未包装二进制，避免 wrapper 再按
-          # Nix 角色变量改写 PKG_CONFIG_PATH。
-          real_pkg_config="${pkgs.pkg-config.pkg-config or pkgs.pkg-config}/bin/pkg-config"
-          cat > "$TMPDIR/hook-bin/pkg-config" <<HOOKPC
-#!${pkgs.runtimeShell}
-export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
-exec "$real_pkg_config" "$@"
+          cat > "$TMPDIR/hook-bin/pkg-config" <<'HOOKPC'
+#!@shell@
+# 清掉 Nix 角色变量，避免 wrapper 用未导出的 PKG_CONFIG_PATH_<salt> 覆盖。
+for v in ''${!NIX_PKG_CONFIG_WRAPPER_*}; do unset "$v"; done
+export PKG_CONFIG_PATH="@pkg_config_path@"
+exec "@system_pkg_config@" "$@"
 HOOKPC
+          sed -i \
+            -e "s|@shell@|${pkgs.runtimeShell}|" \
+            -e "s|@pkg_config_path@|$PKG_CONFIG_PATH|" \
+            -e "s|@system_pkg_config@|$system_pkg_config|" \
+            "$TMPDIR/hook-bin/pkg-config"
           chmod +x "$TMPDIR/hook-bin/pkg-config"
           export PATH="$TMPDIR/hook-bin:$PATH"
 
