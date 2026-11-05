@@ -10,16 +10,15 @@
  *   [int32 pos_ms][int32 samples][int32 channels] + samples*channels 个 float32
  *
  * 本读取器只维护块索引（pos_ms / 文件偏移 / 每块样本数 / 全局样本起点），
- * 不缓存全量 PCM；每次读取按需从独立 FILE* 定位读窗口并下混为 L/R，语义对齐
- * Dart 侧 PcmAnalyzer（app/lib/services/playback/pcm_analyzer.dart）：
+ * 不缓存全量 PCM；每次读取按需从独立 FILE* 定位读窗口并下混为 L/R：
  *   - 增量扫描：每次 read 先按当前文件长度补索引，块未写完即停止；
  *   - 文件变短 / 块头非法 / pos_ms 回退 → 视为 seek 截断重建，清空重扫；
  *   - 以 end_pos_ms 为终点向前取最近 frames 个样本，窗口可跨块；
  *   - 前缀不足（早于文件首样本）补零；尾部未解码（终点越过最后一个完整块）
  *     返回 -1，不做半截窗口。
  *
- * pos_ms 语义：按块头原样建索引，当前引擎写的是块起始时间（与 PcmAnalyzer
- * 的 `_offsets` 一致）。读取方不假设块头/块尾，只信任块头。
+ * pos_ms 语义：按块头原样建索引，当前引擎写的是块起始时间。
+ * 读取方不假设块头/块尾，只信任块头。
  *
  * 线程模型：仅由频谱线程调用；内部使用独立 FILE*，不与写线程共享文件位置。
  */

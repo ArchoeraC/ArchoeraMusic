@@ -4,24 +4,25 @@
 >
 > 范围：桌面端 `archoera-audio-engine`（`mediaengine_lib.c` / `audio_engine.h` /
 > `archoera_mediaengine.h`）播放层新增「内存播放」能力；Dart 播放层（`engine_bindings.dart` /
-> `pcm_analyzer.dart` / `audio_engine_process.dart` / `playback_notifier.dart`）配套改造。
+> `audio_engine_process.dart` / `playback_notifier.dart`）配套改造（v1 的
+> `pcm_analyzer.dart` 已删除）。
 >
 > 关联：`docs/architecture.md` §5/§9/§10.1、`docs/audio-kernel-zig.md` P5/§15/§16.2。
 >
 > **v2 频谱（2026-11-04，破坏性更新）**：频谱分析改为引擎侧 50ms 事件推送
 > （[`spectrum-analyzer.md`](spectrum-analyzer.md)），内存模式直接读进程内块列表，
-> App 播放路径不再经 Dart `pcm_window` 拉窗；该 FFI 保留给 CLI/测试，引擎内部
+> App 播放路径不再经 Dart 拉窗；v1 的公开 FFI 已删除，引擎内部
 > 复用 `mem_window`。
 
 ## 1. 动机与目标语义
 
 现状（player 模式）无论 `Stable`（FFmpeg）还是 `EraAudio`（Zig 内核），解码 PCM 都
 **整曲写盘**：`on_pcm_out`（`mediaengine_lib.c`）把 PCM 同时写 `stream.wav` + `stream.pcm`
-（流式喂设备与写盘并行），`stream.wav` 供 miniaudio 文件自播/回退，`stream.pcm` 供 Dart
-`PcmAnalyzer` 拉模式做频谱。
+（流式喂设备与写盘并行），`stream.wav` 供 miniaudio 文件自播/回退，`stream.pcm` 供引擎频谱线程取窗
+（v1 的 Dart `PcmAnalyzer` 拉模式已删除）。
 
 「内存播放」模式的目标：**播放会话的解码产物全部驻留进程内内存，不写任何会话文件**——
-流式出声照常；频谱可视化改走内存缓冲（v1 经 `pcm_window` FFI 拉窗；v2 由引擎
+流式出声照常；频谱可视化改走内存缓冲（v1 经公开 FFI 拉窗；v2 由引擎
 频谱线程直接读块列表并 50ms 事件推送，见 `spectrum-analyzer.md`）。仅当 **raw 设备
 流式无法启动**时按用户设定直接报错（见 §5.1），不再回退写盘。
 
@@ -85,7 +86,7 @@ BlockList {
 > 两种策略建立在**同一块列表表示**上，差别只在是否到 cap 后淘汰：
 > - `cap=-1` ⇒ 全量块列表直至歌曲结束（用户显式选择，设置需警告，§4）；
 > - `cap=auto/自定义` ⇒ 先全量存，到 cap 才退化滚动；auto 的 cap 很小（见 §3.3），
->   实际等价于「实时分析窗口 + 有限回访」——`pcm_window` 只在播放头附近取帧，
+>   实际等价于「实时分析窗口 + 有限回访」——频谱取窗只在播放头附近取帧，
 >   全量整曲驻留没有消费者，故默认收敛为有界窗口。
 
 > **缓冲复用池（2026-09-30 增补，纯内存治理）**：淘汰 / `mem_reset`（seek 重建、
@@ -109,7 +110,7 @@ cap   = clamp(可用内存 × 0.1, floor, 32 MiB)
 ```
 
 **硬性上限（32 MiB，不只停留在公式层，运行时强制）**：
-- **32 MiB 是自动模式不可逾越的封顶**：驻留 PCM 仅服务频谱取帧（v1 `pcm_window` /
+- **32 MiB 是自动模式不可逾越的封顶**：驻留 PCM 仅服务频谱取帧（v1 公开 FFI /
   v2 引擎频谱线程直接读块列表，实际只需最近 `fftSize≈8192` 样本 ≈ 171ms），全量整曲
   驻留没有消费者，故 auto 收敛为小窗口——把单会话原生内存从「整曲（数百 MB，高解析
   更大）」压到有界 ≤32 MiB；
@@ -153,38 +154,42 @@ prefs 见 `app/lib/stores/prefs_player.dart`）：
 `engine_thread` 与 `mediaengine_stream_rebuild` 在 `no_disk_cache=1` 且流式成功时不调用
 `wav_begin()` / `fopen(stream.pcm)`；`on_pcm_out` 改写入内存块列表 + 喂设备 ring。
 
-### 5.3 v1 FFI（App 不再使用，保留给 CLI/测试）
+### 5.3 取窗接口（v1 公开 FFI 已删除，改内部接口）
 
-> **v2（2026-11-04）**：App 播放路径的频谱改由引擎频谱线程直接读内存块列表并
-> 50ms 事件推送，不再调用下列 `pcm_window` / `pcm_epoch` FFI；FFI 本身保留给
-> CLI/测试（`test_memory_mode` 仍用它对照 PCM 内容），不属于 v2 频谱契约。
+> **2026-11-05**：`archoera_mediaengine_pcm_window` / `pcm_epoch` 已从公开
+> 头文件与动态库导出中删除；Dart/CLI 不再有取窗入口。引擎自身的频谱线程走
+> `src/mediaengine_internal.h`（不导出、不承诺 ABI）：
 
+```c
+/* 生产频谱取窗（内存块 / 流式环 / stream.pcm 分派） */
+int era_mediaengine_read_window(ArchoeraMediaEngine *e, int end_pos_ms,
+                                int frames, float *out_l, float *out_r);
+/* 白盒测试用：内存块窗口（blocking lock + 曲尾截断） */
+int era_mediaengine_mem_window(ArchoeraMediaEngine *e, int end_pos_ms,
+                               int frames, float *out_l, float *out_r);
+/* 内存会话重建计数（seek 重建 +1） */
+int era_mediaengine_mem_epoch(ArchoeraMediaEngine *e);
 ```
-int  archoera_mediaengine_pcm_window(ArchoeraMediaEngine *e,
-                                     int end_pos_ms, int frames,
-                                     float *out_l, float *out_r);
-/*  0  命中：以 end_pos_ms 为终点取最近 frames 样本（L/R，引擎输出恒 2ch）
- * -1  越出保留窗 / 尚未解码（调用方按现「帧缺失」处理，如频谱静默）
- * -2  参数错误 / 非内存模式会话（返回 -2 表示应走原文件路径） */
-int  archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e);
-/* seek 重建后 epoch+1；Dart 据此丢弃旧缓存帧索引 */
-```
 
-调用语义与现 `PcmAnalyzer.frameAt`（二分块索引 + 跨块取窗 + 下混）一致；引擎输出已为
-`cfg.output_channels`（2），FFI 直接给 L/R。
+- `read_window` 与生产频谱线程共用同一实现；尾部未解码返回 -1，服务层据此
+  退回因果窗口。
+- `mem_window` 保留旧「远超曲尾截到末块」语义，仅 `tests/test_memory_mode.c`
+  / `tests/test_pool_pipeline.c` 直接编译 `mediaengine_lib.c` 时使用。
+- 两个符号不带 `ARCHOERA_MEDIAENGINE_API`、不进 Windows `.def`，动态库中
+  不可见（`nm -D` 已确认）。
 
 ## 6. Dart 配套
 
 > **v2 起 App 播放路径不再使用本节的双后端拉模式**：`PlaybackNotifier` 只消费
-> `EngineFft` 事件；`PcmAnalyzer` / `MemoryPcmAnalyzer` 仅作为未迁移 CLI/测试的
-> 历史实现保留。以下为 v1 规格。
+> `EngineFft` 事件；v1 的 `PcmAnalyzer` / `MemoryPcmAnalyzer` 与对应 FFI 绑定
+> 已于 2026-11-05 删除。以下为历史规格（保留作语义参考）。
 
 - `EngineConfigC`（`engine_bindings.dart`）追加 `noDiskCache` / `pcmMemCapKb` 两字段；
   create 传入。
 - `PcmAnalyzer` 拆双后端，`frameAt` 接口不变：
   - `FilePcmAnalyzer`（现状，文件模式）；
   - `MemoryPcmAnalyzer`（内存模式）：帧索引本地缓存；每次 frameAt 校验 epoch，命中拉
-    `pcm_window`，miss 按静默；无需 `scan` 文件增量扫描。
+    取窗，miss 按静默；无需 `scan` 文件增量扫描（历史 v1 规格）。
 - `playback_notifier.dart` 按开关选择实例；设置默认内存模式。
 - 在线源行为不变（SongCache 开关独立，见 §1 组合表）。
 
@@ -194,7 +199,7 @@ int  archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e);
 - 或 env `ARCHOERA_ENGINE_FILE_MODE=1`（Dart 启动注入 `no_disk_cache=0`）。
 
 文件模式为字节级现状（PARITY SHA 基准在文件模式下执行）；内存模式默认下，基准/回归按
-`pcm_window` 窗口比对（float 误差 ≤1e-4），不再比对文件。
+取窗比对（float 误差 ≤1e-4），不再比对文件。
 
 ## 8. 验收标准
 
@@ -202,12 +207,12 @@ int  archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e);
    - 内存模式（含中途 seek / 暂停续播 / destroy）：会话目录**不产生** `stream.wav/.pcm`；
    - `ARCHOERA_ENGINE_FILE_MODE=1`：写盘与现状逐字节一致；
    - 无设备场景：emit error 且不落盘；
-   - `pcm_window`：0/-1/-2 语义；`cap=auto` 边界、`cap=-1` 全量可回访、达 cap 滚动淘汰
+   - 取窗（`era_mediaengine_read_window` / `_mem_window`）：0/-1/-2 语义；`cap=auto` 边界、`cap=-1` 全量可回访、达 cap 滚动淘汰
      行为；seek 重建后 epoch+1 且旧帧不可再取；
    - **cap 强制不越界**：auto 模式注入“内存查询超大/查询失败”用例 → 实际 cap 仍 ≤32 MiB
      （失败回落下限档）；伪造音频超量批次 → append 后记账立即淘汰、不越过 cap；
      `pcm_mem_cap_kb>0` → 实测绝不越过用户值。
-2. Dart 单元/集成：MemoryPcmAnalyzer 与 FilePcmAnalyzer 窗口样本误差 ≤1e-4；设置默认开；
+2. Dart 单元/集成（历史 v1，已随分析器删除）：内存/文件窗口样本误差 ≤1e-4；设置默认开；
    无上限确认框与文案出现；三档策略映射正确。
 3. 回归：文件模式（env 强制）下既有引擎测试与 PARITY 基准全绿。
 4. POSIX 编译 + C 测试通过；Windows 留 CI（沿用既有 `#ifdef _WIN32` 与 UTF-8 宽字符边界
@@ -219,7 +224,7 @@ int  archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e);
 ## 9. 分阶段实施
 
 - **S1** C 引擎：EngineConfig 两字段、块列表内存底座 + 保留策略、auto cap 计算、
-  `pcm_window`/`pcm_epoch` FFI、无设备 error、`tests/test_memory_mode.c`。**✅ 已实现**
+  取窗接口、无设备 error、`tests/test_memory_mode.c`。**✅ 已实现**
   （POSIX ctest 7/7 通过；Windows 留 CI）。
 - **S2** Dart：EngineConfigC + FFI 包装、PcmAnalyzer 双后端、pref/设置 UI/警告文案、接线。
   **✅ 已实现**（`engineMemoryPlay` 默认开；策略 auto/自定义/无上限 + 无上限确认框）。

@@ -828,12 +828,11 @@
       engine_bindings: {
         group: "ffi",
         type: "ffi",
-        title: "engine_bindings / fft_bindings",
-        meta: "archoera_mediaengine_* / pcm_window / segstore / libfft",
-        description: "真正的 C ABI 定义在这里，包含创建引擎、命令发送、事件等待、内存 PCM 取窗和 FFT 绑定。",
+        title: "engine_bindings",
+        meta: "archoera_mediaengine_* / segstore / 事件轮询",
+        description: "真正的 C ABI 定义在这里：创建引擎、命令发送、事件等待；频谱改由引擎线程推送，v1 拉窗/FFT 绑定已删除。",
         files: [
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/engine_bindings.dart",
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/fft_bindings.dart"
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/playback/engine_bindings.dart"
         ]
       },
       audio_engine_native: {

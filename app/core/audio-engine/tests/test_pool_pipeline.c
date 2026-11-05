@@ -31,6 +31,7 @@
 
 #include "audio_engine.h"
 #include "archoera_mediaengine.h"
+#include "mediaengine_internal.h"
 #include "native_decoder.h"
 
 static int g_fail = 0;
@@ -86,13 +87,25 @@ static int drain_events(ArchoeraMediaEngine *e, int *had_err)
     return got_done;
 }
 
-/* pcm_window 命中判定 + A/B 窗口逐位比较；返回 0 相等且命中 */
+/* A/B 窗口逐位比较（生产取窗路径：era_mediaengine_read_window）；返回 0 相等 */
 static int probe_eq(ArchoeraMediaEngine *a, ArchoeraMediaEngine *b,
                     int end_ms, int frames,
                     float *la, float *ra, float *lb, float *rb)
 {
-    if (archoera_mediaengine_pcm_window(a, end_ms, frames, la, ra) != 0) return -1;
-    if (archoera_mediaengine_pcm_window(b, end_ms, frames, lb, rb) != 0) return -2;
+    if (era_mediaengine_read_window(a, end_ms, frames, la, ra) != 0) return -1;
+    if (era_mediaengine_read_window(b, end_ms, frames, lb, rb) != 0) return -2;
+    if (memcmp(la, lb, (size_t)frames * sizeof(float)) != 0) return 1;
+    if (memcmp(ra, rb, (size_t)frames * sizeof(float)) != 0) return 2;
+    return 0;
+}
+
+/* 整曲窗口比较：end 远超曲尾，用白盒 mem_window（截到末块）取全曲。 */
+static int probe_eq_whole(ArchoeraMediaEngine *a, ArchoeraMediaEngine *b,
+                          int end_ms, int frames,
+                          float *la, float *ra, float *lb, float *rb)
+{
+    if (era_mediaengine_mem_window(a, end_ms, frames, la, ra) != 0) return -1;
+    if (era_mediaengine_mem_window(b, end_ms, frames, lb, rb) != 0) return -2;
     if (memcmp(la, lb, (size_t)frames * sizeof(float)) != 0) return 1;
     if (memcmp(ra, rb, (size_t)frames * sizeof(float)) != 0) return 2;
     return 0;
@@ -181,7 +194,7 @@ int main(int argc, char **argv)
     /* ── A/B 产出的整曲 PCM 逐位对照 ── */
     if (eA && eB) {
         /* 整曲窗口：end 远超曲尾 → 截到末块末尾，frames 含头部前缀补零的完整回放 */
-        ok = (probe_eq(eA, eB, 100000, WIN_FULL, lA, rA, lB, rB) == 0);
+        ok = (probe_eq_whole(eA, eB, 100000, WIN_FULL, lA, rA, lB, rB) == 0);
         CHECK(ok, "整曲 PCM A==B（memcmp 逐位一致 → sample count 一致）");
         CHECK(window_nonzero(lA, rA, WIN_FULL),
               "A 整曲窗口有非静音内容（确实解码出音频）");

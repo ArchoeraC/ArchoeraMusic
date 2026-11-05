@@ -18,9 +18,6 @@ enum NativeModule {
     candidates: ['native', 'audio-engine/build', 'core/audio-engine/build'],
   ),
 
-  /// FFT 分析库（libfft.{so,dylib} / fft.dll），位于 audio-engine 产物目录。
-  fft('fft', candidates: ['native', 'audio-engine/build', 'core/audio-engine/build']),
-
   /// 扫描库（scanner-ffi.{so,dylib,dll}，无 lib 前缀）。
   scanner(
     'scanner-ffi',

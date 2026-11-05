@@ -5,7 +5,7 @@
 /**
  * audio_engine.h — 服务端音频引擎公开 API
  *
- * Phase 2：decode → resample → equalizer → loudness → limiter → fft → encode
+ * Phase 2：decode → resample → equalizer → loudness → limiter → encode
  *
  * 设计目标：
  *   - 输入：任意 FFmpeg 支持的音频文件/URL
@@ -56,8 +56,6 @@ typedef struct {
     int   normalization_album;/**< ReplayGain 取用口径：0=track（默认）/ 1=album */
     bool  limiter_enabled;    /**< 限幅器开关 */
     float limiter_threshold_db; /**< 限幅器阈值（dB），默认 -1.0 */
-    bool  fft_enabled;        /**< FFT 频谱分析开关 */
-    int   fft_size;           /**< FFT 点数（如 1024, 2048） */
 
     /* Phase 4: 变速变调 */
     bool  tempo_enabled;      /**< 变速变调开关 */
@@ -70,7 +68,7 @@ typedef struct {
                                    默认由 Dart「内存播放」开关注入（0 = 文件模式） */
     int64_t pcm_mem_cap_kb;   /**< 解码 PCM 内存保留上限（KB）：
                                    0 = auto（有界分析窗口：按可用内存均衡，8 MiB ~ 32 MiB
-                                       硬上限，查询故障回落；驻留仅供频谱 pcm_window）
+                                       硬上限，查询故障回落；驻留仅供频谱取窗）
                                    >0 = 用户上限（引擎绝不越过用户设定）
                                    -1 = 无上限（整曲可回访；设置须显式警告） */
     float initial_volume;    /**< 会话初始音量（0~1，默认 1.0）。必须在**首块 PCM
@@ -93,8 +91,6 @@ typedef struct {
     .normalization_album = 0, \
     .limiter_enabled = true, \
     .limiter_threshold_db = -1.0f, \
-    .fft_enabled = false, \
-    .fft_size = 1024, \
     .tempo_enabled = false, \
     .tempo_speed = 1.0f, \
     .tempo_pitch = 0.0f, \
@@ -115,10 +111,10 @@ typedef struct SegStore SegStore;
 typedef int (*OutputCallback)(const uint8_t *data, size_t size, void *user_data);
 
 /**
- * PCM 流出回调：管线 FFT 阶段（编码前）的 48kHz float 交错 PCM
+ * PCM 流出回调：编码前的 float 交错 PCM
  *
- * 供客户端（Flutter）直接获取原始 PCM 自行分析（FFT 客户端化，§10.1），
- * 不再依赖引擎侧频谱输出。数据位于 EQ/响度/限幅/tempo 之后、编码之前。
+ * 数据位于 EQ/响度/限幅/tempo 之后、编码之前；引擎侧频谱服务、流式播放
+ * 与 PCM 落盘都从这里取数（docs/spectrum-analyzer.md §3）。
  *
  * @param pcm         交错 float PCM（L R L R ...），每帧 channels 个样本
  * @param samples     帧数（每声道）
@@ -194,7 +190,7 @@ AudioPipeline* pipeline_create_store(SegStore *store,
                                       void *user);
 
 /**
- * 驱动管线：解码 → 重采样 → EQ → 响度 → 限幅 → FFT → 编码 → 封装 → 输出
+ * 驱动管线：解码 → 重采样 → EQ → 响度 → 限幅 → tempo → 编码 → 封装 → 输出
  *
  * 每次调用处理若干帧，通过 output 回调写出数据。
  * 当返回值为 0 时表示输入已读完且编码器已 flush。
@@ -207,10 +203,10 @@ ssize_t pipeline_process(AudioPipeline *p);
 int pipeline_run(AudioPipeline *p);
 
 /**
- * 注册 PCM 流出回调（FFT 阶段编码前 PCM；cb 为 NULL 取消）
+ * 注册 PCM 流出回调（编码前 PCM；cb 为 NULL 取消）
  *
- * 桌面端 Flutter 直连引擎后经 UDS 收取原始 PCM，自行完成频谱分析
- * （FFT 客户端化），引擎只负责解码/处理/转码。
+ * 引擎频谱服务按播放位置从这里产出的 PCM 取窗，流式播放也经该回调喂设备。
+
  */
 void pipeline_set_pcm_out_cb(AudioPipeline *p, PcmOutCallback cb, void *user_data);
 
@@ -310,59 +306,6 @@ void pipeline_set_lowfreq_bass(AudioPipeline *p, float gain_db, float freq);
  * 输出声道；用于设备实际只有左/右一侧发声时避免丢失另一侧内容。
  */
 void pipeline_set_channel_merge_enabled(AudioPipeline *p, bool enabled);
-
-/** 运行时启用/禁用 FFT */
-void pipeline_set_fft_enabled(AudioPipeline *p, bool enabled);
-
-/** 获取 FFT 频谱数据（dB 值，输出到 out_db 缓冲区） */
-int pipeline_get_fft_spectrum(AudioPipeline *p, float *out_db, int bins, float min_db);
-
-/**
- * 获取立体声 FFT 频谱数据（dB，左右声道独立）
- *
- * @param p         管线实例
- * @param out_db_l  输出左声道 dB 值缓冲区
- * @param out_db_r  输出右声道 dB 值缓冲区
- * @param bins      频段数
- * @param min_db    最小 dB 值
- * @return 0 成功，-1 参数错误
- */
-int pipeline_get_fft_spectrum_stereo(AudioPipeline *p,
-                                     float *out_db_l, float *out_db_r,
-                                     int bins, float min_db);
-
-/**
- * 获取归一化立体声 FFT 频谱（前端渲染契约：[0,1] 对数映射，对齐 Electron Rust 端）
- *
- * @param p          管线实例
- * @param out_l      输出左声道归一化谱（[0,1]），至少 bins 个元素
- * @param out_r      输出右声道归一化谱（[0,1]），至少 bins 个元素
- * @param bins       频段数（前端固定 128）
- * @return 0 成功，-1 参数错误
- */
-int pipeline_get_fft_spectrum_norm_stereo(AudioPipeline *p,
-                                          float *out_l, float *out_r,
-                                          int bins);
-
-/** 获取 FFT 点数 */
-int pipeline_get_fft_size(const AudioPipeline *p);
-
-/**
- * FFT 帧回调：每完成一次频谱计算后同步调用（新频谱已就绪）
- *
- * 触发于 fft_process 系列内部，转码线程内同步执行；
- * 用于按已处理音频位置推送频谱（转码可快于实时，墙钟驱动不可靠）。
- *
- * @param user_data 注册时传入的用户数据（通常为 AudioPipeline*）
- * @param fft_size  本次 FFT 点数
- */
-typedef void (*AudioFftFrameCb)(void *user_data, int fft_size);
-
-/** 注册 FFT 帧回调（转发到 fft_set_frame_cb；cb 为 NULL 取消） */
-void pipeline_set_fft_frame_cb(AudioPipeline *p, AudioFftFrameCb cb, void *user_data);
-
-/** FFT 已处理音频时间（秒，样本级粒度，供频谱推送驱动） */
-double pipeline_get_fft_processed_seconds(const AudioPipeline *p);
 
 /**
  * Phase 4: 变速变调

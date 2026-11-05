@@ -155,7 +155,7 @@ if(GO)
 endif()
 
 # === ArchoeraMusic audio-engine：内嵌 CMake 构建链（一键构建）===
-# flutter build / flutter run 时自动调用 cmake 产出 libfft.so /
+# flutter build / flutter run 时自动调用 cmake 产出
 # libarchoera_mediaengine.so / archoera-audio-engine 到 audio-engine/build/
 #（与下方 OPTIONAL install 路径一致），无需手动 cmake 预构建。
 # cmake 自身增量编译，无变更时仅 ~0.1s。依赖系统 ffmpeg-devel
@@ -168,7 +168,7 @@ set(AUDIO_ENGINE_BUILD_DIR "${AUDIO_ENGINE_DIR}/build")
 add_custom_target(audio_engine_cmake ALL
   COMMAND ${AUDIO_ENGINE_CMAKE} -S "${AUDIO_ENGINE_DIR}" -B "${AUDIO_ENGINE_BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
   COMMAND ${AUDIO_ENGINE_CMAKE} --build "${AUDIO_ENGINE_BUILD_DIR}" -j
-  COMMENT "cmake build archoera-audio-engine (libfft + mediaengine)"
+  COMMENT "cmake build archoera-audio-engine (mediaengine)"
   VERBATIM
 )
 add_dependencies(${BINARY_NAME} audio_engine_cmake)
@@ -256,7 +256,7 @@ endif()
 # 引擎模块位于 app/core/{audio-engine,scanner,indexer,scraper,subsonic}（app 内部，
 # 路径关系固定，可随 app 独立部署），产物统一安装进 bundle/native/ 平铺（对齐
 # ffi-libs-layout 计划；NativeLibPaths 祖先链优先查 native/，随后回退旧 <module>/build 布局）：
-#   bundle/native/{archoera-audio-engine,libarchoera_mediaengine.so,libfft.so}
+#   bundle/native/{archoera-audio-engine,libarchoera_mediaengine.so}
 #   bundle/native/{scanner-ffi.so,libe_sqlite3.so}
 #   bundle/native/{indexer-ffi.so}（libe_sqlite3.so 已由 scanner 提供，indexer 仅兜底）
 #   bundle/native/{libarchoera_scraper.so}
@@ -275,8 +275,6 @@ set(SUBSONIC_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/subsonic/build")
 install(PROGRAMS "${ENGINE_SRC_DIR}/archoera-audio-engine"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${ENGINE_SRC_DIR}/libarchoera_mediaengine.so"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
-install(FILES "${ENGINE_SRC_DIR}/libfft.so"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 # FFmpeg 内嵌运行库（audio-engine 构建时自系统 FFmpeg 拷入其 build/ffmpeg/；
 # 与引擎同装 native/，引擎 RUNPATH=$ORIGIN 优先解析，系统 FFmpeg 升级不影响）。
