@@ -1917,7 +1917,8 @@ uint32_t caps() {
     uint32_t c = CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_MEDIA_SESSION |
                  CAP_MEDIA_SEEK | CAP_MEDIA_ARTWORK | CAP_APP_INSTANCE |
                  CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME | CAP_DEEP_LINK |
-                 CAP_REVEAL_PATH | CAP_TRAY | CAP_SECURE_FILE | CAP_OPEN_URL;
+                 CAP_REVEAL_PATH | CAP_TRAY | CAP_SECURE_FILE | CAP_OPEN_URL |
+                 CAP_ELEVATION;
     const bool hasDisplay = std::getenv("WAYLAND_DISPLAY") != nullptr ||
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
@@ -1942,6 +1943,11 @@ int32_t hardenProcess() {
     setrlimit(RLIMIT_CORE, &rl);
 #endif
     return OK;
+}
+
+int32_t processElevation() {
+    // sudo / root 登录 / setuid 均使有效 uid 为 0；普通启动恒为非 0。
+    return ::geteuid() == 0 ? APL_ELEVATION_ROOT : APL_ELEVATION_NONE;
 }
 
 int32_t init() {

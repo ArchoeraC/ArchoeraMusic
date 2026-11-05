@@ -19,6 +19,8 @@ int32_t shutdown() { return OK; }
 // 未实现平台：无进程硬化原语（不可测目标）；返回 OK 由宿主忽略。
 int32_t hardenProcess() { return OK; }
 
+int32_t processElevation() { return ERR_UNSUPPORTED; }
+
 int32_t powerSetSleepInhibit(int32_t) { return ERR_UNSUPPORTED; }
 int32_t powerSetScreenEvents(int32_t) { return ERR_UNSUPPORTED; }
 
