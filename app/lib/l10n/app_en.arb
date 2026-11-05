@@ -1734,6 +1734,7 @@
   "mcpShellUsageError": "Usage error",
   "mcpShellErrorPrefix": "Error",
   "mcpShellDisabled": "archoerashell is disabled in Settings (MCP access → Command-line shell).",
+  "mcpShellElevatedRefused": "Refusing to run archoerashell as root/administrator: the CLI and MCP credentials never need elevation, and running elevated magnifies config/log ownership risks. Re-run as a normal user; for containers/CI that genuinely require elevation, set ARCHOERA_ALLOW_ELEVATED=1 explicitly.",
   "mcpShellHelpStatus": "Usage: archoerashell status\n\nShow current playback status: playing/paused, track, position, volume, repeat/shuffle.",
   "mcpShellHelpNowPlaying": "Usage: archoerashell now-playing\n\nShow only the current track and position.",
   "mcpShellHelpPlay": "Usage: archoerashell play\n\nStart/resume playback.",
@@ -1911,5 +1912,11 @@
   "settingsKdfPasswordTitle": "Verify current password",
   "settingsKdfPasswordDesc": "Changing Argon2id strength re-wraps the password slot (master key and stored credentials stay unchanged). Enter your current unlock password.",
   "settingsKdfPasswordHint": "Current password",
-  "toastKdfRepacked": "Re-wrapped with no data loss"
+  "toastKdfRepacked": "Re-wrapped with no data loss",
+  "elevationGateTitle": "Elevated launch detected",
+  "elevationGateBody": "ArchoeraMusic is running as {kind}. Playback, downloads and the credential vault never need elevation. Continuing elevated hands the whole machine to any flaw in this app: a single remote-code-execution or supply-chain issue can affect the entire system, and preferences, caches and logs are written with {kind} rights, where a normal user may be unable to read or clean them up.\n\nExit and restart ArchoeraMusic as your normal user.",
+  "elevationGateKindRoot": "root (superuser)",
+  "elevationGateKindAdministrator": "administrator",
+  "elevationGateExit": "Exit",
+  "elevationGateContinue": "I understand the risk — continue"
 }

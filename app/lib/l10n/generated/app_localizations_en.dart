@@ -5835,6 +5835,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'archoerashell is disabled in Settings (MCP access → Command-line shell).';
 
   @override
+  String get mcpShellElevatedRefused =>
+      'Refusing to run archoerashell as root/administrator: the CLI and MCP credentials never need elevation, and running elevated magnifies config/log ownership risks. Re-run as a normal user; for containers/CI that genuinely require elevation, set ARCHOERA_ALLOW_ELEVATED=1 explicitly.';
+
+  @override
   String get mcpShellHelpStatus =>
       'Usage: archoerashell status\n\nShow current playback status: playing/paused, track, position, volume, repeat/shuffle.';
 
@@ -6422,4 +6426,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toastKdfRepacked => 'Re-wrapped with no data loss';
+
+  @override
+  String get elevationGateTitle => 'Elevated launch detected';
+
+  @override
+  String elevationGateBody({required String kind}) {
+    return 'ArchoeraMusic is running as $kind. Playback, downloads and the credential vault never need elevation. Continuing elevated hands the whole machine to any flaw in this app: a single remote-code-execution or supply-chain issue can affect the entire system, and preferences, caches and logs are written with $kind rights, where a normal user may be unable to read or clean them up.\n\nExit and restart ArchoeraMusic as your normal user.';
+  }
+
+  @override
+  String get elevationGateKindRoot => 'root (superuser)';
+
+  @override
+  String get elevationGateKindAdministrator => 'administrator';
+
+  @override
+  String get elevationGateExit => 'Exit';
+
+  @override
+  String get elevationGateContinue => 'I understand the risk — continue';
 }

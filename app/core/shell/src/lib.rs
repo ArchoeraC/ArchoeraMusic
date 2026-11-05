@@ -11,6 +11,7 @@
 mod cli;
 #[cfg(windows)]
 mod console;
+mod elevation;
 mod http;
 mod l10n;
 mod lineedit;
@@ -41,7 +42,7 @@ unsafe fn collect_args(argc: c_int, argv: *const *const c_char) -> Vec<String> {
 
 /// 主可执行文件被以 `archoerashell …` 调用时进入此入口。
 ///
-/// 返回进程退出码（0 成功 / 1 运行期错误 / 2 用法错误）。捕获 panic，避免
+/// 返回进程退出码（0 成功 / 1 运行期错误 / 2 用法错误 / 77 拒绝提权启动）。捕获 panic，避免
 /// unwinding 跨越 FFI 边界。
 ///
 /// # Safety
@@ -59,6 +60,16 @@ pub unsafe extern "C" fn archoera_shell_main(
     // Windows：GUI 子系统进程被终端调用时接管/补齐标准流与 UTF-8/ANSI。
     #[cfg(windows)]
     let console_state = console::ensure();
+    // 提权防呆：CLI 与 MCP 凭据都不需要 root/管理员，默认拒绝（与 GUI 启动门
+    // 同一策略）；容器/CI 确需提权时用 ARCHOERA_ALLOW_ELEVATED=1 显式放行。
+    // 放在控制台接管之后，保证 Windows 上拒绝信息能写进调用方终端。
+    if elevation::is_elevated() && !elevation::override_allowed() {
+        let l10n = l10n::L10n::new(None);
+        eprintln!("{}", l10n.raw("mcpShellElevatedRefused"));
+        #[cfg(windows)]
+        console::restore(console_state);
+        return elevation::EXIT_ELEVATED;
+    }
     let code =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| cli::run(sub))).unwrap_or(70);
     // 复位被改写的控制台代码页，保持调用方终端状态。

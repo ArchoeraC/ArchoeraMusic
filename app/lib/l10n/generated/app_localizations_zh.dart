@@ -5561,6 +5561,10 @@ class AppLocalizationsZh extends AppLocalizations {
       'archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。';
 
   @override
+  String get mcpShellElevatedRefused =>
+      '拒绝以 root / 管理员身份运行 archoerashell：命令行与 MCP 凭据都不需要提权，提权会放大配置/日志的属主风险。请以普通用户重新运行；容器/CI 确需提权时显式设置 ARCHOERA_ALLOW_ELEVATED=1。';
+
+  @override
   String get mcpShellHelpStatus =>
       '用法: archoerashell status\n\n显示当前播放状态：播放/暂停、当前曲目、进度、音量、循环/随机。';
 
@@ -6134,6 +6138,26 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toastKdfRepacked => '已重封装，不丢数据';
+
+  @override
+  String get elevationGateTitle => '检测到以高权限身份启动';
+
+  @override
+  String elevationGateBody({required String kind}) {
+    return 'ArchoeraMusic 正以$kind身份运行。播放、下载与凭据保险库都不需要提权：以提权身份继续，任何一处远程代码执行或供应链问题都会波及整台机器，偏好、缓存与日志也会以$kind权限落盘，普通用户可能无法读取或清理。\n\n建议退出，然后以当前普通用户身份重新启动。';
+  }
+
+  @override
+  String get elevationGateKindRoot => 'root（超级用户）';
+
+  @override
+  String get elevationGateKindAdministrator => '管理员';
+
+  @override
+  String get elevationGateExit => '退出应用';
+
+  @override
+  String get elevationGateContinue => '我已知晓风险，仍要继续';
 }
 
 /// The translations for Chinese, as used in China (`zh_CN`).
@@ -11692,6 +11716,10 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       'archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。';
 
   @override
+  String get mcpShellElevatedRefused =>
+      '拒绝以 root / 管理员身份运行 archoerashell：命令行与 MCP 凭据都不需要提权，提权会放大配置/日志的属主风险。请以普通用户重新运行；容器/CI 确需提权时显式设置 ARCHOERA_ALLOW_ELEVATED=1。';
+
+  @override
   String get mcpShellHelpStatus =>
       '用法: archoerashell status\n\n显示当前播放状态：播放/暂停、当前曲目、进度、音量、循环/随机。';
 
@@ -12265,6 +12293,26 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get toastKdfRepacked => '已重封装，不丢数据';
+
+  @override
+  String get elevationGateTitle => '检测到以高权限身份启动';
+
+  @override
+  String elevationGateBody({required String kind}) {
+    return 'ArchoeraMusic 正以$kind身份运行。播放、下载与凭据保险库都不需要提权：以提权身份继续，任何一处远程代码执行或供应链问题都会波及整台机器，偏好、缓存与日志也会以$kind权限落盘，普通用户可能无法读取或清理。\n\n建议退出，然后以当前普通用户身份重新启动。';
+  }
+
+  @override
+  String get elevationGateKindRoot => 'root（超级用户）';
+
+  @override
+  String get elevationGateKindAdministrator => '管理员';
+
+  @override
+  String get elevationGateExit => '退出应用';
+
+  @override
+  String get elevationGateContinue => '我已知晓风险，仍要继续';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -17824,6 +17872,10 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
       'archoerashell 已在設定中停用（設定 → MCP 接入 → 命令列 shell）。';
 
   @override
+  String get mcpShellElevatedRefused =>
+      '拒絕以 root / 系統管理員身分執行 archoerashell：命令列與 MCP 憑證都不需要提權，提權會放大設定/日誌的擁有者風險。請以一般使用者重新執行；容器/CI 確需提權時請明確設定 ARCHOERA_ALLOW_ELEVATED=1。';
+
+  @override
   String get mcpShellHelpStatus =>
       '用法: archoerashell status\n\n顯示目前播放狀態：播放/暫停、目前曲目、進度、音量、循環/隨機。';
 
@@ -18397,4 +18449,24 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get toastKdfRepacked => '已重新封裝，不丟資料';
+
+  @override
+  String get elevationGateTitle => '偵測到以高權限身分啟動';
+
+  @override
+  String elevationGateBody({required String kind}) {
+    return 'ArchoeraMusic 正以$kind身分執行。播放、下載與憑證保險庫都不需要提權：以提權身分繼續，任何一處遠端程式碼執行或供應鏈問題都會波及整台機器，偏好、快取與日誌也會以$kind權限落盤，一般使用者可能無法讀取或清理。\n\n建議結束後，以目前的一般使用者身分重新啟動。';
+  }
+
+  @override
+  String get elevationGateKindRoot => 'root（超級使用者）';
+
+  @override
+  String get elevationGateKindAdministrator => '系統管理員';
+
+  @override
+  String get elevationGateExit => '結束應用程式';
+
+  @override
+  String get elevationGateContinue => '我已了解風險，仍要繼續';
 }

@@ -21,6 +21,9 @@ int32_t shutdown();
 // 进程硬化（禁 core：防明文凭据随 core 落盘）；幂等；release 生效。
 int32_t hardenProcess();
 
+// 提权探测（见 include/archoera_platform.h APL_CAP_ELEVATION）：只读，不提权。
+int32_t processElevation();
+
 int32_t powerSetSleepInhibit(int32_t on);
 int32_t powerSetScreenEvents(int32_t on);
 

@@ -5897,6 +5897,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'archoerashell ist in den Einstellungen deaktiviert (MCP-Zugriff → Kommandozeilen-Shell).';
 
   @override
+  String get mcpShellElevatedRefused =>
+      'archoerashell wird nicht als root/Administrator ausgeführt: CLI und MCP-Zugangsdaten benötigen niemals erhöhte Rechte, und ein erhöhter Start vergrößert die Eigentümerrisiken von Konfiguration und Protokollen. Bitte als normaler Benutzer erneut starten; nur für Container/CI, die es wirklich benötigen, explizit ARCHOERA_ALLOW_ELEVATED=1 setzen.';
+
+  @override
   String get mcpShellHelpStatus =>
       'Verwendung: archoerashell status\n\nZeigt den Wiedergabestatus: Wiedergabe/Pause, Titel, Position, Lautstärke, Wiederholen/Zufall.';
 
@@ -6495,4 +6499,24 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get toastKdfRepacked => 'Neu umhüllt, keine Daten verloren';
+
+  @override
+  String get elevationGateTitle => 'Start mit erhöhten Rechten erkannt';
+
+  @override
+  String elevationGateBody({required String kind}) {
+    return 'ArchoeraMusic läuft als $kind. Wiedergabe, Downloads und der Anmeldedaten-Tresor benötigen niemals erhöhte Rechte. Wer erhöht weiterläuft, überlässt dem gesamten System jede Schwachstelle dieser App: Eine einzige Remote-Code-Execution- oder Supply-Chain-Lücke kann den ganzen Rechner betreffen, und Einstellungen, Caches und Protokolle werden mit $kind-Rechten geschrieben, sodass ein normaler Benutzer sie womöglich nicht lesen oder löschen kann.\n\nBeenden und ArchoeraMusic als normaler Benutzer neu starten.';
+  }
+
+  @override
+  String get elevationGateKindRoot => 'root (Superuser)';
+
+  @override
+  String get elevationGateKindAdministrator => 'Administrator';
+
+  @override
+  String get elevationGateExit => 'Beenden';
+
+  @override
+  String get elevationGateContinue => 'Risiko verstanden – trotzdem fortfahren';
 }

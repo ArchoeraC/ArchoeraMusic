@@ -84,6 +84,22 @@ int32_t hardenProcess() {
     return OK;
 }
 
+int32_t processElevation() {
+    // TokenElevation 反映 UAC 是否**实际授予**了提权令牌：管理员账户以普通
+    // 方式启动时为 0（受支持的默认方式），只有「以管理员身份运行」/提权进程为 1。
+    HANDLE token = nullptr;
+    if (!::OpenProcessToken(::GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        return ERR_BACKEND;
+    }
+    TOKEN_ELEVATION info{};
+    DWORD returned = 0;
+    const BOOL ok = ::GetTokenInformation(token, TokenElevation, &info,
+                                          sizeof(info), &returned);
+    ::CloseHandle(token);
+    if (!ok) return ERR_BACKEND;
+    return info.TokenIsElevated != 0 ? APL_ELEVATION_ADMIN : APL_ELEVATION_NONE;
+}
+
 namespace {
 
 // ── 诊断日志 ──────────────────────────────────────────────────────
@@ -1383,7 +1399,7 @@ uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
            CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
-           CAP_SECURE_FILE | CAP_OPEN_URL;
+           CAP_SECURE_FILE | CAP_OPEN_URL | CAP_ELEVATION;
 }
 
 int32_t init() {
