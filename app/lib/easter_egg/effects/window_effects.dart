@@ -23,38 +23,36 @@ Future<void> _notResponding(EasterEggContext ctx) async {
 /// [kMinimizeTrapDuration] 结束后释放并还原窗口。（唯一会恢复的彩蛋）
 const Duration kMinimizeTrapDuration = Duration(seconds: 6);
 
-class _ReMinimizeListener with WindowListener {
-  @override
-  void onWindowRestore() {
-    unawaited(windowManager.minimize());
-  }
-}
-
 Future<void> _minimizeTrap(EasterEggContext ctx) async {
-  final listener = _ReMinimizeListener();
-  windowManager.addListener(listener);
+  final window = WindowManager.instance.getCurrent();
+  if (window == null) return;
+  final listenerId = window.addListener((event) {
+    if (event is WindowRestoredEvent) window.minimize();
+  });
   try {
-    await windowManager.minimize();
+    window.minimize();
     await Future<void>.delayed(kMinimizeTrapDuration);
   } catch (_) {
     // 无窗口系统：忽略
   } finally {
-    windowManager.removeListener(listener);
+    window.removeListener(listenerId);
     try {
-      await windowManager.restore();
-      await windowManager.focus();
+      window.restore();
+      window.focus();
     } catch (_) {}
   }
 }
 
 /// 探测「程序能否移动自身窗口」：Wayland 合成器下客户端不被允许。
 Future<bool> _windowMoveSupported() async {
+  final window = WindowManager.instance.getCurrent();
+  if (window == null) return false;
   try {
-    final p0 = await windowManager.getPosition();
-    await windowManager.setPosition(Offset(p0.dx + 1, p0.dy + 1));
-    final p1 = await windowManager.getPosition();
+    final p0 = window.position.toOffset();
+    window.position = Offset(p0.dx + 1, p0.dy + 1).toNative();
+    final p1 = window.position.toOffset();
     final ok = (p1 - p0).distance > 0.5;
-    if (ok) await windowManager.setPosition(p0);
+    if (ok) window.position = p0.toNative();
     return ok;
   } catch (_) {
     return false;
@@ -74,9 +72,11 @@ Future<void> _desktopScroll(EasterEggContext ctx) async {
   const frame = Duration(milliseconds: 50);
 
   if (native) {
+    final window = WindowManager.instance.getCurrent();
+    if (window == null) return;
     Offset original;
     try {
-      original = await windowManager.getPosition();
+      original = window.position.toOffset();
     } catch (_) {
       return;
     }
@@ -84,9 +84,10 @@ Future<void> _desktopScroll(EasterEggContext ctx) async {
     while (true) {
       t += 0.16;
       try {
-        await windowManager.setPosition(
-          Offset(original.dx + 460 * math.sin(t), original.dy + 300 * math.sin(t * 1.7 + 1.1)),
-        );
+        window.position = Offset(
+          original.dx + 460 * math.sin(t),
+          original.dy + 300 * math.sin(t * 1.7 + 1.1),
+        ).toNative();
       } catch (_) {
         return;
       }

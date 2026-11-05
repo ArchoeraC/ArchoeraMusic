@@ -15,6 +15,7 @@ import '../../services/platform/platform_capabilities.dart';
 import '../../services/platform/platform_failure.dart';
 import '../../services/platform/system_tray.dart';
 import '../../services/playback/playback_notifier.dart';
+import '../../services/power/power_saver.dart' show powerSaverProvider;
 import '../../stores/app_prefs.dart';
 import '../../l10n/l10n.dart';
 import '../../app/app_quit.dart';
@@ -44,13 +45,21 @@ class TrayIntegration extends ConsumerStatefulWidget {
   ConsumerState<TrayIntegration> createState() => _TrayIntegrationState();
 }
 
-class _TrayIntegrationState extends ConsumerState<TrayIntegration>
-    with WindowListener {
+class _TrayIntegrationState extends ConsumerState<TrayIntegration> {
   /// 托盘是否就绪（决定关闭窗口是否隐藏到托盘）。
   bool _trayReady = false;
 
+  /// 当前应用窗口句柄（nativeapi；无窗口环境为 null）。
+  Window? _window;
+
+  /// 窗口事件监听句柄（dispose 时按 id 注销）。
+  ListenerId? _windowListenerId;
+
   /// 关闭确认弹窗中「记住我的选择」复选框状态（每次弹窗前重置）。
   bool _closeRemember = false;
+
+  /// 关闭请求处理中（避免连点关闭叠加多个确认框）。
+  bool _handlingClose = false;
 
   /// 托盘能力实现（进程级单例；本组件只 create/destroy，不 dispose 服务）。
   SystemTray? _tray;
@@ -70,13 +79,11 @@ class _TrayIntegrationState extends ConsumerState<TrayIntegration>
 
   @override
   void dispose() {
-    windowManager.removeListener(this);
+    final listenerId = _windowListenerId;
+    if (listenerId != null) _window?.removeListener(listenerId);
     _disposeTray();
     super.dispose();
   }
-
-  @override
-  Future<void> onWindowClose() => _handleWindowClose();
 
   @override
   Widget build(BuildContext context) => _buildTrayIntegration(context);
