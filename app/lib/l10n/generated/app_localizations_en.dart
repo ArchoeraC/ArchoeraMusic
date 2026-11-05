@@ -5521,6 +5521,78 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsChannelMergeOff => 'Off (original stereo preserved)';
 
   @override
+  String get settingsSectionPeq => 'Parametric EQ';
+
+  @override
+  String get settingsSectionPeqDesc =>
+      'Peak / low-shelf / high-shelf bands, independent of the fixed 10-band EQ above.';
+
+  @override
+  String get settingsPeq => 'Parametric EQ';
+
+  @override
+  String get settingsPeqAddBand => 'Add band';
+
+  @override
+  String get settingsPeqAdd => 'Add';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return 'Band $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => 'Peak';
+
+  @override
+  String get settingsPeqKindLowShelf => 'Low shelf';
+
+  @override
+  String get settingsPeqKindHighShelf => 'High shelf';
+
+  @override
+  String get settingsPeqFreq => 'Frequency';
+
+  @override
+  String get settingsPeqGain => 'Gain';
+
+  @override
+  String get settingsSectionLowfreq => 'Subsonic / low-frequency management';
+
+  @override
+  String get settingsSectionLowfreqDesc =>
+      'Subsonic high-pass to remove rumble + low-shelf bass boost.';
+
+  @override
+  String get settingsLowfreq => 'Low-frequency management';
+
+  @override
+  String get settingsLowfreqHpfCutoff => 'High-pass cutoff';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / order $order';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1st order';
+
+  @override
+  String get settingsLowfreqOrder2 => '2nd order';
+
+  @override
+  String get settingsLowfreqHpfFreq => 'High-pass frequency';
+
+  @override
+  String get settingsLowfreqBassGain => 'Shelf gain';
+
+  @override
+  String get settingsLowfreqBassFreq => 'Shelf frequency';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override
