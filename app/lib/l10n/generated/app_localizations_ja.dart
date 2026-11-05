@@ -5330,6 +5330,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsPitchUnit => '半音';
 
   @override
+  String get settingsSectionChannels => 'チャンネル';
+
+  @override
+  String get settingsSectionChannelsDesc =>
+      'デバイスの左側または右側からしか音が出ない場合（片側イヤホン、モノラルスピーカーなど）に有効にします。有効にすると両側で全体の音が聞こえます。通常のステレオ機器では無効のままにしてください。';
+
+  @override
+  String get settingsChannelMerge => 'チャンネル統合';
+
+  @override
+  String get settingsChannelMergeDesc =>
+      'すべてのチャンネルを等パワーでモノラルに合成し、各出力チャンネルにコピーします';
+
+  @override
+  String get settingsChannelMergeOn => '有効（すべてのチャンネルをモノラルに統合）';
+
+  @override
+  String get settingsChannelMergeOff => '無効（元のステレオを維持）';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override
