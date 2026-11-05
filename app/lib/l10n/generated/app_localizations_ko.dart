@@ -5354,6 +5354,78 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsChannelMergeOff => '꺼짐(원래 스테레오 유지)';
 
   @override
+  String get settingsSectionPeq => '파라메트릭 EQ';
+
+  @override
+  String get settingsSectionPeqDesc =>
+      '피크 / 로우 셸프 / 하이 셸프 밴드를 자유롭게 추가하며, 위의 고정 10밴드 EQ와는 별개입니다.';
+
+  @override
+  String get settingsPeq => '파라메트릭 EQ';
+
+  @override
+  String get settingsPeqAddBand => '밴드 추가';
+
+  @override
+  String get settingsPeqAdd => '추가';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return '밴드 $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => '피크';
+
+  @override
+  String get settingsPeqKindLowShelf => '로우 셸프';
+
+  @override
+  String get settingsPeqKindHighShelf => '하이 셸프';
+
+  @override
+  String get settingsPeqFreq => '주파수';
+
+  @override
+  String get settingsPeqGain => '게인';
+
+  @override
+  String get settingsSectionLowfreq => '서브소닉 / 저역 관리';
+
+  @override
+  String get settingsSectionLowfreqDesc =>
+      '서브소닉 하이패스로 럼블을 제거하고 로우 셸프로 저역을 보강합니다.';
+
+  @override
+  String get settingsLowfreq => '저역 관리';
+
+  @override
+  String get settingsLowfreqHpfCutoff => '하이패스 컷오프';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / $order차';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1차';
+
+  @override
+  String get settingsLowfreqOrder2 => '2차';
+
+  @override
+  String get settingsLowfreqHpfFreq => '하이패스 주파수';
+
+  @override
+  String get settingsLowfreqBassGain => '셸프 게인';
+
+  @override
+  String get settingsLowfreqBassFreq => '셸프 주파수';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override

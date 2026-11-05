@@ -5580,6 +5580,78 @@ class AppLocalizationsDe extends AppLocalizations {
       'Deaktiviert (Original-Stereo bleibt erhalten)';
 
   @override
+  String get settingsSectionPeq => 'Parametrischer EQ';
+
+  @override
+  String get settingsSectionPeqDesc =>
+      'Peak-/Low-Shelf-/High-Shelf-Bänder, unabhängig vom festen 10-Band-EQ oben.';
+
+  @override
+  String get settingsPeq => 'Parametrischer EQ';
+
+  @override
+  String get settingsPeqAddBand => 'Band hinzufügen';
+
+  @override
+  String get settingsPeqAdd => 'Hinzufügen';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return 'Band $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => 'Peak';
+
+  @override
+  String get settingsPeqKindLowShelf => 'Low-Shelf';
+
+  @override
+  String get settingsPeqKindHighShelf => 'High-Shelf';
+
+  @override
+  String get settingsPeqFreq => 'Frequenz';
+
+  @override
+  String get settingsPeqGain => 'Verstärkung';
+
+  @override
+  String get settingsSectionLowfreq => 'Subsonic-/Tieffrequenz-Verwaltung';
+
+  @override
+  String get settingsSectionLowfreqDesc =>
+      'Subsonic-Hochpass gegen Rumpeln + Low-Shelf-Bassanhebung.';
+
+  @override
+  String get settingsLowfreq => 'Tieffrequenz-Verwaltung';
+
+  @override
+  String get settingsLowfreqHpfCutoff => 'Hochpass-Grenzfrequenz';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / $order. Ordnung';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1. Ordnung';
+
+  @override
+  String get settingsLowfreqOrder2 => '2. Ordnung';
+
+  @override
+  String get settingsLowfreqHpfFreq => 'Hochpassfrequenz';
+
+  @override
+  String get settingsLowfreqBassGain => 'Shelf-Verstärkung';
+
+  @override
+  String get settingsLowfreqBassFreq => 'Shelf-Frequenz';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override

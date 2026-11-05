@@ -5350,6 +5350,78 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsChannelMergeOff => '無効（元のステレオを維持）';
 
   @override
+  String get settingsSectionPeq => 'パラメトリック EQ';
+
+  @override
+  String get settingsSectionPeqDesc =>
+      'ピーク / ローシェルフ / ハイシェルフを任意に追加。上の固定 10 バンド EQ とは独立です。';
+
+  @override
+  String get settingsPeq => 'パラメトリック EQ';
+
+  @override
+  String get settingsPeqAddBand => 'バンドを追加';
+
+  @override
+  String get settingsPeqAdd => '追加';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return 'バンド $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => 'ピーク';
+
+  @override
+  String get settingsPeqKindLowShelf => 'ローシェルフ';
+
+  @override
+  String get settingsPeqKindHighShelf => 'ハイシェルフ';
+
+  @override
+  String get settingsPeqFreq => '周波数';
+
+  @override
+  String get settingsPeqGain => 'ゲイン';
+
+  @override
+  String get settingsSectionLowfreq => '超低域 / 低域管理';
+
+  @override
+  String get settingsSectionLowfreqDesc =>
+      'サブソニックのハイパスでゴロつきを除去 + ローシェルフで低域を増強。';
+
+  @override
+  String get settingsLowfreq => '低域管理';
+
+  @override
+  String get settingsLowfreqHpfCutoff => 'ハイパス遮断周波数';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / $order 次';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1 次';
+
+  @override
+  String get settingsLowfreqOrder2 => '2 次';
+
+  @override
+  String get settingsLowfreqHpfFreq => 'ハイパス周波数';
+
+  @override
+  String get settingsLowfreqBassGain => 'シェルフゲイン';
+
+  @override
+  String get settingsLowfreqBassFreq => 'シェルフ周波数';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override
