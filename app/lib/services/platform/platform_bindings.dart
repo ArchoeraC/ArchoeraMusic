@@ -46,6 +46,12 @@ const int aplCapRevealPath = 1 << 10;
 const int aplCapTray = 1 << 11;
 const int aplCapSecureFile = 1 << 12;
 const int aplCapOpenUrl = 1 << 13;
+const int aplCapElevation = 1 << 14;
+
+/// 提权探测结果（对齐 `APL_ELEVATION_*`）。
+const int aplElevationNone = 0;
+const int aplElevationRoot = 1;
+const int aplElevationAdmin = 2;
 
 const int aplEventMediaCommand = 1;
 const int aplEventMediaSeek = 2;
@@ -60,7 +66,7 @@ const int aplEventTrayDoubleClick = 10;
 const int aplEventTrayRightClick = 11;
 const int aplEventTrayMenuCommand = 12;
 
-const int aplAbiVersion = 5;
+const int aplAbiVersion = 6;
 
 /// 托盘菜单项（对齐 `AplTrayMenuItem`）：id==0 为分隔符；checked==-1 非复选。
 class AplTrayMenuItem {
@@ -196,6 +202,7 @@ typedef _AplVersionC = Int32 Function();
 typedef _AplInitC = Int32 Function();
 typedef _AplShutdownC = Int32 Function();
 typedef _AplHardenC = Int32 Function();
+typedef _AplProcessElevationC = Int32 Function();
 typedef _AplCapsC = Uint32 Function();
 typedef _AplPowerInhibitC = Int32 Function(Int32 on);
 typedef _AplPowerScreenC = Int32 Function(Int32 on);
@@ -239,6 +246,7 @@ typedef _AplVersionD = int Function();
 typedef _AplInitD = int Function();
 typedef _AplShutdownD = int Function();
 typedef _AplHardenD = int Function();
+typedef _AplProcessElevationD = int Function();
 typedef _AplCapsD = int Function();
 typedef _AplPowerInhibitD = int Function(int on);
 typedef _AplPowerScreenD = int Function(int on);
@@ -354,6 +362,8 @@ class PlatformBindings {
         _init = lib.lookupFunction<_AplInitC, _AplInitD>('apl_init'),
         _shutdown = lib.lookupFunction<_AplShutdownC, _AplShutdownD>('apl_shutdown'),
         _harden = lib.lookupFunction<_AplHardenC, _AplHardenD>('apl_harden_process'),
+        _processElevation = lib.lookupFunction<_AplProcessElevationC, _AplProcessElevationD>(
+            'apl_process_elevation'),
         _caps = lib.lookupFunction<_AplCapsC, _AplCapsD>('apl_capabilities'),
         _powerInhibit =
             lib.lookupFunction<_AplPowerInhibitC, _AplPowerInhibitD>('apl_power_set_sleep_inhibit'),
@@ -425,6 +435,7 @@ class PlatformBindings {
   final _AplInitD _init;
   final _AplShutdownD _shutdown;
   final _AplHardenD _harden;
+  final _AplProcessElevationD _processElevation;
   final _AplCapsD _caps;
   final _AplPowerInhibitD _powerInhibit;
   final _AplPowerScreenD _powerScreen;
@@ -476,6 +487,10 @@ class PlatformBindings {
   /// 刻意不设 PR_SET_DUMPABLE=0 / PT_DENY_ATTACH——那会打断 vault 的父进程血缘校验。
   /// release 构建生效；幂等。返回 0=成功（桥接不可用时调用方忽略）。
   int hardenProcess() => _harden();
+
+  /// 提权探测：`aplElevationNone/Root/Admin`；<0 = 探测失败（调用方按未提权降级）。
+  /// 只读，不做任何提权/降权。
+  int processElevation() => _processElevation();
 
   int acquireInstance() => _instanceAcquire();
 
