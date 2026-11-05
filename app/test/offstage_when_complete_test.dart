@@ -35,7 +35,7 @@ void main() {
     );
 
     await tester.pumpWidget(host());
-    final offstageOf = () => tester.widget<Offstage>(find.byType(Offstage));
+    Offstage offstageOf() => tester.widget<Offstage>(find.byType(Offstage));
     expect(offstageOf().offstage, isFalse);
 
     // 动画中途：仍在绘制。
@@ -73,7 +73,7 @@ void main() {
         ),
       ),
     );
-    final offstageOf = () => tester.widget<Offstage>(find.byType(Offstage));
+    Offstage offstageOf() => tester.widget<Offstage>(find.byType(Offstage));
 
     controller.value = 0.998;
     await tester.pump();
