@@ -16,6 +16,7 @@
 //!   - `parametric.zig` 参数化 EQ（`era_peq_*`；方向① D1）
 //!   - `lowfreq.zig`  次声/低频管理（`era_lowfreq_*`；方向① D2）
 //!   - `channel_merge.zig` 多声道合并（`era_channel_merge_*`；单侧设备兜底）
+//!   - `spectrum.zig` 频谱分析（`era_spectrum_*`；VQT + Stage 适配）
 //!   - `resampler.zig` / `tempo.zig`  移植计划占位（未导出）
 //!
 //! 已移植块经 `kernel/kernel.zig` 的 `zk_dsp_*` C ABI 暴露给 C 壳；
