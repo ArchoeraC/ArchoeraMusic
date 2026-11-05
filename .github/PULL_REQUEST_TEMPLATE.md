@@ -1,40 +1,50 @@
-<!-- 提交规范见 CONTRIBUTING §7：Commit 遵循 type(scope): 中文描述 -->
+<!--
+提交前请确认：
+1. 一个 PR 只做一件事；无关改动请拆分，便于审查与回滚。
+2. PR 请提交到 main（main 禁止直接推送，需走 PR）。
+3. 使用 AI 辅助没有问题，但请自行测试并对结果负责，不要提交未经验证的代码。
+提交规范见 CONTRIBUTING §7。
+-->
 
-## 动机与方案
+## 改动类型
 
-<!-- 关联 Issue：# 编号；解决了什么问题、方案要点 -->
+- [ ] 新功能（feat）
+- [ ] 缺陷修复（fix）
+- [ ] 重构 / 优化（不改变对外行为）
+- [ ] 文档（docs）
+- [ ] 其他（请在「改动说明」中注明）
 
-## 改动范围
+## 是否包含破坏性变更
 
-<!-- 勾选触及的模块 -->
-- [ ] Dart（`app/lib` / `app/test`）
-- [ ] C / Zig（audio-engine）
-- [ ] C#（scanner / vault）
-- [ ] C++（scraper）
-- [ ] Rust（downloader / tempo-rs / transcoder）
-- [ ] Go（subsonic）
-- [ ] 文档（docs / README / 模块 README）
-- [ ] CI / 构建（workflows / 脚本 / 打包）
+- [ ] 否
+- [ ] 是（请在「改动说明」中说明影响与迁移方式）
 
-## 验收证据
+## 改动说明
 
-- [ ] `flutter analyze` 0 issue
-- [ ] `flutter test` 全绿
-- [ ] 原生模块构建 / 测试（如适用，注明模块与命令）：
-- [ ] 已验证平台：Linux / Windows / macOS（未覆盖的端说明原因与风险，红线 §2.2）
+<!-- 做了什么、为什么这么做（动机 + 主要变更）；触及的模块可顺带列出（Dart / 原生 / 文档 / CI） -->
 
-## AI 参与声明（红线 §2.3，必填）
+## 关联 Issue
 
-- 参与程度：无 / 轻度补全 / 大段生成（选一）
-- [ ] 已完成人工逐行审核，理解全部改动
-- [ ] 已附本地测试证据
+<!-- 如有关联，填 #编号；写 "Closes #编号" 可在合并时自动关闭对应 Issue -->
 
-## 检查清单
+## 测试情况
 
-- [ ] 接受贡献者授权（[docs/licensing.md §2.2](../docs/licensing.md#22-贡献者授权contributor-license-grant)，AGPL-3.0-or-later 不可撤销再许可）
-- [ ] 未触碰红线（CONTRIBUTING §2.1–2.6：广告 / 付费墙 / frp / 遥测 / 非 FFI 运行时 / 平台歧视 / 舞弊 / 注入 / 供应链投毒 / 非公开依赖 / 个人数据）
-- [ ] 新增依赖已登记 `THIRD-PARTY-LICENSES.md` 且许可合规（§9）；锁定文件已更新
-- [ ] 新增数据存储已在描述中注明存储位置与访问方（§2.5）
-- [ ] 主张「平台硬性限制」的已附依据（§2.2）
-- [ ] 文档已同步（§8：architecture / README / 模块文档）
-- [ ] 无调试残留、死代码、无关格式化噪音（代码纯净，§2.3）
+<!-- 跑了哪些测试 / 手动验证步骤 / 覆盖到的平台（Linux / Windows / macOS）；未覆盖的平台说明原因 -->
+
+- [ ] `cd app && dart analyze lib` 0 issue
+- [ ] `cd app && flutter test` 全绿（真实网络用例可用 `ARCHOERA_ONLINE_TEST=1` 单独跑）
+- [ ] 改动原生模块时，已跑对应构建 / 测试（注明模块与命令）：
+
+## 截图 / 录屏
+
+<!-- 涉及 UI 改动请附上；无则可删除本节 -->
+
+## 自查清单
+
+- [ ] 本 PR 只包含一个主要功能 / 修复，没有夹带无关改动或调试残留
+- [ ] 接受贡献者授权（[docs/licensing.md §2.2](../docs/licensing.md#22-贡献者授权contributor-license-grant)，AGPL-3.0-or-later）
+- [ ] 未触碰红线（CONTRIBUTING §2.1–2.6）
+- [ ] 如新增依赖：已登记 `THIRD-PARTY-LICENSES.md` 且许可兼容（§9）
+- [ ] 如新增数据存储：已在描述中注明存储位置与访问方（§2.5）
+- [ ] 如改动行为 / 接口：相关文档已同步（§8）
+- [ ] 如改动平台相关行为：已说明三端影响；主张平台硬性限制的已附依据（§2.2）
