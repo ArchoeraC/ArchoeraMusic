@@ -101,10 +101,10 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
     _apply();
   }
 
-  String _peqKindLabel(int kind) => switch (kind) {
-    peqKindLowShelf => '低架',
-    peqKindHighShelf => '高架',
-    _ => '峰值',
+  String _peqKindLabel(AppLocalizations l10n, int kind) => switch (kind) {
+    peqKindLowShelf => l10n.settingsPeqKindLowShelf,
+    peqKindHighShelf => l10n.settingsPeqKindHighShelf,
+    _ => l10n.settingsPeqKindPeak,
   };
 
   /// 把当前偏好下发到引擎（实时生效）。
@@ -236,13 +236,15 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
         const SizedBox(height: 20),
         // 1.5) 参数化均衡器（方向① D1）
         SettingSection(
-          title: '参数化均衡器',
-          note: '任意段峰值 / 低架 / 高架；独立于上方固定 10 段。',
+          title: l10n.settingsSectionPeq,
+          note: l10n.settingsSectionPeqDesc,
           children: [
             SettingSwitchTile(
               icon: EtaIcons.chartLine,
-              title: '参数化均衡器',
-              subtitle: prefs.peqEnabled ? '已启用' : '已停用',
+              title: l10n.settingsPeq,
+              subtitle: prefs.peqEnabled
+                  ? l10n.settingsEqEnabledOn
+                  : l10n.settingsEqEnabledOff,
               value: prefs.peqEnabled,
               onChanged: (v) {
                 notifier.setPeq(enabled: v);
@@ -252,7 +254,7 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
             _bandTile(
               l10n,
               enabled: prefs.peqEnabled,
-              label: '预增益',
+              label: l10n.settingsEqPreamp,
               sub: '${_peqPreamp.toStringAsFixed(1)} dB',
               value: _peqPreamp,
               min: peqPreampMinDb,
@@ -269,10 +271,10 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
               _peqBandTile(l10n, i, _peqBands[i], prefs.peqEnabled),
             SettingTile(
               icon: EtaIcons.add,
-              title: '添加频段',
+              title: l10n.settingsPeqAddBand,
               subtitle: '${_peqBands.length} / $peqMaxBands',
               trailing: SButton(
-                label: '添加',
+                label: l10n.settingsPeqAdd,
                 variant: SButtonVariant.secondary,
                 size: SButtonSize.small,
                 onPressed: _peqBands.length >= peqMaxBands ? null : _addPeqBand,
@@ -283,13 +285,15 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
         const SizedBox(height: 20),
         // 1.6) 次声 / 低频管理（方向① D2）
         SettingSection(
-          title: '次声 / 低频管理',
-          note: '高通去隆隆声（subsonic）+ 低架 bass boost。',
+          title: l10n.settingsSectionLowfreq,
+          note: l10n.settingsSectionLowfreqDesc,
           children: [
             SettingSwitchTile(
               icon: EtaIcons.dashboard3,
-              title: '低频管理',
-              subtitle: prefs.lowfreqEnabled ? '已启用' : '已停用',
+              title: l10n.settingsLowfreq,
+              subtitle: prefs.lowfreqEnabled
+                  ? l10n.settingsEqEnabledOn
+                  : l10n.settingsEqEnabledOff,
               value: prefs.lowfreqEnabled,
               onChanged: (v) {
                 notifier.setLowFreq(enabled: v);
@@ -298,15 +302,24 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
             ),
             SettingTile(
               icon: EtaIcons.filter,
-              title: '高通截止',
-              subtitle: '${_hpfFreq.toStringAsFixed(0)} Hz / $_hpfOrder 阶',
+              title: l10n.settingsLowfreqHpfCutoff,
+              subtitle: l10n.settingsLowfreqHpfSummary(
+                freq: _hpfFreq.toStringAsFixed(0),
+                order: _hpfOrder,
+              ),
               trailing: DropdownButton<int>(
                 value: _hpfOrder,
                 underline: const SizedBox.shrink(),
                 isDense: true,
-                items: const [
-                  DropdownMenuItem(value: 1, child: Text('1 阶')),
-                  DropdownMenuItem(value: 2, child: Text('2 阶')),
+                items: [
+                  DropdownMenuItem(
+                    value: 1,
+                    child: Text(l10n.settingsLowfreqOrder1),
+                  ),
+                  DropdownMenuItem(
+                    value: 2,
+                    child: Text(l10n.settingsLowfreqOrder2),
+                  ),
                 ],
                 onChanged: (v) {
                   if (v == null) return;
@@ -319,7 +332,7 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
             _bandTile(
               l10n,
               enabled: prefs.lowfreqEnabled,
-              label: '高通频率',
+              label: l10n.settingsLowfreqHpfFreq,
               sub: '${_hpfFreq.toStringAsFixed(0)} Hz',
               value: _hpfFreq,
               min: lowfreqHpfFreqMin,
@@ -335,7 +348,7 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
             _bandTile(
               l10n,
               enabled: prefs.lowfreqEnabled,
-              label: '低架增益',
+              label: l10n.settingsLowfreqBassGain,
               sub: '${_bassGain.toStringAsFixed(1)} dB',
               value: _bassGain,
               min: lowfreqBassGainMinDb,
@@ -351,7 +364,7 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
             _bandTile(
               l10n,
               enabled: prefs.lowfreqEnabled,
-              label: '低架频率',
+              label: l10n.settingsLowfreqBassFreq,
               sub: '${_bassFreq.toStringAsFixed(0)} Hz',
               value: _bassFreq,
               min: lowfreqBassFreqMin,
@@ -530,8 +543,8 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
       children: [
         SettingTile(
           icon: EtaIcons.columnsOutline,
-          title: '频段 ${index + 1}',
-          subtitle: _peqKindLabel(band.kind),
+          title: l10n.settingsPeqBand(index: index + 1),
+          subtitle: _peqKindLabel(l10n, band.kind),
           enabled: enabled,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
@@ -542,7 +555,10 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
                 isDense: true,
                 items: [
                   for (final k in peqKinds)
-                    DropdownMenuItem(value: k, child: Text(_peqKindLabel(k))),
+                    DropdownMenuItem(
+                      value: k,
+                      child: Text(_peqKindLabel(l10n, k)),
+                    ),
                 ],
                 onChanged: enabled
                     ? (v) {
@@ -553,7 +569,7 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
               ),
               const SizedBox(width: 4),
               SButton(
-                label: '删除',
+                label: l10n.commonDelete,
                 variant: SButtonVariant.secondary,
                 size: SButtonSize.small,
                 onPressed: () => _removePeqBand(index),
@@ -564,7 +580,7 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
         _bandTile(
           l10n,
           enabled: enabled,
-          label: '频率',
+          label: l10n.settingsPeqFreq,
           sub: '${band.freq.toStringAsFixed(0)} Hz',
           value: band.freq,
           min: peqFreqMin,
@@ -588,7 +604,7 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
         _bandTile(
           l10n,
           enabled: enabled,
-          label: '增益',
+          label: l10n.settingsPeqGain,
           sub: '${band.gainDb.toStringAsFixed(1)} dB',
           value: band.gainDb,
           min: peqGainMinDb,

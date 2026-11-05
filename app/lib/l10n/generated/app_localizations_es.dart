@@ -5613,6 +5613,79 @@ class AppLocalizationsEs extends AppLocalizations {
       'Desactivado (se conserva el estéreo original)';
 
   @override
+  String get settingsSectionPeq => 'Ecualizador paramétrico';
+
+  @override
+  String get settingsSectionPeqDesc =>
+      'Bandas de pico / estante bajo / estante alto, independientes del ecualizador fijo de 10 bandas de arriba.';
+
+  @override
+  String get settingsPeq => 'Ecualizador paramétrico';
+
+  @override
+  String get settingsPeqAddBand => 'Añadir banda';
+
+  @override
+  String get settingsPeqAdd => 'Añadir';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return 'Banda $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => 'Pico';
+
+  @override
+  String get settingsPeqKindLowShelf => 'Estante bajo';
+
+  @override
+  String get settingsPeqKindHighShelf => 'Estante alto';
+
+  @override
+  String get settingsPeqFreq => 'Frecuencia';
+
+  @override
+  String get settingsPeqGain => 'Ganancia';
+
+  @override
+  String get settingsSectionLowfreq =>
+      'Gestión de subgraves / bajas frecuencias';
+
+  @override
+  String get settingsSectionLowfreqDesc =>
+      'Paso alto subsónico para quitar retumbe + refuerzo de graves de estante bajo.';
+
+  @override
+  String get settingsLowfreq => 'Gestión de bajas frecuencias';
+
+  @override
+  String get settingsLowfreqHpfCutoff => 'Corte del paso alto';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / orden $order';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1.er orden';
+
+  @override
+  String get settingsLowfreqOrder2 => '2.º orden';
+
+  @override
+  String get settingsLowfreqHpfFreq => 'Frecuencia del paso alto';
+
+  @override
+  String get settingsLowfreqBassGain => 'Ganancia del estante';
+
+  @override
+  String get settingsLowfreqBassFreq => 'Frecuencia del estante';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override

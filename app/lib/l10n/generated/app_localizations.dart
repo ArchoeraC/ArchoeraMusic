@@ -9825,6 +9825,135 @@ abstract class AppLocalizations {
   /// **'已停用（保持原始立体声）'**
   String get settingsChannelMergeOff;
 
+  /// No description provided for @settingsSectionPeq.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'参数化均衡器'**
+  String get settingsSectionPeq;
+
+  /// No description provided for @settingsSectionPeqDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'任意段峰值 / 低架 / 高架；独立于上方固定 10 段。'**
+  String get settingsSectionPeqDesc;
+
+  /// No description provided for @settingsPeq.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'参数化均衡器'**
+  String get settingsPeq;
+
+  /// No description provided for @settingsPeqAddBand.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'添加频段'**
+  String get settingsPeqAddBand;
+
+  /// No description provided for @settingsPeqAdd.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'添加'**
+  String get settingsPeqAdd;
+
+  /// No description provided for @settingsPeqBand.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'频段 {index}'**
+  String settingsPeqBand({required Object index});
+
+  /// No description provided for @settingsPeqKindPeak.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'峰值'**
+  String get settingsPeqKindPeak;
+
+  /// No description provided for @settingsPeqKindLowShelf.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'低架'**
+  String get settingsPeqKindLowShelf;
+
+  /// No description provided for @settingsPeqKindHighShelf.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高架'**
+  String get settingsPeqKindHighShelf;
+
+  /// No description provided for @settingsPeqFreq.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'频率'**
+  String get settingsPeqFreq;
+
+  /// No description provided for @settingsPeqGain.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'增益'**
+  String get settingsPeqGain;
+
+  /// No description provided for @settingsSectionLowfreq.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'次声 / 低频管理'**
+  String get settingsSectionLowfreq;
+
+  /// No description provided for @settingsSectionLowfreqDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高通去隆隆声（subsonic）+ 低架 bass boost。'**
+  String get settingsSectionLowfreqDesc;
+
+  /// No description provided for @settingsLowfreq.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'低频管理'**
+  String get settingsLowfreq;
+
+  /// No description provided for @settingsLowfreqHpfCutoff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高通截止'**
+  String get settingsLowfreqHpfCutoff;
+
+  /// No description provided for @settingsLowfreqHpfSummary.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'{freq} Hz / {order} 阶'**
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  });
+
+  /// No description provided for @settingsLowfreqOrder1.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'1 阶'**
+  String get settingsLowfreqOrder1;
+
+  /// No description provided for @settingsLowfreqOrder2.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'2 阶'**
+  String get settingsLowfreqOrder2;
+
+  /// No description provided for @settingsLowfreqHpfFreq.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高通频率'**
+  String get settingsLowfreqHpfFreq;
+
+  /// No description provided for @settingsLowfreqBassGain.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'低架增益'**
+  String get settingsLowfreqBassGain;
+
+  /// No description provided for @settingsLowfreqBassFreq.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'低架频率'**
+  String get settingsLowfreqBassFreq;
+
   /// No description provided for @settingsSectionSystem.
   ///
   /// In zh_CN, this message translates to:

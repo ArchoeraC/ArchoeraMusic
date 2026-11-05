@@ -5264,6 +5264,76 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsChannelMergeOff => '已停用（保持原始立体声）';
 
   @override
+  String get settingsSectionPeq => '参数化均衡器';
+
+  @override
+  String get settingsSectionPeqDesc => '任意段峰值 / 低架 / 高架；独立于上方固定 10 段。';
+
+  @override
+  String get settingsPeq => '参数化均衡器';
+
+  @override
+  String get settingsPeqAddBand => '添加频段';
+
+  @override
+  String get settingsPeqAdd => '添加';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return '频段 $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => '峰值';
+
+  @override
+  String get settingsPeqKindLowShelf => '低架';
+
+  @override
+  String get settingsPeqKindHighShelf => '高架';
+
+  @override
+  String get settingsPeqFreq => '频率';
+
+  @override
+  String get settingsPeqGain => '增益';
+
+  @override
+  String get settingsSectionLowfreq => '次声 / 低频管理';
+
+  @override
+  String get settingsSectionLowfreqDesc => '高通去隆隆声（subsonic）+ 低架 bass boost。';
+
+  @override
+  String get settingsLowfreq => '低频管理';
+
+  @override
+  String get settingsLowfreqHpfCutoff => '高通截止';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / $order 阶';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1 阶';
+
+  @override
+  String get settingsLowfreqOrder2 => '2 阶';
+
+  @override
+  String get settingsLowfreqHpfFreq => '高通频率';
+
+  @override
+  String get settingsLowfreqBassGain => '低架增益';
+
+  @override
+  String get settingsLowfreqBassFreq => '低架频率';
+
+  @override
   String get settingsSectionSystem => '系统集成';
 
   @override
@@ -11323,6 +11393,76 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsChannelMergeOff => '已停用（保持原始立体声）';
+
+  @override
+  String get settingsSectionPeq => '参数化均衡器';
+
+  @override
+  String get settingsSectionPeqDesc => '任意段峰值 / 低架 / 高架；独立于上方固定 10 段。';
+
+  @override
+  String get settingsPeq => '参数化均衡器';
+
+  @override
+  String get settingsPeqAddBand => '添加频段';
+
+  @override
+  String get settingsPeqAdd => '添加';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return '频段 $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => '峰值';
+
+  @override
+  String get settingsPeqKindLowShelf => '低架';
+
+  @override
+  String get settingsPeqKindHighShelf => '高架';
+
+  @override
+  String get settingsPeqFreq => '频率';
+
+  @override
+  String get settingsPeqGain => '增益';
+
+  @override
+  String get settingsSectionLowfreq => '次声 / 低频管理';
+
+  @override
+  String get settingsSectionLowfreqDesc => '高通去隆隆声（subsonic）+ 低架 bass boost。';
+
+  @override
+  String get settingsLowfreq => '低频管理';
+
+  @override
+  String get settingsLowfreqHpfCutoff => '高通截止';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / $order 阶';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1 阶';
+
+  @override
+  String get settingsLowfreqOrder2 => '2 阶';
+
+  @override
+  String get settingsLowfreqHpfFreq => '高通频率';
+
+  @override
+  String get settingsLowfreqBassGain => '低架增益';
+
+  @override
+  String get settingsLowfreqBassFreq => '低架频率';
 
   @override
   String get settingsSectionSystem => '系统集成';
@@ -17385,6 +17525,76 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsChannelMergeOff => '已停用（保持原始立體聲）';
+
+  @override
+  String get settingsSectionPeq => '參數化等化器';
+
+  @override
+  String get settingsSectionPeqDesc => '任意段峰值 / 低架 / 高架；獨立於上方固定 10 段。';
+
+  @override
+  String get settingsPeq => '參數化等化器';
+
+  @override
+  String get settingsPeqAddBand => '新增頻段';
+
+  @override
+  String get settingsPeqAdd => '新增';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return '頻段 $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => '峰值';
+
+  @override
+  String get settingsPeqKindLowShelf => '低架';
+
+  @override
+  String get settingsPeqKindHighShelf => '高架';
+
+  @override
+  String get settingsPeqFreq => '頻率';
+
+  @override
+  String get settingsPeqGain => '增益';
+
+  @override
+  String get settingsSectionLowfreq => '次聲 / 低頻管理';
+
+  @override
+  String get settingsSectionLowfreqDesc => '高通去隆隆聲（subsonic）+ 低架 bass boost。';
+
+  @override
+  String get settingsLowfreq => '低頻管理';
+
+  @override
+  String get settingsLowfreqHpfCutoff => '高通截止';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / $order 階';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1 階';
+
+  @override
+  String get settingsLowfreqOrder2 => '2 階';
+
+  @override
+  String get settingsLowfreqHpfFreq => '高通頻率';
+
+  @override
+  String get settingsLowfreqBassGain => '低架增益';
+
+  @override
+  String get settingsLowfreqBassFreq => '低架頻率';
 
   @override
   String get settingsSectionSystem => '系统集成';

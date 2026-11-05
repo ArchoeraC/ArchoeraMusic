@@ -5615,6 +5615,79 @@ class AppLocalizationsFr extends AppLocalizations {
       'Désactivée (stéréo d\'origine conservé)';
 
   @override
+  String get settingsSectionPeq => 'Égaliseur paramétrique';
+
+  @override
+  String get settingsSectionPeqDesc =>
+      'Bandes crête / plateau bas / plateau haut, indépendantes de l\'égaliseur fixe 10 bandes ci-dessus.';
+
+  @override
+  String get settingsPeq => 'Égaliseur paramétrique';
+
+  @override
+  String get settingsPeqAddBand => 'Ajouter une bande';
+
+  @override
+  String get settingsPeqAdd => 'Ajouter';
+
+  @override
+  String settingsPeqBand({required Object index}) {
+    return 'Bande $index';
+  }
+
+  @override
+  String get settingsPeqKindPeak => 'Crête';
+
+  @override
+  String get settingsPeqKindLowShelf => 'Plateau bas';
+
+  @override
+  String get settingsPeqKindHighShelf => 'Plateau haut';
+
+  @override
+  String get settingsPeqFreq => 'Fréquence';
+
+  @override
+  String get settingsPeqGain => 'Gain';
+
+  @override
+  String get settingsSectionLowfreq =>
+      'Gestion des infra-graves / basses fréquences';
+
+  @override
+  String get settingsSectionLowfreqDesc =>
+      'Passe-haut subsonique anti-ronflement + renfort de basses en plateau bas.';
+
+  @override
+  String get settingsLowfreq => 'Gestion des basses fréquences';
+
+  @override
+  String get settingsLowfreqHpfCutoff => 'Fréquence de coupure du passe-haut';
+
+  @override
+  String settingsLowfreqHpfSummary({
+    required Object freq,
+    required Object order,
+  }) {
+    return '$freq Hz / ordre $order';
+  }
+
+  @override
+  String get settingsLowfreqOrder1 => '1er ordre';
+
+  @override
+  String get settingsLowfreqOrder2 => '2e ordre';
+
+  @override
+  String get settingsLowfreqHpfFreq => 'Fréquence du passe-haut';
+
+  @override
+  String get settingsLowfreqBassGain => 'Gain du plateau';
+
+  @override
+  String get settingsLowfreqBassFreq => 'Fréquence du plateau';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override
