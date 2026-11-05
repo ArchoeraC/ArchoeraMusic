@@ -6,12 +6,15 @@
  * spectrum_service.c — 频谱 v2 引擎侧推送服务（docs/spectrum-analyzer.md §5）
  *
  * 线程模型：
- *   - create 只分配服务壳 + 输入/输出缓冲，不建 VQT 核、不建线程；
- *   - start 首次创建内核分析器（懒初始化）并启动独立线程；
- *   - 线程每 interval_ms 读一次「已播放位置」窗口 → zk_dsp_spectrum_process
+ *   - create 只分配服务壳 + 输入/输出缓冲，不建分析器、不建线程；
+ *   - start 首次创建分析器（懒初始化）并启动独立线程；
+ *   - 线程每 interval_ms 读一次「已播放位置」窗口 → era_dsp_spectrum_process
  *     → emit（可丢）；
  *   - stop 置停止标志，10ms 分片 sleep，join 在 ~10ms 内返回；
  *   - 不占用解码 worker 池、不在音频回调做 FFT、零每帧分配。
+ *
+ * 分析器后端由 spectrum_dsp.c 在编译期选择（Zig VQT / FFmpeg FFT），本文件
+ * 不感知；两种后端输出同一契约。
  */
 #define _DEFAULT_SOURCE
 #include "spectrum_service.h"
@@ -24,10 +27,7 @@
 
 #include "compat/qatomic.h"
 #include "era_log.h"
-
-#if defined(HAS_ARCHOERA_KERNEL)
-#include "kernel_bridge.h"
-#endif
+#include "spectrum_dsp.h"
 
 #define LOG_TAG "[audio-engine:spectrum]"
 
@@ -37,9 +37,7 @@ struct EraSpectrumService {
     int bins;
     int interval_ms;
 
-#if defined(HAS_ARCHOERA_KERNEL)
-    ZkSpectrum *spectrum;
-#endif
+    EraDspSpectrum *spectrum;
 
     /* 复用的取窗/输出缓冲（create 时一次性分配，线程内零分配）。 */
     float *l;
@@ -67,7 +65,6 @@ static void era_spectrum_sleep_ms(int ms)
     nanosleep(&ts, NULL);
 }
 
-#if defined(HAS_ARCHOERA_KERNEL)
 static void *era_spectrum_thread(void *arg)
 {
     EraSpectrumService *s = (EraSpectrumService *)arg;
@@ -81,7 +78,7 @@ static void *era_spectrum_thread(void *arg)
             if (s->last_pos >= 0) {
                 const int delta = pos - s->last_pos;
                 if (delta < -200 || delta > 1000) {
-                    zk_dsp_spectrum_reset(s->spectrum);
+                    era_dsp_spectrum_reset(s->spectrum);
                 }
             }
             s->last_pos = pos;
@@ -103,10 +100,10 @@ static void *era_spectrum_thread(void *arg)
             }
             if (rc == 0) {
                 pthread_mutex_lock(&s->lock);
-                const float beat = zk_dsp_spectrum_process_centered(
+                const float beat = era_dsp_spectrum_process_centered(
                     s->spectrum, s->l, s->r, s->frames, used_future,
                     s->out_l, s->out_r);
-                zk_dsp_spectrum_peaks(s->spectrum, s->peak_l, s->peak_r);
+                era_dsp_spectrum_peaks(s->spectrum, s->peak_l, s->peak_r);
                 pthread_mutex_unlock(&s->lock);
                 if (s->cfg.emit) {
                     s->cfg.emit(s->cfg.ctx, s->out_l, s->out_r,
@@ -125,15 +122,10 @@ static void *era_spectrum_thread(void *arg)
     }
     return NULL;
 }
-#endif
 
 EraSpectrumService *era_spectrum_service_create(
     const EraSpectrumServiceConfig *cfg)
 {
-#if !defined(HAS_ARCHOERA_KERNEL)
-    (void)cfg;
-    return NULL;
-#else
     EraSpectrumService *s;
 
     if (!cfg || !cfg->read || !cfg->position || !cfg->emit) return NULL;
@@ -169,20 +161,15 @@ EraSpectrumService *era_spectrum_service_create(
         return NULL;
     }
     return s;
-#endif
 }
 
 int era_spectrum_service_start(EraSpectrumService *s)
 {
-#if !defined(HAS_ARCHOERA_KERNEL)
-    (void)s;
-    return -1;
-#else
     if (!s) return -1;
     if (s->running) return 0;
 
     if (!s->spectrum) {
-        s->spectrum = zk_dsp_spectrum_create(
+        s->spectrum = era_dsp_spectrum_create(
             s->cfg.sample_rate, s->bins, s->cfg.min_hz, s->cfg.max_hz);
         if (!s->spectrum) {
             ERA_LOGE(NULL, "%s 分析器创建失败（rate=%d bins=%d %.0f–%.0fHz）\n",
@@ -199,90 +186,62 @@ int era_spectrum_service_start(EraSpectrumService *s)
         return -1;
     }
     s->running = 1;
-    ERA_LOGI(NULL, "%s 已启动：%dHz / %d bins / %dms / %d 样本窗\n",
-             LOG_TAG, s->cfg.sample_rate, s->bins, s->interval_ms, s->frames);
+    ERA_LOGI(NULL, "%s 已启动：%dHz / %d bins / %dms / %d 样本窗 / %s\n",
+             LOG_TAG, s->cfg.sample_rate, s->bins, s->interval_ms, s->frames,
+             era_dsp_spectrum_backend());
     return 0;
-#endif
 }
 
 void era_spectrum_service_stop(EraSpectrumService *s)
 {
-#if defined(HAS_ARCHOERA_KERNEL)
     if (!s || !s->running) return;
     QA_STORE_REL(&s->stop, 1);
     pthread_join(s->thread, NULL);
     s->running = 0;
     /* 暂停/关闭后再启用：清空通量/节拍历史，避免旧帧在恢复首帧误触发。 */
-    if (s->spectrum) zk_dsp_spectrum_reset(s->spectrum);
+    if (s->spectrum) era_dsp_spectrum_reset(s->spectrum);
     s->last_pos = -1;
-#else
-    (void)s;
-#endif
 }
 
 void era_spectrum_service_reset(EraSpectrumService *s)
 {
-#if defined(HAS_ARCHOERA_KERNEL)
     if (!s || !s->spectrum) return;
     pthread_mutex_lock(&s->lock);
-    zk_dsp_spectrum_reset(s->spectrum);
+    era_dsp_spectrum_reset(s->spectrum);
     s->last_pos = -1;
     pthread_mutex_unlock(&s->lock);
-#else
-    (void)s;
-#endif
 }
 
 void era_spectrum_service_set_peak_hold(EraSpectrumService *s, bool enabled)
 {
-#if defined(HAS_ARCHOERA_KERNEL)
     if (!s || !s->spectrum) return;
     pthread_mutex_lock(&s->lock);
-    zk_dsp_spectrum_set_peak_hold(s->spectrum, enabled ? 1 : 0);
+    era_dsp_spectrum_set_peak_hold(s->spectrum, enabled);
     pthread_mutex_unlock(&s->lock);
-#else
-    (void)s;
-    (void)enabled;
-#endif
 }
 
 void era_spectrum_service_set_agc(EraSpectrumService *s, bool enabled)
 {
-#if defined(HAS_ARCHOERA_KERNEL)
     if (!s || !s->spectrum) return;
     pthread_mutex_lock(&s->lock);
-    zk_dsp_spectrum_set_agc(s->spectrum, enabled ? 1 : 0);
+    era_dsp_spectrum_set_agc(s->spectrum, enabled);
     pthread_mutex_unlock(&s->lock);
-#else
-    (void)s;
-    (void)enabled;
-#endif
 }
 
 void era_spectrum_service_set_gamma(EraSpectrumService *s, float gamma)
 {
-#if defined(HAS_ARCHOERA_KERNEL)
     if (!s || !s->spectrum) return;
     pthread_mutex_lock(&s->lock);
-    zk_dsp_spectrum_set_gamma(s->spectrum, gamma);
+    era_dsp_spectrum_set_gamma(s->spectrum, gamma);
     pthread_mutex_unlock(&s->lock);
-#else
-    (void)s;
-    (void)gamma;
-#endif
 }
 
 void era_spectrum_service_set_tilt(EraSpectrumService *s, float db_per_oct)
 {
-#if defined(HAS_ARCHOERA_KERNEL)
     if (!s || !s->spectrum) return;
     pthread_mutex_lock(&s->lock);
-    zk_dsp_spectrum_set_tilt(s->spectrum, db_per_oct);
+    era_dsp_spectrum_set_tilt(s->spectrum, db_per_oct);
     pthread_mutex_unlock(&s->lock);
-#else
-    (void)s;
-    (void)db_per_oct;
-#endif
 }
 
 bool era_spectrum_service_is_running(const EraSpectrumService *s)
@@ -292,11 +251,10 @@ bool era_spectrum_service_is_running(const EraSpectrumService *s)
 
 void era_spectrum_service_destroy(EraSpectrumService *s)
 {
-#if defined(HAS_ARCHOERA_KERNEL)
     if (!s) return;
     era_spectrum_service_stop(s);
     if (s->spectrum) {
-        zk_dsp_spectrum_destroy(s->spectrum);
+        era_dsp_spectrum_destroy(s->spectrum);
         s->spectrum = NULL;
     }
     free(s->l);
@@ -307,7 +265,4 @@ void era_spectrum_service_destroy(EraSpectrumService *s)
     free(s->peak_r);
     pthread_mutex_destroy(&s->lock);
     free(s);
-#else
-    (void)s;
-#endif
 }

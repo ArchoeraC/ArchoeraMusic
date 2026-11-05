@@ -38,17 +38,17 @@ void main() {
       markTestSkipped('本机无可用探测库');
       return;
     }
-    expect(registry.isOpen(NativeModule.fft), isFalse);
-    final a = registry.acquire(NativeModule.fft, path: lib);
-    expect(registry.isOpen(NativeModule.fft), isTrue);
-    expect(registry.refsOf(NativeModule.fft), 1);
-    final b = registry.acquire(NativeModule.fft, path: lib);
+    expect(registry.isOpen(NativeModule.scraper), isFalse);
+    final a = registry.acquire(NativeModule.scraper, path: lib);
+    expect(registry.isOpen(NativeModule.scraper), isTrue);
+    expect(registry.refsOf(NativeModule.scraper), 1);
+    final b = registry.acquire(NativeModule.scraper, path: lib);
     expect(identical(a, b), isTrue); // 复用一个对象
-    expect(registry.refsOf(NativeModule.fft), 2);
-    expect(registry.release(NativeModule.fft), isFalse); // 未归零
-    expect(registry.refsOf(NativeModule.fft), 1);
-    expect(registry.release(NativeModule.fft), isTrue); // 归零 → close
-    expect(registry.isOpen(NativeModule.fft), isFalse);
+    expect(registry.refsOf(NativeModule.scraper), 2);
+    expect(registry.release(NativeModule.scraper), isFalse); // 未归零
+    expect(registry.refsOf(NativeModule.scraper), 1);
+    expect(registry.release(NativeModule.scraper), isTrue); // 归零 → close
+    expect(registry.isOpen(NativeModule.scraper), isFalse);
   });
 
   test('重复 release 安全', () {
@@ -56,7 +56,7 @@ void main() {
       markTestSkipped('本机无可用探测库');
       return;
     }
-    expect(registry.release(NativeModule.fft), isFalse);
-    expect(registry.isOpen(NativeModule.fft), isFalse);
+    expect(registry.release(NativeModule.scraper), isFalse);
+    expect(registry.isOpen(NativeModule.scraper), isFalse);
   });
 }

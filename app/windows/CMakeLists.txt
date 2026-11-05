@@ -109,7 +109,7 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
 # 引擎模块位于 app/core/{audio-engine,scanner,indexer,scraper,subsonic}，产物由独立
 # 构建链产出（CI workflow 在 flutter build 前显式构建）；install 统一装进 native/ 平铺
 # （对齐 ffi-libs-layout 计划；NativeLibPaths 祖先链优先查 native/）：
-#   Release/native/{archoera-audio-engine.exe,archoera_mediaengine.dll,fft.dll}
+#   Release/native/{archoera-audio-engine.exe,archoera_mediaengine.dll}
 #   Release/native/{scanner-ffi.dll,e_sqlite3.dll}
 #   Release/native/{indexer-ffi.dll}（e_sqlite3.dll 已由 scanner 提供，indexer 仅兜底）
 #   Release/native/archoera_scraper.dll
@@ -126,8 +126,6 @@ set(SUBSONIC_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../core/subsonic/build")
 install(PROGRAMS "${ENGINE_SRC_DIR}/archoera-audio-engine.exe"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${ENGINE_SRC_DIR}/archoera_mediaengine.dll"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
-install(FILES "${ENGINE_SRC_DIR}/fft.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)
 install(FILES "${SCANNER_SRC_DIR}/scanner-ffi.dll"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/native" COMPONENT Runtime OPTIONAL)

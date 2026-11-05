@@ -6,7 +6,7 @@
  * pipeline.c — 音频处理管线编排
  *
  * Phase 4：
- *   decoder → resampler → equalizer → loudness → limiter → tempo → fft → encoder
+ *   decoder → resampler → equalizer → loudness → limiter → tempo → encoder
  *
  * 数据流：
  *   FFmpeg 解码 → AVFrame(PCM)
@@ -15,7 +15,6 @@
  *   → loudness EBU R128 响度归一化
  *   → limiter 输出限幅
  *   → tempo 变速变调（Rust signalsmith-stretch）
- *   → fft 频谱分析（并行提取）
  *   → libopus 编码 + OGG 封装
  *   → OutputCallback 输出
  */
@@ -30,7 +29,6 @@
 #include "channel_merge.h"
 #include "loudness.h"
 #include "limiter.h"
-#include "fft.h"
 #include "tempo.h"
 #include "era_log.h"
 
@@ -121,7 +119,6 @@ struct AudioPipeline {
     Loudness    *loudness;
     Limiter     *limiter;
     Tempo       *tempo;
-    FFTAnalyzer *fft;
 
     /* 响度归一化：ReplayGain 标签（创建时读一次）+ Dart/扫描器兜底增益。
      * 增益解析优先级：album/track 标签（按 norm_album）> 兜底增益 > 0。 */
@@ -688,14 +685,6 @@ static AudioPipeline* pipeline_create_impl(const char *source,
         tempo_set_enabled(p->tempo, false);
     }
 
-    /* 3.5 FFT 分析器 */
-    p->fft = fft_create(out_rate, cfg->fft_size);
-    if (!p->fft) {
-        ERA_LOGE(NULL, "%s FFT 分析器创建失败\n", LOG_TAG);
-        goto fail;
-    }
-    fft_set_enabled(p->fft, cfg->fft_enabled);
-
     /* 4. 创建编码器（player 模式 skip_encoder：仅 PCM 落盘 WAV/UDS，无 OGG 输出） */
     if (!p->cfg.skip_encoder) {
         p->encoder = encoder_create(out_rate, out_channels,
@@ -815,7 +804,7 @@ AudioPipeline* pipeline_create_store(SegStore *store,
     return pipeline_create_impl(NULL, NULL, store, cfg, output, user, NULL);
 }
 
-/* 处理链前段（不含 tempo/fft）：低频管理 → 参数化 EQ → 固定 EQ → 响度 →
+/* 处理链前段（不含 tempo）：低频管理 → 参数化 EQ → 固定 EQ → 响度 →
  * 多声道合并 → 限幅（合并放在限幅前，等功率求和后的峰值由限幅器兜住）。 */
 static void process_pre_tempo(AudioPipeline *p, float *pcm, int samples)
 {
@@ -828,7 +817,7 @@ static void process_pre_tempo(AudioPipeline *p, float *pcm, int samples)
 }
 
 /* DSP 处理链：重采样后的 float 交错 PCM → lowfreq → peq → eq → loudness →
- * limiter → tempo → fft → PCM 流出回调 → 编码器。返回编码器写入帧数或
+ * limiter → tempo → PCM 流出回调 → 编码器。返回编码器写入帧数或
  * out_samples（skip_encoder 时）。pcm 为 out_rate/out_channels 的重采样输出；
  * samples 为其帧数。 */
 static int process_dsp_chain(AudioPipeline *p, float *pcm, int samples)
@@ -858,9 +847,6 @@ static int process_dsp_chain(AudioPipeline *p, float *pcm, int samples)
         if (ret < 0) return -1;
         samples = t_samples;
     }
-
-    /* FFT 分析（自适应声道数，含 5.1，内部下混为左右声道） */
-    fft_process_multi(p->fft, pcm, samples, p->cfg.output_channels);
 
     /* PCM 流出：位置 = **块起始**的原速音频时间（resampler 累计输出 - 本块输入
        帧数，含起始偏移）。块头语义与 mem_window / stream.pcm 读取器一致。 */
@@ -915,7 +901,7 @@ static int process_frame(AudioPipeline *p, AVFrame *frame)
     if (out_samples < 0) return -1;
     if (out_samples == 0) return 0;
 
-    /* 处理链：eq → loudness → limiter → tempo → fft → encoder */
+    /* 处理链：eq → loudness → limiter → tempo → encoder */
     return process_dsp_chain(p, p->pcm_temp, out_samples);
 }
 
@@ -1074,7 +1060,6 @@ int pipeline_run(AudioPipeline *p)
                 out = t_samples;
             }
 
-            fft_process_multi(p->fft, p->pcm_temp, out, p->cfg.output_channels);
             if (p->pcm_out_cb) {
                 double pos_ms = (double)(resampler_get_output_samples(p->resampler) - in_samples)
                                 / (double)p->cfg.output_sample_rate * 1000.0
@@ -1202,55 +1187,6 @@ void pipeline_set_limiter_enabled(AudioPipeline *p, bool enabled)
     limiter_set_enabled(p->limiter, enabled);
 }
 
-void pipeline_set_fft_enabled(AudioPipeline *p, bool enabled)
-{
-    if (!p || !p->fft) return;
-    fft_set_enabled(p->fft, enabled);
-}
-
-int pipeline_get_fft_spectrum(AudioPipeline *p, float *out_db, int bins, float min_db)
-{
-    if (!p || !p->fft || !out_db || bins <= 0) return -1;
-    fft_get_spectrum_db(p->fft, out_db, bins, min_db);
-    return 0;
-}
-
-int pipeline_get_fft_spectrum_stereo(AudioPipeline *p,
-                                     float *out_db_l, float *out_db_r,
-                                     int bins, float min_db)
-{
-    if (!p || !p->fft || !out_db_l || !out_db_r || bins <= 0) return -1;
-    fft_get_spectrum_db_stereo(p->fft, out_db_l, out_db_r, bins, min_db);
-    return 0;
-}
-
-int pipeline_get_fft_spectrum_norm_stereo(AudioPipeline *p,
-                                          float *out_l, float *out_r,
-                                          int bins)
-{
-    if (!p || !p->fft || !out_l || !out_r || bins <= 0) return -1;
-    fft_get_spectrum_norm_stereo(p->fft, out_l, out_r, bins);
-    return 0;
-}
-
-int pipeline_get_fft_size(const AudioPipeline *p)
-{
-    return p && p->fft ? fft_get_size(p->fft) : 0;
-}
-
-void pipeline_set_fft_frame_cb(AudioPipeline *p, AudioFftFrameCb cb, void *user_data)
-{
-    if (!p || !p->fft) return;
-    /* AudioFftFrameCb 与 fft_frame_cb 签名一致，直接透传 */
-    fft_set_frame_cb(p->fft, (fft_frame_cb)cb, user_data);
-}
-
-/** FFT 已处理音频时间（秒，样本级粒度，供频谱推送驱动） */
-double pipeline_get_fft_processed_seconds(const AudioPipeline *p)
-{
-    return p && p->fft ? fft_get_processed_seconds(p->fft) : 0.0;
-}
-
 /* Phase 4: 变速变调 */
 void pipeline_set_tempo_speed(AudioPipeline *p, float speed)
 {
@@ -1367,7 +1303,6 @@ void pipeline_destroy(AudioPipeline *p)
     if (p->loudness) loudness_destroy(p->loudness);
     if (p->limiter) limiter_destroy(p->limiter);
     if (p->tempo) tempo_destroy(p->tempo);
-    if (p->fft) fft_destroy(p->fft);
 
     if (p->native_buf) free(p->native_buf);
     if (p->pcm_temp) free(p->pcm_temp);
@@ -1377,5 +1312,5 @@ void pipeline_destroy(AudioPipeline *p)
 
 const char* audio_engine_version(void)
 {
-    return "audio-engine-server 0.3.0 (Phase 4: decode→resample→eq→loudness→limiter→tempo→fft→encode)";
+    return "audio-engine-server 0.3.0 (Phase 4: decode→resample→eq→loudness→limiter→tempo→encode)";
 }

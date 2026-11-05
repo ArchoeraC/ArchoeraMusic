@@ -12,7 +12,9 @@ class _SpectrumPainter extends CustomPainter {
   });
 
   static const int fftSize = 128;
-  static const int skipLow = 8;
+  // 频谱 v2 覆盖 40–16kHz，128 带全部参与绘制。旧实现的 `skipLow = 8`
+  // 是 80–2000Hz 时代的遗留，会把最低约 8 带（40–59Hz）整段裁掉，
+  // 与 v2 的低频目标矛盾，故不再跳过。
   static const double attack = 0.4;
   static const double decay = 0.88;
 
@@ -128,16 +130,14 @@ class _SpectrumPainter extends CustomPainter {
   /// 峰值保持线：引擎算好，UI 只按双声道拼接布局描线（不做 DSP）。
   void _drawPeakLine(Canvas canvas, Size size) {
     if (!showPeak || !_hasPeak) return;
-    final channelLength = fftSize - skipLow;
+    final channelLength = fftSize;
     final total = channelLength * 2;
     if (total <= 1) return;
     final path = Path();
     for (var i = 0; i < total; i++) {
       final isLeft = i < channelLength;
       final src = isLeft ? (reverse ? (channelLength - 1 - i) : i) : i - channelLength;
-      final v = isLeft
-          ? _peakL[fftSize - 1 - src]
-          : _peakR[skipLow + src];
+      final v = isLeft ? _peakL[fftSize - 1 - src] : _peakR[src];
       final x = size.width * i / (total - 1);
       final y = size.height - v.clamp(0.0, 1.0) * size.height;
       if (i == 0) {
@@ -158,11 +158,11 @@ class _SpectrumPainter extends CustomPainter {
   }
 
   int _buildBins() {
-    final channelLength = fftSize - skipLow;
+    final channelLength = fftSize;
     for (var i = 0; i < channelLength; i++) {
       final src = reverse ? (channelLength - 1 - i) : i;
       _stereo[i] = _display[0][fftSize - 1 - src];
-      _stereo[channelLength + i] = _display[1][skipLow + src];
+      _stereo[channelLength + i] = _display[1][src];
     }
     return channelLength * 2;
   }

@@ -28,6 +28,7 @@
 #include "decoder.h"
 #include "era_log.h"
 #include "spectrum_service.h"
+#include "mediaengine_internal.h"
 #include "pcm_file_reader.h"
 #include "compat/qatomic.h"
 #if defined(HAS_ARCHOERA_KERNEL)
@@ -101,6 +102,10 @@ void archoera_mediaengine_set_log_sink(ArchoeraMediaEngineLogFn fn,
 /* ── 队列容量 ────────────────────────────────────────────────── */
 #define EV_CAP 512      /* 事件队列条数 */
 #define EV_LINE 511     /* 事件行上限 */
+/* 频谱事件槽按 ERA_SPEC_BINS 带设计（4×128 个 ≤3 位数字 + 元数据 < 4KB）。
+   bins 与槽宽/前端事件缓冲（4096B）强耦合：改这里必须同步 EV_FFT_LINE
+   与 Dart `_eventBufCap`，否则事件会被截断成残帧。 */
+#define ERA_SPEC_BINS 128
 #define EV_FFT_LINE 4095 /* 频谱事件行上限（8-bit 量化 4×128 带 + 元数据 < 4KB） */
 #define CMD_CAP 256     /* 命令队列条数 */
 #define CMD_LINE 4095   /* 命令行上限 */
@@ -200,8 +205,8 @@ typedef struct ArchoeraMediaEngine {
 
     /* ── 内存播放模式（不落盘，cfg.no_disk_cache=1 且 player 会话）── */
     int     mem_mode;          /* 本会话为内存播放模式 */
-    int     mem_sr;            /* 输出采样率（pcm_window 换算） */
-    int     mem_epoch;         /* 会话重建计数（seek 重建 +1；Dart 凭此丢旧帧） */
+    int     mem_sr;            /* 输出采样率（取窗换算） */
+    int     mem_epoch;         /* 会话重建计数（seek 重建 +1；测试凭此识别新段） */
     int64_t mem_cap_bytes;     /* 保留上限字节；INT64_MAX = 无上限 */
     int64_t mem_bytes;         /* 当前驻留字节（cap 判定用，净 PCM+块头） */
     PcmMemBlock *mem_blocks;   /* 块数组（下标 0 最早，队尾最新） */
@@ -277,12 +282,12 @@ typedef struct ArchoeraMediaEngine {
     pthread_cond_t  stage_cv;
 
     /* 保护全部 mem_* 字段：写侧为引擎解码线程（mem_append/reset/free），
-     * 读侧为 Dart/FFI 线程（pcm_window/pcm_epoch）。mem_window 持锁期间仅做
-     * 纯计算与定长拷贝，不调用任何可重入引擎的回调。 */
+     * 读侧为频谱线程（mem_window）与白盒测试（mediaengine_internal.h）。
+     * mem_window 持锁期间仅做纯计算与定长拷贝，不调用任何可重入引擎的回调。 */
     pthread_mutex_t mem_lock;
 } ArchoeraMediaEngine;
 
-/* ── 内存播放模式：cap / append / 保留 / 窗口（对齐 pcm_analyzer 语义）──
+/* ── 内存播放模式：cap / append / 保留 / 窗口（频谱取窗语义）──
    规格见 docs/audio-memory-playback.md：auto 有界分析窗口（32 MiB 硬上限）+
    用户上限优先 + 查询故障回落 + append 后记账强制淘汰（绝不越过 cap）。 */
 
@@ -316,9 +321,9 @@ static long long mem_avail_mb(void)
 /* 解析内存保留上限（字节）。pcm_mem_cap_kb 语义见 audio_engine.h：
    0=auto（有界分析窗口：8 MiB ~ 32 MiB，查询故障回落下限）；>0=用户上限
    （绝不越过）；<0=无上限。
-   说明：驻留 PCM 仅服务 pcm_window（频谱取帧，实际只需最近 fftSize≈2048 样本
-   ≈46ms），全量整曲驻留没有消费者；auto 因而收敛到「覆盖解码前瞻 + 少量回访」
-   的小窗口，把单会话原生内存从数百 MB 压到有界 ≤32 MiB。 */
+   说明：驻留 PCM 仅服务频谱取窗（VQT 最长窗 12288 样本 ≈256ms + 居中窗口
+   的 128ms 前瞻），全量整曲驻留没有消费者；auto 因而收敛到「覆盖解码前瞻 +
+   少量回访」的小窗口，把单会话原生内存从数百 MB 压到有界 ≤32 MiB。 */
 static int64_t mem_resolve_cap(ArchoeraMediaEngine *e)
 {
     const int64_t floor_bytes = 8LL * 1024LL * 1024LL;  /* 8 MiB 下限 */
@@ -521,7 +526,7 @@ static void mem_free(ArchoeraMediaEngine *e)
     mem_heap_trim();
 }
 
-/* 单样本下混 L/R（对齐 pcm_analyzer BS.775；1~6ch，超出退化取前两声道） */
+/* 单样本下混 L/R（ITU-R BS.775；1~6ch，超出退化取前两声道） */
 static void mem_downmix_sample(const float *d, int si, int channels,
                                float *l, float *r)
 {
@@ -579,9 +584,9 @@ static int mem_block_of_sample(ArchoeraMediaEngine *e, int64_t s)
     return lo - 1;
 }
 
-/* pcm_window 实现：以 end_pos_ms 为终点取最近 frames 样本（L/R），语义对齐
-   PcmAnalyzer.frameAt：终点样本 = 定位块内 (posMs 偏移×采样率) 取整；前缀不足
-   补零（仅当头部仍在）；被淘汰/未解码 → -1。返回 0 命中 / -1 / -2。 */
+/* 内存块取窗：以 end_pos_ms 为终点取最近 frames 样本（L/R）。
+   终点样本 = 定位块内 (posMs 偏移×采样率) 取整；前缀不足补零（仅当头部仍在）；
+   被淘汰/未解码 → -1。返回 0 命中 / -1 / -2。 */
 static int mem_window(ArchoeraMediaEngine *e, int end_pos_ms, int frames,
                       float *out_l, float *out_r)
 {
@@ -791,17 +796,17 @@ static int spec_position_cb(void *ctx)
     return -1;
 }
 
-/* 取窗：内存模式走块列表（try_lock）；流式走环形缓冲；文件模式走
-   stream.pcm 读取器。拿不到锁/未命中直接跳过本帧。 */
-static int spec_read_cb(void *ctx, int end_pos_ms, int frames,
-                        float *out_l, float *out_r)
+/* 按播放位置取窗（生产路径）：内存模式走块列表（try_lock）；流式走环形
+   缓冲；文件模式走 stream.pcm 读取器。拿不到锁/未命中直接跳过本帧。
+   测试直接编译本文件并调用；不导出、不承诺 ABI（mediaengine_internal.h）。 */
+int era_mediaengine_read_window(ArchoeraMediaEngine *e, int end_pos_ms,
+                                int frames, float *out_l, float *out_r)
 {
-    ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)ctx;
-    if (!e) return -1;
+    if (!e) return -2;
     if (e->mem_mode) {
         int r;
         /* 频谱居中窗口会请求未来位置；尾部尚未解码时返回 -1，让服务层退回
-           因果窗口。`pcm_window` 的「远超曲尾截到末块」语义不受影响。 */
+           因果窗口（白盒测试用 era_mediaengine_mem_window 的截断语义）。 */
         if (e->mem_block_count <= 0 || e->mem_sr <= 0) return -1;
         {
             const PcmMemBlock *last = &e->mem_blocks[e->mem_block_count - 1];
@@ -834,6 +839,16 @@ static int spec_read_cb(void *ctx, int end_pos_ms, int frames,
         return rc;
     }
     return -1;
+}
+
+/* 频谱服务适配：ctx == ArchoeraMediaEngine*；参数错误统一返回 -1（服务层
+   跳过本帧）。真正的取窗在 era_mediaengine_read_window。 */
+static int spec_read_cb(void *ctx, int end_pos_ms, int frames,
+                        float *out_l, float *out_r)
+{
+    ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)ctx;
+    if (!e) return -1;
+    return era_mediaengine_read_window(e, end_pos_ms, frames, out_l, out_r);
 }
 
 /* 取走最新频谱事件（调用方须持 ev_mutex）；无则返回 0。 */
@@ -918,8 +933,8 @@ static void spec_emit_cb(void *ctx, const float *l, const float *r,
     char buf[EV_FFT_LINE + 1];
     int off;
     if (!e || !l || !r || !peak_l || !peak_r || bins <= 0) return;
-    /* 事件槽按 128 带设计；更大 bins 截断，保证永不写穿 ev_fft 槽。 */
-    if (bins > 128) bins = 128;
+    /* 事件槽按 ERA_SPEC_BINS 带设计；更大 bins 截断，保证永不写穿 ev_fft 槽。 */
+    if (bins > ERA_SPEC_BINS) bins = ERA_SPEC_BINS;
     off = snprintf(buf, sizeof(buf),
                    "{\"type\":\"fft\",\"seq\":%d,\"interval_ms\":%d,"
                    "\"sample_rate\":%d,\"bins\":%d,\"min_hz\":%.1f,\"max_hz\":%.1f,"
@@ -2093,7 +2108,7 @@ static int mediaengine_spectrum_start(ArchoeraMediaEngine *e)
         EraSpectrumServiceConfig cfg;
         memset(&cfg, 0, sizeof(cfg));
         cfg.sample_rate = sr;
-        cfg.bins = 128;
+        cfg.bins = ERA_SPEC_BINS;
         cfg.min_hz = e->spec_min_hz;
         cfg.max_hz = e->spec_max_hz;
         cfg.interval_ms = 50;
@@ -2105,7 +2120,7 @@ static int mediaengine_spectrum_start(ArchoeraMediaEngine *e)
         cfg.ctx = e;
         e->spectrum = era_spectrum_service_create(&cfg);
         if (!e->spectrum) {
-            ERA_LOGW(NULL, "[mediaengine] 频谱服务创建失败（内核不可用/OOM）\n");
+            ERA_LOGW(NULL, "[mediaengine] 频谱服务创建失败（分析器不可用/OOM）\n");
             return -1;
         }
     }
@@ -2402,7 +2417,7 @@ static void *engine_thread(void *arg)
     if (e->mem_mode) {
         /* 内存播放模式（不落盘）：无设备不可回退（不写 stream.wav，无文件播放器可用）。
            - ARCHOERA_MEMORY_HEADLESS=1：测试/无声环境专用——不触碰设备，全速解码至
-             EOF，PCM 仅入内存块列表（pcm_window 可验证内容），不落盘、不播放；
+             EOF，PCM 仅入内存块列表（频谱线程按位置取窗），不落盘、不播放；
            - 否则先尝试 raw 设备流；失败直接 error（不做文件回退）。 */
         if (getenv("ARCHOERA_MEMORY_HEADLESS")) {
             ERA_LOGI(NULL,
@@ -2812,11 +2827,10 @@ int archoera_mediaengine_is_done(ArchoeraMediaEngine *e)
     return e ? (int)QA_LOAD_ACQ(&e->done) : 1;
 }
 
-/* 内存播放模式：以 end_pos_ms 为终点取最近 frames 样本（L/R）写 out_l/out_r。
- * 返回 0 命中；-1 越出保留窗 / 尚未解码；-2 参数错或非内存模式会话。
- * 语义对齐 PcmAnalyzer.frameAt（前缀补零仅在头部仍在时；被淘汰返回 -1）。 */
-int archoera_mediaengine_pcm_window(ArchoeraMediaEngine *e, int end_pos_ms,
-                                    int frames, float *out_l, float *out_r)
+/* 内存块窗口（白盒测试/诊断，不导出）：blocking lock + 曲尾截断。
+ * 返回 0 命中；-1 越出保留窗 / 尚未解码；-2 参数错或非内存模式会话。 */
+int era_mediaengine_mem_window(ArchoeraMediaEngine *e, int end_pos_ms,
+                               int frames, float *out_l, float *out_r)
 {
     int r;
     if (!e) return -2;
@@ -2828,8 +2842,8 @@ int archoera_mediaengine_pcm_window(ArchoeraMediaEngine *e, int end_pos_ms,
     return r;
 }
 
-/* 会话重建计数（seek 重建即 +1）：Dart 凭此丢弃旧帧索引（对齐文件截断语义）。 */
-int archoera_mediaengine_pcm_epoch(ArchoeraMediaEngine *e)
+/* 会话重建计数（seek 重建即 +1）；白盒测试用，不导出。 */
+int era_mediaengine_mem_epoch(ArchoeraMediaEngine *e)
 {
     int epoch;
     if (!e) return -1;

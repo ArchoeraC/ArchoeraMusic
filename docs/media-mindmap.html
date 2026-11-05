@@ -63,7 +63,7 @@
           <span class="tag">宿主注入为回退基线</span></div></li>
         <li><div class="node"><span class="d">解码</span>：EraAudio（已接管格式 flac/mp3/aac/opus/vorbis/mka/dts/tta/spx/shn/mpc…） ↔ FFmpeg 兜底</div></li>
         <li><div class="node"><span class="d">DSP</span>：EQ / limiter / loudness（<code>kernel/dsp</code>；B 档向量化，与 C 逐位一致）</div></li>
-        <li><div class="node"><span class="d">频谱</span>：<code>libfft.so</code>（Dart 拉窗）</div></li>
+        <li><div class="node"><span class="d">频谱</span>：引擎线程（VQT / FFmpeg FFT 双后端）</div></li>
         <li><div class="node"><span class="d">EraSync 常驻池</span>
           <span class="tag" style="color:var(--pool)">pool</span>：<code>zk_submit</code>（decode/metadata，事件推）· <code>zk_engine_*</code> 流式会话（分块串行，<code>max_streams</code>）·
           弹性扩容 <b>cap=max_workers</b>（submit 只提示、Master 异步补建、满即拒）· AS3 调节器 · AS2 pinned 1:1（门控）</div></li>
@@ -111,7 +111,7 @@
         <li><div class="node"><b>扫描元数据不进池</b>：同步直桥 → 不占 EraSync 槽；与播放仅 CPU/内存/磁盘/网络竞争</div></li>
         <li><div class="node"><b>播放池有界</b>：线程 ≤ <code>max_workers</code>(+1 Master)；快速任务要么早停、要么到 cap 即拒</div></li>
         <li><div class="node"><b>QoS 缺口</b>：全局队列 FCFS、无优先级/无抢占 → 批量可能拖累播放；<span class="warn">AS4（播放优先/保留 worker/批量节流）未做</span></div></li>
-        <li><div class="node"><b>ABI 不变</b>：<code>archoera_mediaengine.h</code> 导出 / JSON 协议 / <code>libfft.so</code> / <code>stream.wav|.pcm</code>（P5）；内核符号 <code>era_</code> 前缀；系统能力走 <code>app/native/platform</code></div></li>
+        <li><div class="node"><b>ABI 不变</b>：<code>archoera_mediaengine.h</code> 导出 / JSON 协议 / <code>stream.wav|.pcm</code>（P5）；内核符号 <code>era_</code> 前缀；系统能力走 <code>app/native/platform</code></div></li>
       </ul>
     </li>
 
