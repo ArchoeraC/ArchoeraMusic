@@ -136,16 +136,6 @@ typedef _DestroyDart = void Function(Pointer<Opaque>);
 typedef _ListSinksNative = Int32 Function(Pointer<Uint8>, Int32);
 typedef _ListSinksDart = int Function(Pointer<Uint8>, int);
 
-// 内存播放模式（no_disk_cache）频谱拉取：archoera_mediaengine_pcm_window
-typedef _PcmWindowNative =
-    Int32 Function(Pointer<Opaque>, Int32, Int32, Pointer<Float>, Pointer<Float>);
-typedef _PcmWindowDart =
-    int Function(Pointer<Opaque>, int, int, Pointer<Float>, Pointer<Float>);
-
-// 会话重建计数：archoera_mediaengine_pcm_epoch
-typedef _PcmEpochNative = Int32 Function(Pointer<Opaque>);
-typedef _PcmEpochDart = int Function(Pointer<Opaque>);
-
 // 可用内存（MB）：archoera_mediaengine_mem_available_mb（M3 预算管理器）
 typedef _MemAvailNative = Int64 Function();
 typedef _MemAvailDart = int Function();
@@ -278,14 +268,6 @@ class EngineBindings {
   late final _ListSinksDart _listSinks = _lib
       .lookupFunction<_ListSinksNative, _ListSinksDart>(
         'archoera_mediaengine_list_sinks',
-      );
-  late final _PcmWindowDart _pcmWindowFfi = _lib
-      .lookupFunction<_PcmWindowNative, _PcmWindowDart>(
-        'archoera_mediaengine_pcm_window',
-      );
-  late final _PcmEpochDart _pcmEpochFfi = _lib
-      .lookupFunction<_PcmEpochNative, _PcmEpochDart>(
-        'archoera_mediaengine_pcm_epoch',
       );
   late final _MemAvailDart _memAvailFfi = _lib
       .lookupFunction<_MemAvailNative, _MemAvailDart>(
@@ -468,21 +450,6 @@ class EngineBindings {
       calloc.free(buf);
     }
   }
-
-  /// 内存播放模式频谱拉取：以 [endPosMs] 为终点取最近 [frames] 样本写
-  /// [outL]/[outR]（各 frames 个 float）。返回 0 命中 / -1 越出保留窗或未解码 /
-  /// -2 参数错或非内存模式会话。
-  int pcmWindow(
-    Pointer<Opaque> handle,
-    int endPosMs,
-    int frames,
-    Pointer<Float> outL,
-    Pointer<Float> outR,
-  ) =>
-      _pcmWindowFfi(handle, endPosMs, frames, outL, outR);
-
-  /// 内存播放模式会话重建计数（seek 后 +1，Dart 丢旧帧索引）；非内存模式 -1。
-  int pcmEpoch(Pointer<Opaque> handle) => _pcmEpochFfi(handle);
 
   /// M3：当前可用内存（MB）；<0 = 不可得（调用方回落保守下限）。
   int memAvailableMb() => _memAvailFfi();

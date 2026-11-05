@@ -61,7 +61,7 @@ Dart 网络线程（下载/分段 Range）
           ├─ 未填：阻塞等待 fill（abort/超时唤醒）
           ├─ FFmpeg：AVIOContext{read/seek} ← Store
           └─ EraAudio：Reader 新形态 ← Store
-        → DSP → （内存播放语义不变：PCM 块池 + raw 设备流 / pcm_window FFI）
+        → DSP → （内存播放语义不变：PCM 块池 + raw 设备流 / 引擎内部取窗）
 ```
 
 ## 4. C 侧 SegmentStore（源字节层）
@@ -105,7 +105,7 @@ Dart 网络线程（下载/分段 Range）
 
 - `PcmMemBlock` 由“逐 chunk malloc/memmove 淘汰”改为**定长块 + freelist**：
   分配固定容量块（如 2048 帧×ch），淘汰仅归还 freelist（无搬移/无小碎片）；
-  索引（pos/epoch/start）语义不变；`pcm_window`/`pcm_epoch` FFI 不变。
+  索引（pos/epoch/start）语义不变；取窗改为引擎内部接口（公开 FFI 已删除）。
 - cap/预算沿用 §3.3（auto/自定义/无上限 + 0.8 GiB 硬上限 + append 记账强制淘汰）。
 
 ## 6. 统一预算与丢弃协调
@@ -263,7 +263,7 @@ requiredCeiling = minFloor + requiredCache
    - **整曲缓存命中**：普通播放 + 随机前/后 seek 均命中内存，`pread` 不因 seek 触发
      请求（统计“网络请求次数”== 初始拉取次数）；
    - **LRU 超预算路径**：淘汰段重取走合并 Range + 节流；重取频次 ≤ 护栏上限；
-   - `pcm_window` 命中/越出/epoch 语义不变。
+   - 内部取窗命中/越出/epoch 语义不变。
 3. 内存有界：长播（>budget 内容）驻留 ≈ 预算上限；段池/PCM 块池复用无碎片增长
    （观测 RSS 平台值 + 池空闲命中率）。
 4. 预算强制：auto 0.8 GiB 硬上限 / 查询故障回落 / 用户设限优先 / append 记账强制淘汰

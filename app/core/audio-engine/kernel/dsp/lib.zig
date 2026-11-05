@@ -16,7 +16,7 @@
 //!   - `parametric.zig` 参数化 EQ（`era_peq_*`；方向① D1）
 //!   - `lowfreq.zig`  次声/低频管理（`era_lowfreq_*`；方向① D2）
 //!   - `channel_merge.zig` 多声道合并（`era_channel_merge_*`；单侧设备兜底）
-//!   - `fft.zig` / `resampler.zig` / `tempo.zig`  移植计划占位（未导出）
+//!   - `resampler.zig` / `tempo.zig`  移植计划占位（未导出）
 //!
 //! 已移植块经 `kernel/kernel.zig` 的 `zk_dsp_*` C ABI 暴露给 C 壳；
 //! 命名自有（`era_` 前缀），不照搬 FFmpeg / SoX / 上游标识符。
@@ -37,7 +37,6 @@ pub const channel_merge = @import("channel_merge.zig");
 pub const spectrum = @import("spectrum.zig");
 
 /// 未移植模块的接口占位与移植计划（本轮不导出 C ABI）。
-pub const fft = @import("fft.zig");
 pub const resampler = @import("resampler.zig");
 pub const tempo = @import("tempo.zig");
 
@@ -54,7 +53,6 @@ test {
     _ = @import("lowfreq.zig");
     _ = @import("channel_merge.zig");
     _ = @import("spectrum.zig");
-    _ = @import("fft.zig");
     _ = @import("resampler.zig");
     _ = @import("tempo.zig");
 }

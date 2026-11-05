@@ -55,7 +55,7 @@
   <span><i style="background:var(--dart)"></i>Dart 编排</span>
   <span><i style="background:var(--shell)"></i>C 壳（audio-engine）</span>
   <span><i style="background:var(--kernel)"></i>Zig 内核 EraAudio</span>
-  <span><i style="background:var(--ffmpeg)"></i>FFmpeg / libfft</span>
+  <span><i style="background:var(--ffmpeg)"></i>FFmpeg / 频谱后端</span>
   <span><i style="background:var(--pool)"></i>EraSync 常驻池</span>
   <span><i style="background:var(--scanner)"></i>C# 扫描器</span>
   <span><i style="background:var(--db)"></i>SQLite / 磁盘</span>
@@ -89,7 +89,7 @@
       </div>
       <div class="box ffmpeg">
         <div class="t">FFmpeg 兜底 + 拍频</div>
-        <div class="s">未接管格式/复杂容器由 FFmpeg 解码；<br><code>libfft.so</code> 供 Dart 频谱（ABI 不变）</div>
+        <div class="s">未接管格式/复杂容器由 FFmpeg 解码；<br>频谱由引擎线程分析（VQT 或 libavutil/tx）</div>
       </div>
     </div>
     <div class="arw">↓ PCM</div>
@@ -169,7 +169,7 @@
       <div class="s">解码 / DSP / 元数据探测 / 池调度</div>
     </div>
     <div class="box">
-      <div class="t" style="color:var(--ffmpeg)">FFmpeg / libfft</div>
+      <div class="t" style="color:var(--ffmpeg)">FFmpeg / 频谱后端</div>
       <div class="s">兜底解码 · 频谱 FFT（Dart ABI）</div>
     </div>
     <div class="box">
@@ -188,7 +188,7 @@
 </div>
 
 <div class="foot">
-  ABI 红线：<code>archoera_mediaengine.h</code> 导出 / JSON 协议 / <code>libfft.so</code> / <code>stream.wav|.pcm</code> 不变（P5）；
+  ABI 红线：<code>archoera_mediaengine.h</code> 导出 / JSON 协议 / <code>stream.wav|.pcm</code> 不变（P5）；
   内核符号 <code>era_</code> 前缀；系统能力走 <code>app/native/platform</code> 桥接（Dart 不直连平台）。
   &nbsp;·&nbsp; 依据：<code>docs/audio-kernel-zig.md</code>、<code>audio-kernel-expansion-plan.md</code>、<code>engine-master-pool-design.md</code>、<code>kernel/runtime.zig</code>、<code>scanner/{ScannerEngine,KernelMetadata}.cs</code>。
 </div>

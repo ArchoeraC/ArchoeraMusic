@@ -82,7 +82,7 @@ const String defaultEngine = 'stable';
 const Set<String> engineModes = {'stable', 'eraudio'};
 
 /// 内存播放（不落盘）：默认开启。PCM 驻留进程内内存（引擎块列表），
-/// 不写 stream.wav/.pcm；频谱经 pcm_window FFI。见 docs/audio-memory-playback.md。
+/// 不写 stream.wav/.pcm；频谱由引擎在内存块列表上直接取窗。见 docs/audio-memory-playback.md。
 const bool defaultEngineMemory = true;
 
 /// PCM 内存保留策略：'auto'（按可用内存均衡，0.8 GiB 硬上限）/

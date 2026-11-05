@@ -16,8 +16,10 @@
  *   - 可丢：取窗失败 / 消费端慢时直接跳过本帧，绝不反压音频线程；
  *   - stop 每 10ms 检查一次，join 在 ~10ms 内返回。
  *
- * 无 Zig 内核（HAS_ARCHOERA_KERNEL 未定义）时编译为空实现：create 返回 NULL，
- * start 返回 -1；引擎据此禁用频谱，不影响播放。
+ * 分析器后端由 `spectrum_dsp.c` 编译期选择：链接 Zig 内核时用 VQT
+ * （`zk_dsp_spectrum_*`），纯 FFmpeg 构建时用 libavutil/tx 多分辨率 FFT
+ * （`spectrum_fft.c`）。两者输出同一契约，本服务不感知差异；
+ * 仅当分析器创建失败（OOM 等）时 start 返回 -1，引擎禁用频谱、不影响播放。
  */
 #ifndef ERA_SPECTRUM_SERVICE_H
 #define ERA_SPECTRUM_SERVICE_H
