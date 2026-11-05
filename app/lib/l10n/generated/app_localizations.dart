@@ -10386,6 +10386,12 @@ abstract class AppLocalizations {
   /// **'archoerashell 已在设置中禁用（设置 → MCP 接入 → 命令行 shell）。'**
   String get mcpShellDisabled;
 
+  /// No description provided for @mcpShellElevatedRefused.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'拒绝以 root / 管理员身份运行 archoerashell：命令行与 MCP 凭据都不需要提权，提权会放大配置/日志的属主风险。请以普通用户重新运行；容器/CI 确需提权时显式设置 ARCHOERA_ALLOW_ELEVATED=1。'**
+  String get mcpShellElevatedRefused;
+
   /// No description provided for @mcpShellHelpStatus.
   ///
   /// In zh_CN, this message translates to:
@@ -11415,6 +11421,42 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'已重封装，不丢数据'**
   String get toastKdfRepacked;
+
+  /// No description provided for @elevationGateTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'检测到以高权限身份启动'**
+  String get elevationGateTitle;
+
+  /// No description provided for @elevationGateBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'ArchoeraMusic 正以{kind}身份运行。播放、下载与凭据保险库都不需要提权：以提权身份继续，任何一处远程代码执行或供应链问题都会波及整台机器，偏好、缓存与日志也会以{kind}权限落盘，普通用户可能无法读取或清理。\n\n建议退出，然后以当前普通用户身份重新启动。'**
+  String elevationGateBody({required String kind});
+
+  /// No description provided for @elevationGateKindRoot.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'root（超级用户）'**
+  String get elevationGateKindRoot;
+
+  /// No description provided for @elevationGateKindAdministrator.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'管理员'**
+  String get elevationGateKindAdministrator;
+
+  /// No description provided for @elevationGateExit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'退出应用'**
+  String get elevationGateExit;
+
+  /// No description provided for @elevationGateContinue.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'我已知晓风险，仍要继续'**
+  String get elevationGateContinue;
 }
 
 class _AppLocalizationsDelegate

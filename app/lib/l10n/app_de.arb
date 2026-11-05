@@ -1729,6 +1729,7 @@
   "mcpShellUsageError": "Nutzungsfehler",
   "mcpShellErrorPrefix": "Fehler",
   "mcpShellDisabled": "archoerashell ist in den Einstellungen deaktiviert (MCP-Zugriff → Kommandozeilen-Shell).",
+  "mcpShellElevatedRefused": "archoerashell wird nicht als root/Administrator ausgeführt: CLI und MCP-Zugangsdaten benötigen niemals erhöhte Rechte, und ein erhöhter Start vergrößert die Eigentümerrisiken von Konfiguration und Protokollen. Bitte als normaler Benutzer erneut starten; nur für Container/CI, die es wirklich benötigen, explizit ARCHOERA_ALLOW_ELEVATED=1 setzen.",
   "mcpShellHelpStatus": "Verwendung: archoerashell status\n\nZeigt den Wiedergabestatus: Wiedergabe/Pause, Titel, Position, Lautstärke, Wiederholen/Zufall.",
   "mcpShellHelpNowPlaying": "Verwendung: archoerashell now-playing\n\nZeigt nur den aktuellen Titel und die Position.",
   "mcpShellHelpPlay": "Verwendung: archoerashell play\n\nWiedergabe starten/fortsetzen.",
@@ -1899,5 +1900,11 @@
   "settingsKdfPasswordTitle": "Aktuelles Passwort bestätigen",
   "settingsKdfPasswordDesc": "Eine Änderung der Argon2id-Stärke umhüllt den Passwort-Slot neu (Hauptschlüssel und gespeicherte Anmeldedaten bleiben unverändert). Gib dein aktuelles Entsperrpasswort ein.",
   "settingsKdfPasswordHint": "Aktuelles Passwort",
-  "toastKdfRepacked": "Neu umhüllt, keine Daten verloren"
+  "toastKdfRepacked": "Neu umhüllt, keine Daten verloren",
+  "elevationGateTitle": "Start mit erhöhten Rechten erkannt",
+  "elevationGateBody": "ArchoeraMusic läuft als {kind}. Wiedergabe, Downloads und der Anmeldedaten-Tresor benötigen niemals erhöhte Rechte. Wer erhöht weiterläuft, überlässt dem gesamten System jede Schwachstelle dieser App: Eine einzige Remote-Code-Execution- oder Supply-Chain-Lücke kann den ganzen Rechner betreffen, und Einstellungen, Caches und Protokolle werden mit {kind}-Rechten geschrieben, sodass ein normaler Benutzer sie womöglich nicht lesen oder löschen kann.\n\nBeenden und ArchoeraMusic als normaler Benutzer neu starten.",
+  "elevationGateKindRoot": "root (Superuser)",
+  "elevationGateKindAdministrator": "Administrator",
+  "elevationGateExit": "Beenden",
+  "elevationGateContinue": "Risiko verstanden – trotzdem fortfahren"
 }

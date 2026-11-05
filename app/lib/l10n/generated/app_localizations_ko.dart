@@ -5658,6 +5658,10 @@ class AppLocalizationsKo extends AppLocalizations {
       'archoerashell이 설정에서 꺼져 있습니다(MCP 연동 → 명령줄 shell).';
 
   @override
+  String get mcpShellElevatedRefused =>
+      'archoerashell을 root/관리자로 실행하는 것을 거부했습니다. CLI와 MCP 자격 증명에는 관리자 권한이 필요하지 않으며, 권한을 높이면 설정·로그 소유자 위험이 커집니다. 일반 사용자로 다시 실행하세요. 컨테이너/CI에서 정말 필요할 때만 ARCHOERA_ALLOW_ELEVATED=1을 명시하세요.';
+
+  @override
   String get mcpShellHelpStatus =>
       '사용법: archoerashell status\n\n재생 상태를 표시: 재생/일시정지, 곡, 위치, 볼륨, 반복/셔플.';
 
@@ -6236,4 +6240,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get toastKdfRepacked => '다시 감쌌습니다. 데이터 손실 없음';
+
+  @override
+  String get elevationGateTitle => '관리자 권한 실행이 감지되었습니다';
+
+  @override
+  String elevationGateBody({required String kind}) {
+    return 'ArchoeraMusic이(가) $kind(으)로 실행 중입니다. 재생, 다운로드, 자격 증명 보관소에는 관리자 권한이 필요하지 않습니다. 권한을 유지한 채 계속하면 이 앱의 원격 코드 실행이나 공급망 문제가 시스템 전체에 영향을 줄 수 있고, 설정·캐시·로그가 $kind 권한으로 기록되어 일반 사용자가 읽거나 정리하지 못할 수 있습니다.\n\n종료한 뒤 일반 사용자로 다시 실행하세요.';
+  }
+
+  @override
+  String get elevationGateKindRoot => 'root(슈퍼유저)';
+
+  @override
+  String get elevationGateKindAdministrator => '관리자';
+
+  @override
+  String get elevationGateExit => '종료';
+
+  @override
+  String get elevationGateContinue => '위험을 이해했으며 계속';
 }

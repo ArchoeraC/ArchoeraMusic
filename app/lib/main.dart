@@ -24,6 +24,7 @@ import 'stores/app_prefs.dart';
 import 'stores/data_dir.dart';
 import 'stores/vault_session_store.dart';
 import 'app/app.dart';
+import 'app/elevation_gate.dart';
 import 'app/watermark.dart';
 import 'utils/app_version.dart';
 import 'widgets/common/tray_integration.dart';
@@ -70,6 +71,22 @@ Future<void> main(List<String> args) async {
   // 自身对话框提示后退出（第二实例的 Flutter 引擎已由原生 runner 起好，直接
   // runApp 最小页）。桥接缺失时不再静默放行（旧 Dart 兜底不可靠）——显式失败。
   final platformCaps = PlatformCapabilities.instance();
+  // 提权防呆门：root / 管理员启动先警告并默认退出（播放/下载/凭据库都不需要提权；
+  // 提权只会放大任何缺陷的影响面，并写出普通用户难以清理的属主文件）。必须在
+  // 单实例仲裁、保险库与 SQLite 预加载之前，避免提权进程触碰既有实例与数据。
+  // 探测失败（桥接不可用 / 后端错误）按未提权处理，不让防呆机制阻断正常启动。
+  final elevation = platformCaps.processElevation();
+  if (elevation != null && elevation.elevated) {
+    final proceed = await runElevationGate(
+      elevation,
+      locale: _startupLocale(prefs),
+    );
+    if (!proceed) {
+      Log.i('startup', '已拒绝以提权身份启动（${elevation.kind?.name}）');
+      exit(0);
+    }
+    Log.w('startup', '用户确认以提权身份继续启动（${elevation.kind?.name}）');
+  }
   var firstInstance = false;
   try {
     firstInstance = platformCaps.acquireSingleInstance();
@@ -83,10 +100,7 @@ Future<void> main(List<String> args) async {
       final forwarded = await platformCaps.deepLink.forward();
       if (forwarded == 1) exit(0);
     }
-    final parts = Platform.localeName.replaceAll('-', '_').split('_');
-    final locale = parts.length >= 2
-        ? Locale(parts[0], parts[1])
-        : Locale(parts[0]);
+    final locale = _startupLocale(prefs);
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
     await windowManager.ensureInitialized();
     await windowManager.setSize(const Size(420, 260));
@@ -168,6 +182,16 @@ Future<void> main(List<String> args) async {
   WidgetsBinding.instance.addPostFrameCallback(
     (_) => deepLinkRouter.markReady(),
   );
+}
+
+/// 启动门（提权 / 已有实例）可用的 locale：设置优先，否则跟随系统。
+Locale _startupLocale(AppPrefs prefs) {
+  final configured = prefs.locale;
+  final raw = (configured != null && configured.isNotEmpty)
+      ? configured
+      : Platform.localeName;
+  final parts = raw.replaceAll('-', '_').split('_');
+  return parts.length >= 2 ? Locale(parts[0], parts[1]) : Locale(parts[0]);
 }
 
 /// 读取 `ARCHOERA_LOG_LEVEL`（debug/info/warn/error/fatal），非法/缺省为 info。

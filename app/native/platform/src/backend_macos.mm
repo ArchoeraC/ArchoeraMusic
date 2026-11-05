@@ -51,6 +51,12 @@ int32_t hardenProcess() {
     return OK;
 }
 
+int32_t processElevation() {
+    // Darwin 没有 Win32 式令牌提权：root / sudo 是唯一的提权形态。
+    // `sudo` 下 getuid() 仍是原用户，故只检查有效 uid。
+    return ::geteuid() == 0 ? APL_ELEVATION_ROOT : APL_ELEVATION_NONE;
+}
+
 
 // 推送一次当前系统强调色（定义见文件后部）；平台推送模型，Dart 不查询。
 void pushAccent();
@@ -364,7 +370,7 @@ uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
            CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
-           CAP_SECURE_FILE | CAP_OPEN_URL;
+           CAP_SECURE_FILE | CAP_OPEN_URL | CAP_ELEVATION;
 }
 
 
