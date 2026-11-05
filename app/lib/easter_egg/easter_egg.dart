@@ -15,7 +15,7 @@
 /// [kEasterEggEffects] 追加一条 `EasterEggEffect` 即可。
 library;
 
-import 'dart:async' show Timer, unawaited;
+import 'dart:async' show Timer;
 import 'dart:io' show Platform, sleep;
 import 'dart:math' as math;
 

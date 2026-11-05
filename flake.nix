@@ -599,6 +599,27 @@ NUGETCFG
           chmod -R u+w app/core/audio-engine app/core/scanner app/core/indexer \
             app/core/scraper app/core/subsonic app/core/vault-rs app/native/platform
 
+          # native assets 的 build hook 运行在 hooks_runner 里，只透传环境变量
+          # 白名单（PATH/HOME/NIX_* 等），PKG_CONFIG_PATH 会被丢弃。cnativeapi
+          # 的 hook 用 pkg-config 找 GTK/X11/Xi，故在 PATH 前部放一个薄包装，
+          # 把当前 Nix 构建期的搜索路径显式带进 hook。
+          system_pkg_config="$(command -v pkg-config)"
+          mkdir -p "$TMPDIR/hook-bin"
+          cat > "$TMPDIR/hook-bin/pkg-config" <<'HOOKPC'
+#!@shell@
+# 清掉 Nix 角色变量，避免 wrapper 用未导出的 PKG_CONFIG_PATH_<salt> 覆盖。
+for v in ''${!NIX_PKG_CONFIG_WRAPPER_*}; do unset "$v"; done
+export PKG_CONFIG_PATH="@pkg_config_path@"
+exec "@system_pkg_config@" "$@"
+HOOKPC
+          sed -i \
+            -e "s|@shell@|${pkgs.runtimeShell}|" \
+            -e "s|@pkg_config_path@|$PKG_CONFIG_PATH|" \
+            -e "s|@system_pkg_config@|$system_pkg_config|" \
+            "$TMPDIR/hook-bin/pkg-config"
+          chmod +x "$TMPDIR/hook-bin/pkg-config"
+          export PATH="$TMPDIR/hook-bin:$PATH"
+
           echo "==> flutter build linux"
           (
             cd app
@@ -614,6 +635,15 @@ NUGETCFG
               echo "===== FLUTTER BUILD LOG ====="
               cat "$TMPDIR/flutter-build.log"
               echo "===== END ====="
+              # native assets hook 的完整 stdout/stderr 落在 hooks_runner
+              # 目录下，Flutter 只打印摘要，这里回显便于定位构建失败。
+              find app/.dart_tool/hooks_runner -type f \
+                \( -name 'stdout.txt' -o -name 'stderr.txt' \) 2>/dev/null |
+                while read -r f; do
+                  echo "===== $f ====="
+                  tail -n 120 "$f"
+                  echo "===== END ====="
+                done
               exit 1
             }
           )

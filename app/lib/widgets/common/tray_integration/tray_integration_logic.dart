@@ -15,13 +15,20 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
   Future<void> _setup() async {
     try {
       await _initTray();
-      windowManager.addListener(this);
-      await windowManager.setPreventClose(true);
       _trayReady = true;
     } catch (e) {
       Log.w('tray', '初始化失败，降级为正常关闭退出: $e');
       _trayReady = false;
       _disposeTray();
+      return;
+    }
+    // 关闭拦截是托盘常驻的附加能力：获取/监听窗口失败只降级为直接关闭，
+    // 不影响托盘本身（例如无窗口环境/原生库不可用）。
+    try {
+      _window = WindowManager.instance.getCurrent();
+      _windowListenerId = _window?.addListener(_onWindowEvent);
+    } catch (e) {
+      Log.w('tray', '窗口关闭拦截不可用，关闭将直接退出: $e');
     }
   }
 
@@ -113,8 +120,34 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
   }
 
   Future<void> _showWindow() async {
-    await windowManager.show();
-    await windowManager.focus();
+    final window = _window;
+    if (window == null) return;
+    window.show();
+    window.focus();
+    // nativeapi 不再派发 hide/show 事件：显式通知节能服务恢复前台档。
+    ref.read(powerSaverProvider).setHidden(false);
+  }
+
+  /// 隐藏到托盘（nativeapi 无 hide 事件，显式通知节能服务降到 0 帧档）。
+  void _hideToTray() {
+    _window?.hide();
+    ref.read(powerSaverProvider).setHidden(true);
+  }
+
+  /// 窗口关闭请求：先取消默认关闭，再按「关闭应用时」偏好处理。
+  ///
+  /// nativeapi 以可取消的 [EventRequest] 表达关闭请求；未取消则窗口关闭。
+  /// 旧版 `setPreventClose(true)` 的语义由这里显式接管。
+  Future<void> _onWindowEvent(WindowEvent event) async {
+    if (event is! WindowCloseRequestedEvent) return;
+    event.request.cancel();
+    if (_handlingClose) return;
+    _handlingClose = true;
+    try {
+      await _handleWindowClose();
+    } finally {
+      _handlingClose = false;
+    }
   }
 
   Future<void> _quit() async {
@@ -127,7 +160,7 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
       case 'quit':
         await _quit();
       case 'background':
-        await windowManager.hide();
+        _hideToTray();
       default:
         await _askCloseBehavior();
     }
@@ -209,7 +242,7 @@ extension _TrayIntegrationLogic on _TrayIntegrationState {
       if (behavior == 'quit') {
         await _quit();
       } else {
-        await windowManager.hide();
+        _hideToTray();
       }
     } finally {
       await notifier.restoreVolume();
