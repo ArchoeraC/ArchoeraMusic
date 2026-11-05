@@ -2,11 +2,11 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 回归：设置 →「音频效果」→「声道」的多声道合并开关。
+/// 回归：设置 →「音频效果」下的多声道合并 / 参数化均衡器 / 低频管理。
 ///
-/// 覆盖三件事：
+/// 覆盖：
 ///   1. 文案走 l10n（中文 / 英文两种 locale 都能渲染）；
-///   2. 开关状态跟随偏好，点击后写回偏好；
+///   2. 多声道合并开关状态跟随偏好，点击后写回偏好；
 ///   3. 点击会触发 `applyAudioEffects()`（即时下发引擎）。
 library;
 
@@ -117,5 +117,47 @@ void main() {
     expect(find.text('Channels'), findsOneWidget);
     expect(find.text('Channel merge'), findsOneWidget);
     expect(find.text('Off (original stereo preserved)'), findsOneWidget);
+  });
+
+  testWidgets('参数化均衡器 / 低频管理文案走 l10n', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        appPrefsProvider.overrideWith(_FakePrefsNotifier.new),
+        playbackProvider.overrideWith(_FakePlaybackNotifier.new),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_wrap(container, const Locale('zh', 'CN')));
+    await tester.pumpAndSettle();
+
+    // 小节标题 + 开关标题同名，各两处。
+    expect(find.text('参数化均衡器'), findsNWidgets(2));
+    expect(find.text('添加频段'), findsOneWidget);
+    expect(find.text('预增益'), findsNWidgets(2)); // 固定 EQ + 参数化 EQ 各一处
+    expect(find.text('次声 / 低频管理'), findsOneWidget);
+    expect(find.text('低频管理'), findsOneWidget);
+    expect(find.text('高通截止'), findsOneWidget);
+    expect(find.text('低架增益'), findsOneWidget);
+  });
+
+  testWidgets('参数化均衡器 / 低频管理有英文翻译', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        appPrefsProvider.overrideWith(_FakePrefsNotifier.new),
+        playbackProvider.overrideWith(_FakePlaybackNotifier.new),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_wrap(container, const Locale('en')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Parametric EQ'), findsNWidgets(2));
+    expect(find.text('Add band'), findsOneWidget);
+    expect(find.text('Subsonic / low-frequency management'), findsOneWidget);
+    expect(find.text('Low-frequency management'), findsOneWidget);
+    expect(find.text('High-pass cutoff'), findsOneWidget);
+    expect(find.text('Shelf gain'), findsOneWidget);
   });
 }
