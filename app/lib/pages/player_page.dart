@@ -54,9 +54,15 @@ class PlayerPage extends ConsumerStatefulWidget {
 }
 
 class _PlayerPageState extends ConsumerState<PlayerPage>
-    with SingleTickerProviderStateMixin, WindowListener {
+    with SingleTickerProviderStateMixin {
   /// 拖动中的进度（ms）；null = 跟随播放器实时位置。
   double? _dragMs;
+
+  /// 当前应用窗口句柄（nativeapi；无窗口环境为 null，能力调用静默跳过）。
+  Window? _window;
+
+  /// 窗口事件监听句柄（dispose 时按 id 注销）。
+  ListenerId? _windowListenerId;
 
   /// 切歌方向（slide 样式用）：播放顺序递增 = 下一首（新封面从右进），
   /// 递减 = 上一首（从左进）。对齐原版 watch(playIndex) 判定。
@@ -91,38 +97,41 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   double _lastBeatStrength = 1;
 
   /// 窗口是否处于完整全屏（进入全屏/还原按钮的图标与提示切换）。
-  /// 事件驱动：window_manager 窗口事件（含系统级全屏，如 F11）同步状态，
+  /// 事件驱动：nativeapi 窗口事件（含系统级全屏，如 F11）同步状态，
   /// 无轮询。
   bool _isFullScreen = false;
 
   /// 完整全屏切换（对齐原版 FullPlayer 顶栏 Maximize/Minimize 按钮，
   /// 由 useWindowControls → Electron setFullScreen 实现，这里走
-  /// window_manager.setFullScreen）。
+  /// nativeapi 的 [Window.isFullScreen]）。
   ///
-  /// Windows 下 window_manager 不保证派发 enter/leave fullscreen 窗口事件，
-  /// 若只靠 [onWindowEvent] 同步，按钮图标会停在旧态（必须关掉再打开播放页
-  /// 才会经 initState 查询刷新）。这里改为：乐观置位 → 调用 → 以窗口管理器
-  /// 实际状态校准，三端一致即时刷新。
+  /// Windows 下窗口管理器不保证派发进入/退出全屏事件，若只靠窗口事件
+  /// 同步，按钮图标会停在旧态（必须关掉再打开播放页才会经 initState
+  /// 查询刷新）。这里改为：乐观置位 → 调用 → 以窗口管理器实际状态校准，
+  /// 三端一致即时刷新。
   Future<void> _toggleFullscreen() async {
+    final window = _window;
+    if (window == null) return;
     final target = !_isFullScreen;
     if (mounted) setState(() => _isFullScreen = target);
-    await windowManager.setFullScreen(target);
-    await _syncFullScreen();
+    window.isFullScreen = target;
+    _syncFullScreen();
   }
 
   /// 以窗口管理器真实全屏状态校准本地标记（系统级全屏 / 平台事件缺失兜底）。
-  Future<void> _syncFullScreen() async {
-    final v = await windowManager.isFullScreen();
+  void _syncFullScreen() {
+    final v = _window?.isFullScreen ?? false;
     if (mounted && v != _isFullScreen) {
       setState(() => _isFullScreen = v);
     }
   }
 
-  @override
-  void onWindowEvent(String eventName) {
-    if (eventName == kWindowEventEnterFullScreen && !_isFullScreen) {
+  /// 窗口事件（含系统级全屏，如 F11）：同步播放页全屏按钮状态。
+  void _onWindowEvent(WindowEvent event) {
+    if (!mounted) return;
+    if (event is WindowEnteredFullScreenEvent && !_isFullScreen) {
       setState(() => _isFullScreen = true);
-    } else if (eventName == kWindowEventLeaveFullScreen && _isFullScreen) {
+    } else if (event is WindowExitedFullScreenEvent && _isFullScreen) {
       setState(() => _isFullScreen = false);
     }
   }
@@ -145,9 +154,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       duration: const Duration(milliseconds: 180),
     );
     // 全屏按钮初始状态 + 监听窗口事件（进入/退出全屏时图标同步）
-    windowManager.addListener(this);
+    _window = WindowManager.instance.getCurrent();
+    _windowListenerId = _window?.addListener(_onWindowEvent);
     // 初始全屏状态校准：Windows 平台事件可能缺失，改为主动查询真实状态。
-    unawaited(_syncFullScreen());
+    _syncFullScreen();
     // 缓存路由动画写入器（dispose 时不能再经 ref 获取）。
     _routeAnimNotifier = ref.read(playerRouteAnimationProvider.notifier);
   }
@@ -194,7 +204,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
     // 清空路由动画（壳层恢复折叠态）。
     _routeAnimNotifier?.set(null);
-    windowManager.removeListener(this);
+    final listenerId = _windowListenerId;
+    if (listenerId != null) _window?.removeListener(listenerId);
     _hideTimer?.cancel();
     _coverPulse.dispose();
     super.dispose();
