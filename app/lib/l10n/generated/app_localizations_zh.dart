@@ -5245,6 +5245,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPitchUnit => '半音';
 
   @override
+  String get settingsSectionChannels => '声道';
+
+  @override
+  String get settingsSectionChannelsDesc =>
+      '设备实际只有左/右一侧发声（单只耳机、单声道音箱等）时开启；合并后两侧都能听到完整内容，正常立体声设备建议保持关闭。';
+
+  @override
+  String get settingsChannelMerge => '多声道合并';
+
+  @override
+  String get settingsChannelMergeDesc => '所有声道按等功率合并为单声道后复制到每个输出声道';
+
+  @override
+  String get settingsChannelMergeOn => '已启用（所有声道合并为单声道输出）';
+
+  @override
+  String get settingsChannelMergeOff => '已停用（保持原始立体声）';
+
+  @override
   String get settingsSectionSystem => '系统集成';
 
   @override
@@ -11285,6 +11304,25 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsPitchUnit => '半音';
+
+  @override
+  String get settingsSectionChannels => '声道';
+
+  @override
+  String get settingsSectionChannelsDesc =>
+      '设备实际只有左/右一侧发声（单只耳机、单声道音箱等）时开启；合并后两侧都能听到完整内容，正常立体声设备建议保持关闭。';
+
+  @override
+  String get settingsChannelMerge => '多声道合并';
+
+  @override
+  String get settingsChannelMergeDesc => '所有声道按等功率合并为单声道后复制到每个输出声道';
+
+  @override
+  String get settingsChannelMergeOn => '已启用（所有声道合并为单声道输出）';
+
+  @override
+  String get settingsChannelMergeOff => '已停用（保持原始立体声）';
 
   @override
   String get settingsSectionSystem => '系统集成';
@@ -17328,6 +17366,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsPitchUnit => '半音';
+
+  @override
+  String get settingsSectionChannels => '聲道';
+
+  @override
+  String get settingsSectionChannelsDesc =>
+      '裝置實際只有左/右一側發聲（單耳耳機、單聲道喇叭等）時開啟；合併後兩側都能聽到完整內容，正常立體聲裝置建議保持關閉。';
+
+  @override
+  String get settingsChannelMerge => '多聲道合併';
+
+  @override
+  String get settingsChannelMergeDesc => '所有聲道以等功率合併為單聲道後複製到每個輸出聲道';
+
+  @override
+  String get settingsChannelMergeOn => '已啟用（所有聲道合併為單聲道輸出）';
+
+  @override
+  String get settingsChannelMergeOff => '已停用（保持原始立體聲）';
 
   @override
   String get settingsSectionSystem => '系统集成';

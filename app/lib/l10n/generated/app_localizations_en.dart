@@ -5500,6 +5500,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPitchUnit => 'st';
 
   @override
+  String get settingsSectionChannels => 'Channels';
+
+  @override
+  String get settingsSectionChannelsDesc =>
+      'Enable when only the left or right side of your device actually produces sound (single earbud, mono speaker, etc.); both sides will then carry the full mix. Keep off for normal stereo devices.';
+
+  @override
+  String get settingsChannelMerge => 'Channel merge';
+
+  @override
+  String get settingsChannelMergeDesc =>
+      'Sum all channels at equal power into mono, then copy the result to every output channel';
+
+  @override
+  String get settingsChannelMergeOn =>
+      'On (all channels merged to mono output)';
+
+  @override
+  String get settingsChannelMergeOff => 'Off (original stereo preserved)';
+
+  @override
   String get settingsSectionSystem => 'System integration';
 
   @override
