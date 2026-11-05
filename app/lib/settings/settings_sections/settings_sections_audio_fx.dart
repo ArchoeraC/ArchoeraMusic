@@ -369,16 +369,15 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
         const SizedBox(height: 20),
         // 1.7) 多声道合并（单侧设备兜底）
         SettingSection(
-          title: '声道',
-          note: '设备实际只有左/右一侧发声（单只耳机、单声道音箱等）时开启；'
-              '合并后两侧都能听到完整内容，正常立体声设备建议保持关闭。',
+          title: l10n.settingsSectionChannels,
+          note: l10n.settingsSectionChannelsDesc,
           children: [
             SettingSwitchTile(
               icon: EtaIcons.speakerOutline,
-              title: '多声道合并',
+              title: l10n.settingsChannelMerge,
               subtitle: prefs.channelMergeEnabled
-                  ? '已启用（所有声道合并为单声道输出）'
-                  : '已停用（保持原始立体声）',
+                  ? l10n.settingsChannelMergeOn
+                  : l10n.settingsChannelMergeOff,
               value: prefs.channelMergeEnabled,
               onChanged: (v) {
                 notifier.setChannelMerge(v);
