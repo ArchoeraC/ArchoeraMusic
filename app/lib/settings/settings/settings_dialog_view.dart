@@ -303,6 +303,18 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.speakerOutline,
       ),
       _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsPeq,
+        l10n.settingsSectionPeqDesc,
+        EtaIcons.chartLine,
+      ),
+      _SearchEntry(
+        SettingsCategory.audioEffects,
+        l10n.settingsLowfreq,
+        l10n.settingsSectionLowfreqDesc,
+        EtaIcons.dashboard3,
+      ),
+      _SearchEntry(
         SettingsCategory.lyrics,
         l10n.settingsPlayerLyrics,
         l10n.settingsSearchPlayerLyricsSubtitle,
