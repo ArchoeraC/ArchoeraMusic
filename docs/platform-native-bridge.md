@@ -99,19 +99,24 @@ Linux 本机与 Dart 测试都看不见——对应后端在 Linux 上根本不�
   cd app && flutter test test/native_platform_abi_test.dart
   ```
 
-### 平台与架构支持（2026-09-12 决策）
+### 平台与架构支持（2026-11-06 更新）
 
 | 平台 | 支持架构 | 说明 |
 |---|---|---|
 | Windows | **x64 / Arm64** | Flutter 官方仅 x64/Arm64，**不支持 32 位 x86** → 不提供 |
 | Linux | x64 / Arm64 | |
-| macOS | **arm64**（默认） | 主二进制为 universal（x86_64+arm64），但 `native/` FFI 库仅 arm64 |
+| macOS | **arm64 / x86_64** | 两架构**分别构建、分别发包**；x86_64 为维护模式，要求 macOS 14+ |
 
 - **Windows 32 位（x86）**：Flutter 平台限制（无 32 位构建），**放弃**。
-- **macOS Intel（x86_64）**：Flutter 仍支持且 app 主二进制已 universal，但原生模块需
-  universal 化（CMake 加 `CMAKE_OSX_ARCHITECTURES`、Rust/Go 用 `lipo`、.NET NativeAOT
-  单架构需分别 publish 再合）；叠加 Apple/Flutter 正在弃用 Intel，**暂时放弃**
-  （如需支持单开专项）。
+- **macOS Intel（x86_64）**：自 2026-11-06 起提供独立单架构包
+  （`ArchoeraMusic-<ver>-macos-x64.tar.gz`）。不构建 universal：`native/` 下
+  FFmpeg、scanner/indexer NativeAOT、Rust/Go 模块均按单架构产出，universal
+  会显著增加构建复杂度，且 Flutter 已在弃用 universal。
+  - 部署目标统一为 **macOS 14.0**（原生依赖 Homebrew/FFmpeg 的实际下限；
+    Flutter 3.47 自身最低为 macOS 12）。
+  - 上游窗口：GitHub `macos-*-intel` runner、Flutter 的 x64 支持、macOS 26
+    （最后一个支持 Intel 的大版本）任一结束即进入 EOL 评估。
+  - 真实 Intel Mac 上的启动/播放/扫描仍需在发版前人工冒烟。
 
 ## 3. C ABI（`include/archoera_platform.h` 草案）
 

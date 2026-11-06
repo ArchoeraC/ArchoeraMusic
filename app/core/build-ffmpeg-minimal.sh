@@ -138,6 +138,15 @@ fi
 
 echo "[build-ffmpeg-minimal] configure（纯 LGPL · 仅音频 · 共享库 · 自包含 TLS）…"
 # 自包含 TLS：优先经 mbedTLS pkg-config 探测（静态库链接进 libav*，无运行期外部依赖）。
+# Homebrew 的 opus（--enable-libopus）在 macOS 上默认不保证进入 pkg-config
+# 搜索路径；显式加入当前架构的 brew 前缀（Intel /usr/local，Apple Silicon
+# /opt/homebrew），避免 x86_64 构建因找不到 opus 而失败。
+if command -v brew >/dev/null 2>&1; then
+  BREW_PREFIX="$(brew --prefix 2>/dev/null || true)"
+  if [ -n "$BREW_PREFIX" ]; then
+    export PKG_CONFIG_PATH="$BREW_PREFIX/opt/opus/lib/pkgconfig:$BREW_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+  fi
+fi
 export PKG_CONFIG_PATH="$MBEDTLS_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 # --disable-autodetect：关闭所有外部库自动探测（zlib 除外，显式开启）
 # --disable-gpl/nonfree + --enable-version3：FFmpeg 把 mbedtls 列入
