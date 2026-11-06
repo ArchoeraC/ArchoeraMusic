@@ -51,11 +51,14 @@ final class EngineConfigC extends Struct {
   @Float()
   external double limiterThresholdDb;
 
-  @Bool()
-  external bool fftEnabled;
-
-  @Int32()
-  external int fftSize;
+  // 注意：这里**不得**再出现 `fft_enabled` / `fft_size`。频谱 v1 删除时
+  // （docs/spectrum-analyzer.md §2.1）C 侧 `EngineConfig` 已移除这两个字段，
+  // Dart 结构体若保留，会让其后所有字段整体偏移 8 字节（bool+padding+int32）：
+  // tempo/engine_mode/no_disk_cache/pcm_mem_cap_kb/initial_volume 全部读错位
+  // ——表现为内存播放上限被读成 1KB（频谱取窗永远失败、可视化空掉）、
+  // EraAudio 模式失效、初始音量被读成 0。字段顺序必须与
+  // `app/core/audio-engine/include/audio_engine.h` 的 `EngineConfig` 逐字一致，
+  // 改动由 `test/engine_config_abi_test.dart` 守卫。
 
   @Bool()
   external bool tempoEnabled;
@@ -514,8 +517,6 @@ Pointer<EngineConfigC> engineConfigFromParams({
         false // 播放模式由库内强制置 true
     ..limiterEnabled = true
     ..limiterThresholdDb = -1.0
-    ..fftEnabled = false
-    ..fftSize = 1024
     ..tempoEnabled = tempoSpeed != null || tempoPitch != null
     ..tempoSpeed = tempoSpeed ?? 1.0
     ..tempoPitch = tempoPitch ?? 0.0

@@ -10,7 +10,8 @@
 ///   播放控制（循环 / 上一首 / 播放 / 下一首 / 随机）→ 音量；
 /// - 右栏：歌词列表取右栏宽度的 90% 并右对齐，文字左对齐；当前行 95%
 ///   前景色、其余行 28%，非当前行缩到 0.95；上下 25% 渐隐；
-/// - 不渲染页面共享底栏（控制已经在封面下方）。
+/// - 不渲染页面共享底栏（控制已经在封面下方），但底部单独保留一条细频谱，
+///   与其它布局同样消费引擎 `fft` 事件（关闭「频谱可视化」/性能模式时零高度）。
 ///
 /// 低开销取舍：封面投影用 [BoxShadow]（不再复制一张封面做 blur）；歌词复用
 /// [PlayerLyricsBlock] 的共享取色/引擎入口（Vutron 预设强制 simple 列表），
@@ -24,11 +25,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/l10n.dart';
 import '../../../services/playback/playback_notifier.dart';
+import '../../../stores/app_prefs.dart';
 import '../../../widgets/common/anim.dart';
 import '../../../widgets/list/cover_image.dart';
 import '../../../widgets/player/playback_progress_slider.dart';
 import '../../../widgets/player/player_lyrics_block.dart';
 import '../../../widgets/player/player_lyrics_slot.dart';
+import '../../../widgets/player/spectrum_view.dart';
 import 'player_layout.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -57,69 +60,99 @@ class VutronPlayerLayout extends PlayerLayout {
 
   @override
   Widget buildBody(BuildContext context, PlayerLayoutContext c) {
-    return LayoutBuilder(
-      builder: (context, box) {
-        final maxByWidth = (box.maxWidth * coverWidthFraction).clamp(
-          180.0,
-          460.0,
-        );
-        final coverSize = (box.maxHeight * coverHeightFraction).clamp(
-          180.0,
-          maxByWidth,
-        );
-        // 关闭歌词（或没有歌词）时，右栏没有内容；开启自动居中时把
-        // 封面/控制区整体居中，避免留下半屏空白。
-        final showLyrics = c.showLyrics && c.hasLyrics;
-        if (!showLyrics && c.autoCenterCover) {
-          return RepaintBoundary(
-            child: Center(
-              child: SizedBox(
-                width: coverSize,
-                child: _VutronLeftColumn(size: coverSize, ctx: c),
-              ),
-            ),
-          );
-        }
-        return RepaintBoundary(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 左栏：封面 + 信息 + 进度/控制/音量（整体垂直居中）。
-              Expanded(
-                child: Center(
-                  child: SizedBox(
-                    width: coverSize,
-                    child: _VutronLeftColumn(size: coverSize, ctx: c),
-                  ),
-                ),
-              ),
-              // 右栏：歌词容器取 90% 宽并右对齐（对齐 `.main-lyric-container`）。
-              Expanded(
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerRight,
-                  widthFactor: 0.9,
-                  child: PlayerLyricsSlot(
-                    visible: c.showLyrics,
-                    enabled: c.contentMounted && c.hasLyrics,
-                    builder: (_) => RepaintBoundary(
-                      child: PlayerLyricsBlock(
-                        hasLyrics: c.hasLyrics,
-                        // 字号由 vutron 预设接管（720p=28px 起随高度缩放）。
-                        lyricScale: 1,
-                        presentation: PlayerLyricsPresentation.vutron,
-                        textAlign: lyricsAlign,
-                        fadeEdges: true,
-                        onSeek: c.onSeekLyric,
-                        dragMs: c.dragMs,
-                      ),
+    // 页面共享底栏（含 90px 频谱）在 vutron 布局下不渲染，底部单独补一条
+    // 细频谱，避免该布局完全没有可视化（与其它布局同源：引擎 fft 事件）。
+    return Column(
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final maxByWidth = (box.maxWidth * coverWidthFraction).clamp(
+                180.0,
+                460.0,
+              );
+              final coverSize = (box.maxHeight * coverHeightFraction).clamp(
+                180.0,
+                maxByWidth,
+              );
+              // 关闭歌词（或没有歌词）时，右栏没有内容；开启自动居中时把
+              // 封面/控制区整体居中，避免留下半屏空白。
+              final showLyrics = c.showLyrics && c.hasLyrics;
+              if (!showLyrics && c.autoCenterCover) {
+                return RepaintBoundary(
+                  child: Center(
+                    child: SizedBox(
+                      width: coverSize,
+                      child: _VutronLeftColumn(size: coverSize, ctx: c),
                     ),
                   ),
+                );
+              }
+              return RepaintBoundary(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // 左栏：封面 + 信息 + 进度/控制/音量（整体垂直居中）。
+                    Expanded(
+                      child: Center(
+                        child: SizedBox(
+                          width: coverSize,
+                          child: _VutronLeftColumn(size: coverSize, ctx: c),
+                        ),
+                      ),
+                    ),
+                    // 右栏：歌词容器取 90% 宽并右对齐（对齐 `.main-lyric-container`）。
+                    Expanded(
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerRight,
+                        widthFactor: 0.9,
+                        child: PlayerLyricsSlot(
+                          visible: c.showLyrics,
+                          enabled: c.contentMounted && c.hasLyrics,
+                          builder: (_) => RepaintBoundary(
+                            child: PlayerLyricsBlock(
+                              hasLyrics: c.hasLyrics,
+                              // 字号由 vutron 预设接管（720p=28px 起随高度缩放）。
+                              lyricScale: 1,
+                              presentation: PlayerLyricsPresentation.vutron,
+                              textAlign: lyricsAlign,
+                              fadeEdges: true,
+                              onSeek: c.onSeekLyric,
+                              dragMs: c.dragMs,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              );
+            },
           ),
-        );
-      },
+        ),
+        const _VutronSpectrum(),
+      ],
+    );
+  }
+}
+
+/// vutron 布局底部的细频谱条。
+///
+/// 关闭「频谱可视化」/ 性能模式时返回零高度，不改变左栏排版。
+class _VutronSpectrum extends ConsumerWidget {
+  const _VutronSpectrum();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(appPrefsProvider);
+    if (!prefs.enableSpectrum || prefs.performanceMode) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 2),
+      child: RepaintBoundary(
+        child: SpectrumView(height: 40, opacity: 0.45),
+      ),
     );
   }
 }
