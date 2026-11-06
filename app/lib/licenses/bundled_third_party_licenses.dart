@@ -209,14 +209,8 @@ const List<BundledThirdPartyLicense> bundledThirdPartyLicenses = [
     assetPath: 'assets/licenses/LGPL-3.0.txt',
   ),
 
-  // ---- downloader / shell / subsonic（Go）：大量传递依赖按模块归入分组条目 ---
+  // ---- shell / subsonic（Go）：大量传递依赖按模块归入分组条目 ---
   //      逐项清单（含传递依赖）随包 licenses/<模块>-THIRD-PARTY-LICENSES.md。
-  BundledThirdPartyLicense(
-    name: 'downloader — Rust crates（tokio/serde/RustCrypto 等）',
-    licenseId: 'MIT / Apache-2.0',
-    homeUrl: 'https://crates.io',
-    assetPath: 'assets/licenses/Apache-2.0.txt',
-  ),
   BundledThirdPartyLicense(
     name: 'shell — Rust crates（serde_json/indexmap/libc 等）',
     licenseId: 'MIT / Apache-2.0',

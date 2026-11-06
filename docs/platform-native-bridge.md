@@ -165,7 +165,7 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 
 文件管理器定位（`APL_CAP_REVEAL_PATH`，ABI v2 起）：`apl_reveal_path(path)`
 在系统文件管理器中定位路径（文件 → 打开所在目录并选中；目录 → 打开）——
-音乐库「定位文件」、下载「打开所在目录」、隔离区「打开目录」统一走本能力，
+音乐库「定位文件」、隔离区「打开目录」统一走本能力，
 **不再起 `xdg-open`/`explorer` 等子进程**。Linux 走 `org.freedesktop.FileManager1`
 D-Bus（回退 GIO 默认应用打开所在目录）；Windows 走 `SHOpenFolderAndSelectItems` /
 `ShellExecute`；macOS 走 `NSWorkspace`。

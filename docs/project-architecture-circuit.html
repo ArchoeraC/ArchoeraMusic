@@ -545,7 +545,7 @@
           <ul>
             <li>播放是 Dart 通过 FFI 直连 `libarchoera_mediaengine`。</li>
             <li>平台能力统一走 `libarchoera_platform`，不是 Dart 直调系统 API。</li>
-            <li>扫描 / 刮削 / 下载 / Subsonic 都是独立原生模块。</li>
+            <li>扫描 / 刮削 / Subsonic 都是独立原生模块。</li>
             <li>唯一显式子进程例外是 `archoera-vault`。</li>
           </ul>
         </div>
@@ -563,7 +563,7 @@
         <div class="card">
           <h2>看图建议</h2>
           <p>
-            先看“项目架构图”理解层次，再切到“模块通讯图”看真实数据流。对接播放、扫描、下载或平台桥时，这两张图可以互相对照。
+            先看“项目架构图”理解层次，再切到“模块通讯图”看真实数据流。对接播放、扫描或平台桥时，这两张图可以互相对照。
           </p>
         </div>
       </aside>
@@ -614,12 +614,11 @@
         group: "dart",
         type: "ui-pages",
         title: "页面层",
-        meta: "home / library / liked / history / download / search / streaming / player",
-        description: "页面目录按业务拆分，搜索、流媒体详情、下载、曲库和全屏播放页各自有独立视图文件。",
+        meta: "home / library / liked / history / search / streaming / player",
+        description: "页面目录按业务拆分，搜索、流媒体详情、曲库和全屏播放页各自有独立视图文件。",
         files: [
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/home_page.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/library_page.dart",
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/download_page.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/search_page.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/player_page.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/streaming/streaming_page.dart"
@@ -705,18 +704,6 @@
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scraper/scrape_controller.dart"
         ]
       },
-      downloader_service: {
-        group: "ffi",
-        type: "service",
-        title: "下载服务",
-        meta: "DownloaderEngine / Rust push callback / 下载任务控制器",
-        description: "下载层明确禁止 Dart 轮询进度，所有状态都由 Rust 主动回调推送，Dart 只是接收、派发和提供控制命令。",
-        files: [
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_engine.dart",
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_ffi.dart",
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/download_controller.dart"
-        ]
-      },
       audio_native: {
         group: "native",
         type: "native",
@@ -734,12 +721,11 @@
         group: "native",
         type: "native",
         title: "原生模块组",
-        meta: "scanner(C#) / scraper(C++) / downloader(Rust) / subsonic(Go) / log(C)",
-        description: "除了音频引擎外，仓库里还存在多个语言各异但边界清晰的原生模块，它们分别做扫描、刮削、下载、Subsonic 服务和统一日志。",
+        meta: "scanner(C#) / scraper(C++) / subsonic(Go) / log(C)",
+        description: "除了音频引擎外，仓库里还存在多个语言各异但边界清晰的原生模块，它们分别做扫描、刮削、Subsonic 服务和统一日志。",
         files: [
           "/home/betastudio2/文档/ArchoeraMusic/app/core/scanner/ScannerEngine.cs",
           "/home/betastudio2/文档/ArchoeraMusic/app/core/scraper/src/scraper_lib.cpp",
-          "/home/betastudio2/文档/ArchoeraMusic/app/core/downloader/src",
           "/home/betastudio2/文档/ArchoeraMusic/app/core/subsonic/main_ffi.go",
           "/home/betastudio2/文档/ArchoeraMusic/app/native/log/src"
         ]
@@ -772,13 +758,12 @@
         group: "dart",
         type: "ui",
         title: "UI 与页面动作",
-        meta: "PlayerPage / LibraryPage / SearchPage / DownloadPage",
-        description: "用户操作基本都从页面层发起：点播放、点下载、进曲库扫描、切设置、打开全屏播放器。",
+        meta: "PlayerPage / LibraryPage / SearchPage",
+        description: "用户操作基本都从页面层发起：点播放、进曲库扫描、切设置、打开全屏播放器。",
         files: [
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/player/player_page_view.dart",
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/library/library_page_view.dart",
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/search/search_page_view.dart",
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/download/download_page_view.dart"
+          "/home/betastudio2/文档/ArchoeraMusic/app/lib/pages/search/search_page_view.dart"
         ]
       },
       playback_core: {
@@ -889,48 +874,6 @@
           "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/scanner/tracks_db.dart"
         ]
       },
-      download_ui: {
-        group: "dart",
-        type: "service",
-        title: "DownloadController / DownloaderEngine",
-        meta: "任务控制 / 会话同步 / 事件流",
-        description: "下载控制器负责初始化引擎、同步登录态、管理任务和把 Rust 回调转成上层可消费的事件流。",
-        files: [
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/download_controller.dart",
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_engine.dart"
-        ]
-      },
-      download_ffi: {
-        group: "ffi",
-        type: "ffi",
-        title: "downloader_ffi",
-        meta: "init / enqueue / pause / retry / free",
-        description: "下载 FFI 层定义的是命令和回调边界，明确要求 Dart 不做轮询、不自己写下载文件。",
-        files: [
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_ffi.dart"
-        ]
-      },
-      download_native: {
-        group: "native",
-        type: "native",
-        title: "Rust 下载引擎",
-        meta: "主动 push 事件 / 管理历史与下载文件",
-        description: "Rust 侧才是真正解析 URL、控制并发、恢复历史和写文件的地方，Dart 不越界代劳。",
-        files: [
-          "/home/betastudio2/文档/ArchoeraMusic/app/core/downloader/src",
-          "/home/betastudio2/文档/ArchoeraMusic/app/core/downloader/Cargo.toml"
-        ]
-      },
-      download_files: {
-        group: "storage",
-        type: "storage",
-        title: "下载历史与文件",
-        meta: "historyPath / 下载目录 / 临时文件",
-        description: "下载链的最终落点是下载根目录、任务历史文件和临时断点续传文件。",
-        files: [
-          "/home/betastudio2/文档/ArchoeraMusic/app/lib/services/downloader/downloader_engine.dart"
-        ]
-      },
       platform_dart: {
         group: "ffi",
         type: "service",
@@ -1015,7 +958,7 @@
         overview: "这一页更适合看分层：入口、App 壳、页面、服务、FFI、原生模块、存储与唯一子进程怎么拼起来。现在节点位置由 layer 自动计算，后续维护主要改模块注册表和关系。",
         layers: [
           { id: "entry", label: "入口 / UI", nodeIds: ["main", "app_shell", "pages"] },
-          { id: "service", label: "Dart 服务", nodeIds: ["playback", "source_registry", "platform_facade", "scanner_service", "scraper_service", "downloader_service"] },
+          { id: "service", label: "Dart 服务", nodeIds: ["playback", "source_registry", "platform_facade", "scanner_service", "scraper_service"] },
           { id: "state", label: "状态 / 存储", nodeIds: ["state_storage"] },
           { id: "native", label: "原生实现", nodeIds: ["audio_native", "native_suite", "platform_native"] },
           { id: "process", label: "子进程例外", nodeIds: ["vault"] }
@@ -1027,7 +970,6 @@
           { from: "app_shell", to: "pages", kind: "call", label: "页面承载", description: "AppShell 和 Router 决定页面布局、分支和全屏播放器入口。" },
           { from: "pages", to: "playback", kind: "call", label: "播放状态消费", description: "页面层通过 provider 观察播放状态并发出控制命令。" },
           { from: "pages", to: "scanner_service", kind: "call", label: "曲库触发", description: "曲库页和相关 store 会触发自动刷新与扫描。" },
-          { from: "pages", to: "downloader_service", kind: "call", label: "下载任务", description: "下载页与搜索/播放入口通过控制器操作下载任务。" },
           { from: "playback", to: "source_registry", kind: "net", label: "解析音源 / 搜索 / 歌词", description: "播放和搜索依赖 SourcePlatform 统一分派到各纯 Dart 平台实现。" },
           { from: "playback", to: "audio_native", kind: "call", label: "FFI create / command / wait_event", description: "播放通过 engine_bindings.dart 调用音频引擎的 C ABI。" },
           { from: "playback", to: "state_storage", kind: "store", label: "会话 / 历史 / 缓存", description: "播放状态、偏好、歌曲缓存和历史会写入本地存储。" },
@@ -1035,8 +977,7 @@
           { from: "scanner_service", to: "native_suite", kind: "call", label: "scanner-ffi", description: "扫描器通过 NativeAOT 共享库被调用。" },
           { from: "scanner_service", to: "state_storage", kind: "store", label: "library.db", description: "扫描结果最终进入 SQLite 曲库和封面缓存目录。" },
           { from: "scraper_service", to: "native_suite", kind: "call", label: "scraper FFI", description: "刮削逻辑通过 C++ 动态库执行。" },
-          { from: "downloader_service", to: "native_suite", kind: "call", label: "Rust FFI + callback", description: "下载任务控制命令进 Rust，状态再由 Rust 回调推回 Dart。" },
-          { from: "downloader_service", to: "state_storage", kind: "store", label: "下载文件 / 历史", description: "下载器会读写历史文件和落地下载内容。" }
+          { from: "scraper_service", to: "state_storage", kind: "store", label: "刮削结果", description: "刮削结果最终写回曲库元数据。" }
         ]
       },
       communication: {
@@ -1044,11 +985,11 @@
         tab: "模块通讯图",
         overview: "这一页更适合看数据怎么流动：谁发命令、谁回事件、谁写 SQLite、谁通过 FFI 或子进程跨边界。视图只维护层和关系，不再维护 x/y 坐标。",
         layers: [
-          { id: "ui", label: "UI / Dart 控制层", nodeIds: ["ui", "playback_core", "scanner_ui", "download_ui", "subsonic_dart"] },
+          { id: "ui", label: "UI / Dart 控制层", nodeIds: ["ui", "playback_core", "scanner_ui", "subsonic_dart"] },
           { id: "api", label: "远端 API / 服务门面", nodeIds: ["source_core", "remote_apis", "platform_dart"] },
-          { id: "ffi", label: "FFI 边界", nodeIds: ["audio_process", "engine_bindings", "scanner_ffi", "download_ffi", "platform_bind"] },
-          { id: "native", label: "原生执行层", nodeIds: ["audio_engine_native", "scanner_native", "download_native", "subsonic_go", "platform_native_impl", "os"] },
-          { id: "storage", label: "文件 / 数据库 / 进程", nodeIds: ["library_db", "download_files", "vault_proc"] }
+          { id: "ffi", label: "FFI 边界", nodeIds: ["audio_process", "engine_bindings", "scanner_ffi", "platform_bind"] },
+          { id: "native", label: "原生执行层", nodeIds: ["audio_engine_native", "scanner_native", "subsonic_go", "platform_native_impl", "os"] },
+          { id: "storage", label: "文件 / 数据库 / 进程", nodeIds: ["library_db", "vault_proc"] }
         ],
         edges: [
           { from: "ui", to: "playback_core", kind: "call", label: "用户操作 -> 播放命令", description: "点击播放、切歌、seek、切页时，页面把动作交给 PlaybackNotifier。" },
@@ -1068,11 +1009,6 @@
           { from: "scanner_ffi", to: "scanner_native", kind: "call", label: "NativeAOT FFI", description: "扫描共享库进入 C# ScannerEngine 执行。" },
           { from: "scanner_native", to: "scanner_ui", kind: "event", label: "进度回调", description: "C# 扫描器把 JSON 进度回调给 Dart。" },
           { from: "scanner_native", to: "library_db", kind: "store", label: "直写 SQLite / covers", description: "扫描器执行完成后把曲库和封面数据写到文件系统。" },
-          { from: "ui", to: "download_ui", kind: "call", label: "下载操作", description: "页面层发起入队、暂停、恢复和删除。" },
-          { from: "download_ui", to: "download_ffi", kind: "call", label: "init / enqueue / retry", description: "Dart 通过 downloader_ffi 发命令。" },
-          { from: "download_ffi", to: "download_native", kind: "call", label: "Rust FFI", description: "下载引擎真实逻辑在 Rust 实现。" },
-          { from: "download_native", to: "download_ui", kind: "event", label: "push 事件回调", description: "下载进度和状态变化由 Rust 主动推回 Dart，不允许 Dart 轮询。" },
-          { from: "download_native", to: "download_files", kind: "store", label: "文件 / 历史 / tmp", description: "Rust 管理下载目录、历史记录和断点续传文件。" },
           { from: "ui", to: "subsonic_dart", kind: "call", label: "启动本地服务", description: "Subsonic 功能通过控制器创建和管理。" },
           { from: "subsonic_dart", to: "subsonic_go", kind: "call", label: "create / pollEvent", description: "Dart 调进 Go c-shared 库并轮询服务事件。" },
           { from: "ui", to: "vault_proc", kind: "process", label: "密文存取 / 会话", description: "登录态、凭据方案和解锁过程都要通过 vault 子进程。" }

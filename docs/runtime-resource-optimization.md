@@ -20,7 +20,7 @@
 - 背景（最大头）的目标形态：**静态层缓存一次（模糊封面 + 压暗）+ 动态层只在「水纹损伤区」
   以低分辨率绘制**；回退阶梯保证软渲染/老 iGPU 可用。
 - 生命周期：`go_router` 已做「懒建分支 + `Offstage` + `TickerMode`」，缺的是**卸载**（分支状态永驻）
-  与**模块按需**（downloader 启动常驻，见 [module-on-demand-load-plan.md](module-on-demand-load-plan.md)）。
+  与**模块按需**（重模块加载时机，见 [module-on-demand-load-plan.md](module-on-demand-load-plan.md)）。
 - **范围不限于播放页**（用户 2026-09-16）：列表 / 首页 / 搜索 / 侧边栏 / 顶栏 / 播放条 /
   毛玻璃弹窗 / 路由转场 / 图片外观背景同样按四杠杆治理（见 §2.1、§4.6）。
 - **实现边界硬约束**：只落 **Dart + 既有 FFI 桥接**、**集显优先且不依赖独显**、**不改引擎**
@@ -56,7 +56,7 @@
 | 图层结构 | blur/ripple **共用** `.bg-blur-wrap` + 单个 `::after` 压暗 | 多遍全屏叠层（gradient + 模糊 + 折射 + 压暗） | overdraw |
 | 文本 | Chromium 字形栅格缓存 + 合成层 | v7 每帧 `TextPainter.layout()`（P1 已部分解决） | UI 线程 |
 | 列表/分支 | Chromium tile + occlusion culling，标签可丢弃 | `go_router` 懒建分支 + `Offstage` + `TickerMode`；**访问过即永驻** | 缺「卸载」 |
-| 模块 | 渲染/媒体多进程、按需 | downloader `bootstrap.dart:46` **启动即常驻** | 缺「按需」 |
+| 模块 | 渲染/媒体多进程、按需 | 重模块加载时机 | 缺「按需」 |
 
 > 说明：Electron/Chromium 自身内存并不小；真正可比的是**单个效果的开销预算**与**生命周期纪律**，
 > 框架只是提供了成熟的合成器机制。我们的思路是「**借用机制，不照搬架构**」。
@@ -749,7 +749,7 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
     （可选保留状态：轻量状态经 `PageStorage` / provider，重对象直接释放）。
   - 非活动分支额外释放：大 `ui.Image`（封面）、长列表缓存、订阅。
 - **模块**：落地 [module-on-demand-load-plan.md](module-on-demand-load-plan.md)：
-  先解除 `bootstrap.dart:46` 的 downloader 启动常驻，再上注册表引用计数 + 用后释放。
+  先解除 `bootstrap.dart:46` 的重模块启动常驻，再上注册表引用计数 + 用后释放。
 - **播放页**：收起/退出即释放（现状 `dispose` 已释放 shader/纹理）；可学上游**展开延迟挂载**，
   避免首帧同时构建背景 + 歌词 + 频谱。
 - **暂停/后台**：`power_saver.dart` 已按最小化/失焦/熄屏压帧率；需确保**连 ticker 一起停**
@@ -791,7 +791,7 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
 > 另：平台桥接的窗口状态流对 minimized 改为**只置位、不清除**（部分合成器把
 > GTK hide 报告为 minimized=false，会闪回前台并取消后台释放）；清除交给显式
 > show/restore 事件。这样后台判定不再被系统误报打断（对齐“自己判定后台”）。
-> 4. 实测后台常驻基线（release，Linux）：重模块（mediaengine/kernel/downloader/scraper/
+> 4. 实测后台常驻基线（release，Linux）：重模块（mediaengine/kernel/scraper/
 >    scanner/ffmpeg）**均已按需未加载**；~290MB 主要由 GPU 驱动（~67MB）、Flutter 引擎
 >    （~27MB）、字体（Noto CJK + MiSans ~22MB）、原生 heap（~58MB）、Dart heap（~29MB）
 >    构成——即 Flutter/驱动/字形地板，进程内无可卸载 API。
@@ -865,7 +865,7 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
 |---|---|---|---|
 | **R0** | profile 基线：**全应用**（列表/首页/搜索/播放页）2K/4K，记录 UI/raster 帧时间 + GPU 占用（iGPU 与 llvmpipe） | Dart（`addTimingsCallback`）｜`services/render/quality_governor.dart` | 基线与瓶颈归属报告（分页面） |
 | **R1** | 背景**静态层缓存** + **动态层损伤区** + 降分辨率（§4.1） | Dart｜`widgets/player/background/*`、`services/render/damage_region.dart` | iGPU 全屏达帧预算；视觉与上游一致；软渲染可回退 |
-| **R2** | 图层纪律 + 生命周期（§4.2/§4.4）：稳定层隔离、去无谓裁剪、分支卸载、downloader 解除常驻 | Dart + FFI（模块注册表）｜`services/lifecycle/branch_lifecycle.dart`、`services/native_module_registry.dart` | RSS 可控、启动时间不退化；切页/切歌后可回收 |
+| **R2** | 图层纪律 + 生命周期（§4.2/§4.4）：稳定层隔离、去无谓裁剪、分支卸载、重模块解除常驻 | Dart + FFI（模块注册表）｜`services/lifecycle/branch_lifecycle.dart`、`services/native_module_registry.dart` | RSS 可控、启动时间不退化；切页/切歌后可回收 |
 | **R2b** | **全应用 UI 面**（§4.6）：列表/网格纪律、图片解码与缓存上限、毛玻璃范围、转场、常驻部件隔离 | Dart｜`widgets/list/*`、`widgets/common/glass_surface.dart`、`services/render/layer_budget.dart` | 列表滚动帧时间达标；图片常驻内存有界；无全屏模糊弹窗 |
 | **R3** | 文本/几何批处理（§4.3，按 R1/R2 后剩余瓶颈定） | Dart｜`widgets/player/lyrics_v7/*`、`widgets/player/spectrum_view/*` | 歌词区 UI 帧时间≈常数；频谱无离屏 |
 | **R4** | 自适应画质（§4.5） | Dart｜`services/render/quality_governor.dart` | 目标机稳定在帧预算内，无独显依赖 |

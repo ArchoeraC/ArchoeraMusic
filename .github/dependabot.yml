@@ -31,13 +31,8 @@ updates:
       - dependencies
       - ci
 
-  # ── Rust（下载器 / archoerashell / transcoder / tempo-rs / vault-rs）──
+  # ── Rust（archoerashell / transcoder / tempo-rs / vault-rs）──
   - package-ecosystem: cargo
-    directory: /app/core/downloader
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 0 # 停用版本更新（见文件头）
-    labels: [dependencies, rust]
   - package-ecosystem: cargo
     directory: /app/core/shell
     schedule:

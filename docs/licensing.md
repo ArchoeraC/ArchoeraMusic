@@ -31,7 +31,6 @@
 | 扫描器（C#） | `app/core/scanner/THIRD-PARTY-LICENSES.md` | TagLibSharp / SQLitePCLRaw |
 | 本地搜索索引器（C#） | `app/core/indexer/THIRD-PARTY-LICENSES.md` | ToolGood.Words / SQLitePCLRaw / Microsoft.Data.Sqlite；数据表 `nfkc.tsv` / `def_en2hanzi.tsv` / `def_hanzi2en.tsv` / `ja_readings.tsv` 派生自 Unicode（Unicode License，含 Unihan `kDefinition` 与 **`kJapanese`**）；`kana_romaji.tsv` 为自研（标准罗马字事实） |
 | 刮削器（C++） | `app/core/scraper/THIRD-PARTY-LICENSES.md` | TagLib / nlohmann-json |
-| 下载引擎（Rust） | `app/core/downloader/THIRD-PARTY-LICENSES.md` | reqwest / lofty / RustCrypto |
 | Subsonic（Go + Rust） | `app/core/subsonic/THIRD-PARTY-LICENSES.md` | 转码器 / Go 依赖 |
 
 第三方依赖按各自许可证引入（含 Permissive 与 LGPL-2.1+/LGPL-3.0+/MPL-2.0 等 weak-copyleft，逐项见上表各模块 `THIRD-PARTY-LICENSES.md`），并在各自条款下与本项目 AGPL-3.0 代码共存。本声明为项目维护者的合理努力整理，不构成法律意见。

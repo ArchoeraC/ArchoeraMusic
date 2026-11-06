@@ -14,7 +14,7 @@
 | SEC-24 | tag 名经 **`$GITHUB_REF_NAME` 环境变量**注入，`run:` 内不再内插 `${{ github.ref_name }}` | `build-all.yml` |
 | SEC-25 | release 作业生成 **CycloneDX SBOM**：产物侧（FFmpeg / OpenSSL / opus / taglib 等原生库、自家二进制、Go 模块）+ 各生态锁文件（Rust 5× `Cargo.lock`、Dart `pubspec.lock`、Go `go.mod`+`go.sum`、.NET `packages.lock.json`）合并为一份；与**全部**资产一并签 `.sig1` 并列入 `SHA256SUMS`。另写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业、`app/tool/gen_sbom.sh` |
 | SEC-26 | **各生态漏洞扫描**工作流（`cargo audit` / `govulncheck` / `dotnet list package --vulnerable`）；Dependabot 配置保留但**版本更新已停用**（依赖改为定期手动同步，见 §3） | `.github/dependabot.yml`、`security-audit.yml` |
-| SEC-27 | CI 跑**完整 `flutter test`**（不再只跑 widget 冒烟）+ vault 用例（指向测试二进制）+ downloader/subsonic 的 `cargo test` / `go test` | `actions/build-linux/action.yml` |
+| SEC-27 | CI 跑**完整 `flutter test`**（不再只跑 widget 冒烟）+ vault 用例（指向测试二进制）+ subsonic 的 `go test` | `actions/build-linux/action.yml` |
 | SEC-08 | release 作业对目录型产物的 `ARCHOERA-NATIVE-MANIFEST.txt` 做 **key1 ECDSA/SHA-256 分离签名**（`.sig1`），运行期内嵌公钥验签 + 摘要 | `build-all.yml` release 作业 + `app/tool/sign_native_manifest.sh` |
 
 ## 2. 信任根：应用层 key1 清单 + 分发渠道（2026-10 定稿）
@@ -77,24 +77,10 @@
   都以它为准；依赖变更后随 PR 一起更新。
 - `release` 作业的 Environment 人工审批（`release`）是签名的最后一道人工门；SEC-23 的
   tag 祖先校验在其之前拦截「tag 指向未评审提交」。
-- **漏洞处置**：`security-audit.yml` 首次运行即发现 downloader 的
-  `rustls` RUSTSEC-2026-0285（已 `cargo update -p rustls --precise 0.23.45` 修复）。
-  后续同类处置：downloader 的 `quinn-proto`（`reqwest` → `quinn`，仅存在于锁文件/
-  特定 target，不在宿主构建图内）在 2026-10-12 公告库更新后命中
-  RUSTSEC-2026-0338…0342（0.11.17 / 0.11.18 起修复），已
-  `cargo update -p quinn-proto` 升至 0.11.19；同批把被 yank 的 `chacha20`
-  （`rand 0.10` → `chacha20`）升至 0.10.2，消掉 audit 的 yanked 告警。
-  两者都只动锁文件、不改 `Cargo.toml` 约束。
-  确属**不适用**的公告才可经 `ignore` 放行，且须在 workflow 注释写明理由
-  （如 RUSTSEC-2023-0071：`rsa` 仅用于公钥加密、不持私钥）。
-- **2026-10-27 复扫（tokio）**：downloader 命中 RUSTSEC-2026-0386
-  （tokio 1.53.2 的 `AsyncFd::new` / `try_new` / `with_interest` / `try_with_interest`
-  违反 I/O safety；修复版 `>=1.51.6,<1.52.0` 或 `>=1.53.3`）。downloader **不调用
-  `AsyncFd`**（只用到 tokio 的 fs/io-util/sync/time，其余经 reqwest 传递），无运行时
-  暴露面；仍按「能升就升」执行 `cargo update -p tokio --precise 1.53.3`，只改
-  `Cargo.lock`（tokio 的 `windows-sys` 解析随之回到 0.52，Windows 目标仍在依赖图内）。
-  跟踪 issue #171 随本修复关闭。`paste`（RUSTSEC-2024-0436）已在同批通过
-  vendor `lofty` + `pastey` 补丁消除（见 §4），`Cargo.lock` 不再包含 `paste`。
+- **漏洞处置**：`security-audit.yml` 每周对各 Rust crate（vault-rs / shell /
+  subsonic/transcoder / tempo-rs）跑 `cargo audit`。确属**不适用**的公告才可经
+  `ignore` 放行，且须在 workflow 注释写明理由（如 RUSTSEC-2023-0071：`rsa`
+  仅用于公钥加密、不持私钥）。
 - **CodeQL 告警分级（2026-10-27）**：2026-10-22 启用 CodeQL 后首轮产生 44 条
   `cpp/*` 告警。其中 **36 条位于 vendored 第三方库**：`kernel/c/stb_vorbis.c` 的
   1 条指针溢出检查由 `.github/codeql/codeql-config.yml` 的 `paths-ignore` 排除并
@@ -115,24 +101,10 @@
 以下条目是**已评估并接受**的已知风险（或纯属误报/不适用），在此集中登记，避免被
 误判为「尚未发现」或「已修复」。新增例外须同样写明理由、影响面与复核条件。
 
-- **RUSTSEC-2023-0071（`rsa` Marvin 计时侧信道）——不适用**：
-  该公告只影响**持有私钥**、执行解密/签名的一方。downloader 仅用
-  `RsaPublicKey::encrypt`（酷狗登录公钥加密，见 `app/core/downloader/src/crypto.rs`），
-  **不持私钥、不做解密**，故攻击面不存在。已在 `security-audit.yml` 的 `ignore`
-  中登记（附同样理由的注释），待上游 `rsa` 出补丁后复核是否可以去掉该 ignore。
-- **RUSTSEC-2024-0436（`paste` crate 停止维护）——已消除（2026-10-27）**：
-  原先经 `lofty`（downloader 的标签/元数据处理依赖）传递引入，是 **proc-macro**，
-  只在编译期展开、无运行时暴露面；但 `cargo audit` 会持续报 unmaintained。
-  `lofty` 0.25.5 上游仍依赖 `paste`，且无新版本可换。现 vendor `lofty` 至
-  `app/core/downloader/vendor/lofty`，仅将 `paste` 换成 API 兼容的维护分支
-  `pastey` 0.2.3，并用 `[patch.crates-io]` 强制使用；`Cargo.lock` 不再包含
-  `paste`，cargo audit 的 unmaintained 警告消失。升级 lofty 时需重放补丁，
-  步骤见 `app/core/downloader/vendor/lofty/VENDOR.md`。
 - **第三方音源明文 HTTP 端点——上游既定行为，MITM 可篡改内容**：
   `http://login.user.kugou.com`（短信验证码发送，见 `app/lib/services/kugou/kugou_request.dart`）、
-  `http://lyrics.kugou.com`（歌词搜索/下载，见 `app/core/downloader/src/metadata.rs`）、
-  `http://mobilecdn.kugou.com`（歌曲搜索，同上）、`http://aqqmusic.tc.qq.com`（QQ 音乐媒体直链；
-  downloader 的重定向白名单允许公网明文 http，示例见 `app/core/downloader/src/lib.rs`）
+  `http://lyrics.kugou.com`（歌词搜索）、`http://mobilecdn.kugou.com`（歌曲搜索）、
+  `http://aqqmusic.tc.qq.com`（QQ 音乐媒体直链）
   均走**明文 HTTP**：这是**上游服务的既定行为**，客户端无法单方面改成 TLS。
   影响面：同网络路径上的 MITM 可**篡改歌词/媒体内容**（返回错误歌词、替换音频流），
   也可能观察到查询参数（关键词、手机号在查询串中）。
