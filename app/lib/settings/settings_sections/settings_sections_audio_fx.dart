@@ -61,15 +61,31 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
   int get _chorusVoices =>
       _draftChorusVoices ?? ref.read(appPrefsProvider).chorusVoices;
 
+  /// 当前份数下错开滑块的上限（受 60s 总跨度约束，整数 ms）。
+  double get _chorusStepMax => chorusMaxStepMsFor(_chorusVoices);
+
   double get _chorusStep =>
-      _draftChorusStep ?? ref.read(appPrefsProvider).chorusStepMs;
+      (_draftChorusStep ?? ref.read(appPrefsProvider).chorusStepMs).clamp(
+        chorusStepMinMs,
+        _chorusStepMax,
+      );
 
   int get _chorusSpanMs => (_chorusVoices - 1) * _chorusStep.round();
 
   bool get _chorusWarning =>
       _chorusVoices > Platform.numberOfProcessors ||
-      _chorusVoices >= 64 ||
-      _chorusSpanMs >= 1000;
+      _chorusVoices >= chorusWarnVoices ||
+      _chorusSpanMs >= chorusWarnSpanMs;
+
+  /// 改份数时同步收敛错开草稿，避免滑块值越界（份数↑ → 可用错开↓）。
+  void _setDraftChorusVoices(int voices) {
+    final maxStep = chorusMaxStepMsFor(voices);
+    setState(() {
+      _draftChorusVoices = voices;
+      final step = _draftChorusStep ?? ref.read(appPrefsProvider).chorusStepMs;
+      if (step > maxStep) _draftChorusStep = maxStep;
+    });
+  }
 
   List<ParametricBand> get _peqBands =>
       _draftPeqBands ?? ref.read(appPrefsProvider).peqBands;
@@ -447,11 +463,10 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
               min: chorusVoicesMin.toDouble(),
               max: chorusVoicesMax.toDouble(),
               divisions: chorusVoicesMax - chorusVoicesMin,
-              onChanged: (v) =>
-                  setState(() => _draftChorusVoices = v.round()),
+              onChanged: (v) => _setDraftChorusVoices(v.round()),
               onChangeEnd: (v) {
                 final voices = v.round();
-                setState(() => _draftChorusVoices = voices);
+                _setDraftChorusVoices(voices);
                 notifier.setChorus(voices: voices);
                 _apply();
               },
@@ -463,8 +478,8 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
               sub: '${_chorusStep.toStringAsFixed(0)} ms',
               value: _chorusStep,
               min: chorusStepMinMs,
-              max: chorusStepMaxMs,
-              divisions: (chorusStepMaxMs - chorusStepMinMs).round(),
+              max: _chorusStepMax,
+              divisions: (_chorusStepMax - chorusStepMinMs).round(),
               onChanged: (v) => setState(() => _draftChorusStep = v),
               onChangeEnd: (v) {
                 setState(() => _draftChorusStep = v);

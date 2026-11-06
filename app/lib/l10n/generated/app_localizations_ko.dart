@@ -5341,7 +5341,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsChorusEnabledDesc =>
-      '같은 곡을 N개의 병렬 복사본으로 아주 작은 시작 지연을 두고 재생합니다(메모리 재생 전용)';
+      '같은 곡을 N개의 병렬 복사본으로 지정한 시작 지연을 두고 재생합니다(메모리 재생 전용)';
 
   @override
   String get settingsChorusVoices => '병렬 복사본';
@@ -5369,7 +5369,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsChorusNote =>
-      '메모리 재생에서만 적용되며 파일 재생에서는 무시됩니다. 높은 값에서는 볼륨을 낮추고 리미터를 켜 두세요.';
+      '메모리 재생에서만 적용되며 파일 재생에서는 무시됩니다. 전체 간격은 최대 60초로 제한되어 복사본이 많을수록 사용할 수 있는 지연이 줄어듭니다. 높은 값에서는 볼륨을 낮추고 리미터를 켜 두세요.';
 
   @override
   String get settingsSectionChannels => '채널';

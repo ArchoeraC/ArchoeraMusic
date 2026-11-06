@@ -5337,7 +5337,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsChorusEnabledDesc =>
-      '同じ曲を N 個の並列コピーで微小な開始ずれを付けて再生します（メモリ再生のみ）';
+      '同じ曲を N 個の並列コピーで任意の開始ずれを付けて再生します（メモリ再生のみ）';
 
   @override
   String get settingsChorusVoices => '並列コピー数';
@@ -5365,7 +5365,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsChorusNote =>
-      'メモリ再生時のみ有効です。ファイル再生では無視されます。高い値では音量を下げ、リミッターを有効にしてください。';
+      'メモリ再生時のみ有効です。ファイル再生では無視されます。全体のスパンは最大 60 秒で、コピー数が多いほど使えるずれは小さくなります。高い値では音量を下げ、リミッターを有効にしてください。';
 
   @override
   String get settingsSectionChannels => 'チャンネル';

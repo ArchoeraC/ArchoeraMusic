@@ -5600,7 +5600,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsChorusEnabledDesc =>
-      'Lit le même titre en N copies parallèles avec un décalage minimal (lecture en mémoire uniquement)';
+      'Lit le même titre en N copies parallèles avec un décalage réglable (lecture en mémoire uniquement)';
 
   @override
   String get settingsChorusVoices => 'Copies parallèles';
@@ -5628,7 +5628,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsChorusNote =>
-      'Sapplique uniquement à la lecture en mémoire ; la lecture de fichiers lignore. À forte valeur, baissez le volume et gardez le limiteur actif.';
+      'Sapplique uniquement à la lecture en mémoire ; la lecture de fichiers lignore. Létendue totale est limitée à 60 s : plus il y a de copies, plus le décalage disponible est faible. À forte valeur, baissez le volume et gardez le limiteur actif.';
 
   @override
   String get settingsSectionChannels => 'Canaux';

@@ -85,9 +85,30 @@ void main() {
         chorusStepMinMs,
       );
       expect(
-        AppPrefs().copyWithChorus(stepMs: 500).chorusStepMs,
+        AppPrefs().copyWithChorus(stepMs: 9999).chorusStepMs,
         chorusStepMaxMs,
       );
+      expect(AppPrefs().copyWithChorus(stepMs: 3000).chorusStepMs, 3000.0);
+    });
+
+    test('总跨度上限：份数越多，可用错开越小', () {
+      expect(chorusMaxStepMsFor(1), chorusStepMaxMs);
+      expect(chorusMaxStepMsFor(4), chorusStepMaxMs);
+      expect(chorusMaxStepMsFor(21), 3000.0);
+      expect(chorusMaxStepMsFor(22), 2857.0);
+      expect(chorusMaxStepMsFor(128), 472.0);
+
+      // 请求 128 份 × 3000ms 时收敛到 60s 跨度内。
+      final prefs = AppPrefs().copyWithChorus(voices: 128, stepMs: 3000);
+      expect(prefs.chorusVoices, 128);
+      expect(prefs.chorusStepMs, chorusMaxStepMsFor(128));
+      expect(prefs.chorusStepMs * (prefs.chorusVoices - 1), lessThanOrEqualTo(chorusMaxSpanMs));
+
+      // 仅改份数也会收敛既有错开（不留下越界组合）。
+      final grown = AppPrefs()
+          .copyWithChorus(voices: 4, stepMs: 3000)
+          .copyWithChorus(voices: 128);
+      expect(grown.chorusStepMs, chorusMaxStepMsFor(128));
     });
   });
 

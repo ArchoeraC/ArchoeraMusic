@@ -79,13 +79,30 @@ const double speedMax = 2.0;
 const double pitchMinSemitones = -12;
 const double pitchMaxSemitones = 12;
 
-/// 多重奏：并行份数（1~128；1 = 旁通）与每份错开（10~50ms）。
+/// 多重奏：并行份数（1~128；1 = 旁通）与每份错开（10~3000ms）。
+///
+/// 总跨度 `(份数-1) × 错开` 上限 [chorusMaxSpanMs]：份数越多，每份可用错开
+/// 越小（历史环按跨度增长，60s 立体声约 23MB @48kHz）。
 const int chorusVoicesMin = 1;
 const int chorusVoicesMax = 128;
 const int chorusDefaultVoices = 4;
 const double chorusStepMinMs = 10;
-const double chorusStepMaxMs = 50;
+const double chorusStepMaxMs = 3000;
 const double chorusDefaultStepMs = 20;
+const int chorusMaxSpanMs = 60000;
+
+/// 高倍数/大跨度资源警告阈值（与引擎历史环内存增长挂钩）。
+const int chorusWarnVoices = 64;
+const int chorusWarnSpanMs = 30000;
+
+/// 当前份数下每份错开的最大值（整数 ms，受总跨度上限约束）。
+double chorusMaxStepMsFor(int voices) {
+  final v = voices.clamp(chorusVoicesMin, chorusVoicesMax);
+  if (v <= 1) return chorusStepMaxMs;
+  final spanCap = chorusMaxSpanMs / (v - 1);
+  if (spanCap >= chorusStepMaxMs) return chorusStepMaxMs;
+  return spanCap.floorToDouble().clamp(chorusStepMinMs, chorusStepMaxMs);
+}
 
 /// 均衡器预设（10 段增益，dB）。
 const Map<String, List<double>> eqPresets = {
@@ -318,26 +335,31 @@ extension AudioFxPrefs on AppPrefs {
         chorusVoicesMax,
       );
 
-  /// 每份起始错开（10~50ms；第 i 份延迟 i×该值）。
+  /// 每份起始错开（10~3000ms；第 i 份延迟 i×该值）。
+  ///
+  /// 上限还受总跨度 [chorusMaxSpanMs] 约束：`(voices-1) × step ≤ 60s`。
   double get chorusStepMs =>
       ((data[chorusStepMsKey] as num?)?.toDouble() ?? chorusDefaultStepMs)
-          .clamp(chorusStepMinMs, chorusStepMaxMs);
+          .clamp(chorusStepMinMs, chorusMaxStepMsFor(chorusVoices));
 
   /// 设置多重奏（开关 / 份数 / 每份错开）。
   AppPrefs copyWithChorus({
     bool? enabled,
     int? voices,
     double? stepMs,
-  }) => AppPrefs(
-    initialData: {
-      ...data,
-      chorusEnabledKey: ?enabled,
-      if (voices != null)
-        chorusVoicesKey: voices.clamp(chorusVoicesMin, chorusVoicesMax),
-      if (stepMs != null)
-        chorusStepMsKey: stepMs.clamp(chorusStepMinMs, chorusStepMaxMs),
-    },
-  );
+  }) {
+    final v = (voices ?? chorusVoices).clamp(chorusVoicesMin, chorusVoicesMax);
+    final step = (stepMs ?? chorusStepMs)
+        .clamp(chorusStepMinMs, chorusMaxStepMsFor(v));
+    return AppPrefs(
+      initialData: {
+        ...data,
+        chorusEnabledKey: ?enabled,
+        chorusVoicesKey: v,
+        chorusStepMsKey: step,
+      },
+    );
+  }
 }
 
 // ── 参数化 EQ 数据模型与归一化（方向① D1）────────────────────────

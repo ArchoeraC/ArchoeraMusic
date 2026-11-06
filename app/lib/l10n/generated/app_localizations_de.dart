@@ -5565,7 +5565,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsChorusEnabledDesc =>
-      'Denselben Titel in N parallelen Kopien mit winzigem Startversatz abspielen (nur Speicherwiedergabe)';
+      'Denselben Titel in N parallelen Kopien mit einstellbarem Startversatz abspielen (nur Speicherwiedergabe)';
 
   @override
   String get settingsChorusVoices => 'Parallele Kopien';
@@ -5593,7 +5593,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsChorusNote =>
-      'Gilt nur für die Speicherwiedergabe; die Dateiwiedergabe ignoriert dies. Bei hohen Werten Lautstärke senken und Limiter eingeschaltet lassen.';
+      'Gilt nur für die Speicherwiedergabe; die Dateiwiedergabe ignoriert dies. Die Gesamtspanne ist auf 60 s begrenzt, daher erlaubt eine höhere Kopienzahl einen kleineren Versatz; bei hohen Werten Lautstärke senken und Limiter eingeschaltet lassen.';
 
   @override
   String get settingsSectionChannels => 'Kanäle';

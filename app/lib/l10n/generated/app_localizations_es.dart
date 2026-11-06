@@ -5598,7 +5598,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsChorusEnabledDesc =>
-      'Reproduce la misma pista en N copias paralelas con un desfase mínimo (solo reproducción en memoria)';
+      'Reproduce la misma pista en N copias paralelas con un desfase ajustable (solo reproducción en memoria)';
 
   @override
   String get settingsChorusVoices => 'Copias paralelas';
@@ -5626,7 +5626,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsChorusNote =>
-      'Solo se aplica a la reproducción en memoria; la reproducción de archivos lo ignora. Con valores altos, baja el volumen y mantén activado el limitador.';
+      'Solo se aplica a la reproducción en memoria; la reproducción de archivos lo ignora. El intervalo total está limitado a 60 s, así que más copias implican un desfase menor; con valores altos, baja el volumen y mantén activado el limitador.';
 
   @override
   String get settingsSectionChannels => 'Canales';
