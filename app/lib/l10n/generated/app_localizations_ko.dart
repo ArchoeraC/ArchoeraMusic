@@ -5334,6 +5334,44 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsPitchUnit => '반음';
 
   @override
+  String get settingsSectionChorus => '다중 재생';
+
+  @override
+  String get settingsChorusEnabled => '다중 재생 사용';
+
+  @override
+  String get settingsChorusEnabledDesc =>
+      '같은 곡을 N개의 병렬 복사본으로 아주 작은 시작 지연을 두고 재생합니다(메모리 재생 전용)';
+
+  @override
+  String get settingsChorusVoices => '병렬 복사본';
+
+  @override
+  String get settingsChorusStep => '복사본별 지연';
+
+  @override
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  }) {
+    return '×$voices · 지연 $step ms · 전체 $span ms';
+  }
+
+  @override
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  }) {
+    return '×$voices(전체 $span ms)가 권장 한도를 초과했습니다: CPU 스레드 $threads. 높은 값은 CPU/메모리 사용량을 크게 늘려 끊김, 클리핑, 시스템 지연을 일으킬 수 있습니다.';
+  }
+
+  @override
+  String get settingsChorusNote =>
+      '메모리 재생에서만 적용되며 파일 재생에서는 무시됩니다. 높은 값에서는 볼륨을 낮추고 리미터를 켜 두세요.';
+
+  @override
   String get settingsSectionChannels => '채널';
 
   @override

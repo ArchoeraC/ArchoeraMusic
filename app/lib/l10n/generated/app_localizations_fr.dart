@@ -5593,6 +5593,44 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsPitchUnit => 'st';
 
   @override
+  String get settingsSectionChorus => 'Lecture multiple';
+
+  @override
+  String get settingsChorusEnabled => 'Activer la lecture multiple';
+
+  @override
+  String get settingsChorusEnabledDesc =>
+      'Lit le même titre en N copies parallèles avec un décalage minimal (lecture en mémoire uniquement)';
+
+  @override
+  String get settingsChorusVoices => 'Copies parallèles';
+
+  @override
+  String get settingsChorusStep => 'Décalage par copie';
+
+  @override
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  }) {
+    return '×$voices · décalage $step ms · étendue $span ms';
+  }
+
+  @override
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  }) {
+    return '×$voices (étendue $span ms) dépasse la limite conseillée : $threads threads CPU. Les valeurs élevées augmentent fortement lusage CPU/mémoire et peuvent provoquer des saccades, de la saturation ou des ralentissements.';
+  }
+
+  @override
+  String get settingsChorusNote =>
+      'Sapplique uniquement à la lecture en mémoire ; la lecture de fichiers lignore. À forte valeur, baissez le volume et gardez le limiteur actif.';
+
+  @override
   String get settingsSectionChannels => 'Canaux';
 
   @override
