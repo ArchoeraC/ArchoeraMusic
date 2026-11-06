@@ -5330,6 +5330,44 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsPitchUnit => '半音';
 
   @override
+  String get settingsSectionChorus => '多重奏';
+
+  @override
+  String get settingsChorusEnabled => '多重奏を有効化';
+
+  @override
+  String get settingsChorusEnabledDesc =>
+      '同じ曲を N 個の並列コピーで任意の開始ずれを付けて再生します（メモリ再生のみ）';
+
+  @override
+  String get settingsChorusVoices => '並列コピー数';
+
+  @override
+  String get settingsChorusStep => 'コピーごとのずれ';
+
+  @override
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  }) {
+    return '×$voices · ずれ $step ms · 全体 $span ms';
+  }
+
+  @override
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  }) {
+    return '×$voices（全体 $span ms）は推奨上限を超えています：CPU スレッド $threads。高い値では CPU/メモリ使用量が大幅に増え、音切れ・歪み・システムの遅延を起こすことがあります。';
+  }
+
+  @override
+  String get settingsChorusNote =>
+      'メモリ再生時のみ有効です。ファイル再生では無視されます。全体のスパンは最大 60 秒で、コピー数が多いほど使えるずれは小さくなります。高い値では音量を下げ、リミッターを有効にしてください。';
+
+  @override
   String get settingsSectionChannels => 'チャンネル';
 
   @override

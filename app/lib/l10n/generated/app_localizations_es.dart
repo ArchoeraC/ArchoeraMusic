@@ -5591,6 +5591,44 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsPitchUnit => 'st';
 
   @override
+  String get settingsSectionChorus => 'Reproducción múltiple';
+
+  @override
+  String get settingsChorusEnabled => 'Activar reproducción múltiple';
+
+  @override
+  String get settingsChorusEnabledDesc =>
+      'Reproduce la misma pista en N copias paralelas con un desfase ajustable (solo reproducción en memoria)';
+
+  @override
+  String get settingsChorusVoices => 'Copias paralelas';
+
+  @override
+  String get settingsChorusStep => 'Desfase por copia';
+
+  @override
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  }) {
+    return '×$voices · desfase $step ms · intervalo $span ms';
+  }
+
+  @override
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  }) {
+    return '×$voices (intervalo $span ms) supera el límite recomendado: $threads hilos de CPU. Los valores altos aumentan mucho el uso de CPU/memoria y pueden causar tirones, saturación o lentitud del sistema.';
+  }
+
+  @override
+  String get settingsChorusNote =>
+      'Solo se aplica a la reproducción en memoria; la reproducción de archivos lo ignora. El intervalo total está limitado a 60 s, así que más copias implican un desfase menor; con valores altos, baja el volumen y mantén activado el limitador.';
+
+  @override
   String get settingsSectionChannels => 'Canales';
 
   @override
