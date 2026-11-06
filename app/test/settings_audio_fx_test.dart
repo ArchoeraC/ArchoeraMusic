@@ -41,6 +41,16 @@ class _FakePrefsNotifier extends AppPrefsNotifier {
   }
 }
 
+/// 带初始偏好的假控制器（验证历史数据/越界组合的收敛显示）。
+class _SeededPrefsNotifier extends AppPrefsNotifier {
+  _SeededPrefsNotifier(this.seed);
+
+  final AppPrefs seed;
+
+  @override
+  AppPrefs build() => seed;
+}
+
 /// 只记录下发次数，不建引擎/不写会话记忆。
 class _FakePlaybackNotifier extends PlaybackNotifier {
   int applyCount = 0;
@@ -175,6 +185,42 @@ void main() {
 
     expect(find.text('Multi-play'), findsOneWidget);
     expect(find.text('Enable multi-play'), findsOneWidget);
+  });
+
+  testWidgets('多重奏：份数提高后错开上限收敛到 60s 总跨度', (tester) async {
+    final seed = AppPrefs(
+      initialData: {
+        chorusEnabledKey: true,
+        chorusVoicesKey: 128,
+        chorusStepMsKey: 3000,
+      },
+    );
+    final container = ProviderContainer(
+      overrides: [
+        appPrefsProvider.overrideWith(() => _SeededPrefsNotifier(seed)),
+        playbackProvider.overrideWith(_FakePlaybackNotifier.new),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_wrap(container, const Locale('zh', 'CN')));
+    await tester.pumpAndSettle();
+
+    // 128 份时每份最多 472ms，总跨度 127×472 = 59944ms（≤ 60s）。
+    expect(
+      find.text('×128 · 错开 472 ms · 总跨度 59944 ms'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('当前 ×128（总跨度 59944 ms）'), findsOneWidget);
+
+    final tile = find.ancestor(
+      of: find.text('每份错开'),
+      matching: find.byType(SettingSliderTile),
+    );
+    final slider = tester.widget<Slider>(
+      find.descendant(of: tile, matching: find.byType(Slider)),
+    );
+    expect(slider.max, 472.0);
   });
 
   testWidgets('参数化均衡器 / 低频管理文案走 l10n', (tester) async {

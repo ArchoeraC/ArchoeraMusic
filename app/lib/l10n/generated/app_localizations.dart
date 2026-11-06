@@ -9804,7 +9804,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsChorusEnabledDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'把同一首歌分成 N 份，以极小的起始间隔并行播放（仅内存播放模式）'**
+  /// **'把同一首歌分成 N 份，按设定的起始间隔并行播放（仅内存播放模式）'**
   String get settingsChorusEnabledDesc;
 
   /// No description provided for @settingsChorusVoices.
@@ -9842,7 +9842,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsChorusNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'仅在内存播放模式生效；文件播放模式会忽略。高倍数建议降低音量并保持限幅器开启。'**
+  /// **'仅在内存播放模式生效；文件播放模式会忽略。总跨度上限 60 秒，倍数越高可用错开越小；高倍数建议降低音量并保持限幅器开启。'**
   String get settingsChorusNote;
 
   /// No description provided for @settingsSectionChannels.
