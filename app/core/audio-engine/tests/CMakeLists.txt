@@ -621,6 +621,21 @@ add_test(NAME test_channel_merge COMMAND test_channel_merge)
 set_tests_properties(test_channel_merge PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 多重奏抽头混音（纯函数）：旁通 / 延迟求和 / 回绕 / 限幅 / 声道独立 /
+# 单脉冲延迟位置。与 player.c 音频回调共用 src/chorus_mix.h。
+add_executable(test_chorus_mix test_chorus_mix.c)
+target_link_libraries(test_chorus_mix PRIVATE audio_engine_static)
+if(UNIX)
+    target_link_libraries(test_chorus_mix PRIVATE m)
+endif()
+target_include_directories(test_chorus_mix PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_chorus_mix COMMAND test_chorus_mix)
+set_tests_properties(test_chorus_mix PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # N4 流式 Reader 缓冲预算（zk_stream_*）：默认/夹取/超预算拒绝/记账归零
 add_executable(test_stream_budget test_stream_budget.c)
 target_link_libraries(test_stream_budget PRIVATE audio_engine_static)

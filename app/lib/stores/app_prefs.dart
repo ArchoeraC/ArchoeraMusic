@@ -493,6 +493,16 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置多重奏（同一首歌 N 份并行 + 每份极小起始错开；仅内存播放模式）。
+  void setChorus({bool? enabled, int? voices, double? stepMs}) {
+    state = state.copyWithChorus(
+      enabled: enabled,
+      voices: voices,
+      stepMs: stepMs,
+    );
+    state.save();
+  }
+
   /// 设置播放速度（0.5~2.0；变速不变调）。
   void setPlaybackSpeed(double value) {
     state = state.copyWithPlaybackSpeed(value);

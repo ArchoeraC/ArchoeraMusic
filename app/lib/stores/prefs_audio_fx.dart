@@ -46,6 +46,9 @@ const lowfreqHpfOrderKey = 'audio.lowfreq.hpf.order';
 const lowfreqBassGainKey = 'audio.lowfreq.bass.gain';
 const lowfreqBassFreqKey = 'audio.lowfreq.bass.freq';
 const channelMergeKey = 'audio.channelMerge.enabled';
+const chorusEnabledKey = 'audio.chorus.enabled';
+const chorusVoicesKey = 'audio.chorus.voices';
+const chorusStepMsKey = 'audio.chorus.step_ms';
 
 /// 均衡器频段数（对齐引擎 `EQ_BANDS = 10`）。
 const int eqBandCount = 10;
@@ -75,6 +78,14 @@ const double speedMax = 2.0;
 /// 变调范围（半音，-12~+12；0 = 原调）。
 const double pitchMinSemitones = -12;
 const double pitchMaxSemitones = 12;
+
+/// 多重奏：并行份数（1~128；1 = 旁通）与每份错开（10~50ms）。
+const int chorusVoicesMin = 1;
+const int chorusVoicesMax = 128;
+const int chorusDefaultVoices = 4;
+const double chorusStepMinMs = 10;
+const double chorusStepMaxMs = 50;
+const double chorusDefaultStepMs = 20;
 
 /// 均衡器预设（10 段增益，dB）。
 const Map<String, List<double>> eqPresets = {
@@ -293,6 +304,39 @@ extension AudioFxPrefs on AppPrefs {
   /// 设置多声道合并。
   AppPrefs copyWithChannelMerge(bool value) => AppPrefs(
     initialData: {...data, channelMergeKey: value},
+  );
+
+  // ── 多重奏（同一首歌 N 份并行 + 极小起始错开）────────────────────
+
+  /// 多重奏总开关（默认关）。
+  bool get chorusEnabled => data[chorusEnabledKey] as bool? ?? false;
+
+  /// 并行份数（1~128；1 = 旁通）。
+  int get chorusVoices =>
+      ((data[chorusVoicesKey] as num?)?.toInt() ?? chorusDefaultVoices).clamp(
+        chorusVoicesMin,
+        chorusVoicesMax,
+      );
+
+  /// 每份起始错开（10~50ms；第 i 份延迟 i×该值）。
+  double get chorusStepMs =>
+      ((data[chorusStepMsKey] as num?)?.toDouble() ?? chorusDefaultStepMs)
+          .clamp(chorusStepMinMs, chorusStepMaxMs);
+
+  /// 设置多重奏（开关 / 份数 / 每份错开）。
+  AppPrefs copyWithChorus({
+    bool? enabled,
+    int? voices,
+    double? stepMs,
+  }) => AppPrefs(
+    initialData: {
+      ...data,
+      chorusEnabledKey: ?enabled,
+      if (voices != null)
+        chorusVoicesKey: voices.clamp(chorusVoicesMin, chorusVoicesMax),
+      if (stepMs != null)
+        chorusStepMsKey: stepMs.clamp(chorusStepMinMs, chorusStepMaxMs),
+    },
   );
 }
 

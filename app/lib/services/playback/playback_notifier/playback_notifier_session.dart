@@ -119,7 +119,7 @@ mixin _PlaybackNotifierSession
       // ignore: discarded_futures
       _fadeVolume(from: 0, to: state.volume, durationMs: fadeMs);
     }
-    // 会话就绪后下发音频效果（EQ / 限幅 / 响度归一化 / 变速）。
+    // 会话就绪后下发音频效果（EQ / 限幅 / 响度归一化 / 多重奏 / 变速）。
     unawaited(applyAudioEffects());
   }
 

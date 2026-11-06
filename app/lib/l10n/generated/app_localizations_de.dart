@@ -5558,6 +5558,44 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPitchUnit => 'st';
 
   @override
+  String get settingsSectionChorus => 'Mehrfachwiedergabe';
+
+  @override
+  String get settingsChorusEnabled => 'Mehrfachwiedergabe aktivieren';
+
+  @override
+  String get settingsChorusEnabledDesc =>
+      'Denselben Titel in N parallelen Kopien mit winzigem Startversatz abspielen (nur Speicherwiedergabe)';
+
+  @override
+  String get settingsChorusVoices => 'Parallele Kopien';
+
+  @override
+  String get settingsChorusStep => 'Versatz pro Kopie';
+
+  @override
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  }) {
+    return '×$voices · Versatz $step ms · Spanne $span ms';
+  }
+
+  @override
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  }) {
+    return '×$voices (Spanne $span ms) überschreitet die Empfehlung: $threads CPU-Threads. Hohe Werte erhöhen CPU-/Speicherlast stark und können Ruckeln, Übersteuern oder Systemverzögerungen verursachen.';
+  }
+
+  @override
+  String get settingsChorusNote =>
+      'Gilt nur für die Speicherwiedergabe; die Dateiwiedergabe ignoriert dies. Bei hohen Werten Lautstärke senken und Limiter eingeschaltet lassen.';
+
+  @override
   String get settingsSectionChannels => 'Kanäle';
 
   @override

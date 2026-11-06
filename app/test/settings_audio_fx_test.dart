@@ -30,6 +30,15 @@ class _FakePrefsNotifier extends AppPrefsNotifier {
   void setChannelMerge(bool value) {
     state = state.copyWithChannelMerge(value);
   }
+
+  @override
+  void setChorus({bool? enabled, int? voices, double? stepMs}) {
+    state = state.copyWithChorus(
+      enabled: enabled,
+      voices: voices,
+      stepMs: stepMs,
+    );
+  }
 }
 
 /// 只记录下发次数，不建引擎/不写会话记忆。
@@ -117,6 +126,55 @@ void main() {
     expect(find.text('Channels'), findsOneWidget);
     expect(find.text('Channel merge'), findsOneWidget);
     expect(find.text('Off (original stereo preserved)'), findsOneWidget);
+  });
+
+  testWidgets('多重奏开关：默认关、点击后写偏好并下发', (tester) async {
+    final playback = _FakePlaybackNotifier();
+    final container = ProviderContainer(
+      overrides: [
+        appPrefsProvider.overrideWith(_FakePrefsNotifier.new),
+        playbackProvider.overrideWith(() => playback),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_wrap(container, const Locale('zh', 'CN')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('多重奏'), findsOneWidget);
+    expect(find.text('启用多重奏'), findsOneWidget);
+
+    final tile = find.ancestor(
+      of: find.text('启用多重奏'),
+      matching: find.byType(SettingSwitchTile),
+    );
+    final switchFinder = find.descendant(of: tile, matching: find.byType(Switch));
+    expect(tester.widget<Switch>(switchFinder).value, isFalse);
+
+    await tester.ensureVisible(switchFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(switchFinder);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Switch>(switchFinder).value, isTrue);
+    expect(container.read(appPrefsProvider).chorusEnabled, isTrue);
+    expect(playback.applyCount, 1);
+  });
+
+  testWidgets('多重奏文案有英文翻译', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        appPrefsProvider.overrideWith(_FakePrefsNotifier.new),
+        playbackProvider.overrideWith(_FakePlaybackNotifier.new),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_wrap(container, const Locale('en')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Multi-play'), findsOneWidget);
+    expect(find.text('Enable multi-play'), findsOneWidget);
   });
 
   testWidgets('参数化均衡器 / 低频管理文案走 l10n', (tester) async {

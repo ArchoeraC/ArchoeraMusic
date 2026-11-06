@@ -5245,6 +5245,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPitchUnit => '半音';
 
   @override
+  String get settingsSectionChorus => '多重奏';
+
+  @override
+  String get settingsChorusEnabled => '启用多重奏';
+
+  @override
+  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，以极小的起始间隔并行播放（仅内存播放模式）';
+
+  @override
+  String get settingsChorusVoices => '并行倍数';
+
+  @override
+  String get settingsChorusStep => '每份错开';
+
+  @override
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  }) {
+    return '×$voices · 错开 $step ms · 总跨度 $span ms';
+  }
+
+  @override
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  }) {
+    return '当前 ×$voices（总跨度 $span ms）已超过建议上限：CPU 线程 $threads。高倍数会显著增加 CPU/内存占用，可能卡顿、爆音或拖慢系统。';
+  }
+
+  @override
+  String get settingsChorusNote => '仅在内存播放模式生效；文件播放模式会忽略。高倍数建议降低音量并保持限幅器开启。';
+
+  @override
   String get settingsSectionChannels => '声道';
 
   @override
@@ -11398,6 +11434,42 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsPitchUnit => '半音';
+
+  @override
+  String get settingsSectionChorus => '多重奏';
+
+  @override
+  String get settingsChorusEnabled => '启用多重奏';
+
+  @override
+  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，以极小的起始间隔并行播放（仅内存播放模式）';
+
+  @override
+  String get settingsChorusVoices => '并行倍数';
+
+  @override
+  String get settingsChorusStep => '每份错开';
+
+  @override
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  }) {
+    return '×$voices · 错开 $step ms · 总跨度 $span ms';
+  }
+
+  @override
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  }) {
+    return '当前 ×$voices（总跨度 $span ms）已超过建议上限：CPU 线程 $threads。高倍数会显著增加 CPU/内存占用，可能卡顿、爆音或拖慢系统。';
+  }
+
+  @override
+  String get settingsChorusNote => '仅在内存播放模式生效；文件播放模式会忽略。高倍数建议降低音量并保持限幅器开启。';
 
   @override
   String get settingsSectionChannels => '声道';
@@ -17554,6 +17626,42 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsPitchUnit => '半音';
+
+  @override
+  String get settingsSectionChorus => '多重奏';
+
+  @override
+  String get settingsChorusEnabled => '啟用多重奏';
+
+  @override
+  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，以極小的起始間隔並行播放（僅記憶體播放模式）';
+
+  @override
+  String get settingsChorusVoices => '並行倍數';
+
+  @override
+  String get settingsChorusStep => '每份錯開';
+
+  @override
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  }) {
+    return '×$voices · 錯開 $step ms · 總跨度 $span ms';
+  }
+
+  @override
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  }) {
+    return '當前 ×$voices（總跨度 $span ms）已超過建議上限：CPU 執行緒 $threads。高倍數會顯著增加 CPU/記憶體佔用，可能卡頓、爆音或拖慢系統。';
+  }
+
+  @override
+  String get settingsChorusNote => '僅在記憶體播放模式生效；檔案播放模式會忽略。高倍數建議降低音量並保持限幅器開啟。';
 
   @override
   String get settingsSectionChannels => '聲道';
