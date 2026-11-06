@@ -10,7 +10,8 @@
 >
 > 想直接本地调试：把第 2 步换成 `cd app && flutter run -d linux`。
 > Windows 用 `app/core/build_windows.bat` + `flutter build windows`；macOS 用
-> `bash app/core/build-macos.sh osx-arm64` + `flutter build macos`。
+> `bash app/core/build-macos.sh osx-arm64`（Apple Silicon）或
+> `bash app/core/build-macos.sh osx-x64`（Intel）+ `flutter build macos`。
 > 本手册从「为什么是这些前置」讲到「怎么排查」，想按部就班就从头往下读。
 
 ---
@@ -148,9 +149,18 @@ flutter build windows
 ## 4. macOS 自编译（详细）
 
 ```bash
-bash app/core/build-macos.sh osx-arm64   # Apple Silicon；Intel 用 x86_64-apple-darwin 之类（见脚本头）
-cd app && flutter build macos --release
+# Apple Silicon
+bash app/core/build-macos.sh osx-arm64
+cd app && FLUTTER_XCODE_ARCHS=arm64 flutter build macos --release
+
+# Intel（需在 Intel Mac 上构建，或准备好 x86_64 Homebrew/FFmpeg 依赖）
+bash app/core/build-macos.sh osx-x64
+cd app && FLUTTER_XCODE_ARCHS=x86_64 flutter build macos --release
 ```
+
+> macOS 构建为单架构：arm64 与 x86_64 分开产出，不生成 universal 包。
+> 原生依赖（FFmpeg/Homebrew）实际要求 **macOS 14.0+**；x86_64 为维护模式，
+> 随 Flutter/Apple 的 Intel 弃用同步收尾。
 Flutter 构建后会把各模块 `*.dylib` 拷入 `.app/Contents/native/`（macOS 无 CMake install 层，见
 `linux/CMakeLists.txt` 对应注释）。macOS 产物未签名，首次运行需右键“打开”或
 `xattr -dr com.apple.quarantine ArchoeraMusic.app`。

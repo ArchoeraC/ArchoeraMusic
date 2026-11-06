@@ -61,7 +61,7 @@ on:
   workflow_dispatch:
     inputs:
       macos:
-        description: 'macOS（.app，arm64）'
+        description: 'macOS（.app，arm64 + x86_64）'
         type: boolean
         default: true
       windows:
@@ -169,13 +169,21 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           # build（macos/windows matrix）：按选择组装，供 build 动态 matrix 使用。
+          # macOS 两个条目共用 os=macos，后续步骤仍按 matrix.os 判断；arch/rid/
+          # artifact 决定单架构构建与产物名。不能把两个架构塞进一个 universal
+          # 包：native/ 下各模块按单架构构建，且 Flutter 已在弃用 universal。
           ENTRIES=""
-          add() { ENTRIES="${ENTRIES}${ENTRIES:+,}{\"os\":\"$1\",\"runner\":\"$2\",\"zig_archive\":\"$3\"}"; }
-          if [ "$MACOS" = true ]; then add macos macos-15 aarch64-macos; fi
-          if [ "$WINDOWS" = true ]; then add windows windows-latest x86_64-windows; fi
+          add() { ENTRIES="${ENTRIES}${ENTRIES:+,}{\"os\":\"$1\",\"runner\":\"$2\",\"zig_archive\":\"$3\",\"arch\":\"$4\",\"rid\":\"$5\",\"artifact\":\"$6\"}"; }
+          if [ "$MACOS" = true ]; then
+            add macos macos-15 aarch64-macos arm64 osx-arm64 macos-arm64
+            # macos-15-intel 是 GitHub 当前最后一条 x86_64 托管镜像（可用至约
+            # 2027-08）；之后可评估 macos-26-intel 或改自托管/交叉构建。
+            add macos macos-15-intel x86_64-macos x86_64 osx-x64 macos-x64
+          fi
+          if [ "$WINDOWS" = true ]; then add windows windows-latest x86_64-windows x64 "" windows-x64; fi
           # 全不选时给一个占位条目（build 的 job 级 if 会把它跳过），避免空矩阵。
           if [ -z "$ENTRIES" ]; then
-            ENTRIES='{"os":"none","runner":"ubuntu-latest","zig_archive":""}'
+            ENTRIES='{"os":"none","runner":"ubuntu-latest","zig_archive":"","arch":"","rid":"","artifact":""}'
           fi
           echo "build_matrix=[$ENTRIES]" >> "$GITHUB_OUTPUT"
 
@@ -191,7 +199,7 @@ jobs:
           echo "── 点菜结果 ── macos=$MACOS windows=$WINDOWS deb=$DEB deepin=$DEEPIN rpm=$RPM arch=$ARCH appimage=$APPIMAGE flatpak=$FLATPAK nix=$NIX"
 
   build:
-    name: Build ${{ matrix.os }}
+    name: Build ${{ matrix.os }} (${{ matrix.arch }})
     needs: preflight
     if: needs.preflight.outputs.macos == 'true' || needs.preflight.outputs.windows == 'true'
     strategy:
@@ -213,9 +221,10 @@ jobs:
         # 不装 brew 的 ffmpeg：它默认 --enable-gpl（GPL-3.0），破坏本项目
         # THIRD-PARTY-LICENSES 的「GPL 防火墙」；改用自建纯 LGPL 最小 FFmpeg
         # （见 build-ffmpeg-minimal.sh）。dylibbundler 用于把 FFmpeg/TagLib
-        # dylib 收进 .app 并改写 install_name（自包含）。
+        # dylib 收进 .app 并改写 install_name（自包含）。nasm 让 x86_64 FFmpeg
+        # 启用汇编加速；缺省会自动 --disable-x86asm（Intel 上解码明显变慢）。
         run: |
-          brew install taglib curl openssl sqlite nlohmann-json pkg-config dylibbundler opus
+          brew install taglib curl openssl sqlite nlohmann-json pkg-config dylibbundler opus nasm
 
       # ───────────────────────── Windows（mingw / vcpkg）───────────────
       - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
@@ -289,10 +298,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
           toolchain: stable
-      - name: Add macOS Rust targets (universal archoerashell staticlib)
+      - name: Add macOS Rust targets
         if: matrix.os == 'macos'
-        # Release 下 Xcode 按 ARCHS（arm64 x86_64）构建通用二进制，静态库需双架构
-        # slice；脚本阶段亦会幂等 rustup target add 兜底（本地开发用）。
+        # 每次构建只产单架构；vault 按 matrix.rid 选一个 target，archoerashell
+        # 的 Xcode 脚本按 ARCHS 取对应 target。两个都装上，便于本地/未来切换。
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -349,7 +358,7 @@ jobs:
         with:
           path: ~/.local/ffmpeg-minimal
           # tls 段：自包含 mbedTLS 引入后旧缓存（无 .mbedtls-tls 标记）必须失效重建。
-          key: ffmpeg-minimal-9.0.1-tls-${{ runner.os }}-${{ runner.arch }}
+          key: ffmpeg-minimal-9.0.1-tls-${{ runner.os }}-${{ matrix.arch }}
 
       - name: Build minimal FFmpeg (macOS, LGPL)
         if: matrix.os == 'macos' && steps.ffmpeg-cache-macos.outputs.cache-hit != 'true'
@@ -368,8 +377,8 @@ jobs:
         # 统一入口 app/core/build-macos.sh，收敛 audio-engine / scraper /
         # scanner / indexer / vault / downloader / subsonic 全部原生模块编译：
         # 本地开发与 CI 共用同一入口，逻辑改动只落一处（对齐 build_windows.bat）。
-        # 依赖由上方步骤提前安装，脚本只做编译引导。
-        run: bash app/core/build-macos.sh osx-arm64
+        # 依赖由上方步骤提前安装，脚本只做编译引导；matrix.rid 决定单架构。
+        run: bash app/core/build-macos.sh "${{ matrix.rid }}"
 
       - name: Build native modules (Windows bat 一站式引导)
         if: matrix.os == 'windows'
@@ -421,8 +430,13 @@ jobs:
         working-directory: app
         # 工程 Release 配置已用 ad-hoc 签名（CODE_SIGN_IDENTITY = "-"），CI 无需证书；
         # 现行 Flutter 的 build macos 不再支持 --no-codesign，去掉即可。
+        # FLUTTER_XCODE_ARCHS 会被 Flutter 透传为 xcodebuild 的 ARCHS（见
+        # flutter_tools 的 FLUTTER_XCODE_ 前缀约定），从而让主二进制、Flutter
+        # framework 与 archoerashell 都只保留 matrix.arch 一个 slice；否则
+        # Release 默认 universal，会和 native/ 的单架构 FFI 库错配。
         # NekoMusic 客户端标识走 Secret（日志自动打码）；未配置时源默认禁用。
         env:
+          FLUTTER_XCODE_ARCHS: ${{ matrix.arch }}
           NEKO_CLIENT_ID: ${{ secrets.NEKO_CLIENT_ID }}
         run: |
           args=(--release)
@@ -568,11 +582,74 @@ jobs:
             || { echo "::error::完整性清单缺 indexer-ffi.dylib"; exit 1; }
           echo "OK: indexer-ffi 已入包并计入清单"
 
+      - name: Verify macOS bundle architecture & load (native/)
+        if: matrix.os == 'macos'
+        # 硬校验：单架构包内所有 Mach-O 必须只有 matrix.arch 一个 slice；
+        # 再用 dyld 实际 dlopen 每个 FFI 库，验证 @loader_path 依赖能解析。
+        # 最后跑一次 archoerashell --version，覆盖静态库链入 + 参数分派。
+        run: |
+          set -euo pipefail
+          APP="app/build/macos/Build/Products/Release/archoera_music.app"
+          NATIVE="$APP/Contents/native"
+          EXPECTED="${{ matrix.arch }}"
+          fail=0
+          check_arch() {
+            f="$1"
+            [ -f "$f" ] || { echo "::error::缺少文件：$f"; fail=1; return 0; }
+            got="$(lipo -archs "$f")"
+            if [ "$got" != "$EXPECTED" ]; then
+              echo "::error::$f 架构为 '$got'，期望 '$EXPECTED'"
+              fail=1
+            fi
+          }
+
+          check_arch "$APP/Contents/MacOS/archoera_music"
+          check_arch "$APP/Contents/Frameworks/FlutterMacOS.framework/Versions/A/FlutterMacOS"
+          check_arch "$NATIVE/archoera-audio-engine"
+          check_arch "$NATIVE/archoera-vault"
+          for f in "$NATIVE"/*.dylib; do check_arch "$f"; done
+
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+
+          # 自包含检查：bundle 内 dylib 不得残留构建机 Homebrew 绝对路径。
+          if otool -L "$NATIVE"/*.dylib | grep -E '/opt/homebrew|/usr/local' >/tmp/homebrew_refs.txt; then
+            echo "::error::native/ 中仍有 Homebrew 绝对路径依赖："
+            cat /tmp/homebrew_refs.txt
+            exit 1
+          fi
+
+          # 实际 dlopen（不调用业务函数）：验证架构、install_name、SQLite 依赖。
+          python3 - "$NATIVE" <<'PY'
+          import ctypes
+          import os
+          import sys
+
+          native = sys.argv[1]
+          failed = []
+          for name in sorted(os.listdir(native)):
+              if not name.endswith(".dylib"):
+                  continue
+              path = os.path.join(native, name)
+              try:
+                  ctypes.CDLL(path)
+                  print(f"OK load: {name}")
+              except OSError as exc:
+                  failed.append(f"{name}: {exc}")
+          if failed:
+              print("::error::以下 FFI 库加载失败：")
+              for item in failed:
+                  print(item)
+              sys.exit(1)
+          PY
+
+          "$APP/Contents/MacOS/archoera_music" archoerashell --version
+          echo "OK: macOS $EXPECTED 单架构 + native/ 加载验证通过"
+
       - name: Upload artifact (macOS .app)
         if: matrix.os == 'macos'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: ArchoeraMusic-macos-arm64
+          name: ArchoeraMusic-${{ matrix.artifact }}
           path: app/build/macos/Build/Products/Release/archoera_music.app
           if-no-files-found: error
 
@@ -1043,7 +1120,9 @@ jobs:
               echo "跳过（目录不存在）：$1"
             fi
           }
-          sign_dir artifacts/ArchoeraMusic-macos-arm64/archoera_music.app/Contents/native
+          for a in arm64 x64; do
+            sign_dir "artifacts/ArchoeraMusic-macos-$a/archoera_music.app/Contents/native"
+          done
           sign_dir artifacts/ArchoeraMusic-windows-x64/native
           sign_dir artifacts/ArchoeraMusic-linux-x64/native
           # Windows 便携 zip：解压 → 签名其中清单 → 原地同文件名重压。
@@ -1078,7 +1157,8 @@ jobs:
           test -d artifacts/ArchoeraMusic-linux-appimage  # Linux AppImage
           test -d artifacts/ArchoeraMusic-linux-flatpak   # Linux .flatpak
           test -d artifacts/ArchoeraMusic-linux-nix       # Linux NixOS tar.gz
-          test -d artifacts/ArchoeraMusic-macos-arm64     # macOS .app
+          test -d artifacts/ArchoeraMusic-macos-arm64     # macOS arm64 .app
+          test -d artifacts/ArchoeraMusic-macos-x64       # macOS x86_64 .app
           test -d artifacts/ArchoeraMusic-windows-x64     # Windows runner Release
           test -d artifacts/ArchoeraMusic-windows-extra   # Windows installer + portable
           mkdir -p assets
@@ -1099,8 +1179,10 @@ jobs:
             chmod +x "$fp"
           done < <(find artifacts -type f -exec file {} + | grep -i 'ELF\|Mach-O')
           # macOS / Windows 目录型产物压成单文件归档（tar 三端可解）
-          tar -czf "assets/ArchoeraMusic-${VER}-macos-arm64.tar.gz" \
-            -C artifacts/ArchoeraMusic-macos-arm64 .
+          for a in arm64 x64; do
+            tar -czf "assets/ArchoeraMusic-${VER}-macos-$a.tar.gz" \
+              -C "artifacts/ArchoeraMusic-macos-$a" .
+          done
           tar -czf "assets/ArchoeraMusic-${VER}-windows-x64.tar.gz" \
             -C artifacts/ArchoeraMusic-windows-x64 .
           # Linux 原始 bundle 与 package.sh tar 纯二进制内容一致，不再重复出包
@@ -1188,7 +1270,7 @@ jobs:
             cat "$NOTES"
           else
             echo "CHANGELOG.md 未找到 $VER 段落，回退通用文案"
-            printf '三端 matrix 构建产物：Linux 多发行版安装包 / macOS arm64 / Windows x64。\n' > "$NOTES"
+            printf '三端 matrix 构建产物：Linux 多发行版安装包 / macOS arm64 + x86_64 / Windows x64。\n' > "$NOTES"
           fi
 
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
