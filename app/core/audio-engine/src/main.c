@@ -972,7 +972,10 @@ int main(int argc, char *argv[])
     const char *stream_uds_path = NULL;
     const char *control_uds_path = NULL;
     const char *player_file = NULL;
-    while ((opt = getopt_long(argc, argv, "b:f:r:c:o:e:p:ng:Ll:s:FQ:R:PSIC:D:T:KUhvWJYM", long_opts, NULL)) != -1) {
+    /* 短选项表只登记仍有效的选项（已删除的 --fft / --fft-size / --fft-fd /
+       --fft-interval-ms 的 F/s/D/T 不得残留：否则会落到 default 分支，把
+       "已移除的旧参数"误报成用法错误）。 */
+    while ((opt = getopt_long(argc, argv, "b:f:r:c:o:e:p:ng:Ll:Q:R:PSIC:KUhvWJYM", long_opts, NULL)) != -1) {
         switch (opt) {
         case 'b': cfg.bitrate = atoi(optarg); break;
         case 'f': cfg.frame_size_ms = atoi(optarg); break;

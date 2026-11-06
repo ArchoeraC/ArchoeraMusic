@@ -221,16 +221,17 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 | `-o --offset` | 0 | 跳过开头 ms（CUE/seek 用） |
 | `--eq <10,gains>` | 关 | 10 段 EQ 增益（dB），逗号分隔 |
 | `--preamp <dB>` | 0 | 前级增益 |
-| `--normalization` | 关 | 响度归一化 |jian ca
+| `--normalization` | 关 | 响度归一化 |
 | `--normalization-gain <dB>` | 0 | 预计算响度增益（可复用 scanner 分析值） |
 | `--no-limiter` / `--limiter-threshold` | -1.0dB | 限幅器开关 / 阈值 |
-| `--fft` / `--fft-size` / `--fft-interval-ms` | 1024 / 100ms | 频谱分析（对齐 Web 用 `--fft-interval-ms 50`） |
 | `--tempo` / `--tempo-speed` / `--tempo-pitch` / `--tempo-pitch-sync` | [0.5-2.0] / [-12..12] | 变速变调 |
-| `--interactive` + `--control-fd 3` + `--fft-fd 4` | 关 | 交互模式：fd3 写控制命令、fd4 读 FFT JSON |
-| `--keep-alive-ms <n>` | 0 | 转码完成（EOF）后保持进程存活 n ms 等待迟到消费者（默认 10s），避免短音频 done 前消费者未连上 |
+| `--interactive` + `--control-fd 3` | 关 | 交互模式：fd3 写控制命令；控制事件经 `--control-uds`（或 fd3）输出 |
+| `--keep-alive-ms <n>` | 0 | 转码完成（EOF）后保持进程存活 n ms 等待迟到消费者，避免短音频 done 前消费者未连上 |
 | `--stream-uds <path>` | — | OGG/Opus 流输出到 UDS（替代 stdout）；引擎**等待消费者连上（15s）后才开始转码**，保证 OGG 从头完整 |
 | `--pcm-uds <path>` | — | 原始 float PCM 块输出到 UDS：`[pos_ms|samples|channels] + float`（小端，4096 samples/帧），供外部 PCM 消费（v2 频谱不再走该路径） |
 | `--control-uds <path>` | — | 控制事件 JSON 行输出到 UDS（替代 fd3；Dart `Process` 无法传额外 fd）；`control_send_line()` 优先 UDS，否则 fd3 |
+| `--player-file <path>` | — | 播放模式：转码 PCM 落盘为 WAV 并由 miniaudio 自播（桌面 FFI 会话必用） |
+| `--engine-mode <0\|1>` | 0 | 解码引擎：0=Stable（FFmpeg 默认）/ 1=EraAudio（自研内核优先，失败回退 FFmpeg） |
 | stdout / stderr | — | 无 UDS 时 OGG/Opus 走 stdout；stderr 日志 |
 
 **QualityLevel → bitrate 映射**（对齐原项目 `web/api/player.ts`）
@@ -252,7 +253,7 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 | 音量 volume | — | `set_volume {gain}`（主音量在 miniaudio 侧，preamp 管余量） |
 | 响度归一化 | `--normalization` | `set_normalization {enabled}` |
 | 限幅器 | `--limiter-threshold`（默认启用） | `set_limiter {enabled}` |
-| 频谱显示 | `--fft` | `set_fft {enabled, peak_hold, agc, gamma, tilt}` |
+| 频谱显示 | —（引擎侧频谱线程，CLI 无开关） | `set_fft {enabled, peak_hold, agc, gamma, tilt}` |
 | 变速/变调 | `--tempo --tempo-speed --tempo-pitch` | `set_tempo_speed` / `set_tempo_pitch` |
 | seek | `-o --offset`（CLI 启动偏移） | `seek {position_ms}`（进程内，Phase 3+；桌面端由 miniaudio 即时 seek，§5.3） |
 

@@ -24,6 +24,7 @@ import 'package:archoera_music/widgets/player/lyrics_edge_fade.dart';
 import 'package:archoera_music/widgets/player/lyrics_view.dart';
 import 'package:archoera_music/widgets/player/lyrics_v7/lyrics_physics_wall.dart';
 import 'package:archoera_music/widgets/player/playback_progress_slider.dart';
+import 'package:archoera_music/widgets/player/spectrum_view.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 class _StubPrefs extends AppPrefsNotifier {
@@ -156,10 +157,12 @@ void main() {
     expect(playButton.color, scheme.primary);
 
     // 译文单行 textAlign 之外，行内 Column 的交叉轴也要左对齐。
+    // 取**最近一层** Column（ancestor 按由近及远排列）：布局外层（如 vutron
+    // 底部的频谱容器）也可能引入 Column，用 .last 会误取到外层容器。
     final translation = tester.widget<Text>(find.text('第一行翻译'));
     expect(translation.textAlign, TextAlign.left);
     final lineColumn = tester.widget<Column>(
-      find.ancestor(of: find.text('第一行翻译'), matching: find.byType(Column)).last,
+      find.ancestor(of: find.text('第一行翻译'), matching: find.byType(Column)).first,
     );
     expect(lineColumn.crossAxisAlignment, CrossAxisAlignment.start);
   });
@@ -182,6 +185,24 @@ void main() {
     expect(find.byType(LyricsView), findsNothing);
     expect(find.byType(AmllPhysicsWall), findsNothing);
     expect(find.byType(PlaybackProgressSlider), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('底部细频谱：开启时渲染', (tester) async {
+    await _pumpVutron(
+      tester,
+      prefs: {..._prefsData('simple'), enableSpectrumKey: true},
+    );
+    expect(find.byType(SpectrumView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('底部细频谱：关闭时零高度（不渲染、不占位）', (tester) async {
+    await _pumpVutron(
+      tester,
+      prefs: {..._prefsData('simple'), enableSpectrumKey: false},
+    );
+    expect(find.byType(SpectrumView), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }
