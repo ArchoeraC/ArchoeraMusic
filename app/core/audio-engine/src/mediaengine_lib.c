@@ -199,6 +199,11 @@ typedef struct ArchoeraMediaEngine {
     /* 最近一次 set_volume 增益（引擎线程维护；切 sink 重启播放器时重放） */
     float last_volume;
 
+    /* 多重奏偏好（set_chorus；player 尚未创建时先记住，stream_begin 后应用） */
+    int chorus_enabled;
+    int chorus_voices;
+    double chorus_step_ms;
+
     /* ── 流式播放（§B：边解码边出声，raw 设备 + 环形缓冲）────── */
     int player_stream_mode;   /* 当前播放器为流式（player_stream_open 成功） */
     int64_t session_offset_ms;/* 会话起始偏移（初始 cfg.start_offset；事件 rel 基准） */
@@ -1838,6 +1843,26 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
         if (json_get_bool(line, "enabled", &enabled) == 0) {
             pipeline_set_channel_merge_enabled(e->p, enabled);
         }
+    } else if (strcmp(type, "set_chorus") == 0) {
+        /* 多重奏：仅流式/内存播放模式生效；值先缓存，player 建好后应用。 */
+        bool enabled = false;
+        double voices = (double)e->chorus_voices;
+        double step_ms = e->chorus_step_ms;
+        if (json_get_bool(line, "enabled", &enabled) != 0) enabled = false;
+        json_get_number(line, "voices", &voices);
+        json_get_number(line, "step_ms", &step_ms);
+        if (voices < 1) voices = 1;
+        if (voices > 128) voices = 128;
+        if (step_ms < 10) step_ms = 10;
+        if (step_ms > 3000) step_ms = 3000;
+        /* 总跨度封顶与历史环扩容由 player 统一处理（含运行中改参数）。 */
+        e->chorus_enabled = enabled ? 1 : 0;
+        e->chorus_voices = (int)(voices + 0.5);
+        e->chorus_step_ms = step_ms;
+        if (e->player && e->player_stream_mode) {
+            player_stream_set_chorus(e->player, e->chorus_enabled,
+                                     e->chorus_voices, e->chorus_step_ms);
+        }
     } else if (strcmp(type, "set_volume") == 0) {
         double vol = 1.0;
         if (json_get_number(line, "gain", &vol) == 0) {
@@ -2157,6 +2182,8 @@ static int mediaengine_stream_begin(ArchoeraMediaEngine *e)
     }
     e->player_stream_mode = 1;
     pipeline_set_playback_streaming(e->p, true);
+    player_stream_set_chorus(e->player, e->chorus_enabled, e->chorus_voices,
+                             e->chorus_step_ms);
     player_stream_set_pos_base(e->player,
         (double)(e->cfg.start_offset_ms - e->session_offset_ms));
     /* 频谱若已在 set_fft 中申请：此时才知道是流式，补建环形缓冲并启动。 */
@@ -2649,6 +2676,9 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
            会按默认满音量出声（播放器/管线的默认增益均为 1.0）。 */
         e->last_volume = e->cfg.initial_volume;
         if (e->last_volume < 0.0f) e->last_volume = 0.0f;
+        e->chorus_enabled = 0;
+        e->chorus_voices = 4;
+        e->chorus_step_ms = 20.0;
         ERA_LOGI(NULL, "[mediaengine] 初始 sink=%s (%s) volume=%.2f\n",
                 e->sink_id && e->sink_id[0] ? e->sink_id : "(系统默认)",
                 from_env ? "env 显式指定"

@@ -7,7 +7,7 @@ part of '../settings_sections.dart';
 // ── 音频效果 ──────────────────────────────────────────────────────────
 
 /// 音频效果分类：10 段均衡器 / 参数化 EQ / 低频管理 / 多声道合并 /
-/// 响度归一化 / 播放速度。
+/// 多重奏 / 响度归一化 / 播放速度。
 ///
 /// 引擎支持运行时命令，改动即时下发（无需重启会话）；滑块用本地草稿值
 /// 保证拖动顺滑，松手才落盘并下发。
@@ -32,6 +32,10 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
   /// 拖动中的变调草稿（半音）。
   double? _draftPitch;
 
+  /// 拖动中的多重奏草稿：并行份数 / 每份错开（ms）。
+  int? _draftChorusVoices;
+  double? _draftChorusStep;
+
   /// 编辑中的参数化段草稿（方向① D1）；null = 跟随偏好。
   List<ParametricBand>? _draftPeqBands;
 
@@ -53,6 +57,35 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
 
   double get _pitch =>
       _draftPitch ?? ref.read(appPrefsProvider).pitchSemitones;
+
+  int get _chorusVoices =>
+      _draftChorusVoices ?? ref.read(appPrefsProvider).chorusVoices;
+
+  /// 当前份数下错开滑块的上限（受 60s 总跨度约束，整数 ms）。
+  double get _chorusStepMax => chorusMaxStepMsFor(_chorusVoices);
+
+  double get _chorusStep =>
+      (_draftChorusStep ?? ref.read(appPrefsProvider).chorusStepMs).clamp(
+        chorusStepMinMs,
+        _chorusStepMax,
+      );
+
+  int get _chorusSpanMs => (_chorusVoices - 1) * _chorusStep.round();
+
+  bool get _chorusWarning =>
+      _chorusVoices > Platform.numberOfProcessors ||
+      _chorusVoices >= chorusWarnVoices ||
+      _chorusSpanMs >= chorusWarnSpanMs;
+
+  /// 改份数时同步收敛错开草稿，避免滑块值越界（份数↑ → 可用错开↓）。
+  void _setDraftChorusVoices(int voices) {
+    final maxStep = chorusMaxStepMsFor(voices);
+    setState(() {
+      _draftChorusVoices = voices;
+      final step = _draftChorusStep ?? ref.read(appPrefsProvider).chorusStepMs;
+      if (step > maxStep) _draftChorusStep = maxStep;
+    });
+  }
 
   List<ParametricBand> get _peqBands =>
       _draftPeqBands ?? ref.read(appPrefsProvider).peqBands;
@@ -397,6 +430,92 @@ class _AudioEffectsSectionState extends ConsumerState<AudioEffectsSection> {
                 _apply();
               },
             ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // 1.8) 多重奏（同一首歌 N 份并行 + 极小起始错开；仅内存播放模式）
+        SettingSection(
+          title: l10n.settingsSectionChorus,
+          note: l10n.settingsChorusNote,
+          children: [
+            SettingSwitchTile(
+              icon: EtaIcons.music2Outline,
+              title: l10n.settingsChorusEnabled,
+              subtitle: prefs.chorusEnabled
+                  ? l10n.settingsChorusEnabledDesc
+                  : l10n.settingsEqEnabledOff,
+              value: prefs.chorusEnabled,
+              onChanged: (v) {
+                notifier.setChorus(enabled: v);
+                _apply();
+              },
+            ),
+            _bandTile(
+              l10n,
+              enabled: prefs.chorusEnabled,
+              label: l10n.settingsChorusVoices,
+              sub: l10n.settingsChorusSummary(
+                voices: _chorusVoices,
+                step: _chorusStep.round(),
+                span: _chorusSpanMs,
+              ),
+              value: _chorusVoices.toDouble(),
+              min: chorusVoicesMin.toDouble(),
+              max: chorusVoicesMax.toDouble(),
+              divisions: chorusVoicesMax - chorusVoicesMin,
+              onChanged: (v) => _setDraftChorusVoices(v.round()),
+              onChangeEnd: (v) {
+                final voices = v.round();
+                _setDraftChorusVoices(voices);
+                notifier.setChorus(voices: voices);
+                _apply();
+              },
+            ),
+            _bandTile(
+              l10n,
+              enabled: prefs.chorusEnabled,
+              label: l10n.settingsChorusStep,
+              sub: '${_chorusStep.toStringAsFixed(0)} ms',
+              value: _chorusStep,
+              min: chorusStepMinMs,
+              max: _chorusStepMax,
+              divisions: (_chorusStepMax - chorusStepMinMs).round(),
+              onChanged: (v) => setState(() => _draftChorusStep = v),
+              onChangeEnd: (v) {
+                setState(() => _draftChorusStep = v);
+                notifier.setChorus(stepMs: v);
+                _apply();
+              },
+            ),
+            if (prefs.chorusEnabled && _chorusWarning)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      EtaIcons.alertOutline,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        l10n.settingsChorusWarning(
+                          voices: _chorusVoices,
+                          threads: Platform.numberOfProcessors,
+                          span: _chorusSpanMs,
+                        ),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 20),

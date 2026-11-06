@@ -54,6 +54,64 @@ void main() {
     });
   });
 
+  group('多重奏偏好', () {
+    test('默认关闭 / 4 份 / 20ms', () {
+      final prefs = AppPrefs();
+      expect(prefs.chorusEnabled, isFalse);
+      expect(prefs.chorusVoices, chorusDefaultVoices);
+      expect(prefs.chorusStepMs, chorusDefaultStepMs);
+    });
+
+    test('copyWithChorus 读写并夹取到合法范围', () {
+      final prefs = AppPrefs().copyWithChorus(
+        enabled: true,
+        voices: 16,
+        stepMs: 30,
+      );
+      expect(prefs.chorusEnabled, isTrue);
+      expect(prefs.chorusVoices, 16);
+      expect(prefs.chorusStepMs, 30.0);
+
+      expect(
+        AppPrefs().copyWithChorus(voices: 999).chorusVoices,
+        chorusVoicesMax,
+      );
+      expect(
+        AppPrefs().copyWithChorus(voices: -5).chorusVoices,
+        chorusVoicesMin,
+      );
+      expect(
+        AppPrefs().copyWithChorus(stepMs: 1).chorusStepMs,
+        chorusStepMinMs,
+      );
+      expect(
+        AppPrefs().copyWithChorus(stepMs: 9999).chorusStepMs,
+        chorusStepMaxMs,
+      );
+      expect(AppPrefs().copyWithChorus(stepMs: 3000).chorusStepMs, 3000.0);
+    });
+
+    test('总跨度上限：份数越多，可用错开越小', () {
+      expect(chorusMaxStepMsFor(1), chorusStepMaxMs);
+      expect(chorusMaxStepMsFor(4), chorusStepMaxMs);
+      expect(chorusMaxStepMsFor(21), 3000.0);
+      expect(chorusMaxStepMsFor(22), 2857.0);
+      expect(chorusMaxStepMsFor(128), 472.0);
+
+      // 请求 128 份 × 3000ms 时收敛到 60s 跨度内。
+      final prefs = AppPrefs().copyWithChorus(voices: 128, stepMs: 3000);
+      expect(prefs.chorusVoices, 128);
+      expect(prefs.chorusStepMs, chorusMaxStepMsFor(128));
+      expect(prefs.chorusStepMs * (prefs.chorusVoices - 1), lessThanOrEqualTo(chorusMaxSpanMs));
+
+      // 仅改份数也会收敛既有错开（不留下越界组合）。
+      final grown = AppPrefs()
+          .copyWithChorus(voices: 4, stepMs: 3000)
+          .copyWithChorus(voices: 128);
+      expect(grown.chorusStepMs, chorusMaxStepMsFor(128));
+    });
+  });
+
   group('归一化兜底增益', () {
     test('无分析结果 / 非有限值 → 0', () {
       expect(normalizationGainDb(), 0.0);

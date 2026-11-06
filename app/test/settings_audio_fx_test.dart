@@ -30,6 +30,25 @@ class _FakePrefsNotifier extends AppPrefsNotifier {
   void setChannelMerge(bool value) {
     state = state.copyWithChannelMerge(value);
   }
+
+  @override
+  void setChorus({bool? enabled, int? voices, double? stepMs}) {
+    state = state.copyWithChorus(
+      enabled: enabled,
+      voices: voices,
+      stepMs: stepMs,
+    );
+  }
+}
+
+/// 带初始偏好的假控制器（验证历史数据/越界组合的收敛显示）。
+class _SeededPrefsNotifier extends AppPrefsNotifier {
+  _SeededPrefsNotifier(this.seed);
+
+  final AppPrefs seed;
+
+  @override
+  AppPrefs build() => seed;
 }
 
 /// 只记录下发次数，不建引擎/不写会话记忆。
@@ -117,6 +136,91 @@ void main() {
     expect(find.text('Channels'), findsOneWidget);
     expect(find.text('Channel merge'), findsOneWidget);
     expect(find.text('Off (original stereo preserved)'), findsOneWidget);
+  });
+
+  testWidgets('多重奏开关：默认关、点击后写偏好并下发', (tester) async {
+    final playback = _FakePlaybackNotifier();
+    final container = ProviderContainer(
+      overrides: [
+        appPrefsProvider.overrideWith(_FakePrefsNotifier.new),
+        playbackProvider.overrideWith(() => playback),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_wrap(container, const Locale('zh', 'CN')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('多重奏'), findsOneWidget);
+    expect(find.text('启用多重奏'), findsOneWidget);
+
+    final tile = find.ancestor(
+      of: find.text('启用多重奏'),
+      matching: find.byType(SettingSwitchTile),
+    );
+    final switchFinder = find.descendant(of: tile, matching: find.byType(Switch));
+    expect(tester.widget<Switch>(switchFinder).value, isFalse);
+
+    await tester.ensureVisible(switchFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(switchFinder);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Switch>(switchFinder).value, isTrue);
+    expect(container.read(appPrefsProvider).chorusEnabled, isTrue);
+    expect(playback.applyCount, 1);
+  });
+
+  testWidgets('多重奏文案有英文翻译', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        appPrefsProvider.overrideWith(_FakePrefsNotifier.new),
+        playbackProvider.overrideWith(_FakePlaybackNotifier.new),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_wrap(container, const Locale('en')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Multi-play'), findsOneWidget);
+    expect(find.text('Enable multi-play'), findsOneWidget);
+  });
+
+  testWidgets('多重奏：份数提高后错开上限收敛到 60s 总跨度', (tester) async {
+    final seed = AppPrefs(
+      initialData: {
+        chorusEnabledKey: true,
+        chorusVoicesKey: 128,
+        chorusStepMsKey: 3000,
+      },
+    );
+    final container = ProviderContainer(
+      overrides: [
+        appPrefsProvider.overrideWith(() => _SeededPrefsNotifier(seed)),
+        playbackProvider.overrideWith(_FakePlaybackNotifier.new),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_wrap(container, const Locale('zh', 'CN')));
+    await tester.pumpAndSettle();
+
+    // 128 份时每份最多 472ms，总跨度 127×472 = 59944ms（≤ 60s）。
+    expect(
+      find.text('×128 · 错开 472 ms · 总跨度 59944 ms'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('当前 ×128（总跨度 59944 ms）'), findsOneWidget);
+
+    final tile = find.ancestor(
+      of: find.text('每份错开'),
+      matching: find.byType(SettingSliderTile),
+    );
+    final slider = tester.widget<Slider>(
+      find.descendant(of: tile, matching: find.byType(Slider)),
+    );
+    expect(slider.max, 472.0);
   });
 
   testWidgets('参数化均衡器 / 低频管理文案走 l10n', (tester) async {

@@ -464,6 +464,17 @@ static void handle_command(AudioPipeline *p, const char *line) {
         if (json_get_bool(line, "enabled", &enabled) == 0) {
             pipeline_set_channel_merge_enabled(p, enabled);
         }
+    } else if (strcmp(type, "set_chorus") == 0) {
+        /* 多重奏（仅流式播放）：CLI 为即时命令，无持久偏好。 */
+        bool enabled = false;
+        double voices = 4, step_ms = 20;
+        json_get_bool(line, "enabled", &enabled);
+        json_get_number(line, "voices", &voices);
+        json_get_number(line, "step_ms", &step_ms);
+        if (g_player) {
+            player_stream_set_chorus(g_player, enabled ? 1 : 0,
+                                     (int)(voices + 0.5), step_ms);
+        }
     } else if (strcmp(type, "set_volume") == 0) {
         double vol = 1.0;
         if (json_get_number(line, "gain", &vol) == 0) {

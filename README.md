@@ -41,6 +41,7 @@ flutter run -d linux      # 或 windows / macos
 - [用户自编译手册](docs/user-build-from-source.md) —— 三端从源码构建 / 调试 / 打包 / 缓存外置 / 常见问题
 - [疑难解答](docs/troubleshooting.md) —— 按现象排查：启动 / 播放 / 扫描 / 歌词 / 下载 / 流媒体 / 凭据库
 - [本地曲库：扫描与刮削](docs/local-library.md) —— 音乐库扫描 / 元数据刮削 / 目录整理
+- [多重奏](docs/multi-play.md) —— 同一首歌 N 份并行 + 极小起始错开的「恶趣味」效果
 - [平台能力外观层](docs/platform-capability-facade.md) —— 防休眠 / 媒体会话 / 系统定位的能力接口
 - [下载模块设计规范](docs/download-module.md) —— 下载引擎架构 / 依赖许可
 - [解码基准（EraAudio vs FFmpeg）](docs/benchmark-2026-09-21.md) —— 出厂最小 FFmpeg 基线 + 多轮稳定性
