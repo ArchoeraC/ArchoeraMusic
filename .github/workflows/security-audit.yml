@@ -45,7 +45,6 @@ jobs:
       matrix:
         dir:
           - app/core/vault-rs
-          - app/core/downloader
           - app/core/shell
           - app/core/subsonic/transcoder
           - app/core/audio-engine/tempo-rs
@@ -56,8 +55,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           working-directory: ${{ matrix.dir }}
           # RUSTSEC-2023-0071（rsa Marvin 计时侧信道）仅影响**持有私钥**的一方；
-          # downloader 只用 `RsaPublicKey::encrypt`（酷狗登录公钥加密，见 src/crypto.rs），
-          # 不持私钥、不做解密，故该项不适用。待上游出补丁后再评估升级。
+          # 各 crate 不持私钥、不做解密，故该项不适用。待上游出补丁后再评估升级。
           ignore: RUSTSEC-2023-0071
 
   govulncheck:

@@ -162,11 +162,6 @@
 | `collection` | `get_like_status`、`like_track`、`unlike_track`、`list_liked` |
 | `history` | `history_list`、`history_clear` |
 | `lyrics` | `get_lyrics` |
-| `download` | `download_list`、`download_add`、`download_cancel`、`download_remove` |
-
-> `download` 能力组额外要求**开启开发者模式 + 下载模块**（与 GUI 隐藏入口同门槛，
-> 见 `AppPrefs.downloadModuleEnabled`）：未开启时该能力组即使勾选也不会暴露，
-> 调用返回 `unsupported`（GUI 设置中该能力行也会隐藏）。
 
 **曲目引用**：搜索 / 曲库 / 历史结果都带稳定 `ref`（`source:id`），
 `play_track` / `play_tracks` / `queue_add` / 收藏类工具优先用 `ref`
@@ -275,7 +270,6 @@ REPL 自带行编辑器（原始模式，三端一致），方向键与快捷键
            library [关键词] [-n 条数] [--offset n] / library-random / library-stats
            like|unlike|like-status <ref> / list-liked <source> [-n 条数]
            history [-n] / history-clear / lyrics
-           download [list|add <ref>... [--quality <档>]|cancel <id>|remove <id>]
            theme <light|dark|system> / sleep <分钟>|--end / sleep-cancel
            prefs [键...] / tools / info / call <工具> [--json '<参数对象>']
 ```

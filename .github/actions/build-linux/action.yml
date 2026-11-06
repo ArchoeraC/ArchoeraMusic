@@ -90,7 +90,7 @@ runs:
         echo "LD_LIBRARY_PATH=$PREFIX/lib" >> "$GITHUB_ENV"
 
     # 原生模块一站式入口（audio-engine / scraper / scanner / indexer / vault /
-    # downloader / subsonic / platform），逻辑只落一处，对齐 build_windows.bat。
+    # subsonic / platform），逻辑只落一处，对齐 build_windows.bat。
     - name: Build native modules
       shell: bash
       run: bash app/core/build-linux.sh
