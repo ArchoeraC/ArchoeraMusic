@@ -60,13 +60,6 @@ enum NativeModule {
     candidates: ['native', 'subsonic/build', 'core/subsonic/build'],
   ),
 
-  /// 转码器库（libarchoera_transcoder.{so,dylib} / archoera_transcoder.dll），
-  /// 与 subsonic 同目录（Go 侧 dlopen 或 Dart 注入绝对路径）。
-  transcoder(
-    'archoera_transcoder',
-    candidates: ['native', 'subsonic/build', 'core/subsonic/build'],
-  ),
-
   /// 下载库（libarchoera_downloader.{so,dylib} / archoera_downloader.dll，
   /// Cargo target 目录；release 优先、debug 兜底）。
   downloader(
@@ -79,16 +72,12 @@ enum NativeModule {
     ],
   ),
 
-  /// 平台能力桥接库（libarchoera_platform.{so,dylib} / archoera_platform.dll，
-  /// Zig 模块 app/native/platform；Windows DLL 装在 zig-out/bin）。
+  /// 平台能力桥接库（libarchoera_platform.{so,dylib} / archoera_platform.dll；
+  /// CMake 模块 app/native/platform，三平台产物统一落 `build/out/`）。
   platformBridge(
     'archoera_platform',
     envName: 'ARCHOERA_PLATFORM_BRIDGE',
-    candidates: [
-      'native',
-      'native/platform/zig-out/lib',
-      'native/platform/zig-out/bin',
-    ],
+    candidates: ['native', 'native/platform/build/out'],
   ),
 
   /// 统一日志核心库（libarchoera_log.{so,dylib} / archoera_log.dll）。

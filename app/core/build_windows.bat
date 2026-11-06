@@ -138,7 +138,7 @@ if defined KERNEL_LIB if not exist "build\archoera_kernel.dll" (
 goto zig_done
 :no_zig
 echo [build_windows] 警告: 未检测到 zig，EraAudio 内核不编译（引擎以 FFmpeg/Stable 运行）
-echo             安装 Zig 0.16（https://ziglang.org/download）后重跑可启用 EraAudio
+echo             安装 Zig 0.17（https://ziglang.org/download）后重跑可启用 EraAudio
 :zig_done
 
 echo [build_windows] 编译 archoera_mediaengine.dll...
