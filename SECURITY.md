@@ -16,7 +16,7 @@
 
 ## 如何报告
 
-**禁止以公开 Issue / PR / Discussion 提交漏洞细节**——公开披露会放大风险
+**请勿以公开 Issue / PR / Discussion 提交漏洞细节**——公开披露会放大风险
 （凭据保险库 vault、平台登录会话等属于敏感面）。
 
 - **首选**：GitHub 私密漏洞报告——本仓库 **Security → Advisories → Report a vulnerability**；
@@ -42,7 +42,5 @@
 - **不属于**：自托管服务端（Subsonic / Jellyfin）自身的配置不当、第三方音乐平台 API 侧的问题、
   需要物理接触设备或 OS 信任根已被攻破的场景（威胁模型边界见 [docs/vault-security-notes.md](docs/vault-security-notes.md)）。
 
-## 红线提醒
-
-越出研究范畴的利用行为（真实用户数据获取、进程 / 系统注入、供应链投毒、破坏性提交）违反
-[CONTRIBUTING §2 红线](CONTRIBUTING.md#2-红线零容忍)，并可能触犯法律。
+> [!CAUTION]
+> 越出研究范畴的利用行为（真实用户数据获取、进程 / 系统注入、供应链投毒、破坏性提交）违反[CONTRIBUTING §2 红线](CONTRIBUTING.md#2-红线零容忍)，并可能触犯法律。
