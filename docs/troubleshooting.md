@@ -59,8 +59,9 @@
 打包产物里它们平铺在可执行文件旁的 `native/`（macOS 在 `.app/Contents/native/`）；**源码运行**时
 必须先编译这些模块。
 
-- 源码运行：先执行 `bash app/core/build-linux.sh`（Windows 用 `app/core/build_windows.bat`，
-  macOS 用 `bash app/core/build-macos.sh osx-arm64`），再 `flutter run`。
+- 源码运行：先执行 `bash app/core/build-linux.sh`；Windows 用
+  `app/core/build_windows.bat`，macOS 用 `bash app/core/build-macos.sh osx-arm64`
+  （Apple Silicon）或 `bash app/core/build-macos.sh osx-x64`（Intel），再 `flutter run`。
 - 开发态 / 排障可设 `ARCHOERA_NATIVE_DIR` 指向库目录；单个模块也可用
   `ARCHOERA_AUDIO_ENGINE` / `ARCHOERA_SCANNER_FFI` / `ARCHOERA_INDEXER_FFI` /
   `ARCHOERA_PLATFORM_BRIDGE` 精确指定。

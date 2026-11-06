@@ -73,11 +73,13 @@ else
   echo "[build-ffmpeg-minimal] 警告：缺少 $VER 的系统 CA 回退补丁（https 仅认显式 ca_file）" >&2
 fi
 
-# 有 nasm/yasm 则启用 x86 汇编加速；否则退化（仍可正常解码）
-x86asm=()
+# 有 nasm/yasm 则启用 x86 汇编加速；否则退化（仍可正常解码）。
+# 用标量保存可选参数：macOS 自带 bash 3.2 在 `set -u` 下展开空数组
+# `"${x86asm[@]}"` 会报 unbound variable，导致 configure 直接不执行。
+x86asm_flag=""
 if ! command -v nasm >/dev/null 2>&1 && ! command -v yasm >/dev/null 2>&1; then
   echo "[build-ffmpeg-minimal] 未找到 nasm/yasm → --disable-x86asm（性能降级，功能不受影响）"
-  x86asm=(--disable-x86asm)
+  x86asm_flag="--disable-x86asm"
 fi
 
 # 共享库 RUNPATH：Linux 用 $ORIGIN；macOS 用 @loader_path（同目录解析）
@@ -138,6 +140,15 @@ fi
 
 echo "[build-ffmpeg-minimal] configure（纯 LGPL · 仅音频 · 共享库 · 自包含 TLS）…"
 # 自包含 TLS：优先经 mbedTLS pkg-config 探测（静态库链接进 libav*，无运行期外部依赖）。
+# Homebrew 的 opus（--enable-libopus）在 macOS 上默认不保证进入 pkg-config
+# 搜索路径；显式加入当前架构的 brew 前缀（Intel /usr/local，Apple Silicon
+# /opt/homebrew），避免 x86_64 构建因找不到 opus 而失败。
+if command -v brew >/dev/null 2>&1; then
+  BREW_PREFIX="$(brew --prefix 2>/dev/null || true)"
+  if [ -n "$BREW_PREFIX" ]; then
+    export PKG_CONFIG_PATH="$BREW_PREFIX/opt/opus/lib/pkgconfig:$BREW_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+  fi
+fi
 export PKG_CONFIG_PATH="$MBEDTLS_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 # --disable-autodetect：关闭所有外部库自动探测（zlib 除外，显式开启）
 # --disable-gpl/nonfree + --enable-version3：FFmpeg 把 mbedtls 列入
@@ -173,7 +184,7 @@ export PKG_CONFIG_PATH="$MBEDTLS_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CO
   --enable-demuxer="$AUDIO_DEMUXERS" \
   --enable-parser="$AUDIO_PARSERS" \
   --enable-protocol="$PROTOCOLS" \
-  "${x86asm[@]}" \
+  ${x86asm_flag:+"$x86asm_flag"} \
   --extra-cflags="-I$MBEDTLS_PREFIX/include" \
   --extra-ldflags="$extra_ldflags -L$MBEDTLS_PREFIX/lib -lmbedtls -lmbedx509 -lmbedcrypto"
 
