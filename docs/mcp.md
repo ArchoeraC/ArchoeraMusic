@@ -215,9 +215,10 @@ archoerashell.exe [全局选项] <命令> [参数...]             # Windows（�
   因此 GUI 主程序不再静态链入 Rust std（不引入 `WS2_32`/控制台/`dbghelp` 等导入，
   避免未签名 GUI 被 AV 误判为内置网络命令行的 loader）。
 - **macOS**：`app/macos/Runner/main.swift` 在 `NSApplicationMain` 之前检测子命令；
-  `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段按 `$ARCHS`（Release 为
-  `arm64 x86_64`）逐架构编译并 `lipo` 成 `target/universal/release/libarchoera_shell.a`
-  链入（`-liconv` 为 Rust std 的系统依赖）。
+  `Runner.xcodeproj` 的 “Build archoerashell (cargo)” 阶段按 `$ARCHS` 逐架构编译；
+  当前 Release 为单架构（`FLUTTER_XCODE_ARCHS` / `ONLY_ACTIVE_ARCH`），单 slice
+  直接复制，多架构时 `lipo` 成 `target/universal/release/libarchoera_shell.a` 链入
+  （`-liconv` 为 Rust std 的系统依赖）。
 
 实现自包含：参数解析、回环 REST（`std::net`）、TUI 渲染；帮助文案由 `build.rs`
 从 Flutter 的 ARB（`mcpShell*`）生成，与 Dart 端同源（ARB 仍由 Dart 本地化体系维护）。

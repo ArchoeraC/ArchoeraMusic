@@ -216,7 +216,9 @@ cd app && flutter run -d linux      # 本地调试
   `rm -f app/core/audio-engine/build/libarchoera_kernel.a` 再 `cmake --build build`，
   否则测试/引擎仍用旧内核，结果失真（曾导致随机跳转测试排查走偏）。
 - Windows 用 `app/core/build_windows.bat`（vcpkg + MSVC 一站式）；macOS 用
-  `bash app/core/build-macos.sh osx-arm64`。
+  `bash app/core/build-macos.sh osx-arm64`（Apple Silicon）或
+  `bash app/core/build-macos.sh osx-x64`（Intel，需 x86_64 依赖）。macOS 产物按
+  单架构分别构建，Flutter 构建时用 `FLUTTER_XCODE_ARCHS=arm64|x86_64` 钉死。
 - 三端行为一致性是验收标准：涉及 FFI / 平台壳 / 路径解析的改动应尽量**三端验证**（理想三端全验），
   未覆盖的端必须在 PR 说明原因与风险（戒律 #12）。
 
