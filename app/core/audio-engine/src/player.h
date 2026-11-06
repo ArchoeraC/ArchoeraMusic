@@ -155,6 +155,14 @@ void player_stream_end(PlayerCtx *p);
  *  恢复播放态并重启已停设备，使续喂 PCM 继续播出。 */
 void player_stream_resume(PlayerCtx *p);
 
+/** 多重奏（仅流式/内存播放模式）：把同一路 PCM 复制为 voices 份，
+ *  第 i 份相对第 0 份延迟 i×step_ms 混音输出（1..128 份，10..3000ms）。
+ *  总跨度（(voices-1)×step_ms）上限 60s，超出时自动收敛 step；
+ *  历史环按当前跨度按需扩容（运行中扩容会短暂停/启设备）。
+ *  可在播放中调用；关闭或 voices<=1 时无损旁通。文件播放模式忽略。 */
+void player_stream_set_chorus(PlayerCtx *p, int enabled, int voices,
+                              double step_ms);
+
 /** 解码流是否已到 EOF（曲尾排空判定；用户暂停不置位）。 */
 int player_stream_eof(const PlayerCtx *p);
 

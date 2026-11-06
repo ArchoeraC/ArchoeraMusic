@@ -304,6 +304,12 @@ extension _SettingsDialogView on _SettingsDialogState {
       ),
       _SearchEntry(
         SettingsCategory.audioEffects,
+        l10n.settingsChorusEnabled,
+        l10n.settingsChorusEnabledDesc,
+        EtaIcons.music2Outline,
+      ),
+      _SearchEntry(
+        SettingsCategory.audioEffects,
         l10n.settingsPeq,
         l10n.settingsSectionPeqDesc,
         EtaIcons.chartLine,

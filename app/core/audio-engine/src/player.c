@@ -27,6 +27,7 @@
 
 #include "resampler.h"
 #include "era_log.h"
+#include "chorus_mix.h"
 #include <time.h>
 #include <libavutil/samplefmt.h>
 
@@ -44,6 +45,19 @@
    运行期经 player_set_position_interval 可动态调整（降频协商，见
    engine-event-push-plan：normal 50ms / minimized 500ms / unfocused 1000ms） */
 #define POSITION_INTERVAL_MS 50
+
+/* ── 多重奏（stream 模式）──────────────────────────────────────────
+   同一路已解码 PCM 复制为 N 份，第 i 份相对第 0 份延迟 i*step 输出。
+   历史环按设备采样率预留，容量取“当前最远延迟 + 余量”向上 2 的幂（最少
+   8 秒），最多按 60 秒总跨度封顶，在音频回调里只做整数帧延迟 + 混音，
+   不复制/重解码。 */
+#define CHORUS_MAX_VOICES       128
+#define CHORUS_STEP_MIN_MS      10
+#define CHORUS_STEP_MAX_MS      3000
+#define CHORUS_MAX_SPAN_MS      60000   /* 第 0 份与最后一份的最大时间差 */
+#define CHORUS_HISTORY_SECONDS  8.0f    /* 历史环最小容量 */
+#define CHORUS_MARGIN_SECONDS   0.5f    /* 吸收设备块大小抖动 */
+#define CHORUS_HEADROOM         0.85f
 
 struct PlayerCtx {
     ma_engine engine;
@@ -95,6 +109,18 @@ struct PlayerCtx {
     ma_uint64 stream_consumed_frames; /* 累计设备消费帧数（本设备） */
     /* 流式诊断日志（ARCHOERA_DEBUG_STREAM=1，回调零开销时禁用） */
     int stream_debug;
+
+    /* 多重奏：参数由引擎线程写（原子），历史环/尾部只剩音频回调线程访问。
+       chorus_step_q100 = 每份间隔 ×100（10..3000ms → 1000..300000），避免设备
+       采样率切换后缓存帧数，回调内按当前 stream_dev_rate 换算。 */
+    qa_size chorus_enabled;
+    qa_size chorus_voices;
+    qa_size chorus_step_q100;
+    float  *chorus_hist;       /* dev_ch 交织 float，容量 2 的幂 */
+    size_t  chorus_hist_cap;   /* 帧容量 */
+    size_t  chorus_hist_w;     /* 音频线程写游标（帧；仅在设备停止时重置） */
+    qa_size chorus_tail;       /* EOF 后待排空的延迟帧数（引擎线程可清零重置） */
+    qa_size chorus_tail_done;  /* 尾部已排空（防止 stop 前重复回调再次起尾） */
     /* feed→设备 重采样（源率/声道 ≠ 设备原生时；0/0 直通则 NULL） */
     Resampler *stream_swr;
     float *stream_conv_buf;     /* 重采样输出缓冲 */
@@ -640,20 +666,91 @@ static void stream_data_cb(ma_device *pDevice, void *pOutput, const void *pInput
         memset(dst + n * ch, 0, ((size_t)frameCount - n) * ch * sizeof(float));
         QA_FETCH_ADD_RELAXED(&p->stream_underrun, (unsigned)(frameCount - n));
     }
+
+    /* ── 多重奏：先把本次输入（含欠载补零）写入历史环，再按延迟抽头混音。
+       写入发生在混音前，因此 voice 0（延迟 0）读到的就是当前输入，历史里
+       不会混入已混合输出（避免反馈叠加）。关闭时仍写历史，开启瞬间即可有
+       正确的延迟内容。 ───────────────────────────────────────────── */
+    int chorus_mixed = 0;
+    size_t chorus_max_delay = 0;
+    size_t chorus_hw = 0;
+    if (p->chorus_hist && p->chorus_hist_cap > 0) {
+        const size_t hcap = p->chorus_hist_cap;
+        const size_t hmask = hcap - 1;
+        chorus_hw = p->chorus_hist_w;
+        {
+            const size_t start = chorus_hw & hmask;
+            const size_t first = (hcap - start) < (size_t)frameCount
+                                     ? (hcap - start)
+                                     : (size_t)frameCount;
+            memcpy(&p->chorus_hist[start * ch], dst,
+                   first * ch * sizeof(float));
+            if (first < (size_t)frameCount) {
+                memcpy(&p->chorus_hist[0], dst + first * ch,
+                       ((size_t)frameCount - first) * ch * sizeof(float));
+            }
+        }
+
+        {
+            int voices = (int)QA_LOAD_RELAXED(&p->chorus_voices);
+            size_t step_q100 = QA_LOAD_RELAXED(&p->chorus_step_q100);
+            if (voices < 1) voices = 1;
+            if (voices > CHORUS_MAX_VOICES) voices = CHORUS_MAX_VOICES;
+            if (step_q100 < (size_t)(CHORUS_STEP_MIN_MS * 100))
+                step_q100 = (size_t)(CHORUS_STEP_MIN_MS * 100);
+            if (step_q100 > (size_t)(CHORUS_STEP_MAX_MS * 100))
+                step_q100 = (size_t)(CHORUS_STEP_MAX_MS * 100);
+            size_t step_frames = (size_t)(
+                ((double)step_q100 / 100.0) * (double)p->stream_dev_rate /
+                    1000.0 + 0.5);
+            if (step_frames < 1) step_frames = 1;
+            chorus_max_delay = step_frames * (size_t)(voices - 1);
+            if (QA_LOAD_ACQ(&p->chorus_enabled) && voices > 1 &&
+                chorus_max_delay + (size_t)frameCount <= hcap) {
+                const float gain = CHORUS_HEADROOM / sqrtf((float)voices);
+                chorus_mix_taps(p->chorus_hist, hcap, chorus_hw, frameCount, ch,
+                                voices, step_frames, gain, dst);
+                chorus_mixed = 1;
+            }
+        }
+        p->chorus_hist_w = chorus_hw + frameCount;
+    }
+
     float vol = stream_volume_get(p);
     if (vol != 1.0f) {
         for (ma_uint32 i = 0; i < frameCount * ch; i++) dst[i] *= vol;
     }
     QA_STORE_REL(&p->ring_r, r + n);
 
-    /* EOF 且缓冲耗尽：请求停止（由 player_poll 停设备并发 ended） */
-    if (n == 0 &&
-        QA_LOAD_ACQ(&p->stream_eof)) {
-        QA_STORE_REL(&p->stream_stop, 1);
-        if (p->stream_debug) {
-            ERA_LOGD(NULL, "[stream-dbg] cb set stop (frameCount=%u)\n",
-                    frameCount);
+    /* EOF 且缓冲耗尽：普通路径立即停止；多重奏先排空最长延迟的尾巴，
+       否则最后一截延迟副本会被截断（设备继续消费静音，位置停在曲尾）。 */
+    if (n == 0 && QA_LOAD_ACQ(&p->stream_eof)) {
+        int stop_now = 1;
+        if (chorus_mixed && chorus_max_delay > 0 &&
+            !QA_LOAD_ACQ(&p->chorus_tail_done)) {
+            size_t tail = (size_t)QA_LOAD_ACQ(&p->chorus_tail);
+            if (tail == 0) tail = chorus_max_delay;
+            {
+                const size_t used = (tail < (size_t)frameCount)
+                                        ? tail
+                                        : (size_t)frameCount;
+                tail -= used;
+                stop_now = (tail == 0) ? 1 : 0;
+            }
+            if (stop_now) QA_STORE_REL(&p->chorus_tail_done, 1);
+            QA_STORE_REL(&p->chorus_tail, (size_t)tail);
         }
+        if (stop_now) {
+            QA_STORE_REL(&p->stream_stop, 1);
+            if (p->stream_debug) {
+                ERA_LOGD(NULL, "[stream-dbg] cb set stop (frameCount=%u)\n",
+                         frameCount);
+            }
+        }
+    } else if (n > 0) {
+        /* 新数据到达（含曲尾续喂）后重新计尾。 */
+        QA_STORE_REL(&p->chorus_tail, 0);
+        QA_STORE_REL(&p->chorus_tail_done, 0);
     }
 }
 
@@ -677,9 +774,100 @@ static void stream_free_ring(PlayerCtx *p)
 {
     if (p->ring) { free(p->ring); p->ring = NULL; }
     p->ring_cap = 0;
+    if (p->chorus_hist) { free(p->chorus_hist); p->chorus_hist = NULL; }
+    p->chorus_hist_cap = 0;
+    p->chorus_hist_w = 0;
+    QA_STORE_REL(&p->chorus_tail, 0);
+    QA_STORE_REL(&p->chorus_tail_done, 0);
     if (p->stream_swr) { resampler_destroy(p->stream_swr); p->stream_swr = NULL; }
     if (p->stream_conv_buf) { free(p->stream_conv_buf); p->stream_conv_buf = NULL; }
     p->stream_conv_cap_frames = 0;
+}
+
+/* 当前参数所需的历史环帧数（最远延迟 + 余量；voices<=1 → 0）。 */
+static size_t chorus_need_frames(unsigned dev_rate, int voices, double step_ms)
+{
+    if (!dev_rate || voices <= 1) return 0;
+    return (size_t)(step_ms * (double)(voices - 1) / 1000.0 * (double)dev_rate +
+                    (double)dev_rate * CHORUS_MARGIN_SECONDS + 0.5);
+}
+
+/* 重置多重奏历史环（默认 8s，2 的幂）。设备换 sink / seek / 切档时调用，
+   旧历史内容直接丢弃。分配失败只降级为“无多重奏”，不影响正常播放。 */
+static void stream_chorus_realloc(PlayerCtx *p, unsigned dev_rate, unsigned dev_ch)
+{
+    size_t want, cap = 1;
+    float *hist;
+    if (!p || dev_rate == 0 || dev_ch == 0) return;
+    want = (size_t)((double)dev_rate * CHORUS_HISTORY_SECONDS);
+    while (cap < want) cap <<= 1;
+    hist = (float *)calloc(cap * (size_t)dev_ch, sizeof(float));
+    if (!hist) {
+        ERA_LOGW(NULL, "[player] 多重奏历史环分配失败（%zu 帧 × %u ch），已禁用\n",
+                 cap, dev_ch);
+        if (p->chorus_hist) { free(p->chorus_hist); p->chorus_hist = NULL; }
+        p->chorus_hist_cap = 0;
+        p->chorus_hist_w = 0;
+        QA_STORE_REL(&p->chorus_tail, 0);
+        QA_STORE_REL(&p->chorus_tail_done, 0);
+        return;
+    }
+    if (p->chorus_hist) free(p->chorus_hist);
+    p->chorus_hist = hist;
+    p->chorus_hist_cap = cap;
+    p->chorus_hist_w = 0;
+    QA_STORE_REL(&p->chorus_tail, 0);
+    QA_STORE_REL(&p->chorus_tail_done, 0);
+}
+
+/* 按当前最远延迟扩容历史环（只增不减；容量 2 的幂）。调用方保证设备已停止：
+   旧环内容按绝对帧位置迁入新环，避免改参数后延迟抽头突然读到静音。
+   分配失败保留旧环（回调按容量守卫降级为旁通）。 */
+static void stream_chorus_grow(PlayerCtx *p, unsigned dev_rate, unsigned dev_ch,
+                               size_t need_frames)
+{
+    size_t want, cap = 1, oldcap, w, keep, first, i, c;
+    float *hist;
+    if (!p || dev_rate == 0 || dev_ch == 0) return;
+    want = (size_t)((double)dev_rate * CHORUS_HISTORY_SECONDS);
+    if (need_frames > want) want = need_frames;
+    while (cap < want) cap <<= 1;
+    if (p->chorus_hist && p->chorus_hist_cap >= cap) return;
+    hist = (float *)calloc(cap * (size_t)dev_ch, sizeof(float));
+    if (!hist) {
+        ERA_LOGW(NULL,
+                 "[player] 多重奏历史环扩容失败（%zu 帧 × %u ch），沿用旧容量\n",
+                 cap, dev_ch);
+        return;
+    }
+    oldcap = p->chorus_hist_cap;
+    w = p->chorus_hist_w;
+    if (p->chorus_hist && oldcap > 0) {
+        keep = (w < oldcap) ? w : oldcap; /* 旧环中仍有效的帧数 */
+        first = w - keep;
+        for (i = 0; i < keep; i++) {
+            const size_t abs = first + i;
+            const size_t src = abs & (oldcap - 1);
+            const size_t dst = abs & (cap - 1);
+            for (c = 0; c < dev_ch; c++) {
+                hist[dst * dev_ch + c] = p->chorus_hist[src * dev_ch + c];
+            }
+        }
+    }
+    if (p->chorus_hist) free(p->chorus_hist);
+    p->chorus_hist = hist;
+    p->chorus_hist_cap = cap;
+    p->chorus_hist_w = w;
+}
+
+/* 按已缓存的参数保证历史环容量（seek / 切设备复位后调用；此时设备已停止）。 */
+static void stream_chorus_reserve(PlayerCtx *p, unsigned dev_rate, unsigned dev_ch)
+{
+    const int voices = (int)QA_LOAD_RELAXED(&p->chorus_voices);
+    const double step_ms =
+        (double)QA_LOAD_RELAXED(&p->chorus_step_q100) / 100.0;
+    const size_t need = chorus_need_frames(dev_rate, voices, step_ms);
+    if (need > 0) stream_chorus_grow(p, dev_rate, dev_ch, need);
 }
 
 /* 按设备格式 (dev_rate, dev_ch) 分配 ring（旧 ring 由本函数释放）。
@@ -704,6 +892,9 @@ static int stream_ring_realloc(PlayerCtx *p, unsigned dev_rate, unsigned dev_ch)
     p->ring_cap = cap_pow2;
     QA_STORE_REL(&p->ring_w, 0);
     QA_STORE_REL(&p->ring_r, 0);
+    stream_chorus_realloc(p, dev_rate, dev_ch);
+    /* seek / 切设备会丢掉历史，但不能丢大跨度设置：立即按缓存参数扩容。 */
+    stream_chorus_reserve(p, dev_rate, dev_ch);
     return 0;
 }
 
@@ -857,6 +1048,12 @@ PlayerCtx *player_stream_open(const char *sink_id,
     QA_INIT(&p->stream_eof, 0);
     QA_INIT(&p->stream_stop, 0);
     QA_INIT(&p->stream_underrun, 0);
+    QA_INIT(&p->chorus_enabled, 0);
+    QA_INIT(&p->chorus_voices, 4);
+    QA_INIT(&p->chorus_step_q100, (size_t)(20 * 100));
+    QA_INIT(&p->chorus_tail, 0);
+    QA_INIT(&p->chorus_tail_done, 0);
+    stream_chorus_realloc(p, dev_rate, dev_ch);
 
     /* ── feed→设备 重采样（swr；格式相同则 NULL 直通）────────── */
     if (dev_rate != (unsigned)content_rate || dev_ch != (unsigned)content_channels) {
@@ -1034,6 +1231,42 @@ void player_stream_end(PlayerCtx *p)
     QA_STORE_REL(&p->stream_eof, 1);
 }
 
+void player_stream_set_chorus(PlayerCtx *p, int enabled, int voices,
+                              double step_ms)
+{
+    unsigned rate, ch;
+    if (!p || !p->stream_mode) return;
+    if (voices < 1) voices = 1;
+    if (voices > CHORUS_MAX_VOICES) voices = CHORUS_MAX_VOICES;
+    if (step_ms < CHORUS_STEP_MIN_MS) step_ms = CHORUS_STEP_MIN_MS;
+    if (step_ms > CHORUS_STEP_MAX_MS) step_ms = CHORUS_STEP_MAX_MS;
+    /* 总跨度封顶：份数越多，每份可用的错开越小（内存按跨度增长）。 */
+    if (voices > 1 &&
+        step_ms * (double)(voices - 1) > (double)CHORUS_MAX_SPAN_MS) {
+        step_ms = (double)CHORUS_MAX_SPAN_MS / (double)(voices - 1);
+    }
+    /* 历史环按当前最远延迟扩容。运行中扩容需要短暂停设备（~几 ms），
+       分配与迁移都在音频回调之外完成；参数本身是原子的，回调始终看到
+       一组自洽的 voices/step。 */
+    rate = p->stream_dev_rate ? p->stream_dev_rate : 48000u;
+    ch = p->stream_dev_ch ? p->stream_dev_ch : 2u;
+    if (enabled && voices > 1) {
+        const size_t need = chorus_need_frames(rate, voices, step_ms);
+        const size_t cur = p->chorus_hist_cap;
+        if (need > cur) {
+            const int was_started = QA_LOAD_ACQ(&p->stream_dev_started);
+            if (was_started) stream_device_stop(p);
+            stream_chorus_grow(p, rate, ch, need);
+            if (was_started) stream_device_start(p);
+        }
+    }
+    QA_STORE_REL(&p->chorus_voices, (size_t)voices);
+    QA_STORE_REL(&p->chorus_step_q100, (size_t)(step_ms * 100.0 + 0.5));
+    QA_STORE_REL(&p->chorus_enabled, enabled ? 1 : 0);
+    QA_STORE_REL(&p->chorus_tail, 0);
+    QA_STORE_REL(&p->chorus_tail_done, 0);
+}
+
 /* 无缝切档：旧源在曲尾排空（EOF）后，commit_source 会把新源 PCM 续喂同一 ring。
    此处清 EOF/停止/结束标志、恢复播放态并重启已停设备，使续喂 PCM 继续播出
    （否则尾部切档会因设备已停而静默失效）。仅用于「曲尾排空」而非用户暂停。 */
@@ -1043,6 +1276,8 @@ void player_stream_resume(PlayerCtx *p)
     QA_STORE_REL(&p->stream_eof, 0);
     QA_STORE_REL(&p->stream_stop, 0);
     QA_STORE_REL(&p->ended_reported, 0);
+    QA_STORE_REL(&p->chorus_tail, 0);
+    QA_STORE_REL(&p->chorus_tail_done, 0);
     QA_STORE_REL(&p->playing, 1);
     if (p->stream_dev_inited && !QA_LOAD_ACQ(&p->stream_dev_started)) {
         stream_device_start(p);
