@@ -3,8 +3,8 @@
 > 状态：**修复中**——第一批（文档澄清，SEC-04/07/14/15/17/18/19/20/28/29）已完成（ed17b5f1）；
 > 第二批（凭据统一，SEC-01/02/03）已完成（SEC-02/03：bb7d5787；SEC-01：0ee148f2，补强 eaf4d061）；
 > 第三批（防护加固）SEC-05/08/34 文档澄清（bb7d5787）、SEC-09 日志脱敏（be7847b4）、SEC-06 KDF 参数上限（840e6775）已完成；
-> 第四批（功能面加固，SEC-10/11/12/13/16/30/31/32/33）已完成（SEC-11/33：84ffd9ec；SEC-12：831a541b；
-> SEC-31：57ff8c8c；SEC-10/13/16/30/32 文档：a39ffd41）。
+> 第四批（功能面加固，SEC-10/12/13/16/30/31/32）已完成（SEC-12：831a541b；SEC-31：57ff8c8c；
+> SEC-10/13/16/30/32 文档：a39ffd41）。
 > 第五批（发布供应链，SEC-21/22/23/24/25/26/27）已完成（8e0aee31）——CI/签名溯源加固见
 > [supply-chain.md](supply-chain.md)；SEC-22 经 GitHub ruleset 开启 Code Owners 评审。
 > **第六批（残留代码加固，2026-10-12）**：SEC-09 单字母查询键 `p/t/s` 上下文掩码（原生 `archoera_log_scrub` + Dart `Log.scrub`）、
@@ -68,8 +68,8 @@
 ## 0. 评审方法与边界
 
 - **方法**：交叉比对 vault 四份文档与 `architecture` / `privacy` / `SECURITY` / `CONTRIBUTING` /
-  `mcp` / `unified-logging` / `download-module` / `local-library` /
-  `audio-kernel-zig` / `ffi-libs-layout-plan` / `downloader-identity-plan` 及 `docs/archive/`。
+  `mcp` / `unified-logging` / `local-library` / `audio-kernel-zig` / `ffi-libs-layout-plan`
+  及 `docs/archive/`。
 - **第二轮扩面（2026-10-11，其它位置）**：CI 与发布供应链（`.github/workflows/build-all.yml`、
   `.github/actions/build-linux/action.yml`、`.github/CODEOWNERS`）、打包（`packaging/windows/archoera_music.iss`、
   `packaging/linux/*`）、工具脚本（`app/tool/sign_release.sh` / `verify_release.sh` / `sign_watermark.sh`）、
@@ -96,9 +96,8 @@
 | SEC-08 | 中 | FFI 库 / 二进制加载顺序劫持（按文件名 + 系统搜索路径） | ffi-libs-layout-plan（Dart 路径解析）；vault-security-notes §二进制替换防护 | ❌ 未提 | 已修复（文档·第三批 bb7d5787；**代码加固·第六批 2026-10-12**：构建期 SHA-256 清单 + 运行期校验；**本轮重构 2026-10**：升级为 **key1 签名的清单**（`ARCHOERA-NATIVE-MANIFEST.sig1`，内嵌公钥验签 fail-closed），vault 二进制 spawn 前校验；残余=主程序自身无法自证） |
 | SEC-09 | 中 | 全链路日志无脱敏，vault stderr 转发入明文日志 | unified-logging §2/§3；archive/robustness-improvement-plan §2 | ❌ 未提 | 已修复（第三批 be7847b4；**第六批 2026-10-12** 补 p/t/s 单字母查询键掩码） |
 | SEC-10 | 中 | MCP 密钥明文落盘；局域网模式为明文 HTTP | mcp §1/§5 | ❌ 未提 | 已修复（文档·第四批 a39ffd41；**代码加固·第六批 2026-10-12**：密钥改存 vault，prefs.json 不落明文） |
-| SEC-11 | 中 | 下载 / 整理的文件路径由元数据派生，`subDir` 未清洗 `..` | download-module §3.3；local-library §刮削 | ❌ 未提 | 已修复（第四批，84ffd9ec） |
 | SEC-12 | 中 | 原生 HTTP 客户端重定向未限制降级 / 内网 / 非官方主机 | audio-kernel-zig（2026-10-01 / 2026-10-07 落地） | ❌ 未提 | 已修复（第四批，831a541b） |
-| SEC-13 | 中 | 设备指纹与项目自身红线（CONTRIBUTING §2.5）冲突 + 隐私政策未披露 | CONTRIBUTING §2.5；device-bound-vault-plan §5.1；downloader-identity-plan §3.1；privacy §二 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
+| SEC-13 | 中 | 设备指纹与项目自身红线（CONTRIBUTING §2.5）冲突 + 隐私政策未披露 | CONTRIBUTING §2.5；device-bound-vault-plan §5.1；privacy §二 | ❌ 未提 | 已修复（文档·第四批，a39ffd41） |
 | SEC-14 | 低 | vault 安全声明 env 清单不完整 | vault-security-notes §测试明文存储/§二进制替换防护 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-15 | 低 | OS 份额共享只写「应用副本覆盖」，未写「第三方应用可读」 | vault-security-notes §份额覆盖风险 | ❌ 未提 | 已修复（文档·第一批，ed17b5f1；**2026-10-14** Linux libsecret 补实现后在 vault-scheme-comparison §4 补写「同会话应用无客户端侧 ACL」残余） |
 | SEC-16 | 低 | 迁移 / 模式切换跨存储的崩溃一致性未列风险 | device-bound-vault-plan §8；credential-vault-plan §3.4 | ❌ 未提 | 已修复（文档·第四批，a39ffd41；**代码补强 2026-10-14**：方案切换在 `init` 后**自验证**（`VaultProcess.verifyUnlock` 用刚输入口令真实解锁一次），失败即回滚快照（旧库原封不动）；且**先持久化方案再丢弃旧容器**——消除「新库口令对不上 + 旧库已销毁」与「容器新 / pref 旧」两类不可解态，见 §8.7） |
@@ -118,7 +117,6 @@
 | SEC-30 | 低 | `SystemLocation` 敏感权限缺授权/可关闭语义 | platform-capability-facade.md §2.1/§3 | — | 已修复（文档·第四批，a39ffd41） |
 | SEC-31 | 中 | deep link 与 `apl_reveal_path` 外部输入校验未声明 | platform-native-bridge.md §3.1 | — | 已修复（第四批，57ff8c8c） |
 | SEC-32 | 中 | Subsonic 认证/传输模式未定义（token vs 明文密码、http vs https） | architecture §7；privacy §5.2 | — | 已修复（文档·第四批，a39ffd41） |
-| SEC-33 | 低 | 下载临时文件与已存在同名路径（符号链接）处理未定义 | download-module.md §3.3 | — | 已修复（第四批，84ffd9ec） |
 | SEC-34 | 低 | 多运行时同进程的信号处理器/全局符号冲突（DoS/稳定性） | module-on-demand-load-plan.md §2；audio-kernel-zig 2026-10-02 | — | 已修复（文档·第三批，bb7d5787） |
 | SEC-35 | 中 | **Rust 版 vault 无 `mlock`/`VirtualLock`/`MADV_DONTDUMP`**（文档多处称「mlock 缓冲（已有）」，实际仅 C# `MemGuard` 有）→ 主密钥与明文可被换出到 swap / pagefile / hiberfil | vault-rs `serve.rs`/`service.rs`；credential-vault-plan §3.6；vault-security-notes §内存 | ⚠️ 高估 | 已修复（第八批：新增 `src/memguard.rs`——每缓冲**独占页**锁定（页对齐，防相邻缓冲 `munlock` 误解除）、`MADV_DONTDUMP`、启动提额；`selftest-mem` + 会话期 `VmLck>0` 回归） |
 | SEC-36 | 中 | **Rust 版 zeroize 覆盖不全**：`get` 明文与 base64 响应、`set` 解码明文、会话主密钥、读线程行缓冲均直接 drop（C# 对应位置为 `ZeroMemory`/`LockedBuffer`）→ Windows 上实测可扫描到已删除凭据残留 | vault-rs `serve.rs`；C# `ServeSession.cs` | ⚠️ 高估 | 已修复（第八批：明文/口令/主密钥/KEK 收口到 `LockedBuffer`/`Zeroizing`；std 全局 stdout/stdin 缓冲改**原始句柄 + 自有可零化缓冲**） |
@@ -250,14 +248,6 @@
 - **修复方向**：文档明确「密钥防浏览器 / 跨源，不防同用户进程」；局域网模式加说明或改仅回环；
   考虑密钥不落盘 / 仅内存持有。
 
-### SEC-11 · 文件写出路径由元数据派生，`subDir` 未清洗 `..`
-
-- **现象**：下载路径 `subDir` 直接由 `artist` 派生（ByArtist 策略），仅 `filename` 过 `sanitize`；
-  `sanitize` 只把 `\/:*?"<>|` 换成 `_`，**不剥离 `..`**。目录整理同样以标签值 + `/` 构建目录树。
-- **证据**：`download-module.md` §3.3（路径 & 文件名）；`local-library.md` §刮削（仅目录整理）。
-- **影响**：恶意 / 被篡改的平台元数据或本地标签（artist 为 `..` 或含 `/`）→ `destPath` 越出 `rootDir`，任意目录写入。
-- **修复方向**：对 `subDir` 与整理模板变量同样做规范化（拒绝 / 替换 `..`、绝对路径、盘符）；文档补充路径清洗契约。
-
 ### SEC-12 · 原生 HTTP 客户端重定向面（降级 / 内网 / 非官方主机）
 
 - **现象**：内核自研 HTTP/1.1，跟随重定向 ≤6 跳、「重定向原样保留」；TLS 仅「`std.crypto.tls.Client` + 系统 CA」一句。
@@ -268,11 +258,11 @@
 
 ### SEC-13 · 设备指纹与项目自身红线冲突 + 隐私政策未披露
 
-- **现象**：v3 设备绑定采集 `machine-id` / `MachineGuid` / `IOPlatformUUID`；下载器持久化用户级设备身份（默认开启）。
+- **现象**：v3 设备绑定采集 `machine-id` / `MachineGuid` / `IOPlatformUUID`。
 - **证据**：`CONTRIBUTING.md` §2.5 红线明文禁止「设备指纹、持久化设备 ID、跨会话跨启动追踪」能力；
-  `archive/device-bound-vault-plan.md` §5.1（指纹采集表）；`downloader-identity-plan.md` §3.1（「同一用户 → 指纹稳定（首次生成后不变）」，prefs 持久化）；
+  `archive/device-bound-vault-plan.md` §5.1（指纹采集表）；
   `privacy.md` §二 仅在凭据描述里带「v3 设备绑定」字样，**未披露读取硬件设备标识或持久化设备身份**。
-- **影响**：文档层面自相矛盾 + 隐私披露缺口（v3 有 in-app 提示，downloader identity 默认开启且无披露）。
+- **影响**：文档层面自相矛盾 + 隐私披露缺口（v3 有 in-app 提示但隐私政策未披露）。
 - **修复方向**：统一口径——要么修订 §2.5 红线为「禁止**上传 / 跨应用追踪**，本地设备绑定属列举例外」并补隐私政策披露，
   要么把这些能力降级 / 加显式同意；无论哪种，隐私政策需补「本机设备标识的读取与用途」段落。
 
@@ -379,9 +369,9 @@
 ### SEC-27 · CI 测试面过窄（回归可能直达发布）
 
 - **现象**：CI 实际只跑 `dart analyze lib`、`flutter test test/widget_test.dart` + `test/vault_session_store_test.dart`、
-  `cargo test`（仅 `app/core/shell`）、`zig build test`；**未跑完整 `flutter test`**，未跑 downloader / subsonic 的 `cargo test` / `go test`，未跑 scanner C# 测试。
+  `cargo test`（仅 `app/core/shell`）、`zig build test`；**未跑完整 `flutter test`**，未跑 subsonic 的 `go test`，未跑 scanner C# 测试。
 - **证据**：`.github/actions/build-linux/action.yml`（Test 步骤）；`AGENTS.md` 要求提交前 `flutter test` 全绿。
-- **影响**：本地要全量、CI 只冒烟；下载器加解密、平台桥接、vault 其余用例的回归不会被 CI 拦住，可能随发布出去。
+- **影响**：本地要全量、CI 只冒烟；平台桥接、vault 其余用例的回归不会被 CI 拦住，可能随发布出去。
 - **修复方向**：CI 跑完整 `flutter test`（含 vault / 平台用例，必要时 headless 处理）与各模块单测。
 
 ---
@@ -431,18 +421,10 @@
 - **影响**：若以明文密码经 HTTP 传输，凭据在链路上可被嗅探；自建服务器常为内网 http。历史评分件亦提到「支持明文密码、无哈希」。
 - **修复方向**：文档明确认证模式与「不支持 HTTPS 时的行为 / 警示」；优先 token 认证。
 
-### SEC-33 · 下载临时文件与已存在同名路径（符号链接）处理未定义
-
-- **现象**：`download-module.md` §3.3 `tmpPath = destPath + ".tmp"`、完成后原子 rename；§v0.3 提到崩溃后清理 `*.tmp`；
-  `sanitize` 仅替换非法字符并做 "(1)(2)" 去重，未声明对**已存在同名符号链接 / 非普通文件**的处理。
-- **影响**：下载目录若为多用户可写或存在预置符号链接，写 `.tmp`（若跟随链接打开）可能写到预期外路径；同名追加逻辑不区分文件类型。
-- **修复方向**：写临时文件用 `O_NOFOLLOW|O_CREAT|O_EXCL`、写入前后校验路径类型、rename 前确认目标非目录/符号链接；文档补契约。
-- **置信度**：文档层推断（需代码确认打开方式），严重度低。
-
 ### SEC-34 · 多运行时同进程的信号处理器 / 全局符号冲突
 
 - **现象**：`module-on-demand-load-plan.md` §2 显示同进程并存 Go runtime / .NET NativeAOT（scanner、vault）/
-  Rust tokio（downloader / transcoder）/ Zig 内核 / FFmpeg；sqlite 以 `RTLD_GLOBAL|DEEPBIND` 预加载；
+  Rust tokio（transcoder）/ Zig 内核 / FFmpeg；sqlite 以 `RTLD_GLOBAL|DEEPBIND` 预加载；
   `audio-kernel-zig.md`（2026-10-02）记录了 `std.Io.Threaded.deinit` 恢复旧 `SIGIO` handler **致进程被信号终止**的真实缺陷；
   vault 文档亦记录 NativeAOT 接管 `SIGSEGV`。
 - **影响**：多个运行时各自安装信号处理器 / 全局符号，dlopen/dlclose 顺序可能引发进程终止或符号错绑（DoS / 稳定性）；
@@ -656,7 +638,7 @@ status 列为 `none`），不能只看条数——须看 `info` 的 size/message
 | 第一批（文档澄清，低成本） | 修正定性、补声明、消矛盾、清过时稿 | SEC-04、SEC-07、SEC-14、SEC-15、SEC-17、SEC-18、SEC-19、SEC-20、SEC-28、SEC-29 |
 | 第二批（凭据面统一） | 消灭第二套密钥 / 明确降级边界、内存驻留 | SEC-01、SEC-02、SEC-03 |
 | 第三批（防护加固） | 可绕过点与 DoS | SEC-05、SEC-06、SEC-08、SEC-09、SEC-34 |
-| 第四批（功能面加固） | 输入 / 网络 / 权限面 | SEC-10、SEC-11、SEC-12、SEC-13、SEC-16、SEC-30、SEC-31、SEC-32、SEC-33 |
+| 第四批（功能面加固） | 输入 / 网络 / 权限面 | SEC-10、SEC-12、SEC-13、SEC-16、SEC-30、SEC-31、SEC-32 |
 | 第五批（发布供应链） | CI / 签名 / 溯源（优先级高，牵涉信任根） | SEC-21、SEC-22、SEC-23、SEC-24、SEC-25、SEC-26、SEC-27 |
 | 第八批（vault 回归 + 文件系统面 + App 层收口） | 内存护栏 / zeroize / 安全落盘 / 沙箱覆盖 / 容量·读侧·并发 / App 文件访问 | SEC-35～SEC-38、SEC-41～SEC-47（SEC-39 为已声明残余；SEC-40 复核撤回） |
 

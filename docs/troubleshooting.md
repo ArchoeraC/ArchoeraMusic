@@ -43,7 +43,6 @@
 | 搜索只有标题 / 歌手 / 专辑 | §4 |
 | 没有歌词 / 歌词不对 | §5 |
 | 在线音源登录失效、429 | §6 |
-| 下载失败 / 下载很慢 | §7 |
 | 流媒体服务器连不上 | §8 |
 | 忘记口令 / 换机后打不开凭据库 | §9 |
 | 界面卡顿、掉帧、内存高 | §10 |
@@ -56,7 +55,7 @@
 
 ### 1.1 启动闪退，或提示「未找到 xxx」
 
-应用通过 FFI 进程内加载原生模块（音频引擎、扫描器、刮削器、下载器、Subsonic、索引器、平台桥接）。
+应用通过 FFI 进程内加载原生模块（音频引擎、扫描器、刮削器、Subsonic、索引器、平台桥接）。
 打包产物里它们平铺在可执行文件旁的 `native/`（macOS 在 `.app/Contents/native/`）；**源码运行**时
 必须先编译这些模块。
 
@@ -64,7 +63,7 @@
   macOS 用 `bash app/core/build-macos.sh osx-arm64`），再 `flutter run`。
 - 开发态 / 排障可设 `ARCHOERA_NATIVE_DIR` 指向库目录；单个模块也可用
   `ARCHOERA_AUDIO_ENGINE` / `ARCHOERA_SCANNER_FFI` / `ARCHOERA_INDEXER_FFI` /
-  `ARCHOERA_DOWNLOADER_SO` / `ARCHOERA_PLATFORM_BRIDGE` 精确指定。
+  `ARCHOERA_PLATFORM_BRIDGE` 精确指定。
 - 发布包：确认安装目录里的 `native/` 没有被杀毒软件或手工操作删掉。
 - **完整性校验失败**（`原生库完整性校验失败：…（manifest 不匹配）`）：打包态会 fail-closed。
   自己替换过 `native/` 里的库时，必须重新生成清单：
@@ -84,7 +83,7 @@
 ### 1.3 升级后提示「凭据库版本不兼容」
 
 2026-10 的保险库重构移除了旧容器格式，**没有迁移路径**：旧文件必须销毁重建，然后重新登录各平台
-（设置 →「存储」→ 安全销毁）。重建前请确认没有正在进行的下载 / 播放任务。如果确实对您造成了不便，还希望您能够谅解
+（设置 →「存储」→ 安全销毁）。重建前请确认没有正在播放的任务。如果确实对您造成了不便，还希望您能够谅解
 
 ### 1.4 Linux 启动缺依赖
 
@@ -339,31 +338,6 @@ SSL_CERT_DIR=/path/to/certs            # 目录列表，`:` 分隔
 > [!CAUTION]
 > 如果您非要纠结这个地方的不合理性，请以官方客户端功能为准，不要以此迫害开发者
 
-### 7.1 提示「下载引擎初始化失败」
-
-原生下载库未加载或初始化失败（错误里带 code）。先按 §1.1 确认 `native/` 完整；仍失败请附日志中
-`downloader` 相关行。
-
-### 7.2 解析失败 / 下载中断
-
-- 预解析 URL 会过期，「重试」会重新解析，不要复用旧任务参数；
-- 网络切换、代理、平台风控都可能导致中断；可先暂停再继续（支持续传）。
-
-### 7.3 下载很慢 / 被限速
-
-- 设置 →「下载」→「同时下载数」1~5，过多会互相抢带宽；
-- 「下载限速」可按需设置；
-- 「动态设备指纹」默认关闭，开启后每次启动随机设备标识，不建议常开。
-
-> [!WARNING]
-> 对于风控、网络问题等作者也没有办法，也请不要在这个方面难为作者
-
-### 7.4 文件名 / 目录不符合预期
-
-- 「文件名模板」支持 `<artist>` / `<title>` / `<album>`，只影响**之后入队**的任务；
-- 「目录分组」决定按专辑 / 歌手等分组；
-- 「下载记录上限」10~500，超限只淘汰最旧的失败 / 已取消记录，进行中任务不受影响。
-
 ---
 
 ## 8. 流媒体（Subsonic / Jellyfin / Emby）
@@ -417,7 +391,7 @@ SSL_CERT_DIR=/path/to/certs            # 目录列表，`:` 分隔
 ### 9.6 切换加密方案后为什么要重启
 
 切换会重建容器并涉及各模块的凭据状态，应用会提示重启。重启后若为口令模式，需要先解锁；
-解锁前登录态与流媒体凭据显示为未登录，播放与下载会中断。
+解锁前登录态与流媒体凭据显示为未登录，播放会中断。
 
 ---
 
@@ -489,7 +463,7 @@ SSL_CERT_DIR=/path/to/certs            # 目录列表，`:` 分隔
 | `ARCHOERA_DATA_DIR` | 覆盖数据目录（DB / 偏好 / 日志 / 保险库） |
 | `ARCHOERA_LOG_LEVEL` | 日志级别：`debug` / `info` / `warn` / `error` / `fatal` |
 | `ARCHOERA_NATIVE_DIR` | 开发态：原生库搜索目录（完整性校验不读它） |
-| `ARCHOERA_AUDIO_ENGINE` / `ARCHOERA_SCANNER_FFI` / `ARCHOERA_INDEXER_FFI` / `ARCHOERA_DOWNLOADER_SO` / `ARCHOERA_PLATFORM_BRIDGE` | 精确指定单个原生库路径或所在目录 |
+| `ARCHOERA_AUDIO_ENGINE` / `ARCHOERA_SCANNER_FFI` / `ARCHOERA_INDEXER_FFI` / `ARCHOERA_PLATFORM_BRIDGE` | 精确指定单个原生库路径或所在目录 |
 | `ARCHOERA_VAULT_BIN` | 指定 `archoera-vault` 可执行文件 |
 | `ARCHOERA_RIPPLE_SHADER=0` | 关闭水纹 GPU 着色器（回退 CPU 网格） |
 | `ARCHOERA_FLUID_SHADER=0` | 关闭流体背景着色器 |
@@ -526,4 +500,3 @@ SSL_CERT_DIR=/path/to/certs            # 目录列表，`:` 分隔
 - [统一日志](unified-logging.md) —— 日志格式、落盘、脱敏
 - [平台能力外观层](platform-capability-facade.md) —— 托盘 / 媒体会话 / 防休眠的降级语义
 - [本地曲库：扫描与刮削](local-library.md) —— 扫描与元数据细节
-- [下载模块设计规范](download-module.md) —— 下载引擎与许可

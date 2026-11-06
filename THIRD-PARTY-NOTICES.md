@@ -51,8 +51,7 @@ MPL-1.1 / 公有领域）。
 许可均为宽松或 weak-copyleft，与 AGPL-3.0 聚合分发兼容；逐项说明与源码获取方式见对应模块的
 `THIRD-PARTY-LICENSES.md`。各模块的**逐项清单（含传递依赖）**随包分发为
 `licenses/<模块>-THIRD-PARTY-LICENSES.md`（如 `audio-engine-THIRD-PARTY-LICENSES.md`、
-`downloader-THIRD-PARTY-LICENSES.md`、`scraper-THIRD-PARTY-LICENSES.md`、
-`subsonic-THIRD-PARTY-LICENSES.md` 等）。
+`scraper-THIRD-PARTY-LICENSES.md`、`subsonic-THIRD-PARTY-LICENSES.md` 等）。
 
 | 模块 | 组件 | 许可 | 说明 |
 |---|---|---|---|

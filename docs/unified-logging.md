@@ -1,6 +1,6 @@
 # 统一日志（Unified Logging）
 
-全层（Dart / 平台桥接 C++ / C 引擎 / Rust 下载器 / Zig 内核）日志的统一格式、
+全层（Dart / 平台桥接 C++ / C 引擎 / Zig 内核）日志的统一格式、
 分级着色、落盘与注入契约。实现依据：`app/native/log/`（核心）、各模块的
 `*_set_log_sink` 注入点。
 
@@ -58,7 +58,7 @@ Dart 侧仅在传输当次分配并立即释放 UTF-8 缓冲，不保留任何�
 Dart ──▶ archoera_log_write ──▶ [HH:mm:ss LEVEL] [tag] msg ──▶ stderr(色) + logs/archoera.log
         └───────────────────────────────────────────────────────────────────────────────────────┘
              ▲                  ▲                     ▲                    ▲
-   Log.nativeWritePointer  apl_set_log_sink  archoera_mediaengine_  archoera_downloader_
+   Log.nativeWritePointer  apl_set_log_sink  archoera_mediaengine_
    （host 注入源）          （平台桥接）       set_log_sink（C 引擎）  set_log_sink（Rust）
                                                                       └→ zk_set_log_sink（Zig 内核）
 ```
@@ -85,7 +85,6 @@ Dart ──▶ archoera_log_write ──▶ [HH:mm:ss LEVEL] [tag] msg ──▶
 | C++ 刮削器 | `archoera_scraper_set_log_sink` | `SCRAPER_LOGI/W/E/...`（`include/scraper_log.h`） |
 | C# 扫描器 | `scanner_set_log_sink` | `Log.Info/Warn/Error` → 统一 helper（UTF-8 → sink） |
 | Go Subsonic | `archoera_subsonic_set_log_sink` | `logInfo/Warn/Error` → cgo `C.sub_log_emit` |
-| Rust 下载器 | `archoera_downloader_set_log_sink` | `log::info!/warn!/...`（自定义 `log::Log`） |
 | Rust 转码器 | `archoera_transcoder_set_log_sink` | Go 侧 dlopen 后转发同一 sink |
 | Zig 内核 | `zk_set_log_sink`（引擎转发） | `kernel/log.zig` 的 `emit()` |
 | Dart | `Log.i/w/e/f/at(tag, msg)` | 直接调用 |
@@ -116,13 +115,13 @@ Dart ──▶ archoera_log_write ──▶ [HH:mm:ss LEVEL] [tag] msg ──▶
 
 ## 4. 在代码里加日志
 
-- **Dart**：`import '.../services/log/log.dart';` → `Log.w('downloader', '降级：$e')`。
+- **Dart**：`import '.../services/log/log.dart';` → `Log.w('scraper', '降级：$e')`。
   级别按语义选择；不要再用裸 `debugPrint`（`debugPrint` 已统一收口到 INFO）。
 - **C 引擎**：`#include "era_log.h"` → `ERA_LOGE(NULL, "%s 打开失败: %d", LOG_TAG, rc)`。
 - **C++ 刮削器**：`#include "scraper_log.h"` → `SCRAPER_LOGE(NULL, "[scraper] …")`。
 - **C# 扫描器**：用 `Log.Info/Log.Warn/Log.Error("scanner", "…")`（勿直接 `Console.Error`）。
 - **Go Subsonic**：用 `logInfo/logWarn/logError("subsonic", "…")`（勿直接 `log.*`）。
-- **Rust**：沿用 `log::warn!` 等宏（下载器）或 sink 助手（转码器）。
+- **Rust**：沿用 `log::warn!` 等宏或 sink 助手（转码器）。
 - **C++ 桥接**：`archoera::log(2 /*WARN*/, "platform", msg)`。
 - **Zig 内核**：`era_log.emit(2, "kernel:runtime", "…", .{})`。
 
