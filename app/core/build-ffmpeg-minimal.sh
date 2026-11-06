@@ -73,11 +73,13 @@ else
   echo "[build-ffmpeg-minimal] 警告：缺少 $VER 的系统 CA 回退补丁（https 仅认显式 ca_file）" >&2
 fi
 
-# 有 nasm/yasm 则启用 x86 汇编加速；否则退化（仍可正常解码）
-x86asm=()
+# 有 nasm/yasm 则启用 x86 汇编加速；否则退化（仍可正常解码）。
+# 用标量保存可选参数：macOS 自带 bash 3.2 在 `set -u` 下展开空数组
+# `"${x86asm[@]}"` 会报 unbound variable，导致 configure 直接不执行。
+x86asm_flag=""
 if ! command -v nasm >/dev/null 2>&1 && ! command -v yasm >/dev/null 2>&1; then
   echo "[build-ffmpeg-minimal] 未找到 nasm/yasm → --disable-x86asm（性能降级，功能不受影响）"
-  x86asm=(--disable-x86asm)
+  x86asm_flag="--disable-x86asm"
 fi
 
 # 共享库 RUNPATH：Linux 用 $ORIGIN；macOS 用 @loader_path（同目录解析）
@@ -182,7 +184,7 @@ export PKG_CONFIG_PATH="$MBEDTLS_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CO
   --enable-demuxer="$AUDIO_DEMUXERS" \
   --enable-parser="$AUDIO_PARSERS" \
   --enable-protocol="$PROTOCOLS" \
-  "${x86asm[@]}" \
+  ${x86asm_flag:+"$x86asm_flag"} \
   --extra-cflags="-I$MBEDTLS_PREFIX/include" \
   --extra-ldflags="$extra_ldflags -L$MBEDTLS_PREFIX/lib -lmbedtls -lmbedx509 -lmbedcrypto"
 
