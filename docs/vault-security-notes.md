@@ -90,7 +90,9 @@ KDF 参数有**上限与下限**（[VaultLimits.ValidateKdf]：`m∈[8192 KiB, 2
   构建（自包含 CRT）。
 - **macOS**：crypto 模式走 **Keychain**（`kSecClassGenericPassword`，service
   `archoera.vault`，account 按数据目录作用域 `{key}|{dataDir}`，原始字节值）；
-  `aarch64-apple-darwin` + `x86_64-apple-darwin` 双架构经 `lipo` 合成 universal。
+  `build-macos.sh` 按 RID 构建 `aarch64-apple-darwin` / `x86_64-apple-darwin`
+  单架构，`.app` 与 native 库架构一致；`cross-macos.sh` 仍可做双架构
+  universal 的交叉编译检查。
 - **字节 / 协议兼容**：容器格式（crypto `'C'` / slots `'S'`）与 KDF/HKDF/AEAD 语义由
   `app/core/vault-rs/testdata/` 的**冻结黄金夹具**锚定（`test.sh` §14 / `test-windows.sh` §11 读回固定值）；
   C# 活体 oracle（旧 `cross_parity.sh` 双向互解互读）已于 2026-10-12 随 `app/core/vault/` 一并删除。

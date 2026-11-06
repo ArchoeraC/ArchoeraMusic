@@ -2,24 +2,59 @@
 # =====================================================================
 #  ArchoeraMusic macOS 全模块一站式构建脚本（对齐 build_windows.bat 模式）
 #
-#  在单个 bash 会话内完成全部原生模块编译（vault 产出 universal 二进制）：
+#  在单个 bash 会话内完成全部原生模块编译（产物与 RID 单架构一致）：
 #    1. audio-engine : CMake（FFmpeg 解码/EQ/FFT + Rust tempo）
 #    2. scraper      : CMake（openssl keg-only 需 CMAKE_PREFIX_PATH）
 #    3. scanner      : dotnet publish (NativeAOT) + libe_sqlite3
 #    4. indexer      : dotnet publish (NativeAOT, indexer-ffi) + libe_sqlite3
-#    5. vault        : cargo build（vault-rs，Rust 凭据保险库，universal）
+#    5. vault        : cargo build（vault-rs，Rust 凭据保险库，单架构）
 #    6. downloader   : cargo build --release (cdylib)
 #    7. subsonic     : cargo transcoder + go c-shared + go standalone
 #    8. platform     : CMake（平台能力桥接 libarchoera_platform，app/native/platform）
 #    9. shell        : cargo staticlib（内嵌原生 CLI archoerashell，链入 macOS Runner）
 #
+#  用法：build-macos.sh [osx-arm64|osx-x64]
+#    - osx-arm64：Apple Silicon（默认）
+#    - osx-x64  ：Intel；需在 Intel 主机或已准备 x86_64 Homebrew/FFmpeg 依赖的环境
+#
 #  依赖（Homebrew FFmpeg/taglib/openssl、CMake、Rust、Go、.NET）由 CI
 #  workflow 提前安装或由本地开发环境提供，本脚本只做编译引导（幂等）。
+#
+#  注意：CMake 的 build/ 目录不区分架构；同一工作区切换 RID 前请清理各模块
+#  build/，避免把上一架构的 .o/.a 混进新产物。
 # =====================================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JOBS="$(sysctl -n hw.ncpu)"
 RID="${1:-osx-arm64}"
+HOST_ARCH="$(uname -m)"
+
+case "$RID" in
+  osx-arm64)
+    TARGET_ARCH=arm64
+    CMAKE_ARCH=arm64
+    RUST_TARGET=aarch64-apple-darwin
+    ZIG_KERNEL_TARGET="aarch64-macos.14.0"
+    ;;
+  osx-x64)
+    TARGET_ARCH=x86_64
+    CMAKE_ARCH=x86_64
+    RUST_TARGET=x86_64-apple-darwin
+    ZIG_KERNEL_TARGET="x86_64-macos.14.0"
+    ;;
+  *)
+    echo "[build-macos] 错误: 未知 RID '$RID'（支持 osx-arm64 / osx-x64）" >&2
+    exit 2
+    ;;
+esac
+
+case "$RID:$HOST_ARCH" in
+  osx-arm64:arm64|osx-x64:x86_64) ;;
+  *)
+    echo "[build-macos] 警告: RID=$RID 与当前主机 $HOST_ARCH 不一致；" >&2
+    echo "[build-macos]       Homebrew / FFmpeg / opus 等依赖也必须是 $TARGET_ARCH，否则链接会失败。" >&2
+    ;;
+esac
 
 # 统一 macOS 部署目标：Rust 默认按构建机 SDK 出包（CI 为 14.5），而
 # CMake/clang 侧按 14.0 链接，混链会产生 "built for newer macOS version"
@@ -27,14 +62,18 @@ RID="${1:-osx-arm64}"
 # 14.0（与 C 侧一致），cargo（tempo/downloader/transcoder）全部生效。
 export MACOSX_DEPLOYMENT_TARGET=14.0
 
-# Zig 内核同样对齐 14.0：Zig 默认按构建机 SDK 的 min-version 编静态库，会导致
-# 链接期报 "object file ... was built for newer 'macOS' version (15.x) than being
-# linked (14.0)"。按 RID 显式传含 min-version 的 target。
-case "$RID" in
-  osx-arm64) ZIG_KERNEL_TARGET="aarch64-macos.14.0" ;;
-  osx-x64)   ZIG_KERNEL_TARGET="x86_64-macos.14.0" ;;
-  *)         ZIG_KERNEL_TARGET="" ;;
-esac
+# Homebrew 前缀随架构变化：Apple Silicon 在 /opt/homebrew，Intel 在 /usr/local。
+# openssl 是 keg-only，必须显式加入 CMAKE_PREFIX_PATH；opus 的 pkg-config
+# 路径用于 FFmpeg --enable-libopus（本地构建时 CI 已预置最小 FFmpeg 时也保留）。
+BREW_PREFIX="$(brew --prefix 2>/dev/null || true)"
+if [ -n "$BREW_PREFIX" ]; then
+  export CMAKE_PREFIX_PATH="$BREW_PREFIX/opt/openssl:$BREW_PREFIX${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+  export PKG_CONFIG_PATH="$BREW_PREFIX/opt/opus/lib/pkgconfig:$BREW_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+else
+  echo "[build-macos] 警告: 未检测到 Homebrew；scraper/audio-engine 需自行提供 OpenSSL/opus 依赖。" >&2
+fi
+
+CMAKE_ARCH_ARGS=(-DCMAKE_OSX_ARCHITECTURES="$CMAKE_ARCH")
 
 
 # 自研内核（EraAudio, Zig 静态库）须先于 audio-engine cmake 编译并落 zig-out/
@@ -48,13 +87,14 @@ else
   echo "          安装 Zig 0.17（https://ziglang.org/download）后重跑可启用 EraAudio。"
 fi
 
-echo "[build-macos] ===== audio-engine ====="
-cmake -S "$ROOT/audio-engine" -B "$ROOT/audio-engine/build" -DCMAKE_BUILD_TYPE=Release
+echo "[build-macos] ===== audio-engine ($TARGET_ARCH) ====="
+cmake -S "$ROOT/audio-engine" -B "$ROOT/audio-engine/build" \
+  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
 cmake --build "$ROOT/audio-engine/build" -j"$JOBS"
 
-echo "[build-macos] ===== scraper (openssl keg-only) ====="
-export CMAKE_PREFIX_PATH="/opt/homebrew/opt/openssl"
-cmake -S "$ROOT/scraper" -B "$ROOT/scraper/build" -DCMAKE_BUILD_TYPE=Release
+echo "[build-macos] ===== scraper (openssl keg-only, $TARGET_ARCH) ====="
+cmake -S "$ROOT/scraper" -B "$ROOT/scraper/build" \
+  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
 cmake --build "$ROOT/scraper/build" -j"$JOBS"
 
 echo "[build-macos] ===== scanner (NativeAOT, RID=$RID) ====="
@@ -67,21 +107,18 @@ bash "$ROOT/scanner/build.sh" "$RID"
 echo "[build-macos] ===== indexer (NativeAOT, RID=$RID) ====="
 bash "$ROOT/indexer/build.sh" "$RID"
 
-echo "[build-macos] ===== vault (Rust 静态链接, vault-rs, universal) ====="
+echo "[build-macos] ===== vault (Rust 静态链接, vault-rs, $TARGET_ARCH) ====="
 # vault-rs：Rust 实现（OS 授权份额存 Keychain；容器格式由 testdata/ 黄金夹具锚定字节兼容）。
-# 逐架构构建后 lipo 成 universal（与 archoerashell 的 universal 处理同构）；
+# 与 .app 同架构：单独构建 RUST_TARGET，避免向单架构包里塞 universal 可执行文件。
 # Runner.xcodeproj 的拷贝阶段与 CI bundle 步骤均从 core/vault-rs/build/ 取。
 # macOS 已不再使用 C# NativeAOT vault（app/core/vault/** 已于 2026-10-12 删除，
 # 字节兼容改由 app/core/vault-rs/testdata/ 黄金夹具锚定）。
 # 目标架构已由 CI（rustup target add）或本地 rustup 预装；此处幂等兜底。
-for _t in aarch64-apple-darwin x86_64-apple-darwin; do
-  rustup target add "$_t" >/dev/null 2>&1 || true
-  cargo build --release --manifest-path "$ROOT/vault-rs/Cargo.toml" --target "$_t"
-done
+rustup target add "$RUST_TARGET" >/dev/null 2>&1 || true
+cargo build --release --manifest-path "$ROOT/vault-rs/Cargo.toml" --target "$RUST_TARGET"
 mkdir -p "$ROOT/vault-rs/build"
-lipo -create -output "$ROOT/vault-rs/build/archoera-vault" \
-  "$ROOT/vault-rs/target/aarch64-apple-darwin/release/archoera-vault" \
-  "$ROOT/vault-rs/target/x86_64-apple-darwin/release/archoera-vault"
+install -m 755 "$ROOT/vault-rs/target/$RUST_TARGET/release/archoera-vault" \
+  "$ROOT/vault-rs/build/archoera-vault"
 
 echo "[build-macos] ===== downloader (Rust cdylib) ====="
 cargo build --release --manifest-path "$ROOT/downloader/Cargo.toml"
@@ -91,19 +128,21 @@ bash "$ROOT/subsonic/build.sh"
 
 # 平台能力桥接（SystemPower/SystemMedia/SystemWindow，apl_* C ABI，Dart FFI 直连）。
 # CMake 构建（ObjC++ + AppKit/MediaPlayer/Foundation），产物落 build/out/。
-echo "[build-macos] ===== platform bridge (CMake ObjC++) ====="
-cmake -S "$ROOT/../native/platform" -B "$ROOT/../native/platform/build" -DCMAKE_BUILD_TYPE=Release
+echo "[build-macos] ===== platform bridge (CMake ObjC++, $TARGET_ARCH) ====="
+cmake -S "$ROOT/../native/platform" -B "$ROOT/../native/platform/build" \
+  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
 cmake --build "$ROOT/../native/platform/build" -j"$JOBS"
 
 # 统一日志核心（libarchoera_log，C；Dart 载入后注入各原生层的 sink）。
-echo "[build-macos] ===== log core (CMake C) ====="
-cmake -S "$ROOT/../native/log" -B "$ROOT/../native/log/build" -DCMAKE_BUILD_TYPE=Release
+echo "[build-macos] ===== log core (CMake C, $TARGET_ARCH) ====="
+cmake -S "$ROOT/../native/log" -B "$ROOT/../native/log/build" \
+  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
 cmake --build "$ROOT/../native/log/build" -j"$JOBS"
 
 # 内嵌原生 CLI（archoerashell）：Rust staticlib，由 Runner.xcodeproj 的
-# “Build archoerashell (cargo)” 阶段链入 .app；此处预构建一次（幂等），
-# 独立跑本脚本时也能得到 libarchoera_shell.a。
-echo "[build-macos] ===== shell (Rust staticlib, archoerashell) ====="
+# “Build archoerashell (cargo)” 阶段按 Xcode 的 ARCHS 链入 .app；此处预构建
+# 一次（幂等），独立跑本脚本时也能得到宿主机架构的 libarchoera_shell.a。
+echo "[build-macos] ===== shell (Rust staticlib, archoerashell, $TARGET_ARCH) ====="
 cargo build --release --manifest-path "$ROOT/shell/Cargo.toml"
 
 echo "[build-macos] 全部模块构建完成"
