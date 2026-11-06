@@ -82,7 +82,7 @@
           <span class="tag" style="color:var(--db)">WAL · synchronous=NORMAL</span></div></li>
         <li><div class="node"><span class="d">协商</span>：<code>SetConcurrency(_maxParallelism)</code> → <code>zk_metadata_set_concurrency(n)</code>
           —— 内核<b>只存</b>（<code>g_meta_concurrency</code>），<span class="warn">不调度/不限流</span></div></li>
-        <li><div class="node"><span class="d">旁路原生模块</span>：刮削(C++, TagLib+libcurl) · 下载(Rust) · Subsonic(Go)</div></li>
+        <li><div class="node"><span class="d">旁路原生模块</span>：刮削(C++, TagLib+libcurl) · Subsonic(Go)</div></li>
         <li><div class="node"><span class="k">写分配：两级生产者/消费者 + 自适应攒批</span>
           <span class="tag">scanner 写路径</span></div>
           <ul class="tree">

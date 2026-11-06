@@ -49,8 +49,7 @@ void main() {
     // subsonic / transcoder
     expect(names, contains('symphonia'));
     expect(names, contains('mp3lame-encoder / mp3lame-sys'));
-    // downloader / shell / subsonic（Go）分组条目
-    expect(names.any((n) => n.startsWith('downloader —')), isTrue);
+    // shell / subsonic（Go）分组条目
     expect(names.any((n) => n.startsWith('shell —')), isTrue);
     expect(names.any((n) => n.startsWith('subsonic（Go）')), isTrue);
     expect(names, contains('memchr'));

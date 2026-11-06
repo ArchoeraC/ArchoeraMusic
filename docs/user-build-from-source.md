@@ -4,7 +4,7 @@
 > 依次执行两行命令即可（Linux 为例）：
 >
 > ```bash
-> bash app/core/build-linux.sh          # 1) 编译全部原生模块（audio-engine/FFT、scanner、scraper、vault、downloader、subsonic）
+> bash app/core/build-linux.sh          # 1) 编译全部原生模块（audio-engine/FFT、scanner、scraper、vault、subsonic）
 > cd app && flutter build linux --release   # 2) 编译 Flutter Release → app/build/linux/x64/release/bundle/
 > ```
 >
@@ -25,7 +25,6 @@
 | `audio-engine` | C / Zig 内核 | `archoera-audio-engine`、`libarchoera_mediaengine.so` | 解码→DSP（EQ/响度/限幅/频谱/变速）→Opus |
 | `scanner` | C#（NativeAOT） | `scanner-ffi.so` + `libe_sqlite3.so` | 本地音乐库扫描建库 |
 | `scraper` | C++ | `libarchoera_scraper.so` | 多源元数据刮削 + 仅目录整理 |
-| `downloader` | Rust（cdylib） | `libarchoera_downloader.so` | Kugou / Netease 下载引擎 |
 | `subsonic` | Go + Rust | `libarchoera_subsonic.so`、`libarchoera_transcoder.so` | 可选 Subsonic 服务端与转码器 |
 | `vault` | C#（NativeAOT） | `archoera-vault` | 凭据保险库（crypto / slots m1·m2a·m2b；m2b 本机级·较弱） |
 
@@ -41,7 +40,7 @@
 - **Zig 0.17.x**：编译自研解码内核 EraAudio（`app/core/audio-engine/kernel/`）。缺 Zig 时脚本告警并回退
   FFmpeg/Stable 运行（EraAudio 不启用）；如需完整内核请安装 0.17。
 - **CMake ≥ 3.16 + C 工具链**（GCC/Clang），用于 audio-engine / scraper
-- **Rust 工具链**：tempo-rs（静态链接）、downloader、subsonic transcoder
+- **Rust 工具链**：tempo-rs（静态链接）、subsonic transcoder
 - **Go 1.23+**：subsonic 服务端
 - **.NET SDK 10**：scanner / vault 的 NativeAOT publish
 - **FFmpeg 开发库**（`libavcodec`/`libavformat`/`libavutil`/`libswresample`）：
@@ -91,8 +90,7 @@ bash app/core/build-linux.sh
 5. **vault（Rust 静态链接）**：`bash app/core/vault-rs/build.sh`（产出
    `vault-rs/build/archoera-vault`；三端统一 Rust 实现，详见
    [vault-security-notes.md](vault-security-notes.md)）
-6. **downloader（Rust）**：`cargo build --release`；**subsonic**：`bash app/core/subsonic/build.sh`
-   （cargo transcoder + go c-shared + go standalone）
+6. **subsonic**：`bash app/core/subsonic/build.sh`（cargo transcoder + go c-shared + go standalone）
 
 随后编译 Flutter 端：
 
@@ -166,7 +164,7 @@ export ZIG_GLOBAL_CACHE_DIR="$HOME/.cache/archoera-local/zig-global"
 bash app/core/build-linux.sh
 ```
 
-> 注意：`flutter build linux` 内部的 downloader / subsonic 内嵌 cargo 步骤会按模块默认
+> 注意：`flutter build linux` 内部的 subsonic 内嵌 cargo 步骤会按模块默认
 > `target/` 路径取产物（见 `app/linux/CMakeLists.txt`），执行 Flutter 构建前请 **`unset CARGO_TARGET_DIR`**，
 > 否则该步骤产物会落到外部目录导致拷贝失败。
 
@@ -195,7 +193,7 @@ makepkg -f --skipinteg --nocheck --nodeps                      # 产出 *.pkg.ta
 
 ## 7. 常见问题排查
 
-> 构建成功后的**运行期**问题（无声 / 扫描不到 / 歌词 / 下载 / 流媒体 / 凭据库等）见
+> 构建成功后的**运行期**问题（无声 / 扫描不到 / 歌词 / 流媒体 / 凭据库等）见
 > [疑难解答](troubleshooting.md)。本节只列构建与打包相关项。
 
 - **找不到原生库**（如 `ARCHOERA_SCANNER_FFI` / `ARCHOERA_SCRAPER_FFI` 相关报错）：说明 `native/`
@@ -209,7 +207,7 @@ makepkg -f --skipinteg --nocheck --nodeps                      # 产出 *.pkg.ta
 - **scanner / vault NativeAOT 慢**：正常（全量 publish 需数分钟）；改 C# 后可用
   `dotnet build` 快速验证语法再跑 `build.sh`。
 - **Rust 首次编译慢 / 网络差**：依赖已进本地 `~/.cargo` registry；如需离线可对相应 crate 目录
-  执行 `cargo vendor`（见 `docs/download-module.md` §9.6）。
+  执行 `cargo vendor`。
 - **AUR makepkg 失败**：确认在 `packaging/linux/work/arch/` 内、`bundle.tar.zst` 存在、非 root 用户
   执行；跳过依赖检查用 `--nodeps`。
 - **本手册不是法律意见**：源码分发、第三方许可与授权边界详见根 `LICENSE`、各模块
