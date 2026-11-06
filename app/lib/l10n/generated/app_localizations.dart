@@ -9789,6 +9789,62 @@ abstract class AppLocalizations {
   /// **'半音'**
   String get settingsPitchUnit;
 
+  /// No description provided for @settingsSectionChorus.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'多重奏'**
+  String get settingsSectionChorus;
+
+  /// No description provided for @settingsChorusEnabled.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'启用多重奏'**
+  String get settingsChorusEnabled;
+
+  /// No description provided for @settingsChorusEnabledDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'把同一首歌分成 N 份，以极小的起始间隔并行播放（仅内存播放模式）'**
+  String get settingsChorusEnabledDesc;
+
+  /// No description provided for @settingsChorusVoices.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'并行倍数'**
+  String get settingsChorusVoices;
+
+  /// No description provided for @settingsChorusStep.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'每份错开'**
+  String get settingsChorusStep;
+
+  /// No description provided for @settingsChorusSummary.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'×{voices} · 错开 {step} ms · 总跨度 {span} ms'**
+  String settingsChorusSummary({
+    required int voices,
+    required int step,
+    required int span,
+  });
+
+  /// No description provided for @settingsChorusWarning.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'当前 ×{voices}（总跨度 {span} ms）已超过建议上限：CPU 线程 {threads}。高倍数会显著增加 CPU/内存占用，可能卡顿、爆音或拖慢系统。'**
+  String settingsChorusWarning({
+    required int voices,
+    required int threads,
+    required int span,
+  });
+
+  /// No description provided for @settingsChorusNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅在内存播放模式生效；文件播放模式会忽略。高倍数建议降低音量并保持限幅器开启。'**
+  String get settingsChorusNote;
+
   /// No description provided for @settingsSectionChannels.
   ///
   /// In zh_CN, this message translates to:

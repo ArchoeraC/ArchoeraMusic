@@ -54,6 +54,43 @@ void main() {
     });
   });
 
+  group('多重奏偏好', () {
+    test('默认关闭 / 4 份 / 20ms', () {
+      final prefs = AppPrefs();
+      expect(prefs.chorusEnabled, isFalse);
+      expect(prefs.chorusVoices, chorusDefaultVoices);
+      expect(prefs.chorusStepMs, chorusDefaultStepMs);
+    });
+
+    test('copyWithChorus 读写并夹取到合法范围', () {
+      final prefs = AppPrefs().copyWithChorus(
+        enabled: true,
+        voices: 16,
+        stepMs: 30,
+      );
+      expect(prefs.chorusEnabled, isTrue);
+      expect(prefs.chorusVoices, 16);
+      expect(prefs.chorusStepMs, 30.0);
+
+      expect(
+        AppPrefs().copyWithChorus(voices: 999).chorusVoices,
+        chorusVoicesMax,
+      );
+      expect(
+        AppPrefs().copyWithChorus(voices: -5).chorusVoices,
+        chorusVoicesMin,
+      );
+      expect(
+        AppPrefs().copyWithChorus(stepMs: 1).chorusStepMs,
+        chorusStepMinMs,
+      );
+      expect(
+        AppPrefs().copyWithChorus(stepMs: 500).chorusStepMs,
+        chorusStepMaxMs,
+      );
+    });
+  });
+
   group('归一化兜底增益', () {
     test('无分析结果 / 非有限值 → 0', () {
       expect(normalizationGainDb(), 0.0);
