@@ -5507,7 +5507,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsChorusEnabledDesc =>
-      'Play the same track in N parallel copies with a tiny start offset (memory playback only)';
+      'Play the same track in N parallel copies with a set start offset (memory playback only)';
 
   @override
   String get settingsChorusVoices => 'Parallel copies';
@@ -5535,7 +5535,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsChorusNote =>
-      'Only applies to memory playback; file playback ignores it. At high multipliers, lower the volume and keep the limiter on.';
+      'Only applies to memory playback; file playback ignores it. Total span is capped at 60 s, so more copies mean a smaller offset; at high multipliers, lower the volume and keep the limiter on.';
 
   @override
   String get settingsSectionChannels => 'Channels';

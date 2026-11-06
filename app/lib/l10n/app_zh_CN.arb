@@ -1655,7 +1655,7 @@
   "settingsPitchUnit": "半音",
   "settingsSectionChorus": "多重奏",
   "settingsChorusEnabled": "启用多重奏",
-  "settingsChorusEnabledDesc": "把同一首歌分成 N 份，以极小的起始间隔并行播放（仅内存播放模式）",
+  "settingsChorusEnabledDesc": "把同一首歌分成 N 份，按设定的起始间隔并行播放（仅内存播放模式）",
   "settingsChorusVoices": "并行倍数",
   "settingsChorusStep": "每份错开",
   "settingsChorusSummary": "×{voices} · 错开 {step} ms · 总跨度 {span} ms",
@@ -1674,7 +1674,7 @@
       "span": { "type": "int" }
     }
   },
-  "settingsChorusNote": "仅在内存播放模式生效；文件播放模式会忽略。高倍数建议降低音量并保持限幅器开启。",
+  "settingsChorusNote": "仅在内存播放模式生效；文件播放模式会忽略。总跨度上限 60 秒，倍数越高可用错开越小；高倍数建议降低音量并保持限幅器开启。",
   "settingsSectionChannels": "声道",
   "settingsSectionChannelsDesc": "设备实际只有左/右一侧发声（单只耳机、单声道音箱等）时开启；合并后两侧都能听到完整内容，正常立体声设备建议保持关闭。",
   "settingsChannelMerge": "多声道合并",

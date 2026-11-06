@@ -1854,7 +1854,8 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
         if (voices < 1) voices = 1;
         if (voices > 128) voices = 128;
         if (step_ms < 10) step_ms = 10;
-        if (step_ms > 50) step_ms = 50;
+        if (step_ms > 3000) step_ms = 3000;
+        /* 总跨度封顶与历史环扩容由 player 统一处理（含运行中改参数）。 */
         e->chorus_enabled = enabled ? 1 : 0;
         e->chorus_voices = (int)(voices + 0.5);
         e->chorus_step_ms = step_ms;

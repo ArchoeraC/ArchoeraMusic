@@ -5251,7 +5251,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsChorusEnabled => '启用多重奏';
 
   @override
-  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，以极小的起始间隔并行播放（仅内存播放模式）';
+  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，按设定的起始间隔并行播放（仅内存播放模式）';
 
   @override
   String get settingsChorusVoices => '并行倍数';
@@ -5278,7 +5278,8 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsChorusNote => '仅在内存播放模式生效；文件播放模式会忽略。高倍数建议降低音量并保持限幅器开启。';
+  String get settingsChorusNote =>
+      '仅在内存播放模式生效；文件播放模式会忽略。总跨度上限 60 秒，倍数越高可用错开越小；高倍数建议降低音量并保持限幅器开启。';
 
   @override
   String get settingsSectionChannels => '声道';
@@ -11442,7 +11443,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsChorusEnabled => '启用多重奏';
 
   @override
-  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，以极小的起始间隔并行播放（仅内存播放模式）';
+  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，按设定的起始间隔并行播放（仅内存播放模式）';
 
   @override
   String get settingsChorusVoices => '并行倍数';
@@ -11469,7 +11470,8 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsChorusNote => '仅在内存播放模式生效；文件播放模式会忽略。高倍数建议降低音量并保持限幅器开启。';
+  String get settingsChorusNote =>
+      '仅在内存播放模式生效；文件播放模式会忽略。总跨度上限 60 秒，倍数越高可用错开越小；高倍数建议降低音量并保持限幅器开启。';
 
   @override
   String get settingsSectionChannels => '声道';
@@ -17634,7 +17636,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsChorusEnabled => '啟用多重奏';
 
   @override
-  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，以極小的起始間隔並行播放（僅記憶體播放模式）';
+  String get settingsChorusEnabledDesc => '把同一首歌分成 N 份，按設定的起始間隔並行播放（僅記憶體播放模式）';
 
   @override
   String get settingsChorusVoices => '並行倍數';
@@ -17661,7 +17663,8 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsChorusNote => '僅在記憶體播放模式生效；檔案播放模式會忽略。高倍數建議降低音量並保持限幅器開啟。';
+  String get settingsChorusNote =>
+      '僅在記憶體播放模式生效；檔案播放模式會忽略。總跨度上限 60 秒，倍數越高可用錯開越小；高倍數建議降低音量並保持限幅器開啟。';
 
   @override
   String get settingsSectionChannels => '聲道';
