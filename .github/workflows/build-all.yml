@@ -366,7 +366,7 @@ jobs:
       - name: Build native modules (macOS 一站式脚本)
         if: matrix.os == 'macos'
         # 统一入口 app/core/build-macos.sh，收敛 audio-engine / scraper /
-        # scanner / indexer / vault / downloader / subsonic 全部原生模块编译：
+        # scanner / indexer / vault / subsonic 全部原生模块编译：
         # 本地开发与 CI 共用同一入口，逻辑改动只落一处（对齐 build_windows.bat）。
         # 依赖由上方步骤提前安装，脚本只做编译引导。
         run: bash app/core/build-macos.sh osx-arm64
@@ -377,7 +377,7 @@ jobs:
         # 统一入口 app/core/build_windows.bat，在单个 cmd 会话内完成全部模块：
         #   vswhere→vcvars64（MSVC 环境）→ audio-engine（cargo tempo + cl 直编
         #   archoera_mediaengine.dll）→ scraper（CMake+vcpkg toolchain）
-        #   → scanner（dotnet publish）→ indexer（dotnet publish）→ downloader（cargo）→ subsonic（go+rust）
+        #   → scanner（dotnet publish）→ indexer（dotnet publish）→ subsonic（go+rust）
         #   → vault-rs（cargo 静态单文件）。
         # 依赖由上方步骤提前安装（vcpkg headers 缺失时 bat 内自动 install 兜底），
         # 脚本只做编译引导。与 build-linux.sh / build-macos.sh 同构，本地开发
@@ -526,7 +526,6 @@ jobs:
           [ -f "$NATIVE/libe_sqlite3.dylib" ] || cp app/core/indexer/build/libe_sqlite3.dylib "$NATIVE/"
           cp app/core/scraper/build/*.dylib "$NATIVE/"
           cp app/core/subsonic/build/*.dylib "$NATIVE/"
-          cp app/core/downloader/target/release/libarchoera_downloader.dylib "$NATIVE/"
           cp app/core/vault-rs/build/archoera-vault "$NATIVE/"
 
           # 自包含运行库：把引擎(FFmpeg)/scraper(TagLib) 的 dylib 依赖收进 native/

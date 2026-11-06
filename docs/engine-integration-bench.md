@@ -316,7 +316,7 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
   QQ 歌词、playback 源解析/音质；l10n 9 语种。真实链路验证：搜索→免费曲访客直链 HTTP200 可播；VIP 按接口返回
   “需会员/无版权”语义；QQ 扫码出码。回归测试 qqmusic_direct_test 8 项。
 - 诚实边界：不绕过付费；扫码 check_sig/微信 405 多跳需真机验证；榜单未接 QQ UI（首页榜单为 Kugou 专属）；
-  QQ 下载需 Rust 引擎加源未做；红心收藏 QQ 无官方 like API 故隐藏；接口风控/限流需随上游单点修。
+  红心收藏 QQ 无官方 like API 故隐藏；接口风控/限流需随上游单点修。
 
 
 ## 17. 2026-09-05 QQ 收藏(我喜欢) + 聚合搜索
