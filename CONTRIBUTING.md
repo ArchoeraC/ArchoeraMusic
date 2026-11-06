@@ -59,7 +59,7 @@
   接口、配置项或「可选依赖」（与既有的本地 Subsonic 服务端无关，后者不涉及公网穿透）。
 - **禁止遥测 / 埋点 / 数据上报**：应用内统计、用户行为追踪、云端崩溃上报 SaaS 均不得引入；
   诊断只允许本地日志（`logs/`），且不含敏感信息（§10）。
-- **禁止捆绑与静默行为**：不捆绑与核心功能无关的推广内容、不做静默下载、不起后台常驻服务。
+- **禁止捆绑与静默行为**：不捆绑与核心功能无关的推广内容、不做静默下载/静默安装、不起后台常驻服务。
 
 ### 2.2 技术红线（架构形态）
 
@@ -136,7 +136,7 @@
   一律禁止；测试凭据一律使用明确标注的假数据（`test` / 占位符）。
 - **禁止强制联网验证**：不得引入启动、解锁或功能可用性上的强制在线校验（激活码联网核验、
   强制登录才能进入应用、远程开关功能、云端租期 / 授权到期等）；应用断网必须可正常启动并使用。
-- **离线全功能**：非联网状态下禁止一切形式的功能限制——本地曲库、扫描、播放、队列、下载管理、
+- **离线全功能**：非联网状态下禁止一切形式的功能限制——本地曲库、扫描、播放、队列、
   设置等核心能力在无网络时完整可用（刮削 / 歌词在线源离线时允许失败回退，不得报错阻断）。
   唯一例外是**在线音源本身**（网易云 / 酷狗 / QQ 音乐 / 流媒体服务器对网络的硬依赖，属非可抗因素），
   且不得借在线能力反向限制离线功能。
@@ -151,9 +151,7 @@
   从日志缓存提取他人数据等）一律禁止。用户显式授权的能力（如天气功能的系统定位）必须走
   平台能力外观层（`docs/platform-capability-facade.md`）：可关闭、仅用于该功能本身、不做二次利用。
   **边界澄清（SEC-13）**：本条针对的是**上传 / 跨应用追踪 / 服务端关联**；**仅本机**的标识读取
-  属**列举例外**，但须满足「仅本机使用、绝不上传、可关闭或可重置、隐私政策披露」——
-  下载器用户级随机指纹（`downloader-identity-plan.md`，prefs `downloaderIdentity`）首次生成后本机持久化、
-  设置页「重置设备指纹」可清除，不用于跨应用追踪。
+  属**列举例外**，但须满足「仅本机使用、绝不上传、可关闭或可重置、隐私政策披露」。
   （注：旧 v3 设备绑定读取 `machine-id` / `MachineGuid` / `IOPlatformUUID` 的例外**已随 vault 重架构移除**——
   现行 vault 设备因子为每安装随机 `device.key`，**不采集任何设备指纹**。）
   新增任何此类本机标识采集前，必须同步更新 `docs/privacy.md` 披露其来源与用途。
@@ -231,14 +229,14 @@ cd app && flutter run -d linux      # 本地调试
 |---|---|---|
 | 1 | **桌面端零 TCP 端口** | 不引入任何本地监听端口 / loopback 服务；进程间通信只用 FFI 与受控子进程（当前仅 `archoera-vault`，stdio） |
 | 2 | **纯 Dart 平台协议层** | 网易云 / 酷狗 / QQ 音乐等平台 API 签名与请求逻辑全部纯 Dart（`app/lib/apis/`、`app/lib/services/<platform>/`），不引入 Node 侧车、不起子进程跑业务 |
-| 3 | **重型处理走 FFI 直连原生** | 音频引擎（C）、扫描（C#）、刮削（C++）、下载（Rust）、Subsonic（Go）均为进程内 FFI；新增原生能力优先挂在既有模块，不开新语言栈 |
-| 4 | **UI 不直连传输层** | 引擎 / 扫描 / 下载事件统一经 Dart 事件总线（`stores/event_bus`）转译为 `player:*` 等事件；UI 层只消费总线与 Riverpod 状态 |
+| 3 | **重型处理走 FFI 直连原生** | 音频引擎（C）、扫描（C#）、刮削（C++）、Subsonic（Go）均为进程内 FFI；新增原生能力优先挂在既有模块，不开新语言栈 |
+| 4 | **UI 不直连传输层** | 引擎 / 扫描事件统一经 Dart 事件总线（`stores/event_bus`）转译为 `player:*` 等事件；UI 层只消费总线与 Riverpod 状态 |
 | 5 | **状态管理 Riverpod，路由 go_router** | 不混入其他状态方案；跨页状态进 `stores/`，页面局部状态留在页面 |
 | 6 | **下沉需证据驱动** | Dart → 原生的性能下沉必须 `profile → 命中阈值 → 只下沉该模块 → 回归对比`，不主动重写、不预防性优化（决策 #16） |
 | 7 | **存储隔离** | 媒体库 `library.db` 与用户库 `user.db` 物理隔离，均 WAL + busy_timeout；新增表/迁移须写清归属与访问方（架构 §8）；配置走 `config/settings.json` 原子写 + 迁移，不做裸读写 |
 | 8 | **隐藏即静默** | 高频推送（FFT 频谱 / position / 歌词行滚动）在 UI 不可见时必须停止轮询或推送（架构 §5.5） |
 | 9 | **Flutter 零解析负担** | 歌词等复杂数据的解析 / 标准化在 Dart 业务层完成，UI 只消费标准化行数组（架构 §10.2） |
-| 10 | **FFI 契约零回归** | `engine_bindings` / `scanner-ffi` / downloader FFI 等既有符号与行为是契约；变更须保持向后兼容（或同步更新两侧 + 文档 + 测试），行为零回归 |
+| 10 | **FFI 契约零回归** | `engine_bindings` / `scanner-ffi` 等既有符号与行为是契约；变更须保持向后兼容（或同步更新两侧 + 文档 + 测试），行为零回归 |
 | 11 | **禁大子进程 / 非 FFI 运行时（去侧车化不可逆）** | Node、Python、JVM 等无法与 Dart FFI 直连的运行时一律不引入（Node 侧车已于 2026-09-06 整体废弃，见 §2.2）；子进程仅限 `archoera-vault`（安全边界，stdio）；新语言栈先走 §13 决策修订 |
 | 12 | **多端一等公民** | Linux / Windows / macOS 三端能力对齐；平台差异收敛到平台能力外观（`docs/platform-capability-facade.md`）+ 每平台 adapter，能力缺失静默降级；**禁止「只在一端悄悄可用」**；平台相关改动（路径 / 编码 / 窗口 / 系统集成）三端审视（Windows 侧注意 ANSI 代码页 / 窄路径等编码边界，参考 e4840c2f），未验证的端在 PR 显式说明；合并口径：仅平台硬性限制导致的局部功能缺失可协商合入（附依据），其余跨平台兼容冲突一律不合并（红线 §2.2） |
 
@@ -255,7 +253,7 @@ cd app && flutter run -d linux      # 本地调试
   | `lib/apis/` | 纯 Dart 平台 API 协议实现（netease / kugou / qqmusic / lyric） |
   | `lib/app/` | 应用壳：bootstrap / router / shell / theme_provider |
   | `lib/pages/` `lib/widgets/` `lib/settings/` `lib/theme/` | 页面、组件、设置弹窗、主题 |
-  | `lib/services/` | 业务层：playback / scanner / scraper / downloader / subsonic / lyrics / streaming 等 |
+  | `lib/services/` | 业务层：playback / scanner / scraper / subsonic / lyrics / streaming 等 |
   | `lib/stores/` | Riverpod 状态：app_prefs / playback_session / event_bus |
   | `lib/eta/` | 自建图标字体引用（见 `lib/eta/README.md`） |
 
@@ -304,11 +302,11 @@ cd app && flutter run -d linux      # 本地调试
 - CMake ≥ 3.16；新增依赖优先 header-only 并登记 `THIRD-PARTY-LICENSES.md`；
   多源刮削新增数据源时同步更新 [docs/local-library.md](docs/local-library.md) 数据源列表与设置页文案（i18n）。
 
-### 5.5 Rust（`app/core/downloader/`、`tempo-rs/`、`subsonic/transcoder/`）
+### 5.5 Rust（`tempo-rs/`、`subsonic/transcoder/`）
 
 - 提交前 `cargo fmt --check` 与 `cargo clippy` 无新增警告；测试放 `tests/`。
 - FFI 导出符号（`#[no_mangle] pub extern`）是契约（戒律 10），签名变更需同步 Dart 侧绑定与冒烟测试
-  （如 `app/test/downloader_ffi_smoke_test.dart`）。
+  （如 `app/test/engine_config_abi_test.dart`）。
 
 ### 5.6 Go（`app/core/subsonic/`）
 
@@ -332,11 +330,11 @@ cd app && flutter run -d linux      # 本地调试
 |---|---|---|
 | Dart 静态检查 | `cd app && flutter analyze` | 每次 PR |
 | Dart 单元 / Widget | `cd app && flutter test`（`app/test/`） | 每次 PR |
-| C 引擎 / C++ / Rust / Go 原生测试 | 各模块 `tests/`；Zig `zig build test`；Rust `cargo test --manifest-path app/core/<mod>/Cargo.toml`（downloader / shell）；CI workflow 内置 | 改动对应模块时 |
+| C 引擎 / C++ / Rust / Go 原生测试 | 各模块 `tests/`；Zig `zig build test`；Rust `cargo test --manifest-path app/core/<mod>/Cargo.toml`（shell）；CI workflow 内置 | 改动对应模块时 |
 | 内嵌原生 CLI | `cargo test --manifest-path app/core/shell/Cargo.toml`；ARB 改动后 `flutter gen-l10n` | 改动 `app/core/shell` 或 `app/lib/l10n/*.arb` 时 |
 | vault 端到端 | `app/core/vault-rs/test.sh`（Linux）/ `test-windows.sh`（Wine，需 wine+msvc-wine）/ `cross-macos.sh`（交叉编译检查）；CI 内置 | 改动 vault / 会话存储时 |
 | 三端构建 | `.github/workflows/build-all.yml`（tag `v*` 或手动触发） | 合入主干后由维护者触发 |
-| 手动回归 | 播放 / seek / 切歌 / 登录 / 下载 / 扫描 / 刮削核心路径 | 涉及播放链路与数据面改动时 |
+| 手动回归 | 播放 / seek / 切歌 / 登录 / 扫描 / 刮削核心路径 | 涉及播放链路与数据面改动时 |
 | 基准 / 性能 | `app/core/audio-engine/tests/bench/run_suite.py`（内核单测 + ctest + 逐格式 scorecard + 池并发 + scanner）+ 内存基线对比 | 触及解码 / DSP / 播放 / 内存 / 缓存链路时 |
 
 要求：
@@ -368,7 +366,7 @@ cd app && flutter run -d linux      # 本地调试
 | `chore` | 构建 / 脚本 / CI / 版本号（版本号固定用 `chore(version): x.y.z+n`） |
 
 scope 用模块 / 子系统名，与现有历史保持一致的小写风格，例如：
-`playback`、`audio-engine`、`kernel`、`master-pool`、`ui`、`scraper`、`scanner`、`downloader`、
+`playback`、`audio-engine`、`kernel`、`master-pool`、`ui`、`scraper`、`scanner`、
 `subsonic`、`vault`、`settings`、`eta`、`test`、`engine`。
 
 示例（取自真实历史）：
@@ -467,7 +465,7 @@ PR 描述需包含：
 - **凭据落盘**一律走 vault（模式与信任边界见 `docs/vault-security-notes.md`），禁止明文写配置 / 数据库 / 日志；
   `enc:v1:` 字段级加密仅供旧库迁移回退，新凭据（含本地 Subsonic 用户密码，SEC-01）不得再引入，统一以 `uid` 承载入 vault。
 - 涉及网络请求的改动注意：桌面端零 TCP 端口（戒律 1），不出网请求只允许既有平台 API / 刮削源 /
-  下载引擎范围内的新端点。
+  既有原生模块范围内的新端点。
 
 ## 11. 仓库卫生
 

@@ -4,12 +4,12 @@
 >
 > **去侧车化（2026-09-06）**：早期规划的 **Node 侧车方案已整体砍掉**，
 > 仓库不保留任何侧车代码；桌面端为 **Flutter UI + 纯 Dart 业务层（平台 API 纯 Dart 直连）+ 多语言
-> 原生工具链 FFI 直连**（C 引擎 / C# 扫描 / C++ 刮削 / Rust 下载 / Go Subsonic 均进程内 FFI，
+> 原生工具链 FFI 直连**（C 引擎 / C# 扫描 / C++ 刮削 / Go Subsonic 均进程内 FFI，
 > 子进程仅余 `archoera-vault` 凭据保险库），**无 Node 进程、无本地监听端口**。
 > 本文涉及侧车 / stdio RPC / Web 兼容路径的章节均已压缩为简注（§2/§4/§12.0）。
 >
-> **代码归属（2026-08-09）**：所引用的服务端代码（Go Subsonic、C 音频引擎、C# 扫描、C++ 刮削、
-> Rust 下载引擎等）均由本仓库作者**自行编写**，不在任何上游主仓库内，本项目不包含其代码。
+> **代码归属（2026-08-09）**：所引用的服务端代码（Go Subsonic、C 音频引擎、C# 扫描、C++ 刮削等）
+> 均由本仓库作者**自行编写**，不在任何上游主仓库内，本项目不包含其代码。
 >
 > **引擎路线（2026-08-16）**：音频主引擎 = **FFmpeg 默认主引擎 + Zig 内核逐格式渐进替换 + C 壳保留
 > （FFI/CLI）**（详见 `docs/audio-kernel-zig.md`）；Dart/FFI 契约不变，行为零回归。
@@ -23,7 +23,7 @@
 >
 > 定位：独立开发的 Flutter 混合架构音乐播放器（桌面为主），以 AGPL-3.0 开源
 >
-> **核心原则：Flutter 承载 UI 与业务层，后端与原生工具链整体自行编写（C 音频引擎 / C# 扫描 / C++ 刮削 / Rust 下载 / Go Subsonic）。**
+> **核心原则：Flutter 承载 UI 与业务层，后端与原生工具链整体自行编写（C 音频引擎 / C# 扫描 / C++ 刮削 / Go Subsonic）。**
 >
 > **平台能力外观（2026-09-08）**：播放器依赖的 OS 系统能力（防休眠 / 媒体会话与蓝牙耳机控制 /
 > 天气系统定位等）以**能力接口 + 每平台实现**收敛（详见 `docs/platform-capability-facade.md`）；
@@ -50,7 +50,7 @@
 | C | **统一音频引擎（主引擎）**：解码 + EQ/响度/限幅/FFT/变速变调 + PCM 输出 + miniaudio 自播（`archoera-audio-engine`；**2026-08-16 路线：FFmpeg 默认主 + Zig 内核渐进替换，见头部更正块**）|
 | C# | 音乐库扫描（TagLibSharp，`archoera-scanner`） |
 | C++ | 元数据刮削（多源并发，`archoera-scraper`） |
-| Rust | 下载引擎（CLI `archoera-downloader`）、`tempo-rs`（变速变调静态库，C 引擎内置）、媒体控制/任务栏歌词（napi，Phase 3）|
+| Rust | `tempo-rs`（变速变调静态库，C 引擎内置）、媒体控制/任务栏歌词（napi，Phase 3）|
 | Go | Subsonic 协议层（自用桌面端可选启用） |
 
 > **音频架构要点**：桌面端与 Web 端共用**同一条 C 引擎管线**（`archoera-audio-engine`），
@@ -59,7 +59,7 @@
 > Rust `native/audio-engine`（napi 直出）**不在 ArchoeraMusic 引入**，仅留在上游桌面端使用。
 
 **核心处理逻辑技术选型原则**
-- **原生优先**：平台协议 / 数据层由纯 Dart 承接；重型处理由原生工具链 FFI 直连（C 音频引擎、C# 扫描、C++ 刮削、Rust 下载）。
+- **原生优先**：平台协议 / 数据层由纯 Dart 承接；重型处理由原生工具链 FFI 直连（C 音频引擎、C# 扫描、C++ 刮削）。
 - **必要时允许 C/C++**：CPU 密集（加密、格式转换、批量处理）、大缓冲流式转发、常驻大对象缓存等场景，经 **FFI** 调用原生实现。
 - **下沉决策流程（证据驱动，避免过度重构）**：`profile（内存基线 / CPU 热点）→ 命中阈值 → 只下沉该模块 → 回归对比`。
 - **候选下沉点（按需启用，不主动重写）**：歌词/字幕解析与标准化、CUE 分轨、weapi/eapi 加解密、tag 编辑（C++ TagLib 已有）、loudness 分析（scanner 侧已有）。
@@ -75,7 +75,7 @@ SQLite 写入经 `/api/db/*` 代理串行化），2026-09-06 随去侧车化整�
 | 链路 | 落地形态 |
 |---|---|
 | 在线平台 API / 歌词 | **纯 Dart 移植**（`app/lib/core/apis/`：netease / kugou / qqmusic / lyric，纯 Dart 直连） |
-| 音乐库 / 扫描 / 刮削 / 下载 | **原生模块 FFI 直连进程内**（C# / C++ / Rust），直写 SQLite（§8） |
+| 音乐库 / 扫描 / 刮削 | **原生模块 FFI 直连进程内**（C# / C++），直写 SQLite（§8） |
 | 播放 | **C 引擎 FFI 直连**（PCM 落盘 + miniaudio 自播，§5） |
 | 配置 / 会话 / 队列 / 缓存 | **Dart 本地**（`config/settings.json` 原子写 + vault 保险库（crypto / slots m1·m2a·m2b，m2b 本机级·较弱） + drift/Hive） |
 | Subsonic | **Go c-shared FFI 直连**（可选启用；与独立服务端共享同一份代码，build tag 区分） |
@@ -93,7 +93,7 @@ SQLite 写入经 `/api/db/*` 代理串行化），2026-09-06 随去侧车化整�
 │  · 业务层（Dart，Riverpod）：播放控制·歌词同步·队列/历史·主题 │
 │  · 桥接层（FFI 直连，库内）：                                │
 │    ├─ libarchoera_mediaengine（C 引擎：转码+miniaudio 自播） │
-│    ├─ archoera-scanner / scraper / downloader（原生模块）    │
+│    ├─ archoera-scanner / scraper（原生模块）                 │
 │    └─ libarchoera_subsonic（Go c-shared，可选启用）          │
 └─────────────────────────────────────────────────────────────┘
 子进程：仅 archoera-vault（凭据保险库，安全边界，§8）。
@@ -265,7 +265,6 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 |---|---|---|---|
 | `archoera-scanner` | C#（TagLibSharp）| **Dart FFI 直连（进程内）** | FFI 结果/进度直返；SQLite 直写（§8） |
 | `archoera-scraper` | C++（libcurl + TagLib）| **Dart FFI 直连（进程内）** | FFI 进度回调 + 结果直返 |
-| `archoera-downloader` | Rust（reqwest）| **Dart FFI 直连（进程内）** | FFI 进度事件 + 结果直返 |
 | `archoera-audio-engine` | C（FFmpeg + miniaudio）| **主引擎**（Dart FFI 库内加载，2026-08-07）| FFI：`archoera_mediaengine_*`（库内线程转码 PCM 落盘 + miniaudio 自播 + pollEvent FIFO）；CLI 模式保留 stdout OGG + fd3/fd4 |
 | `tempo-rs` | Rust（signalsmith-stretch）| 静态链接进 C 引擎 | C FFI（`HAS_TEMPO` 条件编译）|
 | Go `subsonic` | Go | **Dart FFI 直连（Go c-shared，可选启用）** | 库内提供服务；与独立服务端共享同一份代码（build tag 区分） |
@@ -300,7 +299,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - **二维码登录流程**（netease）：`login_qr_create` → `login_qr_key` → `login_qr_check` 轮询（Flutter 展示二维码 + 定时探测）→ 成功后 `login_status` 确认 + 会话回写
 - **登录态检测**：启动/打开播放前调 `login_status`（netease）；失效 → 播放返回 403/401 → `player:sourceError` → UI 提示重新登录
 - **登出**：`logout` 清平台 cookie（Dart 本地层会话记录 + vault 内密文），**不涉及 `sessions` 表**（已废弃，见 §8）
-- **多账号**：自用单账号起步；多平台多账号切换在 Dart 本地层会话记录中预留（§8 的 `sessions`/`downloads` 表方案已废弃，勿按表实现）
+- **多账号**：自用单账号起步；多平台多账号切换在 Dart 本地层会话记录中预留
 - KuGou / QQ 登录（Phase 2/3）：对齐 netease 模式，各自 modules 内封装
 
 ### 7.5 Subsonic 认证与传输（SEC-32）
@@ -325,7 +324,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 |---|---|---|
 | 曲库 tracks（元数据 / 路径 / 时长 / 歌词 / 封面）| SQLite `database/library.db`（WAL）| C# scanner 直写；Go subsonic FFI 直读；Dart（TracksDb）只读 |
 | Subsonic 用户 / 收藏 / 播放列表 / 分享 | SQLite `database/user.db`（WAL，独立库）| Go subsonic FFI 与 Dart（SubsonicAdmin）直读直写；**用户密码已移入凭据保险库**（`uid=subsonic:<username>`，SEC-01），`password_cipher` 列仅存空串占位（旧库 `enc:v1:` 密文在首次打开时解密迁入 vault 后置空，随后仅作迁移回退） |
-| 平台会话 cookie / 下载任务 | Dart 本地层（drift/Hive + vault） | 登录态与下载任务本地持久化（原侧车 `sessions`/`downloads` 表方案已废弃） |
+| 平台会话 cookie | Dart 本地层（drift/Hive + vault） | 登录态本地持久化（原侧车 `sessions` 表方案已废弃） |
 | 配置 | `config/settings.json`（原子写 + 迁移）| Dart |
 | 队列 / 播放历史 / UI 偏好 | Dart 本地（drift 或 Hive）| Flutter |
 | 日志 | `logs/archoera.log`（单文件，硬上限 4 MiB，超限原地截断）| 全层统一（Dart/桥接/引擎/Rust/Zig）经 `app/native/log` 核心写穿；可在设置页关闭落盘；格式与分级见 `docs/unified-logging.md` |
@@ -375,9 +374,9 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - **窗口**：Phase 1 单主窗口；动态岛/任务栏歌词走系统能力（**桌面歌词独立置顶窗已放弃**，不做多窗口）
 - **状态管理**：Riverpod；**路由**：go_router
 - **i18n（Flutter 原生，非自研）**：`flutter_localizations` + `intl`/`gen_l10n`（ARB 管道）——复用原项目 8 语言文案，首期 zh-CN / en-US，其余后续补
-- **事件总线（Dart 侧统一事件通道）**：`EventBus`（StreamController 多路复用）承载两类事件——引擎事件（FFI `pollEvent` 转译，`player:*`/扫描/下载进度）与本地事件（播放队列、UI 状态）；UI 层只依赖总线，不直连传输层
+- **事件总线（Dart 侧统一事件通道）**：`EventBus`（StreamController 多路复用）承载两类事件——引擎事件（FFI `pollEvent` 转译，`player:*`/扫描进度）与本地事件（播放队列、UI 状态）；UI 层只依赖总线，不直连传输层
 - **主题**：亮/暗 + 封面动态取色
-- **核心页面**：搜索、歌单/榜单、播放页（滚动歌词 + 频谱）、队列、设置、登录（二维码）、音乐库（Phase 3）、下载（Phase 3）
+- **核心页面**：搜索、歌单/榜单、播放页（滚动歌词 + 频谱）、队列、设置、登录（二维码）、音乐库（Phase 3）
 - **歌词渲染**：自绘文本行，沿用原项目时间轴插值/锚点算法；格式解析（LRC/YRC/KRC/QRC/TTML）在 Dart 侧完成
 - **播放控制**：`PlaybackController`（Dart）封装 §5.2 语义，播放走直连引擎（§5.1），业务 API 为纯 Dart 直连
 - **桌面集成（Phase 3+）**：媒体键、系统托盘、全局快捷键、任务栏缩略图——通过原生 media-ctrl（napi，规划中）/ 平台壳插件
@@ -501,7 +500,6 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 | 频谱 | enableSpectrum、spectrumBarWidth、spectrumDisplayMode(mirror/split) |
 | 界面 | 主题（亮/暗/跟随系统）、封面动态取色、语言 |
 | 窗口 | 窗口大小/位置记忆、最小化到托盘、启动恢复播放 |
-| 下载 | 默认目录、并发数 |
 | 平台 | 各平台登录态、首选音质 |
 
 - Flutter 经 Dart 配置层直读写；schema 变更走本地迁移
@@ -519,7 +517,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 | Collection/歌单、Liked、Favorites | `features/playlist` | ✔ |
 | FullPlayer + PlayerBar | `features/player` | ✔ |
 | QueuePopover / QueuePanel | `features/player/queue` | ✔ |
-| History / Daily / Cloud / Download / Library / Folders / Artist | 对应 feature | Phase 3 |
+| History / Daily / Cloud / Library / Folders / Artist | 对应 feature | Phase 3 |
 | Onboarding（6 步引导）| 并入设置页，不做引导 | ✗ |
 | Streaming（Emby/Jellyfin/Subsonic）| Dart 侧 streaming 客户端直连 | Phase 3+ 可选 |
 | Admin / 插件市场 / AMLL DB | 自用不需要 | ✗ |
@@ -532,7 +530,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 
 **布局骨架落地（2026-08-06，已实现）**
 - 壳：`ui/app_shell.dart` = Row[`SideBar` ｜ Column[NavHeader, 页面区]] + 底部 `PlayerBar`
-- `SideBar`（对齐 SideBar.vue）：240↔64 可折叠（AnimatedContainer），Logo + 分组导航（发现：首页/搜索 · 音乐：音乐库 · 个人：我喜欢/收藏/历史 · 其他：下载），对应 7 个 StatefulShellBranch
+- `SideBar`（对齐 SideBar.vue）：240↔64 可折叠（AnimatedContainer），Logo + 分组导航（发现：首页/搜索 · 音乐：音乐库 · 个人：我喜欢/收藏/历史），对应 6 个 StatefulShellBranch
 - `NavHeader`（对齐 NavHeader.vue）：返回 + 全局搜索框（回车跳 `/search?q=`）+ 用户占位 + 主题循环（light→dark→system，`themeModeProvider`）；Linux 窗口控制由系统提供不绘制
 - `PlayerBar`（对齐 PlayerBar.vue）：顶部压缩进度条（拖动 seek）+ 左（封面/曲名/会话，点击 `push('/player')`）+ 播放控制 + 右（时间 + 迷你频谱）
 - `FullPlayer`：`/player` 顶层 GoRoute（parentNavigatorKey 根，盖住整个壳含播放条）= 渐变背景 + 封面大图 + 频谱 + 进度 + 控制；歌词区（§10.2）待接入
@@ -599,7 +597,7 @@ ArchoeraMusic/
 | **Phase 0** 骨架 ✅ | Flutter 三端骨架 + C 引擎构建打通（2026-08-05；原「spawn 侧车 + HTTP/WS 打通」路径已废弃，见 §12.0） | App 可启动、引擎可用 |
 | **Phase 1** Netease + 播放 ✅ | **桌面 FFI 直连引擎播放**（完整转码 PCM 落盘 + miniaudio 自播 + seek 即时 + FFT 拉模式，2026-08-07）；平台 API 纯 Dart 直连；Flutter 搜索页、播放页（歌词 + 频谱）、二维码登录、队列 | 可登录、搜索、播放，歌词/频谱同步，任意 seek |
 | **Phase 2** KuGou | 移植 kugou 模块（song_url/榜单/歌单）为纯 Dart（`app/lib/core/apis/kugou/`）；Flutter 接入酷狗搜索播放 | 可搜索播放酷狗歌曲 |
-| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；下载（Rust CLI）；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）（**桌面歌词独立窗已放弃**）| 核心功能达成规划子集 |
+| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）（**桌面歌词独立窗已放弃**）| 核心功能达成规划子集 |
 | **Phase 4** 优化 | C 引擎增强：进程内 seek、预加载/无缝切换；性能/内存基线（沿用原项目 memory discipline）；缓存与并发策略 | 播放体验优化，桌面集成完备 |
 
 ### 12.0 历史落地记录（简记）
@@ -625,7 +623,7 @@ ArchoeraMusic/
 | 引擎 | `app/core/audio-engine/tests/`（test_fft 等）三平台构建冒烟 |
 | Dart | 单元：api 客户端 / 队列模型 / 状态机；Widget：页面与歌词/频谱组件 |
 | 集成冒烟 | App 启动 → 平台 API 直连（搜索/歌词）→ **桌面端 FFI 直连引擎**（AUTOPLAY：库内转码 PCM 落盘 → miniaudio 播放 → FFT 拉模式 → pollEvent 事件） |
-| 手动回归 | 播放/seek/切歌/登录/下载核心路径清单（自用场景） |
+| 手动回归 | 播放/seek/切歌/登录核心路径清单（自用场景） |
 
 ---
 
@@ -669,4 +667,4 @@ ArchoeraMusic/
 19. **桌面端 FFI 直连引擎（2026-08-07，取代 08-06 spawn+UDS 与更早侧车播放链路）**：Dart 加载 `libarchoera_mediaengine`，库内线程**全速完整转码 PCM 落盘 `stream.wav` → miniaudio 自播**（player 模式 `skip_encoder=true`，不再 Opus 编码）——「完整时长 + 任意 seek」语义；seek 走 miniaudio 即时 seek（不重启引擎、不重转码）；事件 FIFO 50ms 轮询 `pollEvent`（position 只留最新，`set_event_interval` 降频协商）；FFT v1 为拉模式，2026-11-04 v2 起改为引擎 50ms 事件推送（2026-11-05 起 v1 拉模式与 libfft 全部删除）
 20. ~~sidecar 播放路径收窄~~（已随 2026-09-06 去侧车化整体废弃）
 21. **内存播放（不落盘）模式（2026-09-08 决策；S1 引擎 C / S2 Dart 接线与设置已实现，S3 基准收尾待办）**：桌面播放**默认内存模式**（独立开关，与 Stable/EraAudio、SongCache 均独立）；解码 PCM 驻留进程内「全量块列表」（与 `stream.pcm` 文件块同构，达 cap 才滚动淘汰），频谱由引擎频谱线程直接读块列表并 50ms 事件推送（v2 破坏性更新；App 不再使用 `pcm_window` FFI 拉窗），不写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）；`cap`：auto（按可用内存均衡，**32 MiB 硬上限**，查询故障回落、append 后记账强制淘汰、绝不越过用户设限；驻留仅供频谱取帧，另配 8 MiB 块缓冲复用池，`destroy` 时 `malloc_trim` 归还 OS）/ 自定义 / 无上限（须显式警告内存过载后果）。文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为。规格与验收：`docs/audio-memory-playback.md`。
-22. **MCP 控制服务（2026-10-07，可选）**：默认关闭；开启后默认仅绑定回环 `127.0.0.1`（非特权端口），可手动开启「允许局域网访问」绑定 `0.0.0.0`（默认关、需用户确认 + 仍要求密钥）。以标准协议（MCP Streamable HTTP / REST / WebSocket，均 JSON-RPC 2.0 / HTTP+JSON）暴露播放/队列/搜索/曲库/偏好只读/外观/收藏/历史/歌词/下载能力；默认要求访问密钥、能力组默认全关。纯 Dart 实现（`dart:io`，事件循环驱动、无轮询），不参与播放链路（仍为进程内 FFI），是对「桌面端零 TCP 端口」的显式可选例外。另随二进制内置命令行客户端 `archoera_music archoerashell ...`（类 Unix 语法，经 REST 与运行实例通信，不启动 GUI）。详见 `docs/mcp.md`。
+22. **MCP 控制服务（2026-10-07，可选）**：默认关闭；开启后默认仅绑定回环 `127.0.0.1`（非特权端口），可手动开启「允许局域网访问」绑定 `0.0.0.0`（默认关、需用户确认 + 仍要求密钥）。以标准协议（MCP Streamable HTTP / REST / WebSocket，均 JSON-RPC 2.0 / HTTP+JSON）暴露播放/队列/搜索/曲库/偏好只读/外观/收藏/历史/歌词能力；默认要求访问密钥、能力组默认全关。纯 Dart 实现（`dart:io`，事件循环驱动、无轮询），不参与播放链路（仍为进程内 FFI），是对「桌面端零 TCP 端口」的显式可选例外。另随二进制内置命令行客户端 `archoera_music archoerashell ...`（类 Unix 语法，经 REST 与运行实例通信，不启动 GUI）。详见 `docs/mcp.md`。
