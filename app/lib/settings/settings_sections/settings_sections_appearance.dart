@@ -615,7 +615,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                     label: l10n.settingsBackgroundClear,
                     variant: SButtonVariant.ghost,
                     size: SButtonSize.small,
-                    onPressed: () => notifier.setBackground(image: null),
+                    onPressed: () => notifier.setBackground(clearImage: true),
                   ),
                 ),
               ],

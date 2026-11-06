@@ -150,6 +150,59 @@ void main() {
     });
   });
 
+  group('图片背景偏好', () {
+    AppPrefs base() => AppPrefs(
+      initialData: {
+        prefs.appearanceStyleKey: 'image',
+        prefs.backgroundImageKey: '/tmp/bg.png',
+        prefs.backgroundBlurKey: 10,
+        prefs.backgroundDimKey: 0.5,
+        prefs.backgroundScaleKey: 1.4,
+      },
+    );
+
+    test('只调模糊/遮罩/缩放时保留已选背景图', () {
+      final blurred = base().copyWithBackground(blur: 30);
+      expect(blurred.backgroundImage, '/tmp/bg.png');
+      expect(blurred.backgroundBlur, 30);
+      expect(blurred.backgroundDim, 0.5);
+      expect(blurred.backgroundScale, 1.4);
+      expect(
+        appearanceStyleFor(blurred.appearanceStyle)
+            .effectiveImageBackground(blurred),
+        isTrue,
+      );
+
+      final dimmed = base().copyWithBackground(dim: 0.7);
+      expect(dimmed.backgroundImage, '/tmp/bg.png');
+      expect(dimmed.backgroundDim, 0.7);
+
+      final scaled = base().copyWithBackground(scale: 1.8);
+      expect(scaled.backgroundImage, '/tmp/bg.png');
+      expect(scaled.backgroundScale, 1.8);
+
+      final untouched = base().copyWithBackground();
+      expect(untouched.backgroundImage, '/tmp/bg.png');
+      expect(untouched.backgroundBlur, 10);
+    });
+
+    test('显式清除才移除背景图', () {
+      final cleared = base().copyWithBackground(clearImage: true);
+      expect(cleared.backgroundImage, isNull);
+      expect(cleared.data.containsKey(prefs.backgroundImageKey), isFalse);
+      expect(
+        appearanceStyleFor(cleared.appearanceStyle)
+            .effectiveImageBackground(cleared),
+        isFalse,
+      );
+    });
+
+    test('重新选图会替换旧路径', () {
+      final replaced = base().copyWithBackground(image: '/tmp/bg2.png');
+      expect(replaced.backgroundImage, '/tmp/bg2.png');
+    });
+  });
+
   group('偏好白名单', () {
     test('非法 themeSource 读取回退 default，且不写入', () {
       final bad = AppPrefs(initialData: {prefs.themeSourceKey: 'nope'});

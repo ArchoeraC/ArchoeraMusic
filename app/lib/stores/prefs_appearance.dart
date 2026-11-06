@@ -246,19 +246,21 @@ extension AppearancePrefs on AppPrefs {
 
   /// 设置图片背景配置（选图 / 模糊 / 遮罩 / 缩放）。
   ///
-  /// [image] 为 null 时**移除**已落盘的背景图路径（清除按钮）：不能像其他
-  /// 字段用 null-aware 元素——旧键会经 `...data` 残留，导致清除后背景图
-  /// 仍生效（与 copyWithAccent 相同的问题）。
+  /// [image] 为 null 且 [clearImage] 为 false 时**保留**现有背景图——设置页
+  /// 的三个滑块只传模糊/遮罩/缩放，不能顺手把图清掉（否则会退回纯色模式）。
+  /// 清除按钮显式传 [clearImage]=true；此时必须移除已落盘的背景图路径，
+  /// 不能像其他字段用 null-aware 元素——旧键会经 `...data` 残留。
   AppPrefs copyWithBackground({
     String? image,
+    bool clearImage = false,
     int? blur,
     double? dim,
     double? scale,
   }) {
     final d = Map<String, dynamic>.of(data);
-    if (image == null) {
+    if (clearImage) {
       d.remove(backgroundImageKey);
-    } else {
+    } else if (image != null) {
       d[backgroundImageKey] = image;
     }
     return AppPrefs(

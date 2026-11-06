@@ -557,9 +557,18 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   }
 
   /// 设置图片背景配置（选图 / 模糊 / 遮罩 / 缩放）。
-  void setBackground({String? image, int? blur, double? dim, double? scale}) {
+  ///
+  /// [image] 为 null 时保留现有背景图；清除请显式传 [clearImage]=true。
+  void setBackground({
+    String? image,
+    bool clearImage = false,
+    int? blur,
+    double? dim,
+    double? scale,
+  }) {
     state = state.copyWithBackground(
       image: image,
+      clearImage: clearImage,
       blur: blur,
       dim: dim,
       scale: scale,
