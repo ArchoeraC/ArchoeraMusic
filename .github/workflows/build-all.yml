@@ -271,7 +271,14 @@ jobs:
             Write-Host "Strawberry Perl 已在 vcpkg 缓存中"; exit 0
           }
           New-Item -ItemType Directory -Force -Path (Split-Path $zip) | Out-Null
-          foreach ($u in @($url, "https://ghproxy.net/$url", "https://gh-proxy.com/$url")) {
+          foreach ($u in @(
+              $url,
+              "https://ghproxy.net/$url",
+              "https://gh-proxy.com/$url",
+              "https://ghfast.top/$url",
+              "https://gh.moeyy.xyz/$url",
+              "https://ghproxy.cc/$url",
+              "https://gh.llkk.cc/$url")) {
             try {
               curl.exe -fL --retry 2 --retry-delay 5 -o "$zip.part" $u
               if ((Get-FileHash "$zip.part" -Algorithm SHA512).Hash.ToLower() -eq $sha.ToLower()) {
