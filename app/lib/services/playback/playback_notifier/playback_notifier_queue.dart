@@ -116,6 +116,8 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
           );
         }
       }
+      // 正常开新歌/换歌：允许新曲目重新拥有完整的运行期源恢复次数。
+      _sourceRecoveryAttempts = 0;
       await load(
         playUrl,
         bitrate: qualityBitrate[q] ?? 128000,
