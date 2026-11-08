@@ -39,15 +39,24 @@ import 'login_risk_notice.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 打开 NekoMusic 登录界面（先弹登录风险提示）。返回 `true` 表示登录成功。
+///
+/// 没有显式「取消」按钮：**离开登录界面即取消**。这里在 `showDialog` 返回后
+/// 再做一次兜底取消，保证无论点遮罩、按 Esc 还是路由被替换，都会立刻结束
+/// OAuth 等待并注销 `nekomusic://`。
 Future<bool?> showNekoLoginDialog(BuildContext context) async {
   if (!await showLoginRiskNotice(context)) return false;
   if (!context.mounted) return false;
-  return showDialog<bool?>(
+  final container = ProviderScope.containerOf(context, listen: false);
+  final result = await showDialog<bool?>(
     context: context,
     barrierColor: Colors.transparent,
     barrierDismissible: true,
     builder: (_) => const _NekoLoginDialog(),
   );
+  if (result != true) {
+    container.read(nekoApiProvider).cancelSsoLogin();
+  }
+  return result;
 }
 
 class _NekoLoginDialog extends ConsumerStatefulWidget {
