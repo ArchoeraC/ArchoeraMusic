@@ -8,7 +8,11 @@
 /// 本模块解析为时间轴有序行；KRC 解密与解码在 apis 包内完成（kgDecodeKrc），
 /// QRC 解密在 apis 包内完成（qmDecryptQrc），其**逐字正文**（含 XML 外壳）
 /// 由本模块 [convertQrcToYrc] 归一化（Flutter 零依赖实现）。
+/// NekoMusic 的 `neko-v1` 富歌词（JSON，行内自带 words / 翻译 / 音译）
+/// 由 [parseNekoV1Lyrics] 直接构造成 [LyricGroup]。
 library;
+
+import 'dart:convert';
 
 /// 一行歌词（毫秒时间戳 + 文本）。
 class LyricLine {
@@ -279,6 +283,27 @@ class _Frag {
   _Frag(this.text, {this.startMs});
   final String text;
   final int? startMs;
+}
+
+/// `neko-v1` 解析中的一行（逐字片段已转为行内相对偏移）。
+class _NekoV1Row {
+  _NekoV1Row({
+    required this.startMs,
+    required this.endHint,
+    required this.text,
+    required this.translation,
+    required this.romaji,
+    required this.isBG,
+    required this.fragments,
+  });
+
+  final int startMs;
+  final int? endHint;
+  final String text;
+  final String? translation;
+  final String? romaji;
+  final bool isBG;
+  final List<LyricFragment>? fragments;
 }
 
 /// 解析出的一行（主行或背景子行），逐字片段为相对本行 `timeMs` 的偏移。
@@ -583,10 +608,125 @@ bool _isHan(int r) =>
     (r >= 0x3400 && r <= 0x4DBF) ||
     (r >= 0xF900 && r <= 0xFAFF);
 
-/// 解析主歌词（LRC / YRC / KRC / QRC / ESLRC / 增强 LRC）+ 可选翻译
-/// → 时间轴有序、逐行对齐的歌词组。
+/// NekoMusic 富歌词格式标识（`/api/music/info` 的 `lyricsFormat`）。
+const String kNekoV1LyricsFormat = 'neko-v1';
+
+/// 是否为 `neko-v1` 富歌词：显式 format，或 `{"version":1,"lines":[...]}` JSON。
+///
+/// 富歌词与普通 LRC 同为服务端 `data.lyrics` / `data.lyricsRich` 的载荷，
+/// 判定只看外层结构，不要求 `version` 字段（向前兼容后续版本）。
+bool isNekoV1Lyrics(String content, [String? format]) {
+  if (format != null && format.trim().toLowerCase() == kNekoV1LyricsFormat) {
+    return true;
+  }
+  final t = content.trimLeft();
+  return t.startsWith('{') && t.contains('"lines"');
+}
+
+/// 解析 NekoMusic `neko-v1` 富歌词 JSON → [LyricGroup]。
+///
+/// 对齐服务端 `NekoLyrics` 模型：行与词的时间单位均为毫秒，`words[]`
+/// 为逐字/逐词片段（绝对时间），翻译 / 音译随行携带，`background` 标记
+/// 背景和声行。缺时间字段时按「下一行 / 下一字 / 4000ms」兜底补齐，
+/// 保证渲染端始终有可用的高亮窗口。
+List<LyricGroup> parseNekoV1Lyrics(String content) {
+  final trimmed = content.trim();
+  if (trimmed.isEmpty) return const [];
+  final Object? decoded;
+  try {
+    decoded = jsonDecode(trimmed);
+  } catch (_) {
+    return const [];
+  }
+  if (decoded is! Map) return const [];
+  final rawLines = decoded['lines'];
+  if (rawLines is! List) return const [];
+
+  final rows = <_NekoV1Row>[];
+  for (final raw in rawLines) {
+    if (raw is! Map) continue;
+    final start = _asInt(raw['startMs']);
+    if (start == null || start < 0) continue;
+    final text = (raw['text']?.toString() ?? '').trim();
+    if (text.isEmpty) continue;
+    rows.add(_NekoV1Row(
+      startMs: start,
+      endHint: _asInt(raw['endMs']),
+      text: text,
+      translation: _asText(raw['translation']),
+      romaji: _asText(raw['romanization']),
+      isBG: raw['background'] == true,
+      fragments: _nekoV1Fragments(raw['words'], start),
+    ));
+  }
+  if (rows.isEmpty) return const [];
+
+  // 稳定排序：同一时间保持服务端文档顺序。
+  final order = List.generate(rows.length, (i) => i)
+    ..sort((a, b) {
+      final c = rows[a].startMs.compareTo(rows[b].startMs);
+      return c != 0 ? c : a.compareTo(b);
+    });
+
+  final out = <LyricGroup>[];
+  for (var i = 0; i < order.length; i++) {
+    final row = rows[order[i]];
+    var end = row.endHint;
+    if (end == null || end <= row.startMs) {
+      end = i + 1 < order.length
+          ? rows[order[i + 1]].startMs
+          : row.startMs + 4000;
+    }
+    if (end <= row.startMs) end = row.startMs + 4000;
+    out.add(LyricGroup(
+      original: LyricLine(timeMs: row.startMs, text: row.text),
+      translation: row.translation,
+      romaji: row.romaji,
+      fragments: _fillFragmentDurations(row.fragments, row.startMs, end),
+      endMs: end,
+      isBG: row.isBG,
+    ));
+  }
+  return out;
+}
+
+/// `neko-v1` 行内逐字片段：服务端给绝对毫秒，这里转为行内相对偏移。
+List<LyricFragment>? _nekoV1Fragments(Object? rawWords, int lineStart) {
+  if (rawWords is! List || rawWords.isEmpty) return null;
+  final out = <LyricFragment>[];
+  for (final raw in rawWords) {
+    if (raw is! Map) continue;
+    final start = _asInt(raw['startMs']);
+    if (start == null) continue;
+    final text = raw['text']?.toString() ?? '';
+    if (text.isEmpty) continue;
+    final end = _asInt(raw['endMs']);
+    out.add(LyricFragment(
+      text: text,
+      startMs: start < lineStart ? 0 : start - lineStart,
+      durationMs: end != null && end > start ? end - start : null,
+    ));
+  }
+  return out.isEmpty ? null : out;
+}
+
+int? _asInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.round();
+  if (value is String) return int.tryParse(value.trim());
+  return null;
+}
+
+String? _asText(Object? value) {
+  final text = value?.toString().trim() ?? '';
+  return text.isEmpty ? null : text;
+}
+
+/// 解析主歌词（LRC / YRC / KRC / QRC / ESLRC / 增强 LRC / neko-v1）
+/// + 可选翻译 → 时间轴有序、逐行对齐的歌词组。
 ///
 /// - 行级时间戳格式同 [parseLrc]；多时间戳 = 重复行；
+/// - `neko-v1` 富歌词走 [parseNekoV1Lyrics]（行内自带翻译 / 音译 / 逐字）；
 /// - QRC 先经 [convertQrcToYrc] 归一化（兼容历史缓存里的未解包 XML）；
 /// - YRC/KRC 的 `<偏移,时长>字`、ESLRC 的 `<mm:ss>字`、增强 LRC 的行内
 ///   `[mm:ss]字` 都解析为 [LyricFragment]（行内相对偏移）；
@@ -601,6 +741,12 @@ List<LyricGroup> parseLyricGroups({
   String? romaji,
   String? romajiFormat,
 }) {
+  // neko-v1：富歌词自带逐字 / 翻译 / 音译，直接成组，不再走文本归一化。
+  if (isNekoV1Lyrics(content, format)) {
+    final rich = parseNekoV1Lyrics(content);
+    if (rich.isNotEmpty) return rich;
+  }
+
   // QRC 归一化：format 标记为 qrc，或内容带 XML 外壳（旧缓存未解包）。
   // 归一化无产出时保留原文，避免把「误标 qrc 的普通歌词」整首吞掉。
   var main = content;
