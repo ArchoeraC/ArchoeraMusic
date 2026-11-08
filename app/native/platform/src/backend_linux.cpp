@@ -115,6 +115,10 @@ std::atomic<bool> g_theme_pending{false};
 std::atomic<bool> g_theme_dark{false};
 std::atomic<bool> g_theme_valid{false};
 
+// 深链接收常驻：与主题/防休眠订阅无关，启动即建立会话总线连接并注册
+// OpenUri，保证次实例（OAuth 回调 / archoera://）总能转发成功。
+std::atomic<bool> g_deeplink_events{false};
+
 // 系统强调色缓存（异步查询结果）：apl_system_accent 立即返回缓存，避免在
 // Dart/主线程同步等待 XDG portal（切回应用时会重读，同步调用会卡住 UI）。
 std::mutex g_accent_mtx;
@@ -694,16 +698,36 @@ std::string readCmdlineUrl() {
         if (end == std::string::npos) end = data.size();
         const std::string arg = data.substr(start, end - start);
         if (arg.rfind("archoera://", 0) == 0) return arg;
+        // NekoAuth 登录回调（NekoMusic 固定使用 nekomusic://）。
+        if (arg.rfind("nekomusic://", 0) == 0) return arg;
         start = end + 1;
     }
     return std::string();
 }
 
-std::string desktopFilePath() {
+std::string desktopFilePath(const char* scheme) {
     const char* home = std::getenv("HOME");
     if (home == nullptr || *home == '\0') return std::string();
-    return std::string(home) +
-           "/.local/share/applications/archoera_music.desktop";
+    // archoera 保持历史文件名（兼容旧版注册）；其它 scheme 单独一个 .desktop，
+    // 避免后注册的 scheme 覆盖前一 scheme 的 MimeType。
+    const bool primary = scheme != nullptr && std::strcmp(scheme, "archoera") == 0;
+    const std::string name =
+        primary ? std::string("archoera_music.desktop")
+                : std::string("archoera_music_") + scheme + ".desktop";
+    return std::string(home) + "/.local/share/applications/" + name;
+}
+
+// scheme 会拼进文件名：只允许小写字母 / 数字 / 连字符。
+bool isValidScheme(const char* scheme) {
+    if (scheme == nullptr || *scheme == '\0') return false;
+    for (const char* p = scheme; *p != '\0'; ++p) {
+        const char c = *p;
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+              c == '-')) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // ── 连接管理 ──────────────────────────────────────────────────────
@@ -819,6 +843,7 @@ void pumpLoop() {
             if (g_screen_events.load(std::memory_order_acquire) ||
                 g_accent_events.load(std::memory_order_acquire) ||
                 g_theme_events.load(std::memory_order_acquire) ||
+                g_deeplink_events.load(std::memory_order_acquire) ||
                 g_inhibit_pending.load(std::memory_order_acquire) ||
                 g_inhibit_on) {
                 c = ensureConn();
@@ -1953,8 +1978,12 @@ int32_t processElevation() {
 int32_t init() {
     dbus_threads_init_default();
     g_running.store(true, std::memory_order_release);
+    // 深链服务常驻：即使主题/防休眠从不订阅，也要建立会话总线并注册
+    // OpenUri，否则次实例（OAuth 回调）转发会因找不到服务而失败。
+    g_deeplink_events.store(true, std::memory_order_release);
     g_pump = new std::thread(pumpLoop);
-    // 冷启动：命令行中的 archoera:// URL（协议处理程序把 URL 作为 argv 传入）。
+    // 冷启动：命令行中的 archoera:// / nekomusic:// URL（协议处理程序把 URL
+    // 作为 argv 传入）。
     const std::string cold = readCmdlineUrl();
     if (!cold.empty()) {
         std::lock_guard<std::mutex> lock(g_deeplink_mutex);
@@ -2074,8 +2103,8 @@ int32_t appInstanceAcquire() {
 }
 
 int32_t protocolRegister(const char* scheme) {
-    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
-    const std::string path = desktopFilePath();
+    if (!isValidScheme(scheme)) return ERR_STATE;
+    const std::string path = desktopFilePath(scheme);
     if (path.empty()) return ERR_BACKEND;
     char exe[4096] = {0};
     const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
@@ -2119,8 +2148,8 @@ int32_t protocolRegister(const char* scheme) {
 }
 
 int32_t protocolUnregister(const char* scheme) {
-    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
-    const std::string path = desktopFilePath();
+    if (!isValidScheme(scheme)) return ERR_STATE;
+    const std::string path = desktopFilePath(scheme);
     if (!path.empty()) ::unlink(path.c_str());
     return OK;
 }
@@ -2130,25 +2159,32 @@ int32_t deepLinkTake(AplString* out) { return deepLinkTakeLinux(out); }
 int32_t deepLinkForward() {
     const std::string url = readCmdlineUrl();
     if (url.empty()) return 0;
-    DBusError err;
-    dbus_error_init(&err);
-    DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
-    if (c == nullptr) {
+    // 首实例可能仍在启动（深链服务尚未注册），短暂重试，避免把 OAuth 回调
+    // 当成「重复启动」丢弃。
+    for (int attempt = 0; attempt < 10; ++attempt) {
+        DBusError err;
+        dbus_error_init(&err);
+        DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
+        if (c == nullptr) {
+            dbus_error_free(&err);
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            continue;
+        }
+        DBusMessage* msg = dbus_message_new_method_call(
+            kDeepLinkName, kDeepLinkPath, kDeepLinkIface, "OpenUri");
+        const char* u = url.c_str();
+        dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
+        DBusMessage* reply =
+            dbus_connection_send_with_reply_and_block(c, msg, 2000, &err);
+        dbus_message_unref(msg);
+        const bool ok = reply != nullptr;
+        if (reply != nullptr) dbus_message_unref(reply);
         dbus_error_free(&err);
-        return ERR_BACKEND;
+        dbus_connection_unref(c);
+        if (ok) return 1;
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
-    DBusMessage* msg = dbus_message_new_method_call(
-        kDeepLinkName, kDeepLinkPath, kDeepLinkIface, "OpenUri");
-    const char* u = url.c_str();
-    dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
-    DBusMessage* reply =
-        dbus_connection_send_with_reply_and_block(c, msg, 2000, &err);
-    dbus_message_unref(msg);
-    const bool ok = reply != nullptr;
-    if (reply != nullptr) dbus_message_unref(reply);
-    dbus_error_free(&err);
-    dbus_connection_unref(c);
-    return ok ? 1 : ERR_BACKEND;
+    return ERR_BACKEND;
 }
 
 int32_t windowActivate() {

@@ -1086,10 +1086,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsNekoEnableDesc => '검색·좋아요·보관함에 NK 표시 (기본 꺼짐)';
 
   @override
-  String get settingsNekoUnavailable =>
-      '클라이언트 ID(NEKO_CLIENT_ID)가 설정되지 않아 NekoMusic 음원을 사용할 수 없습니다.';
-
-  @override
   String get settingsNekoLogin => '로그인';
 
   @override
@@ -1105,6 +1101,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get nekoLoginTitle => 'NekoMusic 로그인';
+
+  @override
+  String get nekoLoginTabOauth => 'OAuth 로그인';
+
+  @override
+  String get nekoOauthTitle => 'NekoAuth로 로그인';
+
+  @override
+  String get nekoOauthDesc => '시스템 브라우저에서 NekoAuth를 열고 인증 후 앱으로 돌아옵니다.';
+
+  @override
+  String get nekoOauthOpen => '브라우저에서 로그인';
+
+  @override
+  String get nekoOauthWaiting => '브라우저에서 로그인을 완료하세요…';
+
+  @override
+  String get nekoOauthFailed => '로그인 실패';
 
   @override
   String get nekoLoginTabQr => 'QR 코드';

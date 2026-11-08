@@ -20,7 +20,21 @@ class FfiSystemDeepLink implements SystemDeepLink {
 
   final PlatformBindings _b;
   StreamSubscription<AplDeepLinkEvent>? _sub;
-  final _ctrl = StreamController<Uri>.broadcast();
+
+  /// 启动早期（`DeepLinkRouter` 尚未订阅）取回的 URI 先缓存，等首个监听者
+  /// 出现再补发——否则冷启动 / 次实例早到的登录回调会被直接丢掉。
+  final List<Uri> _pending = <Uri>[];
+
+  late final StreamController<Uri> _ctrl = StreamController<Uri>.broadcast(
+    onListen: () {
+      if (_pending.isEmpty) return;
+      final pending = List<Uri>.of(_pending);
+      _pending.clear();
+      for (final uri in pending) {
+        _ctrl.add(uri);
+      }
+    },
+  );
   final _failCtrl = StreamController<PlatformCapabilityFailure>.broadcast();
   bool _disposed = false;
 
@@ -31,7 +45,12 @@ class FfiSystemDeepLink implements SystemDeepLink {
       final raw = _b.deepLinkTake();
       if (raw == null) break;
       final uri = Uri.tryParse(raw);
-      if (uri != null && !_ctrl.isClosed) _ctrl.add(uri);
+      if (uri == null) continue;
+      if (_ctrl.hasListener) {
+        _ctrl.add(uri);
+      } else {
+        _pending.add(uri);
+      }
     }
   }
 

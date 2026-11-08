@@ -1296,7 +1296,7 @@ class _NekoSource extends SourcePlatform {
   @override
   String get source => 'neko';
 
-  /// NekoMusic 走本站 `/api/*`：音频拉流带客户端标识头（UA + X-Neko-Client）。
+  /// NekoMusic 走本站 `/api/*`：音频拉流只需通用 UA（新协议无身份签名头）。
   @override
   Map<String, String> get mediaHeaders => nekoRequestHeaders;
 

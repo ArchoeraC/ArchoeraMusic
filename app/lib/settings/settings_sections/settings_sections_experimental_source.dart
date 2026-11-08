@@ -40,7 +40,7 @@ class _ExperimentalSourceSectionState
   }
 
   void _logout() {
-    ref.read(nekoApiProvider).logout();
+    unawaited(ref.read(nekoApiProvider).logout());
     ref.read(likeControllerProvider).sync();
     setState(() {});
     toast(context.l10n.settingsNekoLogout, type: ToastType.info);
@@ -50,7 +50,6 @@ class _ExperimentalSourceSectionState
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final enabled = ref.watch(appPrefsProvider.select(nekoSourceUsable));
-    final configured = nekoClientIdentityConfigured;
     // 登录态变化时重建（账号名 / 登录按钮）。
     final neko = ref.watch(nekoApiProvider);
     final account = neko.account;
@@ -65,13 +64,8 @@ class _ExperimentalSourceSectionState
             SettingTile(
               icon: EtaIcons.flaskOutline,
               title: l10n.settingsNekoEnable,
-              subtitle: configured
-                  ? l10n.settingsNekoEnableDesc
-                  : l10n.settingsNekoUnavailable,
-              trailing: Switch(
-                value: enabled,
-                onChanged: configured ? _toggleNeko : null,
-              ),
+              subtitle: l10n.settingsNekoEnableDesc,
+              trailing: Switch(value: enabled, onChanged: _toggleNeko),
             ),
             SettingTile(
               icon: EtaIcons.userOutline,

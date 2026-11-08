@@ -2,8 +2,10 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// NekoMusic 客户端标识与媒体请求头注册表单测：版本截断、标识头构造、
-// 封面 / 头像 URL 命中（仅本站 API），第三方 CDN 不附加头。
+// NekoMusic 出站请求头单测：官方锚定 UA、媒体请求头注册表。
+//
+// 新协议不再有客户端身份头（X-Neko-Client / X-Neko-Nonce），UA 只用于
+// 服务端的 SEO / SPA 表示选择，不参与鉴权。
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -21,34 +23,33 @@ void main() {
       // 0.9.20+5 → 0.9.20
       expect(clientVersion, appVersion.split('+').first);
       expect(clientVersion.contains('+'), isFalse);
-      expect(nekoClientValue, 'pc+$clientVersion');
     });
 
-    test('请求头：官方锚定 PC UA 形状 + X-Neko-Client，不冒名 Android / 浏览器', () {
-      final h = nekoRequestHeaders;
-      // 官方锚定正则：NekoMusic-<平台>/<数字开头的版本>；平台取 pc（与 client_id 一致）。
-      expect(h['User-Agent'], matches(RegExp(r'^NekoMusic-PC/\d')));
-      expect(h['User-Agent'], isNotEmpty);
-      expect(h[kNekoClientHeader], 'pc+$clientVersion');
-      // 不再使用本体自报 UA；不冒名 Android、也不伪装浏览器。
-      expect(h['User-Agent'], isNot(startsWith('ArchoeraMusic')));
-      expect(h['User-Agent'], isNot(contains('android')));
-      expect(h['User-Agent'], isNot(contains('Mozilla')));
+    test('请求头：官方锚定 PC UA 形状，无身份头', () {
+      expect(
+        nekoRequestHeaders['User-Agent'],
+        matches(RegExp(r'^NekoMusic-PC/\d')),
+      );
+      expect(nekoRequestHeaders['Accept-Language'], isNotEmpty);
+      // 新协议已移除客户端身份 / 防重放头。
+      expect(nekoRequestHeaders.containsKey('X-Neko-Client'), isFalse);
+      expect(nekoRequestHeaders.containsKey('X-Neko-Nonce'), isFalse);
+      // 不冒名 Android、也不伪装浏览器。
+      expect(nekoRequestHeaders['User-Agent'], isNot(contains('android')));
+      expect(nekoRequestHeaders['User-Agent'], isNot(contains('Mozilla')));
     });
   });
 
   group('mediaHeadersForUrl', () {
-    test('NekoMusic 封面 / 头像附加标识头与浏览器特征头（不含 UA）', () {
+    test('NekoMusic 封面 / 头像只补图片头（不含 UA / 身份头）', () {
       for (final url in const [
         'https://music.nekocore.cn/api/music/cover/42',
         'https://music.nekocore.cn/api/user/avatar/7?v=123',
       ]) {
         final h = mediaHeadersForUrl(url);
         expect(h, isNotNull, reason: url);
-        expect(h![kNekoClientHeader], startsWith('pc+'));
-        // 站点图片走全局浏览器 UA、无法清空 UA；补齐 Accept + Accept-Language
-        // 以通过服务端「浏览器完整性」放行（见 neko_identity.dart 注释）。
-        expect(h.containsKey('User-Agent'), isFalse);
+        expect(h!.containsKey('User-Agent'), isFalse);
+        expect(h.containsKey('X-Neko-Client'), isFalse);
         expect(h['Accept'], isNotEmpty);
         expect(h['Accept-Language'], isNotEmpty);
       }

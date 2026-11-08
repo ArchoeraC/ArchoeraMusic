@@ -1077,10 +1077,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsNekoEnableDesc => '在搜索、我喜欢、收藏中显示 NK（默认关闭）';
 
   @override
-  String get settingsNekoUnavailable =>
-      '未配置客户端标识（构建参数 NEKO_CLIENT_ID），NekoMusic 音源不可用。';
-
-  @override
   String get settingsNekoLogin => '登录';
 
   @override
@@ -1096,6 +1092,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get nekoLoginTitle => '登录 NekoMusic';
+
+  @override
+  String get nekoLoginTabOauth => 'OAuth 登录';
+
+  @override
+  String get nekoOauthTitle => '使用 NekoAuth 登录';
+
+  @override
+  String get nekoOauthDesc => '将在系统浏览器中打开 NekoAuth，完成授权后自动返回本应用。';
+
+  @override
+  String get nekoOauthOpen => '在浏览器中登录';
+
+  @override
+  String get nekoOauthWaiting => '请在浏览器中完成登录…';
+
+  @override
+  String get nekoOauthFailed => '登录失败';
 
   @override
   String get nekoLoginTabQr => '扫码登录';
@@ -7263,10 +7277,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsNekoEnableDesc => '在搜索、我喜欢、收藏中显示 NK（默认关闭）';
 
   @override
-  String get settingsNekoUnavailable =>
-      '未配置客户端标识（构建参数 NEKO_CLIENT_ID），NekoMusic 音源不可用。';
-
-  @override
   String get settingsNekoLogin => '登录';
 
   @override
@@ -7282,6 +7292,24 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get nekoLoginTitle => '登录 NekoMusic';
+
+  @override
+  String get nekoLoginTabOauth => 'OAuth 登录';
+
+  @override
+  String get nekoOauthTitle => '使用 NekoAuth 登录';
+
+  @override
+  String get nekoOauthDesc => '将在系统浏览器中打开 NekoAuth，完成授权后自动返回本应用。';
+
+  @override
+  String get nekoOauthOpen => '在浏览器中登录';
+
+  @override
+  String get nekoOauthWaiting => '请在浏览器中完成登录…';
+
+  @override
+  String get nekoOauthFailed => '登录失败';
 
   @override
   String get nekoLoginTabQr => '扫码登录';
@@ -13449,10 +13477,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsNekoEnableDesc => '在搜尋、我喜歡、收藏中顯示 NK（預設關閉）';
 
   @override
-  String get settingsNekoUnavailable =>
-      '未設定用戶端識別碼（建置參數 NEKO_CLIENT_ID），NekoMusic 音源無法使用。';
-
-  @override
   String get settingsNekoLogin => '登入';
 
   @override
@@ -13468,6 +13492,24 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get nekoLoginTitle => '登入 NekoMusic';
+
+  @override
+  String get nekoLoginTabOauth => 'OAuth 登入';
+
+  @override
+  String get nekoOauthTitle => '使用 NekoAuth 登入';
+
+  @override
+  String get nekoOauthDesc => '將在系統瀏覽器開啟 NekoAuth，完成授權後自動返回本應用程式。';
+
+  @override
+  String get nekoOauthOpen => '在瀏覽器中登入';
+
+  @override
+  String get nekoOauthWaiting => '請在瀏覽器中完成登入…';
+
+  @override
+  String get nekoOauthFailed => '登入失敗';
 
   @override
   String get nekoLoginTabQr => '掃碼登入';

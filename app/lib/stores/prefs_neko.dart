@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import '../apis/neko/neko_client_config.dart';
 import 'app_prefs.dart';
 
 // ── 实验性音源 NekoMusic（source.neko. 前缀）──────────────────────
@@ -20,9 +19,8 @@ extension NekoPrefs on AppPrefs {
       AppPrefs(initialData: {...data, nekoEnabledKey: value});
 }
 
-/// 音源是否可用：用户开启 **且** 构建期注入了我们自己的 `client_id`。
+/// 音源是否可用：仅取决于用户开关。
 ///
-/// 未配置 client_id 的构建一律视为不可用（fail-closed）：不注册实例、不发请求、
-/// 搜索 / 我喜欢 / 收藏的源列表里也不出现该项。
-bool nekoSourceUsable(AppPrefs prefs) =>
-    prefs.nekoEnabled && nekoClientIdentityConfigured;
+/// NekoMusic 已取消第三方客户端 `client_id` / 实例签名要求，不再需要构建期
+/// 注入身份；登录统一走 NekoAuth。
+bool nekoSourceUsable(AppPrefs prefs) => prefs.nekoEnabled;
