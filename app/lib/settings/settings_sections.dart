@@ -55,7 +55,6 @@ import '../widgets/dialogs/sleep_timer_dialogs.dart';
 import '../widgets/player/s_controls.dart';
 import 'settings_color_picker.dart';
 import 'settings_widgets.dart';
-import 'settings_previews.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 

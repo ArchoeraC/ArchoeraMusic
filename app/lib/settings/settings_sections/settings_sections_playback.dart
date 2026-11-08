@@ -727,7 +727,6 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionSpectrum,
-          preview: SpectrumStylePreview(prefs: prefs),
           children: [
             SettingSwitchTile(
               icon: prefs.enableSpectrum
@@ -944,7 +943,6 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsTransitionStyle,
-          preview: CoverTransitionPreview(style: prefs.transitionStyle),
           children: [
             SettingTile(
               icon: EtaIcons.magic2Outline,

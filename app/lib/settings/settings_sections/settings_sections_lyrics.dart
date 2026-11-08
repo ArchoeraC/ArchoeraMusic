@@ -135,7 +135,6 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
         SettingSection(
           title: l10n.settingsSectionLyricStyle,
           note: l10n.settingsLyricsNote,
-          preview: LyricsStylePreview(prefs: prefs),
           children: [
             SettingSliderTile(
               icon: EtaIcons.fontSize,

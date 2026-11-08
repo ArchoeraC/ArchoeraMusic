@@ -56,7 +56,6 @@ class RippleBackground extends StatefulWidget {
   const RippleBackground({
     super.key,
     this.cover,
-    this.imageProvider,
     this.playing = true,
     this.speed = 3,
     this.animate = true,
@@ -71,9 +70,6 @@ class RippleBackground extends StatefulWidget {
 
   /// 封面地址；为空时只渲染 [fallbackColor]。
   final String? cover;
-
-  /// 可选封面 Provider（设置页预览等无文件/URL 场景）；非空时优先于 [cover]。
-  final ImageProvider? imageProvider;
 
   /// 是否播放中（暂停时涟漪降为慢速漂移，对齐上游）。
   final bool playing;
@@ -205,10 +201,7 @@ class _RippleBackgroundState extends State<RippleBackground>
   @override
   void didUpdateWidget(RippleBackground old) {
     super.didUpdateWidget(old);
-    if (old.cover != widget.cover ||
-        old.imageProvider != widget.imageProvider) {
-      _resolveCover();
-    }
+    if (old.cover != widget.cover) _resolveCover();
     // 开关打开且尚未加载 → 懒加载着色器（关闭时无需释放，下次直接复用）。
     if (old.useShader != widget.useShader &&
         widget.useShader &&
@@ -263,8 +256,6 @@ class _RippleBackgroundState extends State<RippleBackground>
   // ── 封面解析 ─────────────────────────────────────────────────────────
 
   ImageProvider? _providerFor(String? cover) {
-    final override = widget.imageProvider;
-    if (override != null) return override;
     if (cover == null || cover.isEmpty) return null;
     // 按屏幕物理像素解码（背景只做模糊/折射，超过屏幕尺寸无观感收益，却按平方
     // 吃内存）。首次解析发生在 didChangeDependencies（_decodePx 已算好）。
