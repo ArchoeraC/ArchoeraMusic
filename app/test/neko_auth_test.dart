@@ -7,6 +7,8 @@
 // - `/api/user/sso/claim`、`/api/user/qrlogin/claim` 换取 token；
 // - 退出登录调用 `/api/user/logout` 并清理本地会话。
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/neko/neko_client.dart';
@@ -109,6 +111,24 @@ void main() {
       ),
       'early',
     );
+  });
+
+  test('取消等待：立即返回 null，且不抢下一次回调', () async {
+    final cancel = Completer<void>();
+    final waiting = NekoSsoBridge.waitForHandoff(
+      timeout: const Duration(minutes: 1),
+      cancel: cancel.future,
+    );
+    cancel.complete();
+    expect(await waiting, isNull);
+
+    final next = NekoSsoBridge.waitForHandoff(
+      timeout: const Duration(seconds: 1),
+    );
+    NekoSsoBridge.handleUri(
+      Uri.parse('nekomusic://sso/complete?handoff=next'),
+    );
+    expect(await next, 'next');
   });
 
   test('ssoClaim：POST handoff 后落盘 token / idToken', () async {
