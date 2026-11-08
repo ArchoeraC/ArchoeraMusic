@@ -42,21 +42,36 @@ class NekoSsoBridge {
     return true;
   }
 
-  /// 等待下一个 handoff；超时返回 null。
+  /// 等待下一个 handoff；超时或 [cancel] 完成时返回 null。
   ///
   /// 若在开始等待前已经收到（冷启动场景），直接返回缓冲值。
   static Future<String?> waitForHandoff({
     Duration timeout = const Duration(minutes: 5),
+    Future<void>? cancel,
   }) {
     final buffered = _pending;
     if (buffered != null) {
       _pending = null;
       return Future<String?>.value(buffered);
     }
-    return _controller.stream.first.timeout(
-      timeout,
-      onTimeout: () => null,
-    );
+
+    final completer = Completer<String?>();
+    Timer? timer;
+    StreamSubscription<String?>? sub;
+
+    void finish(String? value) {
+      if (completer.isCompleted) return;
+      timer?.cancel();
+      unawaited(sub?.cancel());
+      completer.complete(value);
+    }
+
+    // 必须可取消：关闭登录框后不能留下监听，否则下一次登录的 handoff 会被
+    // 旧流程抢走（也会拖住 `nekomusic://` 的注销）。
+    sub = _controller.stream.listen(finish);
+    timer = Timer(timeout, () => finish(null));
+    cancel?.then((_) => finish(null));
+    return completer.future;
   }
 
   /// 丢弃尚未消费的 handoff（用户取消 / 重新发起登录时调用）。

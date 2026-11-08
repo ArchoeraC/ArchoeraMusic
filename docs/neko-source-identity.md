@@ -74,6 +74,12 @@ Accept-Language: zh-CN,zh;q=0.9,en;q=0.8
 
 ### 深链回调与单实例
 
+`nekomusic://` 只在 **Auth 窗口期临时注册**：`startSsoLogin` 开始时注册，
+`claim` 成功 / 失败 / 超时 / 关闭登录框（取消）后的 `finally` 立即注销，
+不在应用启动时常驻，也不长期改写系统协议关联（降低被安全软件误判的概率）。
+macOS 的 scheme 由 `Info.plist` 静态声明，无法运行时开关，只能保证不主动
+注册；Windows / Linux 均按上述生命周期注册与注销。
+
 系统打开 `nekomusic://sso/complete` 时可能启动第二个进程。第二实例只做 URI
 转发（`apl_deep_link_forward`）后静默退出：Linux 通过会话总线的 `OpenUri`、
 Windows 通过隐藏消息窗口的 `WM_COPYDATA`，均带短重试以覆盖首实例启动窗口。
