@@ -2176,41 +2176,28 @@ int32_t deepLinkTake(AplString* out) { return deepLinkTakeLinux(out); }
 int32_t deepLinkForward() {
     const std::string url = readCmdlineUrl();
     if (url.empty()) return 0;
-    // 只做**单向投递**，不等总线/首实例任何回复：首实例的 D-Bus 泵线程可能
-    // 正忙于其它同步调用，等待回复会把第二实例卡死在启动前（空白窗口、
-    // 关不掉、只能强杀）。总线连接/发送失败就短暂重试，最多 ~1s。
-    for (int attempt = 0; attempt < 5; ++attempt) {
-        DBusError err;
-        dbus_error_init(&err);
-        DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
-        if (c == nullptr) {
-            dbus_error_free(&err);
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            continue;
-        }
-        // 广播信号：不需要目标对象路径 / 名称，也不需要任何回复；只要首实例
-        // 的会话总线过滤器在线就能收到，彻底避免 UnknownObject 与阻塞。
-        DBusMessage* msg = dbus_message_new_signal(
-            kDeepLinkPath, "org.archoera.DeepLink", "Uri");
-        if (msg == nullptr) {
-            dbus_connection_unref(c);
-            return ERR_BACKEND;
-        }
-        const char* u = url.c_str();
-        dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
-        dbus_uint32_t serial = 0;
-        const bool queued = dbus_connection_send(c, msg, &serial) != 0;
-        dbus_message_unref(msg);
-        if (queued) {
-            // flush 只把消息写到 socket，不等待应用层回复。
-            dbus_connection_flush(c);
-            dbus_connection_unref(c);
-            return 1;
-        }
-        dbus_connection_unref(c);
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // 纯单向：广播信号后立即返回，不等首实例回复、不重试等待。
+    DBusError err;
+    dbus_error_init(&err);
+    DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
+    if (c == nullptr) {
+        dbus_error_free(&err);
+        return ERR_BACKEND;
     }
-    return ERR_BACKEND;
+    DBusMessage* msg = dbus_message_new_signal(
+        kDeepLinkPath, "org.archoera.DeepLink", "Uri");
+    if (msg == nullptr) {
+        dbus_connection_unref(c);
+        return ERR_BACKEND;
+    }
+    const char* u = url.c_str();
+    dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
+    dbus_uint32_t serial = 0;
+    const bool queued = dbus_connection_send(c, msg, &serial) != 0;
+    dbus_message_unref(msg);
+    if (queued) dbus_connection_flush(c);
+    dbus_connection_unref(c);
+    return queued ? 1 : ERR_BACKEND;
 }
 
 int32_t windowActivate() {
