@@ -147,6 +147,7 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionListDisplay,
+          preview: ListDisplayPreview(prefs: prefs),
           children: [
             SettingSwitchTile(
               icon: EtaIcons.medalOutline,
@@ -179,8 +180,6 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        ListDisplayPreview(prefs: prefs),
         // ── 愚人节特供：奇怪的特效（仅 4/1 出现；开启一次后消失到次年）──
         if (showWeirdEffects) ...[
           const SizedBox(height: 20),
