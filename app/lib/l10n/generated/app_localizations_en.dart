@@ -1107,10 +1107,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Show NK in search, liked and favorites (off by default)';
 
   @override
-  String get settingsUnavailable =>
-      'No client ID configured (_CLIENT_ID); the  source is unavailable.';
-
-  @override
   String get settingsLogin => 'Log in';
 
   @override
@@ -1126,6 +1122,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get LoginTitle => 'Sign in to ';
+
+  @override
+  String get LoginTabOauth => 'OAuth';
+
+  @override
+  String get OauthTitle => 'Sign in with Auth';
+
+  @override
+  String get OauthDesc =>
+      'Opens Auth in your system browser and returns to the app after authorization.';
+
+  @override
+  String get OauthOpen => 'Sign in with browser';
+
+  @override
+  String get OauthWaiting => 'Complete the sign-in in your browser…';
+
+  @override
+  String get OauthFailed => 'Sign-in failed';
 
   @override
   String get LoginTabQr => 'QR code';

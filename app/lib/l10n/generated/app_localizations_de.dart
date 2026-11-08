@@ -1117,10 +1117,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'NK in Suche, Favoriten und Bibliothek anzeigen (standardmäßig aus)';
 
   @override
-  String get settingsUnavailable =>
-      'Keine Client-ID konfiguriert (_CLIENT_ID); die -Quelle ist nicht verfügbar.';
-
-  @override
   String get settingsLogin => 'Anmelden';
 
   @override
@@ -1136,6 +1132,25 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get LoginTitle => 'Bei  anmelden';
+
+  @override
+  String get LoginTabOauth => 'OAuth';
+
+  @override
+  String get OauthTitle => 'Mit Auth anmelden';
+
+  @override
+  String get OauthDesc =>
+      'Öffnet Auth im Systembrowser und kehrt nach der Autorisierung zur App zurück.';
+
+  @override
+  String get OauthOpen => 'Im Browser anmelden';
+
+  @override
+  String get OauthWaiting => 'Bitte die Anmeldung im Browser abschließen…';
+
+  @override
+  String get OauthFailed => 'Anmeldung fehlgeschlagen';
 
   @override
   String get LoginTabQr => 'QR-Code';

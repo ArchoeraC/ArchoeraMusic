@@ -2106,12 +2106,6 @@ abstract class AppLocalizations {
   /// **'在搜索、我喜欢、收藏中显示 NK（默认关闭）'**
   String get settingsEnableDesc;
 
-  /// No description provided for @settingsUnavailable.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'未配置客户端标识（构建参数 _CLIENT_ID）， 音源不可用。'**
-  String get settingsUnavailable;
-
   /// No description provided for @settingsLogin.
   ///
   /// In zh_CN, this message translates to:
@@ -2141,6 +2135,42 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'登录 '**
   String get LoginTitle;
+
+  /// No description provided for @LoginTabOauth.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'OAuth 登录'**
+  String get LoginTabOauth;
+
+  /// No description provided for @OauthTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'使用 Auth 登录'**
+  String get OauthTitle;
+
+  /// No description provided for @OauthDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将在系统浏览器中打开 Auth，完成授权后自动返回本应用。'**
+  String get OauthDesc;
+
+  /// No description provided for @OauthOpen.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在浏览器中登录'**
+  String get OauthOpen;
+
+  /// No description provided for @OauthWaiting.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请在浏览器中完成登录…'**
+  String get OauthWaiting;
+
+  /// No description provided for @OauthFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录失败'**
+  String get OauthFailed;
 
   /// No description provided for @LoginTabQr.
   ///

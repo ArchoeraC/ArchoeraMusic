@@ -1114,10 +1114,6 @@ class AppLocalizationsFr extends AppLocalizations {
       'Afficher NK dans la recherche, les favoris et la bibliothèque (désactivé par défaut)';
 
   @override
-  String get settingsUnavailable =>
-      'Aucun identifiant client configuré (_CLIENT_ID) ; la source  est indisponible.';
-
-  @override
   String get settingsLogin => 'Se connecter';
 
   @override
@@ -1133,6 +1129,25 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get LoginTitle => 'Se connecter à ';
+
+  @override
+  String get LoginTabOauth => 'OAuth';
+
+  @override
+  String get OauthTitle => 'Se connecter avec Auth';
+
+  @override
+  String get OauthDesc =>
+      'Ouvre Auth dans le navigateur système et revient à l’application après autorisation.';
+
+  @override
+  String get OauthOpen => 'Se connecter dans le navigateur';
+
+  @override
+  String get OauthWaiting => 'Terminez la connexion dans le navigateur…';
+
+  @override
+  String get OauthFailed => 'Échec de la connexion';
 
   @override
   String get LoginTabQr => 'Code QR';

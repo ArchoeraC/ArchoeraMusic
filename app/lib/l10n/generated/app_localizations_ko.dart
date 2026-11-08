@@ -1086,10 +1086,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsEnableDesc => '검색·좋아요·보관함에 NK 표시 (기본 꺼짐)';
 
   @override
-  String get settingsUnavailable =>
-      '클라이언트 ID(_CLIENT_ID)가 설정되지 않아  음원을 사용할 수 없습니다.';
-
-  @override
   String get settingsLogin => '로그인';
 
   @override
@@ -1105,6 +1101,24 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get LoginTitle => ' 로그인';
+
+  @override
+  String get LoginTabOauth => 'OAuth 로그인';
+
+  @override
+  String get OauthTitle => 'Auth로 로그인';
+
+  @override
+  String get OauthDesc => '시스템 브라우저에서 Auth를 열고 인증 후 앱으로 돌아옵니다.';
+
+  @override
+  String get OauthOpen => '브라우저에서 로그인';
+
+  @override
+  String get OauthWaiting => '브라우저에서 로그인을 완료하세요…';
+
+  @override
+  String get OauthFailed => '로그인 실패';
 
   @override
   String get LoginTabQr => 'QR 코드';

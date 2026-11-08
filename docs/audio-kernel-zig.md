@@ -705,6 +705,10 @@ pub const Reader = struct {
 >   + `X--Client: archoera+<版本>`；被服务端按爬虫降级时，进程内回退为纯  桌面 UA
 >   形状 `-<平台>/<版本>`（不冒名 Android、不伪装浏览器）。`decoder_apply_http_headers`
 >   仍对空值写 `user_agent`，但  源不再发空 UA。详见 `docs/-source-identity.md`。
+> - **更新（2026-11-08）**： 服务端移除了 `X--Client-*` 身份头、防重放 nonce 与
+>   PoW； 源现在只发送官方锚定的 `-PC/<版本>` UA（仅表示选择，不参与鉴权）与
+>   `Authorization` 用户令牌，登录改走 Auth OAuth。`decoder_apply_http_headers` 的头透传
+>   机制不变。详见 `docs/-source-identity.md`。
 > - FFmpeg 在线 TLS：Linux/macOS 由 `build-ffmpeg-minimal.sh` 构建**自包含 mbedTLS**
 >   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-system-ca`
 >   标记重建，并应用 `patches/ffmpeg-9.0.1-mbedtls-system-ca.patch` 让其回退系统信任库）；
