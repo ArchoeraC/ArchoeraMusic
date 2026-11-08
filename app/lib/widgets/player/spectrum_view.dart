@@ -60,8 +60,6 @@ class SpectrumView extends ConsumerStatefulWidget {
     this.enabled,
     this.style,
     this.reverse,
-    this.fftOverride,
-    this.playingOverride,
   });
 
   /// 画布高度（逻辑像素）。
@@ -89,12 +87,6 @@ class SpectrumView extends ConsumerStatefulWidget {
 
   /// 反向（水平翻转）；null 时跟随设置（player.spectrumReverse）。
   final bool? reverse;
-
-  /// 可选频谱帧覆盖（设置页预览等无真实播放的场合）。
-  final FftFrame? fftOverride;
-
-  /// 可选播放态覆盖（配合 [fftOverride] 驱动预览动画）。
-  final bool? playingOverride;
 
   @override
   ConsumerState<SpectrumView> createState() => _SpectrumViewState();

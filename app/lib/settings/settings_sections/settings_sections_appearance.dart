@@ -83,7 +83,6 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionAccent,
-          preview: ThemeCoverPreview(prefs: prefs),
           children: [
             SettingTile(
               icon: EtaIcons.palette2Outline,
@@ -135,9 +134,6 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionStyle,
-          preview: appearanceStyle.usesImageBackground
-              ? BackgroundEffectPreview(prefs: prefs)
-              : null,
           children: [
             SettingTile(
               icon: EtaIcons.picOutline,
@@ -207,7 +203,6 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionLayout,
-          preview: RouteTransitionPreview(style: prefs.routeTransition),
           children: [
             SettingSwitchTile(
               icon: EtaIcons.miniplayerOutline,
@@ -299,7 +294,6 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionCover,
-          preview: ThemeCoverPreview(prefs: prefs, compact: true),
           children: [
             SettingTile(
               icon: EtaIcons.square,

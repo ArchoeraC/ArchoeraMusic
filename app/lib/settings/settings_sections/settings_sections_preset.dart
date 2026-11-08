@@ -147,7 +147,6 @@ class _PresetSectionState extends ConsumerState<PresetSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionListDisplay,
-          preview: ListDisplayPreview(prefs: prefs),
           children: [
             SettingSwitchTile(
               icon: EtaIcons.medalOutline,

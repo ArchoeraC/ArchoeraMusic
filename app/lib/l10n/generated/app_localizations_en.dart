@@ -4080,39 +4080,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Default source · Streaming servers (Subsonic / Jellyfin / Emby)';
 
   @override
-  String get settingsPreview => 'Preview';
-
-  @override
-  String get settingsPreviewReplay => 'Replay';
-
-  @override
-  String get settingsPreviewSampleTrack => 'Sample track';
-
-  @override
-  String get settingsPreviewSampleArtist => 'Sample artist';
-
-  @override
-  String get settingsPreviewLyric1 => 'Night falls softly outside the window';
-
-  @override
-  String get settingsPreviewLyric2 =>
-      'Let the melody rest where your heartbeat is';
-
-  @override
-  String get settingsPreviewLyric3 => 'Right now I only hear you';
-
-  @override
-  String get settingsPreviewLyricTranslation =>
-      'Translation: Let the melody rest where your heartbeat is';
-
-  @override
-  String get settingsPreviewLyricRomanization =>
-      'Romanized: ye se zai chuang wai man man luo xia';
-
-  @override
-  String get settingsPreviewAlbum => 'Sample album';
-
-  @override
   String get settingsDefaultSource => 'Default source';
 
   @override
