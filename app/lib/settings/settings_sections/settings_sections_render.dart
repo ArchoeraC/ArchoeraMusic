@@ -20,14 +20,6 @@ class RenderSection extends ConsumerWidget {
       children: [
         SettingSection(
           title: l10n.settingsCatRender,
-          preview: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              RippleEffectPreview(prefs: prefs),
-              const SizedBox(height: 12),
-              LyricsEdgeFadePreview(mode: prefs.lyricsEdgeFade),
-            ],
-          ),
           children: [
             SettingSwitchTile(
               icon: EtaIcons.dashboard4Outline,

@@ -233,72 +233,28 @@ class SettingNote extends StatelessWidget {
 }
 
 /// 设置分区：小标题 + 卡片（可选底部灰色说明）。
-///
-/// 传 [preview] 时标题右侧出现「预览」眼睛按钮；预览默认收起，展开后才
-/// 插入内容，避免常驻占用设置页纵向空间。
-class SettingSection extends StatefulWidget {
+class SettingSection extends StatelessWidget {
   const SettingSection({
     super.key,
     required this.title,
     required this.children,
     this.note,
-    this.preview,
   });
 
   final String title;
   final List<Widget> children;
   final String? note;
 
-  /// 可选效果预览；默认折叠，点击标题栏的眼睛按钮展开。
-  final Widget? preview;
-
-  @override
-  State<SettingSection> createState() => _SettingSectionState();
-}
-
-class _SettingSectionState extends State<SettingSection> {
-  bool _showPreview = false;
-
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final hasPreview = widget.preview != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(child: SettingSectionTitle(title: widget.title)),
-            if (hasPreview)
-              Tooltip(
-                message: context.l10n.settingsPreview,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(6),
-                  onTap: () => setState(() => _showPreview = !_showPreview),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(6, 0, 4, 8),
-                    child: Icon(
-                      _showPreview
-                          ? EtaIcons.eyeCloseOutline
-                          : EtaIcons.eyeOutline,
-                      size: 16,
-                      color: _showPreview
-                          ? scheme.primary
-                          : scheme.onSurfaceVariant.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        SettingCard(children: widget.children),
-        if (widget.note != null) ...[
+        SettingSectionTitle(title: title),
+        SettingCard(children: children),
+        if (note != null) ...[
           const SizedBox(height: 8),
-          SettingNote(text: widget.note!),
-        ],
-        if (_showPreview && hasPreview) ...[
-          const SizedBox(height: 12),
-          widget.preview!,
+          SettingNote(text: note!),
         ],
       ],
     );

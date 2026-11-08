@@ -3935,37 +3935,6 @@ class AppLocalizationsKo extends AppLocalizations {
       '기본 음원 · 스트리밍 서버 (Subsonic / Jellyfin / Emby)';
 
   @override
-  String get settingsPreview => '미리보기';
-
-  @override
-  String get settingsPreviewReplay => '다시 재생';
-
-  @override
-  String get settingsPreviewSampleTrack => '예시 곡';
-
-  @override
-  String get settingsPreviewSampleArtist => '예시 아티스트';
-
-  @override
-  String get settingsPreviewLyric1 => '창밖으로 밤이 조용히 내려와';
-
-  @override
-  String get settingsPreviewLyric2 => '심장이 뛰는 자리에 멜로디를 멈춰 줘';
-
-  @override
-  String get settingsPreviewLyric3 => '지금은 너의 목소리만 들려';
-
-  @override
-  String get settingsPreviewLyricTranslation => '번역: 심장이 뛰는 자리에 멜로디를 멈춰 줘';
-
-  @override
-  String get settingsPreviewLyricRomanization =>
-      '로마자: ye se zai chuang wai man man luo xia';
-
-  @override
-  String get settingsPreviewAlbum => '예시 앨범';
-
-  @override
   String get settingsDefaultSource => '기본 음원';
 
   @override

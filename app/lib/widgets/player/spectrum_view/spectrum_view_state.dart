@@ -48,12 +48,8 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
 
   @override
   Widget build(BuildContext context) {
-    final FftFrame? fft =
-        widget.fftOverride ??
-        ref.watch(playbackProvider.select((s) => s.fft));
-    final bool playing =
-        widget.playingOverride ??
-        ref.watch(playbackProvider.select((s) => s.playing));
+    final fft = ref.watch(playbackProvider.select((s) => s.fft));
+    final playing = ref.watch(playbackProvider.select((s) => s.playing));
     final prefs = ref.watch(appPrefsProvider);
     // 自适应画质：降档时降低频谱重绘频率（关闭会改变布局观感，故不关闭）。
     _stride = prefs.adaptiveRenderQuality

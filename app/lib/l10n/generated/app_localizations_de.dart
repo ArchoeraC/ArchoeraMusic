@@ -4125,38 +4125,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Standardquelle · Streaming-Server (Subsonic / Jellyfin / Emby)';
 
   @override
-  String get settingsPreview => 'Vorschau';
-
-  @override
-  String get settingsPreviewReplay => 'Erneut abspielen';
-
-  @override
-  String get settingsPreviewSampleTrack => 'Beispieltitel';
-
-  @override
-  String get settingsPreviewSampleArtist => 'Beispielkünstler';
-
-  @override
-  String get settingsPreviewLyric1 => 'Die Nacht fällt leise vor das Fenster';
-
-  @override
-  String get settingsPreviewLyric2 => 'Lass die Melodie im Herzschlag ruhen';
-
-  @override
-  String get settingsPreviewLyric3 => 'Jetzt höre ich nur dich';
-
-  @override
-  String get settingsPreviewLyricTranslation =>
-      'Übersetzung: Lass die Melodie im Herzschlag ruhen';
-
-  @override
-  String get settingsPreviewLyricRomanization =>
-      'Romanisiert: ye se zai chuang wai man man luo xia';
-
-  @override
-  String get settingsPreviewAlbum => 'Beispielalbum';
-
-  @override
   String get settingsDefaultSource => 'Standardquelle';
 
   @override

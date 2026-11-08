@@ -3885,37 +3885,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）';
 
   @override
-  String get settingsPreview => '效果预览';
-
-  @override
-  String get settingsPreviewReplay => '重播';
-
-  @override
-  String get settingsPreviewSampleTrack => '示例歌曲';
-
-  @override
-  String get settingsPreviewSampleArtist => '示例歌手';
-
-  @override
-  String get settingsPreviewLyric1 => '夜色在窗外慢慢落下';
-
-  @override
-  String get settingsPreviewLyric2 => '让旋律停在心跳的位置';
-
-  @override
-  String get settingsPreviewLyric3 => '这一刻只听得到你';
-
-  @override
-  String get settingsPreviewLyricTranslation => '译文：让旋律停在心跳的位置';
-
-  @override
-  String get settingsPreviewLyricRomanization =>
-      '罗马音：ye se zai chuang wai man man luo xia';
-
-  @override
-  String get settingsPreviewAlbum => '示例专辑';
-
-  @override
   String get settingsDefaultSource => '默认音源';
 
   @override
@@ -10137,37 +10106,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
       '默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）';
 
   @override
-  String get settingsPreview => '效果预览';
-
-  @override
-  String get settingsPreviewReplay => '重播';
-
-  @override
-  String get settingsPreviewSampleTrack => '示例歌曲';
-
-  @override
-  String get settingsPreviewSampleArtist => '示例歌手';
-
-  @override
-  String get settingsPreviewLyric1 => '夜色在窗外慢慢落下';
-
-  @override
-  String get settingsPreviewLyric2 => '让旋律停在心跳的位置';
-
-  @override
-  String get settingsPreviewLyric3 => '这一刻只听得到你';
-
-  @override
-  String get settingsPreviewLyricTranslation => '译文：让旋律停在心跳的位置';
-
-  @override
-  String get settingsPreviewLyricRomanization =>
-      '罗马音：ye se zai chuang wai man man luo xia';
-
-  @override
-  String get settingsPreviewAlbum => '示例专辑';
-
-  @override
   String get settingsDefaultSource => '默认音源';
 
   @override
@@ -16387,37 +16325,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   @override
   String get settingsMediaSourceSubtitle =>
       '預設音源 · 串流伺服器（Subsonic / Jellyfin / Emby）';
-
-  @override
-  String get settingsPreview => '效果預覽';
-
-  @override
-  String get settingsPreviewReplay => '重播';
-
-  @override
-  String get settingsPreviewSampleTrack => '示例歌曲';
-
-  @override
-  String get settingsPreviewSampleArtist => '示例歌手';
-
-  @override
-  String get settingsPreviewLyric1 => '夜色在窗外慢慢落下';
-
-  @override
-  String get settingsPreviewLyric2 => '讓旋律停在心跳的位置';
-
-  @override
-  String get settingsPreviewLyric3 => '這一刻只聽得到你';
-
-  @override
-  String get settingsPreviewLyricTranslation => '譯文：讓旋律停在心跳的位置';
-
-  @override
-  String get settingsPreviewLyricRomanization =>
-      '羅馬音：ye se zai chuang wai man man luo xia';
-
-  @override
-  String get settingsPreviewAlbum => '示例專輯';
 
   @override
   String get settingsDefaultSource => '預設音源';
