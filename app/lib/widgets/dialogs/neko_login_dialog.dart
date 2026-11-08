@@ -398,24 +398,30 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
             ),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _copySsoUrl(session.url),
-                  icon: const Icon(EtaIcons.docmentOutline, size: 16),
-                  label: Text(l10n.nekoOauthCopy),
-                ),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _openSsoUrl(session.url),
+              icon: const Icon(EtaIcons.link, size: 16),
+              label: Text(
+                l10n.nekoOauthOpen,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _openSsoUrl(session.url),
-                  icon: const Icon(EtaIcons.link, size: 16),
-                  label: Text(l10n.nekoOauthOpen),
-                ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _copySsoUrl(session.url),
+              icon: const Icon(EtaIcons.docmentOutline, size: 16),
+              label: Text(
+                l10n.nekoOauthCopy,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 10),
           Text(
