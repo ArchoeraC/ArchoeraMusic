@@ -30,10 +30,18 @@ const double kTranslationFontScale = 0.6;
 const double kLyricLineHeightEm = 1.2;
 
 /// 相邻两行之间的间隙（AMLL `.lyricLineWrapper` 上下各 `padding: .4em`）。
-const double kLyricLineGapEm = 0.8;
+///
+/// 2026-11-08 由 0.8 放宽到 1.0：AMLL 的 0.8em 在密集排版下偏紧，用户反馈
+/// 歌词墙行与行贴得太近；1.0em 仍保持「整行块状滚动」的观感，只是呼吸感更足。
+const double kLyricLineGapEm = 1.0;
 
-/// 主行与翻译之间的间隙（AMLL wrapper 的 `gap: .3em`）。
-const double kLyricTranslationGapEm = 0.3;
+/// 主行与译文/音译之间**没有额外间隙**。
+///
+/// AMLL 的 `gap: .3em` 属于 `.lyricLineWrapper` 的 flex 子项（整行组 ↔ 背景
+/// 行 wrapper），而主行/译文/音译是 `.lyricLine` 内部的**块级**子元素，直接
+/// 上下堆叠、不参与 flex gap。所以视觉间隔只来自各自行高的半行距：
+/// 主行 `1.2em` 的下半行距 0.1em + 子行 `1.5×0.5em` 的上半行距 0.125em。
+const double kLyricTranslationGapEm = 0;
 
 /// 翻译字号倍率（AMLL `.lyricSubLine`：`max(.5em, 10px)`）。
 const double kLyricTranslationFontScale = 0.5;
@@ -123,11 +131,10 @@ double estimateLineHeight(
   bool showTranslation = kDefaultShowTranslation,
   bool showRomanization = false,
 }) {
-  var h = fontSize * kLyricLineHeightEm;
-  if (g.isBG) return h * kBgFontScale;
-  final subFs = lyricTranslationFontSize(fontSize);
-  final subH = fontSize * kLyricTranslationGapEm +
-      subFs * kLyricTranslationLineHeightEm;
+  final mainFs = g.isBG ? fontSize * kBgFontScale : fontSize;
+  var h = mainFs * kLyricLineHeightEm;
+  final subFs = lyricTranslationFontSize(mainFs);
+  final subH = subFs * kLyricTranslationLineHeightEm;
   if (showRomanization && (g.romaji?.isNotEmpty ?? false)) h += subH;
   if (showTranslation && (g.translation?.isNotEmpty ?? false)) h += subH;
   return h;
@@ -154,29 +161,27 @@ double _measureGroup(
     fontWeight: fontWeight,
     lineHeightEm: kLyricLineHeightEm,
   );
-  final subFs = lyricTranslationFontSize(fontSize);
+  final subFs = lyricTranslationFontSize(mainFs);
   // 翻译在主行下方、音译（罗马音）在翻译之下（与 painter / AMLL 子行顺序一致）。
-  if (!g.isBG && showTranslation && (g.translation?.isNotEmpty ?? false)) {
-    h +=
-        fontSize * kLyricTranslationGapEm +
-        _textHeight(
-          g.translation!,
-          subFs,
-          fontFamily,
-          maxWidth,
-          lineHeightEm: kLyricTranslationLineHeightEm,
-        );
+  // 背景人声行也可能自带译文/音译（TTML `x-bg` 内嵌），绘制端会画出来，
+  // 测量端必须一并计入，否则下一行会压在子行上。
+  if (showTranslation && (g.translation?.isNotEmpty ?? false)) {
+    h += _textHeight(
+      g.translation!,
+      subFs,
+      fontFamily,
+      maxWidth,
+      lineHeightEm: kLyricTranslationLineHeightEm,
+    );
   }
-  if (!g.isBG && showRomanization && (g.romaji?.isNotEmpty ?? false)) {
-    h +=
-        fontSize * kLyricTranslationGapEm +
-        _textHeight(
-          g.romaji!,
-          subFs,
-          fontFamily,
-          maxWidth,
-          lineHeightEm: kLyricTranslationLineHeightEm,
-        );
+  if (showRomanization && (g.romaji?.isNotEmpty ?? false)) {
+    h += _textHeight(
+      g.romaji!,
+      subFs,
+      fontFamily,
+      maxWidth,
+      lineHeightEm: kLyricTranslationLineHeightEm,
+    );
   }
   return h;
 }
@@ -213,38 +218,25 @@ double _textHeight(
 /// 由行高列表推每行中心（自然中心）的累计纵坐标。
 ///
 /// 第一行中心在自身半高处；后续行中心 = 前一行中心 + 前一行半高 +
-/// [gapPx] + 本行半高。空列表返回空列表。
+/// 行距 + 本行半高。空列表返回空列表。
 ///
-/// [isBg] 标记背景人声行：背景人声**不占独立纵向槽位**，挂在最近一个
-/// 主行下方（间距为 [gapPx] × 0.4），因此主行滚动时背景行同步跟随
-/// （对齐 AMLL 的 bg line 与主行同组）。
+/// [isBg] 标记背景人声行：背景人声挂在上一行下方，用更紧的间距
+/// （[gapPx] × 0.4），观感上仍与主行同组（对齐 AMLL 的 bg line）。
+///
+/// ⚠ 每一行都必须以**紧邻的上一行**为基准累计，而不是「最近主行」：
+/// 背景行本身有高度，若下一主行仍从最近主行算起，就会与背景行重叠
+/// （表现为带辅词歌词的「重字 / 上一行压下一行」）。
 List<double> computeCenters(
   List<double> heights, {
   double gapPx = kDefaultGapPx,
   List<bool>? isBg,
 }) {
   if (heights.isEmpty) return const [];
-  final centers = <double>[];
-  int? lastMain;
-  for (var i = 0; i < heights.length; i++) {
+  final centers = <double>[heights.first / 2];
+  for (var i = 1; i < heights.length; i++) {
     final bg = isBg != null && i < isBg.length && isBg[i];
-    if (bg && lastMain != null) {
-      centers.add(
-        centers[lastMain] +
-            heights[lastMain] / 2 +
-            gapPx * 0.4 +
-            heights[i] / 2,
-      );
-      continue;
-    }
-    if (lastMain == null) {
-      centers.add(heights[i] / 2);
-    } else {
-      centers.add(
-        centers[lastMain] + heights[lastMain] / 2 + gapPx + heights[i] / 2,
-      );
-    }
-    lastMain = i;
+    final gap = bg ? gapPx * 0.4 : gapPx;
+    centers.add(centers[i - 1] + heights[i - 1] / 2 + gap + heights[i] / 2);
   }
   return centers;
 }
