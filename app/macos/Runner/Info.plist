@@ -38,6 +38,14 @@
 				<string>archoera</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.archoera..oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string></string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>
