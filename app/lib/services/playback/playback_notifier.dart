@@ -209,6 +209,16 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// 连续加载失败计数（成功播放时归零）。
   int _consecutiveFailures = 0;
 
+  /// 运行期源恢复进行中（忽略同一失败会话的重复 error 事件）。
+  bool _sourceRecoveryBusy = false;
+
+  /// 当前引擎会话是否已经 ready（启动期 error 走既有失败/换源路径，不做
+  /// 运行期「URL 过期」恢复，避免与 load 的失败处理并发）。
+  bool _sessionReady = false;
+
+  /// 本次曲目已尝试的运行期源恢复次数（`_playTrackMeta` 开新歌时归零）。
+  int _sourceRecoveryAttempts = 0;
+
   /// 当前会话历史是否已记录（真正开始播放时置位，避免重复记录；
   /// [load] 开新会话时复位）。
   bool _historyRecorded = false;
