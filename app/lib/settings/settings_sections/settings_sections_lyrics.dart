@@ -423,13 +423,6 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
           onChanged: (v) => notifier.setLyricAmll(wordSweep: v),
         ),
         SettingSwitchTile(
-          icon: EtaIcons.magic2Outline,
-          title: l10n.settingsAmllSyntheticSweep,
-          subtitle: l10n.settingsAmllSyntheticSweepDesc,
-          value: prefs.amllSyntheticSweep,
-          onChanged: (v) => notifier.setLyricAmll(syntheticSweep: v),
-        ),
-        SettingSwitchTile(
           icon: EtaIcons.eyeCloseOutline,
           title: l10n.settingsAmllHidePassed,
           subtitle: '',

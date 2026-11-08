@@ -53,7 +53,6 @@ final currentLyricsProvider = FutureProvider.autoDispose<List<LyricGroup>>((
         p.lyricExcludeKeywords.join('\u0000'),
         p.lyricExcludeRegexes.join('\u0000'),
         p.uncensorProfanity,
-        p.amllSyntheticSweep,
       ),
     ),
   );
@@ -80,7 +79,6 @@ final currentLyricsProvider = FutureProvider.autoDispose<List<LyricGroup>>((
       excludeKeywords: cfg.$5.isEmpty ? const [] : cfg.$5.split('\u0000'),
       excludeRegexes: cfg.$6.isEmpty ? const [] : cfg.$6.split('\u0000'),
       uncensor: cfg.$7,
-      syntheticSweep: cfg.$8,
     ),
   );
 });

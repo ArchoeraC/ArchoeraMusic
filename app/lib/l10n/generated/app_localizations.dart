@@ -8457,18 +8457,6 @@ abstract class AppLocalizations {
   /// **'逐字扫亮'**
   String get settingsAmllWordSweep;
 
-  /// No description provided for @settingsAmllSyntheticSweep.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'单行歌词合成扫亮'**
-  String get settingsAmllSyntheticSweep;
-
-  /// No description provided for @settingsAmllSyntheticSweepDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'没有逐字时间的歌词按行时长推算扫亮（翻译 / 音译同样生效）'**
-  String get settingsAmllSyntheticSweepDesc;
-
   /// No description provided for @settingsAmllHidePassed.
   ///
   /// In zh_CN, this message translates to:
