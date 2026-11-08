@@ -1092,18 +1092,24 @@ int32_t deepLinkTakeWin(AplString* out) {
 int32_t deepLinkForwardWin() {
     const std::string url = extractUrlFromCommandLine(::GetCommandLineW());
     if (url.empty()) return 0;
-    HWND target = ::FindWindowW(kDeepLinkClass, nullptr);
-    if (target == nullptr) return ERR_BACKEND;
-    COPYDATASTRUCT cds{};
-    cds.dwData = 0x41524D31;  // 'ARM1'
-    cds.cbData = static_cast<DWORD>(url.size());
-    cds.lpData = const_cast<char*>(url.data());
-    DWORD_PTR result = 0;
-    const LRESULT sent = ::SendMessageTimeoutW(
-        target, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&cds),
-        SMTO_ABORTIFHUNG | SMTO_NORMAL, 3000, &result);
-    if (sent == 0) return ERR_BACKEND;
-    return 1;
+    // 首实例可能仍在启动（隐藏消息窗口尚未创建），短暂重试，避免把 OAuth
+    // 回调当成「重复启动」丢弃。
+    for (int attempt = 0; attempt < 10; ++attempt) {
+        HWND target = ::FindWindowW(kDeepLinkClass, nullptr);
+        if (target != nullptr) {
+            COPYDATASTRUCT cds{};
+            cds.dwData = 0x41524D31;  // 'ARM1'
+            cds.cbData = static_cast<DWORD>(url.size());
+            cds.lpData = const_cast<char*>(url.data());
+            DWORD_PTR result = 0;
+            const LRESULT sent = ::SendMessageTimeoutW(
+                target, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&cds),
+                SMTO_ABORTIFHUNG | SMTO_NORMAL, 3000, &result);
+            if (sent != 0) return 1;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+    return ERR_BACKEND;
 }
 
 // ── 系统托盘（Shell_NotifyIconW + 隐藏消息窗口线程）───────────────
