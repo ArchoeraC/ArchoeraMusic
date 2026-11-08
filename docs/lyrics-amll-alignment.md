@@ -37,7 +37,7 @@ Flutter 的 `ui.Paragraph` 做不到逐 run 变换、也不能给文字直接加
 | `isBG` 背景人声（整行括号判定） | `LyricGroup.isBG`（解析期剥离括号） | `services/lyrics/lyric_line.dart` |
 | `cubic-bezier` 手搓缓动 | `cubicBezier` / `empathEasing` | `curves.dart` |
 | `getPosYSpringPolicy` 按行间隔自适应弹簧 | `resolvePosYSpringPolicy` | `spring_policy.dart` |
-| `.lyricLineWrapper` 排版度量（`line-height:1.2` + `padding:.4em` + `gap:.3em`） | `kLyricLineHeightEm=1.2` / `kLyricLineGapEm=0.8` / `kLyricTranslationGapEm=0.3` | `lyrics_layout.dart` |
+| `.lyricLineWrapper` 排版度量（`line-height:1.2` + `padding:.4em`；主行/子行为块级堆叠、无 flex gap） | `kLyricLineHeightEm=1.2` / `kLyricLineGapEm=1.0` / `kLyricTranslationGapEm=0` | `lyrics_layout.dart` |
 | `LayoutReason` 策略（只有 PlaybackTick 带级联；`snapPosY` 仅连续拖拽） | `_maybeRetarget(stagger:/snapNow:)` + 触摸拖拽跟手 | `lyrics_physics_wall_state.dart` |
 | RebuildView 时 `resetPosition`（整墙从下方飞入，不瞬移） | `_flyIn`：新歌/首帧把各行放到视口下方再由弹簧归位 | `lyrics_physics_wall_state.dart` |
 | 音译（罗马音）小字 + `showRomanization`（main 已实现） | 与本轮的逐字/间距/弹簧改动合并保留（音译在译文**之上**） | `lyric_line.dart` / `lyrics_layout.dart` / painter |
@@ -116,8 +116,10 @@ Flutter 的 `ui.Paragraph` 做不到逐 run 变换、也不能给文字直接加
 ### 3.6 背景人声
 
 整行被 `()`/`（）` 包裹即 `isBG`（对齐 AMLL `isBackgroundVocalText`），解析期
-剥掉最外层括号（逐字行同步剥首尾片段）；该行不挂翻译/音译、字号 ×0.7、
-透明度 ×0.4、**不占独立纵向槽位**（挂在最近主行下方，主行滚动时同步跟随）。
+剥掉最外层括号（逐字行同步剥首尾片段）；该行不继承主行的翻译/音译（TTML
+`x-bg` 自带的译文仍保留并计入行高）、字号 ×0.7、透明度 ×0.4，以 `0.4 × 行距`
+挂在上一行下方；下一行从其下方继续排（占位，避免与下一行重叠），主行滚动时
+同步跟随。
 
 > ⚠ 重建 `LyricGroup` 的地方必须一并保留 `isBG`。目前有两处：
 > `parseLyricGroups` 内部（行结束时间后置计算）与
@@ -127,14 +129,15 @@ Flutter 的 `ui.Paragraph` 做不到逐 run 变换、也不能给文字直接加
 ### 3.7 排版度量（间距）
 
 AMLL 的行距不是「行高 + gap」，而是由 `.lyricLineWrapper` 的
-`padding: .4em`（上下各一颗）+ `line-height: 1.2` + 子行 `gap: .3em` 共同决定。
+`padding: .4em`（上下各一颗）+ `line-height: 1.2` 共同决定；主行、译文、音译
+是 `.lyricLine` 内部的三个**块级** div，彼此直接堆叠，不参与 `gap`。
 我们据此把度量统一为：
 
 | 量 | 值 | AMLL 对应 |
 |---|---|---|
 | 主行行高 | `1.2 × 字号` | `.lyricLine` 继承 `line-height: 1.2` |
-| 相邻行间距 | `0.8 × 字号` | wrapper 上下 `padding: .4em` |
-| 主行↔子行间距 | `0.3 × 字号` | wrapper `gap: .3em` |
+| 相邻行间距 | `1.0 × 字号` | wrapper 上下 `padding: .4em`（我们放宽到 1.0，见下） |
+| 主行↔子行间距 | `0`（视觉间隔仅来自各自半行距） | `.lyricLine` 内块级子元素直接堆叠 |
 | 子行字号 | `max(0.5 × 字号, 10px)` | `.lyricSubLine` `max(.5em, 10px)` |
 | 子行行高 | `1.5 × 子字号` | `.lyricSubLine` `line-height: 1.5em` |
 
@@ -146,6 +149,28 @@ AMLL 的行距不是「行高 + gap」，而是由 `.lyricLineWrapper` 的
 > 且译文与主行几乎贴在一起；本轮统一到上表。注意 `kMainTranslationGapEm` /
 > `kTranslationFontScale` 两个旧常量仍被**简单引擎 `LyricsView`** 使用，
 > 不要混用。
+
+> **2026-11-08 行距放宽**：`kLyricLineGapEm` 由 0.8 提到 1.0（+25%）。AMLL 的
+> 0.8em 是「上下各 .4em 内边距」的等价物，密集排版下观感偏挤；1.0em 仍保持
+> 整行块状滚动的节奏，只是行间呼吸感更足。
+>
+> **背景人声行「重字」修复**：`computeCenters` 原先把非主行（`isBG`）直接挂在
+> 「最近主行」下方，而**下一主行仍从最近主行累计**，导致和声行与下一行在
+> 纵向上重叠（带辅词的歌词，如《茫》，表现为上一行压住下一行）。现在一律以
+> **紧邻的上一行**为基准累计：背景行用 `0.4 × 行距` 贴住上一行，下一行再按
+> 完整行距排在背景行之后，因此背景行也会正常占位、不再被覆盖。
+>
+> **行块垂直锚定**：`heights[i]` 是「主行 + 译文/音译」的整块高度，但旧 painter
+> 只把**主行**居中到 `cy`，译文/音译整体向下探出预留槽位；当下一行是只留
+> `0.4 × 行距` 的辅词行时就会被压住（这才是「辅词和上一行重叠」的直接原因）。
+> 现在主行从 `cy - heights[i]/2` 起排、子行顺次向下，离屏层范围也取
+> `cy ± heights[i]/2`，与 `computeCenters` / AMLL 的整 wrapper 定位一致。
+>
+> **子行间距归零（2026-11-08）**：旧实现误把 AMLL `.lyricLineWrapper` 上的
+> `gap: .3em` 当作「主行↔译文/音译」的间距，导致每个子行多档 0.3em（译文、
+> 音译还叠加）。实际该 `gap` 作用于 wrapper 的 flex 子项（整行组 ↔ 背景行
+> wrapper）；主行/译文/音译是 `.lyricLine` 内的块级兄弟，直接堆叠。因此
+> `kLyricTranslationGapEm` 归零，主↔子视觉间隔只剩半行距（约 0.225em）。
 
 ### 3.8 换行弹簧（「高速换行不如 AMLL」的根因）
 
@@ -183,6 +208,19 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
   行起点——与前行无重叠提前 600ms（不早于上一组结束），对唱重叠提前 400ms
   （不早于前一行时长的 30%），背景行随主行。视野在开唱前先滚到位，高速换行时
   弹簧因此有提前量。**只影响滚动锚点**，高亮/逐字仍按原始行时间。
+  注意间隔/重叠判定用**真实唱段结束**（逐字行取末字结束；AMLL 的 `endTime`
+  即此语义），不能用我们的 `endMs`——管线把它统一置为「下一行起点」（覆盖
+  窗口），曾导致预滚在生产数据下被整体钳没、滚动只能等行开始硬滚
+  （2026-11-08 修复）。
+- **逐字行提前换行（`kWordSwitchLeadMs = 500`，2026-11-08）**：换行瞬间的一次性
+  成本集中——新激活行构建逐字渲染数据（整行排版 + 每字小段落）、旧行淡出/新行
+  淡入、弹簧重定目标；若与逐字扫亮同帧开始（「一边换行一边逐字」）首帧即掉帧。
+  因此下一行有真实字级时间轴且开启扫亮时，高亮提前切换（`_highlightIdxAt`）。
+  切换点取**理想提前量 500ms 与上一行扫亮结束的较晚者**：间隙吃不满 500ms
+  时退化为「上一行扫亮一完成就换行」（不打断正在进行的逐字，但仍把换行成本
+  挪出扫亮起步帧）；仅当扫亮越过下一行起点（对唱）才不提前。普通逐行歌词没有
+  这些成本，不提前；间奏末尾遇到逐字行时同样提前结束间奏。提前切换后、行正式
+  开始前扫亮未起步，`_sweepActiveFor` 加了行开始守卫，不会空跑 60fps 重绘。
 
 ### 3.10 性能：只做视口内的工作（2026-09-20）
 「屏幕只显示得下这么多行」是这一节所有优化的前提——不动的行不该参与每帧
@@ -209,12 +247,19 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
 > `test/lyrics_v7_spring_test.dart`（park 后 setTarget 不继承速度）与
 > `test/lyrics_amll_engine_test.dart`（倒带后继续播放不叠行）。
 
-### 3.11 交互：悬停取消失焦、拖动进度条高亮跟随
+### 3.11 交互：悬停/手动浏览取消失焦、拖动进度条高亮跟随
 
 - **悬停取消失焦**：`MouseRegion` 进入歌词区时把窗口内各行的失焦目标设为 0，
   整层档与逐行档都按 `kBlurTau`（~0.22s）**平滑过渡**到 0，移出后同样平滑恢复
   （原实现为瞬切，观感生硬）。对齐 AMLL `:hover … filter: unset` 的意图——方便
   用户悬停阅读/滚动，但不做生硬的即时跳变。
+- **手动浏览态（`isUserScrolling`）**：拖拽/滚轮后的 5s 窗口内，除冻结自动
+  滚动外还要保持「可读」——所有行失焦目标归 0，行透明度不再按离播放位置的距离
+  压暗（背景行仍 ×0.4）。对齐 AMLL `computeLineBlur` 在 `isUserScrolling` 时直接
+  返回 0、`computeGroupPresentation` 仍给 1.0 的行为。
+- **高亮与布局解耦**：手动浏览期间只冻结**滚动锚点**，`active`（高亮行）与间奏
+  三点仍按播放位置推进，不会卡在开始浏览时的那一行；5s 回弹时按**当前**播放
+  位置重新取锚点，避免「先弹回旧行再跳新行」。
 - **拖动进度条时高亮跟随**：`PlayerLyricsBlock(dragMs:)` 在拖动期间用**拖动位置**
   驱动歌词（高亮与滚动跟手指），并冻结内部时钟（拖动位置是用户目标，不是播放
   推进，不能外推）。播放条那行当前歌词（`_ProgressLyric`）同样跟随。
@@ -228,7 +273,7 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
 | 项 | 差异 | 原因 |
 |---|---|---|
 | 颜色模型 | 保留 `playedColor`/`unplayedColor` 双色（上游单一 `--amll-lp-color` + 蒙版 α） | 既有用户设置与主题色联动；扫亮段用 played 色的 0.4/1.0，语义等价 |
-| 非激活行透明度 | 距离渐淡 + 下限 `inactiveAlpha`（上游：动态词 1.0、非动态 0.2） | 双色模型下需要更明显的层次；仍可由设置调节 |
+| 非激活行透明度 | 距离渐淡 + 下限 `inactiveAlpha`（上游：动态词 1.0、非动态 0.2）；**手动浏览期间恢复 1.0** | 双色模型下需要更明显的层次；仍可由设置调节 |
 | 逐字变换粒度 | 以 `LyricFragment` 为单位（CJK 多为单字）；上游对强调词再拆 grapheme | 片段已经是字/词级，收益有限、复杂度显著 |
 | 强调的作用范围 | 激活行内满足门槛的字符 | 与上游 `enable()` 只作用于高亮行一致 |
 | 背景人声位置 | 恒在主行**下方**（上游按时间可上可下、带 80px 滑入） | 简化；滑入动画后续可加 |
@@ -375,50 +420,19 @@ headless 基准：无失焦 **6.3ms**、逐行失焦 **28.5ms**、整层 1/4 重
 
 ---
 
-## 8. 合成扫亮：传统单行歌词也「滚动」（2026-09-30 第二增强）
+## 8. 普通逐行歌词不做逐字（2026-09-30 引入，2026-11-08 移除）
 
-> 动机：传统单行 LRC 只有行时间，AMLL 引擎对无逐字片段的行走「整行模式」
-> （不扫亮）；长行看起来是「啪」地整行点亮。按行窗口推算逐字时间即可获得
-> 连续扫亮，且翻译 / 音译小字同样适用。
+> 历史：曾用 `SyntheticSweepProcessor` 按行窗口把单行 LRC 切成「假逐字」，
+> 让主行、翻译、音译都按估算时间连续扫亮。但推算出的时间轴并非源数据，
+> 长行 / 快歌会出现与演唱不同步的假动画，翻译 / 音译逐字也反而干扰阅读。
 
-### 8.1 推算规则（`synthesizeSweepFragments`）
+现状：
 
-- 切分原子：CJK（汉字/假名/谚文）逐字、拉丁/其它按空白分词；空白附于前一个
-  原子，保证**拼接结果与原文逐字一致**（满足逐字渲染的 join 校验）。对齐
-  SPlayer-Next `split-words.ts`。
-- 权重 = 原子的非空白字符数；按权重把时长分摊到各原子。
-- 时长估算：`总权重 × kSyntheticSweepPerUnitMs(240)`，钳制到
-  `[600, 10000]ms`；实际扫亮 = `min(行窗口, 估算)`——**长间奏不会拖得极慢**
-  （估算时长内扫完、余下保持全亮），快歌也不会晚于窗口。
-- 片段带 `synthetic: true` 标记，`resolveWordAnim` 据此**跳过长音强调**
-  （估算是位置信息，不是源数据的「长音」语义）。
+- 逐字扫亮只在**真实字级时间轴**存在时启用（YRC/QRC/KRC、ESLRC、增强 LRC、
+  TTML 等），判据为 `LyricGroup.fragments`（子行同理，看
+  `translationFragments` / `romajiFragments`）非空。
+- 普通单行 LRC（含其翻译 / 音译）整行切换点亮：主行走整行段落路径，子行同样
+  整段点亮，不再逐字扫亮，也不触发长音强调。
+- 相关代码已删除：`SyntheticSweepProcessor`、`synthesizeSweepFragments`、
+  `LyricFragment.synthetic`、偏好键 `amll.syntheticSweep` 与设置开关。
 
-### 8.2 管线与开关
-
-- `SyntheticSweepProcessor` 追加在 `LyricPipeline.standard` 末尾（广告 → 排除
-  → 脏话还原 → 合成扫亮），对**所有来源**统一生效（平台 / TTML / 本地）。
-- 已有真实逐字片段的行原样透传（`identical` 短路），仅补齐翻译 / 音译。
-- `LyricProcessContext.syntheticSweep`（默认开）← 偏好 `amll.syntheticSweep`
-  （设置 → 歌词 → 歌词墙，默认开）。
-
-### 8.3 翻译 / 音译扫亮（超出 AMLL）
-
-AMLL 的 `.lp-sub`（翻译 / 音译）恒为静态整行（仅透明度）；我们把同一套合成
-片段用于附属小字：
-
-- `LyricGroup.translationFragments` / `romajiFragments`（可空）；
-  `UncensorLyricProcessor` 等重建点一并透传。
-- 画笔 `_subFragRender` 复用 `buildLyricsFragmentRender`，分别用翻译（lit
-  0.8）/ 音译（lit 0.65）配色与 `kLyricTranslationLineHeightEm`（1.5，保证
-  与段落路径同高不跳行）；翻译 / 音译各用一个独立的 `LyricsFragmentCache`
-  （同索引不互相覆盖），随可见窗口 prune、切歌/字号变化 clear。
-- 重绘门控 `_sweepActiveFor` 纳入翻译 / 音译片段：只有翻译扫亮时也保持
-  60fps 推进。
-
-### 8.4 测试
-
-- `lyrics_synthetic_sweep_test.dart`：切分 / 权重 / 钳制 / join 一致、
-  处理器补齐与透传、`synthetic` 抑制强调；
-- `lyrics_amll_engine_test.dart`：翻译合成扫亮走逐字路径 + 像素级「已唱翻译
-  亮于未唱」；
-- `lyrics_prefs_test.dart`：`amll.syntheticSweep` 默认 / 写入读回。
