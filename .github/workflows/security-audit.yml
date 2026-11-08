@@ -100,17 +100,37 @@ jobs:
       - name: 安装 actionlint（pin 版本 + sha256 校验）
         shell: bash
         env:
-          # 升级时同步改版本号（下载按官方 *_checksums.txt 校验，防截断/篡改）。
+          # 升级时同步改版本号与 ACTIONLINT_SHA256（官方 checksums 里的值）。
           ACTIONLINT_VERSION: v1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
           set -euo pipefail
           V="${ACTIONLINT_VERSION#v}"
           base="https://github.com/rhysd/actionlint/releases/download/${ACTIONLINT_VERSION}"
-          # 用官方资产名保存：checksums 里就是这个名字，sha256sum -c 按名查找。
           asset="actionlint_${V}_linux_amd64.tar.gz"
-          curl -sSfL -o "/tmp/${asset}" "${base}/${asset}"
-          curl -sSfL -o /tmp/actionlint_checksums.txt "${base}/actionlint_${V}_checksums.txt"
-          (cd /tmp && grep " ${asset}$" actionlint_checksums.txt | sha256sum -c -)
+          ok=0
+          for prefix in \
+            "" \
+            "https://ghproxy.net/" \
+            "https://gh-proxy.com/" \
+            "https://ghfast.top/" \
+            "https://gh.moeyy.xyz/" \
+            "https://ghproxy.cc/" \
+            "https://gh.llkk.cc/"; do
+            url="${prefix}${base}/${asset}"
+            echo "尝试: ${url}"
+            if curl -sSfL --max-time 180 -o "/tmp/${asset}" "${url}"; then
+              if echo "${ACTIONLINT_SHA256}  /tmp/${asset}" | sha256sum -c -; then
+                ok=1
+                break
+              fi
+              echo "SHA256 不匹配: ${url}" >&2
+            fi
+          done
+          if [ "${ok}" != 1 ]; then
+            echo "::error::actionlint 下载失败（GitHub 与镜像均不可用或校验失败）"
+            exit 1
+          fi
           tar -C /tmp -xzf "/tmp/${asset}" actionlint
           /tmp/actionlint -version
       - name: Lint 全部 workflow（YAML / 表达式 / uses 输入 / needs 图 / 注入）
