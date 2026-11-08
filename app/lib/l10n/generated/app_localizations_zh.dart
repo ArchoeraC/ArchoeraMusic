@@ -3891,7 +3891,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsDefaultSourceDesc => '打开「我喜欢」「收藏」「搜索」时默认选中的音源';
 
   @override
-  String get settingsDefaultSourceAuto => '自动（按登录状态）';
+  String get settingsDefaultSourceAuto => '默认';
 
   @override
   String get settingsCatScrape => '刮削';
@@ -10112,7 +10112,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsDefaultSourceDesc => '打开「我喜欢」「收藏」「搜索」时默认选中的音源';
 
   @override
-  String get settingsDefaultSourceAuto => '自动（按登录状态）';
+  String get settingsDefaultSourceAuto => '默认';
 
   @override
   String get settingsCatScrape => '刮削';
@@ -16333,7 +16333,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsDefaultSourceDesc => '開啟「我喜歡」「收藏」「搜尋」時預設選中的音源';
 
   @override
-  String get settingsDefaultSourceAuto => '自動（依登入狀態）';
+  String get settingsDefaultSourceAuto => '預設';
 
   @override
   String get settingsCatScrape => '刮削';
