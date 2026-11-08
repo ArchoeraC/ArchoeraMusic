@@ -189,7 +189,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   double _panelBlurTarget() {
     final m = _blurModeResolved;
     final wants = m == LyricsBlurMode.panel || m == LyricsBlurMode.lite;
-    return wants && !_hovering ? 1.0 : 0.0;
+    return wants && !_hovering && !_dragging ? 1.0 : 0.0;
   }
 
   /// 帧耗时采样：判定「这台机器是否吃得住失焦」（见 [LyricsBlurBudget]）。
@@ -288,6 +288,51 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       }
     }
     return res >= 0 ? res : bgRes;
+  }
+
+  /// 高亮行索引：在 [_activeIdxAt] 的严格覆盖之上，为**逐字行**提前换行。
+  ///
+  /// 换行瞬间的一次性成本（新激活行构建逐字渲染数据、旧行淡出/新行淡入、
+  /// 弹簧重定目标）若与逐字扫亮同帧开始会掉帧；提前切换让成本落在行开始
+  /// 前的静止空隙里。仅逐字模式生效（开启扫亮且下一行有真实字级时间轴）；
+  /// 普通逐行歌词没有这些成本，不提前。
+  ///
+  /// 切换点取「理想提前量 [kWordSwitchLeadMs]」与「上一行扫亮结束」的较晚者：
+  /// 间隙吃不满 500ms 时，上一行扫亮一完成就换行（不打断正在进行的逐字，
+  /// 但仍把换行成本挪出扫亮起步帧）；扫亮越过下一行起点（对唱）则不提前。
+  int _highlightIdxAt(int pos) {
+    final active = _activeIdxAt(pos);
+    if (!_c.wordSweep) return active;
+    final g = _c.groups;
+    if (g.isEmpty) return active;
+    // 即将到来的下一行：第一个开始时间晚于当前位置的非背景行。
+    var next = active + 1;
+    while (next < g.length &&
+        (g[next].isBG || g[next].original.timeMs <= pos)) {
+      next++;
+    }
+    if (next >= g.length) return active;
+    final gNext = g[next];
+    if (!_Painter._hasRealWordTiming(gNext.fragments)) return active;
+    var switchAt = gNext.original.timeMs - kWordSwitchLeadMs;
+    if (active >= 0) {
+      final sweepEnd = _sweepEndMs(g[active]);
+      if (sweepEnd != null && sweepEnd > switchAt) switchAt = sweepEnd;
+    }
+    if (pos < switchAt) return active;
+    return next;
+  }
+
+  /// 该行逐字扫亮的结束时刻（绝对毫秒）；无字级时间轴返回 null（无需等待）。
+  int? _sweepEndMs(LyricGroup g) {
+    final frags = g.fragments;
+    if (frags == null || frags.isEmpty) return null;
+    var end = 0;
+    for (final f in frags) {
+      final e = f.startMs + (f.durationMs ?? 0);
+      if (e > end) end = e;
+    }
+    return g.original.timeMs + end;
   }
 
   /// 播放位置是否落在某段间奏内；返回间奏下标，否则 -1。
@@ -500,7 +545,11 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     var hasPrev = false;
     for (var i = 0; i < g.length; i++) {
       final s = g[i].original.timeMs;
-      final e = g[i].endMs ?? s;
+      // 真实唱段结束：逐字行取末字结束；普通行退化为覆盖窗口。
+      // 不能用 endMs——管线把它置为「下一行起点」（见 lyric_line.dart 的行结束
+      // 后置计算），用它判间隔会让 hadGap 恒真、boundary 恒为行起点，预滚被
+      // 整体钳没（生产数据下滚动预滚从未生效，只剩换行瞬间硬滚）。
+      final e = _sweepEndMs(g[i]) ?? (g[i].endMs ?? s);
       if (g[i].isBG) {
         starts[i] = i > 0 ? starts[i - 1] : s;
         continue;
@@ -607,7 +656,9 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 压到 1 个离屏层；用户还可在设置里把 `amll.blurQuality` 设为流畅/画质/关闭，
   /// 弱机另有「连续掉帧自动关闭」兜底（见 [LyricsBlurQuality] / [LyricsBlurBudget]）。
   double _blurTargetFor(int i) {
-    if (_hovering) return 0;
+    // 悬停或用户手动浏览时一律清晰——对齐 AMLL：`computeLineBlur` 在
+    // `isUserScrolling` 时直接返回 0，滚动读词时不应有朦胧感。
+    if (_hovering || _dragging) return 0;
     if (_blurModeResolved == LyricsBlurMode.off) return 0;
     final anchor = _anchorIdx;
     if (anchor < 0) return 0;
@@ -642,14 +693,20 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     bool stagger = false,
     bool snapNow = false,
   }) {
-    if (_dragging) return;
-    final seekSnap = _seekSnap;
-    _seekSnap = false;
     final pos = _clock.valueMs;
-    final interludeIdx = _interludeIndexAt(pos);
+    var interludeIdx = _interludeIndexAt(pos);
     // 间奏期间不点亮任何行（对齐 AMLL：间奏会清空高亮集合），改为三点动画。
-    final active = interludeIdx >= 0 ? -1 : _activeIdxAt(pos);
-    _c.active = active; // 高亮：严格覆盖播放位置（预滚只影响滚动锚点，不影响高亮）
+    var active = interludeIdx >= 0 ? -1 : _highlightIdxAt(pos);
+    // 逐字提前换行同样作用于间奏末尾：间奏的下一行是逐字行且已到提前换行
+    // 点时，间奏提前结束——换行的一次性成本在行开始前完成，不与扫亮同帧。
+    if (interludeIdx >= 0) {
+      final early = _highlightIdxAt(pos);
+      if (early >= 0) {
+        interludeIdx = -1;
+        active = early;
+      }
+    }
+    _c.active = active; // 高亮：严格覆盖播放位置 + 逐字提前换行（预滚只影响滚动锚点）
     _c.dots = interludeIdx < 0
         ? InterludeDotsState.hidden
         : resolveInterludeDots(
@@ -658,6 +715,15 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
             nowMs: pos,
           );
     _c.dotsNaturalY = interludeIdx < 0 ? 0 : _interludeDotY[interludeIdx];
+    _c.userScrolling = _dragging;
+    if (_dragging) {
+      // 用户浏览期间只冻结**自动滚动**（布局锚点），高亮/间奏点仍按播放位置
+      // 推进——对齐 AMLL：`isUserScrolling` 不改变 `isActive`。
+      _repaint.notify();
+      return;
+    }
+    final seekSnap = _seekSnap;
+    _seekSnap = false;
     if (_c.centers.isEmpty) {
       _repaint.notify();
       return;
@@ -755,6 +821,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     if (_c.centers.isEmpty || _y.isEmpty) return;
     // 用户浏览期间目标逐帧变化：暂停烘焙重建（回弹/静止后恢复）。
     _c.staticIdle = false;
+    _c.userScrolling = _dragging;
     final anchor = (_anchorIdx >= 0 && _anchorIdx < _c.centers.length)
         ? _anchorIdx
         : 0;
@@ -783,6 +850,9 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 手动浏览：重置 5s 无操作后回弹到当前行（对齐上游）。
   void _beginUserScroll() {
     _dragging = true;
+    // 立即切换到「浏览态」外观（全行清晰、不按距离压暗），不等下一帧 tick。
+    _c.userScrolling = true;
+    _c.blurStrengthSettled = false;
     _userReset?.cancel();
   }
 
@@ -792,7 +862,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       if (!mounted) return;
       _user = 0;
       _dragging = false;
-      _pushUserTargets();
+      _c.userScrolling = false;
+      // 不能在此时用 `_pushUserTargets`：它的锚点还是浏览开始前的 `_anchorIdx`，
+      // 回弹会先落到旧行再跳新行。直接按当前播放位置重新取锚点。
+      _maybeRetarget(force: true);
     });
   }
 
@@ -862,11 +935,16 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     if (moving || sweeping || _c.dots.visible) _repaint.notify();
   }
 
-  /// 该行是否有会随播放推进的扫亮（主行逐字，或显示中的翻译 / 音译合成扫亮）。
+  /// 该行是否有会随播放推进的扫亮（主行逐字，或显示中的翻译 / 音译扫亮）。
+  /// 只有**真实字级时间轴**才扫亮；普通逐行歌词整行切换，不逐帧变。
+  /// 逐字提前换行后、行正式开始前扫亮尚未起步，不据此拉起 60fps 重绘。
   bool _sweepActiveFor(LyricGroup g) =>
-      (g.fragments?.isNotEmpty ?? false) ||
-      (_c.showTranslation && (g.translationFragments?.isNotEmpty ?? false)) ||
-      (_c.showRomanization && (g.romajiFragments?.isNotEmpty ?? false));
+      _clock.valueMs >= g.original.timeMs &&
+      (_Painter._hasRealWordTiming(g.fragments) ||
+          (_c.showTranslation &&
+              _Painter._hasRealWordTiming(g.translationFragments)) ||
+          (_c.showRomanization &&
+              _Painter._hasRealWordTiming(g.romajiFragments)));
 
   /// 平滑「点亮 / 熄灭 / 缩放 / 失焦」过渡态（只处理视口窗口内的行）。
   ///
@@ -1042,6 +1120,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 当前高亮行索引（无覆盖为 -1）。
   @visibleForTesting
   int debugActive() => _c.active;
+
+  /// 是否处于「用户手动浏览」态（对齐 AMLL `isUserScrolling`）。
+  @visibleForTesting
+  bool debugUserScrolling() => _c.userScrolling;
 
   /// 插值后的渲染位置（毫秒）。
   @visibleForTesting

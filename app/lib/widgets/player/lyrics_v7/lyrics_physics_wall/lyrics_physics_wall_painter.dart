@@ -8,6 +8,13 @@ class _Painter extends CustomPainter {
   _Painter(this.c, Listenable repaint) : super(repaint: repaint);
   final _PaintCtx c;
 
+  /// 该行是否拥有**真实字级时间轴**（YRC/QRC/KRC/ESLyric/TTML 等）。
+  ///
+  /// 普通逐行 LRC（含翻译/音译）不产生字级片段，因此不做逐字：
+  /// 主行与子行都整行切换点亮，避免「一个字一个字亮」的假动画。
+  static bool _hasRealWordTiming(List<LyricFragment>? frags) =>
+      frags != null && frags.isNotEmpty;
+
   /// 文本可用宽度左右各留的边距（px）。
   static const double _widthPad = 24;
 
@@ -226,12 +233,18 @@ class _Painter extends CustomPainter {
   /// 下限为 [_PaintCtx.inactiveAlpha]。背景人声行再乘 0.4
   /// （对齐 AMLL `.lyricBgLine` opacity .4）。
   double _alphaFor(int i) {
+    final isBg = i < c.groups.length && c.groups[i].isBG;
     final focus = c.active >= 0 ? c.active : c.anchor;
-    final d = focus < 0 ? 99.0 : (i - focus).abs().toDouble();
-    var a = math
-        .max(c.inactiveAlpha, 1 - (math.max(0.0, d - 1) * 0.35))
-        .clamp(0.0, 1.0);
-    if (i < c.groups.length && c.groups[i].isBG) a *= 0.4;
+    // 用户手动浏览时不按「离播放位置的距离」压暗：对齐 AMLL 的
+    // `isUserScrolling`——此时所有非背景行都保持 1.0，读到哪行都清晰。
+    var a = 1.0;
+    if (!c.userScrolling) {
+      final d = focus < 0 ? 99.0 : (i - focus).abs().toDouble();
+      a = math
+          .max(c.inactiveAlpha, 1 - (math.max(0.0, d - 1) * 0.35))
+          .clamp(0.0, 1.0);
+    }
+    if (isBg) a *= 0.4;
     return a;
   }
 

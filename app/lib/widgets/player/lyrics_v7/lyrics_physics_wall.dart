@@ -205,6 +205,18 @@ const int kScrollPrerollNoOverlapMs = 600;
 const int kScrollPrerollOverlapMs = 400;
 const double kScrollPrerollOverlapBoundary = 0.3;
 
+/// 逐字行的「提前换行」理想提前量（毫秒）。
+///
+/// 换行瞬间的一次性成本集中：新激活行构建逐字渲染数据（整行排版 + 每字
+/// 小段落）、旧行淡出/新行淡入、弹簧重定目标。若与逐字扫亮同帧开始
+/// （「一边换行一边逐字」），首帧即掉帧、后续帧持续高压。提前切换让这些
+/// 成本落在行开始前的静止空隙里，扫亮起步时只剩扫亮本身。
+///
+/// 仅逐字模式生效（开启扫亮且下一行有真实字级时间轴）；普通逐行歌词没有
+/// 这些成本，不提前。这是**理想值**：间隙不足时退化为「上一行扫亮完成即
+/// 换行」；仅当扫亮越过下一行起点（对唱）才不提前。
+const int kWordSwitchLeadMs = 500;
+
 /// 激活行「点亮」过渡时间常数（秒）：0→1 用 [kActivateTauIn]，1→0 用
 /// [kActivateTauOut]（对齐 AMLL `--mask-alpha-duration` 的 .3s / .45s）。
 const double kActivateTauIn = 0.09;
@@ -358,6 +370,10 @@ class _PaintCtx {
   /// 当前布局锚点（间奏/无覆盖时用于景深与透明度的「焦点」）。
   int anchor = -1;
 
+  /// 用户正在手动浏览（拖拽/滚轮后 5s 内）。对齐 AMLL 的
+  /// `isUserScrolling`：此时不按距离压暗、不施加失焦、只冻结自动滚动。
+  bool userScrolling = false;
+
   /// 上下渐隐由墙体自身按行透明度实现（见 [AmllPhysicsWall.edgeFade]）。
   bool edgeFade = false;
 
@@ -373,7 +389,7 @@ class _PaintCtx {
   /// 激活行的逐字渲染缓存（逐字盒 + 逐字段落）。见 [LyricsFragmentCache]。
   final LyricsFragmentCache fragCache = LyricsFragmentCache();
 
-  /// 翻译 / 音译小字的合成扫亮缓存（各自独立，避免同索引互相覆盖）。
+  /// 翻译 / 音译小字的逐字渲染缓存（各自独立，避免同索引互相覆盖）。
   final LyricsFragmentCache transFragCache = LyricsFragmentCache();
   final LyricsFragmentCache romaFragCache = LyricsFragmentCache();
 
