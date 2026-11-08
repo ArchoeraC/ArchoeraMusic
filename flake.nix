@@ -217,10 +217,6 @@ NUGETCFG
         ];
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         preBuild = netEnv;
         buildPhase = ''
           runHook preBuild
@@ -254,10 +250,6 @@ NUGETCFG
         buildInputs = with pkgs; [ taglib curl openssl sqlite nlohmann_json ];
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         buildPhase = ''
           runHook preBuild
           set -euo pipefail
@@ -291,10 +283,6 @@ NUGETCFG
         buildInputs = with pkgs; [ zlib ];
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         dontConfigureNuget = true;
         preBuild = netEnv + nugetSetup;
         buildPhase = ''
@@ -339,10 +327,6 @@ NUGETCFG
         buildInputs = with pkgs; [ zlib ];
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         dontConfigureNuget = true;
         preBuild = netEnv + nugetSetup;
         buildPhase = ''
@@ -386,10 +370,6 @@ NUGETCFG
         buildInputs = with pkgs; [ glibc.static ];
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         preBuild = netEnv;
         buildPhase = ''
           runHook preBuild
@@ -420,10 +400,6 @@ NUGETCFG
         ];
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         preBuild = netEnv;
         buildPhase = ''
           runHook preBuild
@@ -457,10 +433,6 @@ NUGETCFG
         ];
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         preBuild = netEnv;
         buildPhase = ''
           runHook preBuild
@@ -485,10 +457,6 @@ NUGETCFG
         buildInputs = with pkgs; [ dbus systemd ];
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         buildPhase = ''
           runHook preBuild
           set -euo pipefail
@@ -567,10 +535,6 @@ NUGETCFG
 
         strictDeps = false;
         dontConfigure = true;
-        # NekoMusic 第三方客户端标识（**公开值**，非密钥）：CI 以
-        # `NEKO_CLIENT_ID=... nix build --impure` 注入；未提供时为空字符串，
-        # App 内该音源整体禁用（fail-closed）。
-        NEKO_CLIENT_ID = builtins.getEnv "NEKO_CLIENT_ID";
         preBuild = netEnv;
 
         buildPhase = ''
@@ -625,12 +589,7 @@ HOOKPC
             cd app
             flutter config --no-analytics || true
             flutter pub get
-            flutterArgs=(--release)
-            # bash 的变量取值写法需在此字符串里转义后交给 bash（防 Nix 插值解析）。
-            if [ -n "''${NEKO_CLIENT_ID:-}" ]; then
-              flutterArgs+=("--dart-define=NEKO_CLIENT_ID=''${NEKO_CLIENT_ID}")
-            fi
-            flutter build linux "''${flutterArgs[@]}" \
+            flutter build linux --release \
               > "$TMPDIR/flutter-build.log" 2>&1 || {
               echo "===== FLUTTER BUILD LOG ====="
               cat "$TMPDIR/flutter-build.log"
