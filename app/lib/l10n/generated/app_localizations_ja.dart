@@ -1107,13 +1107,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get nekoOauthTitle => 'NekoAuth でログイン';
 
   @override
-  String get nekoOauthDesc => 'システムブラウザで NekoAuth を開き、認証後にアプリへ戻ります。';
+  String get nekoOauthDesc =>
+      '下記のワンタイムリンクを任意のブラウザで開いて認証してください。既定のブラウザでログインできない場合は、他のブラウザにコピーしてください。';
 
   @override
   String get nekoOauthOpen => 'ブラウザでログイン';
 
   @override
-  String get nekoOauthWaiting => 'ブラウザでログインを完了してください…';
+  String get nekoOauthWaiting => '認証を待っています…';
+
+  @override
+  String get nekoOauthUrlLabel => 'ワンタイムログイン URL';
+
+  @override
+  String get nekoOauthCopy => 'リンクをコピー';
+
+  @override
+  String get nekoOauthCopied => 'リンクをコピーしました';
+
+  @override
+  String get nekoOauthRefresh => '再取得';
 
   @override
   String get nekoOauthFailed => 'ログインに失敗しました';

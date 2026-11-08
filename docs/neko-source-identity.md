@@ -14,7 +14,8 @@
 
 1. `POST /api/user/sso/start`，请求体 `{"client":"pc","returnTo":"/"}`；
 2. 服务端返回 `data.url`（NekoAuth 授权地址，含一次性 state / nonce / PKCE）；
-3. 系统浏览器打开该地址（经 C++ 桥接的 `apl_open_url`，Dart 不直调平台 API）；
+3. 界面展示该一次性地址，用户可复制到任意浏览器，或点「打开浏览器」按钮
+   （经 C++ 桥接的 `apl_open_url`，Dart 不直调平台 API）；
 4. 授权完成后 NekoAuth 回调 NekoMusic，NekoMusic 打开
    `nekomusic://sso/complete?handoff=<一次性交接码>`；
 5. `POST /api/user/sso/claim`，请求体 `{"handoff":"…"}` 取回

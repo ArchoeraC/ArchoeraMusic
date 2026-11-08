@@ -1141,13 +1141,25 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nekoOauthDesc =>
-      'Öffnet NekoAuth im Systembrowser und kehrt nach der Autorisierung zur App zurück.';
+      'Öffne den einmaligen Link unten in einem beliebigen Browser. Falls der Standardbrowser die Anmeldung nicht abschließen kann, kopiere ihn in einen anderen Browser.';
 
   @override
   String get nekoOauthOpen => 'Im Browser anmelden';
 
   @override
-  String get nekoOauthWaiting => 'Bitte die Anmeldung im Browser abschließen…';
+  String get nekoOauthWaiting => 'Warte auf Autorisierung…';
+
+  @override
+  String get nekoOauthUrlLabel => 'Einmaliger Anmeldelink';
+
+  @override
+  String get nekoOauthCopy => 'Link kopieren';
+
+  @override
+  String get nekoOauthCopied => 'Link kopiert';
+
+  @override
+  String get nekoOauthRefresh => 'Neuen Link holen';
 
   @override
   String get nekoOauthFailed => 'Anmeldung fehlgeschlagen';
