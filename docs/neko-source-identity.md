@@ -68,9 +68,9 @@ Accept-Language: zh-CN,zh;q=0.9,en;q=0.8
 
 ### 退出
 
-先 `POST /api/user/logout`（Bearer）吊销 token，再用登录时拿到的 `idToken`
-请求 `POST /api/user/sso/logout-url`，把返回的 NekoAuth 注销地址交给系统浏览器
-打开；失败只记日志，不影响本地退出。
+先 `POST /api/user/logout`（Bearer）吊销 token，再清理本地会话；**不打开浏览器**。
+NekoAuth 的浏览器会话由用户自行在账号中心退出——应用内退出只处理自己的 token，
+避免点「退出登录」又弹出系统浏览器。
 
 ### 深链回调与单实例
 
