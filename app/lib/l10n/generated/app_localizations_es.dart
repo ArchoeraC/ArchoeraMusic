@@ -1140,14 +1140,25 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get OauthDesc =>
-      'Abre Auth en el navegador del sistema y vuelve a la app tras autorizar.';
+      'Abre el enlace de un solo uso en cualquier navegador para autorizar. Si tu navegador predeterminado no puede iniciar sesión, cópialo a otro navegador.';
 
   @override
   String get OauthOpen => 'Iniciar sesión en el navegador';
 
   @override
-  String get OauthWaiting =>
-      'Completa el inicio de sesión en el navegador…';
+  String get OauthWaiting => 'Esperando autorización…';
+
+  @override
+  String get OauthUrlLabel => 'Enlace de inicio de sesión de un solo uso';
+
+  @override
+  String get OauthCopy => 'Copiar enlace';
+
+  @override
+  String get OauthCopied => 'Enlace copiado';
+
+  @override
+  String get OauthRefresh => 'Obtener otro enlace';
 
   @override
   String get OauthFailed => 'Error al iniciar sesión';

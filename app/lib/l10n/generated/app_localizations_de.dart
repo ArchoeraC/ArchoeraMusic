@@ -1141,13 +1141,25 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get OauthDesc =>
-      'Öffnet Auth im Systembrowser und kehrt nach der Autorisierung zur App zurück.';
+      'Öffne den einmaligen Link unten in einem beliebigen Browser. Falls der Standardbrowser die Anmeldung nicht abschließen kann, kopiere ihn in einen anderen Browser.';
 
   @override
   String get OauthOpen => 'Im Browser anmelden';
 
   @override
-  String get OauthWaiting => 'Bitte die Anmeldung im Browser abschließen…';
+  String get OauthWaiting => 'Warte auf Autorisierung…';
+
+  @override
+  String get OauthUrlLabel => 'Einmaliger Anmeldelink';
+
+  @override
+  String get OauthCopy => 'Link kopieren';
+
+  @override
+  String get OauthCopied => 'Link kopiert';
+
+  @override
+  String get OauthRefresh => 'Neuen Link holen';
 
   @override
   String get OauthFailed => 'Anmeldung fehlgeschlagen';

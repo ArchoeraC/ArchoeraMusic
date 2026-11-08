@@ -1107,13 +1107,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get OauthTitle => 'Auth でログイン';
 
   @override
-  String get OauthDesc => 'システムブラウザで Auth を開き、認証後にアプリへ戻ります。';
+  String get OauthDesc =>
+      '下記のワンタイムリンクを任意のブラウザで開いて認証してください。既定のブラウザでログインできない場合は、他のブラウザにコピーしてください。';
 
   @override
   String get OauthOpen => 'ブラウザでログイン';
 
   @override
-  String get OauthWaiting => 'ブラウザでログインを完了してください…';
+  String get OauthWaiting => '認証を待っています…';
+
+  @override
+  String get OauthUrlLabel => 'ワンタイムログイン URL';
+
+  @override
+  String get OauthCopy => 'リンクをコピー';
+
+  @override
+  String get OauthCopied => 'リンクをコピーしました';
+
+  @override
+  String get OauthRefresh => '再取得';
 
   @override
   String get OauthFailed => 'ログインに失敗しました';

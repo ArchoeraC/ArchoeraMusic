@@ -1100,13 +1100,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get OauthTitle => '使用 Auth 登录';
 
   @override
-  String get OauthDesc => '将在系统浏览器中打开 Auth，完成授权后自动返回本应用。';
+  String get OauthDesc => '在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。';
 
   @override
   String get OauthOpen => '在浏览器中登录';
 
   @override
-  String get OauthWaiting => '请在浏览器中完成登录…';
+  String get OauthWaiting => '等待授权完成…';
+
+  @override
+  String get OauthUrlLabel => '一次性登录地址';
+
+  @override
+  String get OauthCopy => '复制链接';
+
+  @override
+  String get OauthCopied => '链接已复制';
+
+  @override
+  String get OauthRefresh => '重新获取';
 
   @override
   String get OauthFailed => '登录失败';
@@ -7300,13 +7312,25 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get OauthTitle => '使用 Auth 登录';
 
   @override
-  String get OauthDesc => '将在系统浏览器中打开 Auth，完成授权后自动返回本应用。';
+  String get OauthDesc => '在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。';
 
   @override
   String get OauthOpen => '在浏览器中登录';
 
   @override
-  String get OauthWaiting => '请在浏览器中完成登录…';
+  String get OauthWaiting => '等待授权完成…';
+
+  @override
+  String get OauthUrlLabel => '一次性登录地址';
+
+  @override
+  String get OauthCopy => '复制链接';
+
+  @override
+  String get OauthCopied => '链接已复制';
+
+  @override
+  String get OauthRefresh => '重新获取';
 
   @override
   String get OauthFailed => '登录失败';
@@ -13500,13 +13524,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get OauthTitle => '使用 Auth 登入';
 
   @override
-  String get OauthDesc => '將在系統瀏覽器開啟 Auth，完成授權後自動返回本應用程式。';
+  String get OauthDesc => '在任意瀏覽器開啟下方的一次性網址完成授權；若預設瀏覽器無法登入，可複製到其它瀏覽器。';
 
   @override
   String get OauthOpen => '在瀏覽器中登入';
 
   @override
-  String get OauthWaiting => '請在瀏覽器中完成登入…';
+  String get OauthWaiting => '等待授權完成…';
+
+  @override
+  String get OauthUrlLabel => '一次性登入網址';
+
+  @override
+  String get OauthCopy => '複製連結';
+
+  @override
+  String get OauthCopied => '連結已複製';
+
+  @override
+  String get OauthRefresh => '重新取得';
 
   @override
   String get OauthFailed => '登入失敗';

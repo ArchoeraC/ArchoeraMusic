@@ -1109,13 +1109,26 @@ class AppLocalizationsKo extends AppLocalizations {
   String get OauthTitle => 'Auth로 로그인';
 
   @override
-  String get OauthDesc => '시스템 브라우저에서 Auth를 열고 인증 후 앱으로 돌아옵니다.';
+  String get OauthDesc =>
+      '아래 일회용 링크를 아무 브라우저에서 열어 인증하세요. 기본 브라우저에서 로그인할 수 없다면 다른 브라우저로 복사하세요.';
 
   @override
   String get OauthOpen => '브라우저에서 로그인';
 
   @override
-  String get OauthWaiting => '브라우저에서 로그인을 완료하세요…';
+  String get OauthWaiting => '인증 대기 중…';
+
+  @override
+  String get OauthUrlLabel => '일회용 로그인 주소';
+
+  @override
+  String get OauthCopy => '링크 복사';
+
+  @override
+  String get OauthCopied => '링크가 복사되었습니다';
+
+  @override
+  String get OauthRefresh => '다시 받기';
 
   @override
   String get OauthFailed => '로그인 실패';
