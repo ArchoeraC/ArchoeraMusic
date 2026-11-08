@@ -6,18 +6,38 @@
 /// 以及会话快照对播放模式的校验回落。
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
+import 'package:archoera_music/services/netease/track.dart';
 import 'package:archoera_music/services/playback/playback_notifier.dart';
 import 'package:archoera_music/services/playback/playback_session.dart';
 import 'package:archoera_music/services/playback/playback_state.dart';
+import 'package:archoera_music/services/playback/shuffle_bag.dart';
 
 /// 无引擎的假控制器：只验证播放模式状态机。
 class _FakePlaybackNotifier extends PlaybackNotifier {
+  _FakePlaybackNotifier([this.initial = const PlaybackState()]);
+
+  final PlaybackState initial;
+
   @override
-  PlaybackState build() => const PlaybackState();
+  PlaybackState build() => initial;
+}
+
+({ProviderContainer container, _FakePlaybackNotifier playback}) _setupPlayback([
+  PlaybackState? initial,
+]) {
+  final fake = _FakePlaybackNotifier(initial ?? const PlaybackState());
+  final c = ProviderContainer(
+    overrides: [playbackProvider.overrideWith(() => fake)],
+  );
+  addTearDown(c.dispose);
+  c.read(playbackProvider); // 初始化 notifier
+  return (container: c, playback: fake);
 }
 
 void main() {
@@ -43,18 +63,8 @@ void main() {
   });
 
   group('cycleRepeatMode / setRepeatMode', () {
-    ({ProviderContainer container, _FakePlaybackNotifier playback}) setup() {
-      final fake = _FakePlaybackNotifier();
-      final c = ProviderContainer(
-        overrides: [playbackProvider.overrideWith(() => fake)],
-      );
-      addTearDown(c.dispose);
-      c.read(playbackProvider); // 初始化 notifier
-      return (container: c, playback: fake);
-    }
-
     test('默认列表循环，按 列表 → 单曲 → 顺序 → 列表 轮换', () {
-      final s = setup();
+      final s = _setupPlayback();
       final pb = s.playback;
       expect(pb.state.repeatMode, 'list');
       pb.cycleRepeatMode();
@@ -66,12 +76,63 @@ void main() {
     });
 
     test('setRepeatMode 接受三态、拒绝未知值', () {
-      final s = setup();
+      final s = _setupPlayback();
       final pb = s.playback;
       pb.setRepeatMode('off');
       expect(pb.state.repeatMode, 'off');
       pb.setRepeatMode('bogus');
       expect(pb.state.repeatMode, 'off', reason: '非法模式应被忽略');
+    });
+  });
+
+  group('随机播放', () {
+    List<Track> tracks(int n) => [
+      for (var i = 0; i < n; i++)
+        Track(id: '$i', title: 'T$i', source: 'local'),
+    ];
+
+    test('待播袋一轮内不重复，取完后为空', () {
+      final bag = ShuffleBag(math.Random(7))..reset(['a', 'b', 'c', 'd']);
+      final seen = <String>{};
+      while (!bag.isEmpty) {
+        final key = bag.take();
+        expect(key, isNotNull);
+        expect(seen.add(key!), isTrue, reason: '同一轮不应重复取到 $key');
+      }
+      expect(seen, {'a', 'b', 'c', 'd'});
+      expect(bag.take(), isNull, reason: '空袋应返回 null');
+    });
+
+    test('开启随机不重排队列，next 在整个队列内随机跳转且一轮不重复', () {
+      final queue = tracks(6);
+      final s = _setupPlayback(PlaybackState(queue: queue, queueIndex: 2));
+      final pb = s.playback;
+
+      pb.setShuffle(true);
+      expect(pb.state.shuffle, isTrue);
+      expect(pb.state.queue, queue, reason: '队列曲目位置必须保持原样');
+      expect(pb.state.queueIndex, 2, reason: '开启随机不应改变当前曲目');
+
+      final seen = <int>{2};
+      for (var i = 0; i < queue.length - 1; i++) {
+        pb.debugAdvanceNext();
+        expect(pb.state.queue, queue, reason: '随机切歌不得重排队列');
+        final idx = pb.state.queueIndex;
+        expect(idx, inInclusiveRange(0, queue.length - 1));
+        expect(seen.add(idx), isTrue, reason: '一轮内不应重复播放同一位置');
+      }
+      expect(seen.length, queue.length, reason: '一轮应覆盖整个队列');
+
+      // 第二轮重新装填：仍不重排队列，且不立即重复当前曲。
+      final before = pb.state.queueIndex;
+      pb.debugAdvanceNext();
+      expect(pb.state.queue, queue);
+      expect(pb.state.queueIndex, isNot(before));
+
+      final current = pb.state.queueIndex;
+      pb.setShuffle(false);
+      expect(pb.state.queue, queue, reason: '关闭随机也不应改变队列顺序');
+      expect(pb.state.queueIndex, current);
     });
   });
 

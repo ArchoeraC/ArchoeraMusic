@@ -24,7 +24,6 @@ mixin _PlaybackNotifierLoading
     if (durMs > 0 && posMs >= durMs) posMs = 0;
     final autoPlay =
         snapshot.playing && ref.read(appPrefsProvider).autoPlayOnLaunch;
-    _originalQueue = List.of(queue);
     _autoResumeInFlight = autoPlay;
     _retryableSnapshot = autoPlay ? snapshot : null;
     state = state.copyWith(
@@ -41,6 +40,8 @@ mixin _PlaybackNotifierLoading
       buffering: false,
       position: Duration(milliseconds: posMs),
     );
+    _resetShuffleState();
+    if (state.shuffle) _refillShuffleBag(excludeIndex: idx);
     _log(
       '恢复会话: ${queue.length} 首 @${posMs}ms '
       '${autoPlay ? '自动续播' : '暂停'}',
@@ -356,5 +357,4 @@ mixin _PlaybackNotifierLoading
       quality: s.quality,
     );
   }
-
 }

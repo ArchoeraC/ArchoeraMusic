@@ -2,9 +2,11 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../services/netease/netease_api.dart';
+import '../../stores/app_prefs.dart';
 import '../../services/source/media_request_headers.dart';
 import '../../services/source/source_platform.dart';
 import '../../easter_egg/mouse_dodge.dart';

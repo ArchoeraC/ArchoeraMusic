@@ -104,7 +104,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
       ref.read(navSearchQueryProvider.notifier).set(_query);
     });
     // 恢复上次的平台 / Tab 选择（壳内容因播放页展开被卸载后重建）。
-    final restored = ref.read(searchPlatformProvider) ?? 'netease';
+    // 无显式选择时使用「默认音源」设置。
+    final restored =
+        ref.read(searchPlatformProvider) ?? preferredSearchSource(ref);
     // 已关闭的音源不保留选择（避免对其发请求）。
     _platform = sourcePlatform(restored).enabled(ref) ? restored : 'netease';
     _tabs = TabController(

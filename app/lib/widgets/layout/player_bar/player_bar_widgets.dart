@@ -4,22 +4,24 @@
 
 part of '../player_bar.dart';
 
-class _BarCover extends StatefulWidget {
+class _BarCover extends ConsumerStatefulWidget {
   const _BarCover({this.cover, this.onTap});
 
   final String? cover;
   final VoidCallback? onTap;
 
   @override
-  State<_BarCover> createState() => _BarCoverState();
+  ConsumerState<_BarCover> createState() => _BarCoverState();
 }
 
-class _BarCoverState extends State<_BarCover> {
+class _BarCoverState extends ConsumerState<_BarCover> {
   static const _size = 40.0;
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
+    final double coverRadius =
+        ref.watch(appPrefsProvider.select((p) => p.coverRadius));
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -29,14 +31,14 @@ class _BarCoverState extends State<_BarCover> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(coverRadius),
           child: Stack(
             children: [
               CoverImage(
                 cover: widget.cover,
                 width: _size,
                 height: _size,
-                radius: 8,
+                radius: coverRadius,
                 iconSize: 22,
               ),
               AnimatedOpacity(

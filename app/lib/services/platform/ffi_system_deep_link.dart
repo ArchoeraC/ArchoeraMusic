@@ -7,6 +7,7 @@ library;
 
 import 'dart:async';
 
+import '../log/log.dart';
 import 'platform_bindings.dart';
 import 'platform_failure.dart';
 import 'system_deep_link.dart';
@@ -46,6 +47,10 @@ class FfiSystemDeepLink implements SystemDeepLink {
       if (raw == null) break;
       final uri = Uri.tryParse(raw);
       if (uri == null) continue;
+      Log.i(
+        'deeplink',
+        '桥接取到 URI scheme=${uri.scheme} host=${uri.host} path=${uri.path}',
+      );
       if (_ctrl.hasListener) {
         _ctrl.add(uri);
       } else {

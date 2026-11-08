@@ -468,7 +468,8 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - **模型**：`nextQueue` + `prevHistory` + 当前索引；`PlaybackController` 管理
 - **播放模式**：`off` 顺序播放（播到队列末尾**自动暂停**并 toast 提示「已播完」，不回绕）/
   `list` 列表循环 / `one` 单曲循环；与独立的随机开关 `shuffle` 正交组合。三态由播放控件/
-  队列面板的循环按钮轮换（`repeatModeCycle`），随机开启时在该洗牌顺序上播放。
+  队列面板的循环按钮轮换（`repeatModeCycle`）。随机开启时**队列曲目位置保持不变**，播放
+  索引由 `ShuffleBag` 在整队列中随机跳转（一轮内不重复，播完再开新一轮），不再重排队列。
 - **切歌流程**：next/prev → `load(track)` → Flutter 重建引擎实例（`archoera_mediaengine_destroy` 旧 + create 新，继承播放器状态，库内无进程切换）→ 完整转码 → miniaudio 播放新 `stream.wav`
 - **播放统计**：每曲播放完成写 Dart 本地统计；Last.fm scrobble 可选（Phase 3，复用 `apis/lastfm` 思路）
 

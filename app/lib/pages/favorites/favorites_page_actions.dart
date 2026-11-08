@@ -19,6 +19,13 @@ extension _FavoritesPageActions on _FavoritesPageState {
     if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
   }
 
+  /// 跟随「默认音源」设置切换（不记为手动选择，后续改设置仍会跟随）。
+  void _applyDefaultPlatform(String source) {
+    if (source == _platform) return;
+    _setPlatform(source, remember: false);
+    if (_loggedIn && !_loaded.contains(_cacheKey)) _fetch();
+  }
+
   void _switchTab(String tabId) {
     if (tabId == _tab) return;
     _setTab(tabId);

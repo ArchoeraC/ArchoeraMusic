@@ -39,15 +39,24 @@ import 'login_risk_notice.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 打开 NekoMusic 登录界面（先弹登录风险提示）。返回 `true` 表示登录成功。
+///
+/// 没有显式「取消」按钮：**离开登录界面即取消**。这里在 `showDialog` 返回后
+/// 再做一次兜底取消，保证无论点遮罩、按 Esc 还是路由被替换，都会立刻结束
+/// OAuth 等待并注销 `nekomusic://`。
 Future<bool?> showNekoLoginDialog(BuildContext context) async {
   if (!await showLoginRiskNotice(context)) return false;
   if (!context.mounted) return false;
-  return showDialog<bool?>(
+  final container = ProviderScope.containerOf(context, listen: false);
+  final result = await showDialog<bool?>(
     context: context,
     barrierColor: Colors.transparent,
     barrierDismissible: true,
     builder: (_) => const _NekoLoginDialog(),
   );
+  if (result != true) {
+    container.read(nekoApiProvider).cancelSsoLogin();
+  }
+  return result;
 }
 
 class _NekoLoginDialog extends ConsumerStatefulWidget {
@@ -68,7 +77,8 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   bool _switching = false;
 
   // ── OAuth ─────────────────────────────────────────────────────────
-  bool _ssoBusy = false;
+  NekoSsoLoginSession? _ssoSession;
+  bool _ssoPreparing = false;
   String _ssoError = '';
 
   // ── 扫码 ──────────────────────────────────────────────────────────
@@ -85,12 +95,16 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   bool _busy = false;
   String _loginError = '';
 
-  NekoApi get _api => ref.read(nekoApiProvider);
+  /// 在 initState 里保存 provider 实例：dispose 阶段不能再碰 `ref`
+  /// （Riverpod 会直接抛 Bad state），但取消 OAuth 又必须在关闭时执行。
+  late final NekoApi _api;
 
   @override
   void initState() {
     super.initState();
-    // 扫码会话等切到扫码 tab 时再创建，避免打开对话框就发请求。
+    _api = ref.read(nekoApiProvider);
+    // OAuth 是默认 tab：先取一次性登录地址，浏览器由用户手动点按钮打开。
+    unawaited(_prepareSso());
   }
 
   List<String> _tabLabels(AppLocalizations l10n) => [
@@ -102,7 +116,13 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   @override
   void dispose() {
     // 关闭登录框即取消仍在等待的 OAuth 回调，避免旧流程稍后领取 token。
-    if (_ssoBusy) ref.read(nekoApiProvider).cancelSsoLogin();
+    // 用 initState 保存的实例，不能在 dispose 里使用 ref。
+    final session = _ssoSession;
+    if (session != null) {
+      session.cancel();
+    } else if (_ssoPreparing) {
+      _api.cancelSsoLogin();
+    }
     _sub?.cancel();
     _emailCtrl.dispose();
     _passCtrl.dispose();
@@ -317,11 +337,12 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
 
   // ── OAuth tab ─────────────────────────────────────────────────────
   Widget _oauthTab(ThemeData theme, ColorScheme scheme, AppLocalizations l10n) {
+    final session = _ssoSession;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(EtaIcons.shieldOutline, size: 48, color: scheme.primary),
-        const SizedBox(height: 14),
+        Icon(EtaIcons.shieldOutline, size: 44, color: scheme.primary),
+        const SizedBox(height: 10),
         Text(
           l10n.nekoOauthTitle,
           textAlign: TextAlign.center,
@@ -338,53 +359,157 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
             height: 1.5,
           ),
         ),
-        if (_ssoError.isNotEmpty) _errorText(_ssoError, scheme),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _ssoBusy ? null : _ssoLogin,
-            child: _ssoBusy ? _spinner() : Text(l10n.nekoOauthOpen),
-          ),
-        ),
-        if (_ssoBusy)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
+        const SizedBox(height: 14),
+        if (_ssoPreparing)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+          )
+        else if (session != null) ...[
+          Align(
+            alignment: Alignment.centerLeft,
             child: Text(
-              l10n.nekoOauthWaiting,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
+              l10n.nekoOauthUrlLabel,
+              style: theme.textTheme.labelSmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
             ),
           ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: scheme.outlineVariant),
+            ),
+            child: SelectableText(
+              session.url,
+              maxLines: 3,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 11,
+                height: 1.35,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _openSsoUrl(session.url),
+              icon: const Icon(EtaIcons.link, size: 16),
+              label: Text(
+                l10n.nekoOauthOpen,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _copySsoUrl(session.url),
+              icon: const Icon(EtaIcons.docmentOutline, size: 16),
+              label: Text(
+                l10n.nekoOauthCopy,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            l10n.nekoOauthWaiting,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (_ssoError.isNotEmpty) _errorText(_ssoError, scheme),
+        if (session != null || _ssoError.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _ssoPreparing ? null : _prepareSso,
+            icon: const Icon(EtaIcons.refresh, size: 16),
+            label: Text(l10n.nekoOauthRefresh),
+          ),
+        ],
       ],
     );
   }
 
-  /// 打开系统浏览器完成 NekoAuth 登录；成功后关闭对话框。
-  Future<void> _ssoLogin() async {
-    final l10n = context.l10n;
+  /// 取一次性授权地址并开始等待回调；不自动打开浏览器。
+  Future<void> _prepareSso() async {
+    _ssoSession?.cancel();
     setState(() {
-      _ssoBusy = true;
+      _ssoPreparing = true;
       _ssoError = '';
+      _ssoSession = null;
     });
     try {
-      await _api.startSsoLogin();
+      final session = await _api.beginSsoLogin();
+      if (!mounted) {
+        session.cancel();
+        return;
+      }
+      setState(() {
+        _ssoSession = session;
+        _ssoPreparing = false;
+      });
+      unawaited(_awaitSso(session));
+    } on NekoApiException catch (e) {
       if (!mounted) return;
+      setState(() {
+        _ssoPreparing = false;
+        _ssoError = e.message.isEmpty ? context.l10n.nekoOauthFailed : e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _ssoPreparing = false;
+        _ssoError = context.l10n.nekoOauthFailed;
+      });
+    }
+  }
+
+  /// 等待用户在任意浏览器完成授权；成功后才关闭登录框。
+  Future<void> _awaitSso(NekoSsoLoginSession session) async {
+    final l10n = context.l10n;
+    try {
+      await session.completed;
+      if (!mounted || !identical(_ssoSession, session)) return;
       Navigator.of(context).pop(true);
       toast(l10n.loginSuccess);
     } on NekoApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || !identical(_ssoSession, session)) return;
       setState(
         () => _ssoError = e.message.isEmpty ? l10n.nekoOauthFailed : e.message,
       );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || !identical(_ssoSession, session)) return;
       setState(() => _ssoError = l10n.nekoOauthFailed);
-    } finally {
-      if (mounted) setState(() => _ssoBusy = false);
     }
+  }
+
+  void _openSsoUrl(String url) {
+    final rc = _api.openSsoUrl(url);
+    if (rc != 0) {
+      // 没有默认浏览器 / 桥接不可用时退回复制链接。
+      unawaited(_copySsoUrl(url));
+    }
+  }
+
+  Future<void> _copySsoUrl(String url) async {
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!mounted) return;
+    toast(context.l10n.nekoOauthCopied, type: ToastType.success);
   }
 
   // ── 扫码 tab ──────────────────────────────────────────────────────

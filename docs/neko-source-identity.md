@@ -14,7 +14,8 @@
 
 1. `POST /api/user/sso/start`，请求体 `{"client":"pc","returnTo":"/"}`；
 2. 服务端返回 `data.url`（NekoAuth 授权地址，含一次性 state / nonce / PKCE）；
-3. 系统浏览器打开该地址（经 C++ 桥接的 `apl_open_url`，Dart 不直调平台 API）；
+3. 界面展示该一次性地址，用户可复制到任意浏览器，或点「打开浏览器」按钮
+   （经 C++ 桥接的 `apl_open_url`，Dart 不直调平台 API）；
 4. 授权完成后 NekoAuth 回调 NekoMusic，NekoMusic 打开
    `nekomusic://sso/complete?handoff=<一次性交接码>`；
 5. `POST /api/user/sso/claim`，请求体 `{"handoff":"…"}` 取回
@@ -68,9 +69,9 @@ Accept-Language: zh-CN,zh;q=0.9,en;q=0.8
 
 ### 退出
 
-先 `POST /api/user/logout`（Bearer）吊销 token，再用登录时拿到的 `idToken`
-请求 `POST /api/user/sso/logout-url`，把返回的 NekoAuth 注销地址交给系统浏览器
-打开；失败只记日志，不影响本地退出。
+先 `POST /api/user/logout`（Bearer）吊销 token，再清理本地会话；**不打开浏览器**。
+NekoAuth 的浏览器会话由用户自行在账号中心退出——应用内退出只处理自己的 token，
+避免点「退出登录」又弹出系统浏览器。
 
 ### 深链回调与单实例
 
@@ -81,8 +82,10 @@ macOS 的 scheme 由 `Info.plist` 静态声明，无法运行时开关，只能�
 注册；Windows / Linux 均按上述生命周期注册与注销。
 
 系统打开 `nekomusic://sso/complete` 时可能启动第二个进程。第二实例只做 URI
-转发（`apl_deep_link_forward`）后静默退出：Linux 通过会话总线的 `OpenUri`、
-Windows 通过隐藏消息窗口的 `WM_COPYDATA`，均带短重试以覆盖首实例启动窗口。
+转发（`apl_deep_link_forward`）后立即退出，三端都是**纯单向、事件驱动**：
+Linux 发会话总线广播信号；Windows 写共享内存后 `PostMessage` 隐藏窗口；
+macOS 发同用户 DistributedNotification。全部不 `SendMessage`、不等回复、
+不重试等待，首实例繁忙也不会卡住第二实例。
 即使转发失败，只要命令行里带深链，也不会再弹「应用已在运行」——避免把登录
 回调误判为重复启动。首实例启动后即常驻注册 `OpenUri`（不依赖主题/防休眠订阅），
 保证回调能送达。

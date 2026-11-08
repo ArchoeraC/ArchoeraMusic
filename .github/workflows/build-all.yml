@@ -229,11 +229,53 @@ jobs:
       # ───────────────────────── Windows（mingw / vcpkg）───────────────
       - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
         if: matrix.os == 'windows'
-        shell: bash
-        # pkgconfiglite 已移除：Windows 原生模块不依赖 pkg-config
-        # （audio-engine 由 build_windows.bat 的 cl.exe 直编、scraper 走
-        #   vcpkg toolchain、subsonic 的 sqlite 为 pure-Go modernc 实现）
+        shell: pwsh
+        # Chocolatey 包依赖 GitHub Release 资产；504 时不要让整个 job 直接失败，
+        # 后面用 runner 自带 MSYS2 或镜像下载的 mingw 兜底。
+        continue-on-error: true
         run: choco install mingw -y --no-progress
+
+      - name: Ensure mingw on PATH (Chocolatey 504 fallback)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          if (Get-Command gcc.exe -ErrorAction SilentlyContinue) {
+            Write-Host "gcc 已在 PATH"; exit 0
+          }
+          $candidates = @(
+            "C:\msys64\mingw64\bin",
+            "C:\msys64\ucrt64\bin",
+            "C:\mingw64\bin",
+            "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin"
+          )
+          foreach ($dir in $candidates) {
+            if (Test-Path (Join-Path $dir "gcc.exe")) {
+              $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+              Write-Host "使用已有 mingw: $dir"; exit 0
+            }
+          }
+
+          $asset = "x86_64-16.2.0-release-posix-seh-ucrt-rt_v14-rev1.7z"
+          $url = "https://github.com/niXman/mingw-builds-binaries/releases/download/16.2.0-rt_v14-rev1/$asset"
+          $archive = Join-Path $env:RUNNER_TEMP $asset
+          $ok = $false
+          foreach ($u in @(
+              $url,
+              "https://ghproxy.net/$url",
+              "https://gh-proxy.com/$url",
+              "https://ghfast.top/$url",
+              "https://gh.moeyy.xyz/$url",
+              "https://ghproxy.cc/$url",
+              "https://gh.llkk.cc/$url")) {
+            try {
+              curl.exe -fL --retry 2 --retry-delay 5 -o $archive $u
+              if ((Get-Item $archive).Length -gt 10MB) { $ok = $true; break }
+            } catch { Write-Warning "下载失败: $u" }
+          }
+          if (-not $ok) { Write-Error "无法获取 mingw（Chocolatey 与镜像均失败）"; exit 1 }
+          7z x $archive -o"C:\" -y | Out-Null
+          "C:\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          & "C:\mingw64\bin\gcc.exe" --version | Select-Object -First 1
 
       - name: Cache vcpkg installed (恢复；ffmpeg/taglib 等预编译跨 run 秒级恢复)
         if: matrix.os == 'windows'
@@ -247,6 +289,52 @@ jobs:
             app/vcpkg_installed
             C:\Users\runneradmin\AppData\Local\vcpkg\archives
           key: vcpkg-installed-${{ hashFiles('app/vcpkg.json') }}
+
+      # GitHub Release 资产偶发 504：先从官方/镜像预取 vcpkg 需要的
+      # Strawberry Perl（openssl 构建依赖），并用 vcpkg 自带的 SHA512 校验。
+      # 失败不致命，vcpkg 仍会按原逻辑直连下载。
+      - name: Prefetch vcpkg tools (GitHub 504 fallback)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $tool = "C:\vcpkg\scripts\cmake\vcpkg_find_acquire_program(PERL).cmake"
+          if (-not (Test-Path $tool)) { Write-Warning "未找到 vcpkg perl 工具定义"; exit 0 }
+          $c = Get-Content $tool -Raw
+          $fn = [regex]::Match($c, 'set\(download_filename "([^"]+)"\)').Groups[1].Value
+          $sha = [regex]::Match($c, 'set\(download_sha512 ([0-9a-fA-F]+)\)').Groups[1].Value
+          $url = [regex]::Match($c, 'set\(download_urls\s*\n?\s*"([^"]+)"').Groups[1].Value
+          if (-not $fn -or -not $sha -or -not $url) {
+            Write-Warning "无法解析 vcpkg perl 工具定义"; exit 0
+          }
+          $zip = Join-Path "C:\vcpkg\downloads" $fn
+          if ((Test-Path $zip) -and
+              ((Get-FileHash $zip -Algorithm SHA512).Hash.ToLower() -eq $sha.ToLower())) {
+            Write-Host "Strawberry Perl 已在 vcpkg 缓存中"; exit 0
+          }
+          New-Item -ItemType Directory -Force -Path (Split-Path $zip) | Out-Null
+          foreach ($u in @(
+              $url,
+              "https://ghproxy.net/$url",
+              "https://gh-proxy.com/$url",
+              "https://ghfast.top/$url",
+              "https://gh.moeyy.xyz/$url",
+              "https://ghproxy.cc/$url",
+              "https://gh.llkk.cc/$url")) {
+            try {
+              curl.exe -fL --retry 2 --retry-delay 5 -o "$zip.part" $u
+              if ((Get-FileHash "$zip.part" -Algorithm SHA512).Hash.ToLower() -eq $sha.ToLower()) {
+                Move-Item "$zip.part" $zip -Force
+                Write-Host "已从镜像获取: $u"
+                exit 0
+              }
+              Write-Warning "SHA512 不匹配: $u"
+            } catch {
+              Write-Warning "下载失败: $u"
+            }
+            Remove-Item "$zip.part" -ErrorAction SilentlyContinue
+          }
+          Write-Warning "所有源均失败，交由 vcpkg 直连重试"
 
       - name: Install vcpkg deps (manifest 模式，依赖清单见 app/vcpkg.json)
         if: matrix.os == 'windows'
@@ -897,14 +985,31 @@ jobs:
           sudo apt-get install -y binutils file patchelf \
             libgtk-3-dev libx11-dev libxi-dev libdbus-1-dev \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev
+          # GitHub Release 资产偶发 504：官方失败时走镜像；下载后校验确实是 ELF。
+          fetch_asset() {
+            local url="$1" out="$2" prefix
+            for prefix in "" \
+              "https://ghproxy.net/" \
+              "https://gh-proxy.com/" \
+              "https://ghfast.top/" \
+              "https://gh.moeyy.xyz/" \
+              "https://ghproxy.cc/" \
+              "https://gh.llkk.cc/"; do
+              if wget -q --timeout=90 --tries=2 -O "$out" "${prefix}${url}" \
+                 && [ -s "$out" ] && file "$out" | grep -q 'ELF'; then
+                return 0
+              fi
+            done
+            return 1
+          }
           # appimagetool（CI 无 FUSE，运行时用 --appimage-extract-and-run）
-          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
+          fetch_asset https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage /tmp/appimagetool.AppImage
           chmod +x /tmp/appimagetool.AppImage
           sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
           # type2 runtime 预下载（appimagetool 打包时不再联网下载，规避网络抖动）
-          wget -q https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 -O /tmp/type2-runtime
+          fetch_asset https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 /tmp/type2-runtime
           # linuxdeploy：AppImage 装配时收拢 GTK/FFmpeg/TagLib 等动态依赖
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O /tmp/linuxdeploy.AppImage
+          fetch_asset https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage /tmp/linuxdeploy.AppImage
           chmod +x /tmp/linuxdeploy.AppImage
       - name: Restore executable bits (artifact 上传丢失权限)
         # upload-artifact@v4 不保留权限（文件统一 644）：解包后按 ELF 可执行文件

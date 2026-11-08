@@ -131,7 +131,7 @@ void main() {
     expect(await next, 'next');
   });
 
-  test('ssoClaim：POST handoff 后落盘 token / idToken', () async {
+  test('ssoClaim：POST handoff 后落盘 token', () async {
     client.responses['/api/user/sso/claim'] = {
       'success': true,
       'data': {
@@ -151,7 +151,6 @@ void main() {
     expect(api.isLoggedIn, isTrue);
     expect(api.account?.nickname, '喵');
     expect(store.get(kNekoSessionPlatform)['token'], 'access-1');
-    expect(store.get(kNekoSessionPlatform)['idToken'], 'id-1');
   });
 
   test('扫码：confirmed 后用 deliveryKey 调 claim 领取 token', () async {

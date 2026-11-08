@@ -130,7 +130,13 @@ NUGETCFG
       };
       mbedtlsSrc = pkgs.fetchurl {
         name = "mbedtls-3.6.2.tar.bz2";
-        url = "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.2/mbedtls-3.6.2.tar.bz2";
+        # 官方 GitHub Release 偶发 504；镜像只做传输回退，hash 仍校验官方内容。
+        urls = [
+          "https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.2/mbedtls-3.6.2.tar.bz2"
+          "https://ghproxy.net/https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.2/mbedtls-3.6.2.tar.bz2"
+          "https://gh-proxy.com/https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.2/mbedtls-3.6.2.tar.bz2"
+          "https://ghfast.top/https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.2/mbedtls-3.6.2.tar.bz2"
+        ];
         hash = "sha256-i1T7m89NWnB4Ao4FIKzd77eQCz5m/sf3F1u1t9hczco=";
       };
 
