@@ -7231,8 +7231,26 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMediaSourceSubtitle.
   ///
   /// In zh_CN, this message translates to:
-  /// **'流媒体服务器（Subsonic / Jellyfin / Emby）'**
+  /// **'默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）'**
   String get settingsMediaSourceSubtitle;
+
+  /// No description provided for @settingsDefaultSource.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'默认音源'**
+  String get settingsDefaultSource;
+
+  /// No description provided for @settingsDefaultSourceDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'打开「我喜欢」「收藏」「搜索」时默认选中的音源'**
+  String get settingsDefaultSourceDesc;
+
+  /// No description provided for @settingsDefaultSourceAuto.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动（按登录状态）'**
+  String get settingsDefaultSourceAuto;
 
   /// No description provided for @settingsCatScrape.
   ///

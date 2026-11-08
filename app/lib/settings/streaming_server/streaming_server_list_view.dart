@@ -14,6 +14,8 @@ extension _StreamingServerListView on _StreamingServerListState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _buildDefaultSourceCard(scheme, l10n),
+        const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: cardDecoration(scheme),
@@ -73,6 +75,58 @@ extension _StreamingServerListView on _StreamingServerListState {
             ),
           ),
       ],
+    );
+  }
+
+  /// 默认音源：打开「我喜欢」「收藏」「搜索」时默认选中的音源。
+  Widget _buildDefaultSourceCard(ColorScheme scheme, AppLocalizations l10n) {
+    final prefs = ref.watch(appPrefsProvider);
+    final options = <SDropdownOption<String>>[
+      SDropdownOption(autoDefaultSource, l10n.settingsDefaultSourceAuto),
+      for (final p in collectionPlatforms(ref))
+        SDropdownOption(p.source, p.label(l10n)),
+    ];
+    final selected = options.any((o) => o.value == prefs.defaultSource)
+        ? prefs.defaultSource
+        : autoDefaultSource;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: cardDecoration(scheme),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.settingsDefaultSource,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  l10n.settingsDefaultSourceDesc,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SDropdown<String>(
+            options: options,
+            selected: selected,
+            onChanged: (value) =>
+                ref.read(appPrefsProvider.notifier).setDefaultSource(value),
+          ),
+        ],
+      ),
     );
   }
 

@@ -3928,7 +3928,16 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      'ストリーミングサーバー（Subsonic / Jellyfin / Emby）';
+      'デフォルト音源 · ストリーミングサーバー（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsDefaultSource => 'デフォルト音源';
+
+  @override
+  String get settingsDefaultSourceDesc => '「いいね」「お気に入り」「検索」を開いたときに既定で選択される音源';
+
+  @override
+  String get settingsDefaultSourceAuto => '自動（ログイン状態に応じて）';
 
   @override
   String get settingsCatScrape => 'スクレイピング';
