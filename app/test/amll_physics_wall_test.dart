@@ -303,6 +303,193 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('手动浏览期间高亮继续跟随播放，不冻结在旧行', (tester) async {
+    final groups = buildGroups(40);
+    await tester.pumpWidget(buildWall(groups, 10 * 1000));
+    await settle(tester, frames: 10);
+    dynamic s = stateOf(tester);
+    expect(s.debugActive(), 10);
+
+    // 触摸向上拖，进入浏览态（5s 内不会回弹）。
+    await tester.drag(find.byType(AmllPhysicsWall), const Offset(0, -200));
+    await tester.pump();
+    expect(s.debugUserScrolling(), isTrue);
+
+    // 浏览期间播放推进两行：高亮必须跟着走（AMLL 的 isUserScrolling 只
+    // 冻结布局，不影响 isActive）。
+    await tester.pumpWidget(buildWall(groups, 12 * 1000));
+    await tester.pump(const Duration(milliseconds: 200));
+    s = stateOf(tester);
+    expect(s.debugActive(), 12);
+    // 但视野仍停在用户浏览位置，不被拉回播放行。
+    expect(s.debugUser(), isNot(0));
+
+    // 5s 无操作后回弹到当前行，高亮仍是最新的那一行。
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(milliseconds: 200));
+    s = stateOf(tester);
+    expect(s.debugUserScrolling(), isFalse);
+    expect(s.debugActive(), 12);
+    expect(s.debugAnchor(), 12);
+  });
+
+  testWidgets('手动浏览期间其他行不再失焦（滚动读词必须清晰）', (tester) async {
+    final groups = buildGroups(20);
+    await tester.pumpWidget(buildWall(groups, 10 * 1000));
+    await settle(tester, frames: 30);
+    dynamic s = stateOf(tester);
+    // 常态：非锚点行有失焦。
+    expect((s.debugBlur() as List<double>).any((v) => v > 0), isTrue);
+
+    await tester.drag(find.byType(AmllPhysicsWall), const Offset(0, -120));
+    await tester.pump();
+    // 失焦按 kBlurTau=0.22s 指数收敛，给足时间到稳态 0。
+    await settle(tester, frames: 90);
+    s = stateOf(tester);
+    expect(s.debugUserScrolling(), isTrue);
+    expect((s.debugBlur() as List<double>).every((v) => v < 0.5), isTrue);
+  });
+
+  group('逐字行提前换行（kWordSwitchLeadMs=500）', () {
+    /// 两行逐字歌词：第 0 行 0~2000 唱完（覆盖至 5000），第 1 行 5000 开始。
+    List<LyricGroup> wordGroups({int line0LastFragEnd = 2000}) => [
+      LyricGroup(
+        original: const LyricLine(timeMs: 0, text: 'AAAA'),
+        endMs: 5000,
+        fragments: [
+          LyricFragment(
+            text: 'AA',
+            startMs: 0,
+            durationMs: line0LastFragEnd ~/ 2,
+          ),
+          LyricFragment(
+            text: 'AA',
+            startMs: line0LastFragEnd ~/ 2,
+            durationMs: line0LastFragEnd ~/ 2,
+          ),
+        ],
+      ),
+      LyricGroup(
+        original: const LyricLine(timeMs: 5000, text: 'BBBB'),
+        endMs: 10000,
+        fragments: const [
+          LyricFragment(text: 'BB', startMs: 0, durationMs: 1000),
+          LyricFragment(text: 'BB', startMs: 1000, durationMs: 1000),
+        ],
+      ),
+    ];
+
+    testWidgets('上一行逐字已完成：提前 500ms 切到下一行', (tester) async {
+      final groups = wordGroups();
+      // 切换点之前（5000-500=4500 之前）：仍高亮第 0 行。
+      await tester.pumpWidget(buildWall(groups, 4400));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 0);
+
+      // 进入提前窗口（4500~5000）：高亮已切到第 1 行。
+      await tester.pumpWidget(buildWall(groups, 4600));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 1);
+      // 逐字渲染数据已提前构建（换行成本不压在行开始帧）。
+      expect(stateOf(tester).debugFragCacheEntries(), greaterThan(0));
+    });
+
+    testWidgets('关闭逐字扫亮时不提前', (tester) async {
+      final groups = wordGroups();
+      Widget wall(int pos) => MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 500,
+            child: AmllPhysicsWall(
+              groups: groups,
+              positionMs: pos,
+              wordSweep: false,
+              onSeek: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpWidget(wall(4600));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 0);
+    });
+
+    testWidgets('间隙不足 500ms：上一行扫亮完成后立即换行', (tester) async {
+      // 第 0 行扫亮 4800 才结束（理想切换点 4500 吃不满）：
+      // 退化为「扫亮一完成就换行」，不等行开始。
+      final groups = wordGroups(line0LastFragEnd: 4800);
+      // 扫亮未完成前不切换（不打断正在进行的逐字）。
+      await tester.pumpWidget(buildWall(groups, 4700));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 0);
+
+      // 扫亮在 4800 完成 → 4850 时已换行（而非等到 5000）。
+      await tester.pumpWidget(buildWall(groups, 4850));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 1);
+    });
+
+    testWidgets('上一行扫亮越过下一行起点（对唱）：不提前', (tester) async {
+      // 扫亮结束（5200）越过下一行起点（5000）：无空隙可用，按原时间切换。
+      final groups = wordGroups(line0LastFragEnd: 5200);
+      await tester.pumpWidget(buildWall(groups, 4900));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 0);
+
+      await tester.pumpWidget(buildWall(groups, 5000));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 1);
+    });
+
+    testWidgets('普通逐行歌词不提前（无逐字负载）', (tester) async {
+      final groups = buildGroups(10); // 每行 1000ms，无片段
+      await tester.pumpWidget(buildWall(groups, 4700));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 4);
+    });
+
+    testWidgets('滚动预滚在 endMs 连续（=下一行起点）时仍然生效', (tester) async {
+      // 回归：生产数据 endMs 恒为下一行起点，预滚曾因此被整体钳没——
+      // 高亮提前切换了，但滚动要等行开始才动。预滚判定必须用真实唱段结束
+      // （行 0 逐字 2000 唱完），预滚窗口 = 5000-600 = 4400。
+      final groups = wordGroups();
+      await tester.pumpWidget(buildWall(groups, 4500));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugAnchor(), 1);
+    });
+
+    testWidgets('间奏末尾：下一行是逐字行时间奏提前结束', (tester) async {
+      final groups = [
+        LyricGroup(
+          original: const LyricLine(timeMs: 0, text: 'AAAA'),
+          endMs: 2000,
+          fragments: const [
+            LyricFragment(text: 'AA', startMs: 0, durationMs: 1000),
+            LyricFragment(text: 'AA', startMs: 1000, durationMs: 1000),
+          ],
+        ),
+        LyricGroup(
+          original: const LyricLine(timeMs: 12000, text: 'BBBB'),
+          endMs: 16000,
+          fragments: const [
+            LyricFragment(text: 'BB', startMs: 0, durationMs: 1000),
+            LyricFragment(text: 'BB', startMs: 1000, durationMs: 1000),
+          ],
+        ),
+      ];
+      // 间奏中（12000-500=11500 之前）：无高亮。
+      await tester.pumpWidget(buildWall(groups, 11400));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), -1);
+
+      // 进入提前窗口：间奏提前结束，高亮直接落到下一行。
+      await tester.pumpWidget(buildWall(groups, 11600));
+      await settle(tester, frames: 10);
+      expect(stateOf(tester).debugActive(), 1);
+    });
+  });
+
   group('Spring1D 延迟语义', () {
     test('延迟期间继续朝当前目标运动，不冻结', () {
       final s = Spring1D();
