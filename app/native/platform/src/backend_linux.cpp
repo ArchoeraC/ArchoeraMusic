@@ -115,6 +115,10 @@ std::atomic<bool> g_theme_pending{false};
 std::atomic<bool> g_theme_dark{false};
 std::atomic<bool> g_theme_valid{false};
 
+// 深链接收常驻：与主题/防休眠订阅无关，启动即建立会话总线连接并注册
+// OpenUri，保证次实例（OAuth 回调 / archoera://）总能转发成功。
+std::atomic<bool> g_deeplink_events{false};
+
 // 系统强调色缓存（异步查询结果）：apl_system_accent 立即返回缓存，避免在
 // Dart/主线程同步等待 XDG portal（切回应用时会重读，同步调用会卡住 UI）。
 std::mutex g_accent_mtx;
@@ -839,6 +843,7 @@ void pumpLoop() {
             if (g_screen_events.load(std::memory_order_acquire) ||
                 g_accent_events.load(std::memory_order_acquire) ||
                 g_theme_events.load(std::memory_order_acquire) ||
+                g_deeplink_events.load(std::memory_order_acquire) ||
                 g_inhibit_pending.load(std::memory_order_acquire) ||
                 g_inhibit_on) {
                 c = ensureConn();
@@ -1973,6 +1978,9 @@ int32_t processElevation() {
 int32_t init() {
     dbus_threads_init_default();
     g_running.store(true, std::memory_order_release);
+    // 深链服务常驻：即使主题/防休眠从不订阅，也要建立会话总线并注册
+    // OpenUri，否则次实例（OAuth 回调）转发会因找不到服务而失败。
+    g_deeplink_events.store(true, std::memory_order_release);
     g_pump = new std::thread(pumpLoop);
     // 冷启动：命令行中的 archoera:// / nekomusic:// URL（协议处理程序把 URL
     // 作为 argv 传入）。
@@ -2151,25 +2159,32 @@ int32_t deepLinkTake(AplString* out) { return deepLinkTakeLinux(out); }
 int32_t deepLinkForward() {
     const std::string url = readCmdlineUrl();
     if (url.empty()) return 0;
-    DBusError err;
-    dbus_error_init(&err);
-    DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
-    if (c == nullptr) {
+    // 首实例可能仍在启动（深链服务尚未注册），短暂重试，避免把 OAuth 回调
+    // 当成「重复启动」丢弃。
+    for (int attempt = 0; attempt < 10; ++attempt) {
+        DBusError err;
+        dbus_error_init(&err);
+        DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
+        if (c == nullptr) {
+            dbus_error_free(&err);
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            continue;
+        }
+        DBusMessage* msg = dbus_message_new_method_call(
+            kDeepLinkName, kDeepLinkPath, kDeepLinkIface, "OpenUri");
+        const char* u = url.c_str();
+        dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
+        DBusMessage* reply =
+            dbus_connection_send_with_reply_and_block(c, msg, 2000, &err);
+        dbus_message_unref(msg);
+        const bool ok = reply != nullptr;
+        if (reply != nullptr) dbus_message_unref(reply);
         dbus_error_free(&err);
-        return ERR_BACKEND;
+        dbus_connection_unref(c);
+        if (ok) return 1;
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
-    DBusMessage* msg = dbus_message_new_method_call(
-        kDeepLinkName, kDeepLinkPath, kDeepLinkIface, "OpenUri");
-    const char* u = url.c_str();
-    dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
-    DBusMessage* reply =
-        dbus_connection_send_with_reply_and_block(c, msg, 2000, &err);
-    dbus_message_unref(msg);
-    const bool ok = reply != nullptr;
-    if (reply != nullptr) dbus_message_unref(reply);
-    dbus_error_free(&err);
-    dbus_connection_unref(c);
-    return ok ? 1 : ERR_BACKEND;
+    return ERR_BACKEND;
 }
 
 int32_t windowActivate() {
