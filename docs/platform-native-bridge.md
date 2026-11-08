@@ -171,7 +171,8 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 >
 > 次实例转发失败时返回负值；`main` 据此识别「带深链的二次启动」，静默退出而不是弹
 > 「应用已在运行」对话框（否则会吞掉 OAuth 回调）。首实例启动即注册 Linux `OpenUri`，
-> 不依赖主题/防休眠订阅。
+> 不依赖主题/防休眠订阅。次实例转发的传输方式：Linux 单向 D-Bus 广播信号、
+> Windows `WM_COPYDATA`（1s 超时，最多 3 次）、macOS 分布式通知；三端都不等待应用层回复。
 
 文件管理器定位（`APL_CAP_REVEAL_PATH`，ABI v2 起）：`apl_reveal_path(path)`
 在系统文件管理器中定位路径（文件 → 打开所在目录并选中；目录 → 打开）——

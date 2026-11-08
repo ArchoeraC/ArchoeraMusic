@@ -1092,9 +1092,9 @@ int32_t deepLinkTakeWin(AplString* out) {
 int32_t deepLinkForwardWin() {
     const std::string url = extractUrlFromCommandLine(::GetCommandLineW());
     if (url.empty()) return 0;
-    // 首实例可能仍在启动（隐藏消息窗口尚未创建），短暂重试，避免把 OAuth
-    // 回调当成「重复启动」丢弃。
-    for (int attempt = 0; attempt < 10; ++attempt) {
+    // 首实例可能仍在启动（隐藏消息窗口尚未创建），短暂重试；每次最多 1s，
+    // 首实例 UI 线程卡住时也不会让第二实例长时间挂起。
+    for (int attempt = 0; attempt < 3; ++attempt) {
         HWND target = ::FindWindowW(kDeepLinkClass, nullptr);
         if (target != nullptr) {
             COPYDATASTRUCT cds{};
@@ -1104,10 +1104,10 @@ int32_t deepLinkForwardWin() {
             DWORD_PTR result = 0;
             const LRESULT sent = ::SendMessageTimeoutW(
                 target, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&cds),
-                SMTO_ABORTIFHUNG | SMTO_NORMAL, 3000, &result);
+                SMTO_ABORTIFHUNG | SMTO_NORMAL, 1000, &result);
             if (sent != 0) return 1;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        std::this_thread::sleep_for(std::chrono::milliseconds(150));
     }
     return ERR_BACKEND;
 }
