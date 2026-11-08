@@ -248,6 +248,45 @@ jobs:
             C:\Users\runneradmin\AppData\Local\vcpkg\archives
           key: vcpkg-installed-${{ hashFiles('app/vcpkg.json') }}
 
+      # GitHub Release 资产偶发 504：先从官方/镜像预取 vcpkg 需要的
+      # Strawberry Perl（openssl 构建依赖），并用 vcpkg 自带的 SHA512 校验。
+      # 失败不致命，vcpkg 仍会按原逻辑直连下载。
+      - name: Prefetch vcpkg tools (GitHub 504 fallback)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $tool = "C:\vcpkg\scripts\cmake\vcpkg_find_acquire_program(PERL).cmake"
+          if (-not (Test-Path $tool)) { Write-Warning "未找到 vcpkg perl 工具定义"; exit 0 }
+          $c = Get-Content $tool -Raw
+          $fn = [regex]::Match($c, 'set\(download_filename "([^"]+)"\)').Groups[1].Value
+          $sha = [regex]::Match($c, 'set\(download_sha512 ([0-9a-fA-F]+)\)').Groups[1].Value
+          $url = [regex]::Match($c, 'set\(download_urls\s*\n?\s*"([^"]+)"').Groups[1].Value
+          if (-not $fn -or -not $sha -or -not $url) {
+            Write-Warning "无法解析 vcpkg perl 工具定义"; exit 0
+          }
+          $zip = Join-Path "C:\vcpkg\downloads" $fn
+          if ((Test-Path $zip) -and
+              ((Get-FileHash $zip -Algorithm SHA512).Hash.ToLower() -eq $sha.ToLower())) {
+            Write-Host "Strawberry Perl 已在 vcpkg 缓存中"; exit 0
+          }
+          New-Item -ItemType Directory -Force -Path (Split-Path $zip) | Out-Null
+          foreach ($u in @($url, "https://ghproxy.net/$url", "https://gh-proxy.com/$url")) {
+            try {
+              curl.exe -fL --retry 2 --retry-delay 5 -o "$zip.part" $u
+              if ((Get-FileHash "$zip.part" -Algorithm SHA512).Hash.ToLower() -eq $sha.ToLower()) {
+                Move-Item "$zip.part" $zip -Force
+                Write-Host "已从镜像获取: $u"
+                exit 0
+              }
+              Write-Warning "SHA512 不匹配: $u"
+            } catch {
+              Write-Warning "下载失败: $u"
+            }
+            Remove-Item "$zip.part" -ErrorAction SilentlyContinue
+          }
+          Write-Warning "所有源均失败，交由 vcpkg 直连重试"
+
       - name: Install vcpkg deps (manifest 模式，依赖清单见 app/vcpkg.json)
         if: matrix.os == 'windows'
         shell: bash
