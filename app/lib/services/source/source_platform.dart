@@ -1296,7 +1296,7 @@ class _Source extends SourcePlatform {
   @override
   String get source => '';
 
-  ///  走本站 `/api/*`：音频拉流带客户端标识头（UA + X--Client）。
+  ///  走本站 `/api/*`：音频拉流只需通用 UA（新协议无身份签名头）。
   @override
   Map<String, String> get mediaHeaders => RequestHeaders;
 
