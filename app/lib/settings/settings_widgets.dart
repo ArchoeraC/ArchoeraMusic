@@ -10,6 +10,7 @@ import '../../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/player/s_controls.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'settings/settings_widgets_tiles.dart';
 part 'settings/settings_widgets_fields.dart';
