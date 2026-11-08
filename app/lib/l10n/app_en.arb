@@ -1401,8 +1401,6 @@
   "settingsAmllAlign": "Active line position",
   "settingsAmllDim": "Inactive line dim",
   "settingsAmllWordSweep": "Word sweep",
-  "settingsAmllSyntheticSweep": "Synthetic sweep for plain lyrics",
-  "settingsAmllSyntheticSweepDesc": "Estimate per-word timing from the duration of each line for karaoke sweep (also applies to translations).",
   "settingsAmllHidePassed": "Hide passed lines",
   "settingsAmllScale": "Shrink inactive lines",
   "settingsAmllBlur": "Blur inactive lines",

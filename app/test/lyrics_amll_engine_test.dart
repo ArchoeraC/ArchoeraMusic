@@ -672,15 +672,16 @@ void main() {
   group('歌词间距（对齐 AMLL CSS 度量）', () {
     test('间距/行高常量与 AMLL 一致', () {
       expect(kLyricLineHeightEm, 1.2);
-      expect(kLyricLineGapEm, 0.8);
-      expect(kLyricTranslationGapEm, 0.3);
+      expect(kLyricLineGapEm, 1.0);
+      // AMLL 的主行/译文/音译是 `.lyricLine` 内的块级兄弟，没有 flex gap。
+      expect(kLyricTranslationGapEm, 0);
       expect(kLyricTranslationFontScale, 0.5);
       expect(kLyricTranslationLineHeightEm, 1.5);
       expect(lyricTranslationFontSize(14), 10); // 下限 10px
       expect(lyricTranslationFontSize(38), 19);
     });
 
-    test('相邻两行中心距 = 行高 + 0.8em 间距', () {
+    test('相邻两行中心距 = 行高 + 1.0em 间距', () {
       const fs = 20.0;
       const h = <double>[fs * kLyricLineHeightEm, fs * kLyricLineHeightEm];
       final centers = computeCenters(h, gapPx: fs * kLyricLineGapEm);
@@ -688,6 +689,30 @@ void main() {
         centers[1] - centers[0],
         closeTo(h[0] + fs * kLyricLineGapEm, 1e-9),
       );
+    });
+
+    test('背景人声行不与下一主行重叠（辅词「重字」回归）', () {
+      const fs = 20.0;
+      const gap = fs * kLyricLineGapEm;
+      // 主行 → 和声（0.7 字号）→ 下一主行。
+      final h = <double>[
+        fs * kLyricLineHeightEm,
+        fs * kBgFontScale * kLyricLineHeightEm,
+        fs * kLyricLineHeightEm,
+      ];
+      final c = computeCenters(h, gapPx: gap, isBg: const [false, true, false]);
+      // 相邻行块的上下边界不能相交。
+      expect(
+        (c[1] - h[1] / 2) - (c[0] + h[0] / 2),
+        closeTo(gap * 0.4, 1e-9),
+        reason: '和声紧贴主行（0.4× 行距）',
+      );
+      expect(
+        (c[2] - h[2] / 2) - (c[1] + h[1] / 2),
+        closeTo(gap, 1e-9),
+        reason: '下一主行必须排在和声之后，而不是叠在和声上',
+      );
+      expect(c[2] - c[1], greaterThan((h[1] + h[2]) / 2));
     });
 
     test('音译行计入行高（主行 + 音译 + 译文，顺序与绘制一致）', () {
@@ -702,10 +727,7 @@ void main() {
       final mainH = fs * kLyricLineHeightEm;
       final subH = lyricTranslationFontSize(fs) * kLyricTranslationLineHeightEm;
       final noSub = computeLineHeights(groups, fontSize: fs, maxWidth: 400);
-      expect(
-        noSub.single,
-        closeTo(mainH + fs * kLyricTranslationGapEm + subH, 0.01),
-      );
+      expect(noSub.single, closeTo(mainH + subH, 0.01));
 
       final withRoma = computeLineHeights(
         groups,
@@ -713,10 +735,7 @@ void main() {
         maxWidth: 400,
         showRomanization: true,
       );
-      expect(
-        withRoma.single,
-        closeTo(mainH + 2 * (fs * kLyricTranslationGapEm + subH), 0.01),
-      );
+      expect(withRoma.single, closeTo(mainH + 2 * subH, 0.01));
 
       // 关闭音译/翻译后只剩主行。
       final bare = computeLineHeights(
@@ -1002,7 +1021,7 @@ void main() {
       expect(left - right, greaterThan(60));
     });
 
-    testWidgets('翻译合成扫亮：激活行翻译走逐字渲染路径', (tester) async {
+    testWidgets('翻译逐字：激活行翻译走逐字渲染路径', (tester) async {
       final groups = [
         LyricGroup(
           original: const LyricLine(timeMs: 0, text: '主行'),
@@ -1092,9 +1111,9 @@ void main() {
         final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
         final b = raw!.buffer.asUint8List();
         int lum(int x, int y) => b[(y * img.width + x) * 4];
-        // 翻译行在主行下方（主行 y≈118..134，翻译 y≈150..160）；
-        // 已唱的 'AAAA ' 在左侧，其余在右侧。
-        for (var y = 148; y <= 162; y++) {
+        // 主行+翻译整块居中（主行 y≈109..135，翻译 y≈135..151，两者直接
+        // 堆叠、无 flex gap）；已唱的 'AAAA ' 在左侧，其余在右侧。
+        for (var y = 137; y <= 149; y++) {
           for (var x = 108; x <= 140; x++) {
             if (lum(x, y) > left) left = lum(x, y);
           }
@@ -1106,6 +1125,82 @@ void main() {
       expect(left, greaterThan(150), reason: '已唱翻译应明亮 ($left)');
       expect(right, lessThan(110), reason: '未唱翻译应压暗 ($right)');
       expect(left - right, greaterThan(40));
+    });
+
+    testWidgets('主行+译文/音译按整块居中，辅词行不复用上一行子行的空间', (tester) async {
+      tester.view.physicalSize = const Size(420, 320);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      const key = ValueKey('block-anchor');
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RepaintBoundary(
+            key: key,
+            child: Container(
+              color: const Color(0xFF101018),
+              child: SizedBox(
+                width: 420,
+                height: 320,
+                child: AmllPhysicsWall(
+                  groups: [
+                    LyricGroup(
+                      original: const LyricLine(timeMs: 0, text: '主行'),
+                      translation: 'translation line',
+                      romaji: 'romaji line here',
+                      endMs: 3000,
+                    ),
+                    LyricGroup(
+                      original: const LyricLine(timeMs: 3000, text: '和声'),
+                      isBG: true,
+                      endMs: 6000,
+                    ),
+                  ],
+                  positionMs: 0,
+                  fontSize: 26,
+                  showRomanization: true,
+                  blurQuality: LyricsBlurQuality.off,
+                  enableScale: false,
+                  alignFraction: 0.5,
+                  onSeek: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      for (var i = 0; i < 40; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      dynamic s = stateOf(tester);
+      final y = s.debugY() as List<double>;
+      final h = s.debugHeights() as List<double>;
+      // 上一行整块下边界 → 辅词行上边界之间的纯间距带。
+      final from = (y[0] + h[0] / 2 + 1).ceil();
+      final to = (y[1] - h[1] / 2 - 1).floor();
+      expect(to, greaterThan(from), reason: '辅词与上一行必须留出间距');
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+        find.byKey(key),
+      );
+      await tester.runAsync(() async {
+        final img = await boundary.toImage(pixelRatio: 1);
+        final raw = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+        final b = raw!.buffer.asUint8List();
+        var maxLum = 0;
+        for (var row = from; row <= to; row++) {
+          for (var x = 0; x < img.width; x++) {
+            final l = b[(row * img.width + x) * 4];
+            if (l > maxLum) maxLum = l;
+          }
+        }
+        // 旧实现把主行按自身高度居中，子行整体下探进这条间距带，正好压到
+        // 只留 0.4× 行距的辅词行上。
+        expect(
+          maxLum,
+          lessThan(60),
+          reason: '间距带内不应出现上一行译文/音译的字形（maxLum=$maxLum）',
+        );
+      });
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('音译行计入行高并正常渲染（含译文，来自 main 的罗马音能力）', (tester) async {
@@ -1559,11 +1654,21 @@ void main() {
       await settle(tester);
       dynamic s = stateOf(tester);
       final centers = s.debugCenters() as List<double>;
+      final heights = s.debugHeights() as List<double>;
       final mainGap = centers[2] - centers[0];
       final bgGap = centers[1] - centers[0];
       // 背景行挂在主行下方（间距明显小于两个主行之间的距离）。
       expect(centers[1], greaterThan(centers[0]));
       expect(bgGap, lessThan(mainGap));
+      // 相邻行块不得相交（辅词「重字」回归）。
+      expect(
+        centers[1] - centers[0],
+        greaterThan((heights[0] + heights[1]) / 2),
+      );
+      expect(
+        centers[2] - centers[1],
+        greaterThan((heights[1] + heights[2]) / 2),
+      );
       expect(tester.takeException(), isNull);
     });
 

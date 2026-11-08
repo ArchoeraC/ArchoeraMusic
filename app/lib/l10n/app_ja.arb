@@ -1450,8 +1450,6 @@
   "settingsAmllAlign": "アクティブ行の位置",
   "settingsAmllDim": "非アクティブ行の透明度",
   "settingsAmllWordSweep": "ワードスイープ",
-  "settingsAmllSyntheticSweep": "通常歌詞の合成スイープ",
-  "settingsAmllSyntheticSweepDesc": "逐字タイミングの無い歌詞を行の長さから推定してスイープ（翻訳・ルビにも適用）",
   "settingsAmllHidePassed": "歌い終わった行を隠す",
   "settingsAmllScale": "非アクティブ行を縮小",
   "settingsAmllBlur": "非アクティブ行をぼかす",
