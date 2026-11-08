@@ -163,10 +163,15 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 接收侧发 `APL_EVENT_DEEP_LINK` 信号，Dart 收到后调用 `apl_deep_link_take`。
 
 > **外部输入契约（SEC-31）**：deep link 接收的是**本机任意程序（含浏览器）都可触发**的
-> 外部 URI，故三端后端只识别**自有方案前缀 `archoera://`**（Linux 命令行 / `OpenUri`、
+> 外部 URI，故三端后端只识别**白名单方案前缀**（`archoera://` 自有动作 +
+> `nekomusic://sso/complete` NekoAuth 登录回调；Linux 命令行 / `OpenUri`、
 > Windows `WM_COPYDATA` / argv、macOS AppleEvent 均在入队前按前缀过滤），其余一律丢弃；
-> 交给 Dart 的内容仍按「只解析自有 host/path 形式、未知 host 忽略」处理。该能力免提权
+> 交给 Dart 的内容仍按「只解析已知 host/path 形式、未知 host 忽略」处理。该能力免提权
 > 注册，不接受任意 URL 打开/执行语义。
+>
+> 次实例转发失败时返回负值；`main` 据此识别「带深链的二次启动」，静默退出而不是弹
+> 「应用已在运行」对话框（否则会吞掉 OAuth 回调）。首实例启动即注册 Linux `OpenUri`，
+> 不依赖主题/防休眠订阅。
 
 文件管理器定位（`APL_CAP_REVEAL_PATH`，ABI v2 起）：`apl_reveal_path(path)`
 在系统文件管理器中定位路径（文件 → 打开所在目录并选中；目录 → 打开）——

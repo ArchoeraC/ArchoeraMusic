@@ -2106,12 +2106,6 @@ abstract class AppLocalizations {
   /// **'在搜索、我喜欢、收藏中显示 NK（默认关闭）'**
   String get settingsNekoEnableDesc;
 
-  /// No description provided for @settingsNekoUnavailable.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'未配置客户端标识（构建参数 NEKO_CLIENT_ID），NekoMusic 音源不可用。'**
-  String get settingsNekoUnavailable;
-
   /// No description provided for @settingsNekoLogin.
   ///
   /// In zh_CN, this message translates to:
@@ -2141,6 +2135,42 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'登录 NekoMusic'**
   String get nekoLoginTitle;
+
+  /// No description provided for @nekoLoginTabOauth.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'OAuth 登录'**
+  String get nekoLoginTabOauth;
+
+  /// No description provided for @nekoOauthTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'使用 NekoAuth 登录'**
+  String get nekoOauthTitle;
+
+  /// No description provided for @nekoOauthDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'将在系统浏览器中打开 NekoAuth，完成授权后自动返回本应用。'**
+  String get nekoOauthDesc;
+
+  /// No description provided for @nekoOauthOpen.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'在浏览器中登录'**
+  String get nekoOauthOpen;
+
+  /// No description provided for @nekoOauthWaiting.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请在浏览器中完成登录…'**
+  String get nekoOauthWaiting;
+
+  /// No description provided for @nekoOauthFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录失败'**
+  String get nekoOauthFailed;
 
   /// No description provided for @nekoLoginTabQr.
   ///

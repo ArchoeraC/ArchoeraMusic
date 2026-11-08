@@ -1116,10 +1116,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Mostrar NK en búsqueda, me gusta y biblioteca (desactivado por defecto)';
 
   @override
-  String get settingsNekoUnavailable =>
-      'No hay un ID de cliente configurado (NEKO_CLIENT_ID); la fuente NekoMusic no está disponible.';
-
-  @override
   String get settingsNekoLogin => 'Iniciar sesión';
 
   @override
@@ -1135,6 +1131,26 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get nekoLoginTitle => 'Iniciar sesión en NekoMusic';
+
+  @override
+  String get nekoLoginTabOauth => 'OAuth';
+
+  @override
+  String get nekoOauthTitle => 'Iniciar sesión con NekoAuth';
+
+  @override
+  String get nekoOauthDesc =>
+      'Abre NekoAuth en el navegador del sistema y vuelve a la app tras autorizar.';
+
+  @override
+  String get nekoOauthOpen => 'Iniciar sesión en el navegador';
+
+  @override
+  String get nekoOauthWaiting =>
+      'Completa el inicio de sesión en el navegador…';
+
+  @override
+  String get nekoOauthFailed => 'Error al iniciar sesión';
 
   @override
   String get nekoLoginTabQr => 'Código QR';

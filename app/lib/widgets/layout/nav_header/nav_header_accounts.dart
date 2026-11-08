@@ -133,7 +133,7 @@ class _AccountsMenu extends ConsumerWidget {
               case 'login_neko':
                 showNekoLoginDialog(context);
               case 'logout_neko':
-                nekoApi.logout();
+                unawaited(nekoApi.logout());
                 ref.read(likeControllerProvider).sync();
                 toast(
                   context.l10n.loginLoggedOut(
@@ -193,7 +193,7 @@ class _AccountsMenu extends ConsumerWidget {
               avatarName: biliNick.isEmpty ? 'B' : biliNick,
               displayName: biliNick.isEmpty ? l10n.brandBilibili : biliNick,
             ),
-            // 实验性音源 Neko（仅启用且配置了自有 client_id 时显示）。
+            // 实验性音源 Neko（仅启用时显示）。
             if (nekoEnabled)
               ..._platformSection(
                 l10n: l10n,
