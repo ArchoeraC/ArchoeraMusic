@@ -64,6 +64,12 @@ class NekoApi extends ChangeNotifier {
   /// OAuth 登录代次：取消 / 重新发起时递增，旧流程不再 claim。
   int _ssoGeneration = 0;
 
+  /// 本次登录流程的取消信号（关闭登录框 / 重新发起时完成）。
+  Completer<void>? _ssoCancel;
+
+  /// 当前是否由本进程临时注册了 `nekomusic://`。
+  bool _ssoSchemeRegistered = false;
+
   /// 头像缓存破坏版本（进程内唯一；换图后 URL 变化以绕过 CDN/HTTP 缓存）。
   final int _avatarVersion = DateTime.now().millisecondsSinceEpoch;
 
@@ -193,10 +199,11 @@ class NekoApi extends ChangeNotifier {
 
   /// NekoAuth 原生客户端登录（OIDC 授权码 + PKCE）。
   ///
-  /// 流程：注册 `nekomusic://` 深链 → `/api/user/sso/start` 取授权地址 →
+  /// 流程：临时注册 `nekomusic://` 深链 → `/api/user/sso/start` 取授权地址 →
   /// 系统浏览器打开 → 等待 `nekomusic://sso/complete?handoff=…` →
-  /// `/api/user/sso/claim` 换 token。超时 / 浏览器无法打开 / 领取失败抛
-  /// [NekoApiException]。
+  /// `/api/user/sso/claim` 换 token。**无论成功、失败、超时还是取消，结束时都会
+  /// 注销 `nekomusic://`**，只在 Auth 窗口期短暂接管协议，避免长期改写系统
+  /// 协议关联（降低被安全软件标记为可疑行为的概率）。
   Future<void> startSsoLogin({
     Duration timeout = const Duration(minutes: 5),
   }) async {
@@ -204,33 +211,59 @@ class NekoApi extends ChangeNotifier {
     if (!caps.deepLinkAvailable || !caps.openUrlAvailable) {
       throw NekoApiException('当前平台不支持浏览器回调登录');
     }
+    // 结束上一次未完成流程，避免两套监听 / 注册并存。
+    cancelSsoLogin();
     final generation = ++_ssoGeneration;
-    // 上一次未消费的 handoff 不能用于本次登录。
-    NekoSsoBridge.clearPending();
-    final registered = await caps.deepLink.register(kNekoSsoScheme);
-    if (!registered) {
-      throw NekoApiException('无法注册 nekomusic:// 登录回调');
+    final cancel = Completer<void>();
+    _ssoCancel = cancel;
+    try {
+      final registered = await caps.deepLink.register(kNekoSsoScheme);
+      if (registered) _ssoSchemeRegistered = true;
+      if (generation != _ssoGeneration) return; // 已取消 / 重新发起
+      if (!registered) {
+        throw NekoApiException('无法注册 nekomusic:// 登录回调');
+      }
+      final url = await ssoStartUrl();
+      if (generation != _ssoGeneration) return;
+      // 先挂监听再打开浏览器，避免回调早于订阅而丢事件。
+      final pending = NekoSsoBridge.waitForHandoff(
+        timeout: timeout,
+        cancel: cancel.future,
+      );
+      final rc = caps.openUrl(url);
+      if (rc != 0) {
+        throw NekoApiException('无法打开系统浏览器', kind: NekoErrorKind.network);
+      }
+      final handoff = await pending;
+      if (generation != _ssoGeneration) return; // 已取消 / 重新发起
+      if (handoff == null || handoff.isEmpty) {
+        throw NekoApiException('登录超时，请重试', kind: NekoErrorKind.network);
+      }
+      await ssoClaim(handoff);
+    } finally {
+      // 只有当前流程负责注销；若已有新流程接管，注册由新流程管理。
+      if (identical(_ssoCancel, cancel)) {
+        _ssoCancel = null;
+        if (_ssoSchemeRegistered) {
+          _ssoSchemeRegistered = false;
+          try {
+            await caps.deepLink.unregister(kNekoSsoScheme);
+          } catch (_) {
+            // 注销失败不影响登录结果（下次登录会重新注册）。
+          }
+        }
+      }
     }
-    final url = await ssoStartUrl();
-    // 先挂监听再打开浏览器，避免回调早于订阅而丢事件。
-    final pending = NekoSsoBridge.waitForHandoff(timeout: timeout);
-    final rc = caps.openUrl(url);
-    if (rc != 0) {
-      throw NekoApiException('无法打开系统浏览器', kind: NekoErrorKind.network);
-    }
-    final handoff = await pending;
-    if (generation != _ssoGeneration) return; // 已取消 / 重新发起
-    if (handoff == null || handoff.isEmpty) {
-      throw NekoApiException('登录超时，请重试', kind: NekoErrorKind.network);
-    }
-    await ssoClaim(handoff);
   }
 
   /// 取消正在等待的 OAuth 回调（关闭登录框 / 重新发起时调用）。
   ///
-  /// 递增代次后，旧流程即使收到 handoff 也不会再领取 token。
+  /// 完成取消信号后 `startSsoLogin` 会立即走到 `finally` 注销 `nekomusic://`，
+  /// 不需要等到 5 分钟超时。
   void cancelSsoLogin() {
     _ssoGeneration++;
+    final cancel = _ssoCancel;
+    if (cancel != null && !cancel.isCompleted) cancel.complete();
     NekoSsoBridge.clearPending();
   }
 
