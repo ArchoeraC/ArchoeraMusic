@@ -95,10 +95,23 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
   if (!firstInstance) {
-    // 协议唤醒：把本次 argv 中的 archoera:// 转发给首实例；成功则静默退出。
+    // 协议唤醒：把本次 argv 中的 archoera:// / nekomusic:// 转发给首实例；
+    // 成功则静默退出。
+    var forwarded = 0;
     if (platformCaps.deepLinkAvailable) {
-      final forwarded = await platformCaps.deepLink.forward();
+      forwarded = await platformCaps.deepLink.forward();
       if (forwarded == 1) exit(0);
+    }
+    // 由 deep link 唤起（如 OAuth 回调）但转发失败：绝不能当成「重复启动」
+    // 弹警告后退出——那会吞掉登录回调，用户只会看到「应用已在运行」。
+    // 原生 forward 返回负值表示「命令行里有深链但转发失败」；args 兜底覆盖
+    // 桥接不可用的情况。
+    if (forwarded < 0 || args.any(_isDeepLinkArg)) {
+      Log.w(
+        'startup',
+        '深链回调未能转交给首实例（forward=$forwarded），静默退出：$args',
+      );
+      exit(0);
     }
     final locale = _startupLocale(prefs);
     // 显示窗口（runner 默认隐藏常驻托盘），再呈现应用风格的警告对话框。
@@ -182,6 +195,12 @@ Future<void> main(List<String> args) async {
   WidgetsBinding.instance.addPostFrameCallback(
     (_) => deepLinkRouter.markReady(),
   );
+}
+
+/// 是否是本应用接受的深链参数（`archoera://` 或 NekoAuth 的 `nekomusic://`）。
+bool _isDeepLinkArg(String arg) {
+  final a = arg.toLowerCase();
+  return a.startsWith('archoera://') || a.startsWith('nekomusic://');
 }
 
 /// 启动门（提权 / 已有实例）可用的 locale：设置优先，否则跟随系统。

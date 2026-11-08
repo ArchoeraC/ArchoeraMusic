@@ -72,6 +72,15 @@ Accept-Language: zh-CN,zh;q=0.9,en;q=0.8
 请求 `POST /api/user/sso/logout-url`，把返回的 NekoAuth 注销地址交给系统浏览器
 打开；失败只记日志，不影响本地退出。
 
+### 深链回调与单实例
+
+系统打开 `nekomusic://sso/complete` 时可能启动第二个进程。第二实例只做 URI
+转发（`apl_deep_link_forward`）后静默退出：Linux 通过会话总线的 `OpenUri`、
+Windows 通过隐藏消息窗口的 `WM_COPYDATA`，均带短重试以覆盖首实例启动窗口。
+即使转发失败，只要命令行里带深链，也不会再弹「应用已在运行」——避免把登录
+回调误判为重复启动。首实例启动后即常驻注册 `OpenUri`（不依赖主题/防休眠订阅），
+保证回调能送达。
+
 ## 不变量
 
 1. access token / idToken 只存凭据保险库（vault 平台键 `neko`），不写日志、
