@@ -4161,8 +4161,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Fuente seleccionada por defecto al abrir Me gusta, Favoritos y Búsqueda';
 
   @override
-  String get settingsDefaultSourceAuto =>
-      'Automático (según el estado de sesión)';
+  String get settingsDefaultSourceAuto => 'Predeterminado';
 
   @override
   String get settingsCatScrape => 'Raspado';

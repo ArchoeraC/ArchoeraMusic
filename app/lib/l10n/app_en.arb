@@ -1193,7 +1193,7 @@
   "settingsMediaSourceSubtitle": "Default source · Streaming servers (Subsonic / Jellyfin / Emby)",
   "settingsDefaultSource": "Default source",
   "settingsDefaultSourceDesc": "Source selected by default when opening Liked, Favorites, and Search",
-  "settingsDefaultSourceAuto": "Auto (follow login status)",
+  "settingsDefaultSourceAuto": "Default",
   "settingsCatScrape": "Scrape",
   "settingsScrapeSubtitle": "Multi-source metadata: cover / lyrics / tags",
   "settingsSectionScrapeDirs": "Scrape Directories",

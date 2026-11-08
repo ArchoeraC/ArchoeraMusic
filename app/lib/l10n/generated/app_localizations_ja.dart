@@ -3937,7 +3937,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsDefaultSourceDesc => '「いいね」「お気に入り」「検索」を開いたときに既定で選択される音源';
 
   @override
-  String get settingsDefaultSourceAuto => '自動（ログイン状態に応じて）';
+  String get settingsDefaultSourceAuto => 'デフォルト';
 
   @override
   String get settingsCatScrape => 'スクレイピング';

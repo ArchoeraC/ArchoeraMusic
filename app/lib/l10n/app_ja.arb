@@ -1062,7 +1062,7 @@
   "settingsMediaSourceSubtitle": "デフォルト音源 · ストリーミングサーバー（Subsonic / Jellyfin / Emby）",
   "settingsDefaultSource": "デフォルト音源",
   "settingsDefaultSourceDesc": "「いいね」「お気に入り」「検索」を開いたときに既定で選択される音源",
-  "settingsDefaultSourceAuto": "自動（ログイン状態に応じて）",
+  "settingsDefaultSourceAuto": "デフォルト",
   "settingsCatScrape": "スクレイピング",
   "settingsScrapeSubtitle": "複数ソースのメタデータ補完：カバー / 歌詞 / タグ",
   "settingsSectionScrapeDirs": "スクレイプ対象ディレクトリ",

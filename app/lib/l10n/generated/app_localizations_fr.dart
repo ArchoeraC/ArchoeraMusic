@@ -4165,7 +4165,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'Source sélectionnée par défaut à louverture de Jaime, Favoris et Recherche';
 
   @override
-  String get settingsDefaultSourceAuto => 'Automatique (selon la connexion)';
+  String get settingsDefaultSourceAuto => 'Par défaut';
 
   @override
   String get settingsCatScrape => 'Scraping';

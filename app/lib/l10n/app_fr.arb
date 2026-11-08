@@ -1062,7 +1062,7 @@
   "settingsMediaSourceSubtitle": "Source par défaut · Serveurs de streaming (Subsonic / Jellyfin / Emby)",
   "settingsDefaultSource": "Source par défaut",
   "settingsDefaultSourceDesc": "Source sélectionnée par défaut à l'ouverture de J'aime, Favoris et Recherche",
-  "settingsDefaultSourceAuto": "Automatique (selon la connexion)",
+  "settingsDefaultSourceAuto": "Par défaut",
   "settingsCatScrape": "Scraping",
   "settingsScrapeSubtitle": "Métadonnées multi-sources : pochette / paroles / tags",
   "settingsSectionScrapeDirs": "Répertoires de scraping",
