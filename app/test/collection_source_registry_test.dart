@@ -68,6 +68,12 @@ void main() {
     );
   });
 
+  test('运行期 URL 过期恢复能力只在会过期直链的源上开启', () {
+    // NT 的 song_url 是带时效签名的 CDN 直链；本地文件不参与。
+    expect(sourcePlatform('netease').urlExpiryRecoverable, isTrue);
+    expect(sourcePlatform('local').urlExpiryRecoverable, isFalse);
+  });
+
   test('authSignal 以 ProviderListenable 暴露，可被容器 listen', () {
     final c = scoped();
     for (final p in collectionPlatforms(c)) {

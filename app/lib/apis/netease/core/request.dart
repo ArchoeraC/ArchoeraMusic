@@ -112,7 +112,14 @@ Map<String, String> _processCookieObject(
       .map((b) => b.toRadixString(16).padLeft(2, '0'))
       .join();
   final ntesNuid = cookie['_ntes_nuid'] ?? hexBytes(16);
-  final os = nmOsMap[cookie['os'] ?? 'pc'] ?? nmOsMap['pc']!;
+  // 未显式指定 os 时跟随宿主平台（对齐 config.ts HOST_OS_KEY）；显式 os 才用
+  // nmOsMap 里的固定版本号。宿主版本号只在「未显式指定」时使用，避免把
+  // Linux 主机的真实内核版本塞进 android/iphone 伪装。
+  final explicitOs = cookie['os'];
+  final os =
+      nmOsMap[explicitOs ?? nmHostOsKey] ??
+      nmOsMap[nmHostOsKey] ??
+      nmOsMap['pc']!;
   final now = DateTime.now().millisecondsSinceEpoch;
 
   final processed = <String, String>{
@@ -123,7 +130,7 @@ Map<String, String> _processCookieObject(
     '_ntes_nnid': cookie['_ntes_nnid'] ?? '$ntesNuid,$now',
     'WNMCID': cookie['WNMCID'] ?? _wnmcid,
     'WEVNSM': cookie['WEVNSM'] ?? '1.0.0',
-    'osver': cookie['osver'] ?? os['osver']!,
+    'osver': cookie['osver'] ?? (explicitOs == null ? nmHostOsVersion : os['osver']!),
     'deviceId': cookie['deviceId'] ?? nmGetDeviceId(),
     'os': cookie['os'] ?? os['os']!,
     'channel': cookie['channel'] ?? os['channel']!,
@@ -202,6 +209,7 @@ Future<NeteaseResponse> createRequest(
   Map<String, dynamic> encryptData;
   var isXeapi = false;
   var needDecrypt = false;
+  int? xeapiGeneration;
 
   switch (cryptoMode) {
     case 'weapi':
@@ -227,6 +235,9 @@ Future<NeteaseResponse> createRequest(
     case 'xeapi':
       isXeapi = true;
       needDecrypt = true;
+      // 先取当前代际号：公钥拉取期间若发生登出/reset，迟到的会话密钥必须丢弃。
+      final session = xeapi.nmGetXeapiSession();
+      xeapiGeneration = session.generation;
       final publicKeyState = await xeapi.nmEnsureXeapiKey(cookie['deviceId'] ?? '');
       final xeapiOs = cookie['os'] == 'android' ? cookie['os']! : 'android';
       final xeapiAppver =
@@ -253,16 +264,19 @@ Future<NeteaseResponse> createRequest(
         'buildver': xeapiBuildver,
         'sDeviceId': cookie['sDeviceId'] ?? cookie['deviceId'] ?? '',
       });
-      final session = xeapi.nmGetXeapiSession();
       final domain = options.domain.isEmpty ? nmXeapiDomain : options.domain;
       url = '$domain/xeapi/${uri.substring(5)}';
-      final enc = nm.nmXeapi(uri, data, nm.NmXeapiOptions(
-        publicKeyState: publicKeyState,
-        sessionId: session.sessionId,
-        sessionKey: session.sessionKey,
-        os: xeapiOs,
-      ));
-      encryptData = {'B': enc.B, 'S': enc.S, 'R': enc.R};
+      final enc = nm.nmXeapi(
+        uri,
+        data,
+        nm.NmXeapiOptions(
+          publicKeyState: publicKeyState,
+          sessionId: session.sessionId,
+          sessionKey: session.sessionKey,
+          os: xeapiOs,
+        ),
+      );
+      encryptData = {'C': enc.C, 'S': enc.S, 'R': enc.R};
       break;
     case 'eapi':
     case 'api':
@@ -362,10 +376,12 @@ Future<NeteaseResponse> createRequest(
   }
 
   // xeapi 会话密钥由响应头下发，缓存供后续请求复用
-  if (isXeapi) {
+  if (isXeapi && xeapiGeneration != null) {
     final ssid = response.headers.value('x-encr-ssid');
     final sskey = response.headers.value('x-encr-sskey');
-    if (ssid != null && sskey != null) xeapi.nmUpdateXeapiSession(ssid, sskey);
+    if (ssid != null && sskey != null) {
+      xeapi.nmUpdateXeapiSession(ssid, sskey, xeapiGeneration);
+    }
   }
 
   Map<String, dynamic> parsed;
@@ -377,17 +393,22 @@ Future<NeteaseResponse> createRequest(
       final decrypted = isXeapi
           ? nm.nmXeapiResDecrypt(bytes)
           : nm.nmEapiResDecrypt(hex, aeapi: headers['x-aeapi'] == 'true');
-      parsed = (decrypted is Map<String, dynamic>) ? decrypted : {'code': response.statusCode};
+      if (decrypted is! Map<String, dynamic>) {
+        throw const FormatException('netease response is not an object');
+      }
+      parsed = decrypted;
     } else {
       final text = await response.transform(utf8.decoder).join();
-      try {
-        parsed = jsonDecode(text) as Map<String, dynamic>;
-      } catch (_) {
-        parsed = {'code': response.statusCode, 'raw': text};
+      final decoded = jsonDecode(text);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('netease response is not an object');
       }
+      parsed = decoded;
     }
   } catch (_) {
-    parsed = {'code': response.statusCode, 'msg': 'parse failed'};
+    // 解析/解密失败一律视为上游 5xx，避免把坏响应伪装成 code=200 成功。
+    final status = response.statusCode >= 400 ? response.statusCode : 502;
+    parsed = {'code': status, 'msg': '网易云响应解析失败'};
   }
 
   if (parsed['code'] != null) parsed['code'] = (parsed['code'] as num).toInt();

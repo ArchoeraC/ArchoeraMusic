@@ -6,6 +6,9 @@ part of '../playback_notifier.dart';
 
 mixin _PlaybackNotifierSession
     on _PlaybackNotifierBase, _PlaybackNotifierQueue, _PlaybackNotifierLoading {
+  /// 运行期「源已过期」自动恢复的尝试上限（每首歌，开新歌时归零）。
+  static const _maxSourceRecoveryAttempts = 2;
+
   @override
   Future<void> _startSession(
     String source, {
@@ -23,6 +26,7 @@ mixin _PlaybackNotifierSession
     // 「已开始播放/时长/位置」覆盖回起点，表现为「缓冲态与实际出声错位，
     // 进度条、歌词等整体落后声音一截」。
     _sessionOffsetMs = offsetMs;
+    _sessionReady = false;
     state = state.copyWith(
       playing: false,
       position: Duration(milliseconds: offsetMs),
@@ -106,6 +110,7 @@ mixin _PlaybackNotifierSession
       _log('会话已放弃（就绪等待期间被 stop）');
       return;
     }
+    _sessionReady = true;
     _log(memoryStore ? '引擎 store 内存源会话就绪，开始播放' : '引擎会话就绪，开始播放');
     if (fadeIn) {
       // 过渡提示窗口：与淡入同宽（对齐 SPlayer「播放过渡时进度条已播放部分
@@ -239,6 +244,9 @@ mixin _PlaybackNotifierSession
         }
         _log('引擎错误: ${event.message}');
         state = state.copyWith(buffering: false);
+        // 在线签名直链过期（暂停/挂起较久后 seek/恢复）会在运行期报错：
+        // 重新解析同一曲目并从当前进度续播，避免用户以为「没点到」而连点。
+        unawaited(_recoverExpiredSource(event));
       case EngineSinkChanged():
         if (event.ok) {
           _log('输出设备已切换');
@@ -256,6 +264,7 @@ mixin _PlaybackNotifierSession
           _sinkFailureCtrl.add(event.message);
         }
       case EngineExited():
+        _sessionReady = false;
         if (_engine != null) {
           if (_autoResumeInFlight) {
             final retry = _retryableSnapshot;
@@ -274,8 +283,83 @@ mixin _PlaybackNotifierSession
     }
   }
 
+  /// 运行期源错误恢复：仅对声明 [SourcePlatform.urlExpiryRecoverable] 的源
+  /// （目前 NT 的签名直链）重新解析播放 URL，并从当前进度续播。
+  ///
+  /// 与「启动失败」不同，运行期 error 往往发生在暂停/挂起较久后的 seek 或
+  /// 恢复播放：旧 URL 的 CDN 签名已过期。此时自动换一首会让用户丢失进度，
+  /// 所以优先按原曲、原音质重新取址；取址失败才停在原地（保留进度）。
+  Future<void> _recoverExpiredSource(EngineError event) async {
+    // 启动期（ready 之前）的 error 由 load 的 catch 走「启动失败」路径，
+    // 这里只处理会话已就绪后的运行期源错误。
+    if (_sourceRecoveryBusy || !_sessionReady) return;
+    // 9/10 = TLS 证书/信任库问题：换一个签名 URL 也不会好，别做无谓重试。
+    if (event.status == 9 || event.status == 10) return;
+    final track = state.track;
+    final src = state.source;
+    if (track == null ||
+        src == null ||
+        !sourcePlatform(track.source).urlExpiryRecoverable) {
+      return;
+    }
+    if (!src.startsWith('http://') && !src.startsWith('https://')) return;
+    if (_sourceRecoveryAttempts >= _maxSourceRecoveryAttempts) {
+      _log('源恢复已达上限（$_maxSourceRecoveryAttempts 次），放弃: ${track.title}');
+      return;
+    }
+
+    _sourceRecoveryBusy = true;
+    _sourceRecoveryAttempts++;
+    final engine = _engine;
+    final gen = _loadGen;
+    final trackId = track.id;
+    final quality = state.quality;
+    var resumeMs = state.position.inMilliseconds;
+    final durMs = state.duration.inMilliseconds > 0
+        ? state.duration.inMilliseconds
+        : track.duration;
+    if (resumeMs < 0) resumeMs = 0;
+    if (durMs > 0 && resumeMs >= durMs) resumeMs = 0;
+    _log(
+      '播放源运行期失效（${event.message}'
+      '${event.status != 0 ? ' / status=${event.status}' : ''}）'
+      '→ 重新解析并续播 @${resumeMs}ms',
+    );
+    state = state.copyWith(buffering: true);
+    try {
+      final url = await _resolveSource(track, quality: quality);
+      if (!identical(_engine, engine) ||
+          gen != _loadGen ||
+          state.track?.id != trackId) {
+        _log('源恢复期间会话已切换，丢弃结果');
+        return;
+      }
+      if (url == null || url.isEmpty) {
+        _log('源恢复失败：无法重新解析播放源 ${track.title}');
+        state = state.copyWith(buffering: false);
+        return;
+      }
+      await load(
+        url,
+        bitrate: qualityBitrate[quality] ?? 128000,
+        title: track.title,
+        subtitle: track.subtitle,
+        trackId: track.id,
+        track: track,
+        quality: quality,
+        offsetMs: resumeMs,
+      );
+    } catch (e) {
+      _log('源恢复异常: ${track.title}: $e');
+      if (gen == _loadGen) state = state.copyWith(buffering: false);
+    } finally {
+      _sourceRecoveryBusy = false;
+    }
+  }
+
   @override
   Future<void> _stopEngine() async {
+    _sessionReady = false;
     for (final s in _engineSubs) {
       s.cancel();
     }
