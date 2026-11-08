@@ -229,11 +229,53 @@ jobs:
       # ───────────────────────── Windows（mingw / vcpkg）───────────────
       - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
         if: matrix.os == 'windows'
-        shell: bash
-        # pkgconfiglite 已移除：Windows 原生模块不依赖 pkg-config
-        # （audio-engine 由 build_windows.bat 的 cl.exe 直编、scraper 走
-        #   vcpkg toolchain、subsonic 的 sqlite 为 pure-Go modernc 实现）
+        shell: pwsh
+        # Chocolatey 包依赖 GitHub Release 资产；504 时不要让整个 job 直接失败，
+        # 后面用 runner 自带 MSYS2 或镜像下载的 mingw 兜底。
+        continue-on-error: true
         run: choco install mingw -y --no-progress
+
+      - name: Ensure mingw on PATH (Chocolatey 504 fallback)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          if (Get-Command gcc.exe -ErrorAction SilentlyContinue) {
+            Write-Host "gcc 已在 PATH"; exit 0
+          }
+          $candidates = @(
+            "C:\msys64\mingw64\bin",
+            "C:\msys64\ucrt64\bin",
+            "C:\mingw64\bin",
+            "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin"
+          )
+          foreach ($dir in $candidates) {
+            if (Test-Path (Join-Path $dir "gcc.exe")) {
+              $dir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+              Write-Host "使用已有 mingw: $dir"; exit 0
+            }
+          }
+
+          $asset = "x86_64-16.2.0-release-posix-seh-ucrt-rt_v14-rev1.7z"
+          $url = "https://github.com/niXman/mingw-builds-binaries/releases/download/16.2.0-rt_v14-rev1/$asset"
+          $archive = Join-Path $env:RUNNER_TEMP $asset
+          $ok = $false
+          foreach ($u in @(
+              $url,
+              "https://ghproxy.net/$url",
+              "https://gh-proxy.com/$url",
+              "https://ghfast.top/$url",
+              "https://gh.moeyy.xyz/$url",
+              "https://ghproxy.cc/$url",
+              "https://gh.llkk.cc/$url")) {
+            try {
+              curl.exe -fL --retry 2 --retry-delay 5 -o $archive $u
+              if ((Get-Item $archive).Length -gt 10MB) { $ok = $true; break }
+            } catch { Write-Warning "下载失败: $u" }
+          }
+          if (-not $ok) { Write-Error "无法获取 mingw（Chocolatey 与镜像均失败）"; exit 1 }
+          7z x $archive -o"C:\" -y | Out-Null
+          "C:\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          & "C:\mingw64\bin\gcc.exe" --version | Select-Object -First 1
 
       - name: Cache vcpkg installed (恢复；ffmpeg/taglib 等预编译跨 run 秒级恢复)
         if: matrix.os == 'windows'
