@@ -2,14 +2,17 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// deep link URI → 应用动作（scheme `archoera://`）。
+/// deep link URI → 应用动作。
 ///
-/// 语法（主机名 = 动作，路径/查询为参数）：
+/// `archoera://`（主机名 = 动作，路径/查询为参数）：
 ///   `archoera://player`                打开全屏播放页
 ///   `archoera://search?q=<keyword>`    打开搜索
 ///   `archoera://album/<id>`            打开流媒体专辑详情
 ///   `archoera://playlist/<id>`         打开流媒体歌单详情
 ///   `archoera://artist/<id>`           打开流媒体歌手详情
+///
+/// `nekomusic://`（仅用于 NekoAuth 登录回调）：
+///   `nekomusic://sso/complete?handoff=<一次性交接码>`
 ///
 /// 启动期（播放现场恢复完成前）到达的链接先缓冲，[markReady] 后统一派发。
 library;
@@ -17,6 +20,7 @@ library;
 import 'dart:async';
 
 import '../../app/router.dart';
+import '../neko/neko_sso_bridge.dart';
 import '../platform/system_deep_link.dart';
 
 class DeepLinkRouter {
@@ -53,6 +57,12 @@ class DeepLinkRouter {
   }
 
   void _dispatch(Uri uri) {
+    if (uri.scheme == kNekoSsoScheme) {
+      // NekoAuth 登录回调：投递给登录流程，不改动页面路由。
+      NekoSsoBridge.handleUri(uri);
+      unawaited(deepLink.activateWindow());
+      return;
+    }
     if (uri.scheme != 'archoera') return;
     final path = uri.pathSegments;
     String seg(int i) =>
