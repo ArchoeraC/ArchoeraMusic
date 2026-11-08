@@ -4176,6 +4176,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsPreviewLyric3 => 'Ahora solo te escucho a ti';
 
   @override
+  String get settingsPreviewLyricTranslation =>
+      'Traducción: Deja que la melodía descanse en tu latido';
+
+  @override
+  String get settingsPreviewLyricRomanization =>
+      'Romanizado: ye se zai chuang wai man man luo xia';
+
+  @override
+  String get settingsPreviewAlbum => 'Álbum de ejemplo';
+
+  @override
   String get settingsDefaultSource => 'Fuente predeterminada';
 
   @override

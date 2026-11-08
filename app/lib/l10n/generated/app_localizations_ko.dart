@@ -3956,6 +3956,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsPreviewLyric3 => '지금은 너의 목소리만 들려';
 
   @override
+  String get settingsPreviewLyricTranslation => '번역: 심장이 뛰는 자리에 멜로디를 멈춰 줘';
+
+  @override
+  String get settingsPreviewLyricRomanization =>
+      '로마자: ye se zai chuang wai man man luo xia';
+
+  @override
+  String get settingsPreviewAlbum => '예시 앨범';
+
+  @override
   String get settingsDefaultSource => '기본 음원';
 
   @override

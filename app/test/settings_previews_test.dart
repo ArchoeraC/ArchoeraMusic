@@ -6,6 +6,7 @@
 /// 且测试环境不启动循环动画（保证 pumpAndSettle 可收敛）。
 library;
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -13,14 +14,22 @@ import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/settings/settings_previews.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
 
+class _NoSavePrefs extends AppPrefsNotifier {
+  @override
+  AppPrefs build() => AppPrefs();
+}
+
 Widget _host(Widget child) {
-  return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: SizedBox(width: 420, child: child),
+  return ProviderScope(
+    overrides: [appPrefsProvider.overrideWith(_NoSavePrefs.new)],
+    child: MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(width: 420, child: child),
+        ),
       ),
     ),
   );
@@ -38,6 +47,12 @@ void main() {
             BackgroundEffectPreview(prefs: prefs),
             const SizedBox(height: 12),
             ThemeCoverPreview(prefs: prefs),
+            const SizedBox(height: 12),
+            LyricsStylePreview(prefs: prefs),
+            const SizedBox(height: 12),
+            ListDisplayPreview(prefs: prefs),
+            const SizedBox(height: 12),
+            SpectrumStylePreview(prefs: prefs),
             const SizedBox(height: 12),
             const CoverTransitionPreview(style: 'scale'),
             const SizedBox(height: 12),
