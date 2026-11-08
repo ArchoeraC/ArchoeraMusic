@@ -20,6 +20,7 @@ library;
 import 'dart:async';
 
 import '../../app/router.dart';
+import '../log/log.dart';
 import '..//_sso_bridge.dart';
 import '../platform/system_deep_link.dart';
 
@@ -59,6 +60,11 @@ class DeepLinkRouter {
   void _dispatch(Uri uri) {
     if (uri.scheme == kSsoScheme) {
       // Auth 登录回调：投递给登录流程，不改动页面路由。
+      Log.i(
+        'deeplink',
+        '收到 Auth 回调 host=${uri.host} path=${uri.path} '
+            'handoff=${uri.queryParameters.containsKey('handoff')}',
+      );
       SsoBridge.handleUri(uri);
       unawaited(deepLink.activateWindow());
       return;

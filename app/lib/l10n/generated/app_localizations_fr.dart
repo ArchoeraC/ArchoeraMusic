@@ -1138,13 +1138,25 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get OauthDesc =>
-      'Ouvre Auth dans le navigateur système et revient à l’application après autorisation.';
+      'Ouvrez le lien à usage unique ci-dessous dans n\'importe quel navigateur. Si votre navigateur par défaut ne peut pas se connecter, copiez-le dans un autre navigateur.';
 
   @override
   String get OauthOpen => 'Se connecter dans le navigateur';
 
   @override
-  String get OauthWaiting => 'Terminez la connexion dans le navigateur…';
+  String get OauthWaiting => 'En attente de l’autorisation…';
+
+  @override
+  String get OauthUrlLabel => 'Lien de connexion à usage unique';
+
+  @override
+  String get OauthCopy => 'Copier le lien';
+
+  @override
+  String get OauthCopied => 'Lien copié';
+
+  @override
+  String get OauthRefresh => 'Obtenir un nouveau lien';
 
   @override
   String get OauthFailed => 'Échec de la connexion';
@@ -2000,7 +2012,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSectionCover => 'Pochette';
 
   @override
-  String get settingsCoverRadius => 'Rayon des coins de pochette';
+  String get settingsCoverRadius => 'Coins de pochette hors lecteur';
 
   @override
   String get settingsCoverRadiusSharp => 'Carré（densité d\'information élevée）';
@@ -4143,7 +4155,17 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      'Serveurs de streaming (Subsonic / Jellyfin / Emby)';
+      'Source par défaut · Serveurs de streaming (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsDefaultSource => 'Source par défaut';
+
+  @override
+  String get settingsDefaultSourceDesc =>
+      'Source sélectionnée par défaut à louverture de Jaime, Favoris et Recherche';
+
+  @override
+  String get settingsDefaultSourceAuto => 'Par défaut';
 
   @override
   String get settingsCatScrape => 'Scraping';

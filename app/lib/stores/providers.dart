@@ -107,7 +107,9 @@ final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
 ///
 /// **实验性音源，默认关闭**（`source..enabled`）：关闭时 UI 不展示
 ///  平台、也不发请求。登录态变化（token 恢复 / 登录 / 登出）时通知 UI。
-final ApiProvider = ChangeNotifierProvider<Api>((ref) => Api());
+final ApiProvider = ChangeNotifierProvider<Api>(
+  (ref) => Api(autoClaimDeepLink: true),
+);
 
 ///  下载歌词重写（ 元数据已规范，仅下载时把站点广告歌词换成标准 LRC）。
 final LyricRewriterProvider = Provider<LyricRewriter>(

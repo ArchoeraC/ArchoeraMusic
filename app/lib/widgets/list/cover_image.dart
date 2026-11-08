@@ -4,10 +4,12 @@
 
 import 'dart:io';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 import '../../services/source/media_request_headers.dart';
+import '../../stores/app_prefs.dart';
 
 /// 网络封面浏览器 UA（NT封面 CDN `p1.music.126.net` 对 Dart 默认 UA 403）。
 ///
@@ -22,13 +24,13 @@ const coverUserAgent =
 ///
 /// 供歌曲列表、播放栏、全屏播放器等处复用：[cover] 为空、路径不可解析
 /// 或加载失败时显示 [EtaIcons.music] 占位（[primaryContainer] 底）。
-class CoverImage extends StatelessWidget {
+class CoverImage extends ConsumerWidget {
   const CoverImage({
     super.key,
     required this.cover,
     this.width = 48,
     this.height = 48,
-    this.radius = 8,
+    this.radius,
     this.iconSize = 22,
   });
 
@@ -38,21 +40,23 @@ class CoverImage extends StatelessWidget {
   final double width;
   final double height;
 
-  /// 圆角（占位与图片共用）。
-  final double radius;
+  /// 圆角（占位与图片共用；null = 跟随「设置 → 外观 → 封面圆角」）。
+  final double? radius;
 
   /// 占位音符图标大小。
   final double iconSize;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final double r = radius ??
+        ref.watch(appPrefsProvider.select((p) => p.coverRadius));
     final placeholder = Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
         color: scheme.primaryContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: BorderRadius.circular(r),
       ),
       child: Icon(EtaIcons.music, size: iconSize, color: scheme.primary),
     );
@@ -99,7 +103,7 @@ class CoverImage extends StatelessWidget {
           progress == null ? child : placeholder,
     );
 
-    return ClipRRect(borderRadius: BorderRadius.circular(radius), child: image);
+    return ClipRRect(borderRadius: BorderRadius.circular(r), child: image);
   }
 }
 

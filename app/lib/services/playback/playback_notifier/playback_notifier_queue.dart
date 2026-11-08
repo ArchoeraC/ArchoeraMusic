@@ -8,6 +8,75 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
   /// 连续失败硬上限。
   static const _maxConsecutiveFailures = 5;
 
+  /// 随机模式待播袋（只存曲目键，队列本身保持原顺序）。
+  final ShuffleBag _shuffleBag = ShuffleBag();
+
+  /// 随机模式播放历史（键），用于「上一首」回到上一首随机曲目。
+  final List<String> _shuffleHistory = <String>[];
+
+  /// 随机历史长度上限（避免长时间随机播放无限增长）。
+  static const _maxShuffleHistory = 200;
+
+  /// 曲目在随机袋中的稳定键（source + id；id 为空时回退标题/歌手）。
+  static String _trackKey(Track track) {
+    final id = track.id.trim();
+    if (id.isNotEmpty) return '${track.source}\u0000$id';
+    return '${track.source}\u0000${track.title}\u0000${track.subtitle}';
+  }
+
+  int _indexOfKey(List<Track> q, String key) {
+    for (var i = 0; i < q.length; i++) {
+      if (_trackKey(q[i]) == key) return i;
+    }
+    return -1;
+  }
+
+  /// 清空随机袋 / 历史（退出随机、重装队列、清空队列时调用）。
+  void _resetShuffleState() {
+    _shuffleBag.clear();
+    _shuffleHistory.clear();
+  }
+
+  /// 重填待播袋：排除当前曲，保证新一轮先覆盖队列其余曲目。
+  void _refillShuffleBag({int? excludeIndex}) {
+    final q = state.queue;
+    final exclude = excludeIndex ?? state.queueIndex;
+    _shuffleBag.reset([
+      for (var i = 0; i < q.length; i++)
+        if (i != exclude) _trackKey(q[i]),
+    ]);
+  }
+
+  /// 清理已从队列删除的曲目键；返回是否仍有待播曲目。
+  bool _pruneShuffleBag() {
+    final keys = {for (final t in state.queue) _trackKey(t)};
+    _shuffleBag.retainWhere(keys.contains);
+    return !_shuffleBag.isEmpty;
+  }
+
+  bool _shuffleCycleExhausted() => !_pruneShuffleBag();
+
+  /// 从待播袋随机取下一首的队列下标；袋空时按需开启新一轮。
+  int? _takeShuffleIndex({bool refill = true}) {
+    final q = state.queue;
+    if (q.isEmpty) return null;
+    if (q.length == 1) return 0;
+    if (!_pruneShuffleBag() && refill) _refillShuffleBag();
+    final key = _shuffleBag.take();
+    if (key == null) return null;
+    final idx = _indexOfKey(q, key);
+    return idx >= 0 ? idx : _takeShuffleIndex(refill: refill);
+  }
+
+  void _pushShuffleHistory() {
+    final track = state.currentQueueTrack;
+    if (track == null) return;
+    _shuffleHistory.add(_trackKey(track));
+    if (_shuffleHistory.length > _maxShuffleHistory) {
+      _shuffleHistory.removeAt(0);
+    }
+  }
+
   Future<String?> _resolveSource(Track track, {String? quality}) {
     return resolvePlaySource(
       ref,
@@ -159,12 +228,15 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
       _log('自动换源: ${track.title} → ${cand.source} 版本（${cand.title}）');
       final q = List.of(state.queue);
       if (state.queueIndex < 0 || state.queueIndex >= q.length) return false;
+      final oldKey = _trackKey(q[state.queueIndex]);
+      final newKey = _trackKey(cand);
       q[state.queueIndex] = cand;
-      state = state.copyWith(queue: q);
-      final orig = _originalQueue;
-      if (orig != null && state.queueIndex < orig.length) {
-        orig[state.queueIndex] = cand;
+      if (state.shuffle) {
+        for (var i = 0; i < _shuffleHistory.length; i++) {
+          if (_shuffleHistory[i] == oldKey) _shuffleHistory[i] = newKey;
+        }
       }
+      state = state.copyWith(queue: q);
       final ok = await _playTrackMeta(url, cand);
       return ok;
     }
@@ -202,36 +274,30 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
   void _advanceNext() {
     final q = state.queue;
     if (q.isEmpty) return;
+    if (state.shuffle) {
+      _pushShuffleHistory();
+      final next = _takeShuffleIndex();
+      if (next != null) state = state.copyWith(queueIndex: next);
+      return;
+    }
     final len = q.length;
     final idx = state.queueIndex;
-    if (idx >= len - 1) {
-      if (state.shuffle && len > 1) {
-        state = state.copyWith(
-          queue: _shuffledWithCurrentFirst(),
-          queueIndex: 1,
-        );
-        _log('随机模式：已重新洗牌队列');
-      } else {
-        state = state.copyWith(queueIndex: 0);
-      }
-    } else {
-      state = state.copyWith(queueIndex: idx + 1);
-    }
+    state = state.copyWith(queueIndex: idx >= len - 1 ? 0 : idx + 1);
   }
+
+  /// 仅测试用：推进到下一首（不触发实际播放）。
+  @visibleForTesting
+  void debugAdvanceNext() => _advanceNext();
 
   Future<void> playQueue(List<Track> tracks, {int startIndex = 0}) async {
     if (tracks.isEmpty) return;
     final idx = startIndex.clamp(0, tracks.length - 1);
-    _originalQueue = List.of(tracks);
+    _resetShuffleState();
+    // 随机模式也保持队列原顺序，只随机决定下一首的队列下标。
+    state = state.copyWith(queue: List.of(tracks), queueIndex: idx);
     if (state.shuffle) {
-      final q = List.of(tracks);
-      final current = q.removeAt(idx);
-      q.shuffle(math.Random());
-      q.insert(0, current);
-      state = state.copyWith(queue: q, queueIndex: 0);
-      _log('随机模式：已洗牌队列（${q.length} 首）');
-    } else {
-      state = state.copyWith(queue: List.of(tracks), queueIndex: idx);
+      _refillShuffleBag(excludeIndex: idx);
+      _log('随机模式：队列顺序不变，随机待播 ${_shuffleBag.length} 首');
     }
     await _playCurrent();
   }
@@ -256,8 +322,8 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
         await _handleTrackFailure(track, '无可用播放源');
         return;
       }
+      _resetShuffleState();
       state = state.copyWith(queue: [track], queueIndex: 0);
-      _originalQueue = List.of(state.queue);
       final ok = await _playTrackMeta(url, track);
       if (!ok) await _handleTrackFailure(track, '播放加载失败');
       return;
@@ -267,10 +333,11 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
       await playAtIndex(existing);
       return;
     }
+    if (state.shuffle) _pushShuffleHistory();
     final at = state.queueIndex + 1;
     final nq = List.of(q)..insert(at, track);
+    if (state.shuffle) _shuffleBag.remove(_trackKey(track));
     state = state.copyWith(queue: nq, queueIndex: at);
-    _originalQueue?.insert(at, track);
     final url = resolvedUrl ?? await _resolveSource(track);
     if (url == null || url.isEmpty) {
       _log('无法解析播放源: ${track.title}');
@@ -284,6 +351,21 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
   Future<void> playPrevious() async {
     final q = state.queue;
     if (q.isEmpty) return;
+    if (state.shuffle) {
+      // 随机模式：优先回到本轮的上一首随机曲目；历史为空时按原顺序兜底。
+      while (_shuffleHistory.isNotEmpty) {
+        final key = _shuffleHistory.removeLast();
+        final idx = _indexOfKey(q, key);
+        if (idx < 0) continue;
+        final cur = state.currentQueueTrack;
+        final curKey = cur == null ? null : _trackKey(cur);
+        _shuffleBag.remove(key);
+        if (curKey != null && curKey != key) _shuffleBag.add(curKey);
+        state = state.copyWith(queueIndex: idx);
+        await _playCurrent();
+        return;
+      }
+    }
     final idx = state.queueIndex > 0 ? state.queueIndex - 1 : q.length - 1;
     state = state.copyWith(queueIndex: idx);
     await _playCurrent();
@@ -305,6 +387,11 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
         state = state.copyWith(playing: true);
       }
       return;
+    }
+    if (state.shuffle) {
+      _pushShuffleHistory();
+      // 手动点播的曲目若还在本轮待播袋里，提前取出，避免之后重复播放。
+      _shuffleBag.remove(_trackKey(q[index]));
     }
     state = state.copyWith(queueIndex: index);
     await _playCurrent();
@@ -334,34 +421,14 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
 
   void setShuffle(bool on) {
     if (state.shuffle == on) return;
+    _resetShuffleState();
+    // 队列本身始终保持原顺序；随机只影响下一首的选择。
+    state = state.copyWith(shuffle: on);
     if (on) {
-      state = state.copyWith(
-        shuffle: true,
-        queue: _shuffledWithCurrentFirst(),
-        queueIndex: 0,
-      );
-      _log('随机播放已开启');
+      _refillShuffleBag();
+      _log('随机播放已开启：队列顺序不变，将在整个队列中随机跳转');
     } else {
-      final original = _originalQueue;
-      final q = state.queue;
-      final currentId = state.currentQueueTrack?.id;
-      List<Track> restored;
-      int idx;
-      if (original != null && original.isNotEmpty) {
-        restored = List.of(original);
-        idx = currentId != null
-            ? restored.indexWhere((t) => t.id == currentId)
-            : 0;
-        if (idx < 0) {
-          restored = List.of(q);
-          idx = state.queueIndex;
-        }
-      } else {
-        restored = List.of(q);
-        idx = state.queueIndex;
-      }
-      state = state.copyWith(shuffle: false, queue: restored, queueIndex: idx);
-      _log('随机播放已关闭');
+      _log('随机播放已关闭：按队列顺序播放');
     }
   }
 
@@ -371,12 +438,16 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     final q = List.of(state.queue);
     if (index < 0 || index >= q.length) return;
     final isCurrent = index == state.queueIndex;
-    q.removeAt(index);
-    _originalQueue?.removeAt(index);
+    final removed = q.removeAt(index);
+    if (state.shuffle) {
+      final key = _trackKey(removed);
+      _shuffleBag.remove(key);
+      _shuffleHistory.removeWhere((k) => k == key);
+    }
     if (isCurrent) {
       if (q.isEmpty) {
+        _resetShuffleState();
         state = state.copyWith(queue: const [], queueIndex: -1);
-        _originalQueue = null;
         await stop();
         return;
       }
@@ -395,9 +466,9 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     final q = List.of(state.queue);
     final qi = state.queueIndex;
     if (q.isEmpty) {
+      _resetShuffleState();
       q.add(track);
       state = state.copyWith(queue: q, queueIndex: 0);
-      _originalQueue = List.of(q);
       return 0;
     }
     final existing = _indexOfTrack(q, track);
@@ -407,8 +478,8 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
     }
     final at = qi + 1;
     q.insert(at, track);
+    if (state.shuffle) _shuffleBag.add(_trackKey(track));
     state = state.copyWith(queue: q);
-    _originalQueue?.insert(at, track);
     return at;
   }
 
@@ -417,16 +488,16 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
   int appendToQueue(Track track) {
     final q = List.of(state.queue);
     if (q.isEmpty) {
+      _resetShuffleState();
       q.add(track);
       state = state.copyWith(queue: q, queueIndex: 0);
-      _originalQueue = List.of(q);
       return 0;
     }
     final existing = _indexOfTrack(q, track);
     if (existing != -1) return existing;
     q.add(track);
+    if (state.shuffle) _shuffleBag.add(_trackKey(track));
     state = state.copyWith(queue: q);
-    _originalQueue?.add(track);
     return q.length - 1;
   }
 
@@ -450,30 +521,14 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
       qi++;
     }
     state = state.copyWith(queue: q, queueIndex: qi);
-    final orig = _originalQueue;
-    if (orig != null && from < orig.length && to < orig.length) {
-      final oi = orig.removeAt(from);
-      orig.insert(to, oi);
-    }
   }
 
   Future<void> clearQueue() async {
+    _resetShuffleState();
     state = state.copyWith(queue: const [], queueIndex: -1);
-    _originalQueue = null;
     if (state.source != null) {
       await stop();
     }
-  }
-
-  List<Track> _shuffledWithCurrentFirst() {
-    final q = List.of(state.queue);
-    if (q.length <= 1) return q;
-    var cur = state.queueIndex;
-    if (cur < 0 || cur >= q.length) cur = 0;
-    final current = q.removeAt(cur);
-    q.shuffle(math.Random());
-    q.insert(0, current);
-    return q;
   }
 
   static int _indexOfTrack(List<Track> q, Track track) {
@@ -500,6 +555,19 @@ mixin _PlaybackNotifierQueue on _PlaybackNotifierBase {
       _log('单曲循环: ${track.title}');
       final ok = await _playTrackMeta(url, track);
       if (!ok) await _handleTrackFailure(track, '单曲循环播放失败');
+      return;
+    }
+    // 随机播放：队列顺序不变，下一首从待播袋随机跳转；顺序播放（'off'）
+    // 在本轮随机完队列后同样自动暂停，列表循环则自动开启下一轮。
+    if (state.shuffle) {
+      if (state.repeatMode == 'off' && _shuffleCycleExhausted()) {
+        state = state.copyWith(playing: false, buffering: false);
+        _log('随机播放：本轮已随机播完队列，自动暂停');
+        unawaited(_stopEngine());
+        toast(ref.read(l10nProvider).queueFinished, type: ToastType.info);
+        return;
+      }
+      await playNext();
       return;
     }
     // 顺序播放（'off'）：播到队列末尾**自动暂停**，不回绕、不续播。

@@ -591,6 +591,8 @@ void handleMethodCall(DBusConnection* c, DBusMessage* msg) {
 }
 
 // ── 信号过滤 ──────────────────────────────────────────────────────
+void setPendingDeepLink(const char* uri);
+
 DBusHandlerResult filter(DBusConnection* c, DBusMessage* msg, void*) {
     const int type = dbus_message_get_type(msg);
     if (type == DBUS_MESSAGE_TYPE_METHOD_CALL) {
@@ -600,6 +602,14 @@ DBusHandlerResult filter(DBusConnection* c, DBusMessage* msg, void*) {
     if (type == DBUS_MESSAGE_TYPE_SIGNAL) {
         const char* member = dbus_message_get_member(msg);
         if (member == nullptr) return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        if (dbus_message_is_signal(msg, "org.archoera.DeepLink", "Uri")) {
+            const char* uri = nullptr;
+            if (dbus_message_get_args(msg, nullptr, DBUS_TYPE_STRING, &uri,
+                                      DBUS_TYPE_INVALID)) {
+                setPendingDeepLink(uri);
+            }
+            return DBUS_HANDLER_RESULT_HANDLED;
+        }
         if (g_screen_events.load(std::memory_order_acquire)) {
             if (std::strcmp(member, "ActiveChanged") == 0) {
                 dbus_bool_t active = FALSE;
@@ -677,11 +687,12 @@ DBusHandlerResult deepLinkObjectHandler(DBusConnection* c, DBusMessage* msg,
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 
-void registerDeepLinkObject(DBusConnection* c) {
+dbus_bool_t registerDeepLinkObject(DBusConnection* c) {
     static const DBusObjectPathVTable vtable = {
         nullptr, deepLinkObjectHandler, nullptr,
         nullptr, nullptr, nullptr};
-    dbus_connection_register_object_path(c, kDeepLinkPath, &vtable, nullptr);
+    return dbus_connection_register_object_path(c, kDeepLinkPath, &vtable,
+                                               nullptr);
 }
 
 std::string readCmdlineUrl() {
@@ -805,8 +816,12 @@ DBusConnection* ensureConn() {
 
     // 协议唤醒：第二个 well-known name（与 MPRIS 名不同，互不冲突），
     // 导出 OpenUri 供次实例转发（见 backend 接口 deepLinkForward）。
-    tryRequestName(c, kDeepLinkName);
-    registerDeepLinkObject(c);
+    const bool dl_name_ok = tryRequestName(c, kDeepLinkName);
+    const dbus_bool_t dl_obj_ok = registerDeepLinkObject(c);
+    log(1, "platform", dl_name_ok ? "deeplink name ok"
+                                  : "deeplink name busy (another instance)");
+    log(1, "platform", dl_obj_ok ? "deeplink object ok"
+                                 : "deeplink object register FAILED");
 
     pickScreensaver(c);
     addMatch(c,
@@ -821,6 +836,8 @@ DBusConnection* ensureConn() {
              "type='signal',interface='org.freedesktop.portal.Settings',member='SettingChanged'");
     addMatch(c,
              "type='signal',interface='org.kde.KGlobalSettings',member='notifyChange'");
+    addMatch(c,
+             "type='signal',interface='org.archoera.DeepLink',member='Uri'");
     dbus_connection_add_filter(c, filter, nullptr, nullptr);
 
     {
@@ -2159,32 +2176,28 @@ int32_t deepLinkTake(AplString* out) { return deepLinkTakeLinux(out); }
 int32_t deepLinkForward() {
     const std::string url = readCmdlineUrl();
     if (url.empty()) return 0;
-    // 首实例可能仍在启动（深链服务尚未注册），短暂重试，避免把 OAuth 回调
-    // 当成「重复启动」丢弃。
-    for (int attempt = 0; attempt < 10; ++attempt) {
-        DBusError err;
-        dbus_error_init(&err);
-        DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
-        if (c == nullptr) {
-            dbus_error_free(&err);
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            continue;
-        }
-        DBusMessage* msg = dbus_message_new_method_call(
-            kDeepLinkName, kDeepLinkPath, kDeepLinkIface, "OpenUri");
-        const char* u = url.c_str();
-        dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
-        DBusMessage* reply =
-            dbus_connection_send_with_reply_and_block(c, msg, 2000, &err);
-        dbus_message_unref(msg);
-        const bool ok = reply != nullptr;
-        if (reply != nullptr) dbus_message_unref(reply);
+    // 纯单向：广播信号后立即返回，不等首实例回复、不重试等待。
+    DBusError err;
+    dbus_error_init(&err);
+    DBusConnection* c = dbus_bus_get(DBUS_BUS_SESSION, &err);
+    if (c == nullptr) {
         dbus_error_free(&err);
-        dbus_connection_unref(c);
-        if (ok) return 1;
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        return ERR_BACKEND;
     }
-    return ERR_BACKEND;
+    DBusMessage* msg = dbus_message_new_signal(
+        kDeepLinkPath, "org.archoera.DeepLink", "Uri");
+    if (msg == nullptr) {
+        dbus_connection_unref(c);
+        return ERR_BACKEND;
+    }
+    const char* u = url.c_str();
+    dbus_message_append_args(msg, DBUS_TYPE_STRING, &u, DBUS_TYPE_INVALID);
+    dbus_uint32_t serial = 0;
+    const bool queued = dbus_connection_send(c, msg, &serial) != 0;
+    dbus_message_unref(msg);
+    if (queued) dbus_connection_flush(c);
+    dbus_connection_unref(c);
+    return queued ? 1 : ERR_BACKEND;
 }
 
 int32_t windowActivate() {

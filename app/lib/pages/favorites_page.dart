@@ -57,8 +57,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   void initState() {
     super.initState();
     // 恢复上次平台选择（壳内容因播放页展开被卸载后重建）；实验性音源已关闭
-    // 时不保留 NK 选择（避免对其发请求）。
-    var source = ref.read(favoritesPlatformProvider) ?? 'netease';
+    // 时不保留 NK 选择（避免对其发请求）。无显式选择时使用「默认音源」设置。
+    var source =
+        ref.read(favoritesPlatformProvider) ?? preferredCollectionSource(ref);
     // 已关闭（如实验性音源开关）的平台不保留选择：回退首个已启用平台。
     if (!collectionPlatform(source).enabled(ref)) {
       final enabled = collectionPlatforms(ref);
@@ -80,9 +81,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
     _loaded.clear();
   }
 
-  void _setPlatform(String source) {
+  void _setPlatform(String source, {bool remember = true}) {
     final adapter = collectionPlatform(source);
-    ref.read(favoritesPlatformProvider.notifier).set(source);
+    if (remember) ref.read(favoritesPlatformProvider.notifier).set(source);
     final restored = ref.read(adapter.tabSelection);
     setState(() {
       _platform = source;

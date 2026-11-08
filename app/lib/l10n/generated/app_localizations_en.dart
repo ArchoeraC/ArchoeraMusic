@@ -1131,13 +1131,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get OauthDesc =>
-      'Opens Auth in your system browser and returns to the app after authorization.';
+      'Open the one-time link below in any browser to authorize. If your default browser can\'t sign in, copy it to another browser.';
 
   @override
   String get OauthOpen => 'Sign in with browser';
 
   @override
-  String get OauthWaiting => 'Complete the sign-in in your browser…';
+  String get OauthWaiting => 'Waiting for authorization…';
+
+  @override
+  String get OauthUrlLabel => 'One-time sign-in link';
+
+  @override
+  String get OauthCopy => 'Copy link';
+
+  @override
+  String get OauthCopied => 'Link copied';
+
+  @override
+  String get OauthRefresh => 'Get a new link';
 
   @override
   String get OauthFailed => 'Sign-in failed';
@@ -1974,7 +1986,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionCover => 'Cover art';
 
   @override
-  String get settingsCoverRadius => 'Cover corner radius';
+  String get settingsCoverRadius => 'Cover corners outside player';
 
   @override
   String get settingsCoverRadiusSharp => 'Square (dense layout)';
@@ -4065,7 +4077,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      'Streaming servers (Subsonic / Jellyfin / Emby)';
+      'Default source · Streaming servers (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsDefaultSource => 'Default source';
+
+  @override
+  String get settingsDefaultSourceDesc =>
+      'Source selected by default when opening Liked, Favorites, and Search';
+
+  @override
+  String get settingsDefaultSourceAuto => 'Default';
 
   @override
   String get settingsCatScrape => 'Scrape';

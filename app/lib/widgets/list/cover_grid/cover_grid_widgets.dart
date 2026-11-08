@@ -7,7 +7,7 @@ part of '../cover_grid.dart';
 /// 封面网格（专辑 / 歌手 / 歌单共用，对齐原项目 CoverList）。
 ///
 /// 供搜索页、主页、歌单详情等复用：[CoverCard] 可单独用于横向列表。
-class CoverGrid extends StatelessWidget {
+class CoverGrid extends ConsumerWidget {
   const CoverGrid({
     super.key,
     required this.items,
@@ -18,7 +18,7 @@ class CoverGrid extends StatelessWidget {
     this.onReachBottom,
     this.maxCrossAxisExtent = 180,
     this.childAspectRatio = 0.78,
-    this.radius = 10,
+    this.radius,
     this.artist = false,
     this.showSource = false,
     this.shrinkWrap = false,
@@ -33,17 +33,21 @@ class CoverGrid extends StatelessWidget {
   final VoidCallback? onReachBottom;
   final double maxCrossAxisExtent;
   final double childAspectRatio;
-  final double radius;
+
+  /// null = 跟随外观设置里的「封面圆角」。
+  final double? radius;
   final bool artist;
   final bool showSource;
   final bool shrinkWrap;
   final ScrollPhysics? physics;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (items.isEmpty && !loading) {
       return const SizedBox.shrink();
     }
+    final double r = radius ??
+        ref.watch(appPrefsProvider.select((p) => p.coverRadius));
     final grid = InkClip(
       child: GridView.builder(
         shrinkWrap: shrinkWrap,
@@ -69,7 +73,7 @@ class CoverGrid extends StatelessWidget {
           final item = items[index];
           return CoverCard(
             item: item,
-            radius: radius,
+            radius: r,
             artist: artist,
             showSource: showSource,
             onTap: () => onTap(item),
@@ -90,7 +94,7 @@ class CoverGrid extends StatelessWidget {
 }
 
 /// 横向封面走带（主页区段：推荐歌单 / 新碟 / 热门歌手）。
-class CoverRail extends StatelessWidget {
+class CoverRail extends ConsumerWidget {
   const CoverRail({
     super.key,
     required this.items,
@@ -99,7 +103,7 @@ class CoverRail extends StatelessWidget {
     this.cardWidth = 140,
     this.height = 178,
     this.loading = false,
-    this.radius = 10,
+    this.radius,
     this.artist = false,
   });
 
@@ -109,14 +113,18 @@ class CoverRail extends StatelessWidget {
   final double cardWidth;
   final double height;
   final bool loading;
-  final double radius;
+
+  /// null = 跟随外观设置里的「封面圆角」。
+  final double? radius;
   final bool artist;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (items.isEmpty && !loading) {
       return const SizedBox.shrink();
     }
+    final double r = radius ??
+        ref.watch(appPrefsProvider.select((p) => p.coverRadius));
     return SizedBox(
       height: height,
       child: InkClip(
@@ -151,7 +159,7 @@ class CoverRail extends StatelessWidget {
               width: cardWidth,
               child: CoverCard(
                 item: item,
-                radius: radius,
+                radius: r,
                 artist: artist,
                 onTap: () => onTap(item),
                 onPlay: onPlay == null ? null : () => onPlay!(item),
