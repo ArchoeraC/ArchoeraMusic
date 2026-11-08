@@ -83,6 +83,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionAccent,
+          preview: ThemeCoverPreview(prefs: prefs),
           children: [
             SettingTile(
               icon: EtaIcons.palette2Outline,
@@ -131,11 +132,12 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         ),
         const SizedBox(height: 8),
         SettingNote(text: l10n.settingsGlobalTintNote),
-        const SizedBox(height: 12),
-        ThemeCoverPreview(prefs: prefs),
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionStyle,
+          preview: appearanceStyle.usesImageBackground
+              ? BackgroundEffectPreview(prefs: prefs)
+              : null,
           children: [
             SettingTile(
               icon: EtaIcons.picOutline,
@@ -155,8 +157,6 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         if (appearanceStyle.usesImageBackground) ...[
           const SizedBox(height: 8),
           _backgroundCard(scheme, prefs, l10n, notifier),
-          const SizedBox(height: 12),
-          BackgroundEffectPreview(prefs: prefs),
           if (imageStyle) ...[
             const SizedBox(height: 12),
             SettingCard(
@@ -207,6 +207,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionLayout,
+          preview: RouteTransitionPreview(style: prefs.routeTransition),
           children: [
             SettingSwitchTile(
               icon: EtaIcons.miniplayerOutline,
@@ -271,8 +272,6 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        RouteTransitionPreview(style: prefs.routeTransition),
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionFont,
@@ -300,6 +299,7 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionCover,
+          preview: ThemeCoverPreview(prefs: prefs, compact: true),
           children: [
             SettingTile(
               icon: EtaIcons.square,
@@ -321,8 +321,6 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        ThemeCoverPreview(prefs: prefs, compact: true),
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionWeather,

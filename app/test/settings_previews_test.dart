@@ -12,7 +12,9 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/settings/settings_previews.dart';
+import 'package:archoera_music/settings/settings_widgets.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 class _NoSavePrefs extends AppPrefsNotifier {
   @override
@@ -89,5 +91,28 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('设置分区预览默认收起，点击眼睛后展开', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        const SettingSection(
+          title: 'Section',
+          preview: Text('PREVIEW'),
+          children: [Text('CHILD')],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('CHILD'), findsOneWidget);
+    expect(find.text('PREVIEW'), findsNothing, reason: '预览默认不占据页面高度');
+
+    await tester.tap(find.byIcon(EtaIcons.eyeOutline));
+    await tester.pumpAndSettle();
+    expect(find.text('PREVIEW'), findsOneWidget);
+
+    await tester.tap(find.byIcon(EtaIcons.eyeCloseOutline));
+    await tester.pumpAndSettle();
+    expect(find.text('PREVIEW'), findsNothing);
   });
 }

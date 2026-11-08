@@ -135,6 +135,7 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
         SettingSection(
           title: l10n.settingsSectionLyricStyle,
           note: l10n.settingsLyricsNote,
+          preview: LyricsStylePreview(prefs: prefs),
           children: [
             SettingSliderTile(
               icon: EtaIcons.fontSize,
@@ -215,8 +216,6 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        LyricsStylePreview(prefs: prefs),
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsLyricSourceOrder,
