@@ -81,8 +81,10 @@ macOS 的 scheme 由 `Info.plist` 静态声明，无法运行时开关，只能�
 注册；Windows / Linux 均按上述生命周期注册与注销。
 
 系统打开 `nekomusic://sso/complete` 时可能启动第二个进程。第二实例只做 URI
-转发（`apl_deep_link_forward`）后静默退出：Linux 通过会话总线的 `OpenUri`、
-Windows 通过隐藏消息窗口的 `WM_COPYDATA`，均带短重试以覆盖首实例启动窗口。
+转发（`apl_deep_link_forward`）后静默退出：Linux 通过会话总线的**单向广播信号**、
+Windows 通过隐藏消息窗口的 `WM_COPYDATA`（1s 超时 + 短重试）、macOS 通过
+同用户 DistributedNotification，均**不等待应用层回复**，避免首实例繁忙时卡死
+第二实例。
 即使转发失败，只要命令行里带深链，也不会再弹「应用已在运行」——避免把登录
 回调误判为重复启动。首实例启动后即常驻注册 `OpenUri`（不依赖主题/防休眠订阅），
 保证回调能送达。
