@@ -694,16 +694,36 @@ std::string readCmdlineUrl() {
         if (end == std::string::npos) end = data.size();
         const std::string arg = data.substr(start, end - start);
         if (arg.rfind("archoera://", 0) == 0) return arg;
+        // NekoAuth 登录回调（NekoMusic 固定使用 nekomusic://）。
+        if (arg.rfind("nekomusic://", 0) == 0) return arg;
         start = end + 1;
     }
     return std::string();
 }
 
-std::string desktopFilePath() {
+std::string desktopFilePath(const char* scheme) {
     const char* home = std::getenv("HOME");
     if (home == nullptr || *home == '\0') return std::string();
-    return std::string(home) +
-           "/.local/share/applications/archoera_music.desktop";
+    // archoera 保持历史文件名（兼容旧版注册）；其它 scheme 单独一个 .desktop，
+    // 避免后注册的 scheme 覆盖前一 scheme 的 MimeType。
+    const bool primary = scheme != nullptr && std::strcmp(scheme, "archoera") == 0;
+    const std::string name =
+        primary ? std::string("archoera_music.desktop")
+                : std::string("archoera_music_") + scheme + ".desktop";
+    return std::string(home) + "/.local/share/applications/" + name;
+}
+
+// scheme 会拼进文件名：只允许小写字母 / 数字 / 连字符。
+bool isValidScheme(const char* scheme) {
+    if (scheme == nullptr || *scheme == '\0') return false;
+    for (const char* p = scheme; *p != '\0'; ++p) {
+        const char c = *p;
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+              c == '-')) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // ── 连接管理 ──────────────────────────────────────────────────────
@@ -1954,7 +1974,8 @@ int32_t init() {
     dbus_threads_init_default();
     g_running.store(true, std::memory_order_release);
     g_pump = new std::thread(pumpLoop);
-    // 冷启动：命令行中的 archoera:// URL（协议处理程序把 URL 作为 argv 传入）。
+    // 冷启动：命令行中的 archoera:// / nekomusic:// URL（协议处理程序把 URL
+    // 作为 argv 传入）。
     const std::string cold = readCmdlineUrl();
     if (!cold.empty()) {
         std::lock_guard<std::mutex> lock(g_deeplink_mutex);
@@ -2074,8 +2095,8 @@ int32_t appInstanceAcquire() {
 }
 
 int32_t protocolRegister(const char* scheme) {
-    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
-    const std::string path = desktopFilePath();
+    if (!isValidScheme(scheme)) return ERR_STATE;
+    const std::string path = desktopFilePath(scheme);
     if (path.empty()) return ERR_BACKEND;
     char exe[4096] = {0};
     const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
@@ -2119,8 +2140,8 @@ int32_t protocolRegister(const char* scheme) {
 }
 
 int32_t protocolUnregister(const char* scheme) {
-    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
-    const std::string path = desktopFilePath();
+    if (!isValidScheme(scheme)) return ERR_STATE;
+    const std::string path = desktopFilePath(scheme);
     if (!path.empty()) ::unlink(path.c_str());
     return OK;
 }

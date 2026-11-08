@@ -949,6 +949,13 @@ std::string extractUrlFromCommandLine(const wchar_t* cmd) {
             ::_wcsnicmp(token.c_str(), wprefix.c_str(), wprefix.size()) == 0) {
             return wideToUtf8Local(token.c_str());
         }
+        // NekoAuth 登录回调（NekoMusic 固定使用 nekomusic://）。
+        const std::wstring nekoprefix = L"nekomusic://";
+        if (token.size() >= nekoprefix.size() &&
+            ::_wcsnicmp(token.c_str(), nekoprefix.c_str(),
+                        nekoprefix.size()) == 0) {
+            return wideToUtf8Local(token.c_str());
+        }
     }
     return std::string();
 }
@@ -1008,8 +1015,21 @@ void destroyDeepLinkWindow() {
     }
 }
 
+// scheme 会拼进 HKCU 注册表路径：只允许小写字母 / 数字 / 连字符。
+bool isValidScheme(const char* scheme) {
+    if (scheme == nullptr || *scheme == '\0') return false;
+    for (const char* p = scheme; *p != '\0'; ++p) {
+        const char c = *p;
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+              c == '-')) {
+            return false;
+        }
+    }
+    return true;
+}
+
 int32_t protocolRegisterWin(const char* scheme) {
-    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
+    if (!isValidScheme(scheme)) return ERR_STATE;
     const std::wstring base =
         L"Software\\Classes\\" + utf8ToWideLocal(scheme);
     HKEY hkey = nullptr;
@@ -1044,7 +1064,7 @@ int32_t protocolRegisterWin(const char* scheme) {
 }
 
 int32_t protocolUnregisterWin(const char* scheme) {
-    if (scheme == nullptr || *scheme == '\0') return ERR_STATE;
+    if (!isValidScheme(scheme)) return ERR_STATE;
     const std::wstring base =
         L"Software\\Classes\\" + utf8ToWideLocal(scheme);
     ::RegDeleteTreeW(HKEY_CURRENT_USER, base.c_str());
