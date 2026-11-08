@@ -387,7 +387,7 @@ int32_t init() {
     }
     // 冷启动：LaunchServices 把 URL 作为启动参数传入。
     for (NSString* arg in [[NSProcessInfo processInfo] arguments]) {
-        if ([arg hasPrefix:@"archoera://"]) {
+        if ([arg hasPrefix:@"archoera://"] || [arg hasPrefix:@"nekomusic://"]) {
             setPendingDeepLink([arg UTF8String]);
             break;
         }
