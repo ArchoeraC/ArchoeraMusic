@@ -7276,6 +7276,24 @@ abstract class AppLocalizations {
   /// **'这一刻只听得到你'**
   String get settingsPreviewLyric3;
 
+  /// No description provided for @settingsPreviewLyricTranslation.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'译文：让旋律停在心跳的位置'**
+  String get settingsPreviewLyricTranslation;
+
+  /// No description provided for @settingsPreviewLyricRomanization.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'罗马音：ye se zai chuang wai man man luo xia'**
+  String get settingsPreviewLyricRomanization;
+
+  /// No description provided for @settingsPreviewAlbum.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'示例专辑'**
+  String get settingsPreviewAlbum;
+
   /// No description provided for @settingsDefaultSource.
   ///
   /// In zh_CN, this message translates to:
