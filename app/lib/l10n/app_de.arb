@@ -1062,7 +1062,7 @@
   "settingsMediaSourceSubtitle": "Standardquelle · Streaming-Server (Subsonic / Jellyfin / Emby)",
   "settingsDefaultSource": "Standardquelle",
   "settingsDefaultSourceDesc": "Beim Öffnen von „Liked“, „Favoriten“ und „Suche“ standardmäßig ausgewählte Quelle",
-  "settingsDefaultSourceAuto": "Automatisch (nach Anmeldestatus)",
+  "settingsDefaultSourceAuto": "Standard",
   "settingsCatScrape": "Scraping",
   "settingsScrapeSubtitle": "Metadaten aus mehreren Quellen: Cover / Lyrics / Tags",
   "settingsSectionScrapeDirs": "Scrape-Verzeichnisse",

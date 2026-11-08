@@ -4087,7 +4087,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Source selected by default when opening Liked, Favorites, and Search';
 
   @override
-  String get settingsDefaultSourceAuto => 'Auto (follow login status)';
+  String get settingsDefaultSourceAuto => 'Default';
 
   @override
   String get settingsCatScrape => 'Scrape';

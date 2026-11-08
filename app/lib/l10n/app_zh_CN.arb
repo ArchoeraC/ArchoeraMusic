@@ -1212,7 +1212,7 @@
   "settingsMediaSourceSubtitle": "默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）",
   "settingsDefaultSource": "默认音源",
   "settingsDefaultSourceDesc": "打开「我喜欢」「收藏」「搜索」时默认选中的音源",
-  "settingsDefaultSourceAuto": "自动（按登录状态）",
+  "settingsDefaultSourceAuto": "默认",
   "settingsCatScrape": "刮削",
   "settingsScrapeSubtitle": "多源元数据补齐 · 封面 / 歌词 / 标签",
   "settingsSectionScrapeDirs": "刮削目录",

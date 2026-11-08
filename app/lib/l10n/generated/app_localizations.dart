@@ -7249,7 +7249,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsDefaultSourceAuto.
   ///
   /// In zh_CN, this message translates to:
-  /// **'自动（按登录状态）'**
+  /// **'默认'**
   String get settingsDefaultSourceAuto;
 
   /// No description provided for @settingsCatScrape.

@@ -4132,7 +4132,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Beim Öffnen von „Liked“, „Favoriten“ und „Suche“ standardmäßig ausgewählte Quelle';
 
   @override
-  String get settingsDefaultSourceAuto => 'Automatisch (nach Anmeldestatus)';
+  String get settingsDefaultSourceAuto => 'Standard';
 
   @override
   String get settingsCatScrape => 'Scraping';

@@ -1162,7 +1162,7 @@
   "settingsMediaSourceSubtitle": "預設音源 · 串流伺服器（Subsonic / Jellyfin / Emby）",
   "settingsDefaultSource": "預設音源",
   "settingsDefaultSourceDesc": "開啟「我喜歡」「收藏」「搜尋」時預設選中的音源",
-  "settingsDefaultSourceAuto": "自動（依登入狀態）",
+  "settingsDefaultSourceAuto": "預設",
   "settingsCatScrape": "刮削",
   "settingsScrapeSubtitle": "多來源中繼資料補齊 · 封面 / 歌詞 / 標籤",
   "settingsSectionScrapeDirs": "刮削目錄",
