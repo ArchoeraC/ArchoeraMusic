@@ -176,7 +176,7 @@ void main() {
       expect(heights[0], closeTo(mainH, 0.01));
       expect(
         heights[1],
-        closeTo(mainH + fontSize * kLyricTranslationGapEm + subH, 0.01),
+        closeTo(mainH + subH, 0.01),
       );
       expect(heights[2], closeTo(mainH, 0.01));
 
@@ -187,6 +187,39 @@ void main() {
         showTranslation: false,
       );
       expect(noTrans[1], closeTo(mainH, 0.01));
+    });
+
+    test('背景人声行自带的译文也计入行高（避免压在下一行上）', () {
+      final bg = <LyricGroup>[
+        const LyricGroup(
+          original: LyricLine(timeMs: 0, text: '和声'),
+          isBG: true,
+          translation: 'harmony',
+        ),
+      ];
+      final bgFs = fontSize * kBgFontScale;
+      final subFs = lyricTranslationFontSize(bgFs);
+      final subH = subFs * kLyricTranslationLineHeightEm;
+      final h = computeLineHeights(
+        bg,
+        fontSize: fontSize,
+        maxWidth: maxWidth,
+      ).single;
+      expect(
+        h,
+        closeTo(
+          bgFs * kLyricLineHeightEm + subH,
+          0.5,
+        ),
+      );
+      final withoutTranslation = computeLineHeights(
+        const [
+          LyricGroup(original: LyricLine(timeMs: 0, text: '和声'), isBG: true),
+        ],
+        fontSize: fontSize,
+        maxWidth: maxWidth,
+      ).single;
+      expect(h, greaterThan(withoutTranslation));
     });
 
     test('computeCenters 按 半高+间隙+半高 累计', () {

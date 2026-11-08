@@ -1424,8 +1424,6 @@
   "settingsAmllAlign": "激活行位置",
   "settingsAmllDim": "非激活行透明度",
   "settingsAmllWordSweep": "逐字扫亮",
-  "settingsAmllSyntheticSweep": "单行歌词合成扫亮",
-  "settingsAmllSyntheticSweepDesc": "没有逐字时间的歌词按行时长推算扫亮（翻译 / 音译同样生效）",
   "settingsAmllHidePassed": "隐藏已唱行",
   "settingsAmllScale": "非激活行缩放",
   "settingsAmllBlur": "非激活行失焦",

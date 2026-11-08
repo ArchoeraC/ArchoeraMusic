@@ -4841,14 +4841,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsAmllWordSweep => 'Wort-Sweep';
 
   @override
-  String get settingsAmllSyntheticSweep =>
-      'Synthetischer Sweep für einfache Lyrics';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc =>
-      'Wort-Timing aus der Zeilendauer schätzen (auch für Übersetzungen).';
-
-  @override
   String get settingsAmllHidePassed => 'Gesungene Zeilen ausblenden';
 
   @override

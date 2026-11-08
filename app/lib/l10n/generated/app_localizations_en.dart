@@ -4790,13 +4790,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAmllWordSweep => 'Word sweep';
 
   @override
-  String get settingsAmllSyntheticSweep => 'Synthetic sweep for plain lyrics';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc =>
-      'Estimate per-word timing from the duration of each line for karaoke sweep (also applies to translations).';
-
-  @override
   String get settingsAmllHidePassed => 'Hide passed lines';
 
   @override

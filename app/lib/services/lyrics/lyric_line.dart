@@ -30,7 +30,6 @@ class LyricFragment {
     required this.text,
     required this.startMs,
     this.durationMs,
-    this.synthetic = false,
   });
 
   /// 片段文本（一个字/词）。
@@ -41,12 +40,6 @@ class LyricFragment {
 
   /// 片段时长（毫秒；仅信息展示用，不参与高亮判定）。
   final int? durationMs;
-
-  /// 是否为按行窗口**推算**的合成片段（非源数据）。
-  ///
-  /// 合成片段用于让传统单行歌词也能扫亮；因其时长由估算而来，不应触发
-  /// 「长音强调」脉冲（见 `resolveWordAnim`）。
-  final bool synthetic;
 }
 
 /// 一组歌词（原文 + 可选翻译 + 可选逐字片段，按行对齐）。
@@ -474,7 +467,6 @@ List<LyricFragment> _rebaseFrags(List<LyricFragment> frags, int offset) => [
       text: f.text,
       startMs: f.startMs - offset,
       durationMs: f.durationMs,
-      synthetic: f.synthetic,
     ),
 ];
 
@@ -767,7 +759,6 @@ void trimBgParentheses(List<LyricFragment> frags) {
       text: first.text.substring(1),
       startMs: first.startMs,
       durationMs: first.durationMs,
-      synthetic: first.synthetic,
     );
   }
   final lastIdx = frags.length - 1;
@@ -777,7 +768,6 @@ void trimBgParentheses(List<LyricFragment> frags) {
       text: last.text.substring(0, last.text.length - 1),
       startMs: last.startMs,
       durationMs: last.durationMs,
-      synthetic: last.synthetic,
     );
   }
   frags.removeWhere((f) => f.text.isEmpty);
@@ -810,132 +800,6 @@ List<LyricFragment>? _fillFragmentDurations(
       text: f.text,
       startMs: f.startMs,
       durationMs: dur,
-      synthetic: f.synthetic,
-    ));
-  }
-  return out;
-}
-
-// ── 无逐字时间的整行歌词：按行窗口合成卡拉OK 扫亮片段 ──────────────
-
-/// 合成扫亮的「每单位」毫秒数（CJK 每字 / 拉丁每字符）。
-///
-/// 传统单行 LRC 只有行时间；用它估算演唱时长（见 [synthesizeSweepFragments]）。
-const int kSyntheticSweepPerUnitMs = 240;
-
-/// 合成扫亮的最短 / 最长估算时长（毫秒），避免极短行一闪而过、长间奏拖得过慢。
-const int kSyntheticSweepMinMs = 600;
-const int kSyntheticSweepMaxMs = 10000;
-
-/// 合成扫亮的字/词原子（文本 + 权重 = 非空白字符数）。
-class _SweepAtom {
-  const _SweepAtom(this.text, this.weight);
-  final String text;
-  final int weight;
-}
-
-bool _isSweepSpace(int r) =>
-    r == 0x20 || r == 0x09 || r == 0x0A || r == 0x0D || r == 0x0C || r == 0x3000;
-
-/// 是否 CJK（汉字 / 假名 / 谚文）——逐字成原子；其余按空白分词。
-bool _isSweepCjk(int r) =>
-    (r >= 0x3040 && r <= 0x30FF) ||
-    (r >= 0x3400 && r <= 0x4DBF) ||
-    (r >= 0x4E00 && r <= 0x9FFF) ||
-    (r >= 0xAC00 && r <= 0xD7AF) ||
-    (r >= 0xF900 && r <= 0xFAFF);
-
-/// 把整行文本切成扫亮原子（拼接结果与原文完全一致）。
-///
-/// CJK 逐字、拉丁/其它按空白分词；空白附在前一个原子尾部（保持拼接一致）。
-/// 对齐 SPlayer-Next `split-words.ts` 的切分策略。
-List<_SweepAtom> _splitSweepAtoms(String text) {
-  final runes = text.runes.toList();
-  final atoms = <_SweepAtom>[];
-  final buf = StringBuffer();
-  void flush() {
-    if (buf.isEmpty) return;
-    final s = buf.toString();
-    var w = 0;
-    for (final r in s.runes) {
-      if (!_isSweepSpace(r)) w++;
-    }
-    atoms.add(_SweepAtom(s, w > 0 ? w : 1));
-    buf.clear();
-  }
-
-  var i = 0;
-  while (i < runes.length) {
-    final r = runes[i];
-    if (_isSweepCjk(r)) {
-      flush();
-      final sb = StringBuffer(String.fromCharCode(r));
-      i++;
-      while (i < runes.length && _isSweepSpace(runes[i])) {
-        sb.write(String.fromCharCode(runes[i]));
-        i++;
-      }
-      atoms.add(_SweepAtom(sb.toString(), 1));
-      continue;
-    }
-    if (_isSweepSpace(r)) {
-      buf.write(String.fromCharCode(r));
-      flush();
-      i++;
-      continue;
-    }
-    buf.write(String.fromCharCode(r));
-    i++;
-  }
-  flush();
-  return atoms;
-}
-
-/// 为「无逐字时间」的整行歌词按行窗口合成卡拉OK 扫亮片段。
-///
-/// 把窗口 `[startMs, endMs]` 按字/词权重分摊成逐字片段（[startMs] 相对行首、
-/// [durationMs] 已填充），使 AMLL 引擎的扫亮动效对传统单行歌词也生效，
-/// 传入翻译 / 音译文本即可让附属小字同样扫亮。
-///
-/// 行窗口远长于自然演唱时长时（长间奏），扫亮在**估算时长**
-/// （`总权重 × [kSyntheticSweepPerUnitMs]`，钳制到
-/// [[kSyntheticSweepMinMs], [kSyntheticSweepMaxMs]]）内完成，余下保持全亮；
-/// 窗口更短则按窗口时长扫完（快歌不拖）。
-///
-/// 文本为空或窗口 ≤ 0 时返回 null（调用方回退整行绘制）。
-List<LyricFragment>? synthesizeSweepFragments(
-  String text,
-  int startMs,
-  int endMs,
-) {
-  final window = endMs - startMs;
-  if (text.trim().isEmpty || window <= 0) return null;
-  final atoms = _splitSweepAtoms(text);
-  if (atoms.isEmpty) return null;
-  var total = 0;
-  for (final a in atoms) {
-    total += a.weight;
-  }
-  if (total <= 0) return null;
-  final estimated = (total * kSyntheticSweepPerUnitMs)
-      .clamp(kSyntheticSweepMinMs, kSyntheticSweepMaxMs)
-      .round();
-  final sweep = window < estimated ? window : estimated;
-
-  final out = <LyricFragment>[];
-  var acc = 0;
-  for (var i = 0; i < atoms.length; i++) {
-    final a = atoms[i];
-    final rel = (sweep * acc) ~/ total;
-    acc += a.weight;
-    final end = i == atoms.length - 1 ? sweep : (sweep * acc) ~/ total;
-    var dur = end - rel;
-    if (dur <= 0) dur = 1;
-    out.add(LyricFragment(
-      text: a.text,
-      startMs: rel,
-      durationMs: dur,
-      synthetic: true,
     ));
   }
   return out;

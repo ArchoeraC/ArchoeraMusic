@@ -105,12 +105,4 @@ void main() {
     });
   });
 
-  group('amllSyntheticSweep（合成扫亮）', () {
-    test('默认开启，可关闭并读回', () {
-      expect(AppPrefs().amllSyntheticSweep, isTrue);
-      final off = AppPrefs().copyWithAmll(syntheticSweep: false);
-      expect(off.amllSyntheticSweep, isFalse);
-      expect(off.copyWithAmll(syntheticSweep: true).amllSyntheticSweep, isTrue);
-    });
-  });
 }
