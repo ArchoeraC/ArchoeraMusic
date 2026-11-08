@@ -1117,10 +1117,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'NK in Suche, Favoriten und Bibliothek anzeigen (standardmäßig aus)';
 
   @override
-  String get settingsNekoUnavailable =>
-      'Keine Client-ID konfiguriert (NEKO_CLIENT_ID); die NekoMusic-Quelle ist nicht verfügbar.';
-
-  @override
   String get settingsNekoLogin => 'Anmelden';
 
   @override
@@ -1136,6 +1132,25 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nekoLoginTitle => 'Bei NekoMusic anmelden';
+
+  @override
+  String get nekoLoginTabOauth => 'OAuth';
+
+  @override
+  String get nekoOauthTitle => 'Mit NekoAuth anmelden';
+
+  @override
+  String get nekoOauthDesc =>
+      'Öffnet NekoAuth im Systembrowser und kehrt nach der Autorisierung zur App zurück.';
+
+  @override
+  String get nekoOauthOpen => 'Im Browser anmelden';
+
+  @override
+  String get nekoOauthWaiting => 'Bitte die Anmeldung im Browser abschließen…';
+
+  @override
+  String get nekoOauthFailed => 'Anmeldung fehlgeschlagen';
 
   @override
   String get nekoLoginTabQr => 'QR-Code';

@@ -10,11 +10,11 @@
 ///
 /// - 扫码：`/api/user/qrlogin/create` 取**服务端渲染好的二维码 PNG**（`qrImage`
 ///   data URL，无须本地自绘）；状态经 SSE `/api/user/qrlogin/status` 推送，
-///   confirmed 即落盘并关闭。
-/// - 账号密码：`/api/user/login`（请求体字段 `email` + `password`）；
-///   忘记密码经 `/api/user/sso/password-reset-url` 取一次性链接交由
-///   NekoAuth 网页处理（对齐上游 PC 客户端 `9e9a3bb`，本项目不内嵌
-///   重置/注册表单）。
+///   `confirmed` 后由 [NekoApi.qrWatch] 用 `deliveryKey` 领取 token 并落盘。
+/// - OAuth：`/api/user/sso/start` 取 NekoAuth 地址 → 系统浏览器授权 →
+///   `nekomusic://sso/complete?handoff=…` 深链回跳 → `/api/user/sso/claim`。
+/// - 账号密码：服务端已下线，仅当编译期开关 `NEKO_ENABLE_PASSWORD_LOGIN`
+///   打开时显示（界面与调用代码保留，便于将来恢复）。
 ///
 /// **不含注册 / 邮箱验证码 / 滑块验证**（本项目不接入注册）。
 library;
@@ -29,6 +29,7 @@ import '../../apis/neko/neko_client.dart' show NekoApiException;
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/neko/neko_api.dart';
+import '../../services/neko/neko_login_config.dart';
 import '../../services/neko/neko_types.dart';
 import '../../services/platform/platform_capabilities.dart';
 import '../../stores/providers.dart';
@@ -57,7 +58,7 @@ class _NekoLoginDialog extends ConsumerStatefulWidget {
 }
 
 class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
-  /// 当前选中 tab：0=扫码 / 1=账号密码（tab 栏高亮，立即切换）。
+  /// 当前选中 tab：0=OAuth / 1=扫码 /（编译期打开时）2=账号密码。
   int _tab = 0;
 
   /// 当前实际渲染的 tab（延后于 [_tab]：旧内容先淡出，再换内容淡入）。
@@ -66,11 +67,15 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   /// 切换中（旧内容淡出阶段，透明度 0）。
   bool _switching = false;
 
+  // ── OAuth ─────────────────────────────────────────────────────────
+  bool _ssoBusy = false;
+  String _ssoError = '';
+
   // ── 扫码 ──────────────────────────────────────────────────────────
   NekoQrSession? _session;
   NekoQrState _qrState = NekoQrState.pending;
   StreamSubscription<NekoQrStatus>? _sub;
-  bool _loading = true;
+  bool _loading = false;
   bool _confirmed = false;
   String _error = '';
 
@@ -85,11 +90,19 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   @override
   void initState() {
     super.initState();
-    _createQr();
+    // 扫码会话等切到扫码 tab 时再创建，避免打开对话框就发请求。
   }
+
+  List<String> _tabLabels(AppLocalizations l10n) => [
+    l10n.nekoLoginTabOauth,
+    l10n.nekoLoginTabQr,
+    if (nekoPasswordLoginEnabled) l10n.nekoLoginTabPassword,
+  ];
 
   @override
   void dispose() {
+    // 关闭登录框即取消仍在等待的 OAuth 回调，避免旧流程稍后领取 token。
+    if (_ssoBusy) ref.read(nekoApiProvider).cancelSsoLogin();
     _sub?.cancel();
     _emailCtrl.dispose();
     _passCtrl.dispose();
@@ -110,6 +123,10 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
     await Future<void>.delayed(const Duration(milliseconds: 50));
     if (!mounted) return;
     setState(() => _switching = false); // 新内容淡入
+    // 首次进入扫码 tab 才创建会话，避免打开对话框即发请求。
+    if (tab == 1 && _session == null && !_loading && !_confirmed) {
+      unawaited(_createQr());
+    }
   }
 
   // ── 扫码 ──────────────────────────────────────────────────────────
@@ -130,7 +147,7 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
         _session = session;
         _loading = false;
       });
-      _sub = _api.qrWatch(session.sessionId).listen(
+      _sub = _api.qrWatch(session).listen(
         _onQrStatus,
         onError: (Object e) {
           if (mounted) setState(() => _error = '$e');
@@ -251,9 +268,11 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
                               opacity: _switching ? 0 : 1,
                               duration: const Duration(milliseconds: 180),
                               curve: Curves.easeInOut,
-                              child: _displayTab == 0
-                                  ? _qrTab(theme, scheme, l10n)
-                                  : _passwordTab(theme, scheme, l10n),
+                              child: switch (_displayTab) {
+                                0 => _oauthTab(theme, scheme, l10n),
+                                1 => _qrTab(theme, scheme, l10n),
+                                _ => _passwordTab(theme, scheme, l10n),
+                              },
                             ),
                           ),
                         ],
@@ -270,7 +289,7 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   }
 
   Widget _tabBar(ColorScheme scheme, AppLocalizations l10n) {
-    final tabs = [l10n.nekoLoginTabQr, l10n.nekoLoginTabPassword];
+    final tabs = _tabLabels(l10n);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -294,6 +313,78 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
           ),
       ],
     );
+  }
+
+  // ── OAuth tab ─────────────────────────────────────────────────────
+  Widget _oauthTab(ThemeData theme, ColorScheme scheme, AppLocalizations l10n) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(EtaIcons.shieldOutline, size: 48, color: scheme.primary),
+        const SizedBox(height: 14),
+        Text(
+          l10n.nekoOauthTitle,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          l10n.nekoOauthDesc,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.5,
+          ),
+        ),
+        if (_ssoError.isNotEmpty) _errorText(_ssoError, scheme),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _ssoBusy ? null : _ssoLogin,
+            child: _ssoBusy ? _spinner() : Text(l10n.nekoOauthOpen),
+          ),
+        ),
+        if (_ssoBusy)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              l10n.nekoOauthWaiting,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 打开系统浏览器完成 NekoAuth 登录；成功后关闭对话框。
+  Future<void> _ssoLogin() async {
+    final l10n = context.l10n;
+    setState(() {
+      _ssoBusy = true;
+      _ssoError = '';
+    });
+    try {
+      await _api.startSsoLogin();
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+      toast(l10n.loginSuccess);
+    } on NekoApiException catch (e) {
+      if (!mounted) return;
+      setState(
+        () => _ssoError = e.message.isEmpty ? l10n.nekoOauthFailed : e.message,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _ssoError = l10n.nekoOauthFailed);
+    } finally {
+      if (mounted) setState(() => _ssoBusy = false);
+    }
   }
 
   // ── 扫码 tab ──────────────────────────────────────────────────────

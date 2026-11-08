@@ -11,7 +11,8 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
-/// Neko 登录用户（`/api/user/login` 与 `/api/user/info` 的 `data.user`）。
+/// Neko 登录用户（`/api/user/sso/claim`、`/api/user/qrlogin/claim` 与
+/// `/api/user/info` 的 `data.user`）。
 ///
 /// 服务端自 `d6a0117` 起把用户昵称字段统一为 **`nickname`**（旧版为 `username`），
 /// 这里优先读 `nickname`、兼容回退 `username`（老客户端 / 老会话）。
@@ -118,11 +119,17 @@ class NekoUserLibrary {
 class NekoQrSession {
   NekoQrSession({
     required this.sessionId,
+    this.deliveryKey = '',
     this.qrImage = '',
     this.expiresIn = 180,
   });
 
   final String sessionId;
+
+  /// 一次性投递密钥：只在创建响应里返回一次，确认扫码后回传本值领取 token。
+  ///
+  /// 只保存在内存（不写二维码 / URL / 日志 / 磁盘）。
+  final String deliveryKey;
 
   /// 服务端渲染好的二维码 PNG data URL（`data:image/png;base64,...`）；空 = 无图。
   final String qrImage;
@@ -151,22 +158,20 @@ Uint8List? decodeQrImageDataUrl(String? dataUrl) {
 enum NekoQrState { pending, scanned, confirmed, canceled, expired, unknown }
 
 /// 二维码状态事件（`event: status` 的 data）。
+///
+/// 服务端自「21.3」起不再在状态帧里下发 token：`confirmed` 只表示可以领取，
+/// 客户端需用创建响应的 `deliveryKey` 调 `/api/user/qrlogin/claim`。
 class NekoQrStatus {
   const NekoQrStatus({
     required this.state,
-    this.token,
-    this.user,
     this.message = '',
   });
 
   final NekoQrState state;
-  final String? token;
-  final NekoUser? user;
   final String message;
 
   factory NekoQrStatus.fromJson(Map<String, dynamic> json) {
     final raw = json['status']?.toString() ?? '';
-    final userRaw = json['user'];
     return NekoQrStatus(
       state: switch (raw) {
         'pending' => NekoQrState.pending,
@@ -176,10 +181,6 @@ class NekoQrStatus {
         'expired' => NekoQrState.expired,
         _ => NekoQrState.unknown,
       },
-      token: json['token']?.toString(),
-      user: userRaw is Map
-          ? NekoUser.fromJson(Map<String, dynamic>.from(userRaw))
-          : null,
       message: json['message']?.toString() ?? '',
     );
   }

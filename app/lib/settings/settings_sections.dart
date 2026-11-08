@@ -26,7 +26,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
-import '../apis/neko/neko_client_config.dart';
 import '../app/app_quit.dart';
 import '../app/appearance_styles/appearance_style_registry.dart';
 import '../app/theme_provider.dart';
