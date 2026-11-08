@@ -3952,6 +3952,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsPreviewLyric3 => '今はあなたの声だけが聞こえる';
 
   @override
+  String get settingsPreviewLyricTranslation => '訳：心臓の鼓動のところで旋律を止めて';
+
+  @override
+  String get settingsPreviewLyricRomanization =>
+      'ローマ字：ye se zai chuang wai man man luo xia';
+
+  @override
+  String get settingsPreviewAlbum => 'サンプルアルバム';
+
+  @override
   String get settingsDefaultSource => 'デフォルト音源';
 
   @override

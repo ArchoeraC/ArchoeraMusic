@@ -4146,6 +4146,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsPreviewLyric3 => 'Jetzt höre ich nur dich';
 
   @override
+  String get settingsPreviewLyricTranslation =>
+      'Übersetzung: Lass die Melodie im Herzschlag ruhen';
+
+  @override
+  String get settingsPreviewLyricRomanization =>
+      'Romanisiert: ye se zai chuang wai man man luo xia';
+
+  @override
+  String get settingsPreviewAlbum => 'Beispielalbum';
+
+  @override
   String get settingsDefaultSource => 'Standardquelle';
 
   @override

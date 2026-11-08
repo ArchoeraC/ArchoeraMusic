@@ -215,6 +215,8 @@ class _LyricsSectionState extends ConsumerState<LyricsSection> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        LyricsStylePreview(prefs: prefs),
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsLyricSourceOrder,

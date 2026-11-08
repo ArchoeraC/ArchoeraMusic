@@ -886,6 +886,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        SpectrumStylePreview(prefs: prefs),
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsSectionExperience,

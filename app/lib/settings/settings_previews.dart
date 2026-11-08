@@ -14,17 +14,20 @@ library;
 
 import 'dart:async';
 import 'dart:io' show File, Platform;
+import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
 import '../app/route_transitions/route_transition_registry.dart';
 import '../l10n/l10n.dart';
+import '../services/playback/fft_frame.dart';
 import '../stores/app_prefs.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common/baked_image_background.dart';
 import '../widgets/player/background/ripple_background.dart';
 import '../widgets/player/cover_switcher.dart';
 import '../widgets/player/lyrics_edge_fade.dart';
+import '../widgets/player/spectrum_view.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
@@ -93,11 +96,17 @@ class SettingsPreviewCard extends StatelessWidget {
 
 /// 示例封面（跟随封面圆角）。
 class _SampleCover extends StatelessWidget {
-  const _SampleCover({required this.size, required this.radius, this.tint});
+  const _SampleCover({
+    required this.size,
+    required this.radius,
+    this.tint,
+    this.shadow = true,
+  });
 
   final double size;
   final double radius;
   final Color? tint;
+  final bool shadow;
 
   @override
   Widget build(BuildContext context) {
@@ -113,13 +122,15 @@ class _SampleCover extends StatelessWidget {
           image: AssetImage(_sampleCoverAsset),
           fit: BoxFit.cover,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        boxShadow: shadow
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ]
+            : null,
       ),
       foregroundDecoration: color == null
           ? null
@@ -411,6 +422,199 @@ class ThemeCoverPreview extends StatelessWidget {
   }
 }
 
+/// 歌词：字号 / 字重 / 配色 / 译文 / 罗马音预览。
+class LyricsStylePreview extends StatelessWidget {
+  const LyricsStylePreview({super.key, required this.prefs});
+
+  final AppPrefs prefs;
+
+  static FontWeight _weight(int value) => switch (value) {
+    500 => FontWeight.w500,
+    600 => FontWeight.w600,
+    700 => FontWeight.w700,
+    _ => FontWeight.w400,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final played = prefs.lyricFollowAccent
+        ? scheme.primary
+        : Color(prefs.lyricPlayedColor);
+    final unplayed = Color(prefs.lyricUnplayedColor);
+    final size = prefs.lyricFontSize;
+    final weight = _weight(prefs.lyricFontWeight);
+    final showTranslation = prefs.showTranslation && !prefs.barEnhancedLyrics;
+    final showRomanization = prefs.showRomanization;
+    final lines = [
+      l10n.settingsPreviewLyric1,
+      l10n.settingsPreviewLyric2,
+      l10n.settingsPreviewLyric3,
+    ];
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < lines.length; i++) ...[
+          Text(
+            lines[i],
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: prefs.fontFamily,
+              fontSize: size,
+              fontWeight: weight,
+              height: 1.25,
+              color: i == 1 ? played : unplayed.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+        if (showTranslation)
+          Text(
+            l10n.settingsPreviewLyricTranslation,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: prefs.fontFamily,
+              fontSize: size * 0.55,
+              height: 1.25,
+              color: unplayed.withValues(alpha: 0.72),
+            ),
+          ),
+        if (showRomanization) ...[
+          if (showTranslation) const SizedBox(height: 4),
+          Text(
+            l10n.settingsPreviewLyricRomanization,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: prefs.fontFamily,
+              fontSize: size * 0.45,
+              height: 1.25,
+              color: unplayed.withValues(alpha: 0.55),
+            ),
+          ),
+        ],
+      ],
+    );
+    return SettingsPreviewCard(
+      label: l10n.settingsPreview,
+      height: 164,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+        child: Center(
+          // 字号可能很大；预览按可用空间等比缩小，不改变相对字号观感。
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
+              child: content,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 强迫症预设：列表标签 / 副标题 / VIP / 音质角标预览。
+class ListDisplayPreview extends StatelessWidget {
+  const ListDisplayPreview({super.key, required this.prefs});
+
+  final AppPrefs prefs;
+
+  Widget _badge(String text, Color color) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: color.withValues(alpha: 0.5)),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 9,
+        fontWeight: FontWeight.w700,
+        height: 1.1,
+        color: color,
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    return SettingsPreviewCard(
+      label: l10n.settingsPreview,
+      height: 76,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              _SampleCover(size: 40, radius: prefs.coverRadius, shadow: false),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.settingsPreviewSampleTrack,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    if (prefs.showSubtitle) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${l10n.settingsPreviewSampleArtist} · ${l10n.settingsPreviewAlbum}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (!prefs.hideVipTag) ...[
+                _badge('VIP', const Color(0xFFFFB84D)),
+                const SizedBox(width: 5),
+              ],
+              if (!prefs.hideQualityTag) ...[
+                _badge('SQ', scheme.primary),
+                const SizedBox(width: 7),
+              ],
+              Icon(
+                EtaIcons.heart,
+                size: 16,
+                color: scheme.primary.withValues(alpha: 0.85),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 播放页：封面切换动效预览（scale / slide / fade 循环）。
 class CoverTransitionPreview extends StatefulWidget {
   const CoverTransitionPreview({super.key, required this.style});
@@ -643,6 +847,83 @@ class _MockRoutePage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 播放：频谱样式 / 柱宽 / 反向 / 峰值保持预览（合成 FFT，不依赖播放）。
+class SpectrumStylePreview extends StatefulWidget {
+  const SpectrumStylePreview({super.key, required this.prefs});
+
+  final AppPrefs prefs;
+
+  @override
+  State<SpectrumStylePreview> createState() => _SpectrumStylePreviewState();
+}
+
+class _SpectrumStylePreviewState extends State<SpectrumStylePreview> {
+  Timer? _timer;
+  int _seq = 0;
+  late FftFrame _frame = _frameAt(0);
+
+  static FftFrame _frameAt(int seq) {
+    const n = 128;
+    final t = seq / 9.0;
+    List<double> band(double phase) => [
+      for (var i = 0; i < n; i++)
+        (math.exp(-(i / n) * 2.6) *
+                (0.24 +
+                    0.76 *
+                        (0.5 + 0.5 * math.sin(t + i * 0.31 + phase)) *
+                        (0.5 + 0.5 * math.sin(t * 0.57 + i * 0.13 + phase))))
+            .clamp(0.0, 1.0),
+    ];
+    final left = band(0);
+    final right = band(1.2);
+    return FftFrame(
+      ldata: left,
+      rdata: right,
+      lpeak: left,
+      rpeak: right,
+      intervalMs: 90,
+      seq: seq,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (_previewMotionEnabled) {
+      _timer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+        if (!mounted) return;
+        setState(() => _frame = _frameAt(++_seq));
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return SettingsPreviewCard(
+      label: l10n.settingsPreview,
+      height: 92,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: SpectrumView(
+          height: 76,
+          opacity: 1,
+          enabled: !widget.prefs.performanceMode,
+          fftOverride: _frame,
+          playingOverride:
+              _previewMotionEnabled && !widget.prefs.performanceMode,
+        ),
       ),
     );
   }

@@ -4180,6 +4180,17 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsPreviewLyric3 => 'En cet instant, seul toi compte';
 
   @override
+  String get settingsPreviewLyricTranslation =>
+      'Traduction : Laisse la mélodie reposer sur ton cœur';
+
+  @override
+  String get settingsPreviewLyricRomanization =>
+      'Romanisé : ye se zai chuang wai man man luo xia';
+
+  @override
+  String get settingsPreviewAlbum => 'Album de démonstration';
+
+  @override
   String get settingsDefaultSource => 'Source par défaut';
 
   @override
