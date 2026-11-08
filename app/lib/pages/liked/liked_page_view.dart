@@ -29,6 +29,12 @@ extension _LikedPageView on _LikedPageState {
         _switchPlatform(defaultLikedPlatform(ref));
       }
     });
+    // 默认音源设置变化：页面尚未手动切换过时，跟随新的默认音源。
+    ref.listen(appPrefsProvider.select((p) => p.defaultSource), (prev, next) {
+      if (ref.read(likedPlatformProvider) != null) return;
+      final target = defaultLikedPlatform(ref);
+      if (target != _platform) _applyDefaultPlatform(target);
+    });
 
     // 两个可能的「我喜欢」后端（服务端 store / QQ 本机库）变化都会触发重建。
     ref.watch(likedStoreProvider);

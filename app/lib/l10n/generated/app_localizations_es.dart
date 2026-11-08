@@ -4151,7 +4151,18 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      'Servidores de streaming (Subsonic / Jellyfin / Emby)';
+      'Fuente predeterminada · Servidores de streaming (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsDefaultSource => 'Fuente predeterminada';
+
+  @override
+  String get settingsDefaultSourceDesc =>
+      'Fuente seleccionada por defecto al abrir Me gusta, Favoritos y Búsqueda';
+
+  @override
+  String get settingsDefaultSourceAuto =>
+      'Automático (según el estado de sesión)';
 
   @override
   String get settingsCatScrape => 'Raspado';

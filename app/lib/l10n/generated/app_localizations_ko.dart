@@ -3932,7 +3932,17 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      '스트리밍 서버 (Subsonic / Jellyfin / Emby)';
+      '기본 음원 · 스트리밍 서버 (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsDefaultSource => '기본 음원';
+
+  @override
+  String get settingsDefaultSourceDesc =>
+      '‘좋아요’, ‘즐겨찾기’, ‘검색’을 열 때 기본으로 선택되는 음원';
+
+  @override
+  String get settingsDefaultSourceAuto => '자동 (로그인 상태에 따라)';
 
   @override
   String get settingsCatScrape => '스크레이핑';

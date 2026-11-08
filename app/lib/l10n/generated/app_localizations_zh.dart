@@ -3882,7 +3882,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      '流媒体服务器（Subsonic / Jellyfin / Emby）';
+      '默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsDefaultSource => '默认音源';
+
+  @override
+  String get settingsDefaultSourceDesc => '打开「我喜欢」「收藏」「搜索」时默认选中的音源';
+
+  @override
+  String get settingsDefaultSourceAuto => '自动（按登录状态）';
 
   @override
   String get settingsCatScrape => '刮削';
@@ -10094,7 +10103,16 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      '流媒体服务器（Subsonic / Jellyfin / Emby）';
+      '默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsDefaultSource => '默认音源';
+
+  @override
+  String get settingsDefaultSourceDesc => '打开「我喜欢」「收藏」「搜索」时默认选中的音源';
+
+  @override
+  String get settingsDefaultSourceAuto => '自动（按登录状态）';
 
   @override
   String get settingsCatScrape => '刮削';
@@ -16306,7 +16324,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      '串流媒體伺服器（Subsonic / Jellyfin / Emby）';
+      '預設音源 · 串流伺服器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsDefaultSource => '預設音源';
+
+  @override
+  String get settingsDefaultSourceDesc => '開啟「我喜歡」「收藏」「搜尋」時預設選中的音源';
+
+  @override
+  String get settingsDefaultSourceAuto => '自動（依登入狀態）';
 
   @override
   String get settingsCatScrape => '刮削';

@@ -39,6 +39,7 @@ import 'qqmusic_login_dialog.dart';
 import 'track_list_dialog.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+
 import '../../services/neko/neko_api.dart';
 import '../../services/neko/neko_types.dart';
 import 'neko_login_dialog.dart';
@@ -278,9 +279,22 @@ List<CollectionPlatform> collectionPlatforms(dynamic ref) =>
 /// 全部已注册平台的适配器（红心同步等全量遍历用）。
 List<CollectionPlatform> allCollectionPlatforms() => List.unmodifiable(_all);
 
-/// 默认「我喜欢」平台：优先已登录的 NT → KG → QQ，否则 NT（与历史一致；
-/// QQ 虽「本机可用」，但未登录时默认仍回 NT 引导登录）。
+/// 用户显式设置的默认收藏音源；`auto` / 未启用 / 未注册时返回 [fallback]。
+String preferredCollectionSource(dynamic ref, {String fallback = 'netease'}) {
+  final prefs = ref.read(appPrefsProvider) as AppPrefs;
+  final preferred = prefs.defaultSource;
+  if (preferred == autoDefaultSource) return fallback;
+  final adapter = _registry[preferred];
+  if (adapter == null || !adapter.enabled(ref)) return fallback;
+  return preferred;
+}
+
+/// 默认「我喜欢」平台：用户设置了默认音源则优先使用；否则按登录态
+/// 优先 NT → KG → QQ，均未登录时回 NT（与历史一致；QQ 虽「本机可用」，
+/// 但未登录时默认仍回 NT 引导登录）。
 String defaultLikedPlatform(dynamic ref) {
+  final preferred = preferredCollectionSource(ref, fallback: '');
+  if (preferred.isNotEmpty) return preferred;
   final nt = collectionPlatform('netease');
   final kg = collectionPlatform('kugou');
   final qq = collectionPlatform('qqmusic');

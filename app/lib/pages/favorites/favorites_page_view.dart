@@ -25,11 +25,17 @@ extension _FavoritesPageView on _FavoritesPageState {
     });
     // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
     ref.watch(appPrefsProvider.select(nekoSourceUsable));
-    // 已启用平台集合变化（实验性音源开关）：当前平台被关闭则退回首个可用平台。
+    // 已启用音源集合变化：当前音源被关闭则退回默认音源。
     ref.listen(appPrefsProvider.select(nekoSourceUsable), (prev, next) {
       if (collectionPlatform(_platform).enabled(ref)) return;
       final enabled = collectionPlatforms(ref);
       _switchPlatform(enabled.isEmpty ? 'netease' : enabled.first.source);
+    });
+    // 默认音源设置变化：页面尚未手动切换过时，跟随新的默认音源。
+    ref.listen(appPrefsProvider.select((p) => p.defaultSource), (prev, next) {
+      if (ref.read(favoritesPlatformProvider) != null) return;
+      final target = preferredCollectionSource(ref);
+      if (target != _platform) _applyDefaultPlatform(target);
     });
 
     final adapter = _adapter;

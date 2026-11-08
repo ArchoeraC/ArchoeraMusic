@@ -26,6 +26,12 @@ extension _SearchPageView on _SearchPageState {
     ref.listen(appPrefsProvider.select(nekoSourceUsable), (prev, next) {
       if (!sourcePlatform(_platform).enabled(ref)) _switchPlatform('netease');
     });
+    // 默认音源设置变化：页面尚未手动切换过时，跟随新的默认音源。
+    ref.listen(appPrefsProvider.select((p) => p.defaultSource), (prev, next) {
+      if (ref.read(searchPlatformProvider) != null) return;
+      final target = preferredSearchSource(ref);
+      if (target != _platform) _switchPlatform(target, remember: false);
+    });
 
     return Scaffold(
       body: Column(

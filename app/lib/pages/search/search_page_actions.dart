@@ -25,9 +25,9 @@ extension _SearchPageActions on _SearchPageState {
 
   /// 切换搜索平台（'netease' / 'kugou' / 'qqmusic' 单平台；'all' 三方
   /// 并行合并——songs 与 albums/artists/playlists 各 tab 均聚合）。
-  void _switchPlatform(String platform) {
+  void _switchPlatform(String platform, {bool remember = true}) {
     if (platform == _platform) return;
-    ref.read(searchPlatformProvider.notifier).set(platform);
+    if (remember) ref.read(searchPlatformProvider.notifier).set(platform);
     setState(() => _platform = platform);
     if (!sourcePlatform(platform).supportsCoverSearch) {
       _tabs.index = 0;
