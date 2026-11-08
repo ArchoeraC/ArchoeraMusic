@@ -1450,8 +1450,6 @@
   "settingsAmllAlign": "啟用行位置",
   "settingsAmllDim": "非啟用行透明度",
   "settingsAmllWordSweep": "逐字掃亮",
-  "settingsAmllSyntheticSweep": "單行歌詞合成掃亮",
-  "settingsAmllSyntheticSweepDesc": "沒有逐字時間的歌詞按行時長推算掃亮（翻譯 / 音譯同樣生效）",
   "settingsAmllHidePassed": "隱藏已唱行",
   "settingsAmllScale": "非啟用行縮放",
   "settingsAmllBlur": "非激活行失焦",

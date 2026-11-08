@@ -8,6 +8,13 @@ class _Painter extends CustomPainter {
   _Painter(this.c, Listenable repaint) : super(repaint: repaint);
   final _PaintCtx c;
 
+  /// 该行是否拥有**真实字级时间轴**（YRC/QRC/KRC/ESLyric/TTML 等）。
+  ///
+  /// 普通逐行 LRC（含翻译/音译）不产生字级片段，因此不做逐字：
+  /// 主行与子行都整行切换点亮，避免「一个字一个字亮」的假动画。
+  static bool _hasRealWordTiming(List<LyricFragment>? frags) =>
+      frags != null && frags.isNotEmpty;
+
   /// 文本可用宽度左右各留的边距（px）。
   static const double _widthPad = 24;
 
@@ -226,12 +233,18 @@ class _Painter extends CustomPainter {
   /// 下限为 [_PaintCtx.inactiveAlpha]。背景人声行再乘 0.4
   /// （对齐 AMLL `.lyricBgLine` opacity .4）。
   double _alphaFor(int i) {
+    final isBg = i < c.groups.length && c.groups[i].isBG;
     final focus = c.active >= 0 ? c.active : c.anchor;
-    final d = focus < 0 ? 99.0 : (i - focus).abs().toDouble();
-    var a = math
-        .max(c.inactiveAlpha, 1 - (math.max(0.0, d - 1) * 0.35))
-        .clamp(0.0, 1.0);
-    if (i < c.groups.length && c.groups[i].isBG) a *= 0.4;
+    // 用户手动浏览时不按「离播放位置的距离」压暗：对齐 AMLL 的
+    // `isUserScrolling`——此时所有非背景行都保持 1.0，读到哪行都清晰。
+    var a = 1.0;
+    if (!c.userScrolling) {
+      final d = focus < 0 ? 99.0 : (i - focus).abs().toDouble();
+      a = math
+          .max(c.inactiveAlpha, 1 - (math.max(0.0, d - 1) * 0.35))
+          .clamp(0.0, 1.0);
+    }
+    if (isBg) a *= 0.4;
     return a;
   }
 
@@ -261,18 +274,24 @@ class _Painter extends CustomPainter {
     return lyricsEdgeFadeAt(cy / viewH);
   }
 
-  /// 离屏层范围：主行以 [cy] 为中心，翻译小字挂在主行下方，因此有翻译时
-  /// 需要向下扩一整个行高的余量（否则翻译底部会被裁掉）。
+  /// 离屏层范围：以 [cy] 为行块中心（主行 + 译文/音译同属一个行块），
+  /// 上下各取半个完整行高，避免子行底部被裁掉。
   Rect _lineBounds(int index, double cy) {
-    final h = index < c.heights.length ? c.heights[index] : 40.0;
+    final h = _lineHeightAt(index);
     final pad = c.fontSize * 0.5;
-    final g = index < c.groups.length ? c.groups[index] : null;
-    final hasSub =
-        (c.showRomanization && (g?.romaji?.isNotEmpty ?? false)) ||
-        (c.showTranslation && (g?.translation?.isNotEmpty ?? false));
-    final bottom = hasSub ? cy + h + pad : cy + h / 2 + pad;
-    return Rect.fromLTRB(0, cy - h / 2 - pad, math.max(1.0, c.w), bottom);
+    // 行块 = 主行 + 译文/音译，`cy` 是**整块**中心（与 computeCenters /
+    // AMLL wrapper 一致），绘制与离屏层都用 ±h/2，不能只按主行高度算。
+    return Rect.fromLTRB(
+      0,
+      cy - h / 2 - pad,
+      math.max(1.0, c.w),
+      cy + h / 2 + pad,
+    );
   }
+
+  /// 该行的完整行块高度（含译文/音译）；越界时给一个保守值。
+  double _lineHeightAt(int index) =>
+      index < c.heights.length ? c.heights[index] : 40.0;
 
   /// 逐行档：一行一个离屏高斯（最贴 AMLL 的半径梯度，层数 ≈ 可见行数）。
   ///
@@ -338,10 +357,14 @@ class _Painter extends CustomPainter {
         Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 1 - fade),
       );
     }
+    // 主行按**整块**顶部对齐：cy 是整块中心，整块高度含译文/音译。
+    // 若仍按主行自身高度居中，子行会整体探出预留槽位，压到下一行（尤其
+    // 0.4× 行距的辅词行）。
+    final h = _lineHeightAt(index);
     canvas.save();
     canvas.translate(c.w / 2, cy);
     canvas.scale(scale);
-    canvas.translate(-base.width / 2, -base.height / 2);
+    canvas.translate(-base.width / 2, -h / 2);
     canvas.drawParagraph(base, Offset.zero);
     canvas.restore();
     // 轻量档：不跑高斯，用一次放大 + 低透明重绘近似散焦（强度随悬停/切档平滑）。
@@ -357,7 +380,7 @@ class _Painter extends CustomPainter {
       canvas.save();
       canvas.translate(c.w / 2, cy);
       canvas.scale(scale * _liteGhostScale);
-      canvas.translate(-ghost.width / 2, -ghost.height / 2);
+      canvas.translate(-ghost.width / 2, -h / 2);
       canvas.drawParagraph(ghost, Offset.zero);
       canvas.restore();
     }
@@ -365,7 +388,7 @@ class _Painter extends CustomPainter {
       canvas,
       index,
       g,
-      cy + base.height / 2,
+      cy - h / 2 + base.height,
       active: false,
       alpha: alpha,
       fs: fs,
@@ -416,19 +439,20 @@ class _Painter extends CustomPainter {
     double fs,
     double maxWidth,
   ) {
+    final h = _lineHeightAt(index);
     final fr = _fragRender(index, g, fs, maxWidth);
     if (fr != null) {
       canvas.save();
       canvas.translate(c.w / 2, cy);
       canvas.scale(scale);
-      canvas.translate(-fr.width / 2, -fr.height / 2);
+      canvas.translate(-fr.width / 2, -h / 2);
       _drawFragments(canvas, g, fr, fs, maxWidth);
       canvas.restore();
       _drawSubLines(
         canvas,
         index,
         g,
-        cy + fr.height / 2,
+        cy - h / 2 + fr.height,
         active: true,
         alpha: 1,
         fs: fs,
@@ -447,14 +471,14 @@ class _Painter extends CustomPainter {
     canvas.save();
     canvas.translate(c.w / 2, cy);
     canvas.scale(scale);
-    canvas.translate(-main.width / 2, -main.height / 2);
+    canvas.translate(-main.width / 2, -h / 2);
     canvas.drawParagraph(main, Offset.zero);
     canvas.restore();
     _drawSubLines(
       canvas,
       index,
       g,
-      cy + main.height / 2,
+      cy - h / 2 + main.height,
       active: true,
       alpha: 1,
       fs: fs,
@@ -596,7 +620,6 @@ class _Painter extends CustomPainter {
     durationMs: dur,
     lineRelMs: tRel,
     fontSize: fs,
-    synthetic: k < fr.synthetic.length && fr.synthetic[k],
   );
 
   LyricsFragmentRender? _fragRender(
@@ -684,12 +707,11 @@ class _Painter extends CustomPainter {
     required double fs,
     required double maxWidth,
   }) {
-    final gap = fs * kLyricTranslationGapEm;
+    // AMLL 的主行/译文/音译是 `.lyricLine` 内的块级兄弟，直接堆叠，不加 gap。
     var below = mainBottom;
     final subFs = lyricTranslationFontSize(fs);
     final tr = g.translation;
     if (c.showTranslation && tr != null && tr.isNotEmpty) {
-      below += gap;
       final fr = active
           ? _subFragRender(index, g, roman: false, fs: fs, maxWidth: maxWidth)
           : null;
@@ -721,7 +743,6 @@ class _Painter extends CustomPainter {
     }
     final ro = g.romaji;
     if (c.showRomanization && ro != null && ro.isNotEmpty) {
-      below += gap;
       final fr = active
           ? _subFragRender(index, g, roman: true, fs: fs, maxWidth: maxWidth)
           : null;
@@ -746,7 +767,7 @@ class _Painter extends CustomPainter {
     }
   }
 
-  /// 翻译 / 音译小字的合成扫亮渲染（无片段 / 关闭逐字时返回 null 回退段落）。
+  /// 翻译 / 音译小字的逐字渲染（无片段 / 关闭逐字时返回 null 回退段落）。
   LyricsFragmentRender? _subFragRender(
     int index,
     LyricGroup g, {
@@ -757,6 +778,7 @@ class _Painter extends CustomPainter {
     if (!c.wordSweep) return null;
     final frags = roman ? g.romajiFragments : g.translationFragments;
     final text = roman ? g.romaji : g.translation;
+    // 普通行（翻译/音译同样没有字级片段）不做逐字。
     if (frags == null || frags.isEmpty || text == null || text.isEmpty) {
       return null;
     }

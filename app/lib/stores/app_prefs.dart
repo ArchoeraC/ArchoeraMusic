@@ -683,7 +683,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? enableScale,
     String? blurQuality,
     String? springPreset,
-    bool? syntheticSweep,
   }) {
     state = state.copyWithAmll(
       engine: engine,
@@ -694,7 +693,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       enableScale: enableScale,
       blurQuality: blurQuality,
       springPreset: springPreset,
-      syntheticSweep: syntheticSweep,
     );
     state.save();
   }

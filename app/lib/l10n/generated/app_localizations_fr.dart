@@ -4879,14 +4879,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsAmllWordSweep => 'Balayage mot à mot';
 
   @override
-  String get settingsAmllSyntheticSweep =>
-      'Balayage synthétique des paroles simples';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc =>
-      'Estime le minutage par mot selon la durée de la ligne (aussi pour les traductions).';
-
-  @override
   String get settingsAmllHidePassed => 'Masquer les lignes déjà chantées';
 
   @override

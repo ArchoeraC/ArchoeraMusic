@@ -23,7 +23,6 @@ const amllEnableScaleKey = 'amll.enableScale';
 const amllBlurQualityKey = 'amll.blurQuality'; // auto | fast | quality | off
 const amllEnableBlurKey = 'amll.enableBlur'; // 旧键（仅用于迁移）
 const amllSpringPresetKey = 'amll.springPreset';
-const amllSyntheticSweepKey = 'amll.syntheticSweep'; // 无逐字歌词按行窗口推算扫亮
 
 // ── 歌词来源 / 格式顺序（强迫症）─────────────────────────────────
 const lyricSourceOrderKey = 'lyrics.sourceOrder';
@@ -202,10 +201,6 @@ extension AmllLyricsPrefs on AppPrefs {
   String get amllSpringPreset =>
       data[amllSpringPresetKey] as String? ?? 'default';
 
-  /// 合成扫亮（默认开）：无逐字时间的整行歌词（含翻译 / 音译）按行窗口推算
-  /// 逐字时间以呈现卡拉OK 扫亮。
-  bool get amllSyntheticSweep => data[amllSyntheticSweepKey] as bool? ?? true;
-
   AppPrefs copyWithAmll({
     String? engine,
     double? alignFraction,
@@ -215,7 +210,6 @@ extension AmllLyricsPrefs on AppPrefs {
     bool? enableScale,
     String? blurQuality,
     String? springPreset,
-    bool? syntheticSweep,
   }) => AppPrefs(
     initialData: {
       ...data,
@@ -230,7 +224,6 @@ extension AmllLyricsPrefs on AppPrefs {
           ? blurQuality
           : null),
       amllSpringPresetKey: ?springPreset,
-      amllSyntheticSweepKey: ?syntheticSweep,
     },
   );
 }
