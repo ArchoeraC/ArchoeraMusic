@@ -1077,10 +1077,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsEnableDesc => '在搜索、我喜欢、收藏中显示 NK（默认关闭）';
 
   @override
-  String get settingsUnavailable =>
-      '未配置客户端标识（构建参数 _CLIENT_ID）， 音源不可用。';
-
-  @override
   String get settingsLogin => '登录';
 
   @override
@@ -1096,6 +1092,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get LoginTitle => '登录 ';
+
+  @override
+  String get LoginTabOauth => 'OAuth 登录';
+
+  @override
+  String get OauthTitle => '使用 Auth 登录';
+
+  @override
+  String get OauthDesc => '将在系统浏览器中打开 Auth，完成授权后自动返回本应用。';
+
+  @override
+  String get OauthOpen => '在浏览器中登录';
+
+  @override
+  String get OauthWaiting => '请在浏览器中完成登录…';
+
+  @override
+  String get OauthFailed => '登录失败';
 
   @override
   String get LoginTabQr => '扫码登录';
@@ -7269,10 +7283,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsEnableDesc => '在搜索、我喜欢、收藏中显示 NK（默认关闭）';
 
   @override
-  String get settingsUnavailable =>
-      '未配置客户端标识（构建参数 _CLIENT_ID）， 音源不可用。';
-
-  @override
   String get settingsLogin => '登录';
 
   @override
@@ -7288,6 +7298,24 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get LoginTitle => '登录 ';
+
+  @override
+  String get LoginTabOauth => 'OAuth 登录';
+
+  @override
+  String get OauthTitle => '使用 Auth 登录';
+
+  @override
+  String get OauthDesc => '将在系统浏览器中打开 Auth，完成授权后自动返回本应用。';
+
+  @override
+  String get OauthOpen => '在浏览器中登录';
+
+  @override
+  String get OauthWaiting => '请在浏览器中完成登录…';
+
+  @override
+  String get OauthFailed => '登录失败';
 
   @override
   String get LoginTabQr => '扫码登录';
@@ -13461,10 +13489,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsEnableDesc => '在搜尋、我喜歡、收藏中顯示 NK（預設關閉）';
 
   @override
-  String get settingsUnavailable =>
-      '未設定用戶端識別碼（建置參數 _CLIENT_ID）， 音源無法使用。';
-
-  @override
   String get settingsLogin => '登入';
 
   @override
@@ -13480,6 +13504,24 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get LoginTitle => '登入 ';
+
+  @override
+  String get LoginTabOauth => 'OAuth 登入';
+
+  @override
+  String get OauthTitle => '使用 Auth 登入';
+
+  @override
+  String get OauthDesc => '將在系統瀏覽器開啟 Auth，完成授權後自動返回本應用程式。';
+
+  @override
+  String get OauthOpen => '在瀏覽器中登入';
+
+  @override
+  String get OauthWaiting => '請在瀏覽器中完成登入…';
+
+  @override
+  String get OauthFailed => '登入失敗';
 
   @override
   String get LoginTabQr => '掃碼登入';

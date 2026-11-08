@@ -1116,10 +1116,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Mostrar NK en búsqueda, me gusta y biblioteca (desactivado por defecto)';
 
   @override
-  String get settingsUnavailable =>
-      'No hay un ID de cliente configurado (_CLIENT_ID); la fuente  no está disponible.';
-
-  @override
   String get settingsLogin => 'Iniciar sesión';
 
   @override
@@ -1135,6 +1131,26 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get LoginTitle => 'Iniciar sesión en ';
+
+  @override
+  String get LoginTabOauth => 'OAuth';
+
+  @override
+  String get OauthTitle => 'Iniciar sesión con Auth';
+
+  @override
+  String get OauthDesc =>
+      'Abre Auth en el navegador del sistema y vuelve a la app tras autorizar.';
+
+  @override
+  String get OauthOpen => 'Iniciar sesión en el navegador';
+
+  @override
+  String get OauthWaiting =>
+      'Completa el inicio de sesión en el navegador…';
+
+  @override
+  String get OauthFailed => 'Error al iniciar sesión';
 
   @override
   String get LoginTabQr => 'Código QR';

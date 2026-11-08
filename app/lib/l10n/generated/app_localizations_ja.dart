@@ -1084,10 +1084,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsEnableDesc => '検索・お気に入り・ライブラリに NK を表示（既定でオフ）';
 
   @override
-  String get settingsUnavailable =>
-      'クライアント ID（_CLIENT_ID）が設定されていないため、 音源は利用できません。';
-
-  @override
   String get settingsLogin => 'ログイン';
 
   @override
@@ -1103,6 +1099,24 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get LoginTitle => ' にログイン';
+
+  @override
+  String get LoginTabOauth => 'OAuth ログイン';
+
+  @override
+  String get OauthTitle => 'Auth でログイン';
+
+  @override
+  String get OauthDesc => 'システムブラウザで Auth を開き、認証後にアプリへ戻ります。';
+
+  @override
+  String get OauthOpen => 'ブラウザでログイン';
+
+  @override
+  String get OauthWaiting => 'ブラウザでログインを完了してください…';
+
+  @override
+  String get OauthFailed => 'ログインに失敗しました';
 
   @override
   String get LoginTabQr => '二次元コード';

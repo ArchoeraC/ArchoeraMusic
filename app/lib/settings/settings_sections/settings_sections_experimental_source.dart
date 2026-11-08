@@ -40,7 +40,7 @@ class _ExperimentalSourceSectionState
   }
 
   void _logout() {
-    ref.read(ApiProvider).logout();
+    unawaited(ref.read(ApiProvider).logout());
     ref.read(likeControllerProvider).sync();
     setState(() {});
     toast(context.l10n.settingsLogout, type: ToastType.info);
@@ -50,7 +50,6 @@ class _ExperimentalSourceSectionState
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final enabled = ref.watch(appPrefsProvider.select(SourceUsable));
-    final configured = ClientIdentityConfigured;
     // 登录态变化时重建（账号名 / 登录按钮）。
     final  = ref.watch(ApiProvider);
     final account = .account;
@@ -65,13 +64,8 @@ class _ExperimentalSourceSectionState
             SettingTile(
               icon: EtaIcons.flaskOutline,
               title: l10n.settingsEnable,
-              subtitle: configured
-                  ? l10n.settingsEnableDesc
-                  : l10n.settingsUnavailable,
-              trailing: Switch(
-                value: enabled,
-                onChanged: configured ? _toggle : null,
-              ),
+              subtitle: l10n.settingsEnableDesc,
+              trailing: Switch(value: enabled, onChanged: _toggle),
             ),
             SettingTile(
               icon: EtaIcons.userOutline,
