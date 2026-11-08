@@ -985,14 +985,31 @@ jobs:
           sudo apt-get install -y binutils file patchelf \
             libgtk-3-dev libx11-dev libxi-dev libdbus-1-dev \
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev
+          # GitHub Release 资产偶发 504：官方失败时走镜像；下载后校验确实是 ELF。
+          fetch_asset() {
+            local url="$1" out="$2" prefix
+            for prefix in "" \
+              "https://ghproxy.net/" \
+              "https://gh-proxy.com/" \
+              "https://ghfast.top/" \
+              "https://gh.moeyy.xyz/" \
+              "https://ghproxy.cc/" \
+              "https://gh.llkk.cc/"; do
+              if wget -q --timeout=90 --tries=2 -O "$out" "${prefix}${url}" \
+                 && [ -s "$out" ] && file "$out" | grep -q 'ELF'; then
+                return 0
+              fi
+            done
+            return 1
+          }
           # appimagetool（CI 无 FUSE，运行时用 --appimage-extract-and-run）
-          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O /tmp/appimagetool.AppImage
+          fetch_asset https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage /tmp/appimagetool.AppImage
           chmod +x /tmp/appimagetool.AppImage
           sudo mv /tmp/appimagetool.AppImage /usr/local/bin/appimagetool
           # type2 runtime 预下载（appimagetool 打包时不再联网下载，规避网络抖动）
-          wget -q https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 -O /tmp/type2-runtime
+          fetch_asset https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 /tmp/type2-runtime
           # linuxdeploy：AppImage 装配时收拢 GTK/FFmpeg/TagLib 等动态依赖
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O /tmp/linuxdeploy.AppImage
+          fetch_asset https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage /tmp/linuxdeploy.AppImage
           chmod +x /tmp/linuxdeploy.AppImage
       - name: Restore executable bits (artifact 上传丢失权限)
         # upload-artifact@v4 不保留权限（文件统一 644）：解包后按 ELF 可执行文件
