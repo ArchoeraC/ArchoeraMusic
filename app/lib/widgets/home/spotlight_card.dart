@@ -83,7 +83,6 @@ class _HomeSpotlightCardState extends ConsumerState<HomeSpotlightCard> {
             cover: lead?.cover,
             width: 96,
             height: 96,
-            radius: 14,
             iconSize: 32,
           ),
           const SizedBox(width: 18),

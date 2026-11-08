@@ -392,7 +392,6 @@ class _QueueTile extends StatelessWidget {
             cover: track.cover,
             width: 30,
             height: 30,
-            radius: 6,
             iconSize: 16,
           ),
           const SizedBox(width: 10),

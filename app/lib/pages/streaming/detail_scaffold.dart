@@ -85,7 +85,7 @@ class DetailHeader extends StatelessWidget {
             child: CoverImage(cover: cover, width: 108, height: 108, radius: 54),
           )
         else
-          CoverImage(cover: cover, width: 108, height: 108, radius: 12),
+          CoverImage(cover: cover, width: 108, height: 108),
         const SizedBox(width: 18),
         Expanded(
           child: Column(
