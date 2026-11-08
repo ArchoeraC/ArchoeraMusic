@@ -7,15 +7,20 @@
 
 import 'dart:convert';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/neko/neko_client.dart';
+import 'package:archoera_music/services/lyrics/engine/lyric_source.dart';
+import 'package:archoera_music/services/lyrics/lyric_line.dart';
+import 'package:archoera_music/services/lyrics/sources/neko_lyric_source.dart';
 import 'package:archoera_music/services/neko/neko_api.dart';
 import 'package:archoera_music/services/neko/neko_audio.dart';
 import 'package:archoera_music/services/neko/neko_lyrics.dart';
 import 'package:archoera_music/services/neko/neko_quality.dart';
 import 'package:archoera_music/services/neko/neko_types.dart';
 import 'package:archoera_music/services/netease/track.dart';
+import 'package:archoera_music/stores/providers.dart';
 
 void main() {
   group('normalizeNekoBaseUrl', () {
@@ -323,6 +328,133 @@ void main() {
     });
   });
 
+  group('neko-v1 富歌词解析（逐字）', () {
+    const rich = {
+      'version': 1,
+      'lines': [
+        {
+          'startMs': 1000,
+          'endMs': 2200,
+          'text': '晴天',
+          'translation': 'Sunny day',
+          'romanization': 'qing tian',
+          'background': false,
+          'words': [
+            {'startMs': 1000, 'endMs': 1400, 'text': '晴'},
+            {'startMs': 1400, 'endMs': 1800, 'text': '天'},
+          ],
+        },
+        {
+          'startMs': 2200,
+          'endMs': 2600,
+          'text': '和声',
+          'background': true,
+          'words': [
+            {'startMs': 2200, 'text': '和'},
+            {'startMs': 2400, 'text': '声'},
+          ],
+        },
+      ],
+    };
+
+    test('行 / 逐字 / 翻译 / 音译 / 背景行 / endMs', () {
+      final groups = parseLyricGroups(
+        content: jsonEncode(rich),
+        format: kNekoV1LyricsFormat,
+      );
+      expect(groups, hasLength(2));
+      expect(groups[0].original.timeMs, 1000);
+      expect(groups[0].original.text, '晴天');
+      expect(groups[0].translation, 'Sunny day');
+      expect(groups[0].romaji, 'qing tian');
+      expect(groups[0].endMs, 2200);
+      final frags = groups[0].fragments!;
+      expect(frags.map((f) => f.text).join(), '晴天');
+      expect(frags[0].startMs, 0);
+      expect(frags[0].durationMs, 400);
+      expect(frags[1].startMs, 400);
+      expect(frags[1].durationMs, 400);
+      expect(groups[1].isBG, isTrue);
+      expect(groups[1].fragments!.first.startMs, 0);
+      expect(groups[1].fragments!.first.durationMs, 200);
+    });
+
+    test('缺少 endMs / 字级 endMs 时按下一行 / 下一字兜底补齐', () {
+      final groups = parseNekoV1Lyrics(jsonEncode({
+        'lines': [
+          {
+            'startMs': 0,
+            'text': '甲乙',
+            'words': [
+              {'startMs': 0, 'text': '甲'},
+              {'startMs': 300, 'text': '乙'},
+            ],
+          },
+          {'startMs': 1000, 'text': '下一行'},
+        ],
+      }));
+      expect(groups, hasLength(2));
+      expect(groups[0].endMs, 1000);
+      expect(groups[0].fragments![0].startMs, 0);
+      expect(groups[0].fragments![0].durationMs, 300);
+      // 末字结束 = 行尾（下一行起点）。
+      expect(groups[0].fragments![1].durationMs, 700);
+    });
+
+    test('非 JSON / 无有效行 → 空；format 标 neko-v1 时回退普通 LRC', () {
+      expect(parseNekoV1Lyrics('not json'), isEmpty);
+      expect(parseNekoV1Lyrics('{"version":1,"lines":[]}'), isEmpty);
+      final fallback = parseLyricGroups(
+        content: '[00:01.000]Hello\n',
+        format: kNekoV1LyricsFormat,
+      );
+      expect(fallback.single.original.text, 'Hello');
+    });
+
+    test('服务端顺序错乱时按 startMs 稳定排序', () {
+      final groups = parseNekoV1Lyrics(jsonEncode({
+        'lines': [
+          {'startMs': 2000, 'text': 'B'},
+          {'startMs': 1000, 'text': 'A'},
+        ],
+      }));
+      expect(groups.map((g) => g.original.text).toList(), ['A', 'B']);
+    });
+  });
+
+  group('NekoLyricSource 富歌词优先', () {
+    test('preferRich=true → neko-v1；false → 兼容 LRC', () async {
+      final fake = _FakeNekoClient();
+      final api = NekoApi(clientFactory: (baseUrl, token) => fake);
+      final container = ProviderContainer(
+        overrides: [nekoApiProvider.overrideWith((ref) => api)],
+      );
+      addTearDown(container.dispose);
+      final sourceProvider = Provider<NekoLyricSource>(
+        (ref) => NekoLyricSource(ref),
+      );
+      final source = container.read(sourceProvider);
+      final track = Track.fromNekoSong({'id': 88, 'title': 'x'});
+
+      final rich = await source.fetch(
+        LyricRequest(track: track, preferRich: true),
+      );
+      expect(rich?.format, kNekoV1LyricsFormat);
+      final groups = parseLyricGroups(
+        content: rich!.content,
+        format: rich.format,
+      );
+      expect(groups.first.original.text, '晴天');
+      expect(groups.first.fragments, hasLength(2));
+
+      final lrc = await source.fetch(
+        LyricRequest(track: track, preferRich: false),
+      );
+      expect(lrc?.format, 'lrc');
+      expect(lrc?.content, '[00:01.00]晴天');
+    });
+  });
+
   group('NekoQrSession 二维码图片解码', () {
     test('解析服务端 qrImage data URL → PNG 字节', () {
       final png = <int>[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A];
@@ -586,6 +718,22 @@ void main() {
       expect(await api.lyricText(''), isNull);
       expect(fake.calls, 0);
     });
+
+    test('lyricsRich / lyricsFormat 解析为 neko-v1 载荷（共用详情缓存）', () async {
+      final fake = _FakeNekoClient();
+      final api = NekoApi(clientFactory: (baseUrl, token) => fake);
+
+      final payload = await api.lyricPayload('88');
+      expect(fake.lastPath, '/api/music/info/88');
+      expect(payload?.format, kNekoV1LyricsFormat);
+      expect(payload?.lrc, '[00:01.00]晴天');
+      expect(payload?.rich?['lines'], isA<List>());
+
+      // 同一曲目的 LRC 读取复用详情缓存，不再发请求。
+      fake.calls = 0;
+      expect(await api.lyricText('88'), '[00:01.00]晴天');
+      expect(fake.calls, 0);
+    });
   });
 
   group('withPicSize 查询参数保护', () {
@@ -625,6 +773,33 @@ class _FakeNekoClient extends NekoClient {
     lastQuery = query;
     if (path.startsWith('/api/music/info/')) {
       final id = path.substring('/api/music/info/'.length);
+      if (id == '88') {
+        return <String, dynamic>{
+          'success': true,
+          'data': const <String, dynamic>{
+            'maxQuality': 'sq',
+            'lyricsFormat': kNekoV1LyricsFormat,
+            'lyrics': '[00:01.00]晴天',
+            'lyricsRich': {
+              'version': 1,
+              'lines': [
+                {
+                  'startMs': 1000,
+                  'endMs': 2000,
+                  'text': '晴天',
+                  'translation': 'Sunny day',
+                  'romanization': 'qing tian',
+                  'background': false,
+                  'words': [
+                    {'startMs': 1000, 'endMs': 1500, 'text': '晴'},
+                    {'startMs': 1500, 'endMs': 2000, 'text': '天'},
+                  ],
+                },
+              ],
+            },
+          },
+        };
+      }
       return <String, dynamic>{
         'success': true,
         'data': id == '42'
