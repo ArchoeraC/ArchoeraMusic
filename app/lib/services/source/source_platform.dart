@@ -267,6 +267,10 @@ abstract class SourcePlatform {
   /// local / streaming 不参与。
   bool get autoFallback => true;
 
+  /// 播放 URL 是否可能过期：引擎**运行期**报源错误时，是否允许重新解析同一
+  /// 曲目并从当前进度续播。默认 false；NT 的签名直链会过期，覆写为 true。
+  bool get urlExpiryRecoverable => false;
+
   /// 自动换源的候选曲目（搜索另一平台）。[autoFallback] 为 false 时不调用。
   Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async =>
       const [];
@@ -496,6 +500,11 @@ class _NeteaseSource extends SourcePlatform {
 
   @override
   String get songCacheReferer => 'https://music.163.com/';
+
+  /// NT `song_url` 返回的是带时效签名的 CDN 直链：暂停/挂起较久后再 seek 或
+  /// 恢复，引擎可能报传输失败。这里允许运行期重新解析并从原进度续播。
+  @override
+  bool get urlExpiryRecoverable => true;
 
   @override
   Future<List<Track>> fallbackCandidates(dynamic ref, Track t) async {

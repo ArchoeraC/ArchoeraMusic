@@ -5,6 +5,8 @@
 /// Netease API 通用常量——对齐 apis/netease/core/config.ts。
 library;
 
+import 'dart:io';
+
 /// AES-CBC 初始向量
 const nmIv = '0102030405060708';
 /// weapi 第一层 AES 预设密钥
@@ -42,7 +44,7 @@ const nmSpecialStatusCodes = <int>{201, 302, 400, 502, 800, 801, 802, 803};
 const nmOsMap = <String, Map<String, String>>{
   'pc': {
     'os': 'pc',
-    'appver': '3.1.17.204416',
+    'appver': '3.1.29.205117',
     'osver': 'Microsoft-Windows-10-Professional-build-19045-64bit',
     'channel': 'netease',
   },
@@ -72,6 +74,44 @@ const nmOsMap = <String, Map<String, String>>{
   },
 };
 
+/// 宿主平台对应的客户端标识（对齐 config.ts `HOST_OS_KEY`）。
+///
+/// 未显式指定 `cookie.os` 时使用宿主真实平台，而不是无条件伪装成 PC；
+/// `os: linux` 却带 Windows 版本号这类不一致组合更容易被风控盯上。
+final String nmHostOsKey = Platform.isMacOS
+    ? 'osx'
+    : Platform.isLinux
+    ? 'linux'
+    : 'pc';
+
+/// 宿主真实系统版本（对齐 Node `os.type()` + `os.release()`）。
+///
+/// 例：Linux → `Linux 6.14.0-37-generic`；macOS → `Darwin 24.6.0`；
+/// Windows → `Windows_NT 10.0.19045`。
+final String nmHostOsVersion = _detectHostOsVersion();
+
+String _detectHostOsVersion() {
+  final raw = Platform.operatingSystemVersion.trim();
+  if (Platform.isLinux) {
+    // Dart: "Linux 6.14.0-37-generic #37~24.04.1-Ubuntu ..."
+    final m = RegExp(r'^\S+\s+(\S+)').firstMatch(raw);
+    return m == null ? 'Linux $raw' : 'Linux ${m.group(1)}';
+  }
+  if (Platform.isMacOS) {
+    // Dart: "Darwin Kernel Version 24.6.0: ..."
+    final m = RegExp(r'(\d+\.\d+\.\d+)').firstMatch(raw);
+    return m == null ? 'Darwin $raw' : 'Darwin ${m.group(1)}';
+  }
+  if (Platform.isWindows) {
+    // Dart: "Windows 10 Pro (build 19045)" / "Windows_NT 10.0.19045"
+    final build = RegExp(r'build\s+(\d+)', caseSensitive: false).firstMatch(raw);
+    if (build != null) return 'Windows_NT 10.0.${build.group(1)}';
+    final m = RegExp(r'(\d+\.\d+\.\d+)').firstMatch(raw);
+    return m == null ? 'Windows_NT $raw' : 'Windows_NT ${m.group(1)}';
+  }
+  return '${Platform.operatingSystem} $raw';
+}
+
 /// 不同加密方式 + 设备类型下的 User-Agent
 const nmUaMap = <String, Map<String, String>>{
   'weapi': {
@@ -85,9 +125,9 @@ const nmUaMap = <String, Map<String, String>>{
   'api': {
     'pc': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 '
         '(KHTML, like Gecko) Safari/537.36 Chrome/91.0.4472.164 '
-        'NeteaseMusicDesktop/3.0.18.203152',
-    'android': 'NeteaseMusic/9.1.65.240927161425(9001065);Dalvik/2.1.0 '
-        '(Linux; U; Android 14; 23013RK75C Build/UKQ1.230804.001)',
+        'NeteaseMusicDesktop/3.1.29.205117',
+    'android': 'NeteaseMusic/9.5.61.260802021928(9005061);Dalvik/2.1.0 '
+        '(Linux; U; Android 12; HBN-AL00 Build/cd737a2.0)',
     'iphone': 'NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)',
   },
 };
