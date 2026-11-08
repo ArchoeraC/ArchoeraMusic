@@ -596,7 +596,7 @@
   "settingsLanguageDesc": "인터페이스 표시 언어 전환",
   "settingsLangSystem": "시스템 따르기",
   "settingsSectionCover": "커버 아트",
-  "settingsCoverRadius": "커버 모서리 둥글게",
+  "settingsCoverRadius": "플레이어 외 커버 모서리",
   "settingsCoverRadiusSharp": "직사각형（정보 밀도 높음）",
   "settingsCoverRadiusPx": "{radius}px 둥글게",
   "settingsCoverRadiusSharpLabel": "직사각형",

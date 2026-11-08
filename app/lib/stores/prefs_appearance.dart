@@ -177,7 +177,7 @@ extension AppearancePrefs on AppPrefs {
   /// MiSans，避免引用已移除的字体族）。
   String get fontFamily => 'MiSans';
 
-  /// 封面圆角（px；0/8/12，对齐原版 CoverList 观感，默认 10）。
+  /// 非播放页封面圆角（px；0/8/12，对齐原版 CoverList 观感，默认 10）。
   double get coverRadius {
     final v = data[coverRadiusKey] as num?;
     if (v == null) return 10;

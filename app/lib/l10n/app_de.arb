@@ -596,7 +596,7 @@
   "settingsLanguageDesc": "Anzeigesprache der Oberfläche wechseln",
   "settingsLangSystem": "System folgen",
   "settingsSectionCover": "Cover",
-  "settingsCoverRadius": "Cover-Eckradius",
+  "settingsCoverRadius": "Cover-Ecken außerhalb des Players",
   "settingsCoverRadiusSharp": "Quadratisch（hohe Informationsdichte）",
   "settingsCoverRadiusPx": "{radius}px Radius",
   "settingsCoverRadiusSharpLabel": "Quadratisch",

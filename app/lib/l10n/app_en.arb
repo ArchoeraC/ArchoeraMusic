@@ -596,7 +596,7 @@
   "settingsLanguageDesc": "Switch interface display language",
   "settingsLangSystem": "Follow system",
   "settingsSectionCover": "Cover art",
-  "settingsCoverRadius": "Cover corner radius",
+  "settingsCoverRadius": "Cover corners outside player",
   "settingsCoverRadiusSharp": "Square (dense layout)",
   "settingsCoverRadiusPx": "{radius}px radius",
   "settingsCoverRadiusSharpLabel": "Square",
