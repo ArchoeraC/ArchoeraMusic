@@ -1002,7 +1002,7 @@ void main() {
       expect(left - right, greaterThan(60));
     });
 
-    testWidgets('翻译合成扫亮：激活行翻译走逐字渲染路径', (tester) async {
+    testWidgets('翻译逐字：激活行翻译走逐字渲染路径', (tester) async {
       final groups = [
         LyricGroup(
           original: const LyricLine(timeMs: 0, text: '主行'),

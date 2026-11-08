@@ -4624,13 +4624,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsAmllWordSweep => 'ワードスイープ';
 
   @override
-  String get settingsAmllSyntheticSweep => '通常歌詞の合成スイープ';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc =>
-      '逐字タイミングの無い歌詞を行の長さから推定してスイープ（翻訳・ルビにも適用）';
-
-  @override
   String get settingsAmllHidePassed => '歌い終わった行を隠す';
 
   @override
