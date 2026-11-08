@@ -6,33 +6,18 @@
 // Track 映射、用户会话往返、二维码图片解码与状态解析。
 
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/neko/neko_client.dart';
-import 'package:archoera_music/apis/neko/neko_replay.dart';
 import 'package:archoera_music/services/neko/neko_api.dart';
 import 'package:archoera_music/services/neko/neko_audio.dart';
-import 'package:archoera_music/services/neko/neko_identity.dart';
-import 'package:archoera_music/services/neko/neko_instance_identity.dart';
 import 'package:archoera_music/services/neko/neko_lyrics.dart';
 import 'package:archoera_music/services/neko/neko_quality.dart';
 import 'package:archoera_music/services/neko/neko_types.dart';
 import 'package:archoera_music/services/netease/track.dart';
 
 void main() {
-  // 客户端身份：测试里注入占位 client_id（生产走 --dart-define=NEKO_CLIENT_ID）；
-  // 假服务端不认识 /api/client/* 时按「站点未启用身份校验」降级为无身份请求。
-  setUp(() {
-    NekoInstanceIdentity.debugClientId = 'nkc_pub_testclient000000';
-  });
-  tearDown(() {
-    NekoInstanceIdentity.debugClientId = null;
-    NekoInstanceIdentity.debugClearPool();
-  });
-
   group('normalizeNekoBaseUrl', () {
     test('空值 / 空白回退默认站点', () {
       expect(normalizeNekoBaseUrl(null), kDefaultNekoBaseUrl);
@@ -113,167 +98,6 @@ void main() {
           reason: '$s',
         );
       }
-    });
-  });
-
-  group('防重放挑战解题（neko_replay）', () {
-    bool meets(String seed, String proof, int bits) => nekoMeetsDifficulty(
-      sha256.convert(utf8.encode('$seed:$proof')).bytes,
-      bits,
-    );
-
-    test('nekoMeetsDifficulty：整字节 / 余数位 / 长度不足', () {
-      // 前 8 位全零
-      expect(nekoMeetsDifficulty([0x00, 0x80], 8), isTrue);
-      expect(nekoMeetsDifficulty([0x01, 0x00], 8), isFalse);
-      // 第 9 位（0x80 为 1、0x7F 为 0）
-      expect(nekoMeetsDifficulty([0x00, 0x80], 9), isFalse);
-      expect(nekoMeetsDifficulty([0x00, 0x7F], 9), isTrue);
-      // 0 位恒成立；长度不足 / 负数不成立
-      expect(nekoMeetsDifficulty([0x00], 0), isTrue);
-      expect(nekoMeetsDifficulty(const [], 1), isFalse);
-      expect(nekoMeetsDifficulty([0x00], -1), isFalse);
-    });
-
-    test('nekoSolveProofSync：解出的 proof 满足难度（十进制计数器）', () {
-      const seed = 'deadbeefdeadbeefdeadbeefdeadbeef';
-      for (final difficulty in const [0, 4, 8, 12]) {
-        final proof = nekoSolveProofSync(seed, difficulty);
-        expect(proof, isNotNull);
-        expect(
-          meets(seed, proof!, difficulty),
-          isTrue,
-          reason: 'difficulty=$difficulty',
-        );
-      }
-    });
-
-    test('nekoSolveProofSync：非法难度返回 null', () {
-      expect(nekoSolveProofSync('s', -1), isNull);
-      expect(nekoSolveProofSync('s', kNekoMaxDifficultyBits + 1), isNull);
-    });
-
-    test('nekoSolveProof：后台 isolate 解出的 proof 同样可用', () async {
-      final proof = await nekoSolveProof('cafebabe', 8);
-      expect(proof, isNotNull);
-      expect(meets('cafebabe', proof!, 8), isTrue);
-    });
-  });
-
-  group('NekoClient 防重放领取（本地 HttpServer 端到端）', () {
-    test('换题 → 解题 → 兑换 → 携带 nonce 访问受保护接口', () async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
-
-      const seed = 'seed-abc';
-      const difficulty = 4;
-      final readNonces = <String>['read-1', 'read-2'];
-      var challengeServed = false;
-      var claimAccepted = false;
-      var protectedAccepted = false;
-
-      server.listen((req) async {
-        final path = req.uri.path;
-        final response = req.response
-          ..headers.contentType = ContentType.json;
-        if (path == '/api/replay/challenge') {
-          challengeServed = true;
-          response.write(
-            jsonEncode({
-              'success': true,
-              'data': {
-                'challenge': 'ch-1',
-                'algorithm': 'sha256-leading-zero-bits',
-                'seed': seed,
-                'difficulty': difficulty,
-                'read': 2,
-                'write': 2,
-                'expiresIn': 60,
-              },
-            }),
-          );
-        } else if (path == '/api/replay/nonce') {
-          final proof = req.uri.queryParameters['proof'];
-          final isChallenge = req.uri.queryParameters['challenge'] == 'ch-1';
-          final valid =
-              proof != null &&
-              nekoMeetsDifficulty(
-                sha256.convert(utf8.encode('$seed:$proof')).bytes,
-                difficulty,
-              );
-          if (isChallenge && valid) {
-            claimAccepted = true;
-            response.write(
-              jsonEncode({
-                'success': true,
-                'data': {
-                  'nonces': {
-                    'read': readNonces,
-                    'write': ['write-1'],
-                  },
-                },
-              }),
-            );
-          } else {
-            response.statusCode = 409;
-            response.write(
-              jsonEncode({'success': false, 'message': '请求已失效，请刷新后重试'}),
-            );
-          }
-        } else if (path == '/api/music/info/1') {
-          final nonce = req.headers.value('X-Neko-Nonce');
-          protectedAccepted = nonce != null && readNonces.contains(nonce);
-          response.write(
-            jsonEncode({
-              'success': true,
-              'data': {'maxQuality': 'sq'},
-            }),
-          );
-        } else {
-          response.statusCode = 404;
-          response.write('{}');
-        }
-        await response.close();
-      });
-
-      final client = NekoClient(baseUrl: 'http://127.0.0.1:${server.port}');
-      final body = await client.getJson('/api/music/info/1');
-      expect(body['success'], isTrue);
-      expect(challengeServed, isTrue, reason: '应先换题');
-      expect(claimAccepted, isTrue, reason: '应带正确 proof 兑换 nonce');
-      expect(protectedAccepted, isTrue, reason: '受保护请求应携带已领取的 nonce');
-    });
-
-    test('换题被防爬降级（SEO HTML）时：明确失败，不把 SEO 页当成功', () async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() => server.close(force: true));
-
-      server.listen((req) async {
-        final response = req.response;
-        if (req.uri.path == '/api/replay/challenge') {
-          // 换题接口被降级为 SEO HTML（按爬虫分流）。
-          response.headers.contentType = ContentType.html;
-          response.write('<!DOCTYPE html><html><body>SEO</body></html>');
-        } else if (req.uri.path == '/api/music/info/1') {
-          // 受保护接口：缺 nonce → 409（请求不执行）。
-          response.statusCode = 409;
-          response.headers
-            ..contentType = ContentType.json
-            ..set(kNekoReplayStatusHeader, 'missing');
-          response.write(
-            jsonEncode({'success': false, 'message': '请求已失效，请刷新后重试'}),
-          );
-        } else {
-          response.statusCode = 404;
-        }
-        await response.close();
-      });
-
-      final client = NekoClient(baseUrl: 'http://127.0.0.1:${server.port}');
-      await expectLater(
-        client.getJson('/api/music/info/1'),
-        throwsA(isA<NekoApiException>()),
-      );
     });
   });
 
@@ -504,9 +328,11 @@ void main() {
       final png = <int>[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A];
       final s = NekoQrSession(
         sessionId: 'sid',
+        deliveryKey: 'dk',
         qrImage: 'data:image/png;base64,${base64Encode(png)}',
       );
       expect(s.sessionId, 'sid');
+      expect(s.deliveryKey, 'dk');
       expect(s.qrImageBytes, png);
     });
 
@@ -520,15 +346,14 @@ void main() {
   });
 
   group('NekoQrStatus', () {
-    test('confirmed 带 token 与用户', () {
+    test('状态帧不再携带 token（需 claim 领取）', () {
       final s = NekoQrStatus.fromJson({
         'status': 'confirmed',
-        'token': 'abc123',
+        'token': 'ignored',
         'user': {'id': 1, 'nickname': 'n'},
       });
       expect(s.state, NekoQrState.confirmed);
-      expect(s.token, 'abc123');
-      expect(s.user?.nickname, 'n');
+      expect(s.message, isEmpty);
     });
 
     test('各状态映射 + 未知回退', () {
