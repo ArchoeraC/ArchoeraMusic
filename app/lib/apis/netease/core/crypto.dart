@@ -377,19 +377,21 @@ Uint8List _deriveX25519AesKey(
   return Uint8List.sublistView(_hmacSha256(prk, info), 0, 16);
 }
 
-/// 中间层变换：随机 XOR → base64 → 随机旋转（对齐 xeapiMidTransform）
+/// 中间层变换：随机 XOR 后按**原始字节**旋转（对齐 xeapiMidTransform）。
+///
+/// 上游 2026-10-10 修正：旧实现先把 XOR 结果转 base64 再旋转，服务端已按
+/// 原始字节解密，旧写法会得到错误明文。
 Uint8List _xeapiMidTransform(Uint8List ciphertext) {
   final random = _randomBytes(16);
   final xored = Uint8List(ciphertext.length);
   for (var i = 0; i < ciphertext.length; i++) {
     xored[i] = ciphertext[i] ^ random[i & 0x0f];
   }
-  final b64 = utf8.encode(base64.encode(xored));
-  final rot = b64.isEmpty ? 0 : (random[0] & 0x0f) % b64.length;
-  final out = Uint8List(16 + b64.length);
+  final rot = xored.isEmpty ? 0 : (random[0] & 0x0f) % xored.length;
+  final out = Uint8List(16 + xored.length);
   out.setAll(0, random);
-  out.setAll(16, b64.sublist(rot));
-  out.setAll(16 + b64.length - rot, b64.sublist(0, rot));
+  out.setAll(16, xored.sublist(rot));
+  out.setAll(16 + xored.length - rot, xored.sublist(0, rot));
   return out;
 }
 
@@ -437,7 +439,15 @@ String _buildXeapiPlaintext(
 
   final bodyData = Map<String, dynamic>.from(data)..remove('e_r');
   final form = nmFormUrlEncode(bodyData);
-  fields['body'] = base64.encode(utf8.encode(form));
+  final mediaType = contentType.split(';').first.trim().toLowerCase();
+  if (form.isNotEmpty) {
+    // form 请求直接放 content；仅非 form 类型才把原始 body 做 base64。
+    if (mediaType == 'application/x-www-form-urlencoded') {
+      fields['content'] = form;
+    } else {
+      fields['body'] = base64.encode(utf8.encode(form));
+    }
+  }
 
   fields['queryString'] = fields.containsKey('queryString')
       ? '${fields['queryString']}&e_r=true'
@@ -445,8 +455,11 @@ String _buildXeapiPlaintext(
   return jsonEncode(fields);
 }
 
-/// xeapi 加密 → { B, S, R } 三段 base64（对齐 crypto.ts xeapi）
-({String B, String S, String R}) nmXeapi(
+/// xeapi 加密 → { C, S, R }（对齐 crypto.ts xeapi）
+///
+/// C 使用 **base64url 无填充**（上游 2026-10-10 起从 `B`/普通 base64 迁移），
+/// S / R 仍为普通 base64。
+({String C, String S, String R}) nmXeapi(
   String uri,
   Map<String, dynamic> data,
   NmXeapiOptions options,
@@ -458,10 +471,10 @@ String _buildXeapiPlaintext(
   final dynamicKey = activeSessionKey ?? _randomBytes(16);
   final plaintext = utf8.encode(_buildXeapiPlaintext(uri, data, options));
 
-  // B = AES-ECB(dynamicKey, midTransform(AES-ECB(STATIC_KEY, plaintext)))
+  // C = AES-ECB(dynamicKey, midTransform(AES-ECB(STATIC_KEY, plaintext)))
   final inner = _aesEcbBytes(plaintext, _xeapiStaticKey, encrypt: true);
   final mid = _xeapiMidTransform(inner);
-  final b = _aesEcbBytes(mid, dynamicKey, encrypt: true);
+  final c = _aesEcbBytes(mid, dynamicKey, encrypt: true);
 
   final s = _xeapiEncryptS(
     dynamicKey,
@@ -475,7 +488,11 @@ String _buildXeapiPlaintext(
   );
   final r = _aesEcbBytes(rPlain, _xeapiStaticKey, encrypt: true);
 
-  return (B: base64.encode(b), S: base64.encode(s), R: base64.encode(r));
+  return (
+    C: base64Url.encode(c).replaceAll('=', ''),
+    S: base64.encode(s),
+    R: base64.encode(r),
+  );
 }
 
 /// xeapi 响应解密：AES-ECB(eapiKey) + 可选 gunzip + JSON（对齐 xeapiResDecrypt）

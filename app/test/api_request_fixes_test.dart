@@ -6,8 +6,13 @@
 /// 响应清洗缺失）钉成确定性单测，避免再次回归。
 library;
 
+import 'dart:io';
+
+import 'package:archoera_music/apis/netease/core/config.dart';
 import 'package:archoera_music/apis/netease/core/crypto.dart';
 import 'package:archoera_music/apis/netease/core/device.dart';
+import 'package:archoera_music/apis/netease/core/request.dart';
+import 'package:archoera_music/apis/netease/modules/index.dart';
 import 'package:archoera_music/apis/qqmusic/core/credential.dart';
 import 'package:archoera_music/apis/qqmusic/core/request.dart';
 import 'package:archoera_music/services/kugou/kugou_request.dart';
@@ -41,6 +46,44 @@ void main() {
     final id = nmGetDeviceId();
     expect(id.length, 52);
     expect(RegExp(r'^[0-9A-F]{52}$').hasMatch(id), isTrue);
+  });
+
+  test('NT 客户端 OS 标识跟随宿主平台（配置表覆盖真实平台）', () {
+    expect(nmHostOsKey, anyOf('linux', 'osx', 'pc'));
+    expect(nmOsMap[nmHostOsKey], isNotNull);
+    expect(nmHostOsVersion, isNotEmpty);
+    final prefix = Platform.isMacOS
+        ? 'Darwin '
+        : Platform.isLinux
+        ? 'Linux '
+        : Platform.isWindows
+        ? 'Windows_NT '
+        : '';
+    if (prefix.isNotEmpty) expect(nmHostOsVersion, startsWith(prefix));
+  });
+
+  test('NT song_url 走 xeapi（eapi 在 NMTID 探测期会 -460，需多次点击）', () async {
+    String? uri;
+    NeteaseRequestOptions? options;
+    await modules['song_url']!({'id': '1330348068', 'level': 'exhigh'}, (
+      u,
+      data,
+      o,
+    ) async {
+      uri = u;
+      options = o;
+      return NeteaseResponse(
+        status: 200,
+        body: const {'code': 200, 'data': <dynamic>[]},
+        cookie: const [],
+      );
+    });
+    expect(uri, '/api/song/enhance/player/url/v1');
+    expect(
+      options!.crypto,
+      'xeapi',
+      reason: 'song_url 必须使用客户端反爬通道，避免 eapi -460 风控',
+    );
   });
 
   group('KG 响应清洗', () {

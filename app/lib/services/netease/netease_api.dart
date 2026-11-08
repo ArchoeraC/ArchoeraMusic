@@ -139,7 +139,11 @@ class NeteaseApi extends NeteaseApiBase
           'id': id,
           'level': neteaseLevels[q] ?? 'exhigh',
         });
-        final data = body?['data'];
+        // 请求层失败（网络错误 / 风控 -460 等）会经 ApisNeteaseCaller 归一为
+        // null；此时换低档位必然同样失败（同一接口、同一会话），继续降级只会
+        // 把「一次点击」放大成最多 5 次请求，反而加剧风控。直接放弃本次解析。
+        if (body == null) return null;
+        final data = body['data'];
         if (data is! List || data.isEmpty) continue;
         final first = data.first;
         if (first is! Map<String, dynamic>) continue;
