@@ -21,6 +21,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../theme/app_theme.dart';
 import '../widgets/player/s_controls.dart';
+import '../widgets/dialogs/collection_platform.dart';
 import '../widgets/dialogs/s_dialog.dart';
 import '../widgets/common/toast.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';

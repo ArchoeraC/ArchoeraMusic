@@ -28,6 +28,7 @@ import 'prefs_scrape.dart';
 import 'prefs_scan.dart';
 import 'prefs_search.dart';
 import 'prefs_security.dart';
+import 'prefs_source.dart';
 import 'prefs_streaming.dart';
 import 'prefs_shortcuts.dart';
 import 'prefs_tag_rules.dart';
@@ -50,6 +51,7 @@ export 'prefs_scrape.dart';
 export 'prefs_scan.dart';
 export 'prefs_search.dart';
 export 'prefs_security.dart';
+export 'prefs_source.dart';
 export 'prefs_streaming.dart';
 export 'prefs_shortcuts.dart';
 export 'prefs_tag_rules.dart';
@@ -825,6 +827,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置实验性音源 NekoMusic 总开关（默认关）。
   void setNekoEnabled(bool value) {
     state = state.copyWithNekoEnabled(value);
+    state.save();
+  }
+
+  /// 设置「我喜欢 / 收藏 / 搜索」等页面的默认音源（`auto` = 自动）。
+  void setDefaultSource(String value) {
+    state = state.copyWithDefaultSource(value);
     state.save();
   }
 

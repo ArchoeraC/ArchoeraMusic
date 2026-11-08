@@ -28,6 +28,16 @@ class _NoSideEffectsPrefsNotifier extends AppPrefsNotifier {
   AppPrefs build() => AppPrefs();
 }
 
+/// 固定偏好值的测试用 prefs controller。
+class _FixedPrefsNotifier extends AppPrefsNotifier {
+  _FixedPrefsNotifier(this.prefs);
+
+  final AppPrefs prefs;
+
+  @override
+  AppPrefs build() => prefs;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -68,5 +78,43 @@ void main() {
       final sub = c.listen(signal, (_, _) {});
       sub.close();
     }
+  });
+
+  test('默认音源偏好作用于收藏 / 搜索默认平台', () {
+    final c = ProviderContainer.test(
+      overrides: [
+        appPrefsProvider.overrideWith(
+          () => _FixedPrefsNotifier(AppPrefs().copyWithDefaultSource('kugou')),
+        ),
+      ],
+    );
+    expect(preferredCollectionSource(c), 'kugou');
+    expect(preferredSearchSource(c), 'kugou');
+    expect(defaultLikedPlatform(c), 'kugou');
+  });
+
+  test('默认音源 auto / 未启用源回退到各页历史默认值', () {
+    final auto = ProviderContainer.test(
+      overrides: [
+        appPrefsProvider.overrideWith(
+          () => _FixedPrefsNotifier(
+            AppPrefs().copyWithDefaultSource(autoDefaultSource),
+          ),
+        ),
+      ],
+    );
+    expect(preferredCollectionSource(auto), 'netease');
+    expect(preferredSearchSource(auto), 'netease');
+
+    final disabledNeko = ProviderContainer.test(
+      overrides: [
+        appPrefsProvider.overrideWith(
+          () => _FixedPrefsNotifier(AppPrefs().copyWithDefaultSource('neko')),
+        ),
+      ],
+    );
+    // Neko 默认关闭：设置里残留的 neko 不应被当作可用默认源。
+    expect(preferredCollectionSource(disabledNeko), 'netease');
+    expect(preferredSearchSource(disabledNeko), 'netease');
   });
 }
