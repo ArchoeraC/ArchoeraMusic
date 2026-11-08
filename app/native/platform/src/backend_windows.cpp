@@ -899,7 +899,13 @@ void messageBox(const char* title, const char* body) {
 // 全程当前用户、免提权：scheme 写 HKCU\Software\Classes；跨实例转发用隐藏
 // 消息窗口 + WM_COPYDATA（不依赖提权，也不起子进程）。
 constexpr wchar_t kDeepLinkClass[] = L"ArchoeraMusic.DeepLink";
+// 单向转发：第二实例把 URI 写入共享内存，再 PostMessage 通知隐藏窗口；
+// 不 SendMessage / 不等待首实例处理（UI 线程卡住也不会拖死第二实例）。
+constexpr wchar_t kDeepLinkMapName[] = L"Local\\ArchoeraMusic.DeepLink.Uri";
+constexpr UINT kDeepLinkPushMsg = WM_APP + 0x52;
+constexpr DWORD kDeepLinkMapSize = 8192;
 HWND g_deeplink_hwnd = nullptr;
+HANDLE g_deeplink_map = nullptr;
 std::mutex g_deeplink_mutex;
 std::string g_deeplink_pending;  // UTF-8；单条待取
 
@@ -987,6 +993,23 @@ LRESULT CALLBACK deepLinkWndProc(HWND hwnd, UINT msg, WPARAM wparam,
             setPendingDeepLink(url);
             return TRUE;
         }
+    } else if (msg == kDeepLinkPushMsg) {
+        HANDLE map = ::OpenFileMappingW(FILE_MAP_READ, FALSE, kDeepLinkMapName);
+        if (map != nullptr) {
+            void* view = ::MapViewOfFile(map, FILE_MAP_READ, 0, 0, 0);
+            if (view != nullptr) {
+                uint32_t len = 0;
+                std::memcpy(&len, view, sizeof(len));
+                if (len > 0 && len < kDeepLinkMapSize - sizeof(len)) {
+                    std::string url(
+                        static_cast<const char*>(view) + sizeof(len), len);
+                    setPendingDeepLink(url);
+                }
+                ::UnmapViewOfFile(view);
+            }
+            ::CloseHandle(map);
+        }
+        return 0;
     } else if (msg == WM_APP + 0x51) {
         activateFlutterWindow();
         return 0;
@@ -1006,6 +1029,11 @@ void ensureDeepLinkWindow() {
         WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kDeepLinkClass,
         L"ArchoeraMusic.DeepLink", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr,
         wc.hInstance, nullptr);
+    if (g_deeplink_map == nullptr) {
+        g_deeplink_map = ::CreateFileMappingW(
+            INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, kDeepLinkMapSize,
+            kDeepLinkMapName);
+    }
 }
 
 void destroyDeepLinkWindow() {
@@ -1092,24 +1120,30 @@ int32_t deepLinkTakeWin(AplString* out) {
 int32_t deepLinkForwardWin() {
     const std::string url = extractUrlFromCommandLine(::GetCommandLineW());
     if (url.empty()) return 0;
-    // 首实例可能仍在启动（隐藏消息窗口尚未创建），短暂重试，避免把 OAuth
-    // 回调当成「重复启动」丢弃。
-    for (int attempt = 0; attempt < 10; ++attempt) {
-        HWND target = ::FindWindowW(kDeepLinkClass, nullptr);
-        if (target != nullptr) {
-            COPYDATASTRUCT cds{};
-            cds.dwData = 0x41524D31;  // 'ARM1'
-            cds.cbData = static_cast<DWORD>(url.size());
-            cds.lpData = const_cast<char*>(url.data());
-            DWORD_PTR result = 0;
-            const LRESULT sent = ::SendMessageTimeoutW(
-                target, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&cds),
-                SMTO_ABORTIFHUNG | SMTO_NORMAL, 3000, &result);
-            if (sent != 0) return 1;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // 纯单向：写入共享内存 → PostMessage（不等待）。首实例若尚未创建映射，
+    // 直接失败返回；此时冷启动路径会负责处理该 URI。
+    HANDLE map = ::OpenFileMappingW(FILE_MAP_WRITE, FALSE, kDeepLinkMapName);
+    if (map == nullptr) return ERR_BACKEND;
+    void* view = ::MapViewOfFile(map, FILE_MAP_WRITE, 0, 0, 0);
+    if (view == nullptr) {
+        ::CloseHandle(map);
+        return ERR_BACKEND;
     }
-    return ERR_BACKEND;
+    const size_t max_len = kDeepLinkMapSize - sizeof(uint32_t);
+    const uint32_t len = static_cast<uint32_t>(
+        url.size() < max_len ? url.size() : max_len);
+    std::memcpy(static_cast<char*>(view) + sizeof(uint32_t), url.data(), len);
+    std::memcpy(view, &len, sizeof(len));  // 长度最后写，读端以非 0 为准
+    ::UnmapViewOfFile(view);
+    ::CloseHandle(map);
+
+    HWND target = ::FindWindowW(kDeepLinkClass, nullptr);
+    if (target == nullptr) return ERR_BACKEND;
+    if (::PostMessageW(target, kDeepLinkPushMsg, 0, 0) == 0) {
+        return ERR_BACKEND;
+    }
+    return 1;
 }
 
 // ── 系统托盘（Shell_NotifyIconW + 隐藏消息窗口线程）───────────────

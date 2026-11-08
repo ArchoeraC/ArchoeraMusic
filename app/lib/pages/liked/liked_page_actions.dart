@@ -10,6 +10,16 @@ extension _LikedPageActions on _LikedPageState {
   void _switchPlatform(String platform) {
     if (platform == _platform) return;
     ref.read(likedPlatformProvider.notifier).set(platform);
+    _applyPlatform(platform);
+  }
+
+  /// 跟随「默认音源」设置切换（不记为手动选择，后续改设置仍会跟随）。
+  void _applyDefaultPlatform(String platform) {
+    if (platform == _platform) return;
+    _applyPlatform(platform);
+  }
+
+  void _applyPlatform(String platform) {
     setState(() => _platform = platform);
     final adapter = collectionPlatform(platform);
     if (adapter.likedAvailable(ref)) adapter.ensureLikedLoaded(ref);

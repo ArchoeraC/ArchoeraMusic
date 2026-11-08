@@ -379,6 +379,16 @@ SourcePlatform sourcePlatform(String source) =>
 List<SourcePlatform> sourcePlatforms(dynamic ref) =>
     _all.where((p) => p.searchable && p.enabled(ref)).toList(growable: false);
 
+/// 用户设置的默认搜索音源；`auto` / 不可搜索 / 未启用时返回 [fallback]。
+String preferredSearchSource(dynamic ref, {String fallback = 'netease'}) {
+  final prefs = ref.read(appPrefsProvider) as AppPrefs;
+  final preferred = prefs.defaultSource;
+  if (preferred == autoDefaultSource) return fallback;
+  final adapter = sourcePlatform(preferred);
+  if (!adapter.searchable || !adapter.enabled(ref)) return fallback;
+  return preferred;
+}
+
 /// 全部已注册平台（含 local / streaming；歌词管线等内部枚举用）。
 List<SourcePlatform> allSourcePlatforms() => List.unmodifiable(_all);
 

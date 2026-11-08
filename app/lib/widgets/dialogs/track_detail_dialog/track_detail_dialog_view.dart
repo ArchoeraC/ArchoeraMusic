@@ -149,7 +149,7 @@ class _TrackDetailHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        CoverImage(cover: track.cover, width: 56, height: 56, radius: 10),
+        CoverImage(cover: track.cover, width: 56, height: 56),
         const SizedBox(width: 14),
         Expanded(
           child: Column(

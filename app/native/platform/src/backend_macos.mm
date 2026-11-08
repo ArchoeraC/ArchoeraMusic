@@ -252,6 +252,15 @@ static void popUpTrayMenu(NSStatusItem* item, NSMenu* menu) {
     }
 }
 
+/// 次实例转发：同一用户会话内的分布式通知（无需 AppleEvents 授权，
+/// 也不阻塞发送方）。首实例的 observer 收到后按 AppleEvent 同路径入队。
+- (void)onDistributedDeepLink:(NSNotification*)notification {
+    NSString* url = notification.userInfo[@"url"];
+    if (url != nil) {
+        archoera::setPendingDeepLink([url UTF8String]);
+    }
+}
+
 - (MPRemoteCommandHandlerStatus)onNext:(MPRemoteCommandEvent*)event {
     (void)event;
     archoera::dispatch(archoera::makeCommand(archoera::CMD_NEXT));
@@ -385,6 +394,12 @@ int32_t init() {
                forEventClass:kInternetEventClass
                   andEventID:kAEGetURL];
     }
+    // 次实例转发：分布式通知（同用户会话），不阻塞发送方。
+    [[NSDistributedNotificationCenter defaultCenter]
+        addObserver:observer()
+           selector:@selector(onDistributedDeepLink:)
+               name:@"org.archoera.DeepLink.Uri"
+             object:nil];
     // 冷启动：LaunchServices 把 URL 作为启动参数传入。
     for (NSString* arg in [[NSProcessInfo processInfo] arguments]) {
         if ([arg hasPrefix:@"archoera://"] || [arg hasPrefix:@"nekomusic://"]) {
@@ -555,7 +570,26 @@ int32_t deepLinkTake(AplString* out) {
 
 // macOS 单实例由 LaunchServices 保证，URL 直接作为 AppleEvent 投递给运行中的
 // 实例，无需自行转发。
-int32_t deepLinkForward() { return 0; }
+int32_t deepLinkForward() { 
+    @autoreleasepool {
+        NSString* url = nil;
+        for (NSString* arg in [[NSProcessInfo processInfo] arguments]) {
+            if ([arg hasPrefix:@"archoera://"] ||
+                [arg hasPrefix:@"nekomusic://"]) {
+                url = arg;
+                break;
+            }
+        }
+        if (url == nil) return 0;
+        // 单向广播，不等待回复；首实例若未运行，由 LaunchServices/冷启动路径处理。
+        [[NSDistributedNotificationCenter defaultCenter]
+            postNotificationName:@"org.archoera.DeepLink.Uri"
+                          object:nil
+                        userInfo:@{@"url" : url}
+              deliverImmediately:YES];
+        return 1;
+    }
+}
 
 int32_t windowActivate() {
     dispatch_async(dispatch_get_main_queue(), ^{

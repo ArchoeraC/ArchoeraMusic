@@ -1141,13 +1141,25 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nekoOauthDesc =>
-      'Öffnet NekoAuth im Systembrowser und kehrt nach der Autorisierung zur App zurück.';
+      'Öffne den einmaligen Link unten in einem beliebigen Browser. Falls der Standardbrowser die Anmeldung nicht abschließen kann, kopiere ihn in einen anderen Browser.';
 
   @override
   String get nekoOauthOpen => 'Im Browser anmelden';
 
   @override
-  String get nekoOauthWaiting => 'Bitte die Anmeldung im Browser abschließen…';
+  String get nekoOauthWaiting => 'Warte auf Autorisierung…';
+
+  @override
+  String get nekoOauthUrlLabel => 'Einmaliger Anmeldelink';
+
+  @override
+  String get nekoOauthCopy => 'Link kopieren';
+
+  @override
+  String get nekoOauthCopied => 'Link kopiert';
+
+  @override
+  String get nekoOauthRefresh => 'Neuen Link holen';
 
   @override
   String get nekoOauthFailed => 'Anmeldung fehlgeschlagen';
@@ -1994,7 +2006,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionCover => 'Cover';
 
   @override
-  String get settingsCoverRadius => 'Cover-Eckradius';
+  String get settingsCoverRadius => 'Cover-Ecken außerhalb des Players';
 
   @override
   String get settingsCoverRadiusSharp => 'Quadratisch（hohe Informationsdichte）';
@@ -4110,7 +4122,17 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      'Streaming-Server (Subsonic / Jellyfin / Emby)';
+      'Standardquelle · Streaming-Server (Subsonic / Jellyfin / Emby)';
+
+  @override
+  String get settingsDefaultSource => 'Standardquelle';
+
+  @override
+  String get settingsDefaultSourceDesc =>
+      'Beim Öffnen von „Liked“, „Favoriten“ und „Suche“ standardmäßig ausgewählte Quelle';
+
+  @override
+  String get settingsDefaultSourceAuto => 'Standard';
 
   @override
   String get settingsCatScrape => 'Scraping';

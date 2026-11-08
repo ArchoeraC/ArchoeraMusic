@@ -531,6 +531,12 @@ extension _SettingsDialogView on _SettingsDialogState {
         EtaIcons.serverOutline,
       ),
       _SearchEntry(
+        SettingsCategory.mediaSource,
+        l10n.settingsDefaultSource,
+        l10n.settingsDefaultSourceDesc,
+        EtaIcons.serverOutline,
+      ),
+      _SearchEntry(
         SettingsCategory.experimentalSource,
         l10n.settingsCatExperimentalSource,
         l10n.settingsExperimentalSourceSubtitle,

@@ -1100,13 +1100,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nekoOauthTitle => '使用 NekoAuth 登录';
 
   @override
-  String get nekoOauthDesc => '将在系统浏览器中打开 NekoAuth，完成授权后自动返回本应用。';
+  String get nekoOauthDesc => '在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。';
 
   @override
   String get nekoOauthOpen => '在浏览器中登录';
 
   @override
-  String get nekoOauthWaiting => '请在浏览器中完成登录…';
+  String get nekoOauthWaiting => '等待授权完成…';
+
+  @override
+  String get nekoOauthUrlLabel => '一次性登录地址';
+
+  @override
+  String get nekoOauthCopy => '复制链接';
+
+  @override
+  String get nekoOauthCopied => '链接已复制';
+
+  @override
+  String get nekoOauthRefresh => '重新获取';
 
   @override
   String get nekoOauthFailed => '登录失败';
@@ -1906,7 +1918,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionCover => '封面';
 
   @override
-  String get settingsCoverRadius => '封面圆角';
+  String get settingsCoverRadius => '非播放页封面圆角';
 
   @override
   String get settingsCoverRadiusSharp => '直角（信息密度高）';
@@ -3870,7 +3882,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      '流媒体服务器（Subsonic / Jellyfin / Emby）';
+      '默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsDefaultSource => '默认音源';
+
+  @override
+  String get settingsDefaultSourceDesc => '打开「我喜欢」「收藏」「搜索」时默认选中的音源';
+
+  @override
+  String get settingsDefaultSourceAuto => '默认';
 
   @override
   String get settingsCatScrape => '刮削';
@@ -7300,13 +7321,25 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get nekoOauthTitle => '使用 NekoAuth 登录';
 
   @override
-  String get nekoOauthDesc => '将在系统浏览器中打开 NekoAuth，完成授权后自动返回本应用。';
+  String get nekoOauthDesc => '在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。';
 
   @override
   String get nekoOauthOpen => '在浏览器中登录';
 
   @override
-  String get nekoOauthWaiting => '请在浏览器中完成登录…';
+  String get nekoOauthWaiting => '等待授权完成…';
+
+  @override
+  String get nekoOauthUrlLabel => '一次性登录地址';
+
+  @override
+  String get nekoOauthCopy => '复制链接';
+
+  @override
+  String get nekoOauthCopied => '链接已复制';
+
+  @override
+  String get nekoOauthRefresh => '重新获取';
 
   @override
   String get nekoOauthFailed => '登录失败';
@@ -8106,7 +8139,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSectionCover => '封面';
 
   @override
-  String get settingsCoverRadius => '封面圆角';
+  String get settingsCoverRadius => '非播放页封面圆角';
 
   @override
   String get settingsCoverRadiusSharp => '直角（信息密度高）';
@@ -10070,7 +10103,16 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      '流媒体服务器（Subsonic / Jellyfin / Emby）';
+      '默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsDefaultSource => '默认音源';
+
+  @override
+  String get settingsDefaultSourceDesc => '打开「我喜欢」「收藏」「搜索」时默认选中的音源';
+
+  @override
+  String get settingsDefaultSourceAuto => '默认';
 
   @override
   String get settingsCatScrape => '刮削';
@@ -13500,13 +13542,25 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get nekoOauthTitle => '使用 NekoAuth 登入';
 
   @override
-  String get nekoOauthDesc => '將在系統瀏覽器開啟 NekoAuth，完成授權後自動返回本應用程式。';
+  String get nekoOauthDesc => '在任意瀏覽器開啟下方的一次性網址完成授權；若預設瀏覽器無法登入，可複製到其它瀏覽器。';
 
   @override
   String get nekoOauthOpen => '在瀏覽器中登入';
 
   @override
-  String get nekoOauthWaiting => '請在瀏覽器中完成登入…';
+  String get nekoOauthWaiting => '等待授權完成…';
+
+  @override
+  String get nekoOauthUrlLabel => '一次性登入網址';
+
+  @override
+  String get nekoOauthCopy => '複製連結';
+
+  @override
+  String get nekoOauthCopied => '連結已複製';
+
+  @override
+  String get nekoOauthRefresh => '重新取得';
 
   @override
   String get nekoOauthFailed => '登入失敗';
@@ -14306,7 +14360,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSectionCover => '封面';
 
   @override
-  String get settingsCoverRadius => '封面圓角';
+  String get settingsCoverRadius => '非播放頁封面圓角';
 
   @override
   String get settingsCoverRadiusSharp => '直角（資訊密度高）';
@@ -16270,7 +16324,16 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      '串流媒體伺服器（Subsonic / Jellyfin / Emby）';
+      '預設音源 · 串流伺服器（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsDefaultSource => '預設音源';
+
+  @override
+  String get settingsDefaultSourceDesc => '開啟「我喜歡」「收藏」「搜尋」時預設選中的音源';
+
+  @override
+  String get settingsDefaultSourceAuto => '預設';
 
   @override
   String get settingsCatScrape => '刮削';

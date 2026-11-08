@@ -1107,13 +1107,26 @@ class AppLocalizationsJa extends AppLocalizations {
   String get nekoOauthTitle => 'NekoAuth でログイン';
 
   @override
-  String get nekoOauthDesc => 'システムブラウザで NekoAuth を開き、認証後にアプリへ戻ります。';
+  String get nekoOauthDesc =>
+      '下記のワンタイムリンクを任意のブラウザで開いて認証してください。既定のブラウザでログインできない場合は、他のブラウザにコピーしてください。';
 
   @override
   String get nekoOauthOpen => 'ブラウザでログイン';
 
   @override
-  String get nekoOauthWaiting => 'ブラウザでログインを完了してください…';
+  String get nekoOauthWaiting => '認証を待っています…';
+
+  @override
+  String get nekoOauthUrlLabel => 'ワンタイムログイン URL';
+
+  @override
+  String get nekoOauthCopy => 'リンクをコピー';
+
+  @override
+  String get nekoOauthCopied => 'リンクをコピーしました';
+
+  @override
+  String get nekoOauthRefresh => '再取得';
 
   @override
   String get nekoOauthFailed => 'ログインに失敗しました';
@@ -1920,7 +1933,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsSectionCover => 'カバーアート';
 
   @override
-  String get settingsCoverRadius => 'カバー角丸';
+  String get settingsCoverRadius => 'プレイヤー以外のジャケット角丸';
 
   @override
   String get settingsCoverRadiusSharp => 'スクエア（情報密度高）';
@@ -3915,7 +3928,16 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsMediaSourceSubtitle =>
-      'ストリーミングサーバー（Subsonic / Jellyfin / Emby）';
+      'デフォルト音源 · ストリーミングサーバー（Subsonic / Jellyfin / Emby）';
+
+  @override
+  String get settingsDefaultSource => 'デフォルト音源';
+
+  @override
+  String get settingsDefaultSourceDesc => '「いいね」「お気に入り」「検索」を開いたときに既定で選択される音源';
+
+  @override
+  String get settingsDefaultSourceAuto => 'デフォルト';
 
   @override
   String get settingsCatScrape => 'スクレイピング';
