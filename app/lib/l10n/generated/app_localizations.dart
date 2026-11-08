@@ -2151,7 +2151,7 @@ abstract class AppLocalizations {
   /// No description provided for @nekoOauthDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'将在系统浏览器中打开 NekoAuth，完成授权后自动返回本应用。'**
+  /// **'在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。'**
   String get nekoOauthDesc;
 
   /// No description provided for @nekoOauthOpen.
@@ -2163,8 +2163,32 @@ abstract class AppLocalizations {
   /// No description provided for @nekoOauthWaiting.
   ///
   /// In zh_CN, this message translates to:
-  /// **'请在浏览器中完成登录…'**
+  /// **'等待授权完成…'**
   String get nekoOauthWaiting;
+
+  /// No description provided for @nekoOauthUrlLabel.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'一次性登录地址'**
+  String get nekoOauthUrlLabel;
+
+  /// No description provided for @nekoOauthCopy.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'复制链接'**
+  String get nekoOauthCopy;
+
+  /// No description provided for @nekoOauthCopied.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'链接已复制'**
+  String get nekoOauthCopied;
+
+  /// No description provided for @nekoOauthRefresh.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重新获取'**
+  String get nekoOauthRefresh;
 
   /// No description provided for @nekoOauthFailed.
   ///

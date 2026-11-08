@@ -1140,14 +1140,25 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get nekoOauthDesc =>
-      'Abre NekoAuth en el navegador del sistema y vuelve a la app tras autorizar.';
+      'Abre el enlace de un solo uso en cualquier navegador para autorizar. Si tu navegador predeterminado no puede iniciar sesión, cópialo a otro navegador.';
 
   @override
   String get nekoOauthOpen => 'Iniciar sesión en el navegador';
 
   @override
-  String get nekoOauthWaiting =>
-      'Completa el inicio de sesión en el navegador…';
+  String get nekoOauthWaiting => 'Esperando autorización…';
+
+  @override
+  String get nekoOauthUrlLabel => 'Enlace de inicio de sesión de un solo uso';
+
+  @override
+  String get nekoOauthCopy => 'Copiar enlace';
+
+  @override
+  String get nekoOauthCopied => 'Enlace copiado';
+
+  @override
+  String get nekoOauthRefresh => 'Obtener otro enlace';
 
   @override
   String get nekoOauthFailed => 'Error al iniciar sesión';

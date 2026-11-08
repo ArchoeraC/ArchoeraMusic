@@ -1138,13 +1138,25 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get nekoOauthDesc =>
-      'Ouvre NekoAuth dans le navigateur système et revient à l’application après autorisation.';
+      'Ouvrez le lien à usage unique ci-dessous dans n\'importe quel navigateur. Si votre navigateur par défaut ne peut pas se connecter, copiez-le dans un autre navigateur.';
 
   @override
   String get nekoOauthOpen => 'Se connecter dans le navigateur';
 
   @override
-  String get nekoOauthWaiting => 'Terminez la connexion dans le navigateur…';
+  String get nekoOauthWaiting => 'En attente de l’autorisation…';
+
+  @override
+  String get nekoOauthUrlLabel => 'Lien de connexion à usage unique';
+
+  @override
+  String get nekoOauthCopy => 'Copier le lien';
+
+  @override
+  String get nekoOauthCopied => 'Lien copié';
+
+  @override
+  String get nekoOauthRefresh => 'Obtenir un nouveau lien';
 
   @override
   String get nekoOauthFailed => 'Échec de la connexion';

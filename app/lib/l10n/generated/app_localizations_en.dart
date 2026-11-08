@@ -1131,13 +1131,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nekoOauthDesc =>
-      'Opens NekoAuth in your system browser and returns to the app after authorization.';
+      'Open the one-time link below in any browser to authorize. If your default browser can\'t sign in, copy it to another browser.';
 
   @override
   String get nekoOauthOpen => 'Sign in with browser';
 
   @override
-  String get nekoOauthWaiting => 'Complete the sign-in in your browser…';
+  String get nekoOauthWaiting => 'Waiting for authorization…';
+
+  @override
+  String get nekoOauthUrlLabel => 'One-time sign-in link';
+
+  @override
+  String get nekoOauthCopy => 'Copy link';
+
+  @override
+  String get nekoOauthCopied => 'Link copied';
+
+  @override
+  String get nekoOauthRefresh => 'Get a new link';
 
   @override
   String get nekoOauthFailed => 'Sign-in failed';
