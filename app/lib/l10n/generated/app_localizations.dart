@@ -7234,6 +7234,48 @@ abstract class AppLocalizations {
   /// **'默认音源 · 流媒体服务器（Subsonic / Jellyfin / Emby）'**
   String get settingsMediaSourceSubtitle;
 
+  /// No description provided for @settingsPreview.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'效果预览'**
+  String get settingsPreview;
+
+  /// No description provided for @settingsPreviewReplay.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'重播'**
+  String get settingsPreviewReplay;
+
+  /// No description provided for @settingsPreviewSampleTrack.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'示例歌曲'**
+  String get settingsPreviewSampleTrack;
+
+  /// No description provided for @settingsPreviewSampleArtist.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'示例歌手'**
+  String get settingsPreviewSampleArtist;
+
+  /// No description provided for @settingsPreviewLyric1.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'夜色在窗外慢慢落下'**
+  String get settingsPreviewLyric1;
+
+  /// No description provided for @settingsPreviewLyric2.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'让旋律停在心跳的位置'**
+  String get settingsPreviewLyric2;
+
+  /// No description provided for @settingsPreviewLyric3.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'这一刻只听得到你'**
+  String get settingsPreviewLyric3;
+
   /// No description provided for @settingsDefaultSource.
   ///
   /// In zh_CN, this message translates to:

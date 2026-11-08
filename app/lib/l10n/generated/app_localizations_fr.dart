@@ -4158,6 +4158,28 @@ class AppLocalizationsFr extends AppLocalizations {
       'Source par défaut · Serveurs de streaming (Subsonic / Jellyfin / Emby)';
 
   @override
+  String get settingsPreview => 'Aperçu';
+
+  @override
+  String get settingsPreviewReplay => 'Rejouer';
+
+  @override
+  String get settingsPreviewSampleTrack => 'Piste de démonstration';
+
+  @override
+  String get settingsPreviewSampleArtist => 'Artiste de démonstration';
+
+  @override
+  String get settingsPreviewLyric1 =>
+      'La nuit tombe doucement derrière la fenêtre';
+
+  @override
+  String get settingsPreviewLyric2 => 'Laisse la mélodie reposer sur ton cœur';
+
+  @override
+  String get settingsPreviewLyric3 => 'En cet instant, seul toi compte';
+
+  @override
   String get settingsDefaultSource => 'Source par défaut';
 
   @override

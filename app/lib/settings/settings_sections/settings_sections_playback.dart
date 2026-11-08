@@ -961,6 +961,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        CoverTransitionPreview(style: prefs.transitionStyle),
         const SizedBox(height: 20),
         SettingSection(
           title: l10n.settingsPlayerBackground,

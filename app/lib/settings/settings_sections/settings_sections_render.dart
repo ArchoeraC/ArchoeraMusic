@@ -85,6 +85,10 @@ class RenderSection extends ConsumerWidget {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        RippleEffectPreview(prefs: prefs),
+        const SizedBox(height: 12),
+        LyricsEdgeFadePreview(mode: prefs.lyricsEdgeFade),
       ],
     );
   }

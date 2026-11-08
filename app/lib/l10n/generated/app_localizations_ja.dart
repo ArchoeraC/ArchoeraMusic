@@ -3931,6 +3931,27 @@ class AppLocalizationsJa extends AppLocalizations {
       'デフォルト音源 · ストリーミングサーバー（Subsonic / Jellyfin / Emby）';
 
   @override
+  String get settingsPreview => 'プレビュー';
+
+  @override
+  String get settingsPreviewReplay => 'もう一度';
+
+  @override
+  String get settingsPreviewSampleTrack => 'サンプル曲';
+
+  @override
+  String get settingsPreviewSampleArtist => 'サンプルアーティスト';
+
+  @override
+  String get settingsPreviewLyric1 => '窓の外に夜が静かに降りる';
+
+  @override
+  String get settingsPreviewLyric2 => '心臓の鼓動のところで旋律を止めて';
+
+  @override
+  String get settingsPreviewLyric3 => '今はあなたの声だけが聞こえる';
+
+  @override
   String get settingsDefaultSource => 'デフォルト音源';
 
   @override

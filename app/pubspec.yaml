@@ -98,6 +98,8 @@ flutter:
   assets:
     - pubspec.yaml
     - assets/icons/
+    # 设置页「效果预览」示例图（封面 / 壁纸；纯 Flutter 渲染小样，非视频）
+    - assets/previews/
     # 字体/图标官方许可正文（「关于 → 字体署名」弹窗完整展示；随包分发）
     - assets/licenses/
 
