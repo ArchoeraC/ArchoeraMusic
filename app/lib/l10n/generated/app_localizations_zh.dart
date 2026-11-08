@@ -4569,12 +4569,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsAmllWordSweep => '逐字扫亮';
 
   @override
-  String get settingsAmllSyntheticSweep => '单行歌词合成扫亮';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc => '没有逐字时间的歌词按行时长推算扫亮（翻译 / 音译同样生效）';
-
-  @override
   String get settingsAmllHidePassed => '隐藏已唱行';
 
   @override
@@ -10759,12 +10753,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsAmllWordSweep => '逐字扫亮';
-
-  @override
-  String get settingsAmllSyntheticSweep => '单行歌词合成扫亮';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc => '没有逐字时间的歌词按行时长推算扫亮（翻译 / 音译同样生效）';
 
   @override
   String get settingsAmllHidePassed => '隐藏已唱行';
@@ -16952,12 +16940,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsAmllWordSweep => '逐字掃亮';
-
-  @override
-  String get settingsAmllSyntheticSweep => '單行歌詞合成掃亮';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc => '沒有逐字時間的歌詞按行時長推算掃亮（翻譯 / 音譯同樣生效）';
 
   @override
   String get settingsAmllHidePassed => '隱藏已唱行';

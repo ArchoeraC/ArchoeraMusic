@@ -1450,8 +1450,6 @@
   "settingsAmllAlign": "Position de la ligne active",
   "settingsAmllDim": "Opacité des lignes inactives",
   "settingsAmllWordSweep": "Balayage mot à mot",
-  "settingsAmllSyntheticSweep": "Balayage synthétique des paroles simples",
-  "settingsAmllSyntheticSweepDesc": "Estime le minutage par mot selon la durée de la ligne (aussi pour les traductions).",
   "settingsAmllHidePassed": "Masquer les lignes déjà chantées",
   "settingsAmllScale": "Réduire les lignes inactives",
   "settingsAmllBlur": "Flou sur les lignes inactives",

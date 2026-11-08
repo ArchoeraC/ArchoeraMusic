@@ -1450,8 +1450,6 @@
   "settingsAmllAlign": "활성 행 위치",
   "settingsAmllDim": "비활성 행 투명도",
   "settingsAmllWordSweep": "단어 스윕",
-  "settingsAmllSyntheticSweep": "일반 가사 합성 스윕",
-  "settingsAmllSyntheticSweepDesc": "단어 타이밍이 없는 가사를 행 길이로 추정해 스윕합니다(번역·발음도 적용).",
   "settingsAmllHidePassed": "지난 행 숨기기",
   "settingsAmllScale": "비활성 행 축소",
   "settingsAmllBlur": "비활성 줄 흐리게",

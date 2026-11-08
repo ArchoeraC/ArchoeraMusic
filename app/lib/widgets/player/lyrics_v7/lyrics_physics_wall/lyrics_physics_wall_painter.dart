@@ -596,7 +596,6 @@ class _Painter extends CustomPainter {
     durationMs: dur,
     lineRelMs: tRel,
     fontSize: fs,
-    synthetic: k < fr.synthetic.length && fr.synthetic[k],
   );
 
   LyricsFragmentRender? _fragRender(
@@ -746,7 +745,7 @@ class _Painter extends CustomPainter {
     }
   }
 
-  /// 翻译 / 音译小字的合成扫亮渲染（无片段 / 关闭逐字时返回 null 回退段落）。
+  /// 翻译 / 音译小字的逐字渲染（无片段 / 关闭逐字时返回 null 回退段落）。
   LyricsFragmentRender? _subFragRender(
     int index,
     LyricGroup g, {
@@ -757,6 +756,7 @@ class _Painter extends CustomPainter {
     if (!c.wordSweep) return null;
     final frags = roman ? g.romajiFragments : g.translationFragments;
     final text = roman ? g.romaji : g.translation;
+    // 普通行（翻译/音译同样没有字级片段）不做逐字。
     if (frags == null || frags.isEmpty || text == null || text.isEmpty) {
       return null;
     }

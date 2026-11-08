@@ -4630,13 +4630,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsAmllWordSweep => '단어 스윕';
 
   @override
-  String get settingsAmllSyntheticSweep => '일반 가사 합성 스윕';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc =>
-      '단어 타이밍이 없는 가사를 행 길이로 추정해 스윕합니다(번역·발음도 적용).';
-
-  @override
   String get settingsAmllHidePassed => '지난 행 숨기기';
 
   @override

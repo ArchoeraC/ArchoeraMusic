@@ -46,7 +46,6 @@ class LyricsFragmentRender {
     required this.startMs,
     required this.durationMs,
     required this.texts,
-    required this.synthetic,
     required this.width,
     required this.height,
   });
@@ -68,9 +67,6 @@ class LyricsFragmentRender {
 
   /// 每个字/词的绘制文本（强调辉光需按帧重建段落）。
   final List<String> texts;
-
-  /// 每个字/词是否为推算的合成片段（合成片段不做长音强调）。
-  final List<bool> synthetic;
 
   /// 整行布局段落的宽度（用于居中定位）。
   final double width;
@@ -168,7 +164,6 @@ LyricsFragmentRender? buildLyricsFragmentRender({
   final startMs = <int>[];
   final durationMs = <int>[];
   final texts = <String>[];
-  final synthetic = <bool>[];
 
   var charIndex = 0;
   for (final f in fragments) {
@@ -197,7 +192,6 @@ LyricsFragmentRender? buildLyricsFragmentRender({
     final d = f.durationMs;
     durationMs.add(d == null || d <= 0 ? 1 : d);
     texts.add(sub);
-    synthetic.add(f.synthetic);
     dim.add(
       _fragParagraph(
         fontFamily: fontFamily,
@@ -230,7 +224,6 @@ LyricsFragmentRender? buildLyricsFragmentRender({
     startMs: startMs,
     durationMs: durationMs,
     texts: texts,
-    synthetic: synthetic,
     width: layout.width,
     height: layout.height,
   );

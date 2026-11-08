@@ -1450,8 +1450,6 @@
   "settingsAmllAlign": "Position der aktiven Zeile",
   "settingsAmllDim": "Deckkraft inaktiver Zeilen",
   "settingsAmllWordSweep": "Wort-Sweep",
-  "settingsAmllSyntheticSweep": "Synthetischer Sweep für einfache Lyrics",
-  "settingsAmllSyntheticSweepDesc": "Wort-Timing aus der Zeilendauer schätzen (auch für Übersetzungen).",
   "settingsAmllHidePassed": "Gesungene Zeilen ausblenden",
   "settingsAmllScale": "Inaktive Zeilen verkleinern",
   "settingsAmllBlur": "Inaktive Zeilen weichzeichnen",

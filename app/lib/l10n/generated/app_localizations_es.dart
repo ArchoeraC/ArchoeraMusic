@@ -4874,14 +4874,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAmllWordSweep => 'Barrido por palabra';
 
   @override
-  String get settingsAmllSyntheticSweep =>
-      'Barrido sintético para letras simples';
-
-  @override
-  String get settingsAmllSyntheticSweepDesc =>
-      'Estima el tiempo por palabra según la duración de la línea (también traducciones).';
-
-  @override
   String get settingsAmllHidePassed => 'Ocultar líneas ya cantadas';
 
   @override

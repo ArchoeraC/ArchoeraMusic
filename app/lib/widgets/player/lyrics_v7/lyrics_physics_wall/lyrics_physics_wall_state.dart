@@ -1116,7 +1116,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   @visibleForTesting
   int debugFragCacheEntries() => _c.fragCache.entryCount;
 
-  /// 翻译 / 音译合成扫亮缓存的条目数（测试用）。
+  /// 翻译 / 音译逐字渲染缓存的条目数（测试用）。
   @visibleForTesting
   int debugSubFragCacheEntries() =>
       _c.transFragCache.entryCount + _c.romaFragCache.entryCount;

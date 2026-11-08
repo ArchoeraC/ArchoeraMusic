@@ -1450,8 +1450,6 @@
   "settingsAmllAlign": "Posición de la línea activa",
   "settingsAmllDim": "Atenuación de líneas inactivas",
   "settingsAmllWordSweep": "Barrido por palabra",
-  "settingsAmllSyntheticSweep": "Barrido sintético para letras simples",
-  "settingsAmllSyntheticSweepDesc": "Estima el tiempo por palabra según la duración de la línea (también traducciones).",
   "settingsAmllHidePassed": "Ocultar líneas ya cantadas",
   "settingsAmllScale": "Reducir líneas inactivas",
   "settingsAmllBlur": "Desenfocar líneas inactivas",
