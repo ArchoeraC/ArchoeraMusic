@@ -903,9 +903,14 @@ class NekoApi extends ChangeNotifier {
     if (body['success'] != true) return null;
     final data = body['data'];
     if (data is! Map) return null;
+    final rawRich = data['lyricsRich'];
     final info = _NekoMusicInfo(
       maxQuality: normalizeNekoQuality(data['maxQuality']?.toString()),
       lyrics: data['lyrics']?.toString() ?? '',
+      lyricsFormat: data['lyricsFormat']?.toString() ?? 'lrc',
+      lyricsRich: rawRich is Map
+          ? Map<String, dynamic>.from(rawRich)
+          : null,
       expiresAt: DateTime.now().add(_musicInfoTtl),
     );
     if (_musicInfos.length >= _musicInfoCacheLimit) {
@@ -954,8 +959,32 @@ class NekoApi extends ChangeNotifier {
   /// （`data.lyrics`，服务端已把 `[mm:ss:xx]` 归一为 `[mm:ss.xx]`）。
   Future<String?> lyricText(String id) async {
     try {
-      final lyrics = (await _fetchMusicInfo(id))?.lyrics ?? '';
-      return lyrics.trim().isEmpty ? null : lyrics;
+      final payload = await lyricPayload(id);
+      final lrc = payload?.lrc ?? '';
+      return lrc.isEmpty ? null : lrc;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 歌词载荷：`neko-v1` 富歌词（逐字）优先，LRC 兼容文本兜底。
+  ///
+  /// 服务端自 `910431cb` 起在音乐详情里返回 `lyricsFormat` + `lyricsRich`：
+  /// 含字级时间轴时 format 为 `neko-v1`，`lyricsRich.lines[].words[]` 携带
+  /// 逐字时间；普通歌词 format 为 `lrc`、rich 为 null。两者共用同一份详情
+  /// 缓存，不会额外请求。
+  Future<NekoLyricPayload?> lyricPayload(String id) async {
+    try {
+      final info = await _fetchMusicInfo(id);
+      if (info == null) return null;
+      final lrc = info.lyrics.trim();
+      final rich = info.lyricsRich;
+      if (lrc.isEmpty && (rich == null || rich.isEmpty)) return null;
+      return NekoLyricPayload(
+        format: info.lyricsFormat,
+        lrc: lrc,
+        rich: rich,
+      );
     } catch (_) {
       return null;
     }
@@ -1093,11 +1122,31 @@ class _NekoMediaUrl {
   final DateTime expiresAt;
 }
 
-/// 内部：音乐详情缓存项（`/api/music/info` 的 `maxQuality` + `lyrics`）。
+/// 歌词载荷：`neko-v1` 富歌词（逐字）+ LRC 兼容文本。
+class NekoLyricPayload {
+  const NekoLyricPayload({
+    required this.format,
+    required this.lrc,
+    this.rich,
+  });
+
+  /// 服务端歌词格式：`lrc` 或 `neko-v1`。
+  final String format;
+
+  /// 兼容用 LRC 文本；无歌词时为空串。
+  final String lrc;
+
+  /// `neko-v1` 富歌词 JSON（原样 `lyricsRich`）；普通 LRC / 无歌词为 null。
+  final Map<String, dynamic>? rich;
+}
+
+/// 内部：音乐详情缓存项（`/api/music/info` 的 `maxQuality` + 歌词）。
 class _NekoMusicInfo {
   const _NekoMusicInfo({
     required this.maxQuality,
     required this.lyrics,
+    required this.lyricsFormat,
+    required this.lyricsRich,
     required this.expiresAt,
   });
 
@@ -1106,6 +1155,12 @@ class _NekoMusicInfo {
 
   /// LRC 歌词原文；服务端无歌词时为空串。
   final String lyrics;
+
+  /// 歌词存储格式（`lrc` / `neko-v1`）。
+  final String lyricsFormat;
+
+  /// `neko-v1` 富歌词；无字级歌词时为 null。
+  final Map<String, dynamic>? lyricsRich;
 
   final DateTime expiresAt;
 }
