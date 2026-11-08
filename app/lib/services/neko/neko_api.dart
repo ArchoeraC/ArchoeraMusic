@@ -18,7 +18,7 @@
 ///
 /// **边界**：不接入注册 / 邮箱验证码 / 滑块验证 / VIP 开通等付费能力。
 ///
-/// 登录态（token + 用户资料 + `idToken`）经 [SessionStore]（vault，平台键
+/// 登录态（token + 用户资料）经 [SessionStore]（vault，平台键
 /// `'neko'`）加密落盘；服务器地址固定，不对外暴露。
 library;
 
@@ -63,7 +63,6 @@ class NekoApi extends ChangeNotifier {
       NekoClient(baseUrl: baseUrl, token: token);
 
   String? _token;
-  String? _idToken;
   NekoUser? _account;
 
   /// 正在做 401 复核（避免 401 风暴触发并发的探测请求）。
@@ -168,7 +167,6 @@ class NekoApi extends ChangeNotifier {
     final token = s['token'];
     if (token == null || token.isEmpty) {
       _token = null;
-      _idToken = null;
       _account = null;
       notifyListeners();
       return;
@@ -177,13 +175,11 @@ class NekoApi extends ChangeNotifier {
       // 服务器变更：旧 token 不通用，清掉避免持续 401。
       store.clear(kNekoSessionPlatform);
       _token = null;
-      _idToken = null;
       _account = null;
       notifyListeners();
       return;
     }
     _token = token;
-    _idToken = s['idToken'];
     _account = NekoUser.fromSessionMap(s);
     notifyListeners();
     // 服务端资料（昵称 / VIP）可能已变：启动后静默刷新一次（失败不影响已恢复的登录态）。
@@ -345,11 +341,7 @@ class NekoApi extends ChangeNotifier {
     if (data is! Map) throw NekoApiException('登录响应格式异常');
     final token = data['token']?.toString() ?? '';
     if (token.isEmpty) throw NekoApiException('登录响应缺少 token');
-    _applyLogin(
-      token,
-      user: _userFrom(data['user']),
-      idToken: data['idToken']?.toString(),
-    );
+    _applyLogin(token, user: _userFrom(data['user']));
     notifyListeners();
     unawaited(refreshAccount());
   }
@@ -371,7 +363,6 @@ class NekoApi extends ChangeNotifier {
       token,
       user: _userFrom(data is Map ? data['user'] : null) ??
           NekoUser(id: '', nickname: '', email: email),
-      idToken: data is Map ? data['idToken']?.toString() : null,
     );
     notifyListeners();
     unawaited(refreshAccount());
@@ -444,11 +435,7 @@ class NekoApi extends ChangeNotifier {
     if (data is! Map || data['status'] != 'confirmed') return false;
     final token = data['token']?.toString() ?? '';
     if (token.isEmpty) return false;
-    _applyLogin(
-      token,
-      user: _userFrom(data['user']),
-      idToken: data['idToken']?.toString(),
-    );
+    _applyLogin(token, user: _userFrom(data['user']));
     unawaited(refreshAccount());
     return true;
   }
@@ -469,48 +456,30 @@ class NekoApi extends ChangeNotifier {
     return url;
   }
 
-  /// 退出登录：先吊销服务端 access token，再清理本地会话。
+  /// 退出登录：吊销服务端 access token 并清理本地会话。
   ///
-  /// 同时用 `idToken` 取 NekoAuth 注销地址并由系统浏览器打开（尽力而为；
-  /// 失败只记日志，不影响本地退出）。
+  /// **不打开浏览器**：NekoAuth 的浏览器会话由用户自行在账号中心退出；
+  /// 应用内退出只处理自己的 token，避免退出操作又弹出系统浏览器。
   Future<void> logout() async {
     final token = _token;
-    final idToken = _idToken;
     _clearSession();
     if (token == null || token.isEmpty) return;
     final client = _clientFactory(baseUrl, token);
     try {
       await client.postJson('/api/user/logout');
-      if (idToken != null && idToken.isNotEmpty) {
-        final body = await client.postJson(
-          '/api/user/sso/logout-url',
-          body: {'idToken': idToken},
-        );
-        final data = body['data'];
-        final url = data is Map ? data['url']?.toString() : null;
-        if (url != null && url.isNotEmpty) {
-          PlatformCapabilities.instance().openUrl(url);
-        }
-      }
     } catch (e) {
-      Log.w('neko', '退出登录时清理服务端会话失败（本地已退出）：$e');
+      Log.w('neko', '退出登录时吊销服务端令牌失败（本地已退出）：$e');
     }
   }
 
-  void _applyLogin(
-    String token, {
-    NekoUser? user,
-    String? idToken,
-  }) {
+  void _applyLogin(String token, {NekoUser? user}) {
     _token = token;
     _account = user;
-    _idToken = idToken;
     _persistSession();
   }
 
   void _clearSession() {
     _token = null;
-    _idToken = null;
     _account = null;
     getRuntime().sessionStore.clear(kNekoSessionPlatform);
     notifyListeners();
@@ -526,7 +495,6 @@ class NekoApi extends ChangeNotifier {
     getRuntime().sessionStore.save(kNekoSessionPlatform, {
       'token': token,
       'baseUrl': baseUrl,
-      if (_idToken != null && _idToken!.isNotEmpty) 'idToken': _idToken!,
       ...(account?.toSessionMap() ?? const <String, String>{}),
     });
   }
