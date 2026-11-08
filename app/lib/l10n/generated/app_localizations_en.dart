@@ -1986,7 +1986,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSectionCover => 'Cover art';
 
   @override
-  String get settingsCoverRadius => 'Cover corner radius';
+  String get settingsCoverRadius => 'Cover corners outside player';
 
   @override
   String get settingsCoverRadiusSharp => 'Square (dense layout)';

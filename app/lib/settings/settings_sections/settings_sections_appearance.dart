@@ -7,7 +7,7 @@ part of '../settings_sections.dart';
 // ── 外观 ──────────────────────────────────────────────────────────────
 
 /// 外观分类：主题 / 主色 / 全局着色 / 外观风格（背景图）/ 布局 / 字体 /
-/// 语言 / 封面圆角。
+/// 语言 / 非播放页封面圆角。
 class AppearanceSection extends ConsumerStatefulWidget {
   const AppearanceSection({super.key});
 

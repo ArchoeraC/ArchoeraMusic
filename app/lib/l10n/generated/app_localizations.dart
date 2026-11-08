@@ -3655,7 +3655,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsCoverRadius.
   ///
   /// In zh_CN, this message translates to:
-  /// **'封面圆角'**
+  /// **'非播放页封面圆角'**
   String get settingsCoverRadius;
 
   /// No description provided for @settingsCoverRadiusSharp.

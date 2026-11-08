@@ -608,7 +608,7 @@
   "settingsLanguageDesc": "切换界面显示语言",
   "settingsLangSystem": "跟随系统",
   "settingsSectionCover": "封面",
-  "settingsCoverRadius": "封面圆角",
+  "settingsCoverRadius": "非播放页封面圆角",
   "settingsCoverRadiusSharp": "直角（信息密度高）",
   "settingsCoverRadiusPx": "{radius}px 圆角",
   "settingsCoverRadiusSharpLabel": "直角",

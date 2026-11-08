@@ -1918,7 +1918,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSectionCover => '封面';
 
   @override
-  String get settingsCoverRadius => '封面圆角';
+  String get settingsCoverRadius => '非播放页封面圆角';
 
   @override
   String get settingsCoverRadiusSharp => '直角（信息密度高）';
@@ -8130,7 +8130,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsSectionCover => '封面';
 
   @override
-  String get settingsCoverRadius => '封面圆角';
+  String get settingsCoverRadius => '非播放页封面圆角';
 
   @override
   String get settingsCoverRadiusSharp => '直角（信息密度高）';
@@ -14342,7 +14342,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsSectionCover => '封面';
 
   @override
-  String get settingsCoverRadius => '封面圓角';
+  String get settingsCoverRadius => '非播放頁封面圓角';
 
   @override
   String get settingsCoverRadiusSharp => '直角（資訊密度高）';

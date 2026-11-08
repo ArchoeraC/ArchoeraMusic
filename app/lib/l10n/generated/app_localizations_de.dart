@@ -2006,7 +2006,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsSectionCover => 'Cover';
 
   @override
-  String get settingsCoverRadius => 'Cover-Eckradius';
+  String get settingsCoverRadius => 'Cover-Ecken außerhalb des Players';
 
   @override
   String get settingsCoverRadiusSharp => 'Quadratisch（hohe Informationsdichte）';

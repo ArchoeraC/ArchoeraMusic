@@ -596,7 +596,7 @@
   "settingsLanguageDesc": "インターフェースの表示言語を切り替え",
   "settingsLangSystem": "システムに従う",
   "settingsSectionCover": "カバーアート",
-  "settingsCoverRadius": "カバー角丸",
+  "settingsCoverRadius": "プレイヤー以外のジャケット角丸",
   "settingsCoverRadiusSharp": "スクエア（情報密度高）",
   "settingsCoverRadiusPx": "{radius}px 角丸",
   "settingsCoverRadiusSharpLabel": "スクエア",

@@ -2016,7 +2016,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsSectionCover => 'Carátula';
 
   @override
-  String get settingsCoverRadius => 'Radio de esquina de carátula';
+  String get settingsCoverRadius => 'Esquinas de portada fuera del reproductor';
 
   @override
   String get settingsCoverRadiusSharp => 'Cuadrado（alta densidad）';
