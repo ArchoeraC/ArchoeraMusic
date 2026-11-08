@@ -24,6 +24,9 @@ class NekoSsoBridge {
   static final StreamController<String?> _controller =
       StreamController<String?>.broadcast();
 
+  /// 广播回调流（冷启动自动登录用；登录框等待走 [waitForHandoff]）。
+  static Stream<String?> get handoffs => _controller.stream;
+
   /// 冷启动 / 早到的 handoff（[waitForHandoff] 先消费它，避免丢事件）。
   static String? _pending;
 
@@ -72,6 +75,13 @@ class NekoSsoBridge {
     timer = Timer(timeout, () => finish(null));
     cancel?.then((_) => finish(null));
     return completer.future;
+  }
+
+  /// 取走尚未消费的 handoff（冷启动自动登录用）。
+  static String? takePending() {
+    final h = _pending;
+    _pending = null;
+    return h;
   }
 
   /// 丢弃尚未消费的 handoff（用户取消 / 重新发起登录时调用）。

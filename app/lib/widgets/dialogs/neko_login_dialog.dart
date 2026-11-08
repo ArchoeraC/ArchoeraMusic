@@ -85,11 +85,14 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   bool _busy = false;
   String _loginError = '';
 
-  NekoApi get _api => ref.read(nekoApiProvider);
+  /// 在 initState 里保存 provider 实例：dispose 阶段不能再碰 `ref`
+  /// （Riverpod 会直接抛 Bad state），但取消 OAuth 又必须在关闭时执行。
+  late final NekoApi _api;
 
   @override
   void initState() {
     super.initState();
+    _api = ref.read(nekoApiProvider);
     // 扫码会话等切到扫码 tab 时再创建，避免打开对话框就发请求。
   }
 
@@ -102,7 +105,8 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   @override
   void dispose() {
     // 关闭登录框即取消仍在等待的 OAuth 回调，避免旧流程稍后领取 token。
-    if (_ssoBusy) ref.read(nekoApiProvider).cancelSsoLogin();
+    // 用 initState 保存的实例，不能在 dispose 里使用 ref。
+    if (_ssoBusy) _api.cancelSsoLogin();
     _sub?.cancel();
     _emailCtrl.dispose();
     _passCtrl.dispose();
