@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/widgets.dart' show Curves;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,6 +24,7 @@ import 'engine_bindings.dart';
 import 'play_source_resolver.dart';
 import 'playback_session.dart';
 import 'playback_state.dart';
+import 'shuffle_bag.dart';
 import '../source/source_platform.dart';
 import 'store_source.dart';
 
@@ -214,9 +216,6 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// 本失败序列中已尝试过平台换源的曲目内容键（规范化标题|歌手，见
   /// [_tryFallbackSource]）：防止网/狗同曲互切死循环；播放成功时清空。
   final Set<String> _fallbackAttempted = {};
-
-  /// 原始队列（关闭随机时恢复顺序用）。
-  List<Track>? _originalQueue;
 
   Future<void> load(
     String source, {

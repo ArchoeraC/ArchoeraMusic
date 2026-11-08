@@ -77,12 +77,11 @@ Mineradio 把内存拆成「工作集压缩 / 系统 purge / 磁盘缓存 LRU / 
 - **守则**：**数据拿全、UI 懒渲染/虚拟化**——分页只改「驻留形态」，不做「截断到 500 首」的
   假优化（对齐原版 LOW_SPEC 纪律）。列表侧已是 `ListView.builder`，主要是 store 层改造。
 
-### 3.2 播放队列双拷贝
+### 3.2 播放队列双拷贝（已消除）
 
-`playback_notifier.dart:761` `_originalQueue = List.of(tracks)` 与 `state.queue` 全量复制，
-shuffle 又 `_shuffledWithCurrentFirst`（`:998`）再复制一遍，队列变更（`moveInQueue`/`insert`/
-`remove`）也频繁 `List.of`。→ 短期去 shuffle 全量复制（`_originalQueue` 改存原序索引表）；
-长期队列改存**轻量 TrackRef**（source/id/quality），详情按需 lazy。
+原实现 `_originalQueue = List.of(tracks)` 为关闭随机保留原序，队列与备份双份常驻；
+开启随机还会再全量洗牌复制。现随机播放改为 `ShuffleBag`（只存曲目键，队列永不重排），
+`_originalQueue` 已删除，播放队列只保留一份。
 
 ### 3.3 liked/歌单全量拉取
 
@@ -183,7 +182,7 @@ Electron 多进程边界。本项目引擎在进程内（无子进程可裁）�
 ### 阶段① 快速收益（低难度，无架构改动）
 
 1. 列表查询去 `lyrics` 列 + `library_page.dart:115` memo 化（去掉最大字符串块）。
-2. 队列 shuffle 去全量复制（`_originalQueue` 改存索引，`playback_notifier.dart`）。
+2. 队列 shuffle 去全量复制（`_originalQueue` 已删除，随机改用 `ShuffleBag` 只存键）。
 3. Netease API 缓存加字节预算（`apis/netease/core/cache.dart`）。
 4. 封面色提取结果缓存（`cover_color.dart`）。
 5. 启动清扫 archoera-* 残留 + 封面磁盘缓存上限。
