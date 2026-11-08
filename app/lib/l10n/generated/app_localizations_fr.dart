@@ -2012,7 +2012,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsSectionCover => 'Pochette';
 
   @override
-  String get settingsCoverRadius => 'Rayon des coins de pochette';
+  String get settingsCoverRadius => 'Coins de pochette hors lecteur';
 
   @override
   String get settingsCoverRadiusSharp => 'Carré（densité d\'information élevée）';

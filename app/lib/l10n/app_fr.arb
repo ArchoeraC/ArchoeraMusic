@@ -596,7 +596,7 @@
   "settingsLanguageDesc": "Changer la langue d''affichage de l''interface",
   "settingsLangSystem": "Suivre le système",
   "settingsSectionCover": "Pochette",
-  "settingsCoverRadius": "Rayon des coins de pochette",
+  "settingsCoverRadius": "Coins de pochette hors lecteur",
   "settingsCoverRadiusSharp": "Carré（densité d''information élevée）",
   "settingsCoverRadiusPx": "Rayon de {radius}px",
   "settingsCoverRadiusSharpLabel": "Carré",

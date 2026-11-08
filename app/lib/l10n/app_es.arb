@@ -596,7 +596,7 @@
   "settingsLanguageDesc": "Cambiar idioma de visualización de la interfaz",
   "settingsLangSystem": "Seguir sistema",
   "settingsSectionCover": "Carátula",
-  "settingsCoverRadius": "Radio de esquina de carátula",
+  "settingsCoverRadius": "Esquinas de portada fuera del reproductor",
   "settingsCoverRadiusSharp": "Cuadrado（alta densidad）",
   "settingsCoverRadiusPx": "Radio de {radius}px",
   "settingsCoverRadiusSharpLabel": "Cuadrado",

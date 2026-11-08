@@ -1936,7 +1936,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsSectionCover => '커버 아트';
 
   @override
-  String get settingsCoverRadius => '커버 모서리 둥글게';
+  String get settingsCoverRadius => '플레이어 외 커버 모서리';
 
   @override
   String get settingsCoverRadiusSharp => '직사각형（정보 밀도 높음）';

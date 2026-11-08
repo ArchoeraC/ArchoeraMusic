@@ -1933,7 +1933,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsSectionCover => 'カバーアート';
 
   @override
-  String get settingsCoverRadius => 'カバー角丸';
+  String get settingsCoverRadius => 'プレイヤー以外のジャケット角丸';
 
   @override
   String get settingsCoverRadiusSharp => 'スクエア（情報密度高）';
