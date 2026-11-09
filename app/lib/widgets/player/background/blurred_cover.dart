@@ -59,6 +59,12 @@ const double kBlurBackgroundSigma = 45;
 const double kBlurBackgroundZoom = 1.5;
 const double kBlurBackgroundSaturation = 1.2;
 
+/// 模糊封面烘焙长边默认上限（物理像素）。
+///
+/// 逻辑 σ=45 的高斯已经把细节抹平，1024 与 2048 肉眼几乎无差；像素量却只有
+/// 1/4，烘焙（UI 线程 `toImageSync`）和常驻内存都显著下降，播放页进出更稳。
+const int kBlurredCoverMaxBakeSide = 1024;
+
 /// 模糊封面背景（对齐上游 `.bg-blur-wrap`）。
 ///
 /// 切歌时按上游双缓冲做法**交叉淡入**（两层叠加、`ease-in-out`），避免封面
@@ -68,12 +74,16 @@ class BlurredCover extends StatelessWidget {
     super.key,
     required this.cover,
     this.duration = const Duration(milliseconds: 500),
+    this.maxBakeSide = kBlurredCoverMaxBakeSide,
   });
 
   final String cover;
 
   /// 交叉淡入时长（对齐上游 `transition: opacity 0.5s ease-in-out`）。
   final Duration duration;
+
+  /// 烘焙纹理长边上限（物理像素）；进入播放页的轻量预览层可传更小值。
+  final int maxBakeSide;
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +107,12 @@ class BlurredCover extends StatelessWidget {
               ),
               child: KeyedSubtree(
                 key: ValueKey<String>(cover),
-                child: _BakedBlurLayer(cover: cover, width: w, height: h),
+                child: _BakedBlurLayer(
+                  cover: cover,
+                  width: w,
+                  height: h,
+                  maxBakeSide: maxBakeSide,
+                ),
               ),
             ),
             // 压暗层：置于交叉淡入之外，避免过渡期两层叠加导致过暗。
@@ -118,21 +133,21 @@ class _BakedBlurLayer extends StatefulWidget {
     required this.cover,
     required this.width,
     required this.height,
+    required this.maxBakeSide,
   });
 
   final String cover;
   final double width;
   final double height;
 
+  /// 烘焙分辨率上限（物理像素长边）。
+  final int maxBakeSide;
+
   @override
   State<_BakedBlurLayer> createState() => _BakedBlurLayerState();
 }
 
 class _BakedBlurLayerState extends State<_BakedBlurLayer> {
-  /// 烘焙分辨率上限（物理像素长边）：模糊后放大肉眼不可辨；封顶避免 4K 全尺寸
-  /// 常驻（3840×2160×4B ≈ 32MB/张；交叉淡入期两张）。
-  static const int maxBakeSide = 2048;
-
   /// 测试（fake-async 软渲染）下 `Picture.toImageSync` 不可靠，直接回退实时滤镜。
   static bool get _canBake => !Platform.environment.containsKey('FLUTTER_TEST');
 
@@ -175,14 +190,15 @@ class _BakedBlurLayerState extends State<_BakedBlurLayer> {
     super.dispose();
   }
 
-  /// 解码目标长边（物理像素）：封顶 [maxBakeSide]，避免整幅解码后又大图烘焙。
+  /// 解码目标长边（物理像素）：封顶 `widget.maxBakeSide`，避免整幅解码后又
+  /// 大图烘焙。
   int _targetDecodePx() {
     final mq = MediaQuery.maybeOf(context);
-    if (mq == null) return maxBakeSide;
+    if (mq == null) return widget.maxBakeSide;
     final s = mq.size;
     final longest =
         (s.width > s.height ? s.width : s.height) * mq.devicePixelRatio;
-    return longest.round().clamp(256, maxBakeSide);
+    return longest.round().clamp(256, widget.maxBakeSide);
   }
 
   void _resolve() {
@@ -236,11 +252,17 @@ class _BakedBlurLayerState extends State<_BakedBlurLayer> {
   /// 同步烘焙：cover 适配 → 放大 1.5（绕中心）→ 高斯模糊 → 饱和，输出物理像素。
   ui.Image? _bake(ui.Image source, Size size, double dpr) {
     final physicalLongest = math.max(size.width, size.height) * dpr;
-    final bakeScale = physicalLongest > maxBakeSide
-        ? maxBakeSide / physicalLongest
+    final bakeScale = physicalLongest > widget.maxBakeSide
+        ? widget.maxBakeSide / physicalLongest
         : 1.0;
-    final w = (size.width * dpr * bakeScale).round().clamp(1, maxBakeSide);
-    final h = (size.height * dpr * bakeScale).round().clamp(1, maxBakeSide);
+    final w = (size.width * dpr * bakeScale).round().clamp(
+      1,
+      widget.maxBakeSide,
+    );
+    final h = (size.height * dpr * bakeScale).round().clamp(
+      1,
+      widget.maxBakeSide,
+    );
     final out = Size(w.toDouble(), h.toDouble());
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Offset.zero & out);

@@ -69,8 +69,18 @@ class _RippleShaderPainter extends CustomPainter {
     // 着色器以 `i < uCount` 掩码，超出槽位不参与；无需清零。
     shader.setFloat(RippleUniforms.count, n.toDouble());
 
-    shader.setImageSampler(RippleUniforms.samplerFrom, from);
-    shader.setImageSampler(RippleUniforms.samplerTo, to);
+    // `setImageSampler` 默认最近邻；水纹会放大预烘焙封面，必须走双线性，
+    // 否则折射/高光会把封面切成明显色块（对齐上游 WebGL LINEAR）。
+    shader.setImageSampler(
+      RippleUniforms.samplerFrom,
+      from,
+      filterQuality: FilterQuality.low,
+    );
+    shader.setImageSampler(
+      RippleUniforms.samplerTo,
+      to,
+      filterQuality: FilterQuality.low,
+    );
     canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
