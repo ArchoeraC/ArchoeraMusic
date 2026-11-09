@@ -905,6 +905,39 @@ class AppLocalizationsEs extends AppLocalizations {
   String get loginRiskTitle => 'Aviso de riesgo de inicio de sesión';
 
   @override
+  String get kugouRiskVerifyTitle => 'Verificación de seguridad de KuGou';
+
+  @override
+  String get kugouRiskVerifySmsDescription =>
+      'KuGou requiere verificación por SMS. Se ha enviado un código al teléfono vinculado a tu cuenta.';
+
+  @override
+  String get kugouRiskVerifySmsHint => 'Código SMS';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => 'Introduce el código SMS';
+
+  @override
+  String get kugouRiskVerifySubmit => 'Verificar';
+
+  @override
+  String get kugouRiskVerifyFailed =>
+      'La verificación falló. Comprueba el código e inténtalo de nuevo.';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle =>
+      'Completa la verificación en la app oficial de KuGou';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      'KuGou requiere un CAPTCHA de Tencent (TCaptcha), que esta versión no puede incrustar en la app. Abre la app oficial de KuGou, completa la verificación de seguridad y vuelve a intentarlo.';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return 'KuGou requiere una verificación de seguridad (tipo $type). Complétala en la app oficial de KuGou e inténtalo de nuevo.';
+  }
+
+  @override
   String get loginRiskBody =>
       'Iniciar sesión en un cliente de terceros conlleva los siguientes riesgos. Confirme antes de continuar:\n\n· La plataforma puede aplicar control de riesgos, restricciones o bloqueos a los inicios de sesión de clientes de terceros, lo que puede causar anomalías en la cuenta o funciones limitadas;\n· El inicio de sesión por QR / credenciales autoriza a este software a acceder a la plataforma con su cuenta; acciones como marcar favoritos, reproducir y comentar afectarán realmente a su cuenta;\n· Las credenciales de inicio de sesión (cookies / tokens, etc.) se guardan solo en este dispositivo, cifradas, y nunca se suben al desarrollador ni a ningún servidor ajeno a la plataforma;\n· Cumpla con los términos de servicio de la plataforma; usted asume todas las consecuencias del uso de este software.\n\nContinuar con el inicio de sesión significa que ha leído y aceptado los riesgos anteriores.';
 
