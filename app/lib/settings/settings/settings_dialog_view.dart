@@ -122,7 +122,24 @@ extension _SettingsDialogView on _SettingsDialogState {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                  child: _buildContent(scheme, l10n),
+                  // Stack 作为搜索跳转高亮的坐标参照系（_contentHostKey）。
+                  child: Stack(
+                    key: _contentHostKey,
+                    fit: StackFit.expand,
+                    children: [
+                      _buildContent(scheme, l10n),
+                      if (_flashRect != null)
+                        Positioned.fromRect(
+                          rect: _flashRect!,
+                          child: IgnorePointer(
+                            child: SettingsRowFlash(
+                              animation: _flashCtrl,
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -349,6 +366,7 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsSearchColorTitle,
         l10n.settingsSearchColorSubtitle,
         EtaIcons.paletteOutline,
+        anchor: l10n.settingsLyricPlayedColor,
       ),
       _SearchEntry(
         SettingsCategory.lyrics,
@@ -385,6 +403,7 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsSearchDjModeTitle,
         l10n.settingsDjModeOn,
         EtaIcons.magic3Outline,
+        anchor: l10n.settingsDjMode,
       ),
       _SearchEntry(
         SettingsCategory.preset,
@@ -439,6 +458,7 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsSearchFilenameTitle,
         l10n.settingsSearchFilenameSubtitle,
         EtaIcons.fontSizeOutline,
+        anchor: l10n.settingsSectionFilename,
       ),
       _SearchEntry(
         SettingsCategory.download,
@@ -571,24 +591,28 @@ extension _SettingsDialogView on _SettingsDialogState {
         l10n.settingsSectionDeclaration,
         l10n.settingsDeclarationEntryDesc,
         EtaIcons.bookOutline,
+        anchor: l10n.settingsSectionLegal,
       ),
       _SearchEntry(
         SettingsCategory.about,
         l10n.settingsSectionPrivacy,
         l10n.settingsPrivacyEntryDesc,
         EtaIcons.shieldOutline,
+        anchor: l10n.settingsSectionLegal,
       ),
       _SearchEntry(
         SettingsCategory.about,
         l10n.settingsSectionFontCredits,
         l10n.settingsFontCreditsEntryDesc,
         EtaIcons.fontOutline,
+        anchor: l10n.settingsSectionLegal,
       ),
       _SearchEntry(
         SettingsCategory.about,
         l10n.settingsSectionThirdPartyLicenses,
         l10n.settingsThirdPartyLicensesEntryDesc,
         EtaIcons.docmentOutline,
+        anchor: l10n.settingsSectionLegal,
       ),
       _SearchEntry(
         SettingsCategory.developer,
@@ -659,14 +683,20 @@ extension _SettingsDialogView on _SettingsDialogState {
                           color: selected ? scheme.primary : scheme.onSurface,
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          cat.label(l10n),
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: selected ? scheme.primary : scheme.onSurface,
+                        Flexible(
+                          child: Text(
+                            cat.label(l10n),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.onSurface,
+                            ),
                           ),
                         ),
                       ],
@@ -711,6 +741,7 @@ extension _SettingsDialogView on _SettingsDialogState {
           Expanded(
             child: InkClip(
               child: SingleChildScrollView(
+                controller: _contentScrollCtrl,
                 child: switch (_category) {
                   SettingsCategory.appearance => const AppearanceSection(),
                   SettingsCategory.playback => const PlaybackSection(),
@@ -865,10 +896,7 @@ extension _SettingsDialogView on _SettingsDialogState {
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           hoverColor: scheme.onSurface.withValues(alpha: 0.05),
-          onTap: () {
-            _setCategory(e.category);
-            _clearQuery();
-          },
+          onTap: () => _jumpToSearchEntry(e),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
@@ -937,6 +965,43 @@ extension _SettingsDialogView on _SettingsDialogState {
       start = idx + q.length;
     }
     return spans;
+  }
+}
+
+/// 搜索命中的设置行高亮：在目标位置脉冲 [SettingsDialog] 设置的高亮框。
+///
+/// 只画描边 + 淡填充、不拦截指针事件；3 次脉冲后由外层清掉 [Rect] 移除。
+class SettingsRowFlash extends StatelessWidget {
+  const SettingsRowFlash({
+    super.key,
+    required this.animation,
+    required this.color,
+  });
+
+  final Animation<double> animation;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        final t = animation.value.clamp(0.0, 1.0);
+        // 每个周期 0 → 1 → 0；t=1 时相位归零，强度自然回到 0。
+        final phase = (t * _SettingsDialogState._flashPulses) % 1.0;
+        final intensity = math.sin(phase * math.pi).abs() * (1 - t * 0.2);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10 * intensity),
+            border: Border.all(
+              color: color.withValues(alpha: 0.9 * intensity),
+              width: 1.6,
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.control),
+          ),
+        );
+      },
+    );
   }
 }
 

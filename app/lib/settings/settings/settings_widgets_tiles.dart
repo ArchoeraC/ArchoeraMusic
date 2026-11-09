@@ -76,7 +76,10 @@ class SettingTile extends StatelessWidget {
         ],
       ),
     );
-    return MouseDodge(child: tile);
+    return SettingsAnchor(
+      label: title,
+      child: MouseDodge(child: tile),
+    );
   }
 }
 
@@ -243,15 +246,18 @@ class SettingSectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-          color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+    return SettingsAnchor(
+      label: title,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+          ),
         ),
       ),
     );
