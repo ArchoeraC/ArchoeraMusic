@@ -905,6 +905,39 @@ class AppLocalizationsFr extends AppLocalizations {
   String get loginRiskTitle => 'Avertissement de risque de connexion';
 
   @override
+  String get kugouRiskVerifyTitle => 'Vérification de sécurité KuGou';
+
+  @override
+  String get kugouRiskVerifySmsDescription =>
+      'KuGou exige une vérification par SMS. Un code a été envoyé au numéro associé à votre compte.';
+
+  @override
+  String get kugouRiskVerifySmsHint => 'Code SMS';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => 'Saisir le code SMS';
+
+  @override
+  String get kugouRiskVerifySubmit => 'Vérifier';
+
+  @override
+  String get kugouRiskVerifyFailed =>
+      'Échec de la vérification. Vérifiez le code et réessayez.';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle =>
+      'Effectuez la vérification dans l’application officielle KuGou';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      'KuGou exige un CAPTCHA Tencent (TCaptcha), que cette version ne peut pas intégrer dans l’application. Ouvrez l’application officielle KuGou, effectuez la vérification de sécurité, puis réessayez.';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return 'KuGou exige une vérification de sécurité (type $type). Effectuez-la dans l’application officielle KuGou, puis réessayez.';
+  }
+
+  @override
   String get loginRiskBody =>
       'La connexion via un client tiers présente les risques suivants. Veuillez confirmer avant de continuer :\n\n· La plateforme peut appliquer un contrôle des risques, des restrictions ou des bannissements aux connexions de clients tiers, ce qui peut entraîner des anomalies de compte ou des fonctions limitées ;\n· La connexion par QR / identifiants autorise ce logiciel à accéder à la plateforme avec votre compte ; les actions telles que l\'ajout aux favoris, la lecture et les commentaires affecteront réellement votre compte ;\n· Les identifiants de connexion (cookies / jetons, etc.) sont stockés uniquement sur cet appareil, chiffrés, et ne sont jamais envoyés au développeur ni à un serveur non lié à la plateforme ;\n· Respectez les conditions de service de la plateforme ; vous assumez toutes les conséquences de l\'utilisation de ce logiciel.\n\nContinuer la connexion signifie que vous avez lu et accepté les risques ci-dessus.';
 

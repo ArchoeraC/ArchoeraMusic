@@ -906,6 +906,39 @@ class AppLocalizationsDe extends AppLocalizations {
   String get loginRiskTitle => 'Anmelderisiko';
 
   @override
+  String get kugouRiskVerifyTitle => 'KuGou-Sicherheitsüberprüfung';
+
+  @override
+  String get kugouRiskVerifySmsDescription =>
+      'KuGou verlangt eine SMS-Verifizierung. Ein Code wurde an die mit deinem Konto verknüpfte Telefonnummer gesendet.';
+
+  @override
+  String get kugouRiskVerifySmsHint => 'SMS-Code';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => 'SMS-Code eingeben';
+
+  @override
+  String get kugouRiskVerifySubmit => 'Bestätigen';
+
+  @override
+  String get kugouRiskVerifyFailed =>
+      'Verifizierung fehlgeschlagen. Prüfe den Code und versuche es erneut.';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle =>
+      'Verifizierung in der offiziellen KuGou-App abschließen';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      'KuGou verlangt ein Tencent-CAPTCHA (TCaptcha), das diese Version nicht in der App einbetten kann. Öffne die offizielle KuGou-App, schließe die Sicherheitsüberprüfung ab und versuche es dann erneut.';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return 'KuGou verlangt eine Sicherheitsüberprüfung (Typ $type). Schließe sie in der offiziellen KuGou-App ab und versuche es erneut.';
+  }
+
+  @override
   String get loginRiskBody =>
       'Die Anmeldung über einen Drittanbieter-Client birgt folgende Risiken. Bitte bestätigen Sie, bevor Sie fortfahren:\n\n· Die Plattform kann gegenüber Anmeldungen von Drittanbieter-Clients Risikokontrollen, Einschränkungen oder Sperren verhängen, was zu Kontoanomalien oder eingeschränkten Funktionen führen kann;\n· QR- / Zugangsdaten-Anmeldung bedeutet, dass Sie dieser Software erlauben, mit Ihrem Konto auf die Plattform zuzugreifen; Aktionen wie Favorisieren, Abspielen und Kommentieren wirken sich tatsächlich auf Ihr Konto aus;\n· Anmeldedaten (Cookies / Token usw.) werden nur lokal verschlüsselt gespeichert und niemals an den Entwickler oder einen Nicht-Plattform-Server hochgeladen;\n· Bitte beachten Sie die Nutzungsbedingungen der jeweiligen Plattform; alle Folgen der Nutzung dieser Software tragen Sie selbst.\n\nMit dem Fortsetzen der Anmeldung bestätigen Sie, diese Risiken gelesen und akzeptiert zu haben.';
 

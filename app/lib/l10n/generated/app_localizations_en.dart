@@ -898,6 +898,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginRiskTitle => 'Login risk notice';
 
   @override
+  String get kugouRiskVerifyTitle => 'KuGou security verification';
+
+  @override
+  String get kugouRiskVerifySmsDescription =>
+      'KuGou requires SMS verification. A code has been sent to the phone number linked to your account.';
+
+  @override
+  String get kugouRiskVerifySmsHint => 'SMS code';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => 'Enter the SMS code';
+
+  @override
+  String get kugouRiskVerifySubmit => 'Verify';
+
+  @override
+  String get kugouRiskVerifyFailed =>
+      'Verification failed. Check the code and try again.';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle =>
+      'Complete verification in the official KuGou app';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      'KuGou requires a Tencent CAPTCHA (TCaptcha), which this version cannot embed in-app. Open the official KuGou app, complete the security verification, then return and try again.';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return 'KuGou requires security verification (type $type). Complete it in the official KuGou app and try again.';
+  }
+
+  @override
   String get loginRiskBody =>
       'Logging into a third-party client involves the following risks. Please confirm before continuing:\n\n- The platform may apply risk control, restrictions or bans to third-party client logins, which may cause account anomalies or limited features;\n- QR / credential login authorizes this software to access the platform with your account; actions such as favoriting, playing and commenting will genuinely affect your account;\n- Login credentials (cookies / tokens, etc.) are stored only on this device, encrypted, and are never uploaded to the developer or any non-platform server;\n- Please comply with the platform\'s terms of service; you bear all consequences of using this software.\n\nContinuing to log in means you have read and accepted the above risks.';
 

@@ -881,6 +881,37 @@ class AppLocalizationsKo extends AppLocalizations {
   String get loginRiskTitle => '로그인 위험 안내';
 
   @override
+  String get kugouRiskVerifyTitle => 'KuGou 보안 인증';
+
+  @override
+  String get kugouRiskVerifySmsDescription =>
+      'KuGou에서 SMS 인증을 요구합니다. 계정에 연결된 휴대폰 번호로 인증 코드를 보냈습니다.';
+
+  @override
+  String get kugouRiskVerifySmsHint => 'SMS 인증 코드';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => 'SMS 인증 코드를 입력하세요';
+
+  @override
+  String get kugouRiskVerifySubmit => '인증';
+
+  @override
+  String get kugouRiskVerifyFailed => '인증에 실패했습니다. 코드를 확인한 후 다시 시도하세요.';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle => 'KuGou 공식 앱에서 인증을 완료하세요';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      'KuGou에서 Tencent CAPTCHA(TCaptcha)를 요구하지만 이 버전에서는 앱 내에 포함할 수 없습니다. KuGou 공식 앱에서 보안 인증을 완료한 후 이 앱으로 돌아와 다시 시도하세요.';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return 'KuGou에서 보안 인증(유형 $type)을 요구합니다. KuGou 공식 앱에서 완료한 후 다시 시도하세요.';
+  }
+
+  @override
   String get loginRiskBody =>
       '서드파티 클라이언트 로그인에는 다음과 같은 위험이 있습니다. 확인 후 계속하십시오:\n\n· 플랫폼은 서드파티 클라이언트 로그인에 대해 위험 관리·제한·차단을 적용할 수 있으며, 이로 인해 계정 이상이나 기능 제한이 발생할 수 있습니다;\n· QR / 자격 증명 로그인은 귀하의 계정으로 이 소프트웨어가 플랫폼에 접근하도록 허가하는 것을 의미하며, 즐겨찾기·재생·댓글 등의 작업은 실제로 귀하의 계정에 반영됩니다;\n· 로그인 자격 증명(Cookie / 토큰 등)은 이 기기에만 암호화되어 저장되며, 개발자나 플랫폼 이외의 서버로 업로드되지 않습니다;\n· 각 플랫폼의 서비스 약관을 준수하십시오. 이 소프트웨어 사용으로 인한 모든 결과는 귀하가 부담합니다.\n\n로그인을 계속하면 위 위험을 읽고 동의한 것으로 간주됩니다.';
 
