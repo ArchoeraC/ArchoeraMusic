@@ -528,16 +528,21 @@ int native_decoder_seek_ms(NativeDecoder *d, int64_t ms)
         rc = zk_decoder_seek_ms(d->zk, (long long)ms) == 0 ? 0 : -1;
     }
     if (rc != 0) return -1;
-    /* 样本级裁剪：目标样本 = ms×sr/1000（与内核取整一致）；落点 = kernel
-     * position_samples（首个待输出样本号）。仅当内核提供样本级位置且落点
-     * 不晚于目标时裁剪；否则保持既有行为（不做毫秒近似换算，避免舍入误差）。 */
+    /* 样本级裁剪：目标样本 = ms×sr/1000；落点 = kernel position_samples
+     * （首个待输出样本号）。所有内核格式都必须提供该 vtable：seek 允许落在
+     * 包含目标的帧内（landing < target），C 层按样本差裁剪前导样本；不提供
+     * 的格式会在 `decoder.zig` 的 vtable 契约/内核测试中直接暴露，不再走
+     * 毫秒估算兜底（毫秒换算可能多裁/少裁，反而引入新的错位）。 */
     if (ms > 0 && d->info.sample_rate > 0) {
         unsigned long long sr = (unsigned long long)d->info.sample_rate;
         unsigned long long tms = (unsigned long long)ms;
         unsigned long long target = tms * sr / 1000ULL;
         long long landing = d->is_stream ? zk_engine_position_samples(d->stream)
                                          : zk_decoder_position_samples(d->zk);
-        if (landing >= 0 && target > (unsigned long long)landing) {
+        /* vtable 必填：landing < 0 属契约违约，直接让 seek 失败，绝不静默
+         * 跳过裁剪（否则切档会整体错位且难以发现）。 */
+        if (landing < 0) return -1;
+        if (target > (unsigned long long)landing) {
             d->trim_samples = (int64_t)(target - (unsigned long long)landing);
         }
     }

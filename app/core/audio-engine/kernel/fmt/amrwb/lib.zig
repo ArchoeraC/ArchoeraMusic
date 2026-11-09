@@ -247,8 +247,14 @@ const vtable = decoder.Decoder.VTable{
     .read = awbRead,
     .seek_ms = awbSeek,
     .position_ms = awbPos,
+    .position_samples = awbPositionSamples,
     .deinit = awbDeinit,
 };
+
+fn awbPositionSamples(ctx: *anyopaque) i64 {
+    const c: *Ctx = @ptrCast(@alignCast(ctx));
+    return @intCast(c.cursor);
+}
 
 /// 打开 .awb / #!AMR-WB（含 3gp 单轨）整文件解码；成功接管 `reader` 所有权。
 pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.Decoder {
