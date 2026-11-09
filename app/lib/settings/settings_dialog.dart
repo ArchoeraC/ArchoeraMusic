@@ -36,7 +36,6 @@ import 'settings_sections.dart';
 import 'streaming_server_list.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
-import '../theme/motion.dart';
 
 export 'settings_categories.dart';
 

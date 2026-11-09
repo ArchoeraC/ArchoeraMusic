@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../common/glass_blur.dart';
 import '../common/qr_image_view.dart';
 
@@ -14,8 +15,8 @@ import '../../stores/providers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import 'login_risk_notice.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
-import '../../theme/motion.dart';
 
 part 'netease_login_dialog/netease_login_dialog_view.dart';
 
@@ -186,9 +187,7 @@ class _NeteaseLoginDialogState extends ConsumerState<_NeteaseLoginDialog> {
       _phoneError = '';
     });
     try {
-      final body = await ref
-          .read(neteaseApiProvider)
-          .captchaSent(phone: phone);
+      final body = await ref.read(neteaseApiProvider).captchaSent(phone: phone);
       if (!mounted) return;
       if ((body?['code'] as num?)?.toInt() == 200) {
         _startCodeCountdown();

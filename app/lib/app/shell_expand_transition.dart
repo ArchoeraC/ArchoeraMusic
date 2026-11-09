@@ -4,8 +4,6 @@
 
 import 'package:flutter/widgets.dart';
 
-import '../theme/motion.dart';
-
 /// 全屏播放器展开时主壳内容的收起/展开动效。
 ///
 /// **不再卸载壳内容**。此前在展开完成后把整个壳（列表 / 图片 / 页面 State）
@@ -23,7 +21,7 @@ class ShellExpandTransition extends StatelessWidget {
     super.key,
     required this.animation,
     required this.child,
-    this.curve = appMotion,
+    this.curve = const Cubic(0.7, 0, 0.3, 1),
     this.disableAnimations = false,
   });
 

@@ -50,12 +50,12 @@ class _ToastItemViewState extends State<_ToastItemView>
 
   late final CurvedAnimation _in = CurvedAnimation(
     parent: _ctrl,
-    curve: appMotionLinear,
+    curve: Curves.easeOut,
   );
   late final CurvedAnimation _out = CurvedAnimation(
     parent: _ctrl,
-    curve: appMotionLinear,
-    reverseCurve: appMotionLinear,
+    curve: Curves.easeIn,
+    reverseCurve: Curves.easeIn,
   );
 
   bool get _leaving => widget.item.leaving;

@@ -22,7 +22,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../../theme/cover_color.dart';
-import '../../../theme/motion.dart';
 
 /// 暗端压暗比例（等价 CSS `brightness(0.9)`）。
 const double kCoverToneDarken = 0.10;
@@ -146,7 +145,7 @@ class CoverToneBackground extends ConsumerWidget {
         : playerDefaultBackgroundGradient(context);
     return AnimatedContainer(
       duration: duration,
-      curve: appMotion,
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(gradient: gradient),
     );
   }

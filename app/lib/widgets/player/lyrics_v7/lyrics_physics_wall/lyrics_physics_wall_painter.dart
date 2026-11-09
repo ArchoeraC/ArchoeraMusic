@@ -515,25 +515,12 @@ class _Painter extends CustomPainter {
         canvas.translate(-cx, -cyF);
       }
       if (t >= dur) {
-        canvas.drawParagraph(
-          _litParagraph(fr, k, fs, maxWidth, anim, lineHeightEm),
-          Offset(box.left, box.top),
-        );
+        canvas.drawParagraph(fr.lit[k], Offset(box.left, box.top));
       } else if (t <= 0) {
         canvas.drawParagraph(fr.dim[k], Offset(box.left, box.top));
       } else {
         canvas.drawParagraph(fr.dim[k], Offset(box.left, box.top));
-        _drawSweepLit(
-          canvas,
-          fr,
-          k,
-          box,
-          t / dur,
-          fs,
-          maxWidth,
-          anim,
-          lineHeightEm,
-        );
+        _drawSweepLit(canvas, fr, k, box, t / dur, fs);
       }
       canvas.restore();
     }
@@ -547,11 +534,8 @@ class _Painter extends CustomPainter {
     FragBox box,
     double p,
     double fs,
-    double maxWidth,
-    WordAnim anim,
-    double lineHeightEm,
   ) {
-    final lit = _litParagraph(fr, k, fs, maxWidth, anim, lineHeightEm);
+    final lit = fr.lit[k];
     final rect = Rect.fromLTWH(
       box.left - 1,
       box.top - 1,
@@ -579,29 +563,6 @@ class _Painter extends CustomPainter {
         ..shader = shader,
     );
     canvas.restore();
-  }
-
-  /// 已唱变体（长音强调时每帧重建带辉光的段落，仅少数长音字/词）。
-  ui.Paragraph _litParagraph(
-    LyricsFragmentRender fr,
-    int k,
-    double fs,
-    double maxWidth,
-    WordAnim anim,
-    double lineHeightEm,
-  ) {
-    if (anim.glowAlpha <= 0.01) return fr.lit[k];
-    return buildGlowFragment(
-      fontFamily: c.fontFamily,
-      fontSize: fs,
-      weight: c.fontWeight,
-      maxWidth: maxWidth,
-      color: c.played.withValues(alpha: _litAlpha),
-      text: fr.texts[k],
-      glowAlpha: anim.glowAlpha,
-      blurRadius: anim.glowBlur,
-      lineHeightEm: lineHeightEm,
-    );
   }
 
   /// 单个字/词的每帧动画参数（对齐 AMLL float + emphasize）。

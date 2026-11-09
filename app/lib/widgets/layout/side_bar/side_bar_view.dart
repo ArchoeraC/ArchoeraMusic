@@ -27,7 +27,7 @@ extension _SideBarView on _SideBarState {
 
     return AnimatedContainer(
       duration: animDuration(context, const Duration(milliseconds: 200)),
-      curve: appMotion,
+      curve: Curves.easeOutCubic,
       width: width,
       color: colorScheme.surfaceContainerLow,
       child: Column(
@@ -186,7 +186,7 @@ extension _SideBarView on _SideBarState {
       child: AnimatedContainer(
         key: anchor,
         duration: animDuration(context, const Duration(milliseconds: 180)),
-        curve: appMotion,
+        curve: Curves.easeOut,
         decoration: BoxDecoration(
           color: selected
               ? colorScheme.primary.withValues(alpha: 0.10)
@@ -219,7 +219,7 @@ extension _SideBarView on _SideBarState {
                         context,
                         const Duration(milliseconds: 180),
                       ),
-                      curve: appMotion,
+                      curve: Curves.easeOut,
                       width: 3,
                       decoration: BoxDecoration(
                         color: !navStyle.slidingIndicator && selected

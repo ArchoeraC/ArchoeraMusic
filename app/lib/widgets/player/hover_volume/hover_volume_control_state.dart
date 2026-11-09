@@ -158,8 +158,8 @@ class _SlideInState extends State<_SlideIn>
       vsync: this,
       duration: const Duration(milliseconds: 220),
     );
-    _size = CurvedAnimation(parent: _controller, curve: appMotion);
-    _opacity = CurvedAnimation(parent: _controller, curve: appMotionLinear);
+    _size = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
     _controller.addStatusListener(_onStatus);
     if (widget.visible) {
       _controller.forward();
