@@ -1,6 +1,9 @@
 {
   "@@locale": "fr",
   "settingsCatRender": "Performance et rendu",
+  "settingsRenderFps": "Images par seconde",
+  "settingsRenderFpsDesc": "Plafond de {fps} images par seconde ; la fréquence de l''écran reste la limite",
+  "settingsRenderFpsWarn": "Une fréquence élevée augmente la charge GPU et la consommation",
   "settingsRenderSubtitle": "Accélération GPU et coût de rendu (expérimental)",
   "settingsRippleShader": "Shader GPU des ondulations",
   "settingsRippleShaderDesc": "Dessiner les ondulations avec un fragment shader (désactivé = maillage CPU)",
@@ -966,6 +969,7 @@
   "settingsBackgroundBlurDesc": "Flou gaussien appliqué à l''image de fond ({blur}px)",
   "settingsBackgroundDim": "Intensité du voile",
   "settingsBackgroundDimDesc": "Opacité du voile noir ({dim}%) ; plus élevée = premier plan plus lisible",
+  "settingsBackgroundDimAuto": "La limite inférieure suit la luminosité de cette image.",
   "settingsBackgroundScale": "Zoom",
   "settingsBackgroundScaleDesc": "Facteur de zoom de l''image de fond ({scale}x)",
   "settingsSidebarCollapsed": "Barre latérale réduite",

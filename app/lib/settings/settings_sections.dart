@@ -38,6 +38,7 @@ import '../services/log/log.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../services/playback/engine_bindings.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/render/image_luminance.dart';
 import '../services/source/media_request_headers.dart';
 import '../services/scraper/scrape_controller.dart';
 import '../services/shortcuts/shortcut_action.dart';

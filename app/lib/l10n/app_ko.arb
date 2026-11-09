@@ -1,6 +1,9 @@
 {
   "@@locale": "ko",
   "settingsCatRender": "성능 / 렌더링",
+  "settingsRenderFps": "렌더링 프레임 수",
+  "settingsRenderFpsDesc": "초당 렌더링 상한({fps} FPS). 실제로는 디스플레이 주사율에 제한됩니다",
+  "settingsRenderFpsWarn": "높은 프레임률은 GPU 부하와 전력 소모를 늘립니다",
   "settingsRenderSubtitle": "GPU 가속 및 렌더링 비용(실험적)",
   "settingsRippleShader": "물결 GPU 셰이더",
   "settingsRippleShaderDesc": "프래그먼트 셰이더로 플레이어 물결 그리기(끄면 CPU 메시)",
@@ -966,6 +969,7 @@
   "settingsBackgroundBlurDesc": "배경 이미지에 가우시안 블러 적용 ({blur}px)",
   "settingsBackgroundDim": "마스크 강도",
   "settingsBackgroundDimDesc": "검은 오버레이 불투명도 ({dim}%) — 높을수록 전경이 잘 보임",
+  "settingsBackgroundDimAuto": "이미지가 밝아 하한이 밝기에 맞춰 자동으로 올라갔습니다",
   "settingsBackgroundScale": "확대 배율",
   "settingsBackgroundScaleDesc": "배경 이미지의 확대 배율 ({scale}x)",
   "settingsSidebarCollapsed": "사이드바 접기",

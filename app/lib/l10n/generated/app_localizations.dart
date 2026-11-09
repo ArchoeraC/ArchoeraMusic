@@ -116,6 +116,24 @@ abstract class AppLocalizations {
   /// **'性能 / 渲染'**
   String get settingsCatRender;
 
+  /// No description provided for @settingsRenderFps.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'渲染帧数'**
+  String get settingsRenderFps;
+
+  /// No description provided for @settingsRenderFpsDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'每秒渲染的上限（{fps} FPS，实际受显示器刷新率限制）'**
+  String settingsRenderFpsDesc({required Object fps});
+
+  /// No description provided for @settingsRenderFpsWarn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高帧率会明显增加 GPU 占用与耗电'**
+  String get settingsRenderFpsWarn;
+
   /// No description provided for @settingsRenderSubtitle.
   ///
   /// In zh_CN, this message translates to:
@@ -6669,6 +6687,12 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'叠加的黑色遮罩透明度（{dim}%），越高前景越易读'**
   String settingsBackgroundDimDesc({required Object dim});
+
+  /// No description provided for @settingsBackgroundDimAuto.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'图片较亮，下限已按亮度自动抬高'**
+  String get settingsBackgroundDimAuto;
 
   /// No description provided for @settingsBackgroundScale.
   ///

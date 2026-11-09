@@ -13,6 +13,17 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsCatRender => 'パフォーマンス / レンダリング';
 
   @override
+  String get settingsRenderFps => '描画フレームレート';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '1 秒あたりの描画上限（$fps FPS）。実際はディスプレイのリフレッシュレートに制限されます';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '高いフレームレートは GPU 負荷と消費電力を増やします';
+
+  @override
   String get settingsRenderSubtitle => 'GPU アクセラレーションとレンダリング負荷（実験的）';
 
   @override
@@ -3634,6 +3645,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String settingsBackgroundDimDesc({required Object dim}) {
     return '黒のオーバーレイ透明度（$dim%）— 高いほど前景が読みやすく';
   }
+
+  @override
+  String get settingsBackgroundDimAuto => '画像が明るいため、下限を明るさに合わせて自動で上げています';
 
   @override
   String get settingsBackgroundScale => 'ズームサイズ';

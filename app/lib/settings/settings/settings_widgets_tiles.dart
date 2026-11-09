@@ -131,6 +131,22 @@ class SettingSwitchTile extends StatelessWidget {
   }
 }
 
+/// 渲染帧率滑块的颜色阈值：≤60 沿用主题色，>60 黄色，>100 红色。
+const int kRenderFpsWarnFrom = 60;
+const int kRenderFpsDangerFrom = 100;
+
+/// 帧率告警黄（设计体系没有 warning token，取暗/亮色板都协调的琥珀色）。
+const Color kRenderFpsWarnColor = Color(0xFFFFB020);
+
+/// 渲染帧率滑块的前景色：[ColorScheme.primary] / 告警黄 / [ColorScheme.error]。
+///
+/// 阈值是「超过」：60 仍是主题色，61 起黄色，101 起红色。
+Color renderFpsSliderColor(ColorScheme scheme, int fps) {
+  if (fps > kRenderFpsDangerFrom) return scheme.error;
+  if (fps > kRenderFpsWarnFrom) return kRenderFpsWarnColor;
+  return scheme.primary;
+}
+
 /// 设置行 + 右侧滑块。
 class SettingSliderTile extends StatelessWidget {
   const SettingSliderTile({
@@ -144,6 +160,7 @@ class SettingSliderTile extends StatelessWidget {
     this.divisions,
     this.label,
     this.width = 140,
+    this.accentColor,
     this.enabled = true,
     this.onChangeEnd,
     required this.onChanged,
@@ -159,6 +176,11 @@ class SettingSliderTile extends StatelessWidget {
   final String? label;
   final double width;
 
+  /// 自定义滑块前景色（轨道/滑块/数值气泡）；null = 跟随主题主色。
+  ///
+  /// 用于「数值跨阈值变色」的滑块（如渲染帧率），其余滑块保持统一外观。
+  final Color? accentColor;
+
   /// 是否可拖动；关闭时仍显示当前值（保留用户设置）。
   final bool enabled;
   final ValueChanged<double>? onChangeEnd;
@@ -166,24 +188,47 @@ class SettingSliderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = accentColor;
+    Widget slider = Slider(
+      value: value,
+      min: min,
+      max: max,
+      divisions: divisions,
+      label: label,
+      onChangeEnd: enabled ? onChangeEnd : null,
+      onChanged: enabled ? onChanged : null,
+    );
+    if (accent != null) {
+      // 与主题默认滑块同构，只换前景色：轨道 / 滑块 / 触摸光晕 / 数值气泡，
+      // 气泡文字按前景色亮度自动取黑或白，亮色主题下也保持可读。
+      final onAccent = accent.computeLuminance() > 0.5
+          ? const Color(0xFF1A1A1A)
+          : const Color(0xFFFFFFFF);
+      slider = SliderTheme(
+        data: SliderTheme.of(context).copyWith(
+          activeTrackColor: accent,
+          thumbColor: accent,
+          overlayColor: accent.withValues(alpha: 0.12),
+          // 帧率滑块是 1 FPS 一档（135 档）：照常画刻度会在 140px 轨道上
+          // 糊成一条实心带，故隐藏刻度点，其余尺寸/形状与其它滑块一致。
+          tickMarkShape: SliderTickMarkShape.noTickMark,
+          valueIndicatorColor: accent,
+          valueIndicatorTextStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: onAccent,
+          ),
+        ),
+        child: slider,
+      );
+    }
     return SettingTile(
       icon: icon,
       title: title,
       subtitle: subtitle,
       trailing: Opacity(
         opacity: enabled ? 1 : 0.45,
-        child: SizedBox(
-          width: width,
-          child: Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions,
-            label: label,
-            onChangeEnd: enabled ? onChangeEnd : null,
-            onChanged: enabled ? onChanged : null,
-          ),
-        ),
+        child: SizedBox(width: width, child: slider),
       ),
     );
   }

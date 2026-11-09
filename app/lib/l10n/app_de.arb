@@ -1,6 +1,9 @@
 {
   "@@locale": "de",
   "settingsCatRender": "Leistung & Rendering",
+  "settingsRenderFps": "Bildrate",
+  "settingsRenderFpsDesc": "Obergrenze der Bilder pro Sekunde ({fps} FPS); die Bildwiederholrate des Displays bleibt die Grenze",
+  "settingsRenderFpsWarn": "Hohe Bildraten erhöhen GPU-Last und Stromverbrauch",
   "settingsRenderSubtitle": "GPU-Beschleunigung und Rendering-Kosten (experimentell)",
   "settingsRippleShader": "Ripple-GPU-Shader",
   "settingsRippleShaderDesc": "Player-Ripple mit Fragment-Shader zeichnen (aus = CPU-Mesh-Fallback)",
@@ -966,6 +969,7 @@
   "settingsBackgroundBlurDesc": "Gaußsche Unschärfe auf das Hintergrundbild angewendet ({blur}px)",
   "settingsBackgroundDim": "Maskenstärke",
   "settingsBackgroundDimDesc": "Deckkraft der schwarzen Überlagerung ({dim}%); höher = Vordergrund besser lesbar",
+  "settingsBackgroundDimAuto": "Die Untergrenze folgt der Helligkeit dieses Bildes.",
   "settingsBackgroundScale": "Zoomgröße",
   "settingsBackgroundScaleDesc": "Zoomfaktor des Hintergrundbilds ({scale}x)",
   "settingsSidebarCollapsed": "Seitenleiste einklappen",

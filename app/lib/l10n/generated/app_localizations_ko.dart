@@ -13,6 +13,17 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsCatRender => '성능 / 렌더링';
 
   @override
+  String get settingsRenderFps => '렌더링 프레임 수';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '초당 렌더링 상한($fps FPS). 실제로는 디스플레이 주사율에 제한됩니다';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '높은 프레임률은 GPU 부하와 전력 소모를 늘립니다';
+
+  @override
   String get settingsRenderSubtitle => 'GPU 가속 및 렌더링 비용(실험적)';
 
   @override
@@ -3637,6 +3648,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String settingsBackgroundDimDesc({required Object dim}) {
     return '검은 오버레이 불투명도 ($dim%) — 높을수록 전경이 잘 보임';
   }
+
+  @override
+  String get settingsBackgroundDimAuto => '이미지가 밝아 하한이 밝기에 맞춰 자동으로 올라갔습니다';
 
   @override
   String get settingsBackgroundScale => '확대 배율';
