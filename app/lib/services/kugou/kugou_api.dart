@@ -6,7 +6,8 @@
 ///
 /// - 搜索：mobilecdn.kugou.com（带封面，http）→ 兜底 songsearch.kugou.com
 /// - 取 URL：gateway.kugou.com/v5/url（android 签名 + key + 真实 dfid）
-///   [dfid] 进程级缓存，status=2（需验证）时重新 register_dev 重试一次
+///   设备身份 [KugouDevice] 与 dfid 均安装级持久化；status=2（需验证）时用
+///   同一设备重新 register_dev 重试一次，不换 GUID/MID（见 kugou_device.dart）
 /// - 歌词：lyrics.kugou.com 两步走（search → download），krc 用
 ///   XOR+zlib 解码（对齐 lx-music 的 KRC 逻辑）
 ///
@@ -31,34 +32,85 @@ import '../netease/netease_api.dart'
         SuggestSongItem;
 import '../netease/track.dart';
 import 'kugou_crypto.dart';
+import 'kugou_device.dart';
 import 'kugou_parse.dart';
 import 'kugou_request.dart';
+import 'kugou_risk.dart';
 import 'kugou_types.dart';
 
 export 'kugou_parse.dart';
+export 'kugou_risk.dart';
 export 'kugou_types.dart';
 
 /// 会话在宿主会话存储中的平台键。
 const _kugouSessionPlatform = 'kugou';
 
+/// 安装级设备身份在宿主会话存储中的平台键（与登录会话分离，
+/// 退出登录不会丢设备，避免重登时变成「新设备」）。
+const _kugouDevicePlatform = 'kugou_device';
+
 /// KG API 封装。
 class KugouApi extends ChangeNotifier {
   KugouApi() {
+    _device = _restoreDevice();
     session = _restoreSession();
   }
 
-  /// 进程级设备标识（register_dev 返回；v5/url 前置条件，随机 dfid
-  /// 会被服务端拒为「需要验证」）。
-  String? _dfid;
+  /// 安装级设备身份（GUID / MID / DEV / MAC / WebGL / dfid）。
+  ///
+  /// 同一安装跨进程复用；只有首次运行或显式重置才生成新设备。旧实现
+  /// 每次启动随机 MID、每次取流随机 dfid，会被服务端当作设备农场。
+  late KugouDevice _device;
 
-  /// 进程级设备 MID（v5/url 签名用）。
-  late final String _mid = kgCalcMid(kgRandomString(16));
+  /// 进行中的 register_dev 请求（并发去重，避免同时注册出多个 dfid）。
+  Future<String>? _dfidFuture;
+
+  /// register_dev 失败后的短暂退避：网络异常时取流会按音质档位循环，
+  /// 若每档都立刻重试注册，短时间密集的设备注册本身就是风控信号。
+  static const _dfidRetryAfter = Duration(seconds: 90);
+  DateTime? _dfidFailedAt;
+
+  /// SSA 验证 UI 处理器；由 app 启动时注入（见 `app/bootstrap.dart`）。
+  ///
+  /// API 层只负责检测/协议，不直接依赖 Flutter 对话框；未注入时按
+  /// [KgRiskVerifyRequiredException] 返回明确错误。
+  KgRiskVerifyHandler? riskVerifyHandler;
+
+  /// 验证对话框串行化：多个请求同时触发 SSA 时不弹多个窗口。
+  Future<void> _verifyLock = Future.value();
 
   /// 登录会话（扫码成功 → token/userid；v5/url 注入后即可拿 VIP 曲目）。
   KugouSession? session;
 
   /// 是否已登录。
   bool get isLoggedIn => session != null;
+
+  /// 当前设备身份（测试/诊断用；不要用它生成新的随机设备）。
+  @visibleForTesting
+  KugouDevice get device => _device;
+
+  KugouDevice _restoreDevice() {
+    final saved = getRuntime().sessionStore.get(_kugouDevicePlatform);
+    if (saved.isNotEmpty) {
+      final device = KugouDevice.fromJson(saved);
+      // 旧版本没有设备记录时会走首次生成；部分字段缺失说明存储损坏，
+      // 与其用空 DEV/WebGL 去登录，不如重建一套完整身份。
+      if (device.guid.isNotEmpty &&
+          device.mid.isNotEmpty &&
+          device.dev.isNotEmpty &&
+          device.webgl.isNotEmpty) {
+        return device;
+      }
+    }
+    // 首次运行：生成并立即持久化，后续启动复用同一套指纹。
+    final device = KugouDevice.generate();
+    getRuntime().sessionStore.save(_kugouDevicePlatform, device.toJson());
+    return device;
+  }
+
+  void _persistDevice() {
+    getRuntime().sessionStore.save(_kugouDevicePlatform, _device.toJson());
+  }
 
   /// 从宿主会话存储恢复（跨重启保留登录态）。
   KugouSession? _restoreSession() {
@@ -87,7 +139,7 @@ class KugouApi extends ChangeNotifier {
         token: current.token,
         userid: current.userid,
         dfid: await _getDfid(),
-        mid: _mid,
+        mid: _device.mid,
       );
       final pic = info['pic']?.toString();
       final nick = info['nickname']?.toString();
@@ -122,11 +174,42 @@ class KugouApi extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> _getDfid() async {
-    final cached = _dfid;
-    if (cached != null) return cached;
-    _dfid = await kgRegisterDevice(mid: _mid);
-    return _dfid!;
+  /// 取真实 dfid：优先复用持久化值；并发调用合并为一次注册。
+  ///
+  /// [refresh] 为 true 时丢弃旧 dfid，用**同一设备身份**重新注册（不会换
+  /// GUID/MID），避免 `status=2` 时不断生成新设备。
+  Future<String> _getDfid({bool refresh = false}) {
+    if (!refresh) {
+      final cached = _device.dfid;
+      if (cached.isNotEmpty) return Future.value(cached);
+    }
+    final pending = _dfidFuture;
+    if (pending != null) return pending;
+    final failedAt = _dfidFailedAt;
+    if (failedAt != null &&
+        DateTime.now().difference(failedAt) < _dfidRetryAfter) {
+      return Future.error(KgApiException('register_dev 失败，暂缓重试'));
+    }
+    final future =
+        kgRegisterDevice(
+              mid: _device.mid,
+              guid: _device.guid,
+              dfid: refresh ? '-' : _device.dfid,
+            )
+            .then((dfid) {
+              _dfidFailedAt = null;
+              _device = _device.withDfid(dfid);
+              _persistDevice();
+              return dfid;
+            })
+            .onError((Object error, StackTrace stack) {
+              _dfidFailedAt = DateTime.now();
+              Error.throwWithStackTrace(error, stack);
+            });
+    _dfidFuture = future;
+    return future.whenComplete(() {
+      if (identical(_dfidFuture, future)) _dfidFuture = null;
+    });
   }
 
   /// 网关请求用 dfid：优先真实注册值，注册失败回退 '-'（不阻断请求）。
@@ -138,41 +221,167 @@ class KugouApi extends ChangeNotifier {
     }
   }
 
+  // ─── SSA 安全验证 ─────────────────────────────────────────────────
+
+  /// 获取验证信息（不弹窗；供 UI 处理器调用）。
+  Future<KgVerifyInfo> getRiskVerifyInfo(String eventId) async {
+    final data = await kgGetVerifyInfo(
+      eventId,
+      dfid: await _safeDfid(),
+      mid: _device.mid,
+      token: session?.token,
+      userid: session?.userid,
+    );
+    return KgVerifyInfo(
+      eventId: eventId,
+      vType: (data['v_type'] as num?)?.toInt() ?? 23,
+      txAppId: data['txappid']?.toString() ?? '',
+      raw: data,
+    );
+  }
+
+  /// 提交短信/腾讯验证码；返回是否通过。
+  ///
+  /// 腾讯 TCaptcha 的 `verifyCode` 形如 `KGCodeTX|{...}`；短信验证码直接传
+  /// 数字串。`sid/edt` 每次现场生成（含当前设备身份）。
+  Future<bool> submitRiskVerify(
+    KgVerifyInfo info, {
+    required String verifyCode,
+  }) async {
+    final dfid = await _safeDfid();
+    final sidEdt = kgGenerateSidEdt(
+      mid: _device.mid,
+      userid: session?.userid ?? '0',
+      dfid: dfid,
+      webgl: _device.webgl,
+    );
+    final resp = await kgVerifyUserInfo(
+      eventId: info.eventId,
+      vType: info.vType,
+      sid: sidEdt.sid,
+      edt: sidEdt.edt,
+      verifyCode: verifyCode,
+      dfid: dfid,
+      mid: _device.mid,
+      token: session?.token,
+      userid: session?.userid,
+    );
+    return (resp['status'] as num?)?.toInt() == 1;
+  }
+
+  /// 遇到 SSA 时调用 UI 处理器并只重试一次原请求。
+  ///
+  /// 二次仍被拦截 / 用户取消 / 当前平台无法验证时，抛
+  /// [KgRiskVerifyRequiredException]（message 可直接展示给用户）。
+  Future<T> _withRiskVerify<T>(Future<T> Function() run) async {
+    try {
+      return await run();
+    } on KgRiskVerifyException catch (e) {
+      final handler = riskVerifyHandler;
+      if (handler == null) {
+        throw KgRiskVerifyRequiredException('酷狗要求完成安全验证，请稍后重试。');
+      }
+
+      final KgVerifyInfo info;
+      try {
+        info = await getRiskVerifyInfo(e.eventId);
+      } catch (_) {
+        throw KgRiskVerifyRequiredException('获取酷狗安全验证信息失败，请稍后重试或在酷狗官方客户端完成验证。');
+      }
+      final outcome = await _runRiskVerify(info);
+      switch (outcome) {
+        case KgRiskVerifyOutcome.verified:
+          break;
+        case KgRiskVerifyOutcome.cancelled:
+          throw KgRiskVerifyRequiredException('已取消安全验证，操作未完成。');
+        case KgRiskVerifyOutcome.unsupported:
+          throw KgRiskVerifyRequiredException(
+            info.isTencentCaptcha
+                ? '酷狗要求腾讯人机验证（TCaptcha），请打开酷狗官方客户端完成安全验证后重试。'
+                : '酷狗要求完成安全验证（类型 ${info.vType}），请在酷狗官方客户端完成后重试。',
+          );
+        case KgRiskVerifyOutcome.failed:
+          throw KgRiskVerifyRequiredException('安全验证未通过，请在酷狗官方客户端完成验证后重试。');
+      }
+
+      try {
+        return await run();
+      } on KgRiskVerifyException {
+        // 验证通过但原请求仍被拦截：通常需要官方客户端完成后续验证。
+        throw KgRiskVerifyRequiredException(
+          '安全验证已通过，但操作仍被拦截。请在酷狗官方客户端完成验证后再试。',
+        );
+      }
+    }
+  }
+
+  Future<KgRiskVerifyOutcome> _runRiskVerify(KgVerifyInfo info) async {
+    // 串行化：同一时刻只允许一个验证弹窗；后到请求等前一个完成后再弹。
+    final previous = _verifyLock;
+    final done = Completer<void>();
+    _verifyLock = done.future;
+    await previous;
+    try {
+      return await riskVerifyHandler!(info);
+    } catch (_) {
+      return KgRiskVerifyOutcome.failed;
+    } finally {
+      done.complete();
+    }
+  }
+
   // ─── 扫码登录 ─────────────────────────────────────────────────────
 
   /// 生成登录二维码 key（UI 用它拼 `$kgQrLoginPage?qrcode=$key` 出图）。
-  Future<String> qrKey() => kgQrKey(mid: _mid);
+  Future<String> qrKey() => _withRiskVerify(() => kgQrKey(mid: _device.mid));
 
   /// 轮询扫码状态。返回 {status, token, userid, nickname}：
   /// 0=过期 / 1=等待 / 2=待确认 / 4=成功（成功后调用 [saveSession]）。
-  Future<Map<String, dynamic>> qrCheck(String key) => kgQrCheck(key, mid: _mid);
+  Future<Map<String, dynamic>> qrCheck(String key) =>
+      _withRiskVerify(() => kgQrCheck(key, mid: _device.mid, dev: _device.dev));
 
   /// 账号密码登录（v9/login_by_pwd）；成功后写入会话并拉取资料。
   Future<void> loginByPwd({
     required String username,
     required String password,
   }) async {
-    final resp = await kgLoginByPwd(
-      username: username,
-      password: password,
-      mid: _mid,
+    final dfid = await _safeDfid();
+    final resp = await _withRiskVerify(
+      () => kgLoginByPwd(
+        username: username,
+        password: password,
+        mid: _device.mid,
+        dfid: dfid,
+        dev: _device.dev,
+      ),
     );
     await _applyLogin(resp);
   }
 
   /// 发送手机短信验证码（v7/send_mobile_code）。
-  Future<void> captchaSent({required String mobile}) =>
-      kgCaptchaSent(mobile: mobile, mid: _mid);
+  Future<void> captchaSent({required String mobile}) async {
+    final dfid = await _safeDfid();
+    await _withRiskVerify(
+      () => kgCaptchaSent(mobile: mobile, mid: _device.mid, dfid: dfid),
+    );
+  }
 
   /// 手机验证码登录（v7/login_by_verifycode）；成功后写入会话并拉取资料。
   Future<void> loginByVerifyCode({
     required String mobile,
     required String code,
   }) async {
-    final resp = await kgLoginByVerifyCode(
-      mobile: mobile,
-      code: code,
-      mid: _mid,
+    final dfid = await _safeDfid();
+    final resp = await _withRiskVerify(
+      () => kgLoginByVerifyCode(
+        mobile: mobile,
+        code: code,
+        mid: _device.mid,
+        guid: _device.guid,
+        mac: _device.mac,
+        dev: _device.dev,
+        dfid: dfid,
+      ),
     );
     await _applyLogin(resp);
   }
@@ -510,7 +719,7 @@ class KugouApi extends ChangeNotifier {
   Future<String?> resolvePlayUrl(
     KugouTrackInfo info, {
     String quality = 'hq',
-  }) async {
+  }) => _withRiskVerify(() async {
     const chains = <String, List<String>>{
       'lq': ['128k'],
       'sq': ['320k', '128k'],
@@ -525,16 +734,19 @@ class KugouApi extends ChangeNotifier {
       try {
         final url = await _tryUrl(hash, qualityParam);
         if (url != null) return url;
+      } on KgRiskVerifyException {
+        // 风控不是“网络错误”，必须冒泡到验证流程，不能静默降级。
+        rethrow;
       } catch (_) {
         // 网络错误继续降级
       }
     }
     return null;
-  }
+  });
 
   /// 单档 URL 请求（dfid 用 register_dev 真实值，对齐 MoeKouMusic 后端
-  /// 先 /register/dev 再 /song/url 的链路；status=2 需验证时换新 dfid
-  /// 重试一次）。
+  /// 先 /register/dev 再 /song/url 的链路；status=2 需验证时用同一设备
+  /// 重新注册 dfid 并重试一次）。
   Future<String?> _tryUrl(
     String hash,
     String qualityParam, {
@@ -547,7 +759,7 @@ class KugouApi extends ChangeNotifier {
     final params = <String, dynamic>{
       ...kgSongUrlBase,
       'dfid': dfid,
-      'mid': _mid,
+      'mid': _device.mid,
       'uuid': '-',
       'appid': kgLiteAppid,
       'clienttime': ts,
@@ -562,7 +774,7 @@ class KugouApi extends ChangeNotifier {
     if (uid.isNotEmpty && uid != '0') params['userid'] = uid;
     params['key'] = kgSignKey(
       hashLc,
-      _mid,
+      _device.mid,
       int.tryParse(uid) ?? 0,
       kgLiteAppid,
       salt: kgLiteKeySalt,
@@ -577,7 +789,7 @@ class KugouApi extends ChangeNotifier {
         'x-router': 'trackercdn.kugou.com',
         'dfid': dfid,
         'clienttime': '$ts',
-        'mid': _mid,
+        'mid': _device.mid,
         'kg-rc': '1',
         'kg-thash': '5d816a0',
         'kg-rec': '1',
@@ -596,9 +808,14 @@ class KugouApi extends ChangeNotifier {
       return null;
     }
     if (status == 2 && !retried) {
-      // 本次请求需要验证：重新注册拿新 dfid 再试一次
-      _dfid = null;
-      return _tryUrl(hashLc, qualityParam, retried: true);
+      // 需要验证：用**同一设备**重新注册 dfid 再试一次。绝不能换
+      // GUID/MID 装成新设备——那正是风控最敏感的行为。
+      try {
+        await _getDfid(refresh: true);
+        return await _tryUrl(hashLc, qualityParam, retried: true);
+      } catch (_) {
+        return null;
+      }
     }
     return null;
   }
@@ -697,18 +914,20 @@ class KugouApi extends ChangeNotifier {
     Map<String, String>? headers,
     String baseUrl = 'https://gateway.kugou.com',
     bool encryptKey = false,
-  }) async => kgGateway(
-    path,
-    method: method,
-    query: query,
-    body: body,
-    headers: headers,
-    baseUrl: baseUrl,
-    encryptKey: encryptKey,
-    dfid: await _safeDfid(),
-    mid: _mid,
-    token: session?.token,
-    userid: session?.userid,
+  }) => _withRiskVerify(
+    () async => kgGateway(
+      path,
+      method: method,
+      query: query,
+      body: body,
+      headers: headers,
+      baseUrl: baseUrl,
+      encryptKey: encryptKey,
+      dfid: await _safeDfid(),
+      mid: _device.mid,
+      token: session?.token,
+      userid: session?.userid,
+    ),
   );
 
   /// 每日推荐（需登录；未登录抛异常提示）。
@@ -749,7 +968,7 @@ class KugouApi extends ChangeNotifier {
       body: {
         // 对齐 top_playlist.js：body 内用标准版 appid/clientver（与 lite 注入的 query 并存）
         'appid': 1005,
-        'mid': _mid,
+        'mid': _device.mid,
         'clientver': 20489,
         'platform': 'android',
         'clienttime': ts,
@@ -1440,8 +1659,7 @@ class KugouApi extends ChangeNotifier {
           {'album_id': albumId},
         ],
         'is_buy': 0,
-        'fields':
-            'album_id,album_name,publish_date,sizable_cover,intro,language,is_publish,heat,type,quality,authors,exclusive,author_name,trans_param',
+        'fields': 'album_id,album_name,publish_date,sizable_cover,intro,language,is_publish,heat,type,quality,authors,exclusive,author_name,trans_param',
       },
       headers: {'x-router': 'openapi.kugou.com', 'kg-tid': '255'},
     );
@@ -1547,7 +1765,7 @@ class KugouApi extends ChangeNotifier {
         body: {
           'appid': 1005,
           'clientver': 20489,
-          'mid': _mid,
+          'mid': _device.mid,
           'clienttime': ts,
           'key': kgSignParamsKey('$ts'),
           'author_id': authorId,
@@ -1707,7 +1925,11 @@ class KugouApi extends ChangeNotifier {
                 ?.toString() ??
             '';
         final coverTpl =
-            (c['img'] ?? c['imgurl'] ?? c['ImgUrl'] ?? c['Avatar'] ?? c['FirstFrameImage'])
+            (c['img'] ??
+                    c['imgurl'] ??
+                    c['ImgUrl'] ??
+                    c['Avatar'] ??
+                    c['FirstFrameImage'])
                 ?.toString();
         items.add(
           CoverItem(

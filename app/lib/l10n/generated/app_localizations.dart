@@ -1722,6 +1722,60 @@ abstract class AppLocalizations {
   /// **'登录风险提示'**
   String get loginRiskTitle;
 
+  /// No description provided for @kugouRiskVerifyTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗安全验证'**
+  String get kugouRiskVerifyTitle;
+
+  /// No description provided for @kugouRiskVerifySmsDescription.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗要求完成短信验证，验证码已发送到账号绑定的手机号。'**
+  String get kugouRiskVerifySmsDescription;
+
+  /// No description provided for @kugouRiskVerifySmsHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'短信验证码'**
+  String get kugouRiskVerifySmsHint;
+
+  /// No description provided for @kugouRiskVerifyCodeRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入短信验证码'**
+  String get kugouRiskVerifyCodeRequired;
+
+  /// No description provided for @kugouRiskVerifySubmit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'提交验证'**
+  String get kugouRiskVerifySubmit;
+
+  /// No description provided for @kugouRiskVerifyFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'验证未通过，请检查验证码后重试。'**
+  String get kugouRiskVerifyFailed;
+
+  /// No description provided for @kugouRiskVerifyTcaptchaTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'需要在酷狗官方客户端完成验证'**
+  String get kugouRiskVerifyTcaptchaTitle;
+
+  /// No description provided for @kugouRiskVerifyTcaptchaBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗要求腾讯人机验证（TCaptcha），当前版本无法在应用内嵌网页完成。请打开酷狗官方客户端完成安全验证后，再回到本应用重试。'**
+  String get kugouRiskVerifyTcaptchaBody;
+
+  /// No description provided for @kugouRiskVerifyUnsupported.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗要求完成安全验证（类型 {type}），请在酷狗官方客户端完成后重试。'**
+  String kugouRiskVerifyUnsupported({required int type});
+
   /// No description provided for @loginRiskBody.
   ///
   /// In zh_CN, this message translates to:

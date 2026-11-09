@@ -875,6 +875,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginRiskTitle => '登录风险提示';
 
   @override
+  String get kugouRiskVerifyTitle => '酷狗安全验证';
+
+  @override
+  String get kugouRiskVerifySmsDescription => '酷狗要求完成短信验证，验证码已发送到账号绑定的手机号。';
+
+  @override
+  String get kugouRiskVerifySmsHint => '短信验证码';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => '请输入短信验证码';
+
+  @override
+  String get kugouRiskVerifySubmit => '提交验证';
+
+  @override
+  String get kugouRiskVerifyFailed => '验证未通过，请检查验证码后重试。';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle => '需要在酷狗官方客户端完成验证';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      '酷狗要求腾讯人机验证（TCaptcha），当前版本无法在应用内嵌网页完成。请打开酷狗官方客户端完成安全验证后，再回到本应用重试。';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return '酷狗要求完成安全验证（类型 $type），请在酷狗官方客户端完成后重试。';
+  }
+
+  @override
   String get loginRiskBody =>
       '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
 
@@ -7043,6 +7073,36 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginRiskTitle => '登录风险提示';
 
   @override
+  String get kugouRiskVerifyTitle => '酷狗安全验证';
+
+  @override
+  String get kugouRiskVerifySmsDescription => '酷狗要求完成短信验证，验证码已发送到账号绑定的手机号。';
+
+  @override
+  String get kugouRiskVerifySmsHint => '短信验证码';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => '请输入短信验证码';
+
+  @override
+  String get kugouRiskVerifySubmit => '提交验证';
+
+  @override
+  String get kugouRiskVerifyFailed => '验证未通过，请检查验证码后重试。';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle => '需要在酷狗官方客户端完成验证';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      '酷狗要求腾讯人机验证（TCaptcha），当前版本无法在应用内嵌网页完成。请打开酷狗官方客户端完成安全验证后，再回到本应用重试。';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return '酷狗要求完成安全验证（类型 $type），请在酷狗官方客户端完成后重试。';
+  }
+
+  @override
   String get loginRiskBody =>
       '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
 
@@ -13209,6 +13269,36 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get loginRiskTitle => '登入風險提示';
+
+  @override
+  String get kugouRiskVerifyTitle => '酷狗安全驗證';
+
+  @override
+  String get kugouRiskVerifySmsDescription => '酷狗要求完成簡訊驗證，驗證碼已傳送到帳號綁定的手機號碼。';
+
+  @override
+  String get kugouRiskVerifySmsHint => '簡訊驗證碼';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => '請輸入簡訊驗證碼';
+
+  @override
+  String get kugouRiskVerifySubmit => '提交驗證';
+
+  @override
+  String get kugouRiskVerifyFailed => '驗證未通過，請檢查驗證碼後重試。';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle => '需要在酷狗官方客戶端完成驗證';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      '酷狗要求騰訊人機驗證（TCaptcha），目前版本無法在應用程式內嵌網頁完成。請開啟酷狗官方客戶端完成安全驗證後，再回到本應用程式重試。';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return '酷狗要求完成安全驗證（類型 $type），請在酷狗官方客戶端完成後重試。';
+  }
 
   @override
   String get loginRiskBody =>
