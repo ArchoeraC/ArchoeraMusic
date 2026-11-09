@@ -13,6 +13,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsCatRender => 'Rendimiento y renderizado';
 
   @override
+  String get settingsRenderFps => 'Fotogramas por segundo';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return 'Límite de fotogramas por segundo ($fps FPS); la frecuencia de la pantalla sigue siendo el tope';
+  }
+
+  @override
+  String get settingsRenderFpsWarn =>
+      'Una tasa alta aumenta la carga de la GPU y el consumo';
+
+  @override
   String get settingsRenderSubtitle =>
       'Aceleración por GPU y coste de renderizado (experimental)';
 
@@ -3821,6 +3833,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String settingsBackgroundDimDesc({required Object dim}) {
     return 'Opacidad de la superposición oscura ($dim%); mayor = más legible el primer plano';
   }
+
+  @override
+  String get settingsBackgroundDimAuto =>
+      'El límite inferior sigue el brillo de esta imagen.';
 
   @override
   String get settingsBackgroundScale => 'Tamaño de zoom';

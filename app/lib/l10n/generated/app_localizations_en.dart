@@ -13,6 +13,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCatRender => 'Performance & Rendering';
 
   @override
+  String get settingsRenderFps => 'Frame rate';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return 'Upper bound of frames per second ($fps FPS); the display refresh rate still caps it';
+  }
+
+  @override
+  String get settingsRenderFpsWarn =>
+      'High frame rates increase GPU load and power draw';
+
+  @override
   String get settingsRenderSubtitle =>
       'GPU acceleration and rendering cost (experimental)';
 
@@ -3754,6 +3766,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsBackgroundDimDesc({required Object dim}) {
     return 'Dark overlay opacity ($dim%); higher keeps the foreground more readable';
   }
+
+  @override
+  String get settingsBackgroundDimAuto =>
+      'The lower bound follows this image\'s brightness.';
 
   @override
   String get settingsBackgroundScale => 'Zoom size';

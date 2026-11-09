@@ -15,12 +15,30 @@ class RenderSection extends ConsumerWidget {
     final l10n = context.l10n;
     final prefs = ref.watch(appPrefsProvider);
     final scheme = Theme.of(context).colorScheme;
+    final fps = prefs.renderFps;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SettingSection(
           title: l10n.settingsCatRender,
           children: [
+            SettingSliderTile(
+              icon: EtaIcons.stopwatchOutline,
+              title: l10n.settingsRenderFps,
+              // 超过 60 FPS 追加说明：滑块变色（黄/红）不是主题色，需要解释。
+              subtitle: fps > kRenderFpsWarnFrom
+                  ? '${l10n.settingsRenderFpsDesc(fps: fps)} '
+                        '${l10n.settingsRenderFpsWarn}'
+                  : l10n.settingsRenderFpsDesc(fps: fps),
+              value: fps.toDouble(),
+              min: kRenderFpsMin.toDouble(),
+              max: kRenderFpsMax.toDouble(),
+              divisions: kRenderFpsMax - kRenderFpsMin,
+              label: '$fps FPS',
+              accentColor: renderFpsSliderColor(scheme, fps),
+              onChanged: (v) =>
+                  ref.read(appPrefsProvider.notifier).setRenderFps(v.round()),
+            ),
             SettingSwitchTile(
               icon: EtaIcons.dashboard4Outline,
               title: l10n.settingsRippleShader,

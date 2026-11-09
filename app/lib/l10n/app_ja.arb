@@ -1,6 +1,9 @@
 {
   "@@locale": "ja",
   "settingsCatRender": "パフォーマンス / レンダリング",
+  "settingsRenderFps": "描画フレームレート",
+  "settingsRenderFpsDesc": "1 秒あたりの描画上限（{fps} FPS）。実際はディスプレイのリフレッシュレートに制限されます",
+  "settingsRenderFpsWarn": "高いフレームレートは GPU 負荷と消費電力を増やします",
   "settingsRenderSubtitle": "GPU アクセラレーションとレンダリング負荷（実験的）",
   "settingsRippleShader": "波紋 GPU シェーダー",
   "settingsRippleShaderDesc": "フラグメントシェーダーで再生画面の波紋を描画（オフ = CPU メッシュ）",
@@ -966,6 +969,7 @@
   "settingsBackgroundBlurDesc": "背景画像にガウスぼかしを適用（{blur}px）",
   "settingsBackgroundDim": "マスク濃度",
   "settingsBackgroundDimDesc": "黒のオーバーレイ透明度（{dim}%）— 高いほど前景が読みやすく",
+  "settingsBackgroundDimAuto": "画像が明るいため、下限を明るさに合わせて自動で上げています",
   "settingsBackgroundScale": "ズームサイズ",
   "settingsBackgroundScaleDesc": "背景画像のズーム倍率（{scale}x）",
   "settingsSidebarCollapsed": "サイドバーを折りたたむ",

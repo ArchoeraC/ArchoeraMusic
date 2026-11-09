@@ -1,6 +1,9 @@
 {
   "@@locale": "zh",
   "settingsCatRender": "性能 / 渲染",
+  "settingsRenderFps": "渲染帧数",
+  "settingsRenderFpsDesc": "每秒渲染的上限（{fps} FPS，实际受显示器刷新率限制）",
+  "settingsRenderFpsWarn": "高帧率会明显增加 GPU 占用与耗电",
   "settingsRenderSubtitle": "GPU 加速与渲染开销（实验）",
   "settingsRippleShader": "水纹 GPU 着色器",
   "settingsRippleShaderDesc": "用片元着色器绘制播放页水纹（关闭则回退 CPU 网格）",
@@ -1097,6 +1100,7 @@
   "settingsBackgroundBlurDesc": "对背景图片应用高斯模糊（{blur}px）",
   "settingsBackgroundDim": "遮罩浓度",
   "settingsBackgroundDimDesc": "叠加的黑色遮罩透明度（{dim}%），越高前景越易读",
+  "settingsBackgroundDimAuto": "图片较亮，下限已按亮度自动抬高",
   "settingsBackgroundScale": "缩放大小",
   "settingsBackgroundScaleDesc": "背景图的缩放倍数（{scale}x）",
   "settingsSidebarCollapsed": "折叠侧边栏",

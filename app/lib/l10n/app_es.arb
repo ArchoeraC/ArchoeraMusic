@@ -1,6 +1,9 @@
 {
   "@@locale": "es",
   "settingsCatRender": "Rendimiento y renderizado",
+  "settingsRenderFps": "Fotogramas por segundo",
+  "settingsRenderFpsDesc": "Límite de fotogramas por segundo ({fps} FPS); la frecuencia de la pantalla sigue siendo el tope",
+  "settingsRenderFpsWarn": "Una tasa alta aumenta la carga de la GPU y el consumo",
   "settingsRenderSubtitle": "Aceleración por GPU y coste de renderizado (experimental)",
   "settingsRippleShader": "Shader GPU de ondas",
   "settingsRippleShaderDesc": "Dibujar las ondas del reproductor con un fragment shader (desactivado = malla CPU)",
@@ -966,6 +969,7 @@
   "settingsBackgroundBlurDesc": "Desenfoque gaussiano aplicado a la imagen de fondo ({blur}px)",
   "settingsBackgroundDim": "Intensidad de máscara",
   "settingsBackgroundDimDesc": "Opacidad de la superposición oscura ({dim}%); mayor = más legible el primer plano",
+  "settingsBackgroundDimAuto": "El límite inferior sigue el brillo de esta imagen.",
   "settingsBackgroundScale": "Tamaño de zoom",
   "settingsBackgroundScaleDesc": "Factor de zoom de la imagen de fondo ({scale}x)",
   "settingsSidebarCollapsed": "Barra lateral contraída",

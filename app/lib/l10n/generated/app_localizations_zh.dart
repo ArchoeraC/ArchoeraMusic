@@ -13,6 +13,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCatRender => '性能 / 渲染';
 
   @override
+  String get settingsRenderFps => '渲染帧数';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '每秒渲染的上限（$fps FPS，实际受显示器刷新率限制）';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '高帧率会明显增加 GPU 占用与耗电';
+
+  @override
   String get settingsRenderSubtitle => 'GPU 加速与渲染开销（实验）';
 
   @override
@@ -3593,6 +3604,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsBackgroundDimAuto => '图片较亮，下限已按亮度自动抬高';
+
+  @override
   String get settingsBackgroundScale => '缩放大小';
 
   @override
@@ -6165,6 +6179,17 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsCatRender => '性能 / 渲染';
+
+  @override
+  String get settingsRenderFps => '渲染帧数';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '每秒渲染的上限（$fps FPS，实际受显示器刷新率限制）';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '高帧率会明显增加 GPU 占用与耗电';
 
   @override
   String get settingsRenderSubtitle => 'GPU 加速与渲染开销（实验）';
@@ -9747,6 +9772,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsBackgroundDimAuto => '图片较亮，下限已按亮度自动抬高';
+
+  @override
   String get settingsBackgroundScale => '缩放大小';
 
   @override
@@ -12319,6 +12347,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsCatRender => '效能 / 渲染';
+
+  @override
+  String get settingsRenderFps => '渲染影格數';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '每秒渲染的上限（$fps FPS，實際受螢幕刷新率限制）';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '高影格率會明顯增加 GPU 佔用與耗電';
 
   @override
   String get settingsRenderSubtitle => 'GPU 加速與渲染開銷（實驗）';
@@ -15899,6 +15938,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String settingsBackgroundDimDesc({required Object dim}) {
     return '疊加的黑色遮罩透明度（$dim%），越高前景越易讀';
   }
+
+  @override
+  String get settingsBackgroundDimAuto => '圖片較亮，下限已按亮度自動抬高';
 
   @override
   String get settingsBackgroundScale => '縮放大小';

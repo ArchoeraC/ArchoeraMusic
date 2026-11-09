@@ -100,6 +100,9 @@ class PowerSaverService {
   /// 「禁用系统休眠」设置（默认关，持久化）。
   bool _suppressSleep = false;
 
+  /// 用户渲染帧数上限（FPS；[kRenderFpsDefault] = 默认 60）。
+  int _fpsCap = kRenderFpsDefault;
+
   /// 唤醒锁当前实际持有状态（避免重复调用）。
   bool _sleepActive = false;
 
@@ -186,6 +189,16 @@ class PowerSaverService {
     if (_suppressSleep == value) return;
     _suppressSleep = value;
     unawaited(_applySleep());
+  }
+
+  /// 用户渲染帧数上限（设置页滑块，30~165 FPS，默认 60）。
+  ///
+  /// 只作为**上限**：与节能档位取更严格者（失焦仍是 1 FPS）；目标帧率
+  /// 不低于显示器刷新率时不做节流（见 [frameIntervalForFps]）。数值未变也
+  /// 应用一次——启动时服务默认值与偏好同为 60，需要这一次把节流状态装上。
+  void setFpsCap(int fps) {
+    _fpsCap = fps.clamp(kRenderFpsMin, kRenderFpsMax);
+    _apply();
   }
 
   /// 应用内媒体播放状态（播放 / 暂停 / 停止）。播放中才允许持有唤醒锁。
@@ -275,7 +288,17 @@ class PowerSaverService {
     final policy = powerSaverRenderPolicy(reason);
     binding.setRenderingEnabled(!policy.stopRendering);
     if (!policy.stopRendering) {
-      binding.setFrameInterval(policy.interval);
+      // 节能档位与用户帧率上限取更严格者：失焦的 1 FPS 不会被 60 FPS 设置
+      // 盖掉，前台则只受用户上限约束（上限 ≥ 刷新率时不节流）。
+      binding.setFrameInterval(
+        effectiveFrameInterval(
+          policy.interval,
+          frameIntervalForFps(
+            _fpsCap,
+            displayRefreshRate: _displayRefreshRate(),
+          ),
+        ),
+      );
     }
     // 降频协商（engine-event-push-plan §4.1）：档位变化时向引擎请求位置事件
     // 间隔——事件源头减量，Dart 侧无需在降频期高频消费 position。引擎未
@@ -287,6 +310,21 @@ class PowerSaverService {
       unawaited(
         _ref.read(playbackProvider.notifier).setEngineEventInterval(interval),
       );
+    }
+  }
+
+  /// 主视图所在显示器的刷新率（Hz）；拿不到时返回 0（按未知处理）。
+  ///
+  /// 目标帧率 ≥ 刷新率时无需节流：引擎本来就按 vsync 出帧。多显示器/无头
+  /// 环境下 `display` 可能不可用，失败静默回落到「未知」。
+  double _displayRefreshRate() {
+    try {
+      final views = WidgetsBinding.instance.platformDispatcher.views;
+      if (views.isEmpty) return 0;
+      final rate = views.first.display.refreshRate;
+      return rate > 1 ? rate : 0;
+    } catch (_) {
+      return 0;
     }
   }
 
@@ -346,6 +384,8 @@ class _PowerSaverHostState extends ConsumerState<PowerSaverHost> {
     final svc = ref.read(powerSaverProvider);
     svc.setEnabled(prefs.powerSaver);
     svc.setSuppressSleep(prefs.suppressSleep);
+    // 渲染帧数上限（默认 60 FPS）：挂载即应用，设置变更实时生效。
+    svc.setFpsCap(prefs.renderFps);
     // 唤醒锁只注册在播放下：以当前播放状态起步
     svc.setPlaying(ref.read(playbackProvider).playing);
     svc.attach();
@@ -358,6 +398,7 @@ class _PowerSaverHostState extends ConsumerState<PowerSaverHost> {
       final svc = ref.read(powerSaverProvider);
       svc.setEnabled(next.powerSaver);
       svc.setSuppressSleep(next.suppressSleep);
+      svc.setFpsCap(next.renderFps);
     });
     // 播放 / 暂停联动唤醒锁：仅播放中且开关打开时才持有
     ref.listen(playbackProvider.select((s) => s.playing), (prev, next) {
