@@ -164,7 +164,6 @@ class _Painter extends CustomPainter {
         _drawLine(canvas, i, c.y[i], fades[i]!);
       }
     }
-    _drawInterludeDots(canvas, viewH);
     // 只缓存可见窗口 → 常驻内存 O(视口)，与歌长无关（§3.4）。
     c.cache.pruneTo(visible);
     c.fragCache.pruneTo(keepFrag);
@@ -191,42 +190,6 @@ class _Painter extends CustomPainter {
       if ((c.scale[i] - scaleTarget).abs() > 1e-4) return false;
     }
     return true;
-  }
-
-  /// 间奏三点（对齐 AMLL interlude-dots：依次点亮 + 呼吸缩放 + 两段式退场）。
-  void _drawInterludeDots(Canvas canvas, double viewH) {
-    final st = c.dots;
-    if (!st.visible || st.opacity <= 0.001) return;
-    final edge = _edgeAlphaAt(c.dotsNaturalY);
-    if (edge <= 0.002) return;
-    final fs = c.fontSize;
-    final size = fs * 0.3;
-    final gap = fs * 0.18;
-    final maxWidth = math.max(40.0, c.w - _widthPad);
-    final textLeft = (c.w - maxWidth) / 2;
-    final groupWidth = 3 * size + 2 * gap;
-    final left = c.textAlign == ui.TextAlign.right
-        ? textLeft + maxWidth - groupWidth - fs * 0.4
-        : textLeft + fs * 0.4;
-    final anchor = c.anchor;
-    final offset = (anchor >= 0 && anchor < c.centers.length)
-        ? (c.centers[anchor] - c.h * c.align)
-        : 0.0;
-    final cy = c.dotsNaturalY - offset;
-    if (cy < -size || cy > viewH + size) return;
-    canvas.save();
-    canvas.translate(left, cy);
-    canvas.scale(st.scale);
-    for (var i = 0; i < 3 && i < st.dots.length; i++) {
-      final a = (st.dots[i] * st.opacity * edge).clamp(0.0, 1.0);
-      if (a <= 0.002) continue;
-      canvas.drawCircle(
-        Offset(size / 2 + i * (size + gap), 0),
-        size / 2,
-        Paint()..color = c.played.withValues(alpha: a),
-      );
-    }
-    canvas.restore();
   }
 
   /// 非激活行透明度：距「焦点行」（激活行，间奏时为锚点行）的距离渐淡，

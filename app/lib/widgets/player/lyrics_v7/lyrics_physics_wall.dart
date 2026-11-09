@@ -377,12 +377,6 @@ class _PaintCtx {
   /// 上下渐隐由墙体自身按行透明度实现（见 [AmllPhysicsWall.edgeFade]）。
   bool edgeFade = false;
 
-  /// 间奏三点动画的当帧状态。
-  InterludeDotsState dots = InterludeDotsState.hidden;
-
-  /// 间奏三点在自然坐标系中的中心 y。
-  double dotsNaturalY = 0;
-
   /// 已排版段落缓存（可见窗口，P1）。见 [LyricsParagraphCache]。
   final LyricsParagraphCache cache = LyricsParagraphCache();
 
