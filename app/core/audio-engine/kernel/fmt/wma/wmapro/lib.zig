@@ -59,8 +59,14 @@ const vtable = decoder.Decoder.VTable{
     .read = read,
     .seek_ms = seekMs,
     .position_ms = positionMs,
+    .position_samples = positionSamples,
     .deinit = deinit,
 };
+
+fn positionSamples(ctx: *anyopaque) i64 {
+    const self: *WmaProCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(self.cursor);
+}
 
 fn read(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const self: *WmaProCtx = @ptrCast(@alignCast(ctx));
@@ -172,7 +178,6 @@ pub fn openFromAsf(allocator: std.mem.Allocator, file_data: []u8, hdr: *const as
         const consumed = dec.decodePacket(cur) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             else => {
-                std.debug.print("dbg: pkt err {s} pkt_idx={d} cur.len={d}\n", .{ @errorName(e), pkt_idx, cur.len });
                 cur = &.{};
                 continue;
             },

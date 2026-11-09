@@ -1037,8 +1037,14 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *WvCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.samples_done);
+}
 
 /// 读一个完整块到 block_buf；文件尾 / 魔数不符 → null；块大小越界 → Corrupt
 fn readBlock(ctx: *WvCtx) Error!?BlockHeader {

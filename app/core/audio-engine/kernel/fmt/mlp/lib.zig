@@ -479,7 +479,8 @@ fn readFilterParams(s: *c.Ctx, br: *BitReader, substr: usize, channel: usize, fi
             while (i < order) : (i += 1) {
                 fp.state[i] = if (state_bits != 0)
                     (br.readSBits(@intCast(state_bits))) * (@as(i32, 1) << @as(u5, @intCast(state_shift)))
-                else 0;
+                else
+                    0;
             }
         }
     }
@@ -696,7 +697,6 @@ fn mlpFilterChannel(
 
         accum = accum >> @intCast(filter_shift);
         const result = (@as(i32, @intCast(accum)) + residual) & mask;
-
 
         // 反向填充 firbuf/iirbuf（C：*--firbuf）
         var k: usize = c.MAX_FIR_ORDER - 1;
@@ -947,7 +947,6 @@ fn readAccessUnit(s: *c.Ctx, buf: []const u8, out: []i16, out_pos: *usize) !usiz
         substream_start = end;
     }
 
-
     const parity_bits = calculateParity(buf, 4) ^ calculateParity(buf[header_size .. header_size + substr_header_size], substr_header_size);
     if ((((parity_bits >> 4) ^ parity_bits) & 0xF) != 0xF) return error.Corrupt;
 
@@ -961,7 +960,9 @@ fn readAccessUnit(s: *c.Ctx, buf: []const u8, out: []i16, out_pos: *usize) !usiz
         if (sub_len == 0) continue;
 
         var sbr = BitReader.init(buf[substream_buf_pos .. substream_buf_pos + sub_len]);
-    if (s.mlp_dbg < 30 and substr == 1 and s.frame_count >= 8 and s.frame_count <= 11) { for (0..1) |_| {} }
+        if (s.mlp_dbg < 30 and substr == 1 and s.frame_count >= 8 and s.frame_count <= 11) {
+            for (0..1) |_| {}
+        }
         s.matrix_changed = 0;
         s.filter_changed = @splat(@splat(0));
 
@@ -1108,12 +1109,30 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) !void {
     f.out_pos = 0;
     f.out_len = 0;
     f.eof = false;
+    const target: i64 = if (ms <= 0)
+        0
+    else
+        @intCast(@divTrunc(@as(u128, @intCast(ms)) * @as(u128, @intCast(sr)), 1000));
     var n: i64 = 0;
-    while (n < 100000) : (n += 1) {
+    while (n < 1_000_000) : (n += 1) {
         const ok = try decodeFrame(f);
         if (!ok) break;
-        f.total_samples += @as(i64, @intCast(f.out_len / f.channels));
-        if (@divTrunc(f.total_samples * 1000, @as(i64, sr)) >= ms) break;
+        const frame_samples: i64 = @intCast(f.out_len / f.channels);
+        if (f.total_samples + frame_samples >= target) {
+            // 目标落在本帧内：保留本帧，排掉前导 skip 样本；下一 read 从
+            // out_pos 继续。这样 position_samples == target，C 层无需再裁，
+            // 也不会因为整帧丢弃而落到目标之后。
+            const skip = @max(0, target - f.total_samples);
+            f.out_pos = @intCast(@min(skip, frame_samples));
+            f.total_samples = target;
+            if (f.out_pos * f.channels >= f.out_len) {
+                // 恰好停在帧尾：丢弃本帧余量，下一帧从 target 开始。
+                f.out_pos = 0;
+                f.out_len = 0;
+            }
+            return;
+        }
+        f.total_samples += frame_samples;
     }
     f.out_pos = 0;
     f.out_len = 0;
@@ -1137,8 +1156,14 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *DecoderCtx = @ptrCast(@alignCast(ctx));
+    return f.total_samples;
+}
 
 pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Info) !decoder.Decoder {
     const f = try allocator.create(DecoderCtx);
@@ -1157,7 +1182,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
         const ms_off: usize = if (n >= 8 and (buf[4] == 0xf8 and buf[5] == 0x72 and buf[6] == 0x6f and buf[7] == 0xba)) 4 else if (n >= 4 and (buf[0] == 0xf8 and buf[1] == 0x72 and buf[2] == 0x6f and buf[3] == 0xba)) 0 else 999;
         if (ms_off != 999 and ms_off + 28 <= n) {
             var mh: MLPHeaderInfo = .{};
-            var br = BitReader.init(buf[ms_off .. ms_off + @as(usize, @intCast(majorSyncSize(buf[ms_off..])))] );
+            var br = BitReader.init(buf[ms_off .. ms_off + @as(usize, @intCast(majorSyncSize(buf[ms_off..])))]);
             if (readMajorSyncInto(&br, &mh)) {
                 sr = mh.group1_samplerate;
                 if (mh.stream_type == 0xba) {
