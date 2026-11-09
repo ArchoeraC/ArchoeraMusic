@@ -13,6 +13,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsCatRender => 'Leistung & Rendering';
 
   @override
+  String get settingsRenderFps => 'Bildrate';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return 'Obergrenze der Bilder pro Sekunde ($fps FPS); die Bildwiederholrate des Displays bleibt die Grenze';
+  }
+
+  @override
+  String get settingsRenderFpsWarn =>
+      'Hohe Bildraten erhöhen GPU-Last und Stromverbrauch';
+
+  @override
   String get settingsRenderSubtitle =>
       'GPU-Beschleunigung und Rendering-Kosten (experimentell)';
 
@@ -3793,6 +3805,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String settingsBackgroundDimDesc({required Object dim}) {
     return 'Deckkraft der schwarzen Überlagerung ($dim%); höher = Vordergrund besser lesbar';
   }
+
+  @override
+  String get settingsBackgroundDimAuto =>
+      'Die Untergrenze folgt der Helligkeit dieses Bildes.';
 
   @override
   String get settingsBackgroundScale => 'Zoomgröße';

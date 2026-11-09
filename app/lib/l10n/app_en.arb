@@ -1,6 +1,9 @@
 {
   "@@locale": "en",
   "settingsCatRender": "Performance & Rendering",
+  "settingsRenderFps": "Frame rate",
+  "settingsRenderFpsDesc": "Upper bound of frames per second ({fps} FPS); the display refresh rate still caps it",
+  "settingsRenderFpsWarn": "High frame rates increase GPU load and power draw",
   "settingsRenderSubtitle": "GPU acceleration and rendering cost (experimental)",
   "settingsRippleShader": "Ripple GPU shader",
   "settingsRippleShaderDesc": "Draw the player ripple with a fragment shader (off = CPU mesh fallback)",
@@ -1097,6 +1100,7 @@
   "settingsBackgroundBlurDesc": "Gaussian blur applied to the background image ({blur}px)",
   "settingsBackgroundDim": "Mask strength",
   "settingsBackgroundDimDesc": "Dark overlay opacity ({dim}%); higher keeps the foreground more readable",
+  "settingsBackgroundDimAuto": "The lower bound follows this image''s brightness.",
   "settingsBackgroundScale": "Zoom size",
   "settingsBackgroundScaleDesc": "Zoom factor of the background image ({scale}x)",
   "settingsSidebarCollapsed": "Collapsed sidebar",

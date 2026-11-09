@@ -2,8 +2,11 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart' show Color;
 
+import '../services/render/image_luminance.dart';
 import 'app_prefs.dart';
 
 // ── 外观域键（appearance. 前缀）────────────────────────────────
@@ -16,6 +19,7 @@ const backgroundImageKey = 'appearance.backgroundImage';
 const backgroundBlurKey = 'appearance.backgroundBlur';
 const backgroundDimKey = 'appearance.backgroundDim';
 const backgroundScaleKey = 'appearance.backgroundScale';
+const backgroundLuminanceKey = 'appearance.backgroundLuminance';
 const routeTransitionKey = 'appearance.routeTransition';
 const sidebarCollapsedKey = 'appearance.sidebarCollapsed';
 const sidebarNavStyleKey = 'appearance.sidebarNavStyle';
@@ -120,8 +124,30 @@ extension AppearancePrefs on AppPrefs {
       ((data[backgroundBlurKey] as num?)?.toInt() ?? 0).clamp(0, 80);
 
   /// 遮罩浓度（0.3~0.9，对齐 imageBackground.dim，默认 0.4）。
+  ///
+  /// 这是**用户意图**，不是最终生效值：亮图需要更高下限时由
+  /// [effectiveBackgroundDim] 抬高，换回暗图后自动恢复本值。
   double get backgroundDim =>
-      ((data[backgroundDimKey] as num?)?.toDouble() ?? 0.4).clamp(0.3, 0.9);
+      ((data[backgroundDimKey] as num?)?.toDouble() ?? 0.4).clamp(
+        kBackgroundDimMin,
+        kBackgroundDimMax,
+      );
+
+  /// 图片不透明像素 90 分位相对亮度（0~1，未测到 = null）。
+  ///
+  /// 落盘缓存，保证重启后的第一帧就有正确的遮罩下限；启动后会在后台重新
+  /// 采样（文件可能已被替换）。
+  double? get backgroundLuminance {
+    final v = (data[backgroundLuminanceKey] as num?)?.toDouble();
+    return v?.clamp(0.0, 1.0);
+  }
+
+  /// 深色正文在本图上的可读性下限（未测到 / 暗图 = [kBackgroundDimMin]）。
+  double get backgroundDimFloor => backgroundDimFloorFor(backgroundLuminance);
+
+  /// 实际交给背景层的遮罩浓度：用户意图与可读性下限取高者。
+  double get effectiveBackgroundDim =>
+      math.max(backgroundDim, backgroundDimFloor);
 
   /// 背景图缩放（1~2，对齐 imageBackground.scale，默认 1.2）。
   double get backgroundScale =>
@@ -244,30 +270,42 @@ extension AppearancePrefs on AppPrefs {
     },
   );
 
-  /// 设置图片背景配置（选图 / 模糊 / 遮罩 / 缩放）。
+  /// 设置图片背景配置（选图 / 模糊 / 遮罩 / 缩放 / 亮度采样）。
   ///
   /// [image] 为 null 且 [clearImage] 为 false 时**保留**现有背景图——设置页
   /// 的三个滑块只传模糊/遮罩/缩放，不能顺手把图清掉（否则会退回纯色模式）。
   /// 清除按钮显式传 [clearImage]=true；此时必须移除已落盘的背景图路径，
   /// 不能像其他字段用 null-aware 元素——旧键会经 `...data` 残留。
+  ///
+  /// [luminance] 为 [sampleImageLuminance] 的采样结果；[clearLuminance] 用于
+  /// 采样失败时清掉旧值（与 [clearImage] 同理，不能用 null-aware 元素）。遮罩
+  /// 浓度按可读性下限收敛，但**不改写**用户意图之外的更高值。
   AppPrefs copyWithBackground({
     String? image,
     bool clearImage = false,
     int? blur,
     double? dim,
     double? scale,
+    double? luminance,
+    bool clearLuminance = false,
   }) {
     final d = Map<String, dynamic>.of(data);
     if (clearImage) {
       d.remove(backgroundImageKey);
+      d.remove(backgroundLuminanceKey);
     } else if (image != null) {
       d[backgroundImageKey] = image;
+    }
+    if (clearLuminance) {
+      d.remove(backgroundLuminanceKey);
+    } else if (luminance != null) {
+      d[backgroundLuminanceKey] = luminance.clamp(0.0, 1.0);
     }
     return AppPrefs(
       initialData: {
         ...d,
         backgroundBlurKey: ?blur?.clamp(0, 80),
-        backgroundDimKey: ?dim?.clamp(0.3, 0.9),
+        backgroundDimKey: ?dim?.clamp(backgroundDimFloor, kBackgroundDimMax),
         backgroundScaleKey: ?scale?.clamp(1, 2),
       },
     );
