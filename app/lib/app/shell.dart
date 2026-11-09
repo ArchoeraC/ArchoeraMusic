@@ -102,10 +102,7 @@ class AppShell extends ConsumerWidget {
             child: ShellExpandTransition(
               animation: playerRouteAnim,
               disableAnimations: noAnim(context),
-              // 完全展开后壳内容卸载，仅保留一层纯色背景（无列表/图片）。
-              placeholder: ColoredBox(
-                color: Theme.of(context).scaffoldBackgroundColor,
-              ),
+              // 完全展开后只停绘/停布局，壳内容与 State 保留，收起即恢复。
               child: content,
             ),
           ),
@@ -123,8 +120,9 @@ class AppShell extends ConsumerWidget {
         const Positioned(top: 10, right: 10, child: FpsMonitorHost()),
       ],
     );
-    // 后台卸载（最小化/托盘/熄屏）在根级 `BackgroundUnloadGate`（app.dart）统一
-    // 处理：整棵路由子树被卸为纯色，覆盖包括本壳在内的所有页面。
+    // 后台节能（最小化/托盘/熄屏）只停帧/降频，不再卸载 UI 子树：
+    // 卸载/重建会 churn 渲染资源（表面/图层/驱动缓存只涨不缩），且恢复时
+    // 重建成本高于保持挂载。详见 `PowerSaverService`。
     return Scaffold(body: body);
   }
 }

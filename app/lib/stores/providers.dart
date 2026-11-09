@@ -107,9 +107,7 @@ final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
 ///
 /// **实验性音源，默认关闭**（`source.neko.enabled`）：关闭时 UI 不展示
 /// Neko 平台、也不发请求。登录态变化（token 恢复 / 登录 / 登出）时通知 UI。
-final nekoApiProvider = ChangeNotifierProvider<NekoApi>(
-  (ref) => NekoApi(autoClaimDeepLink: true),
-);
+final nekoApiProvider = ChangeNotifierProvider<NekoApi>((ref) => NekoApi());
 
 /// Neko 下载歌词重写（Neko 元数据已规范，仅下载时把站点广告歌词换成标准 LRC）。
 final nekoLyricRewriterProvider = Provider<NekoLyricRewriter>(

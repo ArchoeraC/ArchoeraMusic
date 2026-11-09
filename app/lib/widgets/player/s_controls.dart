@@ -12,6 +12,7 @@ import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../common/anim.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../theme/motion.dart';
 
 /// 按钮样式。
 enum SButtonVariant { primary, secondary, ghost, error }
@@ -324,7 +325,7 @@ class SSegmented<T> extends StatelessWidget {
         onTap: () => onChanged(o.value),
         child: AnimatedContainer(
           duration: animDuration(context, const Duration(milliseconds: 150)),
-          curve: Curves.easeOut,
+          curve: appMotion,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: isSelected

@@ -7,7 +7,6 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
-import 'package:flutter/widgets.dart' show Curves;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../netease/track.dart';
@@ -27,6 +26,7 @@ import 'playback_state.dart';
 import 'shuffle_bag.dart';
 import '../source/source_platform.dart';
 import 'store_source.dart';
+import '../../theme/motion.dart';
 
 export 'fft_frame.dart' show FftFrame;
 
@@ -268,7 +268,7 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
     }
   }
 
-  /// 引擎音量渐变（默认约 250ms，easeOut）：每 ~16ms 推送一次引擎音量，
+  /// 引擎音量渐变（默认约 250ms，线性）：每 ~16ms 推送一次引擎音量，
   /// 听感平滑过渡。用于退出弹窗的降半/回升与切歌淡入；**不修改
   /// `state.volume`**（UI 音量控件显示值保持不变），也不写 prefs。
   ///
@@ -282,7 +282,7 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
     final rawSteps = durationMs ~/ stepMs;
     final steps = rawSteps < 1 ? 1 : rawSteps;
     for (var i = 1; i <= steps; i++) {
-      final t = Curves.easeOut.transform(i / steps);
+      final t = appMotionLinear.transform(i / steps);
       final v = from + (to - from) * t;
       // ignore: discarded_futures
       await _engine?.setVolume(v);

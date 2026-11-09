@@ -34,6 +34,7 @@ import '../../list/cover_image.dart';
 import 'fluid_cover.dart';
 import 'fluid_mesh.dart';
 import 'fluid_shader.dart';
+import '../../../theme/motion.dart';
 
 /// 流体背景最终只用 `kFluidCoverSize`（32×32）纹理；解码到 64 做一次廉价
 /// 超采样即可，**绝不能**整幅解码（`processFluidCover` 会把整幅 RGBA 读出来）。
@@ -112,8 +113,6 @@ final int _bassBinEnd = () {
   }
   return end;
 }();
-
-double _easeInOutSine(double x) => -(math.cos(math.pi * x) - 1) / 2;
 
 /// 单个曲目状态的（位移图 + 预烘焙封面 + 淡入 alpha）。
 class _FluidState {
@@ -506,7 +505,7 @@ class _FluidPainter extends CustomPainter {
       shader.setFloat(FluidUniforms.cosAngle, cosAngle);
       shader.setFloat(
         FluidUniforms.alpha,
-        _easeInOutSine(_clamp01(state.alpha)),
+        appMotion.transform(_clamp01(state.alpha)),
       );
       shader.setImageSampler(FluidUniforms.samplerWarp, state.warp);
       shader.setImageSampler(FluidUniforms.samplerCover, state.cover);
@@ -517,7 +516,7 @@ class _FluidPainter extends CustomPainter {
   void _paintFallback(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     for (final state in s._states) {
-      final a = _easeInOutSine(_clamp01(state.alpha));
+      final a = appMotion.transform(_clamp01(state.alpha));
       if (a <= 0.001) continue;
       _drawCover(canvas, rect, state.cover, a);
     }

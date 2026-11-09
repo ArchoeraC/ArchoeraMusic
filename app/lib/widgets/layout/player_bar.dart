@@ -29,6 +29,7 @@ import '../common/anim.dart';
 import '../common/glass_blur.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../theme/motion.dart';
 
 part 'player_bar/player_bar_view.dart';
 part 'player_bar/player_bar_sections.dart';

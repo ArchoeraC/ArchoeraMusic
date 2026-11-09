@@ -1094,66 +1094,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nekoLoginTitle => '登录 NekoMusic';
 
   @override
-  String get nekoLoginTabOauth => 'OAuth 登录';
-
-  @override
-  String get nekoOauthTitle => '使用 NekoAuth 登录';
-
-  @override
-  String get nekoOauthDesc => '在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。';
-
-  @override
-  String get nekoOauthOpen => '在浏览器中登录';
-
-  @override
-  String get nekoOauthWaiting => '等待授权完成…';
-
-  @override
-  String get nekoOauthUrlLabel => '一次性登录地址';
-
-  @override
-  String get nekoOauthCopy => '复制链接';
-
-  @override
-  String get nekoOauthCopied => '链接已复制';
-
-  @override
-  String get nekoOauthRefresh => '重新获取';
-
-  @override
-  String get nekoOauthFailed => '登录失败';
-
-  @override
-  String get nekoLoginTabQr => '扫码登录';
-
-  @override
-  String get nekoLoginTabPassword => '账号密码';
-
-  @override
-  String get nekoLoginEmail => '邮箱';
-
-  @override
-  String get nekoLoginPassword => '密码';
-
-  @override
-  String get nekoLoginPasswordHint => '请输入密码';
-
-  @override
-  String get nekoLoginSubmit => '登录';
-
-  @override
-  String get nekoLoginForgotPassword => '忘记密码？';
-
-  @override
-  String get nekoForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
-
-  @override
-  String get nekoForgotFailed => '获取重置链接失败';
-
-  @override
-  String get nekoForgotOpened => '已在浏览器中打开重置页';
-
-  @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
 
   @override
@@ -2509,13 +2449,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '当前为标准模式';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化时卸载全部内存状态';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      '后台（最小化/托盘/熄屏）丢弃页面数据与缓存，恢复后从零重建（可能回到首页、丢滚动位置）；播放不受影响';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低频谱取帧频率以节省 CPU';
@@ -7315,66 +7248,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get nekoLoginTitle => '登录 NekoMusic';
 
   @override
-  String get nekoLoginTabOauth => 'OAuth 登录';
-
-  @override
-  String get nekoOauthTitle => '使用 NekoAuth 登录';
-
-  @override
-  String get nekoOauthDesc => '在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。';
-
-  @override
-  String get nekoOauthOpen => '在浏览器中登录';
-
-  @override
-  String get nekoOauthWaiting => '等待授权完成…';
-
-  @override
-  String get nekoOauthUrlLabel => '一次性登录地址';
-
-  @override
-  String get nekoOauthCopy => '复制链接';
-
-  @override
-  String get nekoOauthCopied => '链接已复制';
-
-  @override
-  String get nekoOauthRefresh => '重新获取';
-
-  @override
-  String get nekoOauthFailed => '登录失败';
-
-  @override
-  String get nekoLoginTabQr => '扫码登录';
-
-  @override
-  String get nekoLoginTabPassword => '账号密码';
-
-  @override
-  String get nekoLoginEmail => '邮箱';
-
-  @override
-  String get nekoLoginPassword => '密码';
-
-  @override
-  String get nekoLoginPasswordHint => '请输入密码';
-
-  @override
-  String get nekoLoginSubmit => '登录';
-
-  @override
-  String get nekoLoginForgotPassword => '忘记密码？';
-
-  @override
-  String get nekoForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
-
-  @override
-  String get nekoForgotFailed => '获取重置链接失败';
-
-  @override
-  String get nekoForgotOpened => '已在浏览器中打开重置页';
-
-  @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
 
   @override
@@ -8730,13 +8603,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsEnergySavingOff => '当前为标准模式';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化时卸载全部内存状态';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      '后台（最小化/托盘/熄屏）丢弃页面数据与缓存，恢复后从零重建（可能回到首页、丢滚动位置）；播放不受影响';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低频谱取帧频率以节省 CPU';
@@ -13536,66 +13402,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get nekoLoginTitle => '登入 NekoMusic';
 
   @override
-  String get nekoLoginTabOauth => 'OAuth 登入';
-
-  @override
-  String get nekoOauthTitle => '使用 NekoAuth 登入';
-
-  @override
-  String get nekoOauthDesc => '在任意瀏覽器開啟下方的一次性網址完成授權；若預設瀏覽器無法登入，可複製到其它瀏覽器。';
-
-  @override
-  String get nekoOauthOpen => '在瀏覽器中登入';
-
-  @override
-  String get nekoOauthWaiting => '等待授權完成…';
-
-  @override
-  String get nekoOauthUrlLabel => '一次性登入網址';
-
-  @override
-  String get nekoOauthCopy => '複製連結';
-
-  @override
-  String get nekoOauthCopied => '連結已複製';
-
-  @override
-  String get nekoOauthRefresh => '重新取得';
-
-  @override
-  String get nekoOauthFailed => '登入失敗';
-
-  @override
-  String get nekoLoginTabQr => '掃碼登入';
-
-  @override
-  String get nekoLoginTabPassword => '帳號密碼';
-
-  @override
-  String get nekoLoginEmail => '信箱';
-
-  @override
-  String get nekoLoginPassword => '密碼';
-
-  @override
-  String get nekoLoginPasswordHint => '請輸入密碼';
-
-  @override
-  String get nekoLoginSubmit => '登入';
-
-  @override
-  String get nekoLoginForgotPassword => '忘記密碼？';
-
-  @override
-  String get nekoForgotCopyHint => '重設連結已複製，請在瀏覽器中開啟並完成重設';
-
-  @override
-  String get nekoForgotFailed => '取得重設連結失敗';
-
-  @override
-  String get nekoForgotOpened => '已在瀏覽器中開啟重設頁面';
-
-  @override
   String get nekoLoginQrHint => '請使用 NekoMusic 手機 App 掃碼登入';
 
   @override
@@ -14951,13 +14757,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsEnergySavingOff => '目前為標準模式';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化時卸載全部記憶體狀態';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      '背景（最小化/系統匣/關螢幕）丟棄頁面資料與快取，恢復後從零重建（可能回到首頁、遺失捲動位置）；播放不受影響';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低頻譜取幀頻率以節省 CPU';

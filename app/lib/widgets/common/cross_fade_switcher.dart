@@ -14,6 +14,7 @@ library;
 import 'package:material_ui/material_ui.dart';
 
 import 'anim.dart';
+import '../../theme/motion.dart';
 
 class CrossFadeSwitcher extends StatefulWidget {
   const CrossFadeSwitcher({
@@ -21,7 +22,7 @@ class CrossFadeSwitcher extends StatefulWidget {
     required this.switchKey,
     required this.child,
     this.duration = const Duration(milliseconds: 200),
-    this.curve = Curves.ease,
+    this.curve = appMotionLinear,
   });
 
   /// 切换身份；变化时触发交叉淡化。

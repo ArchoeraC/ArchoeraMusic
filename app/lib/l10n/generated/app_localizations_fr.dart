@@ -1131,70 +1131,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get nekoLoginTitle => 'Se connecter à NekoMusic';
 
   @override
-  String get nekoLoginTabOauth => 'OAuth';
-
-  @override
-  String get nekoOauthTitle => 'Se connecter avec NekoAuth';
-
-  @override
-  String get nekoOauthDesc =>
-      'Ouvrez le lien à usage unique ci-dessous dans n\'importe quel navigateur. Si votre navigateur par défaut ne peut pas se connecter, copiez-le dans un autre navigateur.';
-
-  @override
-  String get nekoOauthOpen => 'Se connecter dans le navigateur';
-
-  @override
-  String get nekoOauthWaiting => 'En attente de l’autorisation…';
-
-  @override
-  String get nekoOauthUrlLabel => 'Lien de connexion à usage unique';
-
-  @override
-  String get nekoOauthCopy => 'Copier le lien';
-
-  @override
-  String get nekoOauthCopied => 'Lien copié';
-
-  @override
-  String get nekoOauthRefresh => 'Obtenir un nouveau lien';
-
-  @override
-  String get nekoOauthFailed => 'Échec de la connexion';
-
-  @override
-  String get nekoLoginTabQr => 'Code QR';
-
-  @override
-  String get nekoLoginTabPassword => 'E-mail et mot de passe';
-
-  @override
-  String get nekoLoginEmail => 'E-mail';
-
-  @override
-  String get nekoLoginPassword => 'Mot de passe';
-
-  @override
-  String get nekoLoginPasswordHint => 'Saisissez votre mot de passe';
-
-  @override
-  String get nekoLoginSubmit => 'Se connecter';
-
-  @override
-  String get nekoLoginForgotPassword => 'Mot de passe oublié ?';
-
-  @override
-  String get nekoForgotCopyHint =>
-      'Lien de réinitialisation copié — ouvrez-le dans votre navigateur pour réinitialiser';
-
-  @override
-  String get nekoForgotFailed =>
-      'Échec de l\'obtention du lien de réinitialisation';
-
-  @override
-  String get nekoForgotOpened =>
-      'Page de réinitialisation ouverte dans votre navigateur';
-
-  @override
   String get nekoLoginQrHint =>
       'Scannez avec l\'application NekoMusic pour vous connecter';
 
@@ -2662,14 +2598,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Actuellement en mode standard';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Décharger tout l’état mémoire lors de la réduction';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'En arrière-plan (réduit/barre d’état/écran éteint), abandonne données de page et caches ; reconstruit au retour (retour possible à l’accueil, défilement perdu). Lecture non affectée';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>

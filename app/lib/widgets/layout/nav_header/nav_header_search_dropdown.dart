@@ -58,8 +58,8 @@ class _SearchDropdown extends ConsumerWidget {
 
     final expand = CurvedAnimation(
       parent: panelCtrl,
-      curve: Curves.linearToEaseOut,
-      reverseCurve: Curves.easeInCubic,
+      curve: appMotion,
+      reverseCurve: appMotion,
     );
     final fade = CurveTween(
       curve: const Interval(0.0, 0.45),

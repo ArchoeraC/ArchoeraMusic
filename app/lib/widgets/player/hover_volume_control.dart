@@ -12,6 +12,7 @@ import '../../l10n/l10n.dart';
 import '../../services/playback/playback_notifier.dart';
 import 'ctrl_icon.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../theme/motion.dart';
 
 part 'hover_volume/hover_volume_control_state.dart';
 

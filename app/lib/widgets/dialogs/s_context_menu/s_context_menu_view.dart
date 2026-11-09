@@ -55,7 +55,7 @@ extension _SContextMenuOverlayView on _SContextMenuOverlayState {
           top: top,
           child: TweenAnimationBuilder<double>(
             duration: animDuration(context, const Duration(milliseconds: 140)),
-            curve: Curves.easeOutCubic,
+            curve: appMotion,
             tween: Tween(begin: 0, end: _t),
             builder: (context, t, child) => Transform.scale(
               scale: 0.96 + 0.04 * t,

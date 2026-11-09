@@ -611,7 +611,7 @@ extension _SettingsDialogView on _SettingsDialogState {
       child: AnimatedContainer(
         key: _catKeys[cat] ??= GlobalKey(),
         duration: animDuration(context, const Duration(milliseconds: 150)),
-        curve: Curves.easeOut,
+        curve: appMotion,
         decoration: BoxDecoration(
           color: selected
               ? scheme.primary.withValues(alpha: 0.10)

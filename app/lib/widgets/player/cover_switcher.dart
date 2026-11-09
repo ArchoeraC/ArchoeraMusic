@@ -11,10 +11,9 @@
 ///   下一首新封面从右进、旧封面向左出；上一首相反；
 /// - fade：新旧封面双层交叉淡化，仅改透明度，不做位移或缩放。
 ///
-/// 时长/曲线：scale 离场 0.2s ease / 入场 0.35s easeOutExpo；
-/// slide 离场 0.35s ease / 入场 0.4s easeOutExpo
-/// （`cubic-bezier(0.16,1,0.3,1)` 即 Flutter [Curves.easeOutExpo]）；
-/// fade 两层各 0.36s easeInOutCubic。
+/// 时长/曲线：scale 离场 0.2s / 入场 0.35s（统一近线性 [appMotion]）；
+/// slide 离场 0.35s / 入场 0.4s（统一近线性 [appMotion]）；
+/// fade 两层各 0.36s（统一近线性 [appMotion]）。
 ///
 /// 新增动效只需实现 `CoverTransition` 并登记到 [coverTransitions]，
 /// 本组件不再维护样式分支。
@@ -24,6 +23,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'cover_transitions/cover_transition.dart';
 import 'cover_transitions/cover_transition_registry.dart';
+import '../../theme/motion.dart';
 
 class CoverSwitcher extends StatelessWidget {
   const CoverSwitcher({

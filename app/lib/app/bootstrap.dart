@@ -15,6 +15,7 @@ import '../services/search/search_service.dart';
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../widgets/common/splash_screen.dart';
+import '../theme/motion.dart';
 
 /// 启动时初始化NT登录态（匿名注册 + 读取持久化账号）。
 class AuthBootstrap extends ConsumerStatefulWidget {
@@ -195,11 +196,11 @@ class _SplashGateState extends State<SplashGate>
           IgnorePointer(
             child: FadeTransition(
               opacity: Tween<double>(begin: 1, end: 0).animate(
-                CurvedAnimation(parent: _dismiss, curve: Curves.easeInCubic),
+                CurvedAnimation(parent: _dismiss, curve: appMotion),
               ),
               child: ScaleTransition(
                 scale: Tween<double>(begin: 1, end: 0.98).animate(
-                  CurvedAnimation(parent: _dismiss, curve: Curves.easeInCubic),
+                  CurvedAnimation(parent: _dismiss, curve: appMotion),
                 ),
                 child: SlideTransition(
                   position:
@@ -209,7 +210,7 @@ class _SplashGateState extends State<SplashGate>
                       ).animate(
                         CurvedAnimation(
                           parent: _dismiss,
-                          curve: Curves.easeInCubic,
+                          curve: appMotion,
                         ),
                       ),
                   child: SplashScreen(engine: widget.engine),

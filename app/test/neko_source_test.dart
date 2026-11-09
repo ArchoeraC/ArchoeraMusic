@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:archoera_music/apis/lyric/format.dart' show kNekoV1LyricsFormat;
 import 'package:archoera_music/apis/neko/neko_client.dart';
 import 'package:archoera_music/services/lyrics/engine/lyric_source.dart';
 import 'package:archoera_music/services/lyrics/lyric_line.dart';
@@ -453,6 +454,51 @@ void main() {
       expect(lrc?.format, 'lrc');
       expect(lrc?.content, '[00:01.00]晴天');
     });
+
+    test('富歌词整首为广告 → 丢弃该候选，preferRich 仍回退到 LRC', () async {
+      final source = _buildNekoSource(
+        NekoApi(clientFactory: (baseUrl, token) => _FakeNekoClient()),
+      );
+      final rich = await source.fetch(
+        LyricRequest(
+          track: Track.fromNekoSong({'id': 89, 'title': 'x'}),
+          preferRich: true,
+        ),
+      );
+      expect(rich?.format, 'lrc');
+      expect(rich?.content, '[00:01.00]晴天');
+    });
+
+    test('无兼容 LRC 时，preferRich=false 也回退到富歌词', () async {
+      final source = _buildNekoSource(
+        NekoApi(clientFactory: (baseUrl, token) => _FakeNekoClient()),
+      );
+      final match = await source.fetch(
+        LyricRequest(
+          track: Track.fromNekoSong({'id': 90, 'title': 'x'}),
+          preferRich: false,
+        ),
+      );
+      expect(match?.format, kNekoV1LyricsFormat);
+      final groups = parseLyricGroups(
+        content: match!.content,
+        format: match.format,
+      );
+      expect(groups.single.original.text, '晴天');
+    });
+
+    test('富歌词与 LRC 均不可用 → null（交给引擎换源）', () async {
+      final source = _buildNekoSource(
+        NekoApi(clientFactory: (baseUrl, token) => _FakeNekoClient()),
+      );
+      final match = await source.fetch(
+        LyricRequest(
+          track: Track.fromNekoSong({'id': 91, 'title': 'x'}),
+          preferRich: true,
+        ),
+      );
+      expect(match, isNull);
+    });
   });
 
   group('NekoQrSession 二维码图片解码', () {
@@ -755,6 +801,15 @@ void main() {
   });
 }
 
+/// 构造一个挂到测试容器上的 Neko 歌词来源（容器随测试结束释放）。
+NekoLyricSource _buildNekoSource(NekoApi api) {
+  final container = ProviderContainer(
+    overrides: [nekoApiProvider.overrideWith((ref) => api)],
+  );
+  addTearDown(container.dispose);
+  return container.read(Provider<NekoLyricSource>((ref) => NekoLyricSource(ref)));
+}
+
 /// 假 NekoClient：只覆盖 `getJson`，用于确定性验证音质解析后的媒体直链。
 class _FakeNekoClient extends NekoClient {
   _FakeNekoClient() : super(baseUrl: kDefaultNekoBaseUrl);
@@ -795,6 +850,54 @@ class _FakeNekoClient extends NekoClient {
                     {'startMs': 1500, 'endMs': 2000, 'text': '天'},
                   ],
                 },
+              ],
+            },
+          },
+        };
+      }
+      if (id == '89') {
+        // 富歌词整首广告；兼容 LRC 可用。
+        return <String, dynamic>{
+          'success': true,
+          'data': const <String, dynamic>{
+            'lyricsFormat': kNekoV1LyricsFormat,
+            'lyrics': '[00:01.00]晴天',
+            'lyricsRich': {
+              'version': 1,
+              'lines': [
+                {'startMs': 0, 'text': '资源来自Neko云音乐'},
+              ],
+            },
+          },
+        };
+      }
+      if (id == '90') {
+        // 只有富歌词，没有兼容 LRC。
+        return <String, dynamic>{
+          'success': true,
+          'data': const <String, dynamic>{
+            'lyricsFormat': kNekoV1LyricsFormat,
+            'lyrics': '',
+            'lyricsRich': {
+              'version': 1,
+              'lines': [
+                {'startMs': 1000, 'text': '晴天'},
+              ],
+            },
+          },
+        };
+      }
+      if (id == '91') {
+        // 富歌词与 LRC 均为广告。
+        return <String, dynamic>{
+          'success': true,
+          'data': const <String, dynamic>{
+            'lyricsFormat': kNekoV1LyricsFormat,
+            'lyrics': '[00:00.00]资源来自Neko云音乐',
+            'lyricsRich': {
+              'version': 1,
+              'lines': [
+                {'startMs': 0, 'text': '资源来自Neko云音乐'},
               ],
             },
           },

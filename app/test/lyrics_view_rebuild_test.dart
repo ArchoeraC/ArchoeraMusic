@@ -2,11 +2,10 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 简单歌词引擎（默认档）的「仅当前行重建」回归：
+/// 简单歌词引擎（默认档）的视口 / 排版缓存回归：
 ///
-/// 位置 tick（~20Hz）只应重建**当前行**（逐字扫亮需要）；非当前行返回缓存
-/// 的同一 widget 实例，`Element.updateChild` 对 identical widget 短路 →
-/// 不重建、不重绘。行高列表也只在「当前行翻转 / 配置变化」时重算。
+/// 重写后不再用 `ListView.builder` 全量构建，而是只构建视口 ± 一屏的行；
+/// 位置 tick（~20Hz）只移动滚动偏移，不重新 `TextPainter.layout()`。
 library;
 
 import 'package:material_ui/material_ui.dart';
@@ -36,33 +35,32 @@ Widget buildView(List<LyricGroup> groups, int pos) => MaterialApp(
 dynamic stateOf(WidgetTester tester) => tester.state(find.byType(LyricsView));
 
 void main() {
-  testWidgets('位置 tick 下非当前行零重建（仅当前行重建）', (tester) async {
-    final groups = buildGroups(50);
-    // 第 5 行（5000–6000ms）中部：当前行固定，只有扫亮在推进。
+  testWidgets('只构建视口附近的行（不随歌长线性增长）', (tester) async {
+    final groups = buildGroups(200);
     await tester.pumpWidget(buildView(groups, 5500));
     await tester.pumpAndSettle();
 
-    final builtBefore = stateOf(tester).debugBuiltLines();
-    final hitsBefore = stateOf(tester).debugLineCacheHits();
+    // 500px 视口 + 上下各一屏余量 ≈ 35 行，远小于 200。
+    expect(stateOf(tester).debugLastWindowSize(), lessThan(50));
+  });
+
+  testWidgets('位置 tick 不重新排版（行高缓存命中）', (tester) async {
+    final groups = buildGroups(50);
+    await tester.pumpWidget(buildView(groups, 5500));
+    await tester.pumpAndSettle();
+
+    final measuredBefore = stateOf(tester).debugMeasuredLines();
 
     // 连续 20 个位置 tick（同一行内）。
     for (var i = 1; i <= 20; i++) {
       await tester.pumpWidget(buildView(groups, 5500 + i * 16));
     }
 
-    final built = stateOf(tester).debugBuiltLines() - builtBefore;
-    final hits = stateOf(tester).debugLineCacheHits() - hitsBefore;
-
-    // 每 tick 最多构造 1 个 _Line（当前行）；非当前行全部命中缓存。
+    final measured = stateOf(tester).debugMeasuredLines() - measuredBefore;
     expect(
-      built,
-      lessThanOrEqualTo(20),
-      reason: '20 个 tick 内最多重建当前行 20 次，实测 $built',
-    );
-    expect(
-      hits,
-      greaterThanOrEqualTo(20),
-      reason: '每个 tick 的非当前行都应命中缓存实例，实测命中 $hits 次',
+      measured,
+      0,
+      reason: '同一行内位置 tick 不应触发任何 TextPainter 排版，实测 $measured',
     );
   });
 

@@ -174,7 +174,7 @@ extension _PlayerPageView on _PlayerPageState {
                           context,
                           const Duration(milliseconds: 300),
                         ),
-                        curve: Curves.easeOut,
+                        curve: appMotionLinear,
                         child: scrims,
                       ),
                     ),
@@ -193,7 +193,7 @@ extension _PlayerPageView on _PlayerPageState {
                             context,
                             const Duration(milliseconds: 300),
                           ),
-                          curve: Curves.easeOut,
+                          curve: appMotionLinear,
                           child: IgnorePointer(
                             ignoring: autoImmersive && !_controlsVisible,
                             child: _PlayerTopBar(
@@ -484,7 +484,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
         AnimatedOpacity(
           opacity: controlsVisible ? 0.4 : 1,
           duration: animDuration(context, const Duration(milliseconds: 300)),
-          curve: Curves.easeOut,
+          curve: appMotionLinear,
           child: RepaintBoundary(
             child: SizedBox(
               width: double.infinity,
@@ -496,7 +496,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
         AnimatedOpacity(
           opacity: controlsVisible ? 1 : 0,
           duration: animDuration(context, const Duration(milliseconds: 300)),
-          curve: Curves.easeOut,
+          curve: appMotionLinear,
           child: IgnorePointer(
             ignoring: !controlsVisible,
             child: Column(

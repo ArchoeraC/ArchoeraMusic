@@ -2,7 +2,15 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// NekoMusic **非标准 LRC** 归一化。
+/// NekoMusic 平台的歌词归一化与富歌词预检。
+///
+/// 覆盖两种服务端载荷：
+/// - `data.lyrics` 的**非标准 LRC**（本文件 [parseNekoLyrics]）；
+/// - `data.lyricsRich` 的 `neko-v1` JSON（逐字 / 翻译 / 音译；结构解析在
+///   通用引擎 `services/lyrics/lyric_line.dart`，本文件只做「是否存在可展示
+///   行」的轻量预检，避免歌词来源层为广告兜底而重复构造整首歌词组）。
+///
+/// ## 非标准 LRC
 ///
 /// 平台音乐详情 `/api/music/info/{id}` 的 `data.lyrics` 返回的歌词形如：
 ///
@@ -21,6 +29,10 @@
 /// 本函数把两种写法都归一化为「标准主歌词 LRC + 独立译文 LRC」，复用引擎
 /// 既有的翻译对齐逻辑（[LyricMatchResult.translation]），不侵入通用解析器。
 library;
+
+import 'dart:convert';
+
+import '../lyrics/ad_filter.dart';
 
 /// 归一化结果：主歌词（标准 LRC）+ 可选译文（标准 LRC）。
 class NekoParsedLyrics {
@@ -89,4 +101,35 @@ String _unquote(String s) {
     }
   }
   return s;
+}
+
+/// `neko-v1` 富歌词 JSON 是否至少有一行可展示内容（非广告 / 非空）。
+///
+/// 歌词来源用它决定「富歌词候选是否可用」：整首都是站点广告/占位时丢弃该
+/// 候选，交给兼容 LRC 或标准音源回退。只做结构预检，不构造 [LyricGroup]；
+/// 真正的解析仍由引擎 `parseNekoV1Lyrics` 完成（单一解析职责）。
+bool nekoV1HasDisplayableLine(String richJson) {
+  final raw = richJson.trim();
+  if (raw.isEmpty) return false;
+  Object? decoded;
+  try {
+    decoded = jsonDecode(raw);
+  } catch (_) {
+    return false;
+  }
+  if (decoded is! Map) return false;
+  final lines = decoded['lines'];
+  if (lines is! List) return false;
+  for (final line in lines) {
+    if (line is! Map) continue;
+    // 与 parseNekoV1Lyrics 的接受条件保持一致：必须有有效起始时间。
+    final start = line['startMs'];
+    final startMs = start is num
+        ? start.toInt()
+        : int.tryParse(start?.toString().trim() ?? '');
+    if (startMs == null || startMs < 0) continue;
+    final text = line['text']?.toString().trim() ?? '';
+    if (text.isNotEmpty && !isAdMetadataText(text)) return true;
+  }
+  return false;
 }
