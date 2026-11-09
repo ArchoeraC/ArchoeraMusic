@@ -333,7 +333,7 @@ class _PlaybackSliderState extends State<PlaybackSlider>
                 animation: _glowCtrl,
                 builder: (context, _) {
                   // 呼吸系数 1.0 → 1.25（对齐 0.8→0.95 / 0.35→0.5 的比例）。
-                  final k = 1.0 + 0.25 * Curves.easeInOut.transform(_glowCtrl.value);
+                  final k = 1.0 + 0.25 * appMotion.transform(_glowCtrl.value);
                   return DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(3),

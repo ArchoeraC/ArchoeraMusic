@@ -22,6 +22,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../services/netease/track.dart';
 import '../common/anim.dart';
 import '../list/cover_image.dart';
+import '../../theme/motion.dart';
 
 part 'player_cover/fullscreen_cover_view.dart';
 part 'player_cover/player_cover_view.dart';

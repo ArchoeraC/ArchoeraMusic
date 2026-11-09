@@ -50,7 +50,7 @@ extension _SplashScreenBuild on _SplashScreenState {
       opacity: Tween<double>(begin: 0, end: 1).animate(
         CurvedAnimation(
           parent: _intro,
-          curve: const Interval(0, 0.55, curve: Curves.easeOut),
+          curve: const Interval(0, 0.55, curve: appMotion),
         ),
       ),
       child: DecoratedBox(
@@ -73,7 +73,7 @@ extension _SplashScreenBuild on _SplashScreenState {
   Widget _buildLogo() {
     final rise = CurvedAnimation(
       parent: _intro,
-      curve: const Interval(0, 0.5, curve: Curves.easeOutExpo),
+      curve: const Interval(0, 0.5, curve: appMotion),
     );
     return FadeTransition(
       opacity: Tween<double>(begin: 0, end: 1).animate(rise),
@@ -98,7 +98,7 @@ extension _SplashScreenBuild on _SplashScreenState {
   Widget _buildEngineBadge(ColorScheme scheme) {
     final appear = CurvedAnimation(
       parent: _intro,
-      curve: const Interval(0.5, 0.95, curve: Curves.easeOut),
+      curve: const Interval(0.5, 0.95, curve: appMotion),
     );
     return FadeTransition(
       opacity: Tween<double>(begin: 0, end: 0.8).animate(appear),
@@ -107,7 +107,7 @@ extension _SplashScreenBuild on _SplashScreenState {
             .animate(
               CurvedAnimation(
                 parent: _intro,
-                curve: const Interval(0.5, 0.95, curve: Curves.easeOutExpo),
+                curve: const Interval(0.5, 0.95, curve: appMotion),
               ),
             ),
         child: Row(
@@ -133,7 +133,7 @@ extension _SplashScreenBuild on _SplashScreenState {
   Widget _buildFooter(ColorScheme scheme) {
     final fade = CurvedAnimation(
       parent: _intro,
-      curve: const Interval(0.35, 0.85, curve: Curves.easeOut),
+      curve: const Interval(0.35, 0.85, curve: appMotion),
     );
     return Positioned(
       left: 0,
@@ -146,7 +146,7 @@ extension _SplashScreenBuild on _SplashScreenState {
               .animate(
                 CurvedAnimation(
                   parent: _intro,
-                  curve: const Interval(0.35, 0.85, curve: Curves.easeOutExpo),
+                  curve: const Interval(0.35, 0.85, curve: appMotion),
                 ),
               ),
           child: Text(
@@ -215,7 +215,7 @@ class _StaggeredChar extends StatelessWidget {
       animation: intro,
       builder: (context, _) {
         final local = ((intro.value - delay) / 0.42).clamp(0.0, 1.0);
-        final t = Curves.easeOutCubic.transform(local);
+        final t = appMotion.transform(local);
         return Opacity(
           opacity: t,
           child: Transform.translate(

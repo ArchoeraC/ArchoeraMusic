@@ -926,7 +926,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? hideVipTag,
     bool? hideQualityTag,
     bool? showSubtitle,
-    bool? unloadAllMemory,
   }) {
     state = state.copyWithPreset(
       performanceMode: performanceMode,
@@ -937,7 +936,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       hideVipTag: hideVipTag,
       hideQualityTag: hideQualityTag,
       showSubtitle: showSubtitle,
-      unloadAllMemory: unloadAllMemory,
     );
     state.save();
   }

@@ -109,7 +109,7 @@ class _SpectrumViewState extends ConsumerState<SpectrumView>
       child: AnimatedOpacity(
         opacity: targetOpacity,
         duration: animDuration(context, const Duration(milliseconds: 300)),
-        curve: Curves.easeOut,
+        curve: appMotionLinear,
         // 横向渐隐已并入画笔 shader（spectrumFadeShader），不再用
         // ShaderMask 离屏层（P3：减少一次合成 pass）。
         child: CustomPaint(

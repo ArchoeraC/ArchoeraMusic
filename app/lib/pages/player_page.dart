@@ -35,6 +35,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 import 'player/layouts/player_layout.dart';
 import 'player/layouts/poster_layout.dart';
+import '../theme/motion.dart';
 
 part 'player/player_page_view.dart';
 

@@ -35,6 +35,7 @@ import '../../../widgets/player/spectrum_view.dart';
 import 'player_layout.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../../theme/motion.dart';
 
 class VutronPlayerLayout extends PlayerLayout {
   const VutronPlayerLayout();
@@ -438,7 +439,7 @@ class _VutronVolumeBarState extends State<_VutronVolumeBar> {
               end: _hovered ? _hoverTrackHeight : _trackHeight,
             ),
             duration: animDuration(context, const Duration(milliseconds: 280)),
-            curve: Curves.easeOut,
+            curve: appMotion,
             builder: (context, trackHeight, _) => CustomPaint(
               painter: _VutronVolumeBarPainter(
                 value: widget.value.clamp(0.0, 1.0),

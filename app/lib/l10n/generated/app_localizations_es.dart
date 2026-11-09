@@ -1133,70 +1133,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get LoginTitle => 'Iniciar sesión en ';
 
   @override
-  String get LoginTabOauth => 'OAuth';
-
-  @override
-  String get OauthTitle => 'Iniciar sesión con Auth';
-
-  @override
-  String get OauthDesc =>
-      'Abre el enlace de un solo uso en cualquier navegador para autorizar. Si tu navegador predeterminado no puede iniciar sesión, cópialo a otro navegador.';
-
-  @override
-  String get OauthOpen => 'Iniciar sesión en el navegador';
-
-  @override
-  String get OauthWaiting => 'Esperando autorización…';
-
-  @override
-  String get OauthUrlLabel => 'Enlace de inicio de sesión de un solo uso';
-
-  @override
-  String get OauthCopy => 'Copiar enlace';
-
-  @override
-  String get OauthCopied => 'Enlace copiado';
-
-  @override
-  String get OauthRefresh => 'Obtener otro enlace';
-
-  @override
-  String get OauthFailed => 'Error al iniciar sesión';
-
-  @override
-  String get LoginTabQr => 'Código QR';
-
-  @override
-  String get LoginTabPassword => 'Correo y contraseña';
-
-  @override
-  String get LoginEmail => 'Correo';
-
-  @override
-  String get LoginPassword => 'Contraseña';
-
-  @override
-  String get LoginPasswordHint => 'Introduce tu contraseña';
-
-  @override
-  String get LoginSubmit => 'Iniciar sesión';
-
-  @override
-  String get LoginForgotPassword => '¿Olvidaste la contraseña?';
-
-  @override
-  String get ForgotCopyHint =>
-      'Enlace de restablecimiento copiado. Ábrelo en tu navegador para restablecerlo.';
-
-  @override
-  String get ForgotFailed =>
-      'No se pudo obtener el enlace de restablecimiento';
-
-  @override
-  String get ForgotOpened =>
-      'Página de restablecimiento abierta en tu navegador';
-
-  @override
   String get LoginQrHint =>
       'Escanea con la app  para iniciar sesión';
 
@@ -2661,14 +2597,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Actualmente en modo estándar';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Descargar todo el estado de memoria al minimizar';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'En segundo plano (minimizar/bandeja/pantalla apagada) descarta datos de página y cachés; reconstruye al volver (puede volver al inicio, perder el desplazamiento). La reproducción no se ve afectada';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>

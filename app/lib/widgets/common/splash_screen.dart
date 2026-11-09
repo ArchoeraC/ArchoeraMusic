@@ -6,13 +6,14 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../eta/mark/eta_mark.dart';
 import '../layout/app_logo.dart';
+import '../../theme/motion.dart';
 
 part 'splash_screen/splash_screen_widgets.dart';
 
 /// 启动动画（品牌 Splash）。
 ///
 /// 动效：
-/// - Logo：上滑渐亮（`easeOutExpo`），不再有呼吸/闪烁；
+/// - Logo：上滑渐亮（近线性 [appMotion]），不再有呼吸/闪烁；
 /// - 品牌名：逐字从下方浮现（错开节奏）；
 /// - 底部小字：固定于窗口最底部，延迟上滑渐显（终态约 0.4 透明度）。
 /// 背景为深色氛围 + 主色径向光晕（静态）。由外层 [SplashGate] 控制淡出；

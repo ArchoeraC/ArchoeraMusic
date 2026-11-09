@@ -1103,67 +1103,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get LoginTitle => ' 로그인';
 
   @override
-  String get LoginTabOauth => 'OAuth 로그인';
-
-  @override
-  String get OauthTitle => 'Auth로 로그인';
-
-  @override
-  String get OauthDesc =>
-      '아래 일회용 링크를 아무 브라우저에서 열어 인증하세요. 기본 브라우저에서 로그인할 수 없다면 다른 브라우저로 복사하세요.';
-
-  @override
-  String get OauthOpen => '브라우저에서 로그인';
-
-  @override
-  String get OauthWaiting => '인증 대기 중…';
-
-  @override
-  String get OauthUrlLabel => '일회용 로그인 주소';
-
-  @override
-  String get OauthCopy => '링크 복사';
-
-  @override
-  String get OauthCopied => '링크가 복사되었습니다';
-
-  @override
-  String get OauthRefresh => '다시 받기';
-
-  @override
-  String get OauthFailed => '로그인 실패';
-
-  @override
-  String get LoginTabQr => 'QR 코드';
-
-  @override
-  String get LoginTabPassword => '이메일 및 비밀번호';
-
-  @override
-  String get LoginEmail => '이메일';
-
-  @override
-  String get LoginPassword => '비밀번호';
-
-  @override
-  String get LoginPasswordHint => '비밀번호 입력';
-
-  @override
-  String get LoginSubmit => '로그인';
-
-  @override
-  String get LoginForgotPassword => '비밀번호 찾기';
-
-  @override
-  String get ForgotCopyHint => '재설정 링크가 복사되었습니다. 브라우저에서 열어 재설정을 완료하세요.';
-
-  @override
-  String get ForgotFailed => '재설정 링크를 가져오지 못했습니다';
-
-  @override
-  String get ForgotOpened => '브라우저에서 재설정 페이지를 열었습니다';
-
-  @override
   String get LoginQrHint => ' 모바일 앱으로 스캔하여 로그인';
 
   @override
@@ -2534,13 +2473,6 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '현재 표준 모드';
-
-  @override
-  String get settingsUnloadAllMemory => '최소화 시 모든 메모리 상태 해제';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      '백그라운드(최소화/트레이/화면 꺼짐)에서 페이지 데이터와 캐시를 버리고 복귀 시 재구축(홈으로 돌아가거나 스크롤 위치 상실 가능). 재생에는 영향 없음';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '스펙트럼 캡처 빈도를 낮춰 CPU 절약';

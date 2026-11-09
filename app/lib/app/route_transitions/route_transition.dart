@@ -9,13 +9,14 @@
 library;
 
 import 'package:material_ui/material_ui.dart';
+import '../../theme/motion.dart';
 
 /// 内建转场统一时长（对齐原版进入动画 0.15s）。
 const Duration routeTransitionDuration = Duration(milliseconds: 150);
 
-/// 进入/退出曲线（对齐原版 route-fade/slide/zoom 的 ease-out / ease-in）。
-const Curve routeTransitionCurve = Curves.easeOut;
-const Curve routeTransitionReverseCurve = Curves.easeIn;
+/// 进入/退出曲线（统一近线性 [appMotion]；进入与退出同速，避免反向突变）。
+const Curve routeTransitionCurve = appMotion;
+const Curve routeTransitionReverseCurve = appMotion;
 
 /// 按统一曲线包装分支动画控制器。
 Animation<double> routeTransitionCurved(Animation<double> animation) =>

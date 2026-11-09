@@ -47,7 +47,7 @@ class _BarCoverState extends ConsumerState<_BarCover> {
                   context,
                   const Duration(milliseconds: 200),
                 ),
-                curve: Curves.easeOut,
+                curve: appMotion,
                 child: Container(
                   width: _size,
                   height: _size,

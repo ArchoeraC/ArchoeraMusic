@@ -206,8 +206,8 @@ class _LyricRollState extends State<_LyricRoll>
       child: AnimatedBuilder(
         animation: _ctrl,
         builder: (context, _) {
-          // easeOutCubic：起步快、收尾稳，读起来像「滚过去」而非「弹过去」。
-          final t = Curves.easeOutCubic.transform(_ctrl.value);
+          // 近线性：起步/收尾速度一致，读起来像「整条滚过去」而不是「窜一下」。
+          final t = appMotion.transform(_ctrl.value);
           // 新行位移：前进时 1→0（自下方上移入位），倒退时 -1→0。
           final incoming = _rollUp ? 1 - t : t - 1;
           // 旧行位移：前进时 0→-1（向上滚出），倒退时 0→1。
@@ -264,7 +264,7 @@ class _KaraokeFollow extends StatelessWidget {
       child: TweenAnimationBuilder<double>(
         tween: Tween<double>(end: dx),
         duration: Duration(milliseconds: animMs),
-        curve: Curves.easeOut,
+        curve: appMotionLinear,
         builder: (context, value, child) => OverflowBox(
           alignment: Alignment.centerLeft,
           maxWidth: double.infinity,

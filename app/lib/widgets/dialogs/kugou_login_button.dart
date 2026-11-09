@@ -30,6 +30,7 @@ import '../common/toast.dart';
 import '../common/anim.dart';
 import 'login_risk_notice.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../theme/motion.dart';
 
 part 'kugou_login_button/kugou_login_button_view.dart';
 

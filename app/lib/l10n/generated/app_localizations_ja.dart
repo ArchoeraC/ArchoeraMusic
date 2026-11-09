@@ -1101,67 +1101,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get LoginTitle => ' にログイン';
 
   @override
-  String get LoginTabOauth => 'OAuth ログイン';
-
-  @override
-  String get OauthTitle => 'Auth でログイン';
-
-  @override
-  String get OauthDesc =>
-      '下記のワンタイムリンクを任意のブラウザで開いて認証してください。既定のブラウザでログインできない場合は、他のブラウザにコピーしてください。';
-
-  @override
-  String get OauthOpen => 'ブラウザでログイン';
-
-  @override
-  String get OauthWaiting => '認証を待っています…';
-
-  @override
-  String get OauthUrlLabel => 'ワンタイムログイン URL';
-
-  @override
-  String get OauthCopy => 'リンクをコピー';
-
-  @override
-  String get OauthCopied => 'リンクをコピーしました';
-
-  @override
-  String get OauthRefresh => '再取得';
-
-  @override
-  String get OauthFailed => 'ログインに失敗しました';
-
-  @override
-  String get LoginTabQr => '二次元コード';
-
-  @override
-  String get LoginTabPassword => 'メールとパスワード';
-
-  @override
-  String get LoginEmail => 'メール';
-
-  @override
-  String get LoginPassword => 'パスワード';
-
-  @override
-  String get LoginPasswordHint => 'パスワードを入力';
-
-  @override
-  String get LoginSubmit => 'ログイン';
-
-  @override
-  String get LoginForgotPassword => 'パスワードをお忘れですか？';
-
-  @override
-  String get ForgotCopyHint => 'リセットリンクをコピーしました。ブラウザで開いて再設定してください';
-
-  @override
-  String get ForgotFailed => 'リセットリンクの取得に失敗しました';
-
-  @override
-  String get ForgotOpened => 'ブラウザで再設定ページを開きました';
-
-  @override
   String get LoginQrHint => ' アプリでスキャンしてログイン';
 
   @override
@@ -2532,13 +2471,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '現在標準モード';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化時に全メモリ状態を解放';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'バックグラウンド（最小化/トレイ/画面オフ）でページデータとキャッシュを破棄し、復帰時に再構築（ホームに戻る/スクロール位置が失われる場合あり）。再生には影響なし';
 
   @override
   String get settingsSearchEnergySavingSubtitle => 'スペクトル取得頻度を下げて CPU を節約';

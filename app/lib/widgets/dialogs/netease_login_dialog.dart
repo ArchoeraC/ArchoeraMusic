@@ -15,6 +15,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import 'login_risk_notice.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../theme/motion.dart';
 
 part 'netease_login_dialog/netease_login_dialog_view.dart';
 

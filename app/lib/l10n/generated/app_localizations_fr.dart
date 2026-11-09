@@ -1131,70 +1131,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get LoginTitle => 'Se connecter à ';
 
   @override
-  String get LoginTabOauth => 'OAuth';
-
-  @override
-  String get OauthTitle => 'Se connecter avec Auth';
-
-  @override
-  String get OauthDesc =>
-      'Ouvrez le lien à usage unique ci-dessous dans n\'importe quel navigateur. Si votre navigateur par défaut ne peut pas se connecter, copiez-le dans un autre navigateur.';
-
-  @override
-  String get OauthOpen => 'Se connecter dans le navigateur';
-
-  @override
-  String get OauthWaiting => 'En attente de l’autorisation…';
-
-  @override
-  String get OauthUrlLabel => 'Lien de connexion à usage unique';
-
-  @override
-  String get OauthCopy => 'Copier le lien';
-
-  @override
-  String get OauthCopied => 'Lien copié';
-
-  @override
-  String get OauthRefresh => 'Obtenir un nouveau lien';
-
-  @override
-  String get OauthFailed => 'Échec de la connexion';
-
-  @override
-  String get LoginTabQr => 'Code QR';
-
-  @override
-  String get LoginTabPassword => 'E-mail et mot de passe';
-
-  @override
-  String get LoginEmail => 'E-mail';
-
-  @override
-  String get LoginPassword => 'Mot de passe';
-
-  @override
-  String get LoginPasswordHint => 'Saisissez votre mot de passe';
-
-  @override
-  String get LoginSubmit => 'Se connecter';
-
-  @override
-  String get LoginForgotPassword => 'Mot de passe oublié ?';
-
-  @override
-  String get ForgotCopyHint =>
-      'Lien de réinitialisation copié — ouvrez-le dans votre navigateur pour réinitialiser';
-
-  @override
-  String get ForgotFailed =>
-      'Échec de l\'obtention du lien de réinitialisation';
-
-  @override
-  String get ForgotOpened =>
-      'Page de réinitialisation ouverte dans votre navigateur';
-
-  @override
   String get LoginQrHint =>
       'Scannez avec l\'application  pour vous connecter';
 
@@ -2662,14 +2598,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Actuellement en mode standard';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Décharger tout l’état mémoire lors de la réduction';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'En arrière-plan (réduit/barre d’état/écran éteint), abandonne données de page et caches ; reconstruit au retour (retour possible à l’accueil, défilement perdu). Lecture non affectée';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>

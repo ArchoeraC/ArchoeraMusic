@@ -1124,68 +1124,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get LoginTitle => 'Sign in to ';
 
   @override
-  String get LoginTabOauth => 'OAuth';
-
-  @override
-  String get OauthTitle => 'Sign in with Auth';
-
-  @override
-  String get OauthDesc =>
-      'Open the one-time link below in any browser to authorize. If your default browser can\'t sign in, copy it to another browser.';
-
-  @override
-  String get OauthOpen => 'Sign in with browser';
-
-  @override
-  String get OauthWaiting => 'Waiting for authorization…';
-
-  @override
-  String get OauthUrlLabel => 'One-time sign-in link';
-
-  @override
-  String get OauthCopy => 'Copy link';
-
-  @override
-  String get OauthCopied => 'Link copied';
-
-  @override
-  String get OauthRefresh => 'Get a new link';
-
-  @override
-  String get OauthFailed => 'Sign-in failed';
-
-  @override
-  String get LoginTabQr => 'QR code';
-
-  @override
-  String get LoginTabPassword => 'Email & password';
-
-  @override
-  String get LoginEmail => 'Email';
-
-  @override
-  String get LoginPassword => 'Password';
-
-  @override
-  String get LoginPasswordHint => 'Enter your password';
-
-  @override
-  String get LoginSubmit => 'Sign in';
-
-  @override
-  String get LoginForgotPassword => 'Forgot password?';
-
-  @override
-  String get ForgotCopyHint =>
-      'Reset link copied — open it in your browser to reset';
-
-  @override
-  String get ForgotFailed => 'Failed to get reset link';
-
-  @override
-  String get ForgotOpened => 'Reset page opened in your browser';
-
-  @override
   String get LoginQrHint => 'Scan with the  mobile app to sign in';
 
   @override
@@ -2617,14 +2555,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Currently in standard mode';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Unload all memory state when minimized';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'In background (minimize/tray/screen-off), drop page data and caches; rebuild from scratch on restore (may return home, lose scroll). Playback unaffected';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>

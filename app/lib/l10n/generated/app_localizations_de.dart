@@ -1134,69 +1134,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get LoginTitle => 'Bei  anmelden';
 
   @override
-  String get LoginTabOauth => 'OAuth';
-
-  @override
-  String get OauthTitle => 'Mit Auth anmelden';
-
-  @override
-  String get OauthDesc =>
-      'Öffne den einmaligen Link unten in einem beliebigen Browser. Falls der Standardbrowser die Anmeldung nicht abschließen kann, kopiere ihn in einen anderen Browser.';
-
-  @override
-  String get OauthOpen => 'Im Browser anmelden';
-
-  @override
-  String get OauthWaiting => 'Warte auf Autorisierung…';
-
-  @override
-  String get OauthUrlLabel => 'Einmaliger Anmeldelink';
-
-  @override
-  String get OauthCopy => 'Link kopieren';
-
-  @override
-  String get OauthCopied => 'Link kopiert';
-
-  @override
-  String get OauthRefresh => 'Neuen Link holen';
-
-  @override
-  String get OauthFailed => 'Anmeldung fehlgeschlagen';
-
-  @override
-  String get LoginTabQr => 'QR-Code';
-
-  @override
-  String get LoginTabPassword => 'E-Mail und Passwort';
-
-  @override
-  String get LoginEmail => 'E-Mail';
-
-  @override
-  String get LoginPassword => 'Passwort';
-
-  @override
-  String get LoginPasswordHint => 'Passwort eingeben';
-
-  @override
-  String get LoginSubmit => 'Anmelden';
-
-  @override
-  String get LoginForgotPassword => 'Passwort vergessen?';
-
-  @override
-  String get ForgotCopyHint =>
-      'Link zum Zurücksetzen kopiert – im Browser öffnen und ändern';
-
-  @override
-  String get ForgotFailed =>
-      'Link zum Zurücksetzen konnte nicht abgerufen werden';
-
-  @override
-  String get ForgotOpened => 'Seite zum Zurücksetzen im Browser geöffnet';
-
-  @override
   String get LoginQrHint => 'Mit der -App scannen und anmelden';
 
   @override
@@ -2646,14 +2583,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Derzeit im Standardmodus';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Beim Minimieren den gesamten Speicherzustand entladen';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'Im Hintergrund (Minimiert/Tray/Bildschirm aus) Seitendaten und Caches verwerfen; beim Zurückkehren neu aufbauen (evtl. zurück zur Startseite, Scrollposition verloren). Wiedergabe unbeeinflusst';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>
