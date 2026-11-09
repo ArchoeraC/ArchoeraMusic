@@ -4,6 +4,8 @@
 
 import 'package:flutter/widgets.dart';
 
+import 'player_route_curves.dart';
+
 /// 全屏播放器展开时主壳内容的收起/展开动效。
 ///
 /// **不再卸载壳内容**。此前在展开完成后把整个壳（列表 / 图片 / 页面 State）
@@ -21,7 +23,8 @@ class ShellExpandTransition extends StatelessWidget {
     super.key,
     required this.animation,
     required this.child,
-    this.curve = const Cubic(0.7, 0, 0.3, 1),
+    this.curve = kPlayerRouteOpenCurve,
+    this.reverseCurve = kPlayerRouteCloseCurve,
     this.disableAnimations = false,
   });
 
@@ -31,8 +34,14 @@ class ShellExpandTransition extends StatelessWidget {
   /// 壳内容（始终保留在树上）。
   final Widget child;
 
-  /// 动画曲线（与播放页滑动保持一致）。
+  /// 展开曲线（与播放页上滑共用 [kPlayerRouteOpenCurve]）。
   final Curve curve;
+
+  /// 收起曲线（与播放页下滑共用 [kPlayerRouteCloseCurve]）。
+  ///
+  /// 收起时 [animation] 的原始值由 1 递减到 0，Flutter 的 `CurvedAnimation`
+  /// 对 reverseCurve 不做 flipped，故这里同样传 ease-out 形状即得「先慢后快」。
+  final Curve reverseCurve;
 
   /// 性能模式：跳过动画，直切目标态。
   final bool disableAnimations;
@@ -48,7 +57,7 @@ class ShellExpandTransition extends StatelessWidget {
         final reversing = animation.status == AnimationStatus.reverse;
         final t = disableAnimations
             ? (raw >= 1 ? 1.0 : 0.0)
-            : curve.transform(raw);
+            : (reversing ? reverseCurve : curve).transform(raw);
         final expanded = t >= 0.999 && !reversing;
         return Offstage(
           offstage: expanded,
