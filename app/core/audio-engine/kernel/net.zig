@@ -279,7 +279,10 @@ fn ensureCaBundle() NetError!void {
         if (g_ca.map.count() != 0) src = "SSL_CERT_FILE";
     }
     if (envNonEmpty("SSL_CERT_DIR")) |dirs| {
-        var it = std.mem.splitScalar(u8, dirs, ':');
+        // OpenSSL 语义：目录列表分隔符随平台不同——Windows 用 ';'（':' 是盘符），
+        // 其余平台用 ':'。用错分隔符会把 "C:\certs" 拆碎，导致证书目录失效。
+        const sep: u8 = if (builtin.os.tag == .windows) ';' else ':';
+        var it = std.mem.splitScalar(u8, dirs, sep);
         while (it.next()) |dir| {
             const path = std.mem.trim(u8, dir, " \t");
             if (path.len != 0) caAddDir(io, now, path);
