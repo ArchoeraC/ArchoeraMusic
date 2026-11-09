@@ -53,7 +53,7 @@
 | 维度 | 上游 SPlayer-Next（Electron） | 我们（Flutter） | 差距性质 |
 |---|---|---|---|
 | 水纹背景 | `BackgroundRipple.vue`：**0.55 渲染尺度** WebGL/WebGPU canvas + CSS `blur(10px)` | `ripple_background.dart`：**全分辨率 CPU 顶点场**（≤160×90 顶点 × 48 涟漪，UI 线程） | 像素量 ×3.3、线程、算法 |
-| 背景生命周期 | 展开后**延迟 500ms 挂载**、收起 **500ms 卸载**（`PlayerBackground.vue:15-43`） | 路由 push 即建、pop 才销毁 | 常驻/首帧成本 |
+| 背景生命周期 | 展开后**延迟 500ms 挂载**、收起 **500ms 卸载**（`PlayerBackground.vue:15-43`）；流体就绪前用模糊缩略图铺底 | 轻量样式（渐变/纯色/模糊/主色）路由 push 即建；水纹/流体等重效果等进入动画结束再挂载，采样完成前由模糊封面预览铺底（`PlayerBackground.active`） | 常驻/首帧成本、黑屏 |
 | 图层结构 | blur/ripple **共用** `.bg-blur-wrap` + 单个 `::after` 压暗 | 多遍全屏叠层（gradient + 模糊 + 折射 + 压暗） | overdraw |
 | 文本 | Chromium 字形栅格缓存 + 合成层 | v7 每帧 `TextPainter.layout()`（P1 已部分解决） | UI 线程 |
 | 列表/分支 | Chromium tile + occlusion culling，标签可丢弃 | `go_router` 懒建分支 + `Offstage` + `TickerMode`；**访问过即永驻** | 缺「卸载」 |

@@ -69,7 +69,8 @@ extension _PlayerPageView on _PlayerPageState {
     final coverKey = current != null
         ? '${current.source}/${current.id}'
         : 'local:$source';
-    // 重内容（背景 / 歌词）在路由进入动画结束后才挂载；性能模式直切视为已完成。
+    // 重内容（歌词块、背景的水纹/流体层）等路由进入动画结束后再挂载；性能
+    // 模式直切视为已完成。背景的轻量预览层不在此门控内。
     final contentMounted =
         _contentMounted ||
         (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
@@ -112,8 +113,9 @@ extension _PlayerPageView on _PlayerPageState {
     final backdrop = layout.buildBackdrop(context, layoutCtx);
     final scrims = layout.buildScrims(context, layoutCtx);
 
-    // 播放页常驻不透明底色：重内容（背景）延迟挂载期间也保证整页不透明，
-    // 避免透出下方壳层（进入动画那 500ms 出现白/黑空档）。
+    // 播放页常驻不透明底色：任何背景层尚未绘制时也保证整页不透明，
+    // 避免透出下方壳层。背景本身从进入动画第一帧就挂载（见下方
+    // PlayerBackground 的 active 参数），不再留出发黑的空档。
     final playerBg =
         theme.extension<AppChromeColors>()?.playerBackground ??
         colorScheme.surface;
@@ -121,139 +123,152 @@ extension _PlayerPageView on _PlayerPageState {
       backgroundColor: playerBg,
       // 硬裁切到播放页范围（对齐原版 FullPlayer 根节点 `overflow-hidden`）：
       // 封面背景经 blur/scale 后的绘制不会溢出到播放页之外。
-      body: MouseRegion(
-        onEnter: (_) {
-          if (!mounted) return;
-          if (!_pointerInside) setState(() => _pointerInside = true);
-          _pokeControls();
-        },
-        onExit: (_) {
-          if (!mounted) return;
-          setState(() => _pointerInside = false);
-          // 自动沉浸：指针离开窗口立即隐藏控件（含顶栏）。
-          if (ref.read(appPrefsProvider).autoImmersive) {
-            _hideTimer?.cancel();
-            setState(() => _controlsVisible = false);
-          }
-        },
-        cursor: (autoImmersive && !_controlsVisible)
-            ? SystemMouseCursors.none
-            : MouseCursor.defer,
-        child: ClipRect(
-          child: Listener(
-            behavior: HitTestBehavior.translucent,
-            onPointerHover: (_) => _pokeControls(),
-            onPointerDown: (_) => _pokeControls(),
-            onPointerSignal: (_) => _pokeControls(),
-            child: Stack(
-              children: [
-                Positioned.fill(child: ColoredBox(color: playerBg)),
-                if (contentMounted)
+      // 收起动画期间冻结页内所有 ticker（歌词墙 / 封面脉冲 / 频谱等），只保留
+      // 路由自身的下滑；对齐 SPlayer-Next 在 `before-leave` 里 `lyric.freeze()`
+      // + 停表，把帧预算让给壳层恢复布局，避免收起时卡顿。
+      body: TickerMode(
+        enabled: !_closing,
+        child: MouseRegion(
+          onEnter: (_) {
+            if (!mounted) return;
+            if (!_pointerInside) setState(() => _pointerInside = true);
+            _pokeControls();
+          },
+          onExit: (_) {
+            if (!mounted) return;
+            setState(() => _pointerInside = false);
+            // 自动沉浸：指针离开窗口立即隐藏控件（含顶栏）。
+            if (ref.read(appPrefsProvider).autoImmersive) {
+              _hideTimer?.cancel();
+              setState(() => _controlsVisible = false);
+            }
+          },
+          cursor: (autoImmersive && !_controlsVisible)
+              ? SystemMouseCursors.none
+              : MouseCursor.defer,
+          child: ClipRect(
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerHover: (_) => _pokeControls(),
+              onPointerDown: (_) => _pokeControls(),
+              onPointerSignal: (_) => _pokeControls(),
+              child: Stack(
+                children: [
+                  Positioned.fill(child: ColoredBox(color: playerBg)),
                   Positioned.fill(
                     // 背景独立成层：歌词/频谱/进度持续重绘时，背景（已烘焙的
                     // 静态贴图 + 压暗）不再随父层重放光栅化；Skia 后端可将其
                     // 缓存为纹理复用（对齐 runtime-resource-optimization §4）。
+                    //
+                    // 进入动画期间即挂载：轻量样式（渐变 / 纯色 / 模糊 / 主色）
+                    // 直接出最终画面；水纹 / 流体等重效果先由模糊封面预览铺底，
+                    // 等路由动画结束（contentMounted）再挂载并淡入，避免黑屏。
                     child: RepaintBoundary(
                       child: PlayerBackground(
                         cover: current?.cover,
                         playing: playing,
+                        active: contentMounted,
+                        paused: _closing,
                       ),
                     ),
                   ),
-                // 布局自己的页面级视觉（整幅封面等）。
-                if (backdrop != null)
-                  Positioned.fill(child: IgnorePointer(child: backdrop)),
-                // 布局自己的遮罩（自动沉浸时随 chrome 一起淡出）。
-                if (scrims != null)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: AnimatedOpacity(
-                        opacity: chromeOpacity,
-                        duration: animDuration(
-                          context,
-                          const Duration(milliseconds: 300),
-                        ),
-                        curve: Curves.easeOut,
-                        child: scrims,
-                      ),
-                    ),
-                  ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: kPlayerPageHorizontalPadding,
-                    ),
-                    child: Column(
-                      children: [
-                        // 自动沉浸：控件隐藏时顶栏一并淡出（普通模式顶栏常驻）。
-                        AnimatedOpacity(
-                          opacity: (!autoImmersive || _controlsVisible) ? 1 : 0,
+                  // 布局自己的页面级视觉（整幅封面等）。
+                  if (backdrop != null)
+                    Positioned.fill(child: IgnorePointer(child: backdrop)),
+                  // 布局自己的遮罩（自动沉浸时随 chrome 一起淡出）。
+                  if (scrims != null)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedOpacity(
+                          opacity: chromeOpacity,
                           duration: animDuration(
                             context,
                             const Duration(milliseconds: 300),
                           ),
                           curve: Curves.easeOut,
-                          child: IgnorePointer(
-                            ignoring: autoImmersive && !_controlsVisible,
-                            child: _PlayerTopBar(
-                              l10n: l10n,
-                              showLyrics: showLyrics,
-                              hasLyrics: hasLyrics,
-                              colorScheme: colorScheme,
-                              current: current,
-                              quality: quality,
-                              qualityLevels: qualityLevels,
-                              isFullScreen: _isFullScreen,
-                              onClose: () => context.pop(),
-                              onToggleLyrics:
-                                  hasLyrics && layout.lyricsToggleable
-                                  ? () => ref
-                                        .read(appPrefsProvider.notifier)
-                                        .setShowLyricsInPlayer(!showLyrics)
-                                  : null,
-                              onSelectQuality: notifier.setQuality,
-                              onToggleFullscreen: _toggleFullscreen,
+                          child: scrims,
+                        ),
+                      ),
+                    ),
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: kPlayerPageHorizontalPadding,
+                      ),
+                      child: Column(
+                        children: [
+                          // 自动沉浸：控件隐藏时顶栏一并淡出（普通模式顶栏常驻）。
+                          AnimatedOpacity(
+                            opacity: (!autoImmersive || _controlsVisible)
+                                ? 1
+                                : 0,
+                            duration: animDuration(
+                              context,
+                              const Duration(milliseconds: 300),
+                            ),
+                            curve: Curves.easeOut,
+                            child: IgnorePointer(
+                              ignoring: autoImmersive && !_controlsVisible,
+                              child: _PlayerTopBar(
+                                l10n: l10n,
+                                showLyrics: showLyrics,
+                                hasLyrics: hasLyrics,
+                                colorScheme: colorScheme,
+                                current: current,
+                                quality: quality,
+                                qualityLevels: qualityLevels,
+                                isFullScreen: _isFullScreen,
+                                onClose: () => context.pop(),
+                                onToggleLyrics:
+                                    hasLyrics && layout.lyricsToggleable
+                                    ? () => ref
+                                          .read(appPrefsProvider.notifier)
+                                          .setShowLyricsInPlayer(!showLyrics)
+                                    : null,
+                                onSelectQuality: notifier.setQuality,
+                                onToggleFullscreen: _toggleFullscreen,
+                              ),
                             ),
                           ),
-                        ),
-                        Expanded(child: layout.buildBody(context, layoutCtx)),
-                        Text(
-                          !hasContent
-                              ? l10n.playerPageLoadHint
-                              : (buffering ? l10n.playerBarBuffering : ''),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        if (layout.usesDefaultBottomBar)
-                          _PlayerBottomOverlay(
-                            controlsVisible: _controlsVisible,
-                            theme: theme,
-                            dragMs: _dragMs,
-                            buffering: buffering,
-                            hasSource: hasSource,
-                            hasContent: hasContent,
-                            hasQueue: hasQueue,
-                            canLike: canLike,
-                            canComment: canComment,
-                            liked: liked,
-                            current: current,
-                            shuffle: shuffle,
-                            repeatMode: repeatMode,
-                            playing: playing,
-                            showProgressLyric: prefs.showProgressLyric,
-                            onDragChanged: (v) => setState(() => _dragMs = v),
-                            onSeekEnd: (_) => setState(() => _dragMs = null),
-                            onToggleLike: _toggleLike,
-                            onShowComments: () {
-                              if (current != null) {
-                                showCommentDialog(context, track: current);
-                              }
-                            },
+                          Expanded(child: layout.buildBody(context, layoutCtx)),
+                          Text(
+                            !hasContent
+                                ? l10n.playerPageLoadHint
+                                : (buffering ? l10n.playerBarBuffering : ''),
+                            style: theme.textTheme.bodySmall,
                           ),
-                      ],
+                          if (layout.usesDefaultBottomBar)
+                            _PlayerBottomOverlay(
+                              controlsVisible: _controlsVisible,
+                              theme: theme,
+                              dragMs: _dragMs,
+                              buffering: buffering,
+                              hasSource: hasSource,
+                              hasContent: hasContent,
+                              hasQueue: hasQueue,
+                              canLike: canLike,
+                              canComment: canComment,
+                              liked: liked,
+                              current: current,
+                              shuffle: shuffle,
+                              repeatMode: repeatMode,
+                              playing: playing,
+                              showProgressLyric: prefs.showProgressLyric,
+                              onDragChanged: (v) => setState(() => _dragMs = v),
+                              onSeekEnd: (_) => setState(() => _dragMs = null),
+                              onToggleLike: _toggleLike,
+                              onShowComments: () {
+                                if (current != null) {
+                                  showCommentDialog(context, track: current);
+                                }
+                              },
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

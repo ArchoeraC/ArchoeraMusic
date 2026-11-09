@@ -78,10 +78,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   /// 指针是否在播放页窗口内（自动沉浸：离开窗口立即隐藏顶/底栏）。
   bool _pointerInside = true;
 
-  /// 路由进入动画是否已完成：完成前不挂载重内容（背景 / 歌词块），
-  /// 对齐原版 FullPlayer 的 `lyricMounted`（`@after-enter` 后才挂载）
-  /// 与 PlayerBackground 延迟挂载。普通 chrome（顶栏 / 封面 / 控件）不受影响。
+  /// 路由进入动画是否已完成：完成前不挂载重内容（歌词块、背景的水纹 / 流体
+  /// 层），对齐原版 FullPlayer 的 `lyricMounted` 与 `visualizerMounted`
+  /// （均在 `@after-enter` 之后才挂载）。播放页背景本身（预览层）从第一帧就
+  /// 挂载，普通 chrome（顶栏 / 封面 / 控件）不受影响。
   bool _contentMounted = false;
+
+  /// 退出动画是否进行中：收起时暂停水纹/流体的逐帧渲染，只保留最后一帧，
+  /// 把帧预算让给壳层重排 + 路由下滑，避免收起卡顿。
+  bool _closing = false;
 
   /// 当前 `ModalRoute` 的进入/退出动画（在 [didChangeDependencies] 绑定，
   /// 状态变更驱动 [_contentMounted]；同时写入 provider 供壳层驱动收起动效）。
@@ -186,15 +191,23 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   ///
   /// 只在进入动画完成后置真；退出时保持内容挂载直到路由销毁。
   void _syncContentMounted() {
-    if (_routeAnimation?.status == AnimationStatus.completed &&
-        !_contentMounted) {
+    final status = _routeAnimation?.status;
+    final closing = status == AnimationStatus.reverse;
+    if (closing != _closing) {
+      setState(() => _closing = closing);
+    }
+    if (status == AnimationStatus.completed && !_contentMounted) {
       setState(() => _contentMounted = true);
     }
   }
 
-  /// 路由转场状态 → 重内容挂载态（进入完成才挂载背景/歌词）。
+  /// 路由转场状态 → 重内容挂载态（进入完成才挂载背景/歌词）与退出暂停。
   void _onRouteAnimationStatus(AnimationStatus status) {
     if (!mounted) return;
+    final closing = status == AnimationStatus.reverse;
+    if (closing != _closing) {
+      setState(() => _closing = closing);
+    }
     if (status == AnimationStatus.completed && !_contentMounted) {
       setState(() => _contentMounted = true);
     }

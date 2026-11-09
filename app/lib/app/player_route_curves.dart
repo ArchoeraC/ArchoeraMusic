@@ -15,6 +15,13 @@ import 'package:flutter/animation.dart';
 /// 同一条曲线，保证两者逐帧同步。
 const Curve kPlayerRouteOpenCurve = Cubic(0.25, 0.5, 0.45, 0.95);
 
+/// 播放页进/出转场时长（展开与收起同值）。
+///
+/// 原为 500ms（对齐 Web 版），实机观感偏拖沓；降到 350ms 后起步更利落，
+/// 仍保留足够位移让上滑/下滑可读。路由（`/player`）与壳层共用此值，
+/// 两者不会脱拍。
+const Duration kPlayerRouteTransitionDuration = Duration(milliseconds: 350);
+
 /// 全屏播放页收起曲线（路由动画 1 → 0）：**先慢后快**。
 ///
 /// 收起时路由动画的原始值从 1 递减到 0，`CurvedAnimation.reverseCurve` 是

@@ -132,14 +132,15 @@ final appRouter = GoRouter(
         // （不透明路由会立刻把下方路由 offstage）。展开动画结束后壳内容由
         // ShellExpandTransition 停绘/停布局（State 保留），背后绘制开销为零。
         opaque: false,
-        transitionDuration: const Duration(milliseconds: 500),
-        reverseTransitionDuration: const Duration(milliseconds: 500),
+        transitionDuration: kPlayerRouteTransitionDuration,
+        reverseTransitionDuration: kPlayerRouteTransitionDuration,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           // 性能模式（MediaQuery.disableAnimations）：播放页直切，无展开动效
           if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
             return child;
           }
-          // 纯垂直上滑（对齐原版 FullPlayer 的 `translate-y-full → 0`，500ms）。
+          // 纯垂直上滑（对齐原版 FullPlayer 的 `translate-y-full → 0`，
+          // 时长见 `kPlayerRouteTransitionDuration`）。
           // 曲线改成单峰：展开先快后慢、收起先慢后快（见
           // `player_route_curves.dart`）；收起走 reverseCurve，Flutter 直接把它
           // 作用在 1 → 0 的递减值上，因此两条曲线都用 ease-out 形状。

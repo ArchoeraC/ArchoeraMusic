@@ -59,6 +59,22 @@ const double _kFftMinFreq = 80;
 const double _kFftMaxFreq = 2000;
 const int _kFftBins = 128;
 
+/// 流体离屏渲染尺寸（**物理像素**）。
+///
+/// 上游 `BaseRenderer` 用 `clientWidth * devicePixelRatio * renderScale` 设置
+/// 画布物理尺寸；若这里只按逻辑像素算，高 DPI 屏上的实际分辨率会低一个 DPR
+/// 倍（视觉明显更糊）。逻辑尺寸 × DPR × renderScale 才与上游同档。
+({int width, int height}) fluidRenderSize(
+  double logicalWidth,
+  double logicalHeight,
+  double devicePixelRatio,
+  double renderScale,
+) {
+  int axis(double value) =>
+      math.max(1, (value * devicePixelRatio * renderScale).round());
+  return (width: axis(logicalWidth), height: axis(logicalHeight));
+}
+
 double _clamp01(double v) => v.clamp(0.0, 1.0).toDouble();
 
 /// 上游 `getBassPulse`：从 128 段对数频谱（双声道）提取 80~180Hz 脉冲强度 0~1。
@@ -140,6 +156,7 @@ class FluidBackground extends ConsumerStatefulWidget {
     this.fps = 30,
     this.freezeOnPause = false,
     this.beat = false,
+    this.onReady,
   });
 
   /// 封面地址（http(s)/file:///本地路径）；为空时只铺底色。
@@ -166,6 +183,11 @@ class FluidBackground extends ConsumerStatefulWidget {
   /// 低频节拍脉动（对齐上游 `playerBgBeat`，默认 false）。
   final bool beat;
 
+  /// 首个可绘制状态（位移图 + 封面纹理）就绪时回调一次。
+  ///
+  /// 供播放页在采样/烘焙完成前保留模糊封面预览层；与上游 `@ready` 事件对应。
+  final VoidCallback? onReady;
+
   @override
   ConsumerState<FluidBackground> createState() => _FluidBackgroundState();
 }
@@ -191,6 +213,14 @@ class _FluidBackgroundState extends ConsumerState<FluidBackground>
   ImageStreamListener? _listener;
   ui.Image? _smallImage;
 
+  /// 设备像素比：`renderScale` 是相对**物理像素**的比例（对齐上游
+  /// `BaseRenderer` 的 `clientWidth * devicePixelRatio * renderScale`），
+  /// 不能按逻辑像素算，否则高 DPI 屏幕上实际分辨率会再低一个 DPR 倍。
+  double _devicePixelRatio = 1.0;
+
+  /// [FluidBackground.onReady] 只上报一次（封面替换不需要重新铺预览）。
+  bool _reportedReady = false;
+
   @override
   void initState() {
     super.initState();
@@ -198,6 +228,13 @@ class _FluidBackgroundState extends ConsumerState<FluidBackground>
     _resolveCover();
     if (widget.animate) _ensureTicker();
     if (kEnableFluidShader) _loadShader();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _devicePixelRatio =
+        MediaQuery.maybeDevicePixelRatioOf(context) ?? _devicePixelRatio;
   }
 
   @override
@@ -240,6 +277,16 @@ class _FluidBackgroundState extends ConsumerState<FluidBackground>
     _lastTickUs = 0;
     _lastFrameUs = 0;
     _ticker.start();
+  }
+
+  /// 首个流体状态已写入后上报就绪：延后到帧末，保证预览层淡出前
+  /// 流体至少已实际绘制过一帧。
+  void _reportReady() {
+    if (_reportedReady || widget.onReady == null) return;
+    _reportedReady = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onReady?.call();
+    });
   }
 
   /// 静态模式：立即完成所有淡入并丢弃旧状态（性能模式停表时用）。
@@ -337,6 +384,9 @@ class _FluidBackgroundState extends ConsumerState<FluidBackground>
         cover.dispose();
       }
     });
+    // 有状态（着色器路径）时等淡入到不透明再上报，预览层会一直铺到流体画面
+    // 完全显形；预烘焙封面直铺 / 关闭动画时首帧即不透明，立即上报。
+    if (_staticCover != null || !widget.animate) _reportReady();
   }
 
   // ── 帧循环 ───────────────────────────────────────────────────────────
@@ -364,6 +414,7 @@ class _FluidBackgroundState extends ConsumerState<FluidBackground>
     }
     if (_updateVolume()) changed = true;
     if (_advanceAlphas(frameDeltaMs)) changed = true;
+    if (_states.isNotEmpty && _states.last.alpha >= 1.0) _reportReady();
     if (changed) _repaint.notify();
   }
 
@@ -474,8 +525,9 @@ class _FluidPainter extends CustomPainter {
   }
 
   ui.Image? _renderSmall(double w, double h, double scale) {
-    final smallW = math.max(1, (w * scale).round());
-    final smallH = math.max(1, (h * scale).round());
+    final small = fluidRenderSize(w, h, s._devicePixelRatio, scale);
+    final smallW = small.width;
+    final smallH = small.height;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     _paintContent(canvas, Size(smallW.toDouble(), smallH.toDouble()));
@@ -512,8 +564,19 @@ class _FluidPainter extends CustomPainter {
         FluidUniforms.alpha,
         _easeInOutSine(_clamp01(state.alpha)),
       );
-      shader.setImageSampler(FluidUniforms.samplerWarp, state.warp);
-      shader.setImageSampler(FluidUniforms.samplerCover, state.cover);
+      // 必须显式 bilinear：`setImageSampler` 默认 FilterQuality.none（最近邻），
+      // 会把 32×32 封面与位移贴图放大成色块/折线；上游 WebGL 两张纹理都是
+      // LINEAR。这是流体观感明显粗糙的主因。
+      shader.setImageSampler(
+        FluidUniforms.samplerWarp,
+        state.warp,
+        filterQuality: FilterQuality.low,
+      );
+      shader.setImageSampler(
+        FluidUniforms.samplerCover,
+        state.cover,
+        filterQuality: FilterQuality.low,
+      );
       canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
     }
   }

@@ -192,11 +192,15 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
   `buildFluidWarpMesh` 逐行照搬上游 `updateMesh`（含 gl-matrix 列主序矩阵与 5 组预设 /
   `cp-generate` 随机生成），把「未 aspect 校正的 NDC `pos` → 纹理坐标 `v_uv`」前向栅格化
   进 `drawVertices`（顶点色 = RG 存 `v_uv`，`BlendMode.dst`），`Picture.toImageSync` 出图。
-  **每首歌只烘焙一次**（`256×256`，subdiv=50），窗口缩放不需重烘焙。
+  **每首歌只烘焙一次**（`512×512`，subdiv=50），窗口缩放不需重烘焙。
 - **片元单 pass**（`app/shaders/fluid.frag`）：屏幕 uv → **逆 aspect**（还原上游顶点着色器）
   → 查位移图得 `v_uv` → 旋转/缩放 → **镜像重复**采封面 → 音量 alpha/晕影/dither → 预乘输出。
   uniform 扁平布局 `FluidUniforms`（uSize/uAspect/uVolume/uSinAngle/uCosAngle/uAlpha，
   sampler uWarp/uCover），含与 `.frag` 一致性的单元测试。
+  ⚠️ **两张采样纹理都必须显式 `FilterQuality.low`（双线性）**：Flutter
+  `FragmentShader.setImageSampler` 默认是 `FilterQuality.none`（最近邻），会把 32×32
+  封面与位移贴图放大成色块/折线；上游 WebGL 两张纹理均为 `LINEAR`。水纹着色器的
+  `uCoverFrom/uCoverTo` 同理。
 - **封面预烘焙**（`fluid_cover.dart`）：封面压到 32×32 → 上游四步色调（对比度 0.4 →
   饱和 3.0 → 对比度 1.7 → 亮度 0.75，中间不夹取故合并成**单个颜色矩阵**）→
   `blurImage(radius=2, quality=4)` 盒式模糊，均为纯 CPU 字节运算，逐位移植且可单测。
@@ -204,7 +208,8 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
   （`drawRect` 时引擎会**拷贝** uniforms，故复用同一 `FragmentShader` 安全）；旧状态在
   新状态 alpha 达 1.1 后释放。上游 `meshStates` 语义一致。
 - **设置项完整对齐上游**：`player.playerBg*` → 流速（0.1~10，默认 4）/ 渲染比例
-  （0.5~2，默认 0.5，`renderScale` 低分辨率离屏）/ 帧率上限（24~120，默认 30）/
+  （0.5~2，默认 0.5，`renderScale` 低分辨率离屏；尺寸按 **逻辑像素 × DPR × scale**
+  计算，与上游 `clientWidth * devicePixelRatio * renderScale` 同档，高 DPI 下不漏分辨率）/ 帧率上限（24~120，默认 30）/
   暂停冻结（默认 false）/ 低频节拍脉动（默认 false，移植 `getBassPulse` 80~180Hz +
   attack/decay 平滑）。性能模式停表呈现静态帧。
 - **回退**：着色器不可用 / `ARCHOERA_FLUID_SHADER=0` / 位移图烘焙失败 / `flutter test`
