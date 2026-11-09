@@ -97,8 +97,15 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+/// APE seek 精确丢弃到目标样本（samples_done = target）。
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const a: *ApeCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(a.samples_done);
+}
 
 /// CRC-32/MPEG（IEEE 反射表，poly 0xEDB88320），对齐 FFmpeg av_crc(AV_CRC_32_IEEE_LE)
 const crc32_table = blk: {
