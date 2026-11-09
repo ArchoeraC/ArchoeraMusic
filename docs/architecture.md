@@ -456,7 +456,8 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 **渲染（Flutter）**
 - **歌词引擎 Dart 移植（重点工程）**：原项目 `Lyrics/engine/`（AMLL：line-builder / word-builder / spring / line-animations / emphasize / interlude / scroll-preroll / split-words）→ Apple Music 风格逐字/逐词高亮动画、弹簧曲线、间奏处理（详见 §10.7）
   - **表现层对齐已实现（2026-09-20）**：时钟 vsync 插值、羽化渐变扫亮、非激活行失焦/缩放景深、
-    逐词上浮、长音强调辉光、间奏三点、背景人声行 —— 见 [lyrics-amll-alignment.md](lyrics-amll-alignment.md)。
+    逐词上浮、长音强调辉光、间奏识别、背景人声行 —— 见 [lyrics-amll-alignment.md](lyrics-amll-alignment.md)。
+    （AMLL 的间奏三点等待动画已按产品要求移除。）
     仍未移植：换行平衡（line-balancer）、ruby/罗马音、对唱布局、scroll-preroll。
 - 翻译行：双行模式（原文 + 译文），可开关
 - 无歌词回退：显示"纯音乐 / 无歌词"状态
