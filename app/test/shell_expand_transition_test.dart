@@ -10,14 +10,22 @@ library;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:archoera_music/app/player_route_curves.dart';
 import 'package:archoera_music/app/shell_expand_transition.dart';
 
-Widget _host(Animation<double> animation, {bool disableAnimations = false}) {
+Widget _host(
+  Animation<double> animation, {
+  bool disableAnimations = false,
+  Curve curve = kPlayerRouteOpenCurve,
+  Curve reverseCurve = kPlayerRouteCloseCurve,
+}) {
   return MaterialApp(
     home: Scaffold(
       body: ShellExpandTransition(
         animation: animation,
         disableAnimations: disableAnimations,
+        curve: curve,
+        reverseCurve: reverseCurve,
         child: const Text('child'),
       ),
     ),
@@ -85,6 +93,43 @@ void main() {
       expect(find.text('child'), findsOneWidget);
       await tester.pumpAndSettle();
       expect(find.text('child'), findsOneWidget);
+    });
+
+    testWidgets('展开/收起分别走 curve / reverseCurve', (tester) async {
+      final c = _controller(tester);
+      const open = Curves.easeOutQuad;
+      const close = Curves.easeInQuad;
+      await tester.pumpWidget(_host(c, curve: open, reverseCurve: close));
+
+      // 正向：用 curve 变换原始值。
+      c.forward();
+      c.stop();
+      c.value = 0.5;
+      await tester.pump();
+      final forwardOpacity = tester
+          .widget<Opacity>(
+            find.ancestor(
+              of: find.text('child'),
+              matching: find.byType(Opacity),
+            ),
+          )
+          .opacity;
+      expect(forwardOpacity, closeTo(1 - open.transform(0.5), 1e-9));
+
+      // 反向：用 reverseCurve 直接变换递减中的原始值（不做 flipped）。
+      c.reverse();
+      c.stop();
+      c.value = 0.5;
+      await tester.pump();
+      final reverseOpacity = tester
+          .widget<Opacity>(
+            find.ancestor(
+              of: find.text('child'),
+              matching: find.byType(Opacity),
+            ),
+          )
+          .opacity;
+      expect(reverseOpacity, closeTo(1 - close.transform(0.5), 1e-9));
     });
 
     testWidgets('disableAnimations：展开/折叠均直切', (tester) async {
