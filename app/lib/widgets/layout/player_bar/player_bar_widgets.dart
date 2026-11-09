@@ -20,8 +20,9 @@ class _BarCoverState extends ConsumerState<_BarCover> {
 
   @override
   Widget build(BuildContext context) {
-    final double coverRadius =
-        ref.watch(appPrefsProvider.select((p) => p.coverRadius));
+    final double coverRadius = ref.watch(
+      appPrefsProvider.select((p) => p.coverRadius),
+    );
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -47,7 +48,7 @@ class _BarCoverState extends ConsumerState<_BarCover> {
                   context,
                   const Duration(milliseconds: 200),
                 ),
-                curve: appMotion,
+                curve: Curves.easeOut,
                 child: Container(
                   width: _size,
                   height: _size,

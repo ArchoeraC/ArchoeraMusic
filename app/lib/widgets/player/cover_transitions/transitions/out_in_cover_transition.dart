@@ -8,7 +8,6 @@ library;
 import 'package:material_ui/material_ui.dart';
 
 import '../../../common/anim.dart';
-import '../../../../theme/motion.dart';
 
 /// out-in 切换器。
 ///
@@ -16,7 +15,7 @@ import '../../../../theme/motion.dart';
 /// - [slide] 为 false 时做位移 + 缩放 + 淡入淡出；
 /// - [slide] 为 true 时做全幅滑动，方向跟随 [next]（下一首从右进、向左出，
 ///   上一首相反）。
-/// 离场曲线 [appMotion]，入场曲线 [appMotion]；时长由
+/// 离场曲线 [Curves.ease]，入场曲线 [Curves.easeOutExpo]；时长由
 /// [leaveDuration] / [enterDuration] 指定。系统关闭动画时直接换图。
 class OutInCoverTransition extends StatefulWidget {
   const OutInCoverTransition({
@@ -109,9 +108,9 @@ class _OutInCoverTransitionState extends State<OutInCoverTransition>
       builder: (context, _) {
         final t = _ctrl.value;
         final posT = _leaving
-            ? appMotion.transform(t)
-            : appMotion.transform(t);
-        final opT = appMotion.transform(t);
+            ? Curves.ease.transform(t)
+            : Curves.easeOutExpo.transform(t);
+        final opT = Curves.ease.transform(t);
         return LayoutBuilder(
           builder: (context, c) {
             final width = c.maxWidth;

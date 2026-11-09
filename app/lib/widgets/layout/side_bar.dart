@@ -17,7 +17,6 @@ import '../common/anim.dart';
 import '../common/ink_clip.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
-import '../../theme/motion.dart';
 
 part 'side_bar/side_bar_view.dart';
 

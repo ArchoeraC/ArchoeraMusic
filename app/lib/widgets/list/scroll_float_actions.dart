@@ -18,8 +18,8 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/l10n.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
-import '../../theme/motion.dart';
 
 part 'scroll_float_actions/scroll_float_actions_view.dart';
 
@@ -161,7 +161,7 @@ class _ScrollToTopButtonState extends State<ScrollToTopButton> {
     widget.controller.animateTo(
       0,
       duration: const Duration(milliseconds: 320),
-      curve: appMotion,
+      curve: Curves.easeOutCubic,
     );
   }
 
@@ -199,7 +199,7 @@ class LocatePlayingButton extends StatelessWidget {
     controller.animateTo(
       target,
       duration: const Duration(milliseconds: 320),
-      curve: appMotion,
+      curve: Curves.easeOutCubic,
     );
   }
 

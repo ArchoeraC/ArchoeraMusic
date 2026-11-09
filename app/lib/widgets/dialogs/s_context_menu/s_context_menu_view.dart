@@ -55,7 +55,7 @@ extension _SContextMenuOverlayView on _SContextMenuOverlayState {
           top: top,
           child: TweenAnimationBuilder<double>(
             duration: animDuration(context, const Duration(milliseconds: 140)),
-            curve: appMotion,
+            curve: Curves.easeOutCubic,
             tween: Tween(begin: 0, end: _t),
             builder: (context, t, child) => Transform.scale(
               scale: 0.96 + 0.04 * t,
@@ -89,9 +89,8 @@ extension _SContextMenuOverlayView on _SContextMenuOverlayState {
                               ),
                               child: Divider(
                                 height: 1,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.outline.withValues(alpha: 0.4),
+                                color: Theme.of(context).colorScheme.outline
+                                    .withValues(alpha: 0.4),
                               ),
                             )
                           : _MenuItem(item: item, onClose: widget.onClose),

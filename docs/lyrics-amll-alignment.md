@@ -32,7 +32,7 @@ Flutter 的 `ui.Paragraph` 做不到逐 run 变换、也不能给文字直接加
 | `mask-image` 渐变扫亮（未唱 .4 / 已唱 1.0，羽化 `wordFadeWidth×字高`） | 逐字 `dstIn` 线性渐变遮罩 | `lyrics_fragment_render.dart` + painter |
 | 非激活行 `blur(1+distance)` + `scale .97` + opacity | 指数平滑的 `_blur` / `_scale` / `_fade`（无逐行弹簧对象） | `lyrics_physics_wall_state.dart` |
 | `float` 每词 0→-0.05em（BG ×2） | `resolveWordAnim` 的 `dy` | `lyrics_word_anim.dart` |
-| `emphasize` 长音脉冲（`empEasing` 0→1→0）+ 白辉光 + 缩放 + 推挤 + bob | 同参数；辉光用 `ui.TextStyle.shadows` | `lyrics_word_anim.dart` + painter |
+| `emphasize` 长音脉冲（`empEasing` 0→1→0）+ 白辉光 + 缩放 + 推挤 + bob | 同参数；辉光**已停用**（不复用 `ui.TextStyle.shadows`，避免逐帧重建阴影段落），缩放/推挤/bob 保留 | `lyrics_word_anim.dart` + painter |
 | `interlude-dots`（≥7s 空隙） | `computeInterludes` + `resolveInterludeDots` | `interlude_dots.dart` |
 | `isBG` 背景人声（整行括号判定） | `LyricGroup.isBG`（解析期剥离括号） | `services/lyrics/lyric_line.dart` |
 | `cubic-bezier` 手搓缓动 | `cubicBezier` / `empathEasing` | `curves.dart` |

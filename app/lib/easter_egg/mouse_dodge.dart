@@ -22,7 +22,6 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import 'easter_egg_visual_state.dart';
-import '../theme/motion.dart';
 
 /// 每次躲避的步长与动画时长。
 const Duration _kDodgeAnim = Duration(milliseconds: 240);
@@ -80,7 +79,7 @@ class _MouseDodgeState extends State<MouseDodge> {
         return TweenAnimationBuilder<Offset>(
           tween: Tween<Offset>(begin: Offset.zero, end: _target),
           duration: _kDodgeAnim,
-          curve: appMotion,
+          curve: Curves.easeOutCubic,
           builder: (BuildContext context, Offset offset, Widget? inner) =>
               Transform.translate(offset: offset, child: inner),
           child: content,
