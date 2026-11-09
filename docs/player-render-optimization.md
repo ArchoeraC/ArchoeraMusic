@@ -17,7 +17,6 @@
 > [architecture.md](architecture.md)、
 > [runtime-resource-optimization.md](runtime-resource-optimization.md)（跨框架机制 + 全局长效方案）、
 > [rendering-reference-research.md](rendering-reference-research.md)（外部合成器渲染参考调研，2026-11-03）、
-> [motion-system.md](motion-system.md)（全应用近线性动效节奏，2026-11-09）、
 > [archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md](archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md)。
 
 ---
@@ -261,7 +260,7 @@ Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐
 | 逐字渲染 | `lyrics_fragment_render.dart`：整行段落取 `getBoxesForRange` 逐字盒 + 逐字左对齐小段落（缓存） | 每行 1 次整行 layout + 2N 次小段落（换行时一次性） |
 | 羽化扫亮 | 逐字 dstIn 线性渐变遮罩（未唱 α0.4 → 已唱 α1.0），当前扫过字 1 层 `saveLayer` | 每帧 1 层（仅激活行） |
 | 景深 | 非激活行失焦（默认「整层一次 + 1/4 重采样」，可切逐行 σ=`min(5,1+距离)`）+ 弹簧化 `scale 0.97` + 距离透明度；帧预算守卫自动降级 | 默认档每帧 **1** 个离屏层（像素量 1/4）；逐行档 ≈ 可见行数层 |
-| 逐词上浮/长音强调 | `lyrics_word_anim.dart`（AMLL float + emphasize 脉冲：辉光/缩放/推挤/bob） | 长音字/词每帧重建 1 个小段落 |
+| 逐词上浮/长音强调 | `lyrics_word_anim.dart`（AMLL float + emphasize 脉冲：缩放/推挤/bob；辉光已停用） | 复用预渲染段落，0 段/帧（原为 1 个小段落/帧） |
 | 间奏三点 | `interlude_dots.dart`（≥7s 空隙；依次点亮 + 呼吸 + 两段退场） | 3 个圆，可忽略 |
 | 背景人声行 | 解析整行括号 → `isBG`；0.7× 字号、0.4 透明度、以 0.4× 行距挂在上一行下方（占位，不再与下一行重叠） | 无额外成本 |
 | 行距/行高度量 | `kLyricLineHeightEm 1.2` + `kLyricLineGapEm 1.0`（AMLL wrapper 内边距等效 0.8，适度放宽） | 无 |

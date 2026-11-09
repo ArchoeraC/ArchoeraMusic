@@ -54,12 +54,12 @@ extension _NeteaseLoginDialogView on _NeteaseLoginDialogState {
                           // AnimatedOpacity 整体淡出/淡入 + AnimatedSize 动画高度。
                           AnimatedSize(
                             duration: const Duration(milliseconds: 250),
-                            curve: appMotion,
+                            curve: Curves.easeInOutCubic,
                             alignment: Alignment.topCenter,
                             child: AnimatedOpacity(
                               opacity: _switching ? 0 : 1,
                               duration: const Duration(milliseconds: 180),
-                              curve: appMotion,
+                              curve: Curves.easeInOut,
                               child: switch (_displayTab) {
                                 0 => _qrTab(theme, scheme, l10n),
                                 1 => _phoneTab(theme, scheme, l10n),
@@ -261,7 +261,9 @@ extension _NeteaseLoginDialogView on _NeteaseLoginDialogState {
             SizedBox(
               height: 48,
               child: FilledButton.tonal(
-                onPressed: (_phoneBusy || _codeCountdown > 0) ? null : _sendCode,
+                onPressed: (_phoneBusy || _codeCountdown > 0)
+                    ? null
+                    : _sendCode,
                 child: Text(
                   _codeCountdown > 0
                       ? '${_codeCountdown}s'

@@ -31,11 +31,11 @@ import '../widgets/player/quality_menu.dart';
 import '../widgets/player/spectrum_view.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/common/anim.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 import 'player/layouts/player_layout.dart';
 import 'player/layouts/poster_layout.dart';
-import '../theme/motion.dart';
 
 part 'player/player_page_view.dart';
 
@@ -221,9 +221,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final maxAsync = platform.maxQualityProvider(track);
     final maxQuality = maxAsync == null
         ? null
-        : ref
-              .watch(maxAsync)
-              .maybeWhen(data: (v) => v, orElse: () => null);
+        : ref.watch(maxAsync).maybeWhen(data: (v) => v, orElse: () => null);
     return platform.availableQualities(track, maxQuality: maxQuality);
   }
 

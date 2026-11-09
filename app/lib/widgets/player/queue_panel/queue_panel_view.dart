@@ -30,8 +30,8 @@ extension _QueuePanelView on QueuePanel {
                       ).animate(
                         CurvedAnimation(
                           parent: animation,
-                          curve: appMotion,
-                          reverseCurve: appMotion,
+                          curve: Curves.easeOutCubic,
+                          reverseCurve: Curves.easeInCubic,
                         ),
                       ),
                   child: panel,
@@ -42,12 +42,11 @@ extension _QueuePanelView on QueuePanel {
 
     final expand = CurvedAnimation(
       parent: animation,
-      curve: appMotion,
-      reverseCurve: appMotion,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
     );
-    final fade = CurveTween(
-      curve: const Interval(0.0, 1.0 / 3.0),
-    ).animate(animation);
+    final fade = CurveTween(curve: const Interval(0.0, 1.0 / 3.0))
+        .animate(animation);
     final panel = ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxHeight!),
       child: glass,
@@ -388,12 +387,7 @@ class _QueueTile extends StatelessWidget {
       ),
       title: Row(
         children: [
-          CoverImage(
-            cover: track.cover,
-            width: 30,
-            height: 30,
-            iconSize: 16,
-          ),
+          CoverImage(cover: track.cover, width: 30, height: 30, iconSize: 16),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

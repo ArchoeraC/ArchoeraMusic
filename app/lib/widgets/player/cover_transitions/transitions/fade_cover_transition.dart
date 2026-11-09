@@ -9,7 +9,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../common/cross_fade_switcher.dart';
 import '../cover_transition.dart';
-import '../../../../theme/motion.dart';
 
 class FadeCoverTransition extends CoverTransition {
   const FadeCoverTransition();
@@ -24,7 +23,7 @@ class FadeCoverTransition extends CoverTransition {
         // 比上游 SImg 的 200ms 略长，便于感知；只改透明度，避免与封面
         // 自身的播放/暂停缩放叠加成“边淡边动”的观感。
         duration: const Duration(milliseconds: 360),
-        curve: appMotion,
+        curve: Curves.easeInOutCubic,
         child: c.child,
       );
 }

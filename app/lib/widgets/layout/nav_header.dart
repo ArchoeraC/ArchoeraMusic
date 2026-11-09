@@ -35,8 +35,6 @@ import '../common/toast.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
-import '../../theme/motion.dart';
-
 part 'nav_header/nav_header_accounts.dart';
 part 'nav_header/nav_header_search_dropdown.dart';
 part 'nav_header/nav_header_view.dart';

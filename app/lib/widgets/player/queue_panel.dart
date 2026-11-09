@@ -12,8 +12,8 @@ import '../../l10n/l10n.dart';
 import '../../utils/format.dart';
 import '../list/cover_image.dart';
 import '../common/glass_blur.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
-import '../../theme/motion.dart';
 
 part 'queue_panel/queue_panel_view.dart';
 

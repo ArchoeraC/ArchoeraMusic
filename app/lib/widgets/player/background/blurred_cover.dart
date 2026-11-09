@@ -23,7 +23,6 @@ import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 
 import '../../list/cover_image.dart';
-import '../../../theme/motion.dart';
 
 /// 饱和度颜色滤镜（对齐上游 `saturate`），供水纹与模糊背景共用。
 ColorFilter saturationColorFilter(double saturation) {
@@ -90,8 +89,8 @@ class BlurredCover extends StatelessWidget {
             // 双缓冲交叉淡入：旧图淡出、新图淡入同时进行（每层各自烘焙一次）。
             AnimatedSwitcher(
               duration: duration,
-              switchInCurve: appMotionLinear,
-              switchOutCurve: appMotionLinear,
+              switchInCurve: Curves.easeInOut,
+              switchOutCurve: Curves.easeInOut,
               layoutBuilder: (currentChild, previousChildren) => Stack(
                 fit: StackFit.expand,
                 children: [...previousChildren, ?currentChild],
@@ -181,7 +180,8 @@ class _BakedBlurLayerState extends State<_BakedBlurLayer> {
     final mq = MediaQuery.maybeOf(context);
     if (mq == null) return maxBakeSide;
     final s = mq.size;
-    final longest = (s.width > s.height ? s.width : s.height) * mq.devicePixelRatio;
+    final longest =
+        (s.width > s.height ? s.width : s.height) * mq.devicePixelRatio;
     return longest.round().clamp(256, maxBakeSide);
   }
 
@@ -257,7 +257,10 @@ class _BakedBlurLayerState extends State<_BakedBlurLayer> {
 
     final srcSize = Size(source.width.toDouble(), source.height.toDouble());
     final fitted = applyBoxFit(BoxFit.cover, srcSize, out);
-    final srcRect = Alignment.center.inscribe(fitted.source, Offset.zero & srcSize);
+    final srcRect = Alignment.center.inscribe(
+      fitted.source,
+      Offset.zero & srcSize,
+    );
     final dstRect = Alignment.center.inscribe(
       fitted.destination,
       Offset.zero & out,

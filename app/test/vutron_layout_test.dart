@@ -145,9 +145,8 @@ void main() {
     expect(view.unplayedColor, const Color(_unplayed));
     expect(view.textAlign, TextAlign.left);
     expect(view.inactiveScale, 0.95);
-    // 2026-11-09 起 simple 引擎自己按行做上下渐隐（零离屏层），
-    // 不再依赖外层 ShaderMask。
-    expect(view.fadeEdges, isTrue);
+    // 渐隐由共享歌词区遮罩承担（SPlayer 的 10%/25% 非线性 mask）。
+    expect(find.byType(LyricsEdgeFade), findsOneWidget);
     expect(view.currentFontSize, view.fontSize);
 
     // 播放键跟随主题色（与页面其它控制一致）。

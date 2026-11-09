@@ -145,9 +145,7 @@ class _RecoveryPasswordFieldState extends State<_RecoveryPasswordField> {
               visualDensity: VisualDensity.compact,
               onPressed: () => setState(() => _obscure = !_obscure),
               icon: Icon(
-                _obscure
-                    ? EtaIcons.eyeCloseOutline
-                    : EtaIcons.eyeOutline,
+                _obscure ? EtaIcons.eyeCloseOutline : EtaIcons.eyeOutline,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
@@ -221,8 +219,7 @@ class _NewPasswordFieldState extends State<_NewPasswordField> {
     super.dispose();
   }
 
-  bool get _valid =>
-      _ctrl.text.isNotEmpty && _ctrl.text == _confirm.text;
+  bool get _valid => _ctrl.text.isNotEmpty && _ctrl.text == _confirm.text;
 
   void _submit() {
     if (!_valid) return;
@@ -328,7 +325,7 @@ class _SchemeCard extends StatelessWidget {
         onTap: busy ? null : () => onTap(value),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          curve: appMotion,
+          curve: Curves.easeOut,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isSelected

@@ -13,8 +13,8 @@
 library;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:material_color_utilities/material_color_utilities.dart' show Hct;
-import 'motion.dart';
+import 'package:material_color_utilities/material_color_utilities.dart'
+    show Hct;
 
 /// 近中性种子色度阈值：低于此值视为「无有效色相」，用 [DynamicSchemeVariant.content]
 /// 生成近中性方案。否则 `tonalSpot` 会从灰种子的任意色相重建出突兀的高彩度色
@@ -537,8 +537,8 @@ class _FadeSlidePageTransitionsBuilder extends PageTransitionsBuilder {
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return child;
     final curved = CurvedAnimation(
       parent: animation,
-      curve: appMotion,
-      reverseCurve: appMotion,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
     );
     return FadeTransition(
       opacity: curved,

@@ -13,8 +13,7 @@ extension _BarLyricTextView on _BarLyricTextState {
     final prefs = ref.watch(appPrefsProvider);
     final showTranslation = prefs.showTranslation;
     final groups =
-        ref.watch(currentLyricsProvider).value ??
-        const <LyricGroup>[];
+        ref.watch(currentLyricsProvider).value ?? const <LyricGroup>[];
 
     final idx = lyricIndexAt(groups, positionMs);
     if (idx < 0) return SizedBox(height: widget.height);
@@ -207,7 +206,7 @@ class _LyricRollState extends State<_LyricRoll>
         animation: _ctrl,
         builder: (context, _) {
           // 近线性：起步/收尾速度一致，读起来像「整条滚过去」而不是「窜一下」。
-          final t = appMotion.transform(_ctrl.value);
+          final t = Curves.easeOutCubic.transform(_ctrl.value);
           // 新行位移：前进时 1→0（自下方上移入位），倒退时 -1→0。
           final incoming = _rollUp ? 1 - t : t - 1;
           // 旧行位移：前进时 0→-1（向上滚出），倒退时 0→1。
@@ -264,7 +263,7 @@ class _KaraokeFollow extends StatelessWidget {
       child: TweenAnimationBuilder<double>(
         tween: Tween<double>(end: dx),
         duration: Duration(milliseconds: animMs),
-        curve: appMotionLinear,
+        curve: Curves.easeOut,
         builder: (context, value, child) => OverflowBox(
           alignment: Alignment.centerLeft,
           maxWidth: double.infinity,

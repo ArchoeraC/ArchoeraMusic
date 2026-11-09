@@ -43,8 +43,7 @@ extension _PlayerPageView on _PlayerPageState {
       _coverPulse.forward(from: 0);
     });
     final canLike = current != null && sourceSupportsLike(current.source);
-    final canComment =
-        current != null && sourceSupportsComment(current.source);
+    final canComment = current != null && sourceSupportsComment(current.source);
     final liked = canLike
         ? ref.watch(likeControllerProvider).isLiked(current)
         : false;
@@ -174,7 +173,7 @@ extension _PlayerPageView on _PlayerPageState {
                           context,
                           const Duration(milliseconds: 300),
                         ),
-                        curve: appMotionLinear,
+                        curve: Curves.easeOut,
                         child: scrims,
                       ),
                     ),
@@ -193,7 +192,7 @@ extension _PlayerPageView on _PlayerPageState {
                             context,
                             const Duration(milliseconds: 300),
                           ),
-                          curve: appMotionLinear,
+                          curve: Curves.easeOut,
                           child: IgnorePointer(
                             ignoring: autoImmersive && !_controlsVisible,
                             child: _PlayerTopBar(
@@ -206,7 +205,8 @@ extension _PlayerPageView on _PlayerPageState {
                               qualityLevels: qualityLevels,
                               isFullScreen: _isFullScreen,
                               onClose: () => context.pop(),
-                              onToggleLyrics: hasLyrics && layout.lyricsToggleable
+                              onToggleLyrics:
+                                  hasLyrics && layout.lyricsToggleable
                                   ? () => ref
                                         .read(appPrefsProvider.notifier)
                                         .setShowLyricsInPlayer(!showLyrics)
@@ -484,7 +484,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
         AnimatedOpacity(
           opacity: controlsVisible ? 0.4 : 1,
           duration: animDuration(context, const Duration(milliseconds: 300)),
-          curve: appMotionLinear,
+          curve: Curves.easeOut,
           child: RepaintBoundary(
             child: SizedBox(
               width: double.infinity,
@@ -496,7 +496,7 @@ class _PlayerBottomOverlay extends StatelessWidget {
         AnimatedOpacity(
           opacity: controlsVisible ? 1 : 0,
           duration: animDuration(context, const Duration(milliseconds: 300)),
-          curve: appMotionLinear,
+          curve: Curves.easeOut,
           child: IgnorePointer(
             ignoring: !controlsVisible,
             child: Column(
@@ -562,8 +562,7 @@ class _ProgressLyric extends ConsumerWidget {
       playbackProvider.select((s) => s.position.inMilliseconds),
     );
     final groups =
-        ref.watch(currentLyricsProvider).value ??
-        const <LyricGroup>[];
+        ref.watch(currentLyricsProvider).value ?? const <LyricGroup>[];
     if (groups.isEmpty) return const SizedBox.shrink();
     final i = lyricIndexAt(groups, dragMs?.round() ?? pos);
     if (i < 0 || i >= groups.length) return const SizedBox.shrink();

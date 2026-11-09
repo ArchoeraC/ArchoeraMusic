@@ -34,7 +34,6 @@ import '../../list/cover_image.dart';
 import 'fluid_cover.dart';
 import 'fluid_mesh.dart';
 import 'fluid_shader.dart';
-import '../../../theme/motion.dart';
 
 /// 流体背景最终只用 `kFluidCoverSize`（32×32）纹理；解码到 64 做一次廉价
 /// 超采样即可，**绝不能**整幅解码（`processFluidCover` 会把整幅 RGBA 读出来）。
@@ -76,7 +75,8 @@ double fluidBassPulse(List<double> left, List<double> right) {
   for (var i = start; i < end; i++) {
     final position = count <= 1 ? 0.0 : (i - start) / (count - 1);
     final weight = 1 - position * (1 - _kBassHighBinWeight);
-    final value = ((i < left.length ? left[i] : 0.0) +
+    final value =
+        ((i < left.length ? left[i] : 0.0) +
             (i < right.length ? right[i] : 0.0)) /
         2;
     sum += value * value * weight;
@@ -85,7 +85,10 @@ double fluidBassPulse(List<double> left, List<double> right) {
   }
   final rms = math.sqrt(sum / math.max(1, weightSum));
   final energy = rms * (1 - _kBassPeakMix) + peak * _kBassPeakMix;
-  final normalized = math.max(0, (energy - _kBassThreshold) / (1 - _kBassThreshold));
+  final normalized = math.max(
+    0,
+    (energy - _kBassThreshold) / (1 - _kBassThreshold),
+  );
   return _clamp01(math.pow(normalized, _kBassCurve).toDouble() * _kBassGain);
 }
 
@@ -113,6 +116,8 @@ final int _bassBinEnd = () {
   }
   return end;
 }();
+
+double _easeInOutSine(double x) => -(math.cos(math.pi * x) - 1) / 2;
 
 /// 单个曲目状态的（位移图 + 预烘焙封面 + 淡入 alpha）。
 class _FluidState {
@@ -377,8 +382,8 @@ class _FluidBackgroundState extends ConsumerState<FluidBackground>
     final pulse = fluidBassPulse(fft.ldata, fft.rdata);
     final factor = pulse > _smoothedPulse ? kFluidBassAttack : kFluidBassDecay;
     _smoothedPulse += factor * (pulse - _smoothedPulse);
-    final next = (kFluidVolumeBase + _clamp01(_smoothedPulse) * kFluidVolumeRange) /
-        10;
+    final next =
+        (kFluidVolumeBase + _clamp01(_smoothedPulse) * kFluidVolumeRange) / 10;
     if ((next - _volume).abs() < 1e-6) return false;
     _volume = next;
     return true;
@@ -505,7 +510,7 @@ class _FluidPainter extends CustomPainter {
       shader.setFloat(FluidUniforms.cosAngle, cosAngle);
       shader.setFloat(
         FluidUniforms.alpha,
-        appMotion.transform(_clamp01(state.alpha)),
+        _easeInOutSine(_clamp01(state.alpha)),
       );
       shader.setImageSampler(FluidUniforms.samplerWarp, state.warp);
       shader.setImageSampler(FluidUniforms.samplerCover, state.cover);
@@ -516,7 +521,7 @@ class _FluidPainter extends CustomPainter {
   void _paintFallback(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     for (final state in s._states) {
-      final a = appMotion.transform(_clamp01(state.alpha));
+      final a = _easeInOutSine(_clamp01(state.alpha));
       if (a <= 0.001) continue;
       _drawCover(canvas, rect, state.cover, a);
     }

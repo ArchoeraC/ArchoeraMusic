@@ -123,14 +123,13 @@ class PlayerLyricsBlock extends ConsumerWidget {
     const showTranslation = true;
     // 上下渐隐实现（设置页「性能 / 渲染」，环境变量可覆盖，见
     // `LyricsEdgeFadeMode`）：
-    // - wall（默认）：歌词渲染器自己按行透明度渐隐（零离屏层），两种引擎都支持；
+    // - wall（默认）：物理墙自己按行透明度渐隐（零离屏层），仅 amll 引擎支持；
     // - shader：外层 `ShaderMask`，任意子树都正确，但每帧一次**面积级离屏层**
     //   （全屏时成本随面积线性增长）；
     // - off：不渐隐。
     final fadeMode = resolveLyricsEdgeFadeMode(prefs.lyricsEdgeFade);
-    // `wall` 档：两种引擎都直接乘进每行颜色（零离屏层）。simple 引擎
-    // 2026-11-09 重写后也支持逐行渐隐，不再需要全屏 ShaderMask。
-    final wallEdgeFade = fadeEdges && fadeMode == LyricsEdgeFadeMode.wall;
+    final wallEdgeFade =
+        fadeEdges && engine == 'amll' && fadeMode == LyricsEdgeFadeMode.wall;
     final wall = engine == 'amll'
         ? AmllPhysicsWall(
             groups: groups,
@@ -171,12 +170,11 @@ class PlayerLyricsBlock extends ConsumerWidget {
             inactiveFontWeight: vutron ? FontWeight.w600 : FontWeight.w400,
             inactiveScale: vutron ? 0.95 : 1.0,
             textAlign: textAlign,
-            fadeEdges: wallEdgeFade,
             onSeek: onSeek,
           );
     return ClipRect(
-      // 逐行渐隐模式由歌词渲染器自身完成，不能再套 ShaderMask（会叠两次）。
-      child: fadeEdges && fadeMode == LyricsEdgeFadeMode.shader
+      // 逐行渐隐模式由墙自身完成，不能再套 ShaderMask（会叠两次）。
+      child: fadeEdges && !wallEdgeFade && fadeMode != LyricsEdgeFadeMode.off
           ? LyricsEdgeFade(child: wall)
           : wall,
     );

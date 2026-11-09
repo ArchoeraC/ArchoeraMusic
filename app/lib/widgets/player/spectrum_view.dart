@@ -15,7 +15,6 @@ import '../common/anim.dart';
 import 'spectrum_view/spectrum_timing.dart';
 import 'spectrum_view/styles/spectrum_style.dart';
 import 'spectrum_view/styles/spectrum_style_registry.dart';
-import '../../theme/motion.dart';
 
 part 'spectrum_view/spectrum_view_state.dart';
 part 'spectrum_view/spectrum_view_painter.dart';

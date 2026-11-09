@@ -45,7 +45,7 @@ class PlayerCoverBlock extends StatelessWidget {
         AnimatedScale(
           scale: playing ? 1.0 : 0.9,
           duration: animDuration(context, const Duration(milliseconds: 500)),
-          curve: appMotion,
+          curve: Curves.easeOutBack,
           child: AnimatedBuilder(
             animation: pulse,
             builder: (context, child) => Transform.scale(

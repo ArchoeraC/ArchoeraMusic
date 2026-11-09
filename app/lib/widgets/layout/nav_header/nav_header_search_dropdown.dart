@@ -58,12 +58,11 @@ class _SearchDropdown extends ConsumerWidget {
 
     final expand = CurvedAnimation(
       parent: panelCtrl,
-      curve: appMotion,
-      reverseCurve: appMotion,
+      curve: Curves.linearToEaseOut,
+      reverseCurve: Curves.easeInCubic,
     );
-    final fade = CurveTween(
-      curve: const Interval(0.0, 0.45),
-    ).animate(panelCtrl);
+    final fade = CurveTween(curve: const Interval(0.0, 0.45))
+        .animate(panelCtrl);
 
     final panel = ClipRRect(
       borderRadius: const BorderRadius.vertical(
@@ -95,9 +94,8 @@ class _SearchDropdown extends ConsumerWidget {
                   ),
                 ),
                 child: ScrollConfiguration(
-                  behavior: ScrollConfiguration.of(
-                    context,
-                  ).copyWith(scrollbars: false),
+                  behavior: ScrollConfiguration.of(context)
+                      .copyWith(scrollbars: false),
                   child: SingleChildScrollView(child: body),
                 ),
               ),
@@ -206,12 +204,7 @@ class _SearchDropdown extends ConsumerWidget {
       );
     } else if (hot.isNotEmpty) {
       children.add(
-        _sectionTitle(
-          context,
-          EtaIcons.fireOutline,
-          l10n.searchHot,
-          bottom: 2,
-        ),
+        _sectionTitle(context, EtaIcons.fireOutline, l10n.searchHot, bottom: 2),
       );
       for (var i = 0; i < hot.length && i < 20; i++) {
         children.add(_hotTile(scheme, hot[i], i));
@@ -222,12 +215,7 @@ class _SearchDropdown extends ConsumerWidget {
     final kugouHotTitle = '${l10n.brandKugou} · ${l10n.searchHot}';
     if (kugouHotLoading) {
       children.add(
-        _sectionTitle(
-          context,
-          EtaIcons.fireOutline,
-          kugouHotTitle,
-          bottom: 10,
-        ),
+        _sectionTitle(context, EtaIcons.fireOutline, kugouHotTitle, bottom: 10),
       );
       children.add(
         const Padding(
@@ -241,12 +229,7 @@ class _SearchDropdown extends ConsumerWidget {
       );
     } else if (kugouHot.isNotEmpty) {
       children.add(
-        _sectionTitle(
-          context,
-          EtaIcons.fireOutline,
-          kugouHotTitle,
-          bottom: 2,
-        ),
+        _sectionTitle(context, EtaIcons.fireOutline, kugouHotTitle, bottom: 2),
       );
       for (var i = 0; i < kugouHot.length && i < 20; i++) {
         children.add(_hotTile(scheme, kugouHot[i], i));
@@ -345,7 +328,11 @@ class _SearchDropdown extends ConsumerWidget {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-              Icon(EtaIcons.cornerUpLeft, size: 14, color: scheme.onSurfaceVariant),
+              Icon(
+                EtaIcons.cornerUpLeft,
+                size: 14,
+                color: scheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),

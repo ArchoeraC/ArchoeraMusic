@@ -34,8 +34,8 @@ enum LyricsEdgeFadeMode {
   ///
   /// 逐行取「行中心」处的渐隐值，因此是阶梯式淡出（不是逐像素渐变）；
   /// 与 `ShaderMask` 逐像素实测最大差 9/255（`test/lyrics_edge_fade_test.dart`），
-  /// 观感差异集中在最上/最下 1~2 行且不可辨。物理墙（`AmllPhysicsWall.edgeFade`）
-  /// 与重写后的 simple 引擎（`LyricsView.fadeEdges`）都支持。
+  /// 观感差异集中在最上/最下 1~2 行且不可辨。仅物理歌词墙支持
+  /// （`AmllPhysicsWall.edgeFade`）。
   wall,
 
   /// 不做渐隐（诊断用，观感会露出硬边）。

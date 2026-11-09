@@ -7,6 +7,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/widgets.dart' show Curves;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../netease/track.dart';
@@ -26,7 +27,6 @@ import 'playback_state.dart';
 import 'shuffle_bag.dart';
 import '../source/source_platform.dart';
 import 'store_source.dart';
-import '../../theme/motion.dart';
 
 export 'fft_frame.dart' show FftFrame;
 
@@ -168,7 +168,8 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
       return;
     }
     final prefs = ref.read(appPrefsProvider);
-    final wanted = !prefs.performanceMode &&
+    final wanted =
+        !prefs.performanceMode &&
         (prefs.enableSpectrum || prefs.barSpectrum) &&
         state.playing;
     final peak = prefs.spectrumPeakHold;
@@ -282,7 +283,7 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
     final rawSteps = durationMs ~/ stepMs;
     final steps = rawSteps < 1 ? 1 : rawSteps;
     for (var i = 1; i <= steps; i++) {
-      final t = appMotionLinear.transform(i / steps);
+      final t = Curves.easeOut.transform(i / steps);
       final v = from + (to - from) * t;
       // ignore: discarded_futures
       await _engine?.setVolume(v);
@@ -356,10 +357,8 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   }
 
   /// 由本地响度分析结果计算归一化兜底增益（dB）。见 [normalizationGainDb]。
-  double _normalizationGainDb(Track? track) => normalizationGainDb(
-    lufs: track?.loudnessLufs,
-    peak: track?.loudnessPeak,
-  );
+  double _normalizationGainDb(Track? track) =>
+      normalizationGainDb(lufs: track?.loudnessLufs, peak: track?.loudnessPeak);
 
   void _log(String line);
 }

@@ -232,7 +232,7 @@ extension _PlayerBarSections on _PlayerBarState {
                       context,
                       const Duration(milliseconds: 300),
                     ),
-                    curve: appMotion,
+                    curve: Curves.easeOutCubic,
                     alignment: Alignment.topCenter,
                     child: const _BarInfoSlot(),
                   ),

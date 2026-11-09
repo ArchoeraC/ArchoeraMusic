@@ -15,7 +15,6 @@ library;
 import 'package:material_ui/material_ui.dart';
 
 import '../common/anim.dart';
-import '../../theme/motion.dart';
 
 /// 歌词显隐槽（见库注释）。
 class PlayerLyricsSlot extends StatefulWidget {
@@ -57,8 +56,8 @@ class _PlayerLyricsSlotState extends State<PlayerLyricsSlot>
   ).animate(
     CurvedAnimation(
       parent: _ctrl,
-      curve: appMotion,
-      reverseCurve: appMotion,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
     ),
   );
 
