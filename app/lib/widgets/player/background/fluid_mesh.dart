@@ -19,7 +19,12 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 /// 位移贴图默认分辨率（正方形，边长像素）。
-const int kFluidWarpResolution = 256;
+///
+/// 上游用 subdiv=50 的顶点网格直接插值 `v_uv`（4~6 个控制点 → 150~250 个
+/// 顶点/轴）；位移贴图需要覆盖同等精度的 UV 场。256 在高 DPI/大窗口下先被
+/// 放大再采样，形变边缘会出现轻微折线；512 与上游网格密度匹配，且仍只占
+/// 512×512×4 ≈ 1 MiB、每首歌烘焙一次，带来明显更平滑的流动边缘。
+const int kFluidWarpResolution = 512;
 
 /// 网格细分级别（对齐上游 `resetSubdivition(50)`）。
 const int kFluidSubdiv = 50;
@@ -264,10 +269,7 @@ void _smoothifyControlPoints(
   double factor = 0.5,
   double factorIterationModifier = 0.1,
 }) {
-  var grid = List.generate(
-    h,
-    (j) => List.generate(w, (i) => conf[j * w + i]),
-  );
+  var grid = List.generate(h, (j) => List.generate(w, (i) => conf[j * w + i]));
   var f = factor;
   const kernel = [1, 2, 1, 2, 4, 2, 1, 2, 1];
   const kernelSum = 16.0;
@@ -395,7 +397,9 @@ FluidControlPointPreset pickFluidControlPoints({math.Random? random}) {
 }
 
 /// 由预设构建控制点网格（应用角度 → 切线、缩放 → 切线模长）。
-List<FluidControlPoint> buildFluidControlPoints(FluidControlPointPreset preset) {
+List<FluidControlPoint> buildFluidControlPoints(
+  FluidControlPointPreset preset,
+) {
   final w = preset.width;
   final h = preset.height;
   final uPower = w > 1 ? 2 / (w - 1) : 0.0;
@@ -489,11 +493,7 @@ Float64List _mat4Mul(Float64List a, Float64List b) {
 /// `out = m * a`（gl-matrix `Vec4.transformMat4`）。
 void _vec4Transform(Float64List out, Float64List a, Float64List m) {
   for (var r = 0; r < 4; r++) {
-    out[r] =
-        m[r] * a[0] +
-        m[4 + r] * a[1] +
-        m[8 + r] * a[2] +
-        m[12 + r] * a[3];
+    out[r] = m[r] * a[0] + m[4 + r] * a[1] + m[8 + r] * a[2] + m[12 + r] * a[3];
   }
 }
 
@@ -572,12 +572,8 @@ FluidWarpMesh buildFluidWarpMesh(
       final p10 = cp[cy * w + cx + 1];
       final p11 = cp[(cy + 1) * w + cx + 1];
 
-      final xAcc = _precomputeMatrix(
-        _meshCoefficients(p00, p01, p10, p11, 0),
-      );
-      final yAcc = _precomputeMatrix(
-        _meshCoefficients(p00, p01, p10, p11, 1),
-      );
+      final xAcc = _precomputeMatrix(_meshCoefficients(p00, p01, p10, p11, 0));
+      final yAcc = _precomputeMatrix(_meshCoefficients(p00, p01, p10, p11, 1));
 
       final sX = cx / (w - 1);
       final sY = cy / (h - 1);
