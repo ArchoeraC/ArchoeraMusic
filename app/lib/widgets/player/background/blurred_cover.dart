@@ -23,6 +23,7 @@ import 'dart:ui' as ui;
 import 'package:material_ui/material_ui.dart';
 
 import '../../list/cover_image.dart';
+import '../../../theme/motion.dart';
 
 /// 饱和度颜色滤镜（对齐上游 `saturate`），供水纹与模糊背景共用。
 ColorFilter saturationColorFilter(double saturation) {
@@ -89,8 +90,8 @@ class BlurredCover extends StatelessWidget {
             // 双缓冲交叉淡入：旧图淡出、新图淡入同时进行（每层各自烘焙一次）。
             AnimatedSwitcher(
               duration: duration,
-              switchInCurve: Curves.easeInOut,
-              switchOutCurve: Curves.easeInOut,
+              switchInCurve: appMotionLinear,
+              switchOutCurve: appMotionLinear,
               layoutBuilder: (currentChild, previousChildren) => Stack(
                 fit: StackFit.expand,
                 children: [...previousChildren, ?currentChild],

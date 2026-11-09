@@ -1101,67 +1101,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get nekoLoginTitle => 'NekoMusic にログイン';
 
   @override
-  String get nekoLoginTabOauth => 'OAuth ログイン';
-
-  @override
-  String get nekoOauthTitle => 'NekoAuth でログイン';
-
-  @override
-  String get nekoOauthDesc =>
-      '下記のワンタイムリンクを任意のブラウザで開いて認証してください。既定のブラウザでログインできない場合は、他のブラウザにコピーしてください。';
-
-  @override
-  String get nekoOauthOpen => 'ブラウザでログイン';
-
-  @override
-  String get nekoOauthWaiting => '認証を待っています…';
-
-  @override
-  String get nekoOauthUrlLabel => 'ワンタイムログイン URL';
-
-  @override
-  String get nekoOauthCopy => 'リンクをコピー';
-
-  @override
-  String get nekoOauthCopied => 'リンクをコピーしました';
-
-  @override
-  String get nekoOauthRefresh => '再取得';
-
-  @override
-  String get nekoOauthFailed => 'ログインに失敗しました';
-
-  @override
-  String get nekoLoginTabQr => '二次元コード';
-
-  @override
-  String get nekoLoginTabPassword => 'メールとパスワード';
-
-  @override
-  String get nekoLoginEmail => 'メール';
-
-  @override
-  String get nekoLoginPassword => 'パスワード';
-
-  @override
-  String get nekoLoginPasswordHint => 'パスワードを入力';
-
-  @override
-  String get nekoLoginSubmit => 'ログイン';
-
-  @override
-  String get nekoLoginForgotPassword => 'パスワードをお忘れですか？';
-
-  @override
-  String get nekoForgotCopyHint => 'リセットリンクをコピーしました。ブラウザで開いて再設定してください';
-
-  @override
-  String get nekoForgotFailed => 'リセットリンクの取得に失敗しました';
-
-  @override
-  String get nekoForgotOpened => 'ブラウザで再設定ページを開きました';
-
-  @override
   String get nekoLoginQrHint => 'NekoMusic アプリでスキャンしてログイン';
 
   @override
@@ -2532,13 +2471,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '現在標準モード';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化時に全メモリ状態を解放';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'バックグラウンド（最小化/トレイ/画面オフ）でページデータとキャッシュを破棄し、復帰時に再構築（ホームに戻る/スクロール位置が失われる場合あり）。再生には影響なし';
 
   @override
   String get settingsSearchEnergySavingSubtitle => 'スペクトル取得頻度を下げて CPU を節約';

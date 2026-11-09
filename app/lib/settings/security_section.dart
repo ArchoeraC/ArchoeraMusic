@@ -48,6 +48,7 @@ import '../services/security/vault_switch_snapshot.dart';
 import 'settings_widgets.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../theme/motion.dart';
 
 part 'security/security_section_actions.dart';
 part 'security/security_section_view.dart';

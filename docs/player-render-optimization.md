@@ -17,6 +17,7 @@
 > [architecture.md](architecture.md)、
 > [runtime-resource-optimization.md](runtime-resource-optimization.md)（跨框架机制 + 全局长效方案）、
 > [rendering-reference-research.md](rendering-reference-research.md)（外部合成器渲染参考调研，2026-11-03）、
+> [motion-system.md](motion-system.md)（全应用近线性动效节奏，2026-11-09）、
 > [archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md](archive/CROSS_PLATFORM_CAPABILITY_IMPROVEMENT.md)。
 
 ---
@@ -62,7 +63,8 @@
    - `paint()` 对**每个可见行每帧**新建 `TextPainter` 并 `layout()`（`:51`、`_painterFor` `:96`）；
    - 每行一次 `saveLayer`（`:53`）——离屏渲染目标，iGPU 上尤其贵；
    - 翻译行再建一个 `TextPainter`（`:72`）。
-   - 简单引擎 `LyricsView` 更甚：每次 build 对**全部行**重算高度（`lyrics_view/lyrics_view_widgets.dart:18-21`）。
+   - 简单引擎 `LyricsView` 更甚：每次 build 对**全部行**重算高度——**2026-11-09 已重写**
+     （自绘视口 + 行高缓存 + 线性滚动，见 §4.2）。
 3. **频谱** `app/lib/widgets/player/spectrum_view/spectrum_view_painter.dart`
    - 20fps 重绘（`pushIntervalMs = 50`），`bars` 模式每根 bar 一次 `drawRRect`（`:125`）；
      宽屏下 bar 数多 → draw call 多。量级最小，优先级最低。
@@ -231,13 +233,17 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
    - 半分辨率、单 pass。
 
 - 简单引擎 `LyricsView` 的 O(N) 每 build 全量测高同样按 1 收敛。
-- **简单引擎（默认档）位置 tick 只重建当前行（2026-11-03）**：位置 tick（~20Hz）
-  原先会让整个 `ListView` 重建全部可见行；现非当前行返回**缓存的同一 widget
-  实例**（`Element.updateChild` 对 identical widget 短路 → 不重建、不重绘），
-  行高列表也只在「当前行翻转 / 分组 / 宽度 / 样式」变化时重算（换行约每几秒
-  一次，而非每 tick 跑 O(行数)）。当前行因逐字扫亮仍每 tick 重建（必要）。
-  回归：`test/lyrics_view_rebuild_test.dart`（20 tick 内构造 ≤ 当前行数、缓存
-  命中 ≥ tick 数；跨行翻转不串行）。
+- **简单引擎（默认档）2026-11-09 重写：自绘视口 + 线性滚动**：
+  - 不再用 `ListView` + 每次换行 `animateTo(easeOutCubic)`；单
+    `AnimationController` 驱动滚动偏移，换行按恒定速度（约 0.34 px/ms）
+    线性插值，大幅 seek 直接吸附（避免慢速滑过整首歌）。
+  - 只构建视口 ± 一屏的行；行高用 `TextPainter` 实测并缓存，位置 tick
+    （~20Hz）**0 次排版**。
+  - 当前行按离视口中心距离连续变化颜色 / 缩放 / 透明度；逐字歌词按片段
+    时长连续扫亮（不是「唱到就整字换色」）。
+  - 上下渐隐直接乘进行颜色（零离屏层），`wall` 档对 simple 也生效。
+  - 回归：`lyrics_view_test`（换行 / 居中 / 跳转）、`lyrics_view_rebuild_test`
+    （视口窗口 < 50 行、20 tick 0 次 TextPainter 排版）。
 - **歌词上下渐隐 / 全屏封面右缘渗入：保持 `ShaderMask`（dstIn）**。
   2026-11-03 曾尝试「`RepaintBoundary` + dstOut 叠加」免每帧离屏层——软件
   光栅下逐像素等价（差 ≤ 2/255）、测试通过，但**真机上 dstOut 未被边界
@@ -340,7 +346,7 @@ compose 滤镜链（降采样 → blur → 升采样）」，且非激活行段�
 优先级更高，用于现场 A/B（不改设置、不重编译）：
 
 ```bash
-ARCHOERA_LYRICS_FADE=wall     # 默认：物理墙逐行 alpha（仅 amll 引擎）
+ARCHOERA_LYRICS_FADE=wall     # 默认：逐行 alpha（amll 与 simple 引擎都支持）
 ARCHOERA_LYRICS_FADE=shader   # 回退：外层 ShaderMask（任意引擎都正确）
 ARCHOERA_LYRICS_FADE=off      # 不渐隐（仅诊断，会露硬边）
 
@@ -352,8 +358,8 @@ ARCHOERA_COVER_MASK=off       # 跳过全屏封面右缘渗入遮罩（仅诊断
   `Paint.color` alpha，与烘焙的位置无关缓存天然兼容）。
 - 曲线与 `LyricsEdgeFade` 的停点逐段一致（`test/lyrics_edge_fade_test.dart`
   断言停点、夹紧、中段恒 1）。
-- simple 引擎未接入逐行模式（列表项是独立 widget，需逐项传 alpha），自动回退
-  `shader`。
+- **simple 引擎已接入逐行模式（2026-11-09 重写后）**：每行颜色直接乘
+  `lyricsEdgeFadeAt(行中心 / 视口高)`，不再回退 `shader`。
 
 **成本模型（为什么全屏才严重）**：
 

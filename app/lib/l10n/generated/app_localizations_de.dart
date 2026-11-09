@@ -1134,69 +1134,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get nekoLoginTitle => 'Bei NekoMusic anmelden';
 
   @override
-  String get nekoLoginTabOauth => 'OAuth';
-
-  @override
-  String get nekoOauthTitle => 'Mit NekoAuth anmelden';
-
-  @override
-  String get nekoOauthDesc =>
-      'Öffne den einmaligen Link unten in einem beliebigen Browser. Falls der Standardbrowser die Anmeldung nicht abschließen kann, kopiere ihn in einen anderen Browser.';
-
-  @override
-  String get nekoOauthOpen => 'Im Browser anmelden';
-
-  @override
-  String get nekoOauthWaiting => 'Warte auf Autorisierung…';
-
-  @override
-  String get nekoOauthUrlLabel => 'Einmaliger Anmeldelink';
-
-  @override
-  String get nekoOauthCopy => 'Link kopieren';
-
-  @override
-  String get nekoOauthCopied => 'Link kopiert';
-
-  @override
-  String get nekoOauthRefresh => 'Neuen Link holen';
-
-  @override
-  String get nekoOauthFailed => 'Anmeldung fehlgeschlagen';
-
-  @override
-  String get nekoLoginTabQr => 'QR-Code';
-
-  @override
-  String get nekoLoginTabPassword => 'E-Mail und Passwort';
-
-  @override
-  String get nekoLoginEmail => 'E-Mail';
-
-  @override
-  String get nekoLoginPassword => 'Passwort';
-
-  @override
-  String get nekoLoginPasswordHint => 'Passwort eingeben';
-
-  @override
-  String get nekoLoginSubmit => 'Anmelden';
-
-  @override
-  String get nekoLoginForgotPassword => 'Passwort vergessen?';
-
-  @override
-  String get nekoForgotCopyHint =>
-      'Link zum Zurücksetzen kopiert – im Browser öffnen und ändern';
-
-  @override
-  String get nekoForgotFailed =>
-      'Link zum Zurücksetzen konnte nicht abgerufen werden';
-
-  @override
-  String get nekoForgotOpened => 'Seite zum Zurücksetzen im Browser geöffnet';
-
-  @override
   String get nekoLoginQrHint => 'Mit der NekoMusic-App scannen und anmelden';
 
   @override
@@ -2646,14 +2583,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Derzeit im Standardmodus';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Beim Minimieren den gesamten Speicherzustand entladen';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'Im Hintergrund (Minimiert/Tray/Bildschirm aus) Seitendaten und Caches verwerfen; beim Zurückkehren neu aufbauen (evtl. zurück zur Startseite, Scrollposition verloren). Wiedergabe unbeeinflusst';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>

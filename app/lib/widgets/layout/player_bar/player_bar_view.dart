@@ -62,8 +62,8 @@ extension _PlayerBarView on _PlayerBarState {
     final showBar = hasSource || hasQueue;
     return AnimatedSwitcher(
       duration: animDuration(context, const Duration(milliseconds: 300)),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
+      switchInCurve: appMotion,
+      switchOutCurve: appMotion,
       transitionBuilder: (child, animation) => SlideTransition(
         // 从自身高度 100% 下方滑入（对齐原版 translate-y-full）；
         // 悬浮层底部定位，滑出即超出窗口底部被裁掉。

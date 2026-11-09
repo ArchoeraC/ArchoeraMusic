@@ -2,19 +2,18 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// NekoAuth / 扫码登录的新请求方案单测：
-// - `nekomusic://sso/complete?handoff=…` 深链解析与等待；
-// - `/api/user/sso/claim`、`/api/user/qrlogin/claim` 换取 token；
+// Neko 扫码登录单测：
+// - `/api/user/qrlogin/claim` 用 deliveryKey 换取 token；
 // - 退出登录调用 `/api/user/logout` 并清理本地会话。
-
-import 'dart:async';
+//
+// OAuth（`/api/user/sso/*` 与 `nekomusic://` 深链）已于 2026-11-09 整体移除，
+// 对应测试一并删除（破坏性变更，见 CHANGELOG）。
 
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/neko/neko_client.dart';
 import 'package:archoera_music/apis/runtime.dart';
 import 'package:archoera_music/services/neko/neko_api.dart';
-import 'package:archoera_music/services/neko/neko_sso_bridge.dart';
 import 'package:archoera_music/services/neko/neko_types.dart';
 
 class _MemorySessionStore implements SessionStore {
@@ -80,78 +79,28 @@ void main() {
     setRuntime(runtime: ApisRuntime(sessionStore: store));
     client = _FakeNekoClient();
     api = NekoApi(clientFactory: (_, _) => client);
-    NekoSsoBridge.debugReset();
   });
 
   tearDown(() {
     setRuntime(runtime: previous);
-    NekoSsoBridge.debugReset();
   });
 
-  test('深链解析：nekomusic://sso/complete?handoff=…', () async {
-    final pending = NekoSsoBridge.waitForHandoff(
-      timeout: const Duration(seconds: 1),
-    );
-    expect(
-      NekoSsoBridge.handleUri(
-        Uri.parse('nekomusic://sso/complete?handoff=abc123'),
-      ),
-      isTrue,
-    );
-    expect(await pending, 'abc123');
-  });
-
-  test('深链早到：先缓存，等待时直接消费', () async {
-    NekoSsoBridge.handleUri(
-      Uri.parse('nekomusic://sso/complete?handoff=early'),
-    );
-    expect(
-      await NekoSsoBridge.waitForHandoff(
-        timeout: const Duration(seconds: 1),
-      ),
-      'early',
-    );
-  });
-
-  test('取消等待：立即返回 null，且不抢下一次回调', () async {
-    final cancel = Completer<void>();
-    final waiting = NekoSsoBridge.waitForHandoff(
-      timeout: const Duration(minutes: 1),
-      cancel: cancel.future,
-    );
-    cancel.complete();
-    expect(await waiting, isNull);
-
-    final next = NekoSsoBridge.waitForHandoff(
-      timeout: const Duration(seconds: 1),
-    );
-    NekoSsoBridge.handleUri(
-      Uri.parse('nekomusic://sso/complete?handoff=next'),
-    );
-    expect(await next, 'next');
-  });
-
-  test('ssoClaim：POST handoff 后落盘 token', () async {
-    client.responses['/api/user/sso/claim'] = {
+  Future<void> loginByQr({String token = 'qr-token'}) async {
+    client.responses['/api/user/qrlogin/claim'] = {
       'success': true,
       'data': {
-        'token': 'access-1',
-        'idToken': 'id-1',
-        'user': {'id': 7, 'nickname': '喵', 'email': 'a@b.c'},
+        'status': 'confirmed',
+        'token': token,
+        'user': {'id': 9, 'nickname': '扫码用户'},
       },
     };
-
-    await api.ssoClaim('handoff-1');
-
-    final call = client.calls.lastWhere(
-      (c) => c.path == '/api/user/sso/claim',
+    client.events.add(
+      const NekoSseEvent(event: 'status', data: '{"status":"confirmed"}'),
     );
-    expect(call.path, '/api/user/sso/claim');
-    expect(_bodyOf(call.body)['handoff'], 'handoff-1');
-    expect(api.isLoggedIn, isTrue);
-    expect(api.account?.nickname, '喵');
-    expect(store.get(kNekoSessionPlatform)['token'], 'access-1');
-  });
+    await api
+        .qrWatch(NekoQrSession(sessionId: 'sid-1', deliveryKey: 'dk-1'))
+        .toList();
+  }
 
   test('扫码：confirmed 后用 deliveryKey 调 claim 领取 token', () async {
     client.responses['/api/user/qrlogin/create'] = {
@@ -202,10 +151,7 @@ void main() {
       const NekoSseEvent(event: 'status', data: '{"status":"confirmed"}'),
     );
 
-    final session = NekoQrSession(
-      sessionId: 'sid-1',
-      deliveryKey: 'dk-1',
-    );
+    final session = NekoQrSession(sessionId: 'sid-1', deliveryKey: 'dk-1');
     await expectLater(
       api.qrWatch(session).toList(),
       throwsA(isA<NekoApiException>()),
@@ -215,14 +161,7 @@ void main() {
   });
 
   test('logout：调用 /api/user/logout 并清本地会话', () async {
-    client.responses['/api/user/sso/claim'] = {
-      'success': true,
-      'data': {
-        'token': 't',
-        'user': {'id': 1, 'nickname': 'n'},
-      },
-    };
-    await api.ssoClaim('h');
+    await loginByQr(token: 't');
 
     await api.logout();
 

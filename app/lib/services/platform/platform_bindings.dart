@@ -45,7 +45,7 @@ const int aplCapDeepLink = 1 << 9;
 const int aplCapRevealPath = 1 << 10;
 const int aplCapTray = 1 << 11;
 const int aplCapSecureFile = 1 << 12;
-const int aplCapOpenUrl = 1 << 13;
+// 1 << 13 保留：原 aplCapOpenUrl（ABI v7 移除，勿复用）。
 const int aplCapElevation = 1 << 14;
 
 /// 提权探测结果（对齐 `APL_ELEVATION_*`）。
@@ -66,7 +66,8 @@ const int aplEventTrayDoubleClick = 10;
 const int aplEventTrayRightClick = 11;
 const int aplEventTrayMenuCommand = 12;
 
-const int aplAbiVersion = 6;
+/// 契约版本 7：移除 `apl_open_url` / `APL_CAP_OPEN_URL`（破坏性 ABI 变更）。
+const int aplAbiVersion = 7;
 
 /// 托盘菜单项（对齐 `AplTrayMenuItem`）：id==0 为分隔符；checked==-1 非复选。
 class AplTrayMenuItem {
@@ -210,13 +211,22 @@ typedef _AplWindowEventsC = Int32 Function(Int32 on);
 typedef _AplInstanceAcquireC = Int32 Function();
 typedef _AplNotifyC = Int32 Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplRevealPathC = Int32 Function(Pointer<Utf8> path);
-typedef _AplOpenUrlC = Int32 Function(Pointer<Utf8> url);
-typedef _AplSystemAccentC = Int32 Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
+typedef _AplSystemAccentC = Int32 Function(
+  Pointer<Int32> r,
+  Pointer<Int32> g,
+  Pointer<Int32> b,
+);
 typedef _AplSystemAccentSetEventsC = Int32 Function(Int32 on);
 typedef _AplSystemThemeSetEventsC = Int32 Function(Int32 on);
 typedef _AplMediaTrackC = Int32 Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackC = Int32 Function(
-    Int32 state, Int64 positionMs, Double speed, Double volume, Int32 loop, Int32 shuffle);
+  Int32 state,
+  Int64 positionMs,
+  Double speed,
+  Double volume,
+  Int32 loop,
+  Int32 shuffle,
+);
 typedef _AplMediaWindowC = Int32 Function(Int64 window);
 typedef _AplProtocolRegisterC = Int32 Function(Pointer<Utf8> scheme);
 typedef _AplProtocolUnregisterC = Int32 Function(Pointer<Utf8> scheme);
@@ -228,19 +238,38 @@ typedef _AplTrayDestroyC = Int32 Function();
 typedef _AplTraySetIconC = Int32 Function(Pointer<Utf8> iconPath);
 typedef _AplTraySetTooltipC = Int32 Function(Pointer<Utf8> tooltip);
 typedef _AplTraySetVisibleC = Int32 Function(Int32 visible);
-typedef _AplTraySetMenuC = Int32 Function(Pointer<AplTrayMenuItemFfi> items, Int32 count);
+typedef _AplTraySetMenuC = Int32 Function(
+  Pointer<AplTrayMenuItemFfi> items,
+  Int32 count,
+);
 typedef _AplTraySetMenuTriggerC = Int32 Function(Int32 trigger);
-typedef _AplFileReadC = Int32 Function(Pointer<Utf8> path, Int32 allowSymlink, Int64 maxBytes,
-    Pointer<Uint8> out, Pointer<Size> inoutLen);
-typedef _AplFileWriteAtomicC = Int32 Function(Pointer<Utf8> path, Pointer<Uint8> data, Size len);
+typedef _AplFileReadC = Int32 Function(
+  Pointer<Utf8> path,
+  Int32 allowSymlink,
+  Int64 maxBytes,
+  Pointer<Uint8> out,
+  Pointer<Size> inoutLen,
+);
+typedef _AplFileWriteAtomicC = Int32 Function(
+  Pointer<Utf8> path,
+  Pointer<Uint8> data,
+  Size len,
+);
 typedef _SetEventCallbackC = Int32 Function(
-    Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
+  Pointer<NativeFunction<AplEventCallbackC>>,
+  Pointer<Void> userData,
+);
 typedef _SetLogSinkC = Void Function(Pointer<NativeFunction<AplLogFnC>> fn);
 
 typedef AplEventCallbackC = Void Function(
-    Pointer<AplEventFfi> event, Pointer<Void> userData);
+  Pointer<AplEventFfi> event,
+  Pointer<Void> userData,
+);
 typedef AplLogFnC = Void Function(
-    Int32 level, Pointer<Utf8> tag, Pointer<Utf8> message);
+  Int32 level,
+  Pointer<Utf8> tag,
+  Pointer<Utf8> message,
+);
 
 typedef _AplVersionD = int Function();
 typedef _AplInitD = int Function();
@@ -254,13 +283,22 @@ typedef _AplWindowEventsD = int Function(int on);
 typedef _AplInstanceAcquireD = int Function();
 typedef _AplNotifyD = int Function(Pointer<Utf8> title, Pointer<Utf8> body);
 typedef _AplRevealPathD = int Function(Pointer<Utf8> path);
-typedef _AplOpenUrlD = int Function(Pointer<Utf8> url);
-typedef _AplSystemAccentD = int Function(Pointer<Int32> r, Pointer<Int32> g, Pointer<Int32> b);
+typedef _AplSystemAccentD = int Function(
+  Pointer<Int32> r,
+  Pointer<Int32> g,
+  Pointer<Int32> b,
+);
 typedef _AplSystemAccentSetEventsD = int Function(int on);
 typedef _AplSystemThemeSetEventsD = int Function(int on);
 typedef _AplMediaTrackD = int Function(Pointer<AplTrackMetaFfi> track);
 typedef _AplMediaPlaybackD = int Function(
-    int state, int positionMs, double speed, double volume, int loop, int shuffle);
+  int state,
+  int positionMs,
+  double speed,
+  double volume,
+  int loop,
+  int shuffle,
+);
 typedef _AplMediaWindowD = int Function(int window);
 typedef _AplProtocolRegisterD = int Function(Pointer<Utf8> scheme);
 typedef _AplProtocolUnregisterD = int Function(Pointer<Utf8> scheme);
@@ -272,13 +310,27 @@ typedef _AplTrayDestroyD = int Function();
 typedef _AplTraySetIconD = int Function(Pointer<Utf8> iconPath);
 typedef _AplTraySetTooltipD = int Function(Pointer<Utf8> tooltip);
 typedef _AplTraySetVisibleD = int Function(int visible);
-typedef _AplTraySetMenuD = int Function(Pointer<AplTrayMenuItemFfi> items, int count);
+typedef _AplTraySetMenuD = int Function(
+  Pointer<AplTrayMenuItemFfi> items,
+  int count,
+);
 typedef _AplTraySetMenuTriggerD = int Function(int trigger);
-typedef _AplFileReadD = int Function(Pointer<Utf8> path, int allowSymlink, int maxBytes,
-    Pointer<Uint8> out, Pointer<Size> inoutLen);
-typedef _AplFileWriteAtomicD = int Function(Pointer<Utf8> path, Pointer<Uint8> data, int len);
+typedef _AplFileReadD = int Function(
+  Pointer<Utf8> path,
+  int allowSymlink,
+  int maxBytes,
+  Pointer<Uint8> out,
+  Pointer<Size> inoutLen,
+);
+typedef _AplFileWriteAtomicD = int Function(
+  Pointer<Utf8> path,
+  Pointer<Uint8> data,
+  int len,
+);
 typedef _SetEventCallbackD = int Function(
-    Pointer<NativeFunction<AplEventCallbackC>>, Pointer<Void> userData);
+  Pointer<NativeFunction<AplEventCallbackC>>,
+  Pointer<Void> userData,
+);
 typedef _SetLogSinkD = void Function(Pointer<NativeFunction<AplLogFnC>> fn);
 
 // ── 绑定 ───────────────────────────────────────────────────────────
@@ -358,68 +410,117 @@ final class AplTrayMenuCommandEvent extends AplNativeEvent {
 /// libarchoera_platform 绑定（进程级单例，[tryLoad] 失败返回 null → Noop）。
 class PlatformBindings {
   PlatformBindings._(DynamicLibrary lib)
-      : _version = lib.lookupFunction<_AplVersionC, _AplVersionD>('apl_abi_version'),
-        _init = lib.lookupFunction<_AplInitC, _AplInitD>('apl_init'),
-        _shutdown = lib.lookupFunction<_AplShutdownC, _AplShutdownD>('apl_shutdown'),
-        _harden = lib.lookupFunction<_AplHardenC, _AplHardenD>('apl_harden_process'),
-        _processElevation = lib.lookupFunction<_AplProcessElevationC, _AplProcessElevationD>(
-            'apl_process_elevation'),
-        _caps = lib.lookupFunction<_AplCapsC, _AplCapsD>('apl_capabilities'),
-        _powerInhibit =
-            lib.lookupFunction<_AplPowerInhibitC, _AplPowerInhibitD>('apl_power_set_sleep_inhibit'),
-        _powerScreen =
-            lib.lookupFunction<_AplPowerScreenC, _AplPowerScreenD>('apl_power_set_screen_events'),
-        _windowEvents =
-            lib.lookupFunction<_AplWindowEventsC, _AplWindowEventsD>('apl_window_set_events'),
-        _instanceAcquire =
-            lib.lookupFunction<_AplInstanceAcquireC, _AplInstanceAcquireD>('apl_instance_acquire'),
-        _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
-        _revealPath =
-            lib.lookupFunction<_AplRevealPathC, _AplRevealPathD>('apl_reveal_path'),
-        _openUrl = lib.lookupFunction<_AplOpenUrlC, _AplOpenUrlD>('apl_open_url'),
-        _systemAccent = lib
-            .lookupFunction<_AplSystemAccentC, _AplSystemAccentD>('apl_system_accent'),
-        _systemAccentSetEvents = lib.lookupFunction<_AplSystemAccentSetEventsC,
-            _AplSystemAccentSetEventsD>('apl_system_accent_set_events'),
-        _systemThemeSetEvents = lib.lookupFunction<_AplSystemThemeSetEventsC,
-            _AplSystemThemeSetEventsD>('apl_system_theme_set_events'),
-        _mediaTrack =
-            lib.lookupFunction<_AplMediaTrackC, _AplMediaTrackD>('apl_media_set_track'),
-        _mediaPlayback =
-            lib.lookupFunction<_AplMediaPlaybackC, _AplMediaPlaybackD>('apl_media_set_playback'),
-        _mediaWindow =
-            lib.lookupFunction<_AplMediaWindowC, _AplMediaWindowD>('apl_media_set_window'),
-        _protocolRegister = lib.lookupFunction<_AplProtocolRegisterC, _AplProtocolRegisterD>(
-            'apl_protocol_register'),
-        _protocolUnregister = lib.lookupFunction<_AplProtocolUnregisterC, _AplProtocolUnregisterD>(
-            'apl_protocol_unregister'),
-        _deepLinkTakeFn =
-            lib.lookupFunction<_AplDeepLinkTakeC, _AplDeepLinkTakeD>('apl_deep_link_take'),
-        _deepLinkForwardFn = lib.lookupFunction<_AplDeepLinkForwardC, _AplDeepLinkForwardD>(
-            'apl_deep_link_forward'),
-        _windowActivateFn = lib.lookupFunction<_AplWindowActivateC, _AplWindowActivateD>(
-            'apl_window_activate'),
-        _trayCreateFn =
-            lib.lookupFunction<_AplTrayCreateC, _AplTrayCreateD>('apl_tray_create'),
-        _trayDestroyFn =
-            lib.lookupFunction<_AplTrayDestroyC, _AplTrayDestroyD>('apl_tray_destroy'),
-        _traySetIconFn =
-            lib.lookupFunction<_AplTraySetIconC, _AplTraySetIconD>('apl_tray_set_icon'),
-        _traySetTooltipFn = lib.lookupFunction<_AplTraySetTooltipC, _AplTraySetTooltipD>(
-            'apl_tray_set_tooltip'),
-        _traySetVisibleFn = lib.lookupFunction<_AplTraySetVisibleC, _AplTraySetVisibleD>(
-            'apl_tray_set_visible'),
-        _traySetMenuFn =
-            lib.lookupFunction<_AplTraySetMenuC, _AplTraySetMenuD>('apl_tray_set_menu'),
-        _traySetMenuTriggerFn = lib.lookupFunction<_AplTraySetMenuTriggerC,
-            _AplTraySetMenuTriggerD>('apl_tray_set_menu_trigger'),
-        _fileRead = lib.lookupFunction<_AplFileReadC, _AplFileReadD>('apl_file_read'),
-        _fileWriteAtomic = lib.lookupFunction<_AplFileWriteAtomicC, _AplFileWriteAtomicD>(
-            'apl_file_write_atomic'),
-        _setCallback = lib
-            .lookupFunction<_SetEventCallbackC, _SetEventCallbackD>('apl_set_event_callback'),
-        _setLogSink =
-            lib.lookupFunction<_SetLogSinkC, _SetLogSinkD>('apl_set_log_sink') {
+    : _version = lib.lookupFunction<_AplVersionC, _AplVersionD>(
+        'apl_abi_version',
+      ),
+      _init = lib.lookupFunction<_AplInitC, _AplInitD>('apl_init'),
+      _shutdown = lib.lookupFunction<_AplShutdownC, _AplShutdownD>(
+        'apl_shutdown',
+      ),
+      _harden = lib.lookupFunction<_AplHardenC, _AplHardenD>(
+        'apl_harden_process',
+      ),
+      _processElevation = lib
+          .lookupFunction<_AplProcessElevationC, _AplProcessElevationD>(
+            'apl_process_elevation',
+          ),
+      _caps = lib.lookupFunction<_AplCapsC, _AplCapsD>('apl_capabilities'),
+      _powerInhibit = lib.lookupFunction<_AplPowerInhibitC, _AplPowerInhibitD>(
+        'apl_power_set_sleep_inhibit',
+      ),
+      _powerScreen = lib.lookupFunction<_AplPowerScreenC, _AplPowerScreenD>(
+        'apl_power_set_screen_events',
+      ),
+      _windowEvents = lib.lookupFunction<_AplWindowEventsC, _AplWindowEventsD>(
+        'apl_window_set_events',
+      ),
+      _instanceAcquire = lib
+          .lookupFunction<_AplInstanceAcquireC, _AplInstanceAcquireD>(
+            'apl_instance_acquire',
+          ),
+      _notify = lib.lookupFunction<_AplNotifyC, _AplNotifyD>('apl_notify'),
+      _revealPath = lib.lookupFunction<_AplRevealPathC, _AplRevealPathD>(
+        'apl_reveal_path',
+      ),
+      _systemAccent = lib.lookupFunction<_AplSystemAccentC, _AplSystemAccentD>(
+        'apl_system_accent',
+      ),
+      _systemAccentSetEvents = lib
+          .lookupFunction<
+            _AplSystemAccentSetEventsC,
+            _AplSystemAccentSetEventsD
+          >('apl_system_accent_set_events'),
+      _systemThemeSetEvents = lib
+          .lookupFunction<_AplSystemThemeSetEventsC, _AplSystemThemeSetEventsD>(
+            'apl_system_theme_set_events',
+          ),
+      _mediaTrack = lib.lookupFunction<_AplMediaTrackC, _AplMediaTrackD>(
+        'apl_media_set_track',
+      ),
+      _mediaPlayback = lib
+          .lookupFunction<_AplMediaPlaybackC, _AplMediaPlaybackD>(
+            'apl_media_set_playback',
+          ),
+      _mediaWindow = lib.lookupFunction<_AplMediaWindowC, _AplMediaWindowD>(
+        'apl_media_set_window',
+      ),
+      _protocolRegister = lib
+          .lookupFunction<_AplProtocolRegisterC, _AplProtocolRegisterD>(
+            'apl_protocol_register',
+          ),
+      _protocolUnregister = lib
+          .lookupFunction<_AplProtocolUnregisterC, _AplProtocolUnregisterD>(
+            'apl_protocol_unregister',
+          ),
+      _deepLinkTakeFn = lib
+          .lookupFunction<_AplDeepLinkTakeC, _AplDeepLinkTakeD>(
+            'apl_deep_link_take',
+          ),
+      _deepLinkForwardFn = lib
+          .lookupFunction<_AplDeepLinkForwardC, _AplDeepLinkForwardD>(
+            'apl_deep_link_forward',
+          ),
+      _windowActivateFn = lib
+          .lookupFunction<_AplWindowActivateC, _AplWindowActivateD>(
+            'apl_window_activate',
+          ),
+      _trayCreateFn = lib.lookupFunction<_AplTrayCreateC, _AplTrayCreateD>(
+        'apl_tray_create',
+      ),
+      _trayDestroyFn = lib.lookupFunction<_AplTrayDestroyC, _AplTrayDestroyD>(
+        'apl_tray_destroy',
+      ),
+      _traySetIconFn = lib.lookupFunction<_AplTraySetIconC, _AplTraySetIconD>(
+        'apl_tray_set_icon',
+      ),
+      _traySetTooltipFn = lib
+          .lookupFunction<_AplTraySetTooltipC, _AplTraySetTooltipD>(
+            'apl_tray_set_tooltip',
+          ),
+      _traySetVisibleFn = lib
+          .lookupFunction<_AplTraySetVisibleC, _AplTraySetVisibleD>(
+            'apl_tray_set_visible',
+          ),
+      _traySetMenuFn = lib.lookupFunction<_AplTraySetMenuC, _AplTraySetMenuD>(
+        'apl_tray_set_menu',
+      ),
+      _traySetMenuTriggerFn = lib
+          .lookupFunction<_AplTraySetMenuTriggerC, _AplTraySetMenuTriggerD>(
+            'apl_tray_set_menu_trigger',
+          ),
+      _fileRead = lib.lookupFunction<_AplFileReadC, _AplFileReadD>(
+        'apl_file_read',
+      ),
+      _fileWriteAtomic = lib
+          .lookupFunction<_AplFileWriteAtomicC, _AplFileWriteAtomicD>(
+            'apl_file_write_atomic',
+          ),
+      _setCallback = lib.lookupFunction<_SetEventCallbackC, _SetEventCallbackD>(
+        'apl_set_event_callback',
+      ),
+      _setLogSink = lib.lookupFunction<_SetLogSinkC, _SetLogSinkD>(
+        'apl_set_log_sink',
+      ) {
     // 事件回调：listener 可从任意 OS 线程触发，事件按到达序进入 Dart 端口
     _eventCallable = NativeCallable<AplEventCallbackC>.listener(_onNativeEvent);
     _setCallback(_eventCallable.nativeFunction, nullptr);
@@ -443,7 +544,6 @@ class PlatformBindings {
   final _AplInstanceAcquireD _instanceAcquire;
   final _AplNotifyD _notify;
   final _AplRevealPathD _revealPath;
-  final _AplOpenUrlD _openUrl;
   final _AplSystemAccentD _systemAccent;
   final _AplSystemAccentSetEventsD _systemAccentSetEvents;
   final _AplSystemThemeSetEventsD _systemThemeSetEvents;
@@ -476,9 +576,13 @@ class PlatformBindings {
   final _accentCtrl = StreamController<AplAccentEvent>.broadcast();
   final _themeCtrl = StreamController<AplThemeEvent>.broadcast();
   final _deepLinkCtrl = StreamController<AplDeepLinkEvent>.broadcast();
+  // 任意事件信号：供「事件槽可能被后续事件覆盖」时机会性补取深链等一次性事件。
+  final _anyEventCtrl = StreamController<void>.broadcast();
   final _trayClickCtrl = StreamController<AplTrayClickEvent>.broadcast();
-  final _trayDoubleClickCtrl = StreamController<AplTrayDoubleClickEvent>.broadcast();
-  final _trayRightClickCtrl = StreamController<AplTrayRightClickEvent>.broadcast();
+  final _trayDoubleClickCtrl =
+      StreamController<AplTrayDoubleClickEvent>.broadcast();
+  final _trayRightClickCtrl =
+      StreamController<AplTrayRightClickEvent>.broadcast();
   final _trayMenuCtrl = StreamController<AplTrayMenuCommandEvent>.broadcast();
 
   /// 单实例仲裁：1=首实例；0=已有实例；<0=错误。
@@ -520,16 +624,6 @@ class PlatformBindings {
     final p = path.toNativeUtf8();
     try {
       return _revealPath(p);
-    } finally {
-      malloc.free(p);
-    }
-  }
-
-  /// 系统默认方式打开 http(s) URL（浏览器）。
-  int openUrl(String url) {
-    final p = url.toNativeUtf8();
-    try {
-      return _openUrl(p);
     } finally {
       malloc.free(p);
     }
@@ -625,9 +719,14 @@ class PlatformBindings {
   Stream<AplAccentEvent> get accentEvents => _accentCtrl.stream;
   Stream<AplThemeEvent> get themeEvents => _themeCtrl.stream;
   Stream<AplDeepLinkEvent> get deepLinkEvents => _deepLinkCtrl.stream;
+
+  /// 任意平台事件（只作信号，不携带数据）。
+  Stream<void> get anyEvents => _anyEventCtrl.stream;
   Stream<AplTrayClickEvent> get trayClickEvents => _trayClickCtrl.stream;
-  Stream<AplTrayDoubleClickEvent> get trayDoubleClickEvents => _trayDoubleClickCtrl.stream;
-  Stream<AplTrayRightClickEvent> get trayRightClickEvents => _trayRightClickCtrl.stream;
+  Stream<AplTrayDoubleClickEvent> get trayDoubleClickEvents =>
+      _trayDoubleClickCtrl.stream;
+  Stream<AplTrayRightClickEvent> get trayRightClickEvents =>
+      _trayRightClickCtrl.stream;
   Stream<AplTrayMenuCommandEvent> get trayMenuEvents => _trayMenuCtrl.stream;
 
   /// 注册/注销当前用户的 URI scheme 处理程序（免提权）；[aplOk]=成功。
@@ -703,7 +802,8 @@ class PlatformBindings {
   int traySetVisible(bool visible) => _traySetVisibleFn(visible ? 1 : 0);
 
   /// 菜单唤出方式：true=左键点击（Linux SNI），false=右键。
-  int traySetMenuTrigger(bool leftClick) => _traySetMenuTriggerFn(leftClick ? 0 : 1);
+  int traySetMenuTrigger(bool leftClick) =>
+      _traySetMenuTriggerFn(leftClick ? 0 : 1);
 
   /// 设置扁平上下文菜单；空列表清除。label 拷贝到原生内存，调用后释放。
   int traySetMenu(List<AplTrayMenuItem> items) {
@@ -728,30 +828,45 @@ class PlatformBindings {
   }
 
   /// 栈上指针仅在回调期间有效——同步取值后立即投递。
-  static void _onNativeEvent(Pointer<AplEventFfi> event, Pointer<Void> userData) {
+  static void _onNativeEvent(
+    Pointer<AplEventFfi> event,
+    Pointer<Void> userData,
+  ) {
     final b = _instance;
     if (b == null || event == nullptr) return;
     final ref = event.ref;
+    // 先发「任意事件」信号：原生事件槽是单槽，后续事件可能覆盖前一个事件
+    // （见 `core.cpp` 的 g_event_slot）。一次性事件（如 deep link）因此可能
+    // 丢失类型，但 URI 仍在原生 pending 缓冲里，消费方可在任意事件后补取。
+    b._anyEventCtrl.add(null);
     switch (ref.type) {
       case aplEventMediaCommand:
-        b._commandCtrl.add(MediaCommandEvent(_commandFromNative(ref.u.command)));
+        b._commandCtrl.add(
+          MediaCommandEvent(_commandFromNative(ref.u.command)),
+        );
       case aplEventMediaSeek:
-        b._seekCtrl.add(AplSeekEvent(relMs: ref.u.seek.relMs, absMs: ref.u.seek.absMs));
+        b._seekCtrl.add(
+          AplSeekEvent(relMs: ref.u.seek.relMs, absMs: ref.u.seek.absMs),
+        );
       case aplEventScreenState:
         b._screenCtrl.add(AplScreenEvent(ref.u.active != 0));
       case aplEventWindowState:
-        b._windowCtrl.add(AplWindowEvent(
-          minimized: ref.u.window.minimized != 0,
-          focused: ref.u.window.focused != 0,
-        ));
+        b._windowCtrl.add(
+          AplWindowEvent(
+            minimized: ref.u.window.minimized != 0,
+            focused: ref.u.window.focused != 0,
+          ),
+        );
       case aplEventBackendState:
         b._backendCtrl.add(AplBackendEvent(ref.u.backendLost != 0));
       case aplEventSystemAccent:
-        b._accentCtrl.add(AplAccentEvent(
-          r: ref.u.accent.r,
-          g: ref.u.accent.g,
-          b: ref.u.accent.b,
-        ));
+        b._accentCtrl.add(
+          AplAccentEvent(
+            r: ref.u.accent.r,
+            g: ref.u.accent.g,
+            b: ref.u.accent.b,
+          ),
+        );
       case aplEventSystemTheme:
         b._themeCtrl.add(AplThemeEvent(ref.u.theme.dark != 0));
       case aplEventDeepLink:
@@ -768,13 +883,13 @@ class PlatformBindings {
   }
 
   static MediaCommand _commandFromNative(int raw) => switch (raw) {
-        0 => MediaCommand.play,
-        1 => MediaCommand.pause,
-        2 => MediaCommand.toggle,
-        3 => MediaCommand.stop,
-        4 => MediaCommand.next,
-        _ => MediaCommand.previous,
-      };
+    0 => MediaCommand.play,
+    1 => MediaCommand.pause,
+    2 => MediaCommand.toggle,
+    3 => MediaCommand.stop,
+    4 => MediaCommand.next,
+    _ => MediaCommand.previous,
+  };
 
   // ── 正向调用 ──
 
@@ -786,13 +901,25 @@ class PlatformBindings {
 
   int setWindowEvents(bool on) => _windowEvents(on ? 1 : 0);
 
-  int setPlayback(int state, int positionMs, double speed, double volume, int loop, int shuffle) =>
-      _mediaPlayback(state, positionMs, speed, volume, loop, shuffle);
+  int setPlayback(
+    int state,
+    int positionMs,
+    double speed,
+    double volume,
+    int loop,
+    int shuffle,
+  ) => _mediaPlayback(state, positionMs, speed, volume, loop, shuffle);
 
   int setWindow(int window) => _mediaWindow(window);
 
   /// 拷贝曲目元数据到原生内存发起调用；调用同步返回后立即释放。
-  int setTrack(String? title, String? artist, String? album, int? durationMs, String? artUrl) {
+  int setTrack(
+    String? title,
+    String? artist,
+    String? album,
+    int? durationMs,
+    String? artUrl,
+  ) {
     if (title == null) return _mediaTrack(nullptr);
     final meta = calloc<AplTrackMetaFfi>();
     final pointers = <Pointer<Uint8>>[];
@@ -828,7 +955,11 @@ class PlatformBindings {
 
   /// 本地封面（file:// 或本地路径）→ 读文件字节填入 [view]（供原生内存流）；
   /// http(s) / 空 / 读取失败则置空（原生按 artUrl 处理）。
-  void _fillArtBytes(AplStringFfi view, String? artUrl, List<Pointer<Uint8>> sink) {
+  void _fillArtBytes(
+    AplStringFfi view,
+    String? artUrl,
+    List<Pointer<Uint8>> sink,
+  ) {
     view.data = nullptr;
     view.len = 0;
     if (artUrl == null || artUrl.isEmpty) return;
@@ -861,6 +992,7 @@ class PlatformBindings {
     _windowCtrl.close();
     _backendCtrl.close();
     _deepLinkCtrl.close();
+    _anyEventCtrl.close();
     _trayClickCtrl.close();
     _trayDoubleClickCtrl.close();
     _trayRightClickCtrl.close();

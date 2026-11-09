@@ -50,6 +50,12 @@ OS：D-Bus 会话总线 / WinRT 媒体会话 / macOS Now Playing
   直接派发（Dart 3.1+ 支持任意原生线程回调 Dart，事件按到达序串行进入 Dart 端口队列，
   无需桥接侧再排队、无需轮询）。
 
+> **单事件槽限制（2026-11-09 记录）**：`core.cpp` 为降低分配使用一个进程级
+> `g_event_slot`，而 `NativeCallable.listener` 是异步读取。连续事件（如 deep link
+> 后紧跟窗口焦点）可能让前一个事件被覆盖。一次性事件（deep link）由消费方在
+> **任意平台事件**后从 native pending 缓冲补取（`FfiSystemDeepLink` 订阅
+> `anyEvents`）；高频状态事件（进度/主题）本身可丢弃，不受影响。
+
 ## 2. 目录结构与产物
 
 ```
@@ -153,7 +159,7 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 #define APL_CAP_REVEAL_PATH        (1u << 10)  /* 文件管理器定位路径（免提权、零子进程） */
 #define APL_CAP_TRAY               (1u << 11)  /* 系统托盘图标 + 上下文菜单（ABI v3） */
 #define APL_CAP_SECURE_FILE        (1u << 12)  /* 安全文件原语（原生 open(2)，ABI v4） */
-#define APL_CAP_OPEN_URL           (1u << 13)  /* 系统默认方式打开 http(s) URL（浏览器，ABI v5） */
+/* 1u << 13 保留：原 APL_CAP_OPEN_URL（ABI v7 移除，勿复用） */
 #define APL_CAP_ELEVATION          (1u << 14)  /* 提权探测：root / 管理员（只读，ABI v6） */
 ```
 
@@ -163,16 +169,17 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 接收侧发 `APL_EVENT_DEEP_LINK` 信号，Dart 收到后调用 `apl_deep_link_take`。
 
 > **外部输入契约（SEC-31）**：deep link 接收的是**本机任意程序（含浏览器）都可触发**的
-> 外部 URI，故三端后端只识别**白名单方案前缀**（`archoera://` 自有动作 +
-> `nekomusic://sso/complete` NekoAuth 登录回调；Linux 命令行 / `OpenUri`、
-> Windows `WM_COPYDATA` / argv、macOS AppleEvent 均在入队前按前缀过滤），其余一律丢弃；
-> 交给 Dart 的内容仍按「只解析已知 host/path 形式、未知 host 忽略」处理。该能力免提权
-> 注册，不接受任意 URL 打开/执行语义。
+> 外部 URI，故三端后端只识别**白名单方案前缀** `archoera://`（Linux 命令行 /
+> `OpenUri`、Windows `WM_COPYDATA` / argv、macOS AppleEvent 均在入队前按前缀过滤），
+> 其余一律丢弃；交给 Dart 的内容仍按「只解析已知 host/path 形式、未知 host 忽略」处理。
+> 该能力免提权注册，不接受任意 URL 打开/执行语义。
 >
 > 次实例转发失败时返回负值；`main` 据此识别「带深链的二次启动」，静默退出而不是弹
-> 「应用已在运行」对话框（否则会吞掉 OAuth 回调）。首实例启动即注册 Linux `OpenUri`，
+> 「应用已在运行」对话框（否则会吞掉深链动作）。首实例启动即注册 Linux `OpenUri`，
 > 不依赖主题/防休眠订阅。次实例转发的传输方式：Linux 单向 D-Bus 广播信号、
 > Windows 共享内存 + `PostMessage`、macOS 分布式通知；三端都只投递、不等待回复。
+Windows 隐藏消息窗口只在首实例创建，第二实例转发时跳过自身 PID 的窗口，
+避免 URI 回环到第二实例后随其退出丢失（2026-11-09 修复）。
 
 文件管理器定位（`APL_CAP_REVEAL_PATH`，ABI v2 起）：`apl_reveal_path(path)`
 在系统文件管理器中定位路径（文件 → 打开所在目录并选中；目录 → 打开）——
@@ -181,14 +188,9 @@ uint32_t apl_capabilities(void);         /* 能力位图 */
 D-Bus（回退 GIO 默认应用打开所在目录）；Windows 走 `SHOpenFolderAndSelectItems` /
 `ShellExecute`；macOS 走 `NSWorkspace`。
 
-URL 打开（`APL_CAP_OPEN_URL`，ABI v5 起）：`apl_open_url(url)` 用系统默认应用
-（浏览器）打开 `http(s)` 链接（Neko 忘记密码 → NekoAuth 重置页等场景）。
-Linux 走 GIO `g_app_info_launch_default_for_uri`（同进程 dlopen，不自建子进程）；
-Windows 走 `ShellExecuteW`；macOS 走 `NSWorkspace openURL`。
-
-> **输入契约**：`apl_open_url` 只接受 `http://` / `https://` 绝对 URL，
-> 其他 scheme（`file:` / `javascript:` / 自定义协议）与相对路径在 `apl.cpp`
-> 边界直接 `APL_ERR_STATE`——本能力只把链接交给系统浏览器，不在进程内执行内容。
+> **ABI v7（2026-11-09，破坏性）**：随 NekoAuth OAuth / 账号密码登录的拆除，
+> 删除 `apl_open_url` 与 `APL_CAP_OPEN_URL`（该能力原先只供 Neko「忘记密码」
+> 打开浏览器）。Dart 侧 `aplAbiVersion` 同步升到 7，旧桥接库会被版本门禁拒绝。
 
 提权探测（`APL_CAP_ELEVATION`，ABI v6 起）：`apl_process_elevation()` **只读**返回
 `APL_ELEVATION_NONE` / `ROOT` / `ADMIN`——Linux / POSIX 与 macOS 查 `geteuid() == 0`
@@ -352,7 +354,8 @@ typedef struct AplEvent {
 } AplEvent;
 
 typedef void (*AplEventCallback)(const AplEvent* event, void* user_data);
-/* event 仅在回调期间有效（栈上）；user_data 由 Dart 提供原样回传 */
+/* event 仅在回调期间有效（当前 core 为单槽；Dart listener 异步读取，
+   一次性事件需从 pending 缓冲补取）；user_data 由 Dart 提供原样回传 */
 
 int32_t apl_set_event_callback(AplEventCallback cb, void* user_data);
 /* cb=NULL 注销。回调可能在任意 OS 线程触发（WinRT free thread / D-Bus IO 线程 /

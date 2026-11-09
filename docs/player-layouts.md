@@ -62,12 +62,14 @@ app/lib/pages/player/layouts/
 
 ## 5. 性能纪律（vutron 为例）
 
-- **不新增渲染器**：`simple` 复用 `LyricsView`（行高实测缓存 + 懒加载列表），
-  `amll` 复用 v7 物理墙；对齐作为段落属性 + 缓存键，不重算行高；
+- **不新增渲染器**：`simple` 用重写后的 `LyricsView`（自绘视口 + 行高实测缓存 +
+  线性滚动，只构建视口附近的行），`amll` 复用 v7 物理墙；对齐作为段落属性 +
+  缓存键，不重算行高；
 - **不做重复模糊**：封面投影用一层 `BoxShadow`，不复制封面再做 blur；
-- **静态遮罩**：歌词上下渐隐用 SPlayer `.lyric-area` 的 10%/25% 非线性
-  `ShaderMask`（0→60%→100%→100%→60%→0），整幅封面布局的顶/底遮罩用
-  SPlayer `cover-mask` 的 8 段非线性 alpha，避免色阶与硬边；
+- **静态遮罩**：歌词上下渐隐默认**逐行 alpha**（simple 与 amll 都支持，
+  零离屏层；曲线沿用 SPlayer `.lyric-area` 的 0→60%→100%→100%→60%→0）；
+  `ShaderMask` 仅作回退（`render.lyricsEdgeFade=shader`）。整幅封面布局的顶/底
+  遮罩用 SPlayer `cover-mask` 的 8 段非线性 alpha，避免色阶与硬边；
 - **封面渐隐**：优先用 `shaders/cover_mask.frag` 的横向直线距离 + 低频噪声
   扰动（每首封面用稳定 seed 轻微移动直线位置，避免机械的规则边界）；着色器
   不可用时回退同形状的 `LinearGradient`，测试环境走回退路径；

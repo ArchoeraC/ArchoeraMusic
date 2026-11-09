@@ -1133,70 +1133,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get nekoLoginTitle => 'Iniciar sesión en NekoMusic';
 
   @override
-  String get nekoLoginTabOauth => 'OAuth';
-
-  @override
-  String get nekoOauthTitle => 'Iniciar sesión con NekoAuth';
-
-  @override
-  String get nekoOauthDesc =>
-      'Abre el enlace de un solo uso en cualquier navegador para autorizar. Si tu navegador predeterminado no puede iniciar sesión, cópialo a otro navegador.';
-
-  @override
-  String get nekoOauthOpen => 'Iniciar sesión en el navegador';
-
-  @override
-  String get nekoOauthWaiting => 'Esperando autorización…';
-
-  @override
-  String get nekoOauthUrlLabel => 'Enlace de inicio de sesión de un solo uso';
-
-  @override
-  String get nekoOauthCopy => 'Copiar enlace';
-
-  @override
-  String get nekoOauthCopied => 'Enlace copiado';
-
-  @override
-  String get nekoOauthRefresh => 'Obtener otro enlace';
-
-  @override
-  String get nekoOauthFailed => 'Error al iniciar sesión';
-
-  @override
-  String get nekoLoginTabQr => 'Código QR';
-
-  @override
-  String get nekoLoginTabPassword => 'Correo y contraseña';
-
-  @override
-  String get nekoLoginEmail => 'Correo';
-
-  @override
-  String get nekoLoginPassword => 'Contraseña';
-
-  @override
-  String get nekoLoginPasswordHint => 'Introduce tu contraseña';
-
-  @override
-  String get nekoLoginSubmit => 'Iniciar sesión';
-
-  @override
-  String get nekoLoginForgotPassword => '¿Olvidaste la contraseña?';
-
-  @override
-  String get nekoForgotCopyHint =>
-      'Enlace de restablecimiento copiado. Ábrelo en tu navegador para restablecerlo.';
-
-  @override
-  String get nekoForgotFailed =>
-      'No se pudo obtener el enlace de restablecimiento';
-
-  @override
-  String get nekoForgotOpened =>
-      'Página de restablecimiento abierta en tu navegador';
-
-  @override
   String get nekoLoginQrHint =>
       'Escanea con la app NekoMusic para iniciar sesión';
 
@@ -2661,14 +2597,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Actualmente en modo estándar';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Descargar todo el estado de memoria al minimizar';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'En segundo plano (minimizar/bandeja/pantalla apagada) descarta datos de página y cachés; reconstruye al volver (puede volver al inicio, perder el desplazamiento). La reproducción no se ve afectada';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>

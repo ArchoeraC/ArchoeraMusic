@@ -16,6 +16,7 @@ import '../../../widgets/player/player_cover.dart';
 import '../../../widgets/player/player_lyrics_block.dart';
 import '../../../widgets/player/player_lyrics_slot.dart';
 import 'player_layout.dart';
+import '../../../theme/motion.dart';
 
 class SplitPlayerLayout extends PlayerLayout {
   const SplitPlayerLayout();
@@ -74,7 +75,7 @@ class SplitPlayerLayout extends PlayerLayout {
                     context,
                     const Duration(milliseconds: 600),
                   ),
-                  curve: Curves.easeOutCubic,
+                  curve: appMotion,
                   child: Align(
                     alignment: Alignment.center,
                     child: RepaintBoundary(

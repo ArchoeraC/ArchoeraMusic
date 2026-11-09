@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../common/anim.dart';
 import 'sidebar_nav_style.dart';
+import '../../../../theme/motion.dart';
 
 /// 滑动指示条（对齐 SMenu animated 模式）。
 class AnimatedSidebarNavStyle extends SidebarNavStyle {
@@ -29,7 +30,7 @@ class AnimatedSidebarNavStyle extends SidebarNavStyle {
     required double height,
   }) => AnimatedPositioned(
     duration: animDuration(context, const Duration(milliseconds: 250)),
-    curve: Curves.easeOut,
+    curve: appMotion,
     // 对齐 SMenu animated：left 跟随选中项左缘；top/height
     // 上下各内缩 10px，与静态模式（Positioned top:10/bottom:10）一致
     left: left,

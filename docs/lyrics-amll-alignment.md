@@ -418,6 +418,30 @@ headless 基准：无失焦 **6.3ms**、逐行失焦 **28.5ms**、整层 1/4 重
 - `lyrics_engine_test.dart`：TTML 覆盖优先 / 未启用回退 / 非 TTML 平台不请求；
 - `lyrics_prefs_test.dart`：TTML 偏好默认值 / 写入读回 / 非法模板回落。
 
+### 7.6 NekoMusic `neko-v1` 富歌词与格式注册表（2026-11-09）
+
+新版 NekoMusic 服务端在音乐详情里返回 `lyricsFormat: neko-v1` 与
+`lyricsRich` JSON（行内 `words[]` 逐字、`translation` / `romanization`、
+`background`、显式 `endMs`），同时保留兼容 LRC。
+
+- **解析归属**：`neko-v1` 与 YRC/QRC/KRC 一样在通用解码器
+  （`services/lyrics/lyric_line.dart` 的 `parseLyricGroups`）里解析；来源层
+  不自行解析整首歌词。
+- **来源注册**：`_NekoSource.lyricSources` 仍返回 `NekoLyricSource`，id 与
+  `SourcePlatform.source` 一致；`online = true` 只用于「Neko 自身歌词不可信
+  时回退标准源」，`neko` 不进入用户来源顺序 `lyricPlatforms`，因此不会污染
+  其它平台的候选。
+- **格式注册表**：`apis/lyric/format.dart` 新增 `lyricFormatIds`（用户可排序的
+  跨平台格式）与 `kNekoV1LyricsFormat`（平台扩展格式）。`neko-v1` 不单列在
+  「歌词格式顺序」设置里，而是作为逐字候选交给 `pickLyricFormat`，跟随
+  `preferWordByWord` 的「逐字 / 标准 LRC」类别。
+- **回退语义**：`NekoLyricSource` 只做 I/O + 广告预检（
+  `neko_lyrics.nekoV1HasDisplayableLine`），再用 `pickLyricFormat` 在富歌词与
+  兼容 LRC 之间选择；首选格式缺失时回退另一类（例如用户选「标准 LRC 优先」
+  但服务端只有富歌词时仍能显示），两类都不可用才返回 null 交给引擎换源。
+- **守卫测试**：`test/lyrics_source_registry_test.dart` 校验歌词来源注册表
+  id 与音源一致、全局唯一，以及 Neko 来源的回退边界。
+
 ---
 
 ## 8. 普通逐行歌词不做逐字（2026-09-30 引入，2026-11-08 移除）

@@ -4,59 +4,45 @@
 
 /// NekoMusic（实验性音源 `neko`）登录界面。
 ///
-/// **模板 / 动效与 NT/KG/QM 登录一致**：全屏毛玻璃背景 + 居中登录卡片，
-/// Tab 切换走「旧内容整体淡出 → 换内容并平滑动画高度 → 新内容淡入」
-/// （AnimatedSize + AnimatedOpacity），点击卡片以外任意处关闭、无关闭键。
+/// **仅扫码登录**：`/api/user/qrlogin/create` 取服务端渲染好的二维码 PNG
+/// （`qrImage` data URL，无须本地自绘）；状态经 SSE
+/// `/api/user/qrlogin/status` 推送，`confirmed` 后由 [NekoApi.qrWatch]
+/// 用 `deliveryKey` 领取 token 并落盘。
 ///
-/// - 扫码：`/api/user/qrlogin/create` 取**服务端渲染好的二维码 PNG**（`qrImage`
-///   data URL，无须本地自绘）；状态经 SSE `/api/user/qrlogin/status` 推送，
-///   `confirmed` 后由 [NekoApi.qrWatch] 用 `deliveryKey` 领取 token 并落盘。
-/// - OAuth：`/api/user/sso/start` 取 NekoAuth 地址 → 系统浏览器授权 →
-///   `nekomusic://sso/complete?handoff=…` 深链回跳 → `/api/user/sso/claim`。
-/// - 账号密码：服务端已下线，仅当编译期开关 `NEKO_ENABLE_PASSWORD_LOGIN`
-///   打开时显示（界面与调用代码保留，便于将来恢复）。
+/// **破坏性变更（2026-11-09）**：NekoAuth OAuth（浏览器回调 +
+/// `nekomusic://` 深链）与传统账号密码登录已整体移除，界面不再提供对应入口。
 ///
 /// **不含注册 / 邮箱验证码 / 滑块验证**（本项目不接入注册）。
 library;
 
 import 'dart:async';
 
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../apis/neko/neko_client.dart' show NekoApiException;
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/neko/neko_api.dart';
-import '../../services/neko/neko_login_config.dart';
 import '../../services/neko/neko_types.dart';
-import '../../services/platform/platform_capabilities.dart';
 import '../../stores/providers.dart';
 import '../common/glass_blur.dart';
 import '../common/toast.dart';
 import 'login_risk_notice.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 打开 NekoMusic 登录界面（先弹登录风险提示）。返回 `true` 表示登录成功。
 ///
-/// 没有显式「取消」按钮：**离开登录界面即取消**。这里在 `showDialog` 返回后
-/// 再做一次兜底取消，保证无论点遮罩、按 Esc 还是路由被替换，都会立刻结束
-/// OAuth 等待并注销 `nekomusic://`。
+/// 没有显式「取消」按钮：**离开登录界面即取消**（关闭时停止二维码状态订阅）。
 Future<bool?> showNekoLoginDialog(BuildContext context) async {
   if (!await showLoginRiskNotice(context)) return false;
   if (!context.mounted) return false;
-  final container = ProviderScope.containerOf(context, listen: false);
-  final result = await showDialog<bool?>(
+  return showDialog<bool?>(
     context: context,
     barrierColor: Colors.transparent,
     barrierDismissible: true,
     builder: (_) => const _NekoLoginDialog(),
   );
-  if (result != true) {
-    container.read(nekoApiProvider).cancelSsoLogin();
-  }
-  return result;
 }
 
 class _NekoLoginDialog extends ConsumerStatefulWidget {
@@ -67,21 +53,8 @@ class _NekoLoginDialog extends ConsumerStatefulWidget {
 }
 
 class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
-  /// 当前选中 tab：0=OAuth / 1=扫码 /（编译期打开时）2=账号密码。
-  int _tab = 0;
+  late final NekoApi _api;
 
-  /// 当前实际渲染的 tab（延后于 [_tab]：旧内容先淡出，再换内容淡入）。
-  int _displayTab = 0;
-
-  /// 切换中（旧内容淡出阶段，透明度 0）。
-  bool _switching = false;
-
-  // ── OAuth ─────────────────────────────────────────────────────────
-  NekoSsoLoginSession? _ssoSession;
-  bool _ssoPreparing = false;
-  String _ssoError = '';
-
-  // ── 扫码 ──────────────────────────────────────────────────────────
   NekoQrSession? _session;
   NekoQrState _qrState = NekoQrState.pending;
   StreamSubscription<NekoQrStatus>? _sub;
@@ -89,67 +62,19 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
   bool _confirmed = false;
   String _error = '';
 
-  // ── 账号密码 ──────────────────────────────────────────────────────
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-  bool _busy = false;
-  String _loginError = '';
-
-  /// 在 initState 里保存 provider 实例：dispose 阶段不能再碰 `ref`
-  /// （Riverpod 会直接抛 Bad state），但取消 OAuth 又必须在关闭时执行。
-  late final NekoApi _api;
-
   @override
   void initState() {
     super.initState();
     _api = ref.read(nekoApiProvider);
-    // OAuth 是默认 tab：先取一次性登录地址，浏览器由用户手动点按钮打开。
-    unawaited(_prepareSso());
+    unawaited(_createQr());
   }
-
-  List<String> _tabLabels(AppLocalizations l10n) => [
-    l10n.nekoLoginTabOauth,
-    l10n.nekoLoginTabQr,
-    if (nekoPasswordLoginEnabled) l10n.nekoLoginTabPassword,
-  ];
 
   @override
   void dispose() {
-    // 关闭登录框即取消仍在等待的 OAuth 回调，避免旧流程稍后领取 token。
-    // 用 initState 保存的实例，不能在 dispose 里使用 ref。
-    final session = _ssoSession;
-    if (session != null) {
-      session.cancel();
-    } else if (_ssoPreparing) {
-      _api.cancelSsoLogin();
-    }
     _sub?.cancel();
-    _emailCtrl.dispose();
-    _passCtrl.dispose();
     super.dispose();
   }
 
-  /// 切换方式：**全部隐藏再显示**（与其他平台登录窗一致）——
-  /// 旧内容先整体淡出（180ms）→ 换内容并平滑动画卡片高度 → 新内容淡入。
-  Future<void> _switchTab(int tab) async {
-    if (_tab == tab || _switching) return;
-    setState(() {
-      _tab = tab; // tab 栏高亮立即切换
-      _switching = true; // 旧内容开始淡出
-    });
-    await Future<void>.delayed(const Duration(milliseconds: 180));
-    if (!mounted) return;
-    setState(() => _displayTab = tab); // 换内容（此刻不可见）
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    if (!mounted) return;
-    setState(() => _switching = false); // 新内容淡入
-    // 首次进入扫码 tab 才创建会话，避免打开对话框即发请求。
-    if (tab == 1 && _session == null && !_loading && !_confirmed) {
-      unawaited(_createQr());
-    }
-  }
-
-  // ── 扫码 ──────────────────────────────────────────────────────────
   Future<void> _createQr() async {
     setState(() {
       _loading = true;
@@ -167,12 +92,14 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
         _session = session;
         _loading = false;
       });
-      _sub = _api.qrWatch(session).listen(
-        _onQrStatus,
-        onError: (Object e) {
-          if (mounted) setState(() => _error = '$e');
-        },
-      );
+      _sub = _api
+          .qrWatch(session)
+          .listen(
+            _onQrStatus,
+            onError: (Object e) {
+              if (mounted) setState(() => _error = '$e');
+            },
+          );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -205,32 +132,6 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
       NekoQrState.expired => l10n.nekoQrExpired,
       _ => l10n.nekoLoginQrHint,
     };
-  }
-
-  // ── 账号密码 ──────────────────────────────────────────────────────
-  Future<void> _passwordLogin() async {
-    final l10n = context.l10n;
-    final email = _emailCtrl.text.trim();
-    final pass = _passCtrl.text;
-    if (email.isEmpty || pass.isEmpty) {
-      setState(() => _loginError = l10n.nekoLoginPasswordHint);
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _loginError = '';
-    });
-    try {
-      await _api.loginPassword(email, pass);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-      toast(l10n.loginSuccess);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loginError = '$e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   @override
@@ -276,25 +177,8 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          _tabBar(scheme, l10n),
                           const SizedBox(height: 20),
-                          // 切换方式：全部隐藏再显示（淡出 → 换内容 / 动画高度 → 淡入）。
-                          AnimatedSize(
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeInOutCubic,
-                            alignment: Alignment.topCenter,
-                            child: AnimatedOpacity(
-                              opacity: _switching ? 0 : 1,
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeInOut,
-                              child: switch (_displayTab) {
-                                0 => _oauthTab(theme, scheme, l10n),
-                                1 => _qrTab(theme, scheme, l10n),
-                                _ => _passwordTab(theme, scheme, l10n),
-                              },
-                            ),
-                          ),
+                          _qrTab(theme, scheme, l10n),
                         ],
                       ),
                     ),
@@ -308,211 +192,6 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
     );
   }
 
-  Widget _tabBar(ColorScheme scheme, AppLocalizations l10n) {
-    final tabs = _tabLabels(l10n);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < tabs.length; i++)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: TextButton(
-              onPressed: () => _switchTab(i),
-              style: TextButton.styleFrom(
-                foregroundColor: _tab == i
-                    ? scheme.primary
-                    : scheme.onSurfaceVariant,
-                textStyle: TextStyle(
-                  fontWeight: _tab == i ? FontWeight.w600 : FontWeight.w400,
-                ),
-                minimumSize: const Size(0, 36),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-              child: Text(tabs[i]),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // ── OAuth tab ─────────────────────────────────────────────────────
-  Widget _oauthTab(ThemeData theme, ColorScheme scheme, AppLocalizations l10n) {
-    final session = _ssoSession;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(EtaIcons.shieldOutline, size: 44, color: scheme.primary),
-        const SizedBox(height: 10),
-        Text(
-          l10n.nekoOauthTitle,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          l10n.nekoOauthDesc,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 14),
-        if (_ssoPreparing)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 18),
-            child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2.4),
-            ),
-          )
-        else if (session != null) ...[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              l10n.nekoOauthUrlLabel,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: SelectableText(
-              session.url,
-              maxLines: 3,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 11,
-                height: 1.35,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => _openSsoUrl(session.url),
-              icon: const Icon(EtaIcons.link, size: 16),
-              label: Text(
-                l10n.nekoOauthOpen,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _copySsoUrl(session.url),
-              icon: const Icon(EtaIcons.docmentOutline, size: 16),
-              label: Text(
-                l10n.nekoOauthCopy,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            l10n.nekoOauthWaiting,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-        if (_ssoError.isNotEmpty) _errorText(_ssoError, scheme),
-        if (session != null || _ssoError.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: _ssoPreparing ? null : _prepareSso,
-            icon: const Icon(EtaIcons.refresh, size: 16),
-            label: Text(l10n.nekoOauthRefresh),
-          ),
-        ],
-      ],
-    );
-  }
-
-  /// 取一次性授权地址并开始等待回调；不自动打开浏览器。
-  Future<void> _prepareSso() async {
-    _ssoSession?.cancel();
-    setState(() {
-      _ssoPreparing = true;
-      _ssoError = '';
-      _ssoSession = null;
-    });
-    try {
-      final session = await _api.beginSsoLogin();
-      if (!mounted) {
-        session.cancel();
-        return;
-      }
-      setState(() {
-        _ssoSession = session;
-        _ssoPreparing = false;
-      });
-      unawaited(_awaitSso(session));
-    } on NekoApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _ssoPreparing = false;
-        _ssoError = e.message.isEmpty ? context.l10n.nekoOauthFailed : e.message;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _ssoPreparing = false;
-        _ssoError = context.l10n.nekoOauthFailed;
-      });
-    }
-  }
-
-  /// 等待用户在任意浏览器完成授权；成功后才关闭登录框。
-  Future<void> _awaitSso(NekoSsoLoginSession session) async {
-    final l10n = context.l10n;
-    try {
-      await session.completed;
-      if (!mounted || !identical(_ssoSession, session)) return;
-      Navigator.of(context).pop(true);
-      toast(l10n.loginSuccess);
-    } on NekoApiException catch (e) {
-      if (!mounted || !identical(_ssoSession, session)) return;
-      setState(
-        () => _ssoError = e.message.isEmpty ? l10n.nekoOauthFailed : e.message,
-      );
-    } catch (_) {
-      if (!mounted || !identical(_ssoSession, session)) return;
-      setState(() => _ssoError = l10n.nekoOauthFailed);
-    }
-  }
-
-  void _openSsoUrl(String url) {
-    final rc = _api.openSsoUrl(url);
-    if (rc != 0) {
-      // 没有默认浏览器 / 桥接不可用时退回复制链接。
-      unawaited(_copySsoUrl(url));
-    }
-  }
-
-  Future<void> _copySsoUrl(String url) async {
-    await Clipboard.setData(ClipboardData(text: url));
-    if (!mounted) return;
-    toast(context.l10n.nekoOauthCopied, type: ToastType.success);
-  }
-
-  // ── 扫码 tab ──────────────────────────────────────────────────────
   Widget _qrTab(ThemeData theme, ColorScheme scheme, AppLocalizations l10n) {
     final session = _session;
     final qrBytes = session?.qrImageBytes;
@@ -632,114 +311,4 @@ class _NekoLoginDialogState extends ConsumerState<_NekoLoginDialog> {
       ],
     );
   }
-
-  // ── 账号密码 tab ──────────────────────────────────────────────────
-  Widget _passwordTab(
-    ThemeData theme,
-    ColorScheme scheme,
-    AppLocalizations l10n,
-  ) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextField(
-          controller: _emailCtrl,
-          keyboardType: TextInputType.emailAddress,
-          enabled: !_busy,
-          decoration: InputDecoration(
-            isDense: true,
-            prefixIcon: const Icon(EtaIcons.userOutline, size: 18),
-            hintText: l10n.nekoLoginEmail,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _passCtrl,
-          obscureText: true,
-          enabled: !_busy,
-          onSubmitted: (_) => _passwordLogin(),
-          decoration: InputDecoration(
-            isDense: true,
-            prefixIcon: const Icon(EtaIcons.lockOutline, size: 18),
-            hintText: l10n.nekoLoginPassword,
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        if (_loginError.isNotEmpty) _errorText(_loginError, scheme),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _busy ? null : _passwordLogin,
-            child: _busy ? _spinner() : Text(l10n.nekoLoginSubmit),
-          ),
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: _busy ? null : _forgotPassword,
-            style: TextButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              textStyle: const TextStyle(fontSize: 13),
-            ),
-            child: Text(l10n.nekoLoginForgotPassword),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 忘记密码：取一次性 NekoAuth 重置链接后交给系统浏览器打开。
-  ///
-  /// 打开链接属系统能力：必须经 C++ 桥接器（`PlatformCapabilities.openUrl`，
-  /// 对齐「Dart 不直调平台 API」的架构约束）。桥接不可用（无默认浏览器 /
-  /// 平台未实现）时退回复制链接 + toast，用户可手动粘贴打开。
-  Future<void> _forgotPassword() async {
-    try {
-      final url = await ref.read(nekoApiProvider).fetchPasswordResetUrl();
-      final rc = PlatformCapabilities.instance().openUrl(url);
-      if (rc != 0) {
-        await Clipboard.setData(ClipboardData(text: url));
-        if (!mounted) return;
-        toast(context.l10n.nekoForgotCopyHint, type: ToastType.success);
-        return;
-      }
-      if (!mounted) return;
-      toast(context.l10n.nekoForgotOpened, type: ToastType.success);
-    } on NekoApiException catch (e) {
-      if (!mounted) return;
-      toast(e.message.isNotEmpty ? e.message : context.l10n.nekoForgotFailed);
-    } catch (_) {
-      if (!mounted) return;
-      toast(context.l10n.nekoForgotFailed);
-    }
-  }
-
-  Widget _errorText(String message, ColorScheme scheme) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Row(
-        children: [
-          Icon(EtaIcons.alertOutline, size: 14, color: scheme.error),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 12, color: scheme.error),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _spinner() => const SizedBox(
-    width: 18,
-    height: 18,
-    child: CircularProgressIndicator(strokeWidth: 2.2),
-  );
 }

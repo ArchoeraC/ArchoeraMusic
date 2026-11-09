@@ -20,6 +20,7 @@ import '../../services/playback/playback_notifier.dart';
 import '../../stores/app_prefs.dart';
 import '../../stores/lyrics_provider.dart';
 import '../common/anim.dart';
+import '../../theme/motion.dart';
 
 part 'bar_lyric_text/bar_lyric_text_widgets.dart';
 

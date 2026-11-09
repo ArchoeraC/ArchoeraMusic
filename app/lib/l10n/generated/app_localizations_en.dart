@@ -1124,68 +1124,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nekoLoginTitle => 'Sign in to NekoMusic';
 
   @override
-  String get nekoLoginTabOauth => 'OAuth';
-
-  @override
-  String get nekoOauthTitle => 'Sign in with NekoAuth';
-
-  @override
-  String get nekoOauthDesc =>
-      'Open the one-time link below in any browser to authorize. If your default browser can\'t sign in, copy it to another browser.';
-
-  @override
-  String get nekoOauthOpen => 'Sign in with browser';
-
-  @override
-  String get nekoOauthWaiting => 'Waiting for authorization…';
-
-  @override
-  String get nekoOauthUrlLabel => 'One-time sign-in link';
-
-  @override
-  String get nekoOauthCopy => 'Copy link';
-
-  @override
-  String get nekoOauthCopied => 'Link copied';
-
-  @override
-  String get nekoOauthRefresh => 'Get a new link';
-
-  @override
-  String get nekoOauthFailed => 'Sign-in failed';
-
-  @override
-  String get nekoLoginTabQr => 'QR code';
-
-  @override
-  String get nekoLoginTabPassword => 'Email & password';
-
-  @override
-  String get nekoLoginEmail => 'Email';
-
-  @override
-  String get nekoLoginPassword => 'Password';
-
-  @override
-  String get nekoLoginPasswordHint => 'Enter your password';
-
-  @override
-  String get nekoLoginSubmit => 'Sign in';
-
-  @override
-  String get nekoLoginForgotPassword => 'Forgot password?';
-
-  @override
-  String get nekoForgotCopyHint =>
-      'Reset link copied — open it in your browser to reset';
-
-  @override
-  String get nekoForgotFailed => 'Failed to get reset link';
-
-  @override
-  String get nekoForgotOpened => 'Reset page opened in your browser';
-
-  @override
   String get nekoLoginQrHint => 'Scan with the NekoMusic mobile app to sign in';
 
   @override
@@ -2617,14 +2555,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Currently in standard mode';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Unload all memory state when minimized';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'In background (minimize/tray/screen-off), drop page data and caches; rebuild from scratch on restore (may return home, lose scroll). Playback unaffected';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>

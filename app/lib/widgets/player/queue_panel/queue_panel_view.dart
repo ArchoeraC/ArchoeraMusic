@@ -30,8 +30,8 @@ extension _QueuePanelView on QueuePanel {
                       ).animate(
                         CurvedAnimation(
                           parent: animation,
-                          curve: Curves.easeOutCubic,
-                          reverseCurve: Curves.easeInCubic,
+                          curve: appMotion,
+                          reverseCurve: appMotion,
                         ),
                       ),
                   child: panel,
@@ -42,8 +42,8 @@ extension _QueuePanelView on QueuePanel {
 
     final expand = CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
+      curve: appMotion,
+      reverseCurve: appMotion,
     );
     final fade = CurveTween(
       curve: const Interval(0.0, 1.0 / 3.0),

@@ -2,27 +2,33 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 歌词滚动渲染组件（§10.2 UI 层；AMLL 观感简化版）。
+/// 普通歌词滚动渲染（非 AMLL 物理歌词墙）。
 ///
-/// 行为：当前行居中 + 主色放大高亮（周边行渐隐）；播放位置驱动
-/// 自动滚动（行切换时一次动画）；点击行 → [onSeek]（毫秒）。
-/// 增强歌词：当前行原文按逐字片段（YRC/KRC）做卡拉OK 高亮，
-/// 翻译以次行小字显示（[LyricGroup.translation]）。
-/// 数据为空时显示占位（对应 Web 端空态）。
+/// 2026-11-09 重写：不再用 `ListView` + 每次换行 `animateTo(easeOutCubic)`，
+/// 改为**单控制器连续滚动**的自绘视口：
 ///
-/// 样式参数（字号 / 行高 / 已唱色 / 未唱色）由播放页从「设置 → 歌词」
-/// 偏好传入（对齐原版 desktopLyric 的个性化配置）。
+/// - 行位置只由一个 `AnimationController` 的线性插值决定（无过冲、无逐行
+///   重新加速），符合人眼对连续阅读运动的预期；
+/// - 只构建视口 ± 一屏的行，行高用 `TextPainter` 实测并缓存，位置 tick
+///   （~20Hz）不会重新排版；
+/// - 当前行按「离视口中心的距离」连续变化颜色 / 缩放 / 透明度，换行时
+///   不会出现整行突然变大变色的跳变；
+/// - 逐字歌词用**连续扫亮**（按片段时长插值），而不是「唱到就整字换色」；
+/// - 上下渐隐直接乘进每行颜色（零离屏层），不再依赖全屏 `ShaderMask`；
+/// - 保留滚轮 / 拖拽手动浏览，3 秒无操作后按当前播放位置线性回中。
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/gestures.dart' show PointerScrollEvent;
 
-import '../../services/lyrics/lyric_line.dart';
-import 'lyrics_v7/lyrics_layout.dart';
 import '../../l10n/l10n.dart';
+import '../../services/lyrics/lyric_line.dart';
+import '../../theme/motion.dart';
 import 'lyrics_edge_fade.dart';
-import '../common/anim.dart';
+import 'lyrics_v7/lyrics_layout.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
@@ -96,7 +102,7 @@ class LyricsView extends StatefulWidget {
   /// 文本对齐（默认居中；Vutron 布局左对齐）。
   final TextAlign textAlign;
 
-  /// 上下 25% 渐隐遮罩（Vutron 的 `mask:true` 观感）。
+  /// 上下渐隐（直接乘进每行颜色，零离屏层）。
   final bool fadeEdges;
 
   /// 行高默认值（含间距）。
@@ -106,74 +112,82 @@ class LyricsView extends StatefulWidget {
   State<LyricsView> createState() => _LyricsViewState();
 }
 
-class _LyricsViewState extends State<LyricsView> {
-  final _controller = ScrollController();
+class _LyricsViewState extends State<LyricsView>
+    with SingleTickerProviderStateMixin {
+  /// 整个歌词视口的滚动偏移（逻辑像素）。无界，由目标值夹到 [0, maxScroll]。
+  late final AnimationController _scroll;
 
-  /// 当前行索引（避免每帧滚动）。
-  int _current = -1;
+  /// 当前布局（行高 / 累计 top / 总高）；宽度 / 样式 / 当前行变化时重算。
+  _LyricsLayout? _layout;
+  Object? _layoutKey;
 
-  /// 实测行高缓存（有界 LRU）。50ms 位置 tick / 滚动 / 主题稳定时，
-  /// 绝大多数行的文本与样式未变，直接命中原高度即可跳过重复的
-  /// TextPainter 布局（每次 build 原本对全部行跑一遍 = O(行数)）。
-  /// 宽度 / 字号 / 文本缩放 / 默认字体样式变化时键失配自然失效。
+  /// 上一次用于「是否动画」判断的样式键（不含当前行索引）。
+  Object? _lastBaseKey;
+
+  /// 上一次已调度跟随的当前行索引。
+  int _lastFollowIndex = -2;
+
+  /// 当前目标偏移（手动浏览恢复时复用）。
+  double _target = 0;
+
+  /// 手动浏览（滚轮 / 拖拽）期间冻结自动跟随；3 秒后恢复。
+  Timer? _resumeTimer;
+  bool _userScrolling = false;
+
+  /// 首帧直接吸附到目标，不做入场滚动。
+  bool _didInitialSnap = false;
+
+  /// 行高实测缓存（有界 LRU）：位置 tick 不改变行高，命中即跳过排版。
   final _rowHeightCache = <_LyricsRowHeightKey, double>{};
 
-  /// 行高列表（按需重算；见 [_heightsKey]）。
-  ///
-  /// 位置 tick（~20Hz）不改变任何行高——只有「当前行翻转 / 分组 / 宽度 /
-  /// 样式」变化才需要重算（换行约每几秒一次），避免每 tick 跑 O(行数)。
-  List<double>? _heights;
-  Object? _heightsKey;
-
-  /// 非当前行 widget 实例缓存。
-  ///
-  /// 返回**同一实例**时 Flutter 的 `Element.updateChild` 会直接跳过该子树的
-  /// 重建与重绘（identical widget 短路）；当前行因逐字扫亮每 tick 变化，
-  /// 不入缓存。缓存随当前行翻转 / 配置 / 主题变化整体作废。
-  final _lineCache = <int, Widget>{};
-
   // ---- 测试探针（仅统计用，不参与运行逻辑）----
-
-  /// 实际构造的 `_Line` 实例数（含当前行与首次进入视口的行）。
   int _builtLines = 0;
-
-  /// 非当前行命中缓存实例的次数。
-  int _cacheHits = 0;
+  int _measuredLines = 0;
+  int _lastWindowSize = 0;
 
   @visibleForTesting
   int debugBuiltLines() => _builtLines;
 
   @visibleForTesting
-  int debugLineCacheHits() => _cacheHits;
+  int debugMeasuredLines() => _measuredLines;
+
+  @visibleForTesting
+  int debugLastWindowSize() => _lastWindowSize;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll = AnimationController.unbounded(vsync: this, value: 0);
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 主题（颜色）/ 文本缩放 / 默认字体样式可能已变：缓存实例与行高作废。
-    _lineCache.clear();
-    _heightsKey = null;
+    // 主题颜色 / 文本缩放 / 默认字体样式可能已变：布局与实例缓存作废。
+    _layoutKey = null;
+    _lastBaseKey = null;
+    _rowHeightCache.clear();
+  }
+
+  @override
+  void didUpdateWidget(LyricsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.groups, widget.groups)) {
+      _layoutKey = null;
+      _lastBaseKey = null;
+      _lastFollowIndex = -2;
+      _didInitialSnap = false;
+      _rowHeightCache.clear();
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _resumeTimer?.cancel();
+    _scroll.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => _buildLyricsView(context);
-
-  /// 按实测行高算出的目标偏移滚动（长行换行后行高可变，不能再按
-  /// 「索引 × 固定行高」换算；偏移由 [_LyricsViewBuild._offsetFor] 给出）。
-  void _scrollToOffset(double offset) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_controller.hasClients) return;
-      final max = _controller.position.maxScrollExtent;
-      _controller.animateTo(
-        offset.clamp(0.0, max),
-        duration: animDuration(context, const Duration(milliseconds: 280)),
-        curve: Curves.easeOutCubic,
-      );
-    });
-  }
 }

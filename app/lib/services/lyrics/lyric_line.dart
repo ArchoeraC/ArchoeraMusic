@@ -14,6 +14,8 @@ library;
 
 import 'dart:convert';
 
+import '../../apis/lyric/format.dart' show kNekoV1LyricsFormat;
+
 /// 一行歌词（毫秒时间戳 + 文本）。
 class LyricLine {
   const LyricLine({required this.timeMs, required this.text});
@@ -607,9 +609,6 @@ bool _isHan(int r) =>
     (r >= 0x4E00 && r <= 0x9FFF) ||
     (r >= 0x3400 && r <= 0x4DBF) ||
     (r >= 0xF900 && r <= 0xFAFF);
-
-/// NekoMusic 富歌词格式标识（`/api/music/info` 的 `lyricsFormat`）。
-const String kNekoV1LyricsFormat = 'neko-v1';
 
 /// 是否为 `neko-v1` 富歌词：显式 format，或 `{"version":1,"lines":[...]}` JSON。
 ///

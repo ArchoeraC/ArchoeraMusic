@@ -116,7 +116,7 @@ std::atomic<bool> g_theme_dark{false};
 std::atomic<bool> g_theme_valid{false};
 
 // 深链接收常驻：与主题/防休眠订阅无关，启动即建立会话总线连接并注册
-// OpenUri，保证次实例（OAuth 回调 / archoera://）总能转发成功。
+// OpenUri，保证次实例转发的 archoera:// 总能成功送达。
 std::atomic<bool> g_deeplink_events{false};
 
 // 系统强调色缓存（异步查询结果）：apl_system_accent 立即返回缓存，避免在
@@ -709,26 +709,19 @@ std::string readCmdlineUrl() {
         if (end == std::string::npos) end = data.size();
         const std::string arg = data.substr(start, end - start);
         if (arg.rfind("archoera://", 0) == 0) return arg;
-        // NekoAuth 登录回调（NekoMusic 固定使用 nekomusic://）。
-        if (arg.rfind("nekomusic://", 0) == 0) return arg;
         start = end + 1;
     }
     return std::string();
 }
 
-std::string desktopFilePath(const char* scheme) {
+std::string desktopFilePath() {
     const char* home = std::getenv("HOME");
     if (home == nullptr || *home == '\0') return std::string();
-    // archoera 保持历史文件名（兼容旧版注册）；其它 scheme 单独一个 .desktop，
-    // 避免后注册的 scheme 覆盖前一 scheme 的 MimeType。
-    const bool primary = scheme != nullptr && std::strcmp(scheme, "archoera") == 0;
-    const std::string name =
-        primary ? std::string("archoera_music.desktop")
-                : std::string("archoera_music_") + scheme + ".desktop";
-    return std::string(home) + "/.local/share/applications/" + name;
+    // 只用固定文件名（历史兼容）；当前 ABI 仅注册 archoera:// 一个方案。
+    return std::string(home) + "/.local/share/applications/archoera_music.desktop";
 }
 
-// scheme 会拼进文件名：只允许小写字母 / 数字 / 连字符。
+// scheme 会写进 .desktop 的 MimeType（外部输入）：只允许小写字母 / 数字 / 连字符。
 bool isValidScheme(const char* scheme) {
     if (scheme == nullptr || *scheme == '\0') return false;
     for (const char* p = scheme; *p != '\0'; ++p) {
@@ -1959,8 +1952,7 @@ uint32_t caps() {
     uint32_t c = CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_MEDIA_SESSION |
                  CAP_MEDIA_SEEK | CAP_MEDIA_ARTWORK | CAP_APP_INSTANCE |
                  CAP_SYSTEM_ACCENT | CAP_SYSTEM_THEME | CAP_DEEP_LINK |
-                 CAP_REVEAL_PATH | CAP_TRAY | CAP_SECURE_FILE | CAP_OPEN_URL |
-                 CAP_ELEVATION;
+                 CAP_REVEAL_PATH | CAP_TRAY | CAP_SECURE_FILE | CAP_ELEVATION;
     const bool hasDisplay = std::getenv("WAYLAND_DISPLAY") != nullptr ||
                             std::getenv("DISPLAY") != nullptr;
     if (hasDisplay && gtkwin::available()) c |= CAP_WINDOW_STATE;
@@ -1996,11 +1988,10 @@ int32_t init() {
     dbus_threads_init_default();
     g_running.store(true, std::memory_order_release);
     // 深链服务常驻：即使主题/防休眠从不订阅，也要建立会话总线并注册
-    // OpenUri，否则次实例（OAuth 回调）转发会因找不到服务而失败。
+    // OpenUri，否则次实例转发的 archoera:// 会因找不到服务而失败。
     g_deeplink_events.store(true, std::memory_order_release);
     g_pump = new std::thread(pumpLoop);
-    // 冷启动：命令行中的 archoera:// / nekomusic:// URL（协议处理程序把 URL
-    // 作为 argv 传入）。
+    // 冷启动：命令行中的 archoera:// URL（协议处理程序把 URL 作为 argv 传入）。
     const std::string cold = readCmdlineUrl();
     if (!cold.empty()) {
         std::lock_guard<std::mutex> lock(g_deeplink_mutex);
@@ -2121,7 +2112,7 @@ int32_t appInstanceAcquire() {
 
 int32_t protocolRegister(const char* scheme) {
     if (!isValidScheme(scheme)) return ERR_STATE;
-    const std::string path = desktopFilePath(scheme);
+    const std::string path = desktopFilePath();
     if (path.empty()) return ERR_BACKEND;
     char exe[4096] = {0};
     const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
@@ -2166,7 +2157,7 @@ int32_t protocolRegister(const char* scheme) {
 
 int32_t protocolUnregister(const char* scheme) {
     if (!isValidScheme(scheme)) return ERR_STATE;
-    const std::string path = desktopFilePath(scheme);
+    const std::string path = desktopFilePath();
     if (!path.empty()) ::unlink(path.c_str());
     return OK;
 }
@@ -2501,17 +2492,6 @@ int32_t revealPath(const char* path) {
     const std::string dir = isDir ? p : parentDir(p);
     if (!dir.empty() && gioOpenDir(dir)) return OK;
     return ERR_BACKEND;
-}
-
-int32_t openUrl(const char* url) {
-    if (url == nullptr || *url == '\0') return ERR_STATE;
-    // 同进程 GIO 拉起默认处理器（浏览器）：不自建子进程，不拼命令行。
-    const auto& gio = gioReveal();
-    if (!gio.ok() || gio.launch_default_for_uri == nullptr) return ERR_UNSUPPORTED;
-    void* err = nullptr;
-    const int ok = gio.launch_default_for_uri(url, nullptr, &err);
-    if (err != nullptr && gio.error_free != nullptr) gio.error_free(err);
-    return ok != 0 ? OK : ERR_BACKEND;
 }
 
 // ── 安全文件原语（POSIX open(2)）───────────────────────────────────
