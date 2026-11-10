@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../app/player_theme.dart';
 import '../services/netease/track.dart';
 import '../services/source/source_platform.dart';
 import '../services/lyrics/lyric_line.dart';
@@ -248,5 +249,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   @override
-  Widget build(BuildContext context) => _buildPage(context);
+  Widget build(BuildContext context) {
+    // 播放页固定暗色主题：背景恒为暗色体系，前景（文字/图标/歌词等）
+    // 不随应用浅色模式反色。见 [playerThemeProvider]。
+    return Theme(
+      data: ref.watch(playerThemeProvider),
+      child: Builder(builder: (context) => _buildPage(context)),
+    );
+  }
 }
