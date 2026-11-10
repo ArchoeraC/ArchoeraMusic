@@ -29,19 +29,6 @@ extension _PlayerPageView on _PlayerPageState {
     final repeatMode = ref.watch(playbackProvider.select((s) => s.repeatMode));
     final hasQueue = ref.watch(playbackProvider.select((s) => s.hasQueue));
     final hasContent = hasSource || hasQueue;
-    ref.listen(playbackProvider.select((s) => s.queueIndex), (prev, next) {
-      if (prev != null && prev != next) {
-        _slideNext = next > prev;
-      }
-    });
-    ref.listen(playbackProvider.select((s) => s.fft), (prev, next) {
-      final p = ref.read(appPrefsProvider);
-      if (!p.coverBeatScale || p.performanceMode) return;
-      final strength = next?.beatStrength ?? 0;
-      if (strength <= 0) return;
-      _lastBeatStrength = strength;
-      _coverPulse.forward(from: 0);
-    });
     final canLike = current != null && sourceSupportsLike(current.source);
     final canComment = current != null && sourceSupportsComment(current.source);
     final liked = canLike
@@ -109,6 +96,7 @@ extension _PlayerPageView on _PlayerPageState {
           ? (ms) => notifier.seek(Duration(milliseconds: ms))
           : null,
       dragMs: _dragMs,
+      sharedKeys: _keysForLayout(layout.id),
     );
     final backdrop = layout.buildBackdrop(context, layoutCtx);
     final scrims = layout.buildScrims(context, layoutCtx);
@@ -172,97 +160,124 @@ extension _PlayerPageView on _PlayerPageState {
                       ),
                     ),
                   ),
-                  // 布局自己的页面级视觉（整幅封面等）。
-                  if (backdrop != null)
-                    Positioned.fill(child: IgnorePointer(child: backdrop)),
-                  // 布局自己的遮罩（自动沉浸时随 chrome 一起淡出）。
-                  if (scrims != null)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: AnimatedOpacity(
-                          opacity: chromeOpacity,
-                          duration: animDuration(
-                            context,
-                            const Duration(milliseconds: 300),
-                          ),
-                          curve: Curves.easeOut,
-                          child: scrims,
-                        ),
-                      ),
-                    ),
-                  SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: kPlayerPageHorizontalPadding,
-                      ),
-                      child: Column(
+                  // 布局层：封面 / 曲目信息 / 歌词由新布局的 live 元素从旧
+                  // 矩形变换到自身矩形，其余 chrome 交叉淡化。背景层保持常驻。
+                  Positioned.fill(
+                    child: PlayerLayoutSwitcher(
+                      layoutId: layout.id,
+                      keysForLayout: _keysForLayout,
+                      child: Stack(
+                        fit: StackFit.expand,
                         children: [
-                          // 自动沉浸：控件隐藏时顶栏一并淡出（普通模式顶栏常驻）。
-                          AnimatedOpacity(
-                            opacity: (!autoImmersive || _controlsVisible)
-                                ? 1
-                                : 0,
-                            duration: animDuration(
-                              context,
-                              const Duration(milliseconds: 300),
+                          // 布局自己的页面级视觉（整幅封面等）。
+                          if (backdrop != null)
+                            Positioned.fill(
+                              child: IgnorePointer(child: backdrop),
                             ),
-                            curve: Curves.easeOut,
-                            child: IgnorePointer(
-                              ignoring: autoImmersive && !_controlsVisible,
-                              child: _PlayerTopBar(
-                                l10n: l10n,
-                                showLyrics: showLyrics,
-                                hasLyrics: hasLyrics,
-                                colorScheme: colorScheme,
-                                current: current,
-                                quality: quality,
-                                qualityLevels: qualityLevels,
-                                isFullScreen: _isFullScreen,
-                                onClose: () => context.pop(),
-                                onToggleLyrics:
-                                    hasLyrics && layout.lyricsToggleable
-                                    ? () => ref
-                                          .read(appPrefsProvider.notifier)
-                                          .setShowLyricsInPlayer(!showLyrics)
-                                    : null,
-                                onSelectQuality: notifier.setQuality,
-                                onToggleFullscreen: _toggleFullscreen,
+                          // 布局自己的遮罩（自动沉浸时随 chrome 一起淡出）。
+                          if (scrims != null)
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: AnimatedOpacity(
+                                  opacity: chromeOpacity,
+                                  duration: animDuration(
+                                    context,
+                                    const Duration(milliseconds: 300),
+                                  ),
+                                  curve: Curves.easeOut,
+                                  child: scrims,
+                                ),
+                              ),
+                            ),
+                          SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: kPlayerPageHorizontalPadding,
+                              ),
+                              child: Column(
+                                children: [
+                                  // 自动沉浸：控件隐藏时顶栏一并淡出（普通模式顶栏常驻）。
+                                  AnimatedOpacity(
+                                    opacity:
+                                        (!autoImmersive || _controlsVisible)
+                                        ? 1
+                                        : 0,
+                                    duration: animDuration(
+                                      context,
+                                      const Duration(milliseconds: 300),
+                                    ),
+                                    curve: Curves.easeOut,
+                                    child: IgnorePointer(
+                                      ignoring:
+                                          autoImmersive && !_controlsVisible,
+                                      child: _PlayerTopBar(
+                                        l10n: l10n,
+                                        showLyrics: showLyrics,
+                                        hasLyrics: hasLyrics,
+                                        colorScheme: colorScheme,
+                                        current: current,
+                                        quality: quality,
+                                        qualityLevels: qualityLevels,
+                                        isFullScreen: _isFullScreen,
+                                        layoutId: layout.id,
+                                        onClose: () => context.pop(),
+                                        onSelectLayout: (id) => ref
+                                            .read(appPrefsProvider.notifier)
+                                            .setCoverLayout(layout: id),
+                                        onToggleLyrics:
+                                            hasLyrics && layout.lyricsToggleable
+                                            ? () => ref
+                                                  .read(
+                                                    appPrefsProvider.notifier,
+                                                  )
+                                                  .setShowLyricsInPlayer(
+                                                    !showLyrics,
+                                                  )
+                                            : null,
+                                        onSelectQuality: notifier.setQuality,
+                                        onToggleFullscreen: _toggleFullscreen,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: layout.buildBody(context, layoutCtx),
+                                  ),
+                                  if (layout.usesDefaultBottomBar)
+                                    _PlayerBottomOverlay(
+                                      controlsVisible: _controlsVisible,
+                                      theme: theme,
+                                      dragMs: _dragMs,
+                                      buffering: buffering,
+                                      hasSource: hasSource,
+                                      hasContent: hasContent,
+                                      hasQueue: hasQueue,
+                                      canLike: canLike,
+                                      canComment: canComment,
+                                      liked: liked,
+                                      current: current,
+                                      shuffle: shuffle,
+                                      repeatMode: repeatMode,
+                                      playing: playing,
+                                      showProgressLyric:
+                                          prefs.showProgressLyric,
+                                      onDragChanged: (v) =>
+                                          setState(() => _dragMs = v),
+                                      onSeekEnd: (_) =>
+                                          setState(() => _dragMs = null),
+                                      onToggleLike: _toggleLike,
+                                      onShowComments: () {
+                                        if (current != null) {
+                                          showCommentDialog(
+                                            context,
+                                            track: current,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                ],
                               ),
                             ),
                           ),
-                          Expanded(child: layout.buildBody(context, layoutCtx)),
-                          Text(
-                            !hasContent
-                                ? l10n.playerPageLoadHint
-                                : (buffering ? l10n.playerBarBuffering : ''),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                          if (layout.usesDefaultBottomBar)
-                            _PlayerBottomOverlay(
-                              controlsVisible: _controlsVisible,
-                              theme: theme,
-                              dragMs: _dragMs,
-                              buffering: buffering,
-                              hasSource: hasSource,
-                              hasContent: hasContent,
-                              hasQueue: hasQueue,
-                              canLike: canLike,
-                              canComment: canComment,
-                              liked: liked,
-                              current: current,
-                              shuffle: shuffle,
-                              repeatMode: repeatMode,
-                              playing: playing,
-                              showProgressLyric: prefs.showProgressLyric,
-                              onDragChanged: (v) => setState(() => _dragMs = v),
-                              onSeekEnd: (_) => setState(() => _dragMs = null),
-                              onToggleLike: _toggleLike,
-                              onShowComments: () {
-                                if (current != null) {
-                                  showCommentDialog(context, track: current);
-                                }
-                              },
-                            ),
                         ],
                       ),
                     ),
@@ -287,7 +302,9 @@ class _PlayerTopBar extends StatelessWidget {
     required this.quality,
     required this.qualityLevels,
     required this.isFullScreen,
+    required this.layoutId,
     required this.onClose,
+    required this.onSelectLayout,
     required this.onToggleLyrics,
     required this.onSelectQuality,
     required this.onToggleFullscreen,
@@ -301,7 +318,12 @@ class _PlayerTopBar extends StatelessWidget {
   final String quality;
   final List<String> qualityLevels;
   final bool isFullScreen;
+
+  /// 当前布局 id（顶栏布局切换菜单的选中态）。
+  final String layoutId;
+
   final VoidCallback onClose;
+  final ValueChanged<String> onSelectLayout;
   final VoidCallback? onToggleLyrics;
   final ValueChanged<String> onSelectQuality;
   final Future<void> Function() onToggleFullscreen;
@@ -353,6 +375,12 @@ class _PlayerTopBar extends StatelessWidget {
               current: quality,
               onSelected: onSelectQuality,
             ),
+          // 播放页内快速切换布局（与设置里的「封面布局」同一份偏好）。
+          _LayoutMenuButton(
+            l10n: l10n,
+            currentId: layoutId,
+            onSelected: onSelectLayout,
+          ),
           Tooltip(
             message: isFullScreen
                 ? l10n.playerBarExitFullscreen
@@ -366,6 +394,152 @@ class _PlayerTopBar extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 播放页布局切换（顶栏）：列出注册表内的布局，选中即写偏好；
+/// 页面布局层由 `PlayerLayoutSwitcher` 做左出右进的滑动过渡。
+class _LayoutMenuButton extends StatelessWidget {
+  const _LayoutMenuButton({
+    required this.l10n,
+    required this.currentId,
+    required this.onSelected,
+  });
+
+  final AppLocalizations l10n;
+  final String currentId;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return PopupMenuButton<String>(
+      tooltip: l10n.settingsCoverLayout,
+      icon: const Icon(EtaIcons.columnsOutline),
+      constraints: const BoxConstraints(minWidth: 236, maxWidth: 320),
+      onSelected: onSelected,
+      itemBuilder: (context) => [
+        for (final layout in playerLayouts)
+          CheckedPopupMenuItem<String>(
+            value: layout.id,
+            checked: layout.id == currentId,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _LayoutPreview(id: layout.id, scheme: scheme),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    playerLayoutLabel(l10n, layout.id),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 菜单里的布局缩略示意（纯几何，不加载图片）。
+class _LayoutPreview extends StatelessWidget {
+  const _LayoutPreview({required this.id, required this.scheme});
+
+  final String id;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final strong = scheme.onSurfaceVariant.withValues(alpha: 0.55);
+    final weak = scheme.onSurfaceVariant.withValues(alpha: 0.30);
+    Widget line(double factor) => Container(
+      width: 12 * factor,
+      height: 2,
+      decoration: BoxDecoration(
+        color: weak,
+        borderRadius: BorderRadius.circular(1),
+      ),
+    );
+    final cover = Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: strong,
+        borderRadius: BorderRadius.circular(3),
+      ),
+    );
+    final lyrics = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        line(0.75),
+        const SizedBox(height: 2),
+        line(1),
+        const SizedBox(height: 2),
+        line(0.85),
+      ],
+    );
+    final content = switch (id) {
+      'fullscreen' => Stack(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: 20,
+              color: strong.withValues(alpha: 0.45),
+              foregroundDecoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.transparent, strong.withValues(alpha: 0.45)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 2),
+              child: lyrics,
+            ),
+          ),
+        ],
+      ),
+      'vutron' => Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [cover, const SizedBox(width: 4), lyrics],
+          ),
+          const SizedBox(height: 3),
+          Container(
+            width: 30,
+            height: 2,
+            decoration: BoxDecoration(
+              color: strong.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(1),
+            ),
+          ),
+        ],
+      ),
+      _ => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [cover, const SizedBox(width: 4), lyrics],
+      ),
+    };
+    return Container(
+      width: 44,
+      height: 30,
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.3)),
+      ),
+      child: content,
     );
   }
 }

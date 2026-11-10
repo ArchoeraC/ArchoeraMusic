@@ -29,13 +29,19 @@ import '../../../stores/app_prefs.dart';
 import '../../../widgets/common/anim.dart';
 import '../../../widgets/list/cover_image.dart';
 import '../../../widgets/player/playback_progress_slider.dart';
+import '../../../widgets/player/playback_slider.dart';
 import '../../../widgets/player/play_pause_button.dart';
 import '../../../widgets/player/player_lyrics_block.dart';
 import '../../../widgets/player/player_lyrics_slot.dart';
+import '../../../widgets/player/player_shared_elements.dart';
+import '../../../widgets/player/player_slider_row.dart';
 import '../../../widgets/player/spectrum_view.dart';
 import 'player_layout.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
+
+/// Vutron 两条滑杆的统一轨道粗细（主题默认 3px，按设计稿略粗一档）。
+const double _barTrackHeight = 4;
 
 class VutronPlayerLayout extends PlayerLayout {
   const VutronPlayerLayout();
@@ -76,41 +82,32 @@ class VutronPlayerLayout extends PlayerLayout {
                 180.0,
                 maxByWidth,
               );
-              // 关闭歌词（或没有歌词）时，右栏没有内容；开启自动居中时把
-              // 封面/控制区整体居中，避免留下半屏空白。
+              // 关闭歌词（或没有歌词）时右栏没有内容；开启自动居中时把
+              // 左栏整体移到页面中心。用 AnimatedAlign 而不是替换整棵
+              // Row：切换时左栏平滑平移，歌词槽同时下滑卸载。
               final showLyrics = c.showLyrics && c.hasLyrics;
-              if (!showLyrics && c.autoCenterCover) {
-                return RepaintBoundary(
-                  child: Center(
-                    child: SizedBox(
-                      width: coverSize,
-                      child: _VutronLeftColumn(size: coverSize, ctx: c),
-                    ),
-                  ),
-                );
-              }
+              final centered = !showLyrics && c.autoCenterCover;
               return RepaintBoundary(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                child: Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    // 左栏：封面 + 信息 + 进度/控制/音量（整体垂直居中）。
-                    Expanded(
-                      child: Center(
-                        child: SizedBox(
-                          width: coverSize,
-                          child: _VutronLeftColumn(size: coverSize, ctx: c),
-                        ),
-                      ),
-                    ),
-                    // 右栏：歌词容器取 90% 宽并右对齐（对齐 `.main-lyric-container`）。
-                    Expanded(
+                    // 右栏：歌词容器取右半宽度的 90% 并右对齐
+                    // （对齐 `.main-lyric-container`）；显隐由槽负责滑入/滑出。
+                    Positioned(
+                      top: 0,
+                      bottom: 0,
+                      right: 0,
+                      width: box.maxWidth * 0.5,
                       child: FractionallySizedBox(
                         alignment: Alignment.centerRight,
                         widthFactor: 0.9,
                         child: PlayerLyricsSlot(
                           visible: c.showLyrics,
                           enabled: c.contentMounted && c.hasLyrics,
-                          builder: (_) => RepaintBoundary(
+                          builder: (_) => PlayerSharedElementBoundary(
+                            kind: PlayerSharedElement.lyrics,
+                            boundaryKey:
+                                c.sharedKeys[PlayerSharedElement.lyrics],
                             child: PlayerLyricsBlock(
                               hasLyrics: c.hasLyrics,
                               // 字号由 vutron 预设接管（720p=28px 起随高度缩放）。
@@ -122,6 +119,25 @@ class VutronPlayerLayout extends PlayerLayout {
                               dragMs: c.dragMs,
                             ),
                           ),
+                        ),
+                      ),
+                    ),
+                    // 左栏：封面 + 信息 + 进度/控制/音量。
+                    // 有歌词 → 左半区居中（Alignment(-0.5) = 全宽 25%）；
+                    // 无歌词且自动居中 → 整页中心，600ms ease-out 平移。
+                    Positioned.fill(
+                      child: AnimatedAlign(
+                        alignment: centered
+                            ? Alignment.center
+                            : const Alignment(-0.5, 0),
+                        duration: animDuration(
+                          context,
+                          const Duration(milliseconds: 600),
+                        ),
+                        curve: kPlayerLayoutTransitionCurve,
+                        child: SizedBox(
+                          width: coverSize,
+                          child: _VutronLeftColumn(size: coverSize, ctx: c),
                         ),
                       ),
                     ),
@@ -171,31 +187,10 @@ class _VutronLeftColumn extends StatelessWidget {
         ? (ctx.title.isEmpty ? ctx.l10n.playerBarUntitled : ctx.title)
         : ctx.l10n.playerPageNotPlaying;
     final subtitle = ctx.hasContent ? ctx.subtitle : '';
-    return Column(
+    final info = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 封面（圆角 12；投影用 BoxShadow，不复制图片做模糊）。
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: CoverImage(
-            cover: ctx.current?.cover,
-            width: size,
-            height: size,
-            radius: 12,
-            iconSize: (size * 0.28).clamp(48.0, 120.0),
-          ),
-        ),
-        const SizedBox(height: 22),
         // 标题 / 副标题（对齐 .top-part：20/600/.88、14/.70）。
         Text(
           title,
@@ -219,10 +214,52 @@ class _VutronLeftColumn extends StatelessWidget {
             ),
           ),
         ],
+      ],
+    );
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 封面（圆角 12；投影用 BoxShadow，不复制图片做模糊）。
+        PlayerSharedElementBoundary(
+          kind: PlayerSharedElement.cover,
+          boundaryKey: ctx.sharedKeys[PlayerSharedElement.cover],
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: CoverImage(
+              cover: ctx.current?.cover,
+              width: size,
+              height: size,
+              radius: 12,
+              iconSize: (size * 0.28).clamp(48.0, 120.0),
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        PlayerSharedElementBoundary(
+          kind: PlayerSharedElement.info,
+          boundaryKey: ctx.sharedKeys[PlayerSharedElement.info],
+          child: info,
+        ),
         const SizedBox(height: 18),
-        // 进度条（4px 轨道 / 时间 15px，对齐 .progress-bar）。
+        // 进度条（细轨道 / 时间 15px，对齐 .progress-bar）。
         PlaybackProgressSlider(
           showTimes: true,
+          // 与音量条共用固定时间槽宽 → 两条轨道左右边缘对齐。
+          timeGutter: PlayerSliderRow.defaultGutter,
+          // 比主题默认 3px 略粗（对齐 SPlayer-Next 的轨道观感）。
+          trackHeight: _barTrackHeight,
+          // 纯条：不显示高亮球（静止/悬停/拖动都不画）。
+          showThumb: false,
           textStyle: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
@@ -334,9 +371,13 @@ class _VutronControls extends ConsumerWidget {
   }
 }
 
-/// 音量行：图标 + 轨道（对齐 Vutron 第二条 .progress-bar）。
+/// 音量行：图标 + 轨道（与进度条共用 [PlayerSliderRow] 栅格与
+/// [PlaybackSlider] 样式，两条轨道左右边缘严格对齐）。
 class _VutronVolume extends ConsumerWidget {
   const _VutronVolume();
+
+  /// 音量行高度：比进度条更紧凑，轨道在其中垂直居中。
+  static const double _barHeight = 32;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -344,158 +385,31 @@ class _VutronVolume extends ConsumerWidget {
     final volume = ref.watch(playbackProvider.select((s) => s.volume));
     final notifier = ref.read(playbackProvider.notifier);
     final muted = volume <= 0.001;
-    return Row(
-      children: [
-        IconButton(
-          tooltip: muted ? context.l10n.volumeUnmute : context.l10n.volumeMute,
-          onPressed: () => unawaited(notifier.setVolume(muted ? 0.7 : 0)),
-          iconSize: 16,
-          padding: EdgeInsets.zero,
-          visualDensity: VisualDensity.compact,
-          constraints: const BoxConstraints(minWidth: 24, minHeight: 32),
-          color: scheme.onSurface.withValues(alpha: 0.58),
-          icon: Icon(muted ? EtaIcons.volumeOff : EtaIcons.volume),
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          child: _VutronVolumeBar(
-            value: volume.clamp(0.0, 1.0),
-            onChanged: notifier.previewVolume,
-            onChangeEnd: (v) => unawaited(notifier.setVolume(v)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 精简音量条：6px 圆角条（无圆点），铺满整条宽度；悬停/拖动时轨道展开到
-/// 12px（280ms ease-out，对齐 SPlayer SSlider `hover-track-height` 的 AM 音量条）。
-///
-/// 不使用 Material [Slider] 的圆点与高命中区，保留一条干净的整宽轨道；
-/// 拖动时只预览（引擎命令合并），松手落盘。
-class _VutronVolumeBar extends StatefulWidget {
-  const _VutronVolumeBar({
-    required this.value,
-    required this.onChanged,
-    required this.onChangeEnd,
-  });
-
-  final double value;
-  final ValueChanged<double> onChanged;
-  final ValueChanged<double> onChangeEnd;
-
-  @override
-  State<_VutronVolumeBar> createState() => _VutronVolumeBarState();
-}
-
-class _VutronVolumeBarState extends State<_VutronVolumeBar> {
-  /// 静止/展开的轨道粗细。
-  static const double _trackHeight = 6;
-  static const double _hoverTrackHeight = 12;
-
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (d) {
-          widget.onChanged(valueAt(d.localPosition.dx, context));
-          widget.onChangeEnd(valueAt(d.localPosition.dx, context));
-        },
-        onHorizontalDragStart: (d) =>
-            widget.onChanged(valueAt(d.localPosition.dx, context)),
-        onHorizontalDragUpdate: (d) =>
-            widget.onChanged(valueAt(d.localPosition.dx, context)),
-        // 拖动期间父层已通过 previewVolume 更新 value，松手落盘当前值。
-        onHorizontalDragEnd: (_) => widget.onChangeEnd(widget.value),
-        child: SizedBox(
-          height: 20,
-          child: TweenAnimationBuilder<double>(
-            // 悬停/拖动展开轨道（拖动中 MouseRegion 保持 hover 态）。
-            tween: Tween(
-              begin: _trackHeight,
-              end: _hovered ? _hoverTrackHeight : _trackHeight,
-            ),
-            duration: animDuration(context, const Duration(milliseconds: 280)),
-            curve: Curves.easeOut,
-            builder: (context, trackHeight, _) => CustomPaint(
-              painter: _VutronVolumeBarPainter(
-                value: widget.value.clamp(0.0, 1.0),
-                trackHeight: trackHeight,
-                // 音量填充跟随主题色，底轨保持低对比中性色。
-                active: scheme.primary,
-                inactive: scheme.onSurface.withValues(alpha: 0.18),
-              ),
-            ),
-          ),
-        ),
+    return PlayerSliderRow(
+      leading: IconButton(
+        tooltip: muted ? context.l10n.volumeUnmute : context.l10n.volumeMute,
+        onPressed: () => unawaited(notifier.setVolume(muted ? 0.7 : 0)),
+        iconSize: 16,
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        constraints: const BoxConstraints(minWidth: 24, minHeight: 32),
+        color: scheme.onSurface.withValues(alpha: 0.58),
+        icon: Icon(muted ? EtaIcons.volumeOff : EtaIcons.volume),
+      ),
+      track: PlaybackSlider(
+        value: volume.clamp(0.0, 1.0),
+        max: 1,
+        buffering: false,
+        showTooltip: false,
+        height: _barHeight,
+        trackHeight: _barTrackHeight,
+        // 纯条：音量也不显示高亮球。
+        showThumb: false,
+        // 音量不是「进度」：关闭愚人节的反向映射。
+        allowPrank: false,
+        onChanged: notifier.previewVolume,
+        onChangeEnd: (v) => unawaited(notifier.setVolume(v)),
       ),
     );
   }
-
-  /// 指针横坐标 → 音量值（轨道宽即组件宽）。
-  double valueAt(double dx, BuildContext context) {
-    final box = context.findRenderObject()! as RenderBox;
-    return (dx / box.size.width.clamp(1.0, double.infinity)).clamp(0.0, 1.0);
-  }
-}
-
-class _VutronVolumeBarPainter extends CustomPainter {
-  const _VutronVolumeBarPainter({
-    required this.value,
-    required this.trackHeight,
-    required this.active,
-    required this.inactive,
-  });
-
-  final double value;
-  final double trackHeight;
-  final Color active;
-  final Color inactive;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final trackHeight = this.trackHeight.clamp(1.0, size.height);
-    final width = size.width;
-    if (width <= 0) return;
-    final cy = size.height / 2;
-    final radius = Radius.circular(trackHeight / 2);
-    canvas.drawRRect(
-      RRect.fromLTRBR(
-        0,
-        cy - trackHeight / 2,
-        width,
-        cy + trackHeight / 2,
-        radius,
-      ),
-      Paint()..color = inactive,
-    );
-    final filled = width * value;
-    if (filled > 0) {
-      canvas.drawRRect(
-        RRect.fromLTRBR(
-          0,
-          cy - trackHeight / 2,
-          filled,
-          cy + trackHeight / 2,
-          radius,
-        ),
-        Paint()..color = active,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_VutronVolumeBarPainter old) =>
-      old.value != value ||
-      old.trackHeight != trackHeight ||
-      old.active != active ||
-      old.inactive != inactive;
 }

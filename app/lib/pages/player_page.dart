@@ -27,6 +27,8 @@ import '../widgets/dialogs/comment_dialog.dart';
 import '../widgets/dialogs/sleep_timer_dialogs.dart';
 import '../widgets/player/playback_progress_slider.dart';
 import '../widgets/player/player_controls_row.dart';
+import '../widgets/player/player_layout_switcher.dart';
+import '../widgets/player/player_shared_elements.dart';
 import '../widgets/player/background/player_background.dart';
 import '../widgets/player/quality_menu.dart';
 import '../widgets/player/spectrum_view.dart';
@@ -59,6 +61,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     with SingleTickerProviderStateMixin {
   /// 拖动中的进度（ms）；null = 跟随播放器实时位置。
   double? _dragMs;
+
+  /// 布局切换共享元素边界（按布局 id 缓存；同一布局内 GlobalKey 稳定）。
+  final Map<String, PlayerSharedElementKeys> _sharedElementKeys = {};
+
+  PlayerSharedElementKeys _keysForLayout(String layoutId) => _sharedElementKeys
+      .putIfAbsent(layoutId, () => PlayerSharedElementKeys(layoutId));
 
   /// 当前应用窗口句柄（nativeapi；无窗口环境为 null，能力调用静默跳过）。
   Window? _window;
@@ -250,6 +258,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
 
   @override
   Widget build(BuildContext context) {
+    // 切歌方向（slide 样式）与封面节拍：在 ConsumerState 的 build 内注册，
+    // 避免放进子 Builder 时 debug 模式触发 ref.listen 的 build 断言。
+    ref.listen(playbackProvider.select((s) => s.queueIndex), (prev, next) {
+      if (prev != null && prev != next) {
+        _slideNext = next > prev;
+      }
+    });
+    ref.listen(playbackProvider.select((s) => s.fft), (prev, next) {
+      final p = ref.read(appPrefsProvider);
+      if (!p.coverBeatScale || p.performanceMode) return;
+      final strength = next?.beatStrength ?? 0;
+      if (strength <= 0) return;
+      _lastBeatStrength = strength;
+      _coverPulse.forward(from: 0);
+    });
     // 播放页固定暗色主题：背景恒为暗色体系，前景（文字/图标/歌词等）
     // 不随应用浅色模式反色。见 [playerThemeProvider]。
     return Theme(

@@ -12,13 +12,17 @@
 /// - [usesDefaultBottomBar]：是否使用页面共享的底部控制区。
 ///
 /// 新增布局只需：实现 [PlayerLayout] → 加进 [playerLayouts] → 在偏好白名单
-/// （`coverLayouts`）与设置分段里登记 id。页面本身不再写 `if (layout == ...)`。
+/// （`coverLayouts`）与设置分段里登记 id；并把封面、曲目信息、歌词分别包进
+/// `PlayerSharedElementBoundary`（key 取自 [PlayerLayoutContext.sharedKeys]），
+/// 布局切换时页面才能对这三类内容做共享元素补间。页面本身不再写
+/// `if (layout == ...)`。
 library;
 
 import 'package:material_ui/material_ui.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../services/netease/track.dart';
+import '../../../widgets/player/player_shared_elements.dart';
 import 'poster_layout.dart';
 import 'split_layout.dart';
 import 'vutron_layout.dart';
@@ -55,6 +59,7 @@ class PlayerLayoutContext {
     required this.l10n,
     required this.onSeekLyric,
     required this.dragMs,
+    required this.sharedKeys,
   });
 
   final Track? current;
@@ -110,6 +115,9 @@ class PlayerLayoutContext {
 
   /// 拖动进度条中的目标位置（毫秒）；null = 未拖动。
   final double? dragMs;
+
+  /// 本布局的共享元素边界 key（封面 / 曲目信息 / 歌词）。
+  final PlayerSharedElementKeys sharedKeys;
 }
 
 /// 播放页布局契约（见库注释）。
@@ -156,3 +164,11 @@ final Map<String, PlayerLayout> _layoutsById = <String, PlayerLayout>{
 /// id → 布局；未知 id 回退 `default`（旧数据/降级安全）。
 PlayerLayout playerLayoutFor(String id) =>
     _layoutsById[id] ?? _layoutsById[SplitPlayerLayout.layoutId]!;
+
+/// 布局 id → 本地化名称（设置页与播放页顶栏的布局切换共用）。
+String playerLayoutLabel(AppLocalizations l10n, String id) => switch (id) {
+  SplitPlayerLayout.layoutId => l10n.settingsCoverLayoutDefault,
+  PosterPlayerLayout.layoutId => l10n.settingsCoverLayoutFullscreen,
+  VutronPlayerLayout.layoutId => l10n.settingsCoverLayoutVutron,
+  _ => id,
+};
