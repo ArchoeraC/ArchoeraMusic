@@ -33,6 +33,8 @@
          未实现抽象成员）的假错。逐文件显式列出并 Link 可稳定解决。 -->
     <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
     <Compile Include="../../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
+    <!-- 纯托管 MD5（曲目 id）：避免 .NET 在 Linux/macOS 运行期 dlopen 系统 libssl。 -->
+    <Compile Include="../../shared/hash/Md5.cs" Link="shared/hash/Md5.cs" />
     <Compile Include="../Models.cs" Link="Models.cs" />
     <Compile Include="../Log.cs" Link="Log.cs" />
     <Compile Include="../IScannerDatabase.cs" Link="IScannerDatabase.cs" />

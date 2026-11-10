@@ -25,6 +25,8 @@ app/vcpkg_installed/
 
 # scraper（C++ 刮削器 FFI / CLI 构建产物；build/ 由 app/core/scraper CMake 产出）
 app/core/scraper/build/
+# scraper 加密后端（Rust staticlib，链入 archoera_scraper）
+app/core/scraper-crypto/target/
 
 # C 音频引擎（app/core/audio-engine/build/ 由 cmake 产出）
 app/core/audio-engine/build/

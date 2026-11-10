@@ -7,7 +7,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ---------- 依赖 ----------
 find_package(CURL REQUIRED)
-find_package(OpenSSL REQUIRED)  # HTTPS + SHA1
 find_package(SQLite3 REQUIRED)  # scraper-state.db 直写
 # SQLite target 命名跨环境不一致：
 #   - CMake 标准 FindSQLite3（≥3.14）与新版 vcpkg：SQLite3::SQLite3
@@ -52,6 +51,91 @@ if(NOT nlohmann_json_FOUND)
     )
     FetchContent_MakeAvailable(nlohmann_json)
 endif()
+
+# ---------- Rust 加密后端（替代 OpenSSL::Crypto）----------
+# AES / RSA 模幂 / MD5 / SHA1 / 随机数由 app/core/scraper-crypto（纯 Rust
+# staticlib）提供，静态合并进 archoera_scraper；运行期不再依赖系统 libcrypto，
+# 发行版 OpenSSL soname 升级（如 libcrypto.so.3 → .so.4）不影响已发布二进制。
+find_program(CARGO_EXECUTABLE cargo REQUIRED)
+set(SCRAPER_CRYPTO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../scraper-crypto")
+file(GLOB_RECURSE SCRAPER_CRYPTO_SOURCES CONFIGURE_DEPENDS
+    "${SCRAPER_CRYPTO_DIR}/src/*.rs")
+set(SCRAPER_CRYPTO_DEPENDS
+    "${SCRAPER_CRYPTO_DIR}/Cargo.toml"
+    "${SCRAPER_CRYPTO_DIR}/Cargo.lock"
+    ${SCRAPER_CRYPTO_SOURCES})
+
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(SCRAPER_CRYPTO_PROFILE "debug")
+    set(SCRAPER_CRYPTO_CARGO_FLAGS "")
+else()
+    # VS 多配置生成器 CMAKE_BUILD_TYPE 为空；桌面发布一律按 Release。
+    set(SCRAPER_CRYPTO_PROFILE "release")
+    set(SCRAPER_CRYPTO_CARGO_FLAGS "--release")
+endif()
+
+if(WIN32)
+    set(SCRAPER_CRYPTO_LIB_NAME "archoera_scraper_crypto.lib")
+else()
+    set(SCRAPER_CRYPTO_LIB_NAME "libarchoera_scraper_crypto.a")
+endif()
+
+# macOS 按 CMAKE_OSX_ARCHITECTURES 逐架构编译（build-macos.sh 传单架构），
+# 多架构时 lipo 成 fat 库；其它平台按宿主 target 编译。
+set(SCRAPER_CRYPTO_TARGETS "")
+set(SCRAPER_CRYPTO_LIBS "")
+if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+    foreach(_arch ${CMAKE_OSX_ARCHITECTURES})
+        if(_arch STREQUAL "arm64")
+            set(_triple aarch64-apple-darwin)
+        elseif(_arch STREQUAL "x86_64")
+            set(_triple x86_64-apple-darwin)
+        else()
+            message(FATAL_ERROR "scraper-crypto: 不支持的 macOS 架构 ${_arch}")
+        endif()
+        list(APPEND SCRAPER_CRYPTO_TARGETS "${_triple}")
+    endforeach()
+else()
+    list(APPEND SCRAPER_CRYPTO_TARGETS "host")
+endif()
+
+foreach(_triple ${SCRAPER_CRYPTO_TARGETS})
+    if(_triple STREQUAL "host")
+        set(_crypto_dir "${SCRAPER_CRYPTO_DIR}/target/${SCRAPER_CRYPTO_PROFILE}")
+        set(_cargo_target_args "")
+        set(_label "host")
+    else()
+        set(_crypto_dir "${SCRAPER_CRYPTO_DIR}/target/${_triple}/${SCRAPER_CRYPTO_PROFILE}")
+        set(_cargo_target_args --target "${_triple}")
+        set(_label "${_triple}")
+    endif()
+    set(_lib "${_crypto_dir}/${SCRAPER_CRYPTO_LIB_NAME}")
+    add_custom_command(
+        OUTPUT "${_lib}"
+        COMMAND "${CARGO_EXECUTABLE}" build ${SCRAPER_CRYPTO_CARGO_FLAGS}
+                ${_cargo_target_args}
+        WORKING_DIRECTORY "${SCRAPER_CRYPTO_DIR}"
+        DEPENDS ${SCRAPER_CRYPTO_DEPENDS}
+        COMMENT "cargo build archoera-scraper-crypto (${_label})"
+        VERBATIM)
+    list(APPEND SCRAPER_CRYPTO_LIBS "${_lib}")
+endforeach()
+
+list(LENGTH SCRAPER_CRYPTO_LIBS _crypto_lib_count)
+if(_crypto_lib_count GREATER 1)
+    set(SCRAPER_CRYPTO_LIB
+        "${SCRAPER_CRYPTO_DIR}/target/universal/${SCRAPER_CRYPTO_PROFILE}/${SCRAPER_CRYPTO_LIB_NAME}")
+    add_custom_command(
+        OUTPUT "${SCRAPER_CRYPTO_LIB}"
+        COMMAND lipo -create ${SCRAPER_CRYPTO_LIBS} -output "${SCRAPER_CRYPTO_LIB}"
+        DEPENDS ${SCRAPER_CRYPTO_LIBS}
+        COMMENT "lipo archoera-scraper-crypto"
+        VERBATIM)
+else()
+    list(GET SCRAPER_CRYPTO_LIBS 0 SCRAPER_CRYPTO_LIB)
+endif()
+
+add_custom_target(scraper_crypto ALL DEPENDS "${SCRAPER_CRYPTO_LIB}")
 
 # ---------- 编译选项 ----------
 if(MSVC)
@@ -99,10 +183,29 @@ endif()
 
 target_link_libraries(archoera_scraper PRIVATE
     CURL::libcurl
-    OpenSSL::Crypto
+    "${SCRAPER_CRYPTO_LIB}"
     nlohmann_json::nlohmann_json
     Taglib::tag
 )
+add_dependencies(archoera_scraper scraper_crypto)
+
+# Rust staticlib 的系统依赖（std / getrandom / num-bigint）。
+if(WIN32)
+    target_link_libraries(archoera_scraper PRIVATE
+        bcrypt advapi32 userenv ntdll ws2_32)
+elseif(APPLE)
+    # Rust std 在 macOS 上依赖 libiconv（CMake 3.16 的 find_library 无 REQUIRED）。
+    find_library(ICONV_LIBRARY iconv)
+    if(NOT ICONV_LIBRARY)
+        message(FATAL_ERROR "scraper-crypto: macOS 上未找到 iconv（Rust std 依赖）")
+    endif()
+    target_link_libraries(archoera_scraper PRIVATE "${ICONV_LIBRARY}")
+else()
+    target_link_libraries(archoera_scraper PRIVATE pthread dl m)
+    # 隐藏静态库（Rust std / crates）的导出符号，避免 .so 动态符号表膨胀，
+    # 也避免与进程内其它 Rust 库发生符号插入。scraper 自己的 C++ 符号不受影响。
+    target_link_options(archoera_scraper PRIVATE "LINKER:--exclude-libs,ALL")
+endif()
 if(SQLITE3_TARGET)
     target_link_libraries(archoera_scraper PRIVATE ${SQLITE3_TARGET})
 else()
@@ -133,4 +236,17 @@ if(NOT WIN32)
     add_executable(test_sanitize tests/test_sanitize.cpp)
     target_include_directories(test_sanitize PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     add_test(NAME test_sanitize COMMAND test_sanitize)
+
+    # Rust 加密后端 C ABI 契约（AES/RSA/摘要/随机数固定向量）。
+    # 直接链 staticlib：共享库已隐藏静态库符号（--exclude-libs,ALL）。
+    add_executable(test_crypto tests/test_crypto.cpp)
+    target_include_directories(test_crypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(test_crypto PRIVATE "${SCRAPER_CRYPTO_LIB}")
+    add_dependencies(test_crypto scraper_crypto)
+    if(APPLE)
+        target_link_libraries(test_crypto PRIVATE "${ICONV_LIBRARY}")
+    else()
+        target_link_libraries(test_crypto PRIVATE pthread dl m)
+    endif()
+    add_test(NAME test_crypto COMMAND test_crypto)
 endif()

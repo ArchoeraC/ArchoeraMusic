@@ -26,6 +26,16 @@ zig build -Doptimize=ReleaseFast
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j
 (cd build && ctest)
 
+# 扫描器（.NET NativeAOT；曲目 id 为纯托管 MD5，避免运行期 dlopen libssl）
+(cd app/core/scanner && ./build.sh linux-x64)
+cd app && flutter test test/scanner_direct_test.dart
+
+# 刮削器加密后端（Rust staticlib，静态合并进 archoera_scraper）
+cd app/core/scraper-crypto && cargo test --release
+cmake -S app/core/scraper -B app/core/scraper/build -DCMAKE_BUILD_TYPE=Release
+cmake --build app/core/scraper/build -j
+(cd app/core/scraper/build && ctest)
+
 # 平台桥接（末条为 ABI 契约符号守卫）
 cmake -S app/native/platform -B app/native/platform/build -DCMAKE_BUILD_TYPE=Release
 cmake --build app/native/platform/build -j

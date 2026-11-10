@@ -301,8 +301,7 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
   }
 
   /// 项目 GitHub 仓库地址（仅展示 / 复制，不打开链接）。
-  static const String _kRepoUrl =
-      'https://github.com/ArchoeraC/ArchoeraMusic';
+  static const String _kRepoUrl = 'https://github.com/ArchoeraC/ArchoeraMusic';
 
   /// Neko 歌姬计划 API 文档（其附加条款要求的原始链接）。
   static const String _kNekoApiDocsUrl =
@@ -470,6 +469,11 @@ const List<_ThanksItem> _kThanksCore = [
   ),
   _ThanksItem('SQLite', 'Public Domain', 'https://sqlite.org'),
   _ThanksItem('libcurl', '', 'https://curl.se/libcurl/'),
+  _ThanksItem(
+    'Rust crypto crates (aes / sha1 / md-5 / num-bigint / getrandom)',
+    'MIT OR Apache-2.0',
+    'https://crates.io',
+  ),
   _ThanksItem('OpenSSL', 'Apache-2.0', 'https://www.openssl.org'),
   _ThanksItem('nlohmann/json', 'MIT', 'https://github.com/nlohmann/json'),
 ];
