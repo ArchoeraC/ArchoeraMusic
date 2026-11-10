@@ -22,147 +22,172 @@ extension _SideBarView on _SideBarState {
           )
         : null;
     final width = collapsed ? 64.0 : 240.0;
-    // 布局完成后测量选中项位置（折叠/展开切换后指示条跟随）
+    // 布局完成后测量选中项位置（折叠/展开到位后指示条重新定位）
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateIndicator());
+
+    // 折叠/展开：先隐藏内容，宽度动效（linear，≤300ms）到位后再显示，
+    // 规避过渡期中间宽度下文字/图标/指示条的半成品布局被绘制出来。
+    ref.listen<bool>(appPrefsProvider.select((p) => p.sidebarCollapsed), (
+      previous,
+      next,
+    ) {
+      if (previous != next) _beginSidebarTransition();
+    });
 
     return AnimatedContainer(
       duration: animDuration(context, const Duration(milliseconds: 200)),
-      curve: Curves.easeOutCubic,
+      curve: Curves.linear,
       width: width,
       color: colorScheme.surfaceContainerLow,
-      child: Column(
-        children: [
-          // Logo（对齐 SideBarLogo.vue：点击回首页，hover 放大）
-          SizedBox(
-            height: 64,
-            child: Center(
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                onEnter: (_) => _setLogoScale(1.05),
-                onExit: (_) => _setLogoScale(1.0),
-                child: Tooltip(
-                  message: l10n.sidebarBackHome,
-                  waitDuration: const Duration(milliseconds: 500),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () => _goBranch(0),
-                    child: TweenAnimationBuilder<double>(
-                      duration: animDuration(
-                        context,
-                        const Duration(milliseconds: 150),
-                      ),
-                      tween: Tween(begin: _logoScale, end: _logoScale),
-                      builder: (context, scale, child) =>
-                          Transform.scale(scale: scale, child: child),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Logo（白标：完全跟随全局主题对比色——底 primaryContainer、标 onPrimaryContainer）
-                          const AppLogo(size: 30),
-                          // 折叠时文字淡出（保留宽度占位过渡）
-                          AnimatedOpacity(
-                            duration: animDuration(
-                              context,
-                              const Duration(milliseconds: 200),
-                            ),
-                            opacity: collapsed ? 0 : 1,
-                            child: AnimatedContainer(
-                              duration: animDuration(
-                                context,
-                                const Duration(milliseconds: 200),
-                              ),
-                              width: collapsed ? 0 : 110,
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 10),
-                                child: Text(
-                                  'Archoera',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.3,
-                                    color: colorScheme.primary,
+      onEnd: _endSidebarTransition,
+      // 过渡期停放内容（Offstage 停绘，但保留 State 与滚动位置），
+      // 宽度动效到位后再显示，规避中间宽度下的半成品布局。
+      child: SizedBox.expand(
+        child: Offstage(
+          offstage: !_sidebarContentVisible,
+          child: Column(
+            children: [
+              // Logo（对齐 SideBarLogo.vue：点击回首页，hover 放大）
+              SizedBox(
+                height: 64,
+                child: Center(
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    onEnter: (_) => _setLogoScale(1.05),
+                    onExit: (_) => _setLogoScale(1.0),
+                    child: Tooltip(
+                      message: l10n.sidebarBackHome,
+                      waitDuration: const Duration(milliseconds: 500),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => _goBranch(0),
+                        child: TweenAnimationBuilder<double>(
+                          duration: animDuration(
+                            context,
+                            const Duration(milliseconds: 150),
+                          ),
+                          tween: Tween(begin: _logoScale, end: _logoScale),
+                          builder: (context, scale, child) =>
+                              Transform.scale(scale: scale, child: child),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Logo（白标：完全跟随全局主题对比色——底 primaryContainer、标 onPrimaryContainer）
+                              const AppLogo(size: 30),
+                              // 折叠时文字淡出（保留宽度占位过渡）
+                              AnimatedOpacity(
+                                duration: animDuration(
+                                  context,
+                                  const Duration(milliseconds: 200),
+                                ),
+                                opacity: collapsed ? 0 : 1,
+                                child: AnimatedContainer(
+                                  duration: animDuration(
+                                    context,
+                                    const Duration(milliseconds: 200),
+                                  ),
+                                  width: collapsed ? 0 : 110,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 10),
+                                    child: Text(
+                                      'Archoera',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.3,
+                                        color: colorScheme.primary,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
-          const Divider(height: 1),
-          // 导航菜单（分组）；滑动样式叠一层容器级指示条
-          Expanded(
-            child: Stack(
-              key: _navHostKey,
-              children: [
-                // InkClip：把导航项 InkWell 的悬停/水波纹 ink 裁剪到导航视口内。
-                InkClip(
-                  child: ListView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: collapsed ? 10 : 10,
-                      vertical: 8,
-                    ),
-                    children: [
-                      for (final (groupTitle, items) in _navGroups(l10n)) ...[
-                        if (!collapsed)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 5),
-                            child: Text(
-                              groupTitle,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.5,
-                                color: colorScheme.onSurfaceVariant.withValues(
-                                  alpha: 0.6,
+              const Divider(height: 1),
+              // 导航菜单（分组）；滑动样式叠一层容器级指示条
+              Expanded(
+                child: Stack(
+                  key: _navHostKey,
+                  children: [
+                    // InkClip：把导航项 InkWell 的悬停/水波纹 ink 裁剪到导航视口内。
+                    InkClip(
+                      child: ListView(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: collapsed ? 10 : 10,
+                          vertical: 8,
+                        ),
+                        children: [
+                          for (final (groupTitle, items) in _navGroups(
+                            l10n,
+                          )) ...[
+                            if (!collapsed)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  12,
+                                  12,
+                                  5,
+                                ),
+                                child: Text(
+                                  groupTitle,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.5,
+                                    color: colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              )
+                            else
+                              const SizedBox(height: 12),
+                            for (final item in items)
+                              MouseDodge(
+                                child: _buildNavItem(
+                                  theme,
+                                  item,
+                                  collapsed,
+                                  navStyle,
                                 ),
                               ),
-                            ),
-                          )
-                        else
-                          const SizedBox(height: 12),
-                        for (final item in items)
-                          MouseDodge(
-                            child: _buildNavItem(
-                              theme,
-                              item,
-                              collapsed,
-                              navStyle,
-                            ),
-                          ),
-                      ],
-                    ],
+                          ],
+                        ],
+                      ),
+                    ),
+                    // 容器级滑动高亮指示条（由高亮样式模块构建；静态样式返回 null）
+                    ?indicator,
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // 折叠开关
+              SizedBox(
+                height: 48,
+                child: IconButton(
+                  tooltip: collapsed
+                      ? l10n.sidebarExpand
+                      : l10n.sidebarCollapse,
+                  onPressed: () => ref
+                      .read(appPrefsProvider.notifier)
+                      .setSidebar(collapsed: !collapsed),
+                  icon: Icon(
+                    collapsed ? EtaIcons.menu : EtaIcons.menu,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
-                // 容器级滑动高亮指示条（由高亮样式模块构建；静态样式返回 null）
-                ?indicator,
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          // 折叠开关
-          SizedBox(
-            height: 48,
-            child: IconButton(
-              tooltip: collapsed ? l10n.sidebarExpand : l10n.sidebarCollapse,
-              onPressed: () => ref
-                  .read(appPrefsProvider.notifier)
-                  .setSidebar(collapsed: !collapsed),
-              icon: Icon(
-                collapsed ? EtaIcons.menu : EtaIcons.menu,
-                size: 20,
-                color: colorScheme.onSurfaceVariant,
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
