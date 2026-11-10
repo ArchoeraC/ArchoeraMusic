@@ -2631,7 +2631,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'La liste affiche uniquement l\'artiste, sans alias';
 
   @override
-  String get settingsEnergySaving => 'Mode économie d\'énergie';
+  String get settingsEnergySaving => 'Économie d’énergie du spectre';
 
   @override
   String get settingsEnergySavingNote =>
@@ -4985,12 +4985,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get shortcutActionPlayPause => 'Lecture / Pause';
 
   @override
-  String get shortcutActionPlay => 'Lire';
-
-  @override
-  String get shortcutActionPause => 'Pause';
-
-  @override
   String get shortcutActionStop => 'Arrêter';
 
   @override
@@ -5066,7 +5060,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get shortcutActionGoStreaming => 'Aller au streaming';
 
   @override
-  String get shortcutActionOpenPlayer => 'Ouvrir le lecteur';
+  String get shortcutActionOpenPlayer => 'Ouvrir / fermer le lecteur';
 
   @override
   String get shortcutActionOpenSettings => 'Ouvrir les paramètres';

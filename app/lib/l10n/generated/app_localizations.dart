@@ -4669,7 +4669,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsEnergySaving.
   ///
   /// In zh_CN, this message translates to:
-  /// **'节能模式'**
+  /// **'频谱节能'**
   String get settingsEnergySaving;
 
   /// No description provided for @settingsEnergySavingNote.
@@ -8649,18 +8649,6 @@ abstract class AppLocalizations {
   /// **'播放 / 暂停'**
   String get shortcutActionPlayPause;
 
-  /// No description provided for @shortcutActionPlay.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'播放'**
-  String get shortcutActionPlay;
-
-  /// No description provided for @shortcutActionPause.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'暂停'**
-  String get shortcutActionPause;
-
   /// No description provided for @shortcutActionStop.
   ///
   /// In zh_CN, this message translates to:
@@ -8814,7 +8802,7 @@ abstract class AppLocalizations {
   /// No description provided for @shortcutActionOpenPlayer.
   ///
   /// In zh_CN, this message translates to:
-  /// **'打开播放页'**
+  /// **'打开 / 关闭播放页'**
   String get shortcutActionOpenPlayer;
 
   /// No description provided for @shortcutActionOpenSettings.

@@ -105,7 +105,6 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
         PlayPauseButton(
           playing: playing,
           buffering: buffering,
-          height: 48,
           tooltip: buffering
               ? l10n.commonLoading
               : (playing ? l10n.commonPause : l10n.commonPlay),

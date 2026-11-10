@@ -41,9 +41,8 @@ class ShortcutsSection extends ConsumerWidget {
             TextButton.icon(
               onPressed: prefs.shortcutOverrides.isEmpty
                   ? null
-                  : () => ref
-                        .read(appPrefsProvider.notifier)
-                        .resetAllShortcuts(),
+                  : () =>
+                        ref.read(appPrefsProvider.notifier).resetAllShortcuts(),
               icon: const Icon(EtaIcons.refresh, size: 16),
               label: Text(l10n.shortcutResetAll),
             ),
@@ -97,8 +96,9 @@ class ShortcutsSection extends ConsumerWidget {
                 color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: (conflict ? scheme.error : scheme.outline)
-                      .withValues(alpha: conflict ? 0.9 : 0.4),
+                  color: (conflict ? scheme.error : scheme.outline).withValues(
+                    alpha: conflict ? 0.9 : 0.4,
+                  ),
                 ),
               ),
               child: Text(
@@ -226,7 +226,9 @@ class _ShortcutCaptureDialogState extends State<_ShortcutCaptureDialog> {
               decoration: BoxDecoration(
                 color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: scheme.outline.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: scheme.outline.withValues(alpha: 0.4),
+                ),
               ),
               child: Text(
                 preview.isEmpty
@@ -302,8 +304,6 @@ String _categoryLabel(AppLocalizations l10n, ShortcutCategory cat) =>
 
 String _actionLabel(AppLocalizations l10n, ShortcutAction a) => switch (a) {
   ShortcutAction.playPause => l10n.shortcutActionPlayPause,
-  ShortcutAction.play => l10n.shortcutActionPlay,
-  ShortcutAction.pause => l10n.shortcutActionPause,
   ShortcutAction.stop => l10n.shortcutActionStop,
   ShortcutAction.next => l10n.shortcutActionNext,
   ShortcutAction.previous => l10n.shortcutActionPrevious,

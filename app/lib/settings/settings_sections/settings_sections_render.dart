@@ -103,6 +103,35 @@ class RenderSection extends ConsumerWidget {
             ),
           ],
         ),
+        const SizedBox(height: 20),
+        // 节能 / 休眠属于渲染与功耗策略，放在「性能 / 渲染」内（原在「播放」）。
+        SettingSection(
+          title: l10n.settingsSectionPower,
+          children: [
+            SettingSwitchTile(
+              icon: prefs.powerSaver ? EtaIcons.leaf : EtaIcons.leafOutline,
+              title: l10n.settingsPowerSaver,
+              subtitle: prefs.powerSaver
+                  ? l10n.settingsPowerSaverOn
+                  : l10n.settingsPowerSaverOff,
+              value: prefs.powerSaver,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setPowerSaver(value),
+            ),
+            SettingSwitchTile(
+              icon: prefs.suppressSleep
+                  ? EtaIcons.bedtimeOffOutline
+                  : EtaIcons.moonStarsOutline,
+              title: l10n.settingsSuppressSleep,
+              subtitle: prefs.suppressSleep
+                  ? l10n.settingsSuppressSleepOn
+                  : l10n.settingsSuppressSleepOff,
+              value: prefs.suppressSleep,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setSuppressSleep(value),
+            ),
+          ],
+        ),
       ],
     );
   }
