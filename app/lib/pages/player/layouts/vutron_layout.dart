@@ -29,6 +29,7 @@ import '../../../stores/app_prefs.dart';
 import '../../../widgets/common/anim.dart';
 import '../../../widgets/list/cover_image.dart';
 import '../../../widgets/player/playback_progress_slider.dart';
+import '../../../widgets/player/play_pause_button.dart';
 import '../../../widgets/player/player_lyrics_block.dart';
 import '../../../widgets/player/player_lyrics_slot.dart';
 import '../../../widgets/player/spectrum_view.dart';
@@ -307,25 +308,12 @@ class _VutronControls extends ConsumerWidget {
           color: scheme.onSurface,
           onPressed: canPrevNext ? notifier.playPrevious : null,
         ),
-        IconButton(
+        // 播放键与其它布局一致使用主题色（缓冲时压暗）；形状为椭圆胶囊。
+        PlayPauseButton(
+          playing: state.playing,
+          buffering: state.buffering,
           tooltip: state.playing ? l10n.commonPause : l10n.commonPlay,
-          onPressed: state.hasContent && !state.buffering
-              ? notifier.toggle
-              : null,
-          iconSize: 40,
-          padding: EdgeInsets.zero,
-          visualDensity: VisualDensity.compact,
-          constraints: BoxConstraints(
-            minWidth: (size / 5).clamp(40.0, 56.0),
-            minHeight: 48,
-          ),
-          // 播放键与其它布局一致使用主题色（缓冲时压暗）。
-          color: state.hasContent
-              ? scheme.primary.withValues(alpha: state.buffering ? 0.35 : 1)
-              : scheme.onSurfaceVariant,
-          icon: Icon(
-            state.playing ? EtaIcons.pauseCircle : EtaIcons.playCircle,
-          ),
+          onPressed: state.hasContent ? notifier.toggle : null,
         ),
         control(
           icon: EtaIcons.skipForward,
