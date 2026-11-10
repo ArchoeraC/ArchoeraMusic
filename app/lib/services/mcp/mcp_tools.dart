@@ -461,7 +461,7 @@ class McpActions {
 
   /// 当前曲目的歌词行（时间轴有序；无歌词返回空数组）。
   Future<Object?> lyrics() async {
-    final groups = await _ref.read(currentLyricsProvider.future);
+    final groups = await awaitCurrentLyrics(_ref);
     final lines = <Map<String, Object?>>[];
     for (final group in groups) {
       lines.add({
