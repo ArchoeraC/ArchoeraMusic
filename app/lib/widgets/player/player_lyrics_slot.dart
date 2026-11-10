@@ -15,6 +15,7 @@ library;
 import 'package:material_ui/material_ui.dart';
 
 import '../common/anim.dart';
+import 'player_shared_elements.dart';
 
 /// 歌词显隐槽（见库注释）。
 class PlayerLyricsSlot extends StatefulWidget {
@@ -50,16 +51,14 @@ class _PlayerLyricsSlotState extends State<PlayerLyricsSlot>
     value: (widget.visible && widget.enabled) ? 1 : 0,
   );
 
-  late final Animation<Offset> _slide = Tween<Offset>(
-    begin: const Offset(0, 1),
-    end: Offset.zero,
-  ).animate(
-    CurvedAnimation(
-      parent: _ctrl,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    ),
-  );
+  late final Animation<Offset> _slide =
+      Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(
+        CurvedAnimation(
+          parent: _ctrl,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        ),
+      );
 
   @override
   void initState() {
@@ -97,7 +96,15 @@ class _PlayerLyricsSlotState extends State<PlayerLyricsSlot>
     // 目标可见，或正在滑出（动画尚未归零）→ 构建；归零后卸载。
     final show = target || (animated && _ctrl.value > 0);
     if (!show) return const SizedBox.shrink();
+    // 布局切换时歌词要飞向另一个布局的位置，不能被歌词槽的滑出裁切。
+    final flying =
+        PlayerSharedElementScope.transformOf(
+          context,
+          PlayerSharedElement.lyrics,
+        ) !=
+        null;
     return ClipRect(
+      clipBehavior: flying ? Clip.none : Clip.hardEdge,
       child: IgnorePointer(
         ignoring: !target,
         child: SlideTransition(
