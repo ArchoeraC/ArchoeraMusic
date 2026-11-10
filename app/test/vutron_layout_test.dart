@@ -111,7 +111,7 @@ Future<void> _pumpVutron(
       overrides: [
         appPrefsProvider.overrideWith(() => _StubPrefs(prefs)),
         playbackProvider.overrideWith(_StubPlayback.new),
-        currentLyricsProvider.overrideWith((ref) async => _groups),
+        currentLyricsProvider.overrideWith((ref) => AsyncData(_groups)),
       ],
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -162,7 +162,9 @@ void main() {
     final translation = tester.widget<Text>(find.text('第一行翻译'));
     expect(translation.textAlign, TextAlign.left);
     final lineColumn = tester.widget<Column>(
-      find.ancestor(of: find.text('第一行翻译'), matching: find.byType(Column)).first,
+      find
+          .ancestor(of: find.text('第一行翻译'), matching: find.byType(Column))
+          .first,
     );
     expect(lineColumn.crossAxisAlignment, CrossAxisAlignment.start);
   });
