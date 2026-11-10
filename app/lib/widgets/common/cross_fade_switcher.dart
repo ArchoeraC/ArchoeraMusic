@@ -104,6 +104,8 @@ class _CrossFadeSwitcherState extends State<CrossFadeSwitcher>
           // 偏移，看起来像“上一首的封面和信息跳了一下”。
           alignment: Alignment.center,
           fit: StackFit.passthrough,
+          // 播放页布局切换时共享元素会临时飞出自己的槽位，不能在这里裁切。
+          clipBehavior: Clip.none,
           children: [
             if (outgoing != null)
               Opacity(
