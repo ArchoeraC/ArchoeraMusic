@@ -8,7 +8,7 @@
 # autoPatchelfHook 负责两件 NixOS 必需的事：
 #   ① 可执行文件 --set-interpreter（NixOS 无 /lib64/ld-linux-x86-64.so.2）；
 #   ② 为 $out 下所有 ELF 追加 buildInputs 的 nix store 路径 RUNPATH
-#      （NixOS 无 /usr/lib，GTK/openssl/curl/sqlite 等系统库只能从 store 解析）。
+#      （NixOS 无 /usr/lib，GTK/curl/sqlite 等系统库只能从 store 解析）。
 # FFmpeg（自建最小纯 LGPL）与 TagLib 随 bundle 内嵌于 native/ 且带 RUNPATH=$ORIGIN，
 # 只依赖 libc/libm/libz，无需 store 提供（见 autoPatchelfIgnoreMissingDeps）。
 # bundle 内相对定位（$ORIGIN / 相对可执行文件路径）保持原样，不改布局。
@@ -30,8 +30,7 @@
   # 并带 RUNPATH=$ORIGIN，只依赖 libc/libm/libz（store 提供）。故不再需要
   # ffmpeg/taglib 的 buildInputs；这些内嵌 soname 由 $ORIGIN 解析，
   # autoPatchelfHook 对「store 里找不到」忽略即可（见 autoPatchelfIgnoreMissingDeps）。
-, curl # libcurl.so.4（scraper）
-, openssl_3 # libcrypto.so.3（scraper）
+, curl # libcurl.so.4（scraper；其 TLS 依赖由 curl 自身 RUNPATH 解析）
 , sqlite # libsqlite3.so.0（scraper）
 , xz
 , zlib
@@ -56,7 +55,6 @@ stdenv.mkDerivation (finalAttrs: {
     at-spi2-atk
     libcloudproviders
     curl
-    openssl_3
     sqlite
     xz
     zlib

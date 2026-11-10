@@ -1260,7 +1260,7 @@ jobs:
 
       # SEC-25：生成 CycloneDX SBOM（随发布分发，供用户/下游核对依赖）。
       # 覆盖范围：发布产物（FFmpeg / OpenSSL / opus / taglib 等原生库、自家
-      # 二进制、Go 模块）+ 各生态锁文件（Rust 5× Cargo.lock、Dart pubspec.lock、
+      # 二进制、Go 模块）+ 各生态锁文件（Rust 各 crate Cargo.lock、Dart pubspec.lock、
       # Go go.mod+go.sum、.NET scanner/indexer 的 packages.lock.json）。
       # 只扫产物目录时 syft 读不到锁文件 → Rust / .NET / Dart 覆盖为 0（旧实现）。
       - name: 安装 syft（SBOM 生成器，pin 版本 + sha256 校验）
