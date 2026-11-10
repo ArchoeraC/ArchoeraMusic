@@ -101,41 +101,17 @@ class _PlayerControlsCenterGroup extends StatelessWidget {
               ? (prank ? notifier.playNext : notifier.playPrevious)
               : null,
         ),
-        const SizedBox(width: 14),
-        Tooltip(
-          message: buffering
+        const SizedBox(width: 12),
+        PlayPauseButton(
+          playing: playing,
+          buffering: buffering,
+          height: 48,
+          tooltip: buffering
               ? l10n.commonLoading
               : (playing ? l10n.commonPause : l10n.commonPlay),
-          child: InkResponse(
-            radius: 28,
-            onTap: hasContent && !buffering ? notifier.toggle : null,
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    playing
-                        ? EtaIcons.pauseCircle
-                        : EtaIcons.playCircle,
-                    size: 48,
-                    color: colorScheme.primary.withValues(
-                      alpha: buffering ? 0.35 : 1,
-                    ),
-                  ),
-                  if (buffering)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 3),
-                    ),
-                ],
-              ),
-            ),
-          ),
+          onPressed: hasContent ? notifier.toggle : null,
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         CtrlIcon(
           tooltip: l10n.commonNext,
           icon: EtaIcons.skipForward,

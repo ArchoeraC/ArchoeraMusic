@@ -24,8 +24,8 @@ import 'package:archoera_music/widgets/player/lyrics_edge_fade.dart';
 import 'package:archoera_music/widgets/player/lyrics_view.dart';
 import 'package:archoera_music/widgets/player/lyrics_v7/lyrics_physics_wall.dart';
 import 'package:archoera_music/widgets/player/playback_progress_slider.dart';
+import 'package:archoera_music/widgets/player/play_pause_button.dart';
 import 'package:archoera_music/widgets/player/spectrum_view.dart';
-import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 class _StubPrefs extends AppPrefsNotifier {
   _StubPrefs([this.data = const <String, dynamic>{}]);
@@ -149,12 +149,26 @@ void main() {
     expect(find.byType(LyricsEdgeFade), findsOneWidget);
     expect(view.currentFontSize, view.fontSize);
 
-    // 播放键跟随主题色（与页面其它控制一致）。
+    // 播放键：椭圆胶囊（横向长于纵向），实心底色跟随主题色。
     final scheme = Theme.of(tester.element(find.byType(Scaffold))).colorScheme;
-    final playButton = tester.widget<IconButton>(
-      find.widgetWithIcon(IconButton, EtaIcons.playCircle),
+    final playButton = tester.widget<PlayPauseButton>(
+      find.byType(PlayPauseButton),
     );
-    expect(playButton.color, scheme.primary);
+    expect(playButton.playing, isFalse);
+    final pill = tester.getSize(find.byType(PlayPauseButton));
+    expect(pill.width, greaterThan(pill.height));
+    final fill =
+        (tester
+                    .widget<AnimatedContainer>(
+                      find.descendant(
+                        of: find.byType(PlayPauseButton),
+                        matching: find.byType(AnimatedContainer),
+                      ),
+                    )
+                    .decoration!
+                as BoxDecoration)
+            .color;
+    expect(fill, scheme.primary);
 
     // 译文单行 textAlign 之外，行内 Column 的交叉轴也要左对齐。
     // 取**最近一层** Column（ancestor 按由近及远排列）：布局外层（如 vutron
