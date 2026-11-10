@@ -986,11 +986,13 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     final groups = widget.groups;
     if (groups.isEmpty) {
       return Center(
-        child: Icon(
-          EtaIcons.fileMusicOutline,
-          size: 64,
-          color: Theme.of(context).colorScheme.onSurfaceVariant
-              .withValues(alpha: 0.3),
+        child: Text(
+          context.l10n.commonNoLyrics,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.35),
+            fontSize: 16,
+          ),
         ),
       );
     }

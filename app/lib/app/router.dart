@@ -170,6 +170,13 @@ final appRouter = GoRouter(
 /// push，若不加防护会不断叠加播放页路由（表现为「播放页可被无限打开」）。
 bool _playerRouteInFlight = false;
 
+/// 播放页收起动画是否在途（防止快捷键连按重复 pop 掉下层页面）。
+bool _playerRouteClosing = false;
+
+/// 当前顶层路由是否已是全屏播放页。
+bool get isPlayerPageOpen =>
+    appRouter.routerDelegate.currentConfiguration.uri.path == '/player';
+
 /// 展开全屏播放页（幂等）。
 ///
 /// 双重防护，避免重复入栈：
@@ -179,9 +186,28 @@ bool _playerRouteInFlight = false;
 /// 快捷键（`ShortcutAction.openPlayer`）与播放条封面统一走此入口。
 void openPlayerPage() {
   if (_playerRouteInFlight) return;
-  if (appRouter.routerDelegate.currentConfiguration.uri.path == '/player') {
+  if (isPlayerPageOpen) {
     return;
   }
   _playerRouteInFlight = true;
-  appRouter.push('/player').whenComplete(() => _playerRouteInFlight = false);
+  appRouter.push('/player').whenComplete(() {
+    _playerRouteInFlight = false;
+    _playerRouteClosing = false;
+  });
+}
+
+/// 收起全屏播放页（幂等；收起动画期间重复调用忽略）。
+void closePlayerPage() {
+  if (_playerRouteClosing || !isPlayerPageOpen) return;
+  _playerRouteClosing = true;
+  appRouter.pop();
+}
+
+/// 打开 / 关闭全屏播放页（快捷键 `ShortcutAction.openPlayer` 的切换入口）。
+void togglePlayerPage() {
+  if (isPlayerPageOpen) {
+    closePlayerPage();
+  } else {
+    openPlayerPage();
+  }
 }

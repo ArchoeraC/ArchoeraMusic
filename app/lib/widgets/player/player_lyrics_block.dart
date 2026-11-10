@@ -21,8 +21,6 @@ import 'lyrics_v7/lyrics_physics_wall.dart';
 import 'lyrics_edge_fade.dart';
 import 'lyrics_view.dart';
 
-import 'package:archoera_music/eta/icon/eta_icons.dart';
-
 /// 歌词呈现预设。
 enum PlayerLyricsPresentation {
   /// 跟随偏好：`simple` 滚动列表或 `amll` 物理歌词墙。
@@ -77,13 +75,10 @@ class PlayerLyricsBlock extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     if (!hasLyrics) {
-      return Center(
-        child: Icon(
-          EtaIcons.fileMusicOutline,
-          size: 64,
-          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-        ),
-      );
+      // 空态由布局层负责（如整幅封面右栏的居中占位）。这里若再画一份，
+      // 歌词槽收到 `enabled = false` 后仍会在 ~480ms 的滑出动画期间构建
+      // 本组件，于是与新出现的占位同时显示两条「暂无歌词」。
+      return const SizedBox.shrink();
     }
     final pos = ref.watch(
       playbackProvider.select((s) => s.position.inMilliseconds),

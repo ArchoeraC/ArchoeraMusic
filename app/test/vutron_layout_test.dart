@@ -8,6 +8,7 @@
 /// - simple 引擎左对齐（含译文对齐），AMLL 引擎按偏好接入。
 library;
 
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -24,6 +25,9 @@ import 'package:archoera_music/widgets/player/lyrics_edge_fade.dart';
 import 'package:archoera_music/widgets/player/lyrics_view.dart';
 import 'package:archoera_music/widgets/player/lyrics_v7/lyrics_physics_wall.dart';
 import 'package:archoera_music/widgets/player/playback_progress_slider.dart';
+import 'package:archoera_music/widgets/player/playback_slider.dart';
+import 'package:archoera_music/widgets/player/player_lyrics_block.dart';
+import 'package:archoera_music/widgets/player/player_shared_elements.dart';
 import 'package:archoera_music/widgets/player/play_pause_button.dart';
 import 'package:archoera_music/widgets/player/spectrum_view.dart';
 
@@ -67,45 +71,73 @@ Map<String, dynamic> _prefsData(String engine) => <String, dynamic>{
   followCoverColorKey: false,
 };
 
+PlayerLayoutContext _ctx({
+  required bool showLyrics,
+  required AnimationController pulse,
+  bool autoCenterCover = true,
+}) => PlayerLayoutContext(
+  current: null,
+  coverKey: 'local:test',
+  title: '测试曲目',
+  subtitle: '测试歌手',
+  playing: false,
+  hasContent: true,
+  hasLyrics: true,
+  showLyrics: showLyrics,
+  contentMounted: true,
+  transitionStyle: 'scale',
+  coverLyricRatio: 0.45,
+  autoCenterCover: autoCenterCover,
+  slideNext: true,
+  coverPulse: pulse,
+  beatStrength: 1,
+  pageWidth: 1200,
+  pageHeight: 720,
+  fullscreenCoverWidth: 0,
+  chromeOpacity: 1,
+  buffering: false,
+  hasSource: true,
+  onDragChanged: (_) {},
+  onSeekEnd: (_) {},
+  l10n: lookupAppLocalizations(const Locale('zh')),
+  onSeekLyric: null,
+  dragMs: null,
+  sharedKeys: PlayerSharedElementKeys('test'),
+);
+
 Future<void> _pumpVutron(
   WidgetTester tester, {
   required Map<String, dynamic> prefs,
   bool showLyrics = true,
   bool autoCenterCover = true,
+  ValueNotifier<bool>? showLyricsListenable,
 }) async {
   final pulse = AnimationController(
     vsync: const TestVSync(),
     duration: const Duration(milliseconds: 100),
   );
   addTearDown(pulse.dispose);
-  final ctx = PlayerLayoutContext(
-    current: null,
-    coverKey: 'local:test',
-    title: '测试曲目',
-    subtitle: '测试歌手',
-    playing: false,
-    hasContent: true,
-    hasLyrics: true,
+  final ctx = _ctx(
     showLyrics: showLyrics,
-    contentMounted: true,
-    transitionStyle: 'scale',
-    coverLyricRatio: 0.45,
+    pulse: pulse,
     autoCenterCover: autoCenterCover,
-    slideNext: true,
-    coverPulse: pulse,
-    beatStrength: 1,
-    pageWidth: 1200,
-    pageHeight: 720,
-    fullscreenCoverWidth: 0,
-    chromeOpacity: 1,
-    buffering: false,
-    hasSource: true,
-    onDragChanged: (_) {},
-    onSeekEnd: (_) {},
-    l10n: lookupAppLocalizations(const Locale('zh')),
-    onSeekLyric: null,
-    dragMs: null,
   );
+  final body = showLyricsListenable == null
+      ? Builder(
+          builder: (context) =>
+              const VutronPlayerLayout().buildBody(context, ctx),
+        )
+      : ValueListenableBuilder<bool>(
+          valueListenable: showLyricsListenable,
+          builder: (context, value, _) => const VutronPlayerLayout().buildBody(
+            context,
+            _ctx(
+              showLyrics: value,
+              pulse: pulse,
+              autoCenterCover: autoCenterCover,
+            ),
+          ),
+        );
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -116,16 +148,7 @@ Future<void> _pumpVutron(
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: SizedBox(
-            width: 1200,
-            height: 720,
-            child: Builder(
-              builder: (context) =>
-                  const VutronPlayerLayout().buildBody(context, ctx),
-            ),
-          ),
-        ),
+        home: Scaffold(body: SizedBox(width: 1200, height: 720, child: body)),
       ),
     ),
   );
@@ -204,6 +227,38 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('开关歌词：左栏平移居中，歌词槽滑出而非整棵替换', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 720));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final showLyrics = ValueNotifier(true);
+    addTearDown(showLyrics.dispose);
+    await _pumpVutron(
+      tester,
+      prefs: _prefsData('simple'),
+      showLyricsListenable: showLyrics,
+    );
+    final before = tester.getCenter(find.byType(PlayPauseButton)).dx;
+    expect(before, lessThan(400), reason: '有歌词时左栏在左半区');
+
+    showLyrics.value = false;
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 180));
+    final mid = tester.getCenter(find.byType(PlayPauseButton)).dx;
+    expect(mid, greaterThan(before + 20), reason: '左栏应在平移中');
+    expect(mid, lessThan(580), reason: '不应瞬间跳到页面中心');
+    expect(
+      find.byType(PlayerLyricsBlock),
+      findsOneWidget,
+      reason: '歌词槽仍在滑出，不能整棵替换',
+    );
+
+    await tester.pump(const Duration(milliseconds: 800));
+    final after = tester.getCenter(find.byType(PlayPauseButton)).dx;
+    expect(after, greaterThan(mid + 20));
+    expect(after, closeTo(600, 24), reason: '最终应在页面中心');
+    expect(find.byType(PlayerLyricsBlock), findsNothing);
+  });
+
   testWidgets('底部细频谱：开启时渲染', (tester) async {
     await _pumpVutron(
       tester,
@@ -219,6 +274,47 @@ void main() {
       prefs: {..._prefsData('simple'), enableSpectrumKey: false},
     );
     expect(find.byType(SpectrumView), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('进度条与音量条：共用滑动条且左右边缘对齐', (tester) async {
+    await _pumpVutron(tester, prefs: _prefsData('simple'));
+    final sliders = find.byType(PlaybackSlider);
+    expect(sliders, findsNWidgets(2), reason: '进度条与音量条都用 PlaybackSlider');
+
+    final progress = tester.getRect(sliders.at(0));
+    final volume = tester.getRect(sliders.at(1));
+    // 同一列里两条轨道必须共用栅格（PlayerSliderRow），左右边缘不漂移。
+    expect(volume.left, closeTo(progress.left, 0.5));
+    expect(volume.right, closeTo(progress.right, 0.5));
+
+    // 进度条与音量条声明同一轨道粗细（4px）；不再常显高亮圆点。
+    expect(tester.widget<PlaybackSlider>(sliders.at(0)).trackHeight, 4);
+    expect(tester.widget<PlaybackSlider>(sliders.at(1)).trackHeight, 4);
+    // 纯条声明：静止、悬停、拖动都不画圆点。
+    expect(tester.widget<PlaybackSlider>(sliders.at(0)).showThumb, isFalse);
+    expect(tester.widget<PlaybackSlider>(sliders.at(1)).showThumb, isFalse);
+
+    // 音量条不是进度：不显示时间/歌词气泡，也不参与愚人节反向映射。
+    final volumeSlider = tester.widget<PlaybackSlider>(sliders.at(1));
+    expect(volumeSlider.showTooltip, isFalse);
+    expect(volumeSlider.allowPrank, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('悬停进度条也不展开滑块圆点（纯条）', (tester) async {
+    await _pumpVutron(tester, prefs: _prefsData('simple'));
+    final progress = find.byType(PlaybackProgressSlider);
+    final center = tester.getCenter(progress);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: center);
+    await tester.pump();
+    await mouse.moveTo(center);
+    await tester.pumpAndSettle();
+
+    // showThumb=false → 不会切换成 Material Slider，自然也没有悬停 thumb。
+    expect(find.byType(Slider), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

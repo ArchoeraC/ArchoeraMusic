@@ -2504,7 +2504,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsShowSubtitleOff => '목록에 아티스트만 표시, 별칭 없음';
 
   @override
-  String get settingsEnergySaving => '절전 모드';
+  String get settingsEnergySaving => '스펙트럼 절전';
 
   @override
   String get settingsEnergySavingNote =>
@@ -4732,12 +4732,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get shortcutActionPlayPause => '재생 / 일시정지';
 
   @override
-  String get shortcutActionPlay => '재생';
-
-  @override
-  String get shortcutActionPause => '일시정지';
-
-  @override
   String get shortcutActionStop => '정지';
 
   @override
@@ -4813,7 +4807,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get shortcutActionGoStreaming => '스트리밍으로';
 
   @override
-  String get shortcutActionOpenPlayer => '플레이어 열기';
+  String get shortcutActionOpenPlayer => '플레이어 열기 / 닫기';
 
   @override
   String get shortcutActionOpenSettings => '설정 열기';

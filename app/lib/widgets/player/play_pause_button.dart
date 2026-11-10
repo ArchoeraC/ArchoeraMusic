@@ -26,7 +26,7 @@ class PlayPauseButton extends StatelessWidget {
     required this.playing,
     required this.onPressed,
     this.buffering = false,
-    this.height = 48,
+    this.height = 36,
     this.tooltip,
   });
 
@@ -44,8 +44,8 @@ class PlayPauseButton extends StatelessWidget {
 
   final String? tooltip;
 
-  /// 横向拉伸比例：参考设计稿的胶囊约为 1.55:1（横向椭圆）。
-  static const double widthFactor = 1.55;
+  /// 横向拉伸比例：胶囊约为 1.45:1（横向椭圆），与相邻图标的高度观感接近。
+  static const double widthFactor = 1.45;
 
   double get width => height * widthFactor;
 
@@ -113,7 +113,7 @@ class PlayPauseButton extends StatelessWidget {
                         playing ? EtaIcons.pause : EtaIcons.play,
                         key: ValueKey(playing),
                         // 播放三角视觉偏轻，稍稍放大一点与暂停双竖线等重。
-                        size: height * (playing ? 0.46 : 0.48),
+                        size: height * (playing ? 0.55 : 0.57),
                         color: glyph,
                       ),
               ),

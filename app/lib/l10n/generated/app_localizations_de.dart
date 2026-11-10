@@ -2617,7 +2617,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsShowSubtitleOff => 'Keine Aliase in der Liste';
 
   @override
-  String get settingsEnergySaving => 'Energiesparmodus';
+  String get settingsEnergySaving => 'Spektrum-Energiesparen';
 
   @override
   String get settingsEnergySavingNote =>
@@ -4948,12 +4948,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shortcutActionPlayPause => 'Wiedergabe / Pause';
 
   @override
-  String get shortcutActionPlay => 'Wiedergabe';
-
-  @override
-  String get shortcutActionPause => 'Pause';
-
-  @override
   String get shortcutActionStop => 'Stopp';
 
   @override
@@ -5029,7 +5023,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get shortcutActionGoStreaming => 'Zum Streaming';
 
   @override
-  String get shortcutActionOpenPlayer => 'Player öffnen';
+  String get shortcutActionOpenPlayer => 'Player öffnen / schließen';
 
   @override
   String get shortcutActionOpenSettings => 'Einstellungen öffnen';

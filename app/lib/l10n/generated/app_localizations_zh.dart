@@ -2479,7 +2479,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsShowSubtitleOff => '列表不展示别名';
 
   @override
-  String get settingsEnergySaving => '节能模式';
+  String get settingsEnergySaving => '频谱节能';
 
   @override
   String get settingsEnergySavingNote =>
@@ -4668,12 +4668,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutActionPlayPause => '播放 / 暂停';
 
   @override
-  String get shortcutActionPlay => '播放';
-
-  @override
-  String get shortcutActionPause => '暂停';
-
-  @override
   String get shortcutActionStop => '停止';
 
   @override
@@ -4749,7 +4743,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutActionGoStreaming => '前往流媒体';
 
   @override
-  String get shortcutActionOpenPlayer => '打开播放页';
+  String get shortcutActionOpenPlayer => '打开 / 关闭播放页';
 
   @override
   String get shortcutActionOpenSettings => '打开设置';
@@ -8677,7 +8671,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsShowSubtitleOff => '列表不展示别名';
 
   @override
-  String get settingsEnergySaving => '节能模式';
+  String get settingsEnergySaving => '频谱节能';
 
   @override
   String get settingsEnergySavingNote =>
@@ -10866,12 +10860,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get shortcutActionPlayPause => '播放 / 暂停';
 
   @override
-  String get shortcutActionPlay => '播放';
-
-  @override
-  String get shortcutActionPause => '暂停';
-
-  @override
   String get shortcutActionStop => '停止';
 
   @override
@@ -10947,7 +10935,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get shortcutActionGoStreaming => '前往流媒体';
 
   @override
-  String get shortcutActionOpenPlayer => '打开播放页';
+  String get shortcutActionOpenPlayer => '打开 / 关闭播放页';
 
   @override
   String get shortcutActionOpenSettings => '打开设置';
@@ -14875,7 +14863,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsShowSubtitleOff => '列表不展示別名';
 
   @override
-  String get settingsEnergySaving => '節能模式';
+  String get settingsEnergySaving => '頻譜節能';
 
   @override
   String get settingsEnergySavingNote =>
@@ -17065,12 +17053,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get shortcutActionPlayPause => '播放 / 暫停';
 
   @override
-  String get shortcutActionPlay => '播放';
-
-  @override
-  String get shortcutActionPause => '暫停';
-
-  @override
   String get shortcutActionStop => '停止';
 
   @override
@@ -17146,7 +17128,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get shortcutActionGoStreaming => '前往串流';
 
   @override
-  String get shortcutActionOpenPlayer => '開啟播放頁';
+  String get shortcutActionOpenPlayer => '開啟 / 關閉播放頁';
 
   @override
   String get shortcutActionOpenSettings => '開啟設定';
