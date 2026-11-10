@@ -30,6 +30,10 @@ class _NavItem {
   final IconData selectedIcon;
 }
 
+/// 侧边栏折叠 / 展开宽度（逻辑像素）。
+const double kSideBarCollapsedWidth = 64;
+const double kSideBarExpandedWidth = 240;
+
 /// 侧边栏（对齐原项目 SideBar.vue + SMenu 观感，独立设计体系）。
 ///
 /// 导航项交互（对齐 SMenu default 模式）：
@@ -39,9 +43,10 @@ class _NavItem {
 ///
 /// 折叠状态 / 导航高亮动效来自设置（appearance.sidebarCollapsed /
 /// appearance.sidebarNavStyle，对齐原版）：
-///  - collapsed：侧边栏折叠为图标模式（宽度 240 → 64）。折叠/展开过渡
-///    先隐藏内容，宽度按 linear 走完（≤300ms）后再显示，规避中间宽度
-///    下文字/图标/指示条的半成品布局；
+///  - collapsed：侧边栏折叠为图标模式（宽度 240 → 64）。折叠/展开过渡为
+///    「内容渐隐 → 宽度 linear 推进 160ms → 到位后渐显」（总 240ms，
+///    ≤300ms）；内容布局在渐隐结束（不可见）时切换到目标态，规避中间
+///    宽度下文字/图标/指示条的半成品布局；
 ///  - sidebarNavStyle=animated：选中指示条改为容器级滑动高亮
 ///    （AnimatedPositioned 平滑移动，对齐 SMenu animated 模式）。
 ///
@@ -57,7 +62,8 @@ class SideBar extends ConsumerStatefulWidget {
   ConsumerState<SideBar> createState() => _SideBarState();
 }
 
-class _SideBarState extends ConsumerState<SideBar> {
+class _SideBarState extends ConsumerState<SideBar>
+    with SingleTickerProviderStateMixin {
   /// Logo hover 缩放（对齐 SideBarLogo.vue hover:scale-105）。
   double _logoScale = 1.0;
 
@@ -75,27 +81,121 @@ class _SideBarState extends ConsumerState<SideBar> {
   double _indicatorHeight = 0;
   bool _indicatorReady = false;
 
-  /// 侧边栏内容是否可见。
-  ///
-  /// 折叠/展开过渡期间先隐藏内容，只播放宽度动效（linear，≤300ms），
-  /// 到位后再显示，规避中间宽度下文字/图标/指示条的半成品布局。
-  bool _sidebarContentVisible = true;
+  /// 折叠/展开过渡时间轴（总 240ms，≤300ms）：
+  ///  - 0–80ms：内容渐隐（同时宽度开始线性推进）；
+  ///  - 0–160ms：宽度线性推进到位（折叠 240→64 / 展开 64→240）；
+  ///  - 160–240ms：到位后内容渐显（此时内容已按目标布局重建）。
+  /// 内容布局在渐隐结束（80ms）时于不可见状态下切换，规避中间宽度
+  /// 下文字/图标/指示条的半成品布局。
+  static const Duration _collapseTransitionDuration = Duration(
+    milliseconds: 240,
+  );
+  static const int _collapseFadeOutMs = 80;
+  static const int _collapseWidthMs = 160;
+  static const int _collapseTotalMs = 240;
 
-  /// 折叠/展开过渡开始：立即隐藏内容。
-  void _beginSidebarTransition() {
-    // 性能模式（disableAnimations）下动效时长归零，直接直切，无需隐藏。
-    if (!mounted || noAnim(context) || !_sidebarContentVisible) return;
+  late final AnimationController _collapseCtrl;
+
+  /// 当前内容布局使用的折叠态（过渡中途在不可见时切换到目标态）。
+  bool _layoutCollapsed = false;
+
+  /// 本次过渡起点的布局 / 目标布局。
+  bool _sourceCollapsed = false;
+  bool _targetCollapsed = false;
+
+  /// 本次过渡的宽度区间（中断重入时从当前显示宽度继续）。
+  double _startWidth = kSideBarExpandedWidth;
+  double _targetWidth = kSideBarExpandedWidth;
+
+  /// 本次过渡起点的内容不透明度（中断重入时从当前亮度继续渐隐）。
+  double _startOpacity = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    final collapsed = ref.read(appPrefsProvider).sidebarCollapsed;
+    _layoutCollapsed = collapsed;
+    _sourceCollapsed = collapsed;
+    _targetCollapsed = collapsed;
+    final width = collapsed ? kSideBarCollapsedWidth : kSideBarExpandedWidth;
+    _startWidth = width;
+    _targetWidth = width;
+    _collapseCtrl =
+        AnimationController(vsync: this, duration: _collapseTransitionDuration)
+          ..addListener(_onCollapseTick)
+          ..addStatusListener(_onCollapseStatus);
+  }
+
+  @override
+  void dispose() {
+    _collapseCtrl.dispose();
+    super.dispose();
+  }
+
+  /// 过渡已推进的毫秒数（0–240）。
+  double get _collapseElapsedMs => _collapseCtrl.value * _collapseTotalMs;
+
+  /// 当前应显示的宽度（0–160ms 线性插值，之后固定在目标宽度）。
+  double get _displayWidth {
+    final p = (_collapseElapsedMs / _collapseWidthMs).clamp(0.0, 1.0);
+    return _startWidth + (_targetWidth - _startWidth) * p;
+  }
+
+  /// 当前内容不透明度：渐隐 → 全隐 → 到位后渐显。
+  /// 渐隐时长按起点不透明度缩放；宽度始终占 0–160ms，渐显固定 160–240ms。
+  double get _contentOpacity {
+    final ms = _collapseElapsedMs;
+    final fadeOutMs = _collapseFadeOutMs * _startOpacity;
+    if (ms < fadeOutMs) return _startOpacity * (1 - ms / fadeOutMs);
+    if (ms < _collapseWidthMs) return 0;
+    if (ms < _collapseTotalMs) {
+      return (ms - _collapseWidthMs) / (_collapseTotalMs - _collapseWidthMs);
+    }
+    return 1;
+  }
+
+  /// 渐隐结束（内容已不可见）时切换内容布局，避免可见的半成品布局。
+  void _onCollapseTick() {
+    final useTarget = _collapseElapsedMs >= _collapseFadeOutMs * _startOpacity;
+    final layout = useTarget ? _targetCollapsed : _sourceCollapsed;
+    if (layout != _layoutCollapsed) {
+      setState(() => _layoutCollapsed = layout);
+    }
+  }
+
+  /// 过渡到位：强制一次重建，让 `_updateIndicator` 按最终布局重新测量。
+  void _onCollapseStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed || !mounted) return;
     setState(() {
-      _sidebarContentVisible = false;
-      // 指示条随内容一起隐藏；重新显示后按最终布局重测，避免补位滑动。
-      _indicatorReady = false;
+      _layoutCollapsed = _targetCollapsed;
+      _sourceCollapsed = _targetCollapsed;
+      _startOpacity = 1;
     });
   }
 
-  /// 宽度动效到位后再显示内容（由 AnimatedContainer.onEnd 回调）。
-  void _endSidebarTransition() {
-    if (!mounted || _sidebarContentVisible) return;
-    setState(() => _sidebarContentVisible = true);
+  /// 折叠/展开过渡：渐隐 → 宽度线性推进 → 渐显。
+  void _animateSidebarCollapse(bool collapsed) {
+    if (!mounted) return;
+    if (_targetCollapsed == collapsed &&
+        !_collapseCtrl.isAnimating &&
+        _layoutCollapsed == collapsed) {
+      return;
+    }
+    // 从当前显示宽度 / 亮度继续；中断重入时按起点不透明度缩放渐隐阶段。
+    final fromWidth = _displayWidth;
+    final fromOpacity = _contentOpacity;
+    _collapseCtrl.stop();
+    setState(() {
+      _sourceCollapsed = _layoutCollapsed;
+      _targetCollapsed = collapsed;
+      _startWidth = fromWidth;
+      _targetWidth = collapsed ? kSideBarCollapsedWidth : kSideBarExpandedWidth;
+      _startOpacity = fromOpacity;
+      // 指示条随内容一起渐隐；到位后按最终布局重新测量，避免补位滑动。
+      _indicatorReady = false;
+    });
+    _collapseCtrl.duration = animDuration(context, _collapseTransitionDuration);
+    _collapseCtrl.forward(from: 0);
   }
 
   List<(String, List<_NavItem>)> _navGroups(AppLocalizations l10n) {
@@ -176,8 +276,8 @@ class _SideBarState extends ConsumerState<SideBar> {
   /// 折叠/展开或切换分支后经 postFrameCallback 调用；位置未变时不做
   /// setState（避免 rebuild → 再测量 的死循环）。
   void _updateIndicator() {
-    // 折叠/展开过渡期内容被隐藏：跳过测量，到位后再按最终布局重新定位。
-    if (!_sidebarContentVisible) return;
+    // 折叠/展开过渡中跳过：过渡结束后再按最终布局重新定位。
+    if (_collapseCtrl.isAnimating) return;
     final style = sidebarNavStyleFor(
       ref.read(appPrefsProvider).sidebarNavStyle,
     );
