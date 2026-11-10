@@ -304,7 +304,11 @@ int32_t apl_window_set_events(int32_t on);
 ```
 
 事件语义与 `window_manager` WindowListener 对齐（minimized/focused/hidden 由
-Zig 折算为 `{minimized, focused}` 二元组），`power_saver` 的档位判定逻辑不变。
+Zig 折算为 `{minimized, focused}` 二元组）。桥接可用时 `power_saver` 的聚焦
+状态**以桥接为准**（Windows 的 `WM_NCACTIVATE` 会在菜单/原生对话框/标题栏
+交互等场景误报 blur，不能覆盖桥接结果）；桥接未置位时回退 nativeapi。
+`minimized=false` 用于清除最小化残留（避免还原路径漏发 restore 后永久停在
+0 帧档），托盘隐藏仍由独立 `hidden` 状态兜底。
 
 ### 3.5 SystemMedia
 
@@ -438,9 +442,12 @@ int32_t apl_system_accent_set_events(int32_t on);
   DEVICE_NOTIFY_THREAD)`（IO 线程注册，线程消息收 `POWERBROADCAST_SETTING`：
   0=关屏 1=开屏）→ `APL_EVENT_SCREEN_STATE`；注册失败（老系统/权限）时
   `apl_power_set_screen_events` 返回 `APL_ERR_BACKEND`（Dart toast 告警）。
-- **窗口状态**：`SetWindowLongPtrW(GWLP_WNDPROC)` 子类化 Flutter 顶层窗口，拦截
-  `WM_SIZE(SIZE_MINIMIZED)` / `WM_ACTIVATE` / `WM_SYSCOMMAND(SC_MINIMIZE)`，
-  折算事件后**必调原 WndProc**（不吞消息，零回归）。
+- **窗口状态**：`SetWindowLongPtrW(GWLP_WNDPROC)` 子类化 Flutter 顶层窗口；
+  `WM_SIZE` / `WM_ACTIVATE` / `WM_ACTIVATEAPP` / `WM_SHOWWINDOW` 仅作为
+  「状态可能变化」的触发，实际状态由 `IsIconic` / `IsWindowVisible` /
+  `GetForegroundWindow` 现场查询折算：同进程其它顶层窗口（原生文件对话框、
+  托盘菜单宿主等）算应用前台，避免前台被误判后台降到 1 FPS；折算事件后
+  **必调原 WndProc**（不吞消息，零回归）。
 
 ### 4.3 macOS
 

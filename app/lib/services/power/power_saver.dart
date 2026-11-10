@@ -57,6 +57,26 @@ const Map<PowerSaverReason, Duration> _intervalByReason = {
   );
 }
 
+/// 桥接窗口状态 → 节能内部状态（纯函数，便于单测）。
+///
+/// - `minimized=true` 置位；
+/// - `minimized=false` 仅在未隐藏到托盘时清除（托盘隐藏由 `hidden` 负责，
+///   等价于旧的「只置位」保护，避免 hide 事件的误报把后台态闪回前台）；
+/// - 聚焦以桥接为准；聚焦且未最小化时清除离屏残留（解锁后恢复满帧）。
+({bool minimized, bool focused, bool screenOff}) mergeBridgeWindowState(
+  SystemWindowState next, {
+  required bool minimized,
+  required bool focused,
+  required bool screenOff,
+  required bool hidden,
+}) {
+  return (
+    minimized: next.minimized ? true : (hidden ? minimized : false),
+    focused: next.focused,
+    screenOff: (next.focused && !next.minimized) ? false : screenOff,
+  );
+}
+
 /// 全局节能模式服务。
 ///
 /// - 窗口最小化 / 隐藏到托盘时**直接停止渲染**（0 帧）；失焦 / 熄屏时
@@ -86,6 +106,14 @@ class PowerSaverService {
 
   /// 节能模式总开关（设置持久化，默认开）。
   bool _enabled = true;
+
+  /// 桥接窗口状态是否已生效。
+  ///
+  /// 生效后聚焦状态以桥接为准（Windows = 顶层 WndProc 的 WM_ACTIVATE +
+  /// 前台窗口查询；macOS = key 通知；Linux = GTK active）。window_manager 的
+  /// 聚焦事件在 Windows 上来自 `WM_NCACTIVATE`，打开菜单/原生对话框等场景会
+  /// 产生误报 blur，不能再覆盖桥接结果（否则前台窗口被误判后台 → 1 FPS）。
+  bool _bridgeWindowActive = false;
 
   bool _minimized = false;
 
@@ -144,18 +172,24 @@ class PowerSaverService {
       Log.w('power', '桥接窗口状态不可用（回退 nativeapi 窗口事件）');
       return;
     }
-    _windowSub = _window.state.listen((s) {
-      // **只置位、不清除** minimized：部分合成器把「GTK hide 到托盘」报告为
-      // minimized=false，若在此覆盖会把后台态闪回前台，导致后台释放/停帧被
-      // 立刻取消（并让「持续后台才释放」的判定永不成立）。清除交给显式的
-      // setHidden(false) / WindowRestoredEvent。
-      if (s.minimized) _minimized = true;
-      _focused = s.focused;
-      // 重新聚焦窗口 ⇒ **强制重建**：屏幕必然点亮/未锁屏。修正解锁后丢失的
-      // 熄屏复位（否则残留 screenOff → 永久 1 FPS，重启才恢复）。
-      if (s.focused && !s.minimized) _screenOff = false;
+    _bridgeWindowActive = true;
+    void applyState(SystemWindowState s) {
+      final next = mergeBridgeWindowState(
+        s,
+        minimized: _minimized,
+        focused: _focused,
+        screenOff: _screenOff,
+        hidden: _hidden,
+      );
+      _minimized = next.minimized;
+      _focused = next.focused;
+      _screenOff = next.screenOff;
       _apply();
-    });
+    }
+
+    _windowSub = _window.state.listen(applyState);
+    // 订阅前桥接可能已推送过快照；立即应用当前值，避免状态停在旧值。
+    applyState(_window.current);
   }
 
   /// 经平台能力外观订阅熄屏状态（原生桥接事件驱动，非轮询）。
@@ -254,10 +288,14 @@ class PowerSaverService {
         _screenOff = false; // 恢复 ⇒ 屏幕点亮
         _apply();
       case WindowFocusedEvent():
+        // 桥接可用时以其为准：Windows 的 WM_NCACTIVATE 误报会在这里
+        // 把前台窗口标成失焦（菜单/原生对话框/标题栏交互等场景）。
+        if (_bridgeWindowActive) return;
         _focused = true;
         _screenOff = false; // 窗口获得焦点 ⇒ 屏幕必然点亮/未锁屏
         _apply();
       case WindowBlurredEvent():
+        if (_bridgeWindowActive) return;
         _focused = false;
         _apply();
       default:
