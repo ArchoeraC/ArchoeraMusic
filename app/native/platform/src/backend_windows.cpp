@@ -375,14 +375,30 @@ void unregisterScreen() {
 // ── 窗口状态（子类化 Flutter 顶层 WndProc）+ WM_APPCOMMAND 媒体键 ──
 WNDPROC g_orig_wndproc = nullptr;
 HWND g_hwnd = nullptr;
-std::atomic<bool> g_minimized{false};
-std::atomic<bool> g_focused{true};
 std::atomic<bool> g_window_events{false};
 
+// 直接从系统查询前台状态，而不是只依赖 WM_ACTIVATE 累计出的布尔值：
+// - 同进程的其它顶层窗口（原生文件对话框、托盘菜单宿主等）激活时，主窗口
+//   仍算「应用在前台」，不应降频；
+// - 最小化 / 隐藏（含系统还原路径未按预期派发消息的情况）一律以
+//   IsIconic / IsWindowVisible 为准，避免残留后台态把前台窗口降到 1 FPS。
 void emitWindow() {
     if (!g_window_events.load(std::memory_order_acquire)) return;
-    dispatch(makeWindowState(g_minimized.load(std::memory_order_acquire),
-                             g_focused.load(std::memory_order_acquire)));
+    const HWND hwnd = g_hwnd;
+    bool minimized = false;
+    bool focused = false;
+    if (hwnd != nullptr) {
+        minimized = ::IsIconic(hwnd) != 0 || ::IsWindowVisible(hwnd) == 0;
+        if (!minimized) {
+            const HWND foreground = ::GetForegroundWindow();
+            DWORD pid = 0;
+            if (foreground != nullptr) {
+                ::GetWindowThreadProcessId(foreground, &pid);
+            }
+            focused = foreground != nullptr && pid == ::GetCurrentProcessId();
+        }
+    }
+    dispatch(makeWindowState(minimized, focused));
 }
 
 // 现代 Windows 把媒体键（含蓝牙 AVRCP）经 SMTC 派发；SMTC 非当前会话/仅前台时
@@ -420,23 +436,20 @@ bool dispatchAppCommand(LPARAM lparam) {
 LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch (msg) {
         case WM_SIZE:
-            g_minimized.store(wparam == SIZE_MINIMIZED,
-                              std::memory_order_release);
+            // 消息只作为「状态可能已变化」的触发；真实状态统一由
+            // emitWindow() 向系统查询（见上方说明）。
             emitWindow();
             break;
-        case WM_ACTIVATE: {
-            const bool focused = (static_cast<unsigned>(wparam) & 0xffff) != 0;
-            g_focused.store(focused, std::memory_order_release);
+        case WM_ACTIVATE:
+        case WM_ACTIVATEAPP:
             emitWindow();
             break;
-        }
         case WM_SHOWWINDOW:
             // 显示/隐藏（关闭到托盘 / 托盘还原）：隐藏同样视为不可见 → 降频；
             // 显示即复位。**不能**用 WM_CLOSE 判定——关闭是否真的隐藏由
             // window_manager 的 preventClose + Dart 侧决策（退出/隐藏/询问）
             // 决定：用户取消关闭确认框、或还原窗口后，WM_CLOSE 会让状态永久
             // 停在「已最小化」而误降频。
-            g_minimized.store(wparam == 0, std::memory_order_release);
             emitWindow();
             break;
         case WM_APPCOMMAND:
