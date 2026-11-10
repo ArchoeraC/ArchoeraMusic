@@ -15,12 +15,10 @@
 ///   中文音乐源（多源并发 + 评分匹配），对中文音乐匹配率更高
 
 #include "scraper.h"
+#include "scraper_crypto.h"
 #include "scraper_log.h"
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
-#include <openssl/evp.h>
-#include <openssl/bn.h>
-#include <openssl/rand.h>
 #include <stdexcept>
 #include <thread>
 #include <cstdio>
@@ -1070,39 +1068,21 @@ private:
     static std::string aes128ecbHex(const std::string& input, const std::string& key) {
         if (key.size() != 16) return "";
 
-        std::string padded = input;
-        unsigned char padVal = static_cast<unsigned char>(16 - input.size() % 16);
-        padded.append(padVal, static_cast<char>(padVal));
-
-        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-        if (!ctx) return "";
-        if (EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), nullptr,
-                               (const unsigned char*)key.data(), nullptr) != 1) {
-            EVP_CIPHER_CTX_free(ctx);
+        // PKCS7 填充由 Rust 后端完成；上限 = 输入 + 一个填充块。
+        std::vector<unsigned char> cipher(input.size() + 16);
+        std::size_t outLen = 0;
+        if (era_crypto_aes128_ecb_pkcs7(
+                reinterpret_cast<const unsigned char*>(key.data()),
+                reinterpret_cast<const unsigned char*>(input.data()),
+                input.size(), cipher.data(), cipher.size(), &outLen) != ERA_CRYPTO_OK) {
             return "";
         }
-        EVP_CIPHER_CTX_set_padding(ctx, 0);
-
-        unsigned char cipherBuf[8192];
-        int outLen = 0;
-        if (EVP_EncryptUpdate(ctx, cipherBuf, &outLen,
-                              (unsigned char*)padded.data(), padded.size()) != 1) {
-            EVP_CIPHER_CTX_free(ctx);
-            return "";
-        }
-        int finalLen = 0;
-        if (EVP_EncryptFinal_ex(ctx, cipherBuf + outLen, &finalLen) != 1) {
-            EVP_CIPHER_CTX_free(ctx);
-            return "";
-        }
-        outLen += finalLen;
-        EVP_CIPHER_CTX_free(ctx);
 
         std::string hex;
         hex.reserve(outLen * 2);
-        for (int i = 0; i < outLen; i++) {
+        for (std::size_t i = 0; i < outLen; i++) {
             char buf[4];
-            std::snprintf(buf, sizeof(buf), "%02X", cipherBuf[i]);
+            std::snprintf(buf, sizeof(buf), "%02X", cipher[i]);
             hex += buf;
         }
         return hex;
@@ -1255,45 +1235,40 @@ private:
     static std::string aes128cbc(const std::string& input, const std::string& key) {
         if (key.size() != 16) return "";
 
-        // PKCS7 padding
+        // 历史行为：旧实现先手动 PKCS7 补块，再交给 EVP（默认填充）补第二块，
+        // 即实际输出是**双填充**。为与已发布版本逐字节一致（单填充是否需要
+        // 改动需与网易云接口联调验证），这里保留手动补块，由 Rust 再补一次。
         std::string padded = input;
         unsigned char padVal = static_cast<unsigned char>(16 - input.size() % 16);
         padded.append(padVal, static_cast<char>(padVal));
 
         // IV = "0102030405060708"
-        unsigned char iv[16] = {0x30,0x31,0x30,0x32,0x30,0x33,0x30,0x34,
-                                0x30,0x35,0x30,0x36,0x30,0x37,0x30,0x38};
+        static const unsigned char iv[16] = {0x30,0x31,0x30,0x32,0x30,0x33,0x30,0x34,
+                                             0x30,0x35,0x30,0x36,0x30,0x37,0x30,0x38};
 
-        unsigned char cipherBuf[4096];
-        int outLen = 0, finalLen = 0;
-        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-        if (!ctx) return "";
-
-        int ok = 1;
-        ok = ok && EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), nullptr,
-                                      reinterpret_cast<const unsigned char*>(key.data()), iv);
-        ok = ok && EVP_EncryptUpdate(ctx, cipherBuf, &outLen,
-                                     reinterpret_cast<const unsigned char*>(padded.data()),
-                                     static_cast<int>(padded.size()));
-        ok = ok && EVP_EncryptFinal_ex(ctx, cipherBuf + outLen, &finalLen);
-        EVP_CIPHER_CTX_free(ctx);
-        if (!ok) return "";
-
-        outLen += finalLen;
+        std::vector<unsigned char> cipher(padded.size() + 16);
+        std::size_t outLen = 0;
+        if (era_crypto_aes128_cbc_pkcs7(
+                reinterpret_cast<const unsigned char*>(key.data()), iv,
+                reinterpret_cast<const unsigned char*>(padded.data()), padded.size(),
+                cipher.data(), cipher.size(), &outLen) != ERA_CRYPTO_OK) {
+            return "";
+        }
 
         // Base64 encode
         static const char b64[] =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const int total = static_cast<int>(outLen);
         std::string result;
         result.reserve((outLen + 2) / 3 * 4);
-        for (int i = 0; i < outLen; i += 3) {
-            unsigned int n = static_cast<unsigned char>(cipherBuf[i]) << 16;
-            if (i + 1 < outLen) n |= static_cast<unsigned char>(cipherBuf[i + 1]) << 8;
-            if (i + 2 < outLen) n |= static_cast<unsigned char>(cipherBuf[i + 2]);
+        for (int i = 0; i < total; i += 3) {
+            unsigned int n = cipher[i] << 16;
+            if (i + 1 < total) n |= cipher[i + 1] << 8;
+            if (i + 2 < total) n |= cipher[i + 2];
             result.push_back(b64[(n >> 18) & 0x3F]);
             result.push_back(b64[(n >> 12) & 0x3F]);
-            result.push_back((i + 1 < outLen) ? b64[(n >> 6) & 0x3F] : '=');
-            result.push_back((i + 2 < outLen) ? b64[n & 0x3F] : '=');
+            result.push_back((i + 1 < total) ? b64[(n >> 6) & 0x3F] : '=');
+            result.push_back((i + 2 < total) ? b64[n & 0x3F] : '=');
         }
         return result;
     }
@@ -1310,24 +1285,19 @@ private:
             hexIn += buf;
         }
 
-        BN_CTX* ctx = BN_CTX_new();
-        BIGNUM* base = BN_new();
-        BIGNUM* exp = BN_new();
-        BIGNUM* mod = BN_new();
-        BIGNUM* res = BN_new();
-
-        BN_hex2bn(&base, hexIn.c_str());
-        BN_hex2bn(&exp, NETESE_PUB_EXPONENT);
-        BN_hex2bn(&mod, NETESE_MODULUS);
-
-        BN_mod_exp(res, base, exp, mod, ctx);
-
-        char* hexOut = BN_bn2hex(res);
-        std::string result(hexOut);
-        OPENSSL_free(hexOut);
-
-        BN_free(base); BN_free(exp); BN_free(mod); BN_free(res);
-        BN_CTX_free(ctx);
+        // RSA 裸模幂由 Rust 后端完成；输出为小写、无前导零的 hex。
+        char hexOut[512] = {0};
+        std::size_t hexLen = 0;
+        if (era_crypto_rsa_modpow_hex(hexIn.c_str(), NETESE_PUB_EXPONENT,
+                                      NETESE_MODULUS, hexOut, sizeof(hexOut),
+                                      &hexLen) != ERA_CRYPTO_OK) {
+            return "";
+        }
+        std::string result(hexOut, hexLen);
+        // 旧实现走 BN_bn2hex（大写）；保持 encSecKey 逐字节一致。
+        for (char& ch : result) {
+            if (ch >= 'a' && ch <= 'f') ch = static_cast<char>(ch - 'a' + 'A');
+        }
 
         // 补齐 256 位十六进制
         if (result.size() < 256) {
@@ -1339,7 +1309,7 @@ private:
     /// 生成 16 字节 hex 随机密钥
     static std::string generateRandomKey() {
         unsigned char buf[16];
-        RAND_bytes(buf, sizeof(buf));
+        if (era_crypto_random(buf, sizeof(buf)) != ERA_CRYPTO_OK) return "";
         std::string hex;
         for (int i = 0; i < 16; ++i) {
             char h[4];
@@ -1600,7 +1570,7 @@ private:
     /// 生成 UUID 格式的 searchid（QQ 音乐搜索请求需要）
     static std::string generateUUID() {
         unsigned char buf[16];
-        RAND_bytes(buf, sizeof(buf));
+        if (era_crypto_random(buf, sizeof(buf)) != ERA_CRYPTO_OK) return "";
         // 格式: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
         char hex[37];
         std::snprintf(hex, sizeof(hex),
@@ -1678,13 +1648,16 @@ private:
 
         std::string sig;
         {
-            unsigned char digest[EVP_MAX_MD_SIZE];
-            unsigned int len = 0;
-            EVP_Digest(raw.c_str(), raw.size(), digest, &len, EVP_md5(), nullptr);
+            unsigned char digest[16];
+            if (era_crypto_md5(reinterpret_cast<const unsigned char*>(raw.data()),
+                               raw.size(), digest) != ERA_CRYPTO_OK) {
+                return false;
+            }
             std::string hex;
-            for (unsigned int i = 0; i < len; ++i) {
+            hex.reserve(32);
+            for (unsigned char byte : digest) {
                 char buf[3];
-                std::snprintf(buf, sizeof(buf), "%02x", digest[i]);
+                std::snprintf(buf, sizeof(buf), "%02x", byte);
                 hex += buf;
             }
             sig = hex;
@@ -2831,27 +2804,33 @@ inline std::string KuwoClient::computeCross(const std::string& token) {
     // 酷我 Cross 头算法：
     //   1. SHA1(token) → 40 字符 hex 串
     //   2. MD5(hex串) → 32 字符 hex 串（即 Cross 值）
-    unsigned char sha1Digest[EVP_MAX_MD_SIZE];
-    unsigned int sha1Len = 0;
-    EVP_Digest(token.c_str(), token.size(), sha1Digest, &sha1Len, EVP_sha1(), nullptr);
+    unsigned char sha1Digest[20];
+    if (era_crypto_sha1(reinterpret_cast<const unsigned char*>(token.data()),
+                        token.size(), sha1Digest) != ERA_CRYPTO_OK) {
+        return "";
+    }
 
     // SHA1 结果转 hex
     std::string sha1Hex;
-    for (unsigned int i = 0; i < sha1Len; ++i) {
+    sha1Hex.reserve(40);
+    for (unsigned char byte : sha1Digest) {
         char buf[3];
-        snprintf(buf, sizeof(buf), "%02x", sha1Digest[i]);
+        snprintf(buf, sizeof(buf), "%02x", byte);
         sha1Hex += buf;
     }
 
     // MD5(sha1Hex)
-    unsigned char md5Digest[EVP_MAX_MD_SIZE];
-    unsigned int md5Len = 0;
-    EVP_Digest(sha1Hex.c_str(), sha1Hex.size(), md5Digest, &md5Len, EVP_md5(), nullptr);
+    unsigned char md5Digest[16];
+    if (era_crypto_md5(reinterpret_cast<const unsigned char*>(sha1Hex.data()),
+                       sha1Hex.size(), md5Digest) != ERA_CRYPTO_OK) {
+        return "";
+    }
 
     std::string cross;
-    for (unsigned int i = 0; i < md5Len; ++i) {
+    cross.reserve(32);
+    for (unsigned char byte : md5Digest) {
         char buf[3];
-        snprintf(buf, sizeof(buf), "%02x", md5Digest[i]);
+        snprintf(buf, sizeof(buf), "%02x", byte);
         cross += buf;
     }
     return cross;

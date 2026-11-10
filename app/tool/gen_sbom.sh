@@ -4,8 +4,8 @@
 #
 #  把「发布产物」与「各生态依赖清单（锁文件）」聚到一个暂存目录，交给 syft
 #  一次扫描，再经 sbom_normalize.py 归一化：
-#    · 产物侧：原生库（FFmpeg / OpenSSL / opus / taglib）、自家二进制、Go 模块；
-#    · 源码侧：Rust（5× Cargo.lock）/ Dart（pubspec.lock）/ Go（go.mod+go.sum）/
+#    · 产物侧：原生库（FFmpeg / opus / taglib）、自家二进制、Go 模块；
+#    · 源码侧：Rust（各 crate Cargo.lock）/ Dart（pubspec.lock）/ Go（go.mod+go.sum）/
 #      .NET（scanner、indexer 的 packages.lock.json）。
 #
 #  为什么合并成一次扫描：SBOM 的「主体」是产品本身而不是某个目录；下游（发行版
@@ -68,6 +68,7 @@ copy_manifest "$ROOT/app/core/shell/Cargo.lock"                   rust/shell
 copy_manifest "$ROOT/app/core/vault-rs/Cargo.lock"                rust/vault
 copy_manifest "$ROOT/app/core/audio-engine/tempo-rs/Cargo.lock"   rust/tempo
 copy_manifest "$ROOT/app/core/subsonic/transcoder/Cargo.lock"     rust/transcoder
+copy_manifest "$ROOT/app/core/scraper-crypto/Cargo.lock"          rust/scraper-crypto
 copy_manifest "$ROOT/app/core/subsonic/go.mod"                    go/subsonic
 copy_manifest "$ROOT/app/core/subsonic/go.sum"                    go/subsonic
 copy_manifest "$ROOT/app/core/scanner/packages.lock.json"         nuget/scanner

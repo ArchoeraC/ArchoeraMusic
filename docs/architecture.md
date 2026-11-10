@@ -264,7 +264,7 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 | 二进制 | 语言 | 调用方 | 协议 |
 |---|---|---|---|
 | `archoera-scanner` | C#（TagLibSharp）| **Dart FFI 直连（进程内）** | FFI 结果/进度直返；SQLite 直写（§8） |
-| `archoera-scraper` | C++（libcurl + TagLib）| **Dart FFI 直连（进程内）** | FFI 进度回调 + 结果直返 |
+| `archoera-scraper` | C++（libcurl + TagLib；AES/RSA/MD5/SHA1 走内嵌 Rust staticlib，不依赖系统 OpenSSL）| **Dart FFI 直连（进程内）** | FFI 进度回调 + 结果直返 |
 | `archoera-audio-engine` | C（FFmpeg + miniaudio）| **主引擎**（Dart FFI 库内加载，2026-08-07）| FFI：`archoera_mediaengine_*`（库内线程转码 PCM 落盘 + miniaudio 自播 + pollEvent FIFO）；CLI 模式保留 stdout OGG + fd3/fd4 |
 | `tempo-rs` | Rust（signalsmith-stretch）| 静态链接进 C 引擎 | C FFI（`HAS_TEMPO` 条件编译）|
 | Go `subsonic` | Go | **Dart FFI 直连（Go c-shared，可选启用）** | 库内提供服务；与独立服务端共享同一份代码（build tag 区分） |

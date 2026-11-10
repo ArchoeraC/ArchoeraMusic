@@ -12,7 +12,7 @@
 | SEC-22 | `protect-main` 开启 **Require review from Code Owners**：CI/签名/打包/水印等关键路径改动无法被非 owner 自合并（owner 为 bypass actor，可自建 PR 自合并） | GitHub ruleset + `.github/CODEOWNERS` |
 | SEC-23 | `release` 作业在签名前**校验发版 tag 指向受保护长分支**（`main` 或 `ArchoeraOS`）的祖先提交，否则拒绝构建/签名 | `build-all.yml` release 作业 |
 | SEC-24 | tag 名经 **`$GITHUB_REF_NAME` 环境变量**注入，`run:` 内不再内插 `${{ github.ref_name }}` | `build-all.yml` |
-| SEC-25 | release 作业生成 **CycloneDX SBOM**：产物侧（FFmpeg / OpenSSL / opus / taglib 等原生库、自家二进制、Go 模块）+ 各生态锁文件（Rust 5× `Cargo.lock`、Dart `pubspec.lock`、Go `go.mod`+`go.sum`、.NET `packages.lock.json`）合并为一份；与**全部**资产一并签 `.sig1` 并列入 `SHA256SUMS`。另写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业、`app/tool/gen_sbom.sh` |
+| SEC-25 | release 作业生成 **CycloneDX SBOM**：产物侧（FFmpeg / opus / taglib 等原生库、AppImage 经 linuxdeploy 收拢的 libcurl/OpenSSL、自家二进制、Go 模块）+ 各生态锁文件（Rust 各 crate `Cargo.lock`、Dart `pubspec.lock`、Go `go.mod`+`go.sum`、.NET `packages.lock.json`）合并为一份；与**全部**资产一并签 `.sig1` 并列入 `SHA256SUMS`。另写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业、`app/tool/gen_sbom.sh` |
 | SEC-26 | **各生态漏洞扫描**工作流（`cargo audit` / `govulncheck` / `dotnet list package --vulnerable`）；Dependabot 配置保留但**版本更新已停用**（依赖改为定期手动同步，见 §3） | `.github/dependabot.yml`、`security-audit.yml` |
 | SEC-27 | CI 跑**完整 `flutter test`**（不再只跑 widget 冒烟）+ vault 用例（指向测试二进制）+ subsonic 的 `go test` | `actions/build-linux/action.yml` |
 | SEC-08 | release 作业对目录型产物的 `ARCHOERA-NATIVE-MANIFEST.txt` 做 **key1 ECDSA/SHA-256 分离签名**（`.sig1`），运行期内嵌公钥验签 + 摘要 | `build-all.yml` release 作业 + `app/tool/sign_native_manifest.sh` |
