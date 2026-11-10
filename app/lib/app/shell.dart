@@ -112,9 +112,11 @@ class AppShell extends ConsumerWidget {
         // 右侧开始，避免盖住侧边栏底部）
         // 侧边栏折叠/展开时与宽度动效同步平移（linear，时长一致）。
         AnimatedPositioned(
-          duration: animDuration(context, const Duration(milliseconds: 200)),
+          duration: animDuration(context, const Duration(milliseconds: 160)),
           curve: Curves.linear,
-          left: floating ? (collapsed ? 64.0 : 240.0) + 1 : 0,
+          left: floating
+              ? (collapsed ? kSideBarCollapsedWidth : kSideBarExpandedWidth) + 1
+              : 0,
           right: 0,
           bottom: 0,
           child: occludedWhenPlayerOpen(const PlayerBar()),
