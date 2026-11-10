@@ -42,7 +42,7 @@ import 'lyrics_word_anim.dart';
 import 'spring.dart';
 import 'spring_policy.dart';
 
-import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../../l10n/l10n.dart';
 
 part 'lyrics_physics_wall/lyrics_physics_wall_state.dart';
 part 'lyrics_physics_wall/lyrics_physics_wall_painter.dart';

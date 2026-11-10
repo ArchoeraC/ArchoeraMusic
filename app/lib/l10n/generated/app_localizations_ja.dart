@@ -2502,7 +2502,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsShowSubtitleOff => 'リストに別名を表示しない';
 
   @override
-  String get settingsEnergySaving => '省エネモード';
+  String get settingsEnergySaving => 'スペクトラム省電力';
 
   @override
   String get settingsEnergySavingNote =>
@@ -4726,12 +4726,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get shortcutActionPlayPause => '再生 / 一時停止';
 
   @override
-  String get shortcutActionPlay => '再生';
-
-  @override
-  String get shortcutActionPause => '一時停止';
-
-  @override
   String get shortcutActionStop => '停止';
 
   @override
@@ -4807,7 +4801,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get shortcutActionGoStreaming => 'ストリーミングへ';
 
   @override
-  String get shortcutActionOpenPlayer => 'プレイヤーを開く';
+  String get shortcutActionOpenPlayer => 'プレイヤーを開く / 閉じる';
 
   @override
   String get shortcutActionOpenSettings => '設定を開く';

@@ -6,6 +6,9 @@ part of '../playback_slider.dart';
 
 class _PlaybackSliderState extends State<PlaybackSlider>
     with SingleTickerProviderStateMixin {
+  /// 细条状态圆点直径（与主题 thumb（半径 6）一致，悬停切换不跳动）。
+  static const double _barThumbSize = 12;
+
   bool _hovered = false;
   bool _dragging = false;
   bool _barDragging = false;
@@ -88,7 +91,7 @@ class _PlaybackSliderState extends State<PlaybackSlider>
   }
 
   /// 奇怪的特效是否激活（进度条反向：从右向左填充、拖点映射同步反向）。
-  bool get _prank => aprilFoolsActiveNotifier.value;
+  bool get _prank => widget.allowPrank && aprilFoolsActiveNotifier.value;
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +119,7 @@ class _PlaybackSliderState extends State<PlaybackSlider>
         onHover: (e) => setState(() => _hoverDx = e.localPosition.dx),
         cursor: SystemMouseCursors.click,
         child: SizedBox(
-          height: 48,
+          height: widget.height,
           child: LayoutBuilder(
             builder: (context, c) {
               // 缓存轨道矩形供 Overlay 气泡复用（不在 build 中触发重建）。
@@ -125,7 +128,9 @@ class _PlaybackSliderState extends State<PlaybackSlider>
                 c.maxWidth,
                 c.maxHeight,
               );
-              return (_hovered || _dragging) && !_barDragging
+              return widget.showThumb &&
+                      (_hovered || _dragging) &&
+                      !_barDragging
                   ? _buildSlider(scheme, rect)
                   : _buildBar(scheme, rect);
             },
@@ -140,7 +145,7 @@ class _PlaybackSliderState extends State<PlaybackSlider>
     final overlayW =
         st.overlayShape?.getPreferredSize(true, false).width ??
         (st.thumbShape?.getPreferredSize(true, false).width ?? 24.0);
-    final trackH = st.trackHeight ?? 4.0;
+    final trackH = widget.trackHeight ?? st.trackHeight ?? 4.0;
     final trackW = (width - overlayW).clamp(0.0, double.infinity);
     return Rect.fromLTWH(
       (overlayW - trackH) / 2,
@@ -243,6 +248,7 @@ class _PlaybackSliderState extends State<PlaybackSlider>
         _maybeMirror(
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
+              trackHeight: widget.trackHeight,
               activeTrackColor: widget.buffering
                   ? scheme.primary.withValues(alpha: 0.35)
                   : null,
@@ -363,14 +369,18 @@ class _PlaybackSliderState extends State<PlaybackSlider>
         ),
         if (widget.buffering) _bufferLayer(scheme, rect),
         // 触摸拖动：细条无滑块，补一个跟随的圆点（时间提示走 Overlay）。
-        if (_barDragging)
+        // showThumb=false（Vutron 纯条）时连这个圆点也不画。
+        if (widget.showThumb && _barDragging)
           Positioned(
-            left: (valueDx() - 6).clamp(0.0, double.infinity),
-            top: rect.center.dy - 6,
+            left: (valueDx() - _barThumbSize / 2).clamp(
+              rect.left,
+              rect.right - _barThumbSize,
+            ),
+            top: rect.center.dy - _barThumbSize / 2,
             child: IgnorePointer(
               child: Container(
-                width: 12,
-                height: 12,
+                width: _barThumbSize,
+                height: _barThumbSize,
                 decoration: BoxDecoration(
                   color: scheme.primary,
                   shape: BoxShape.circle,

@@ -11,6 +11,7 @@ import '../../stores/app_prefs.dart';
 import '../../stores/lyrics_provider.dart';
 import '../../utils/format.dart';
 import 'playback_slider.dart';
+import 'player_slider_row.dart';
 
 /// 播放进度条（播放条 / 全屏播放器共用）。
 ///
@@ -22,6 +23,9 @@ class PlaybackProgressSlider extends ConsumerWidget {
     super.key,
     this.showTimes = false,
     this.textStyle,
+    this.timeGutter,
+    this.trackHeight,
+    this.showThumb = true,
     this.dragMs,
     this.buffering = false,
     this.enabled = true,
@@ -32,6 +36,18 @@ class PlaybackProgressSlider extends ConsumerWidget {
   /// 是否同时展示左右时间（全屏播放器：pos / dur）；false = 仅滑块。
   final bool showTimes;
   final TextStyle? textStyle;
+
+  /// 左右时间槽宽；null = 按文字宽度自然排布（播放条默认）。
+  ///
+  /// 传值时改走 [PlayerSliderRow] 的固定栅格，方便与同一列的音量条对齐
+  /// （Vutron 经典布局）。时间过长时槽内等比缩小，不会把轨道挤歪。
+  final double? timeGutter;
+
+  /// 轨道粗细；null = 跟随主题（3px）。Vutron 经典布局声明 4px。
+  final double? trackHeight;
+
+  /// 是否显示滑块圆点；false = 纯细条（Vutron 经典布局）。
+  final bool showThumb;
 
   /// 拖动中的进度（ms）；null = 跟随播放器实时位置。
   final double? dragMs;
@@ -70,6 +86,8 @@ class PlaybackProgressSlider extends ConsumerWidget {
       buffering: buffering,
       glow: glow,
       showTooltip: prefs.showProgressTooltip,
+      trackHeight: trackHeight,
+      showThumb: showThumb,
       // 悬停/拖动：时间提示旁一并显示该位置的歌词行（时间显示的歌词定位）。
       tooltipLyric: prefs.showProgressTooltip
           ? (ms) => _lyricAt(groups, ms)
@@ -91,6 +109,14 @@ class PlaybackProgressSlider extends ConsumerWidget {
     );
     if (!showTimes) return slider;
     final (left, right) = formatTimePair(s.pos, s.dur, prefs.timeFormat);
+    if (timeGutter != null) {
+      return PlayerSliderRow(
+        gutter: timeGutter!,
+        leading: _gutterTime(left),
+        trailing: _gutterTime(right),
+        track: slider,
+      );
+    }
     return Row(
       children: [
         Text(left, style: textStyle),
@@ -102,6 +128,13 @@ class PlaybackProgressSlider extends ConsumerWidget {
       ],
     );
   }
+
+  /// 固定槽内的时间标签：超长（> 1 小时）等比缩小，不撑破栅格。
+  Widget _gutterTime(String text) => FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.centerLeft,
+    child: Text(text, maxLines: 1, style: textStyle),
+  );
 
   /// 时间标签与进度条之间的水平留白。
   static const double _timeGap = 12;
