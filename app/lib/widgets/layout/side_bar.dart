@@ -39,7 +39,9 @@ class _NavItem {
 ///
 /// 折叠状态 / 导航高亮动效来自设置（appearance.sidebarCollapsed /
 /// appearance.sidebarNavStyle，对齐原版）：
-///  - collapsed：侧边栏折叠为图标模式（宽度 240 → 64）；
+///  - collapsed：侧边栏折叠为图标模式（宽度 240 → 64）。折叠/展开过渡
+///    先隐藏内容，宽度按 linear 走完（≤300ms）后再显示，规避中间宽度
+///    下文字/图标/指示条的半成品布局；
 ///  - sidebarNavStyle=animated：选中指示条改为容器级滑动高亮
 ///    （AnimatedPositioned 平滑移动，对齐 SMenu animated 模式）。
 ///
@@ -72,6 +74,29 @@ class _SideBarState extends ConsumerState<SideBar> {
   double _indicatorTop = 0;
   double _indicatorHeight = 0;
   bool _indicatorReady = false;
+
+  /// 侧边栏内容是否可见。
+  ///
+  /// 折叠/展开过渡期间先隐藏内容，只播放宽度动效（linear，≤300ms），
+  /// 到位后再显示，规避中间宽度下文字/图标/指示条的半成品布局。
+  bool _sidebarContentVisible = true;
+
+  /// 折叠/展开过渡开始：立即隐藏内容。
+  void _beginSidebarTransition() {
+    // 性能模式（disableAnimations）下动效时长归零，直接直切，无需隐藏。
+    if (!mounted || noAnim(context) || !_sidebarContentVisible) return;
+    setState(() {
+      _sidebarContentVisible = false;
+      // 指示条随内容一起隐藏；重新显示后按最终布局重测，避免补位滑动。
+      _indicatorReady = false;
+    });
+  }
+
+  /// 宽度动效到位后再显示内容（由 AnimatedContainer.onEnd 回调）。
+  void _endSidebarTransition() {
+    if (!mounted || _sidebarContentVisible) return;
+    setState(() => _sidebarContentVisible = true);
+  }
 
   List<(String, List<_NavItem>)> _navGroups(AppLocalizations l10n) {
     final prefs = ref.read(appPrefsProvider);
@@ -151,6 +176,8 @@ class _SideBarState extends ConsumerState<SideBar> {
   /// 折叠/展开或切换分支后经 postFrameCallback 调用；位置未变时不做
   /// setState（避免 rebuild → 再测量 的死循环）。
   void _updateIndicator() {
+    // 折叠/展开过渡期内容被隐藏：跳过测量，到位后再按最终布局重新定位。
+    if (!_sidebarContentVisible) return;
     final style = sidebarNavStyleFor(
       ref.read(appPrefsProvider).sidebarNavStyle,
     );

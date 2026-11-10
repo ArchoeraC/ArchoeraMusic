@@ -110,7 +110,10 @@ class AppShell extends ConsumerWidget {
         // 底部播放条（悬浮层，不占布局空间——对齐原版 MainLayout 的
         // fixed 播放条：悬浮模式侧边栏可占满侧边；播放条从侧边栏
         // 右侧开始，避免盖住侧边栏底部）
-        Positioned(
+        // 侧边栏折叠/展开时与宽度动效同步平移（linear，时长一致）。
+        AnimatedPositioned(
+          duration: animDuration(context, const Duration(milliseconds: 200)),
+          curve: Curves.linear,
           left: floating ? (collapsed ? 64.0 : 240.0) + 1 : 0,
           right: 0,
           bottom: 0,
