@@ -21,6 +21,7 @@
 #
 #  用法: fix-macos-loadpaths.sh <native_dir>
 #  依赖: install_name_tool、otool（Xcode Command Line Tools）
+#  注意：只用 bash 3.2 可用语法（macOS 自带 /bin/bash 仍是 3.2）。
 # =====================================================================
 set -euo pipefail
 export LC_ALL=C
