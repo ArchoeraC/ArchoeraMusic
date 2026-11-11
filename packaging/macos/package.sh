@@ -11,8 +11,9 @@
 #        ditto 生成的归档（保留 .app 的符号链接、可执行位与扩展属性），
 #        跨平台解压可用；发布侧同时对两者签 .sig1。
 #
-#  用法: package.sh dmg <archoera_music.app> <版本> <arch>
+#  用法: bash packaging/macos/package.sh <archoera_music.app> <版本> <arch>
 #        arch ∈ arm64 | x64
+#        （位置参数；不要写成 "dmg ..."，格式由本脚本固定为 DMG + zip）
 #  环境: SKIP_DMG=1 仅生成 zip（无 hdiutil 或仅需校验时）
 # =====================================================================
 set -euo pipefail
@@ -23,7 +24,7 @@ BUNDLE_ID="com.archoera.archoeraMusic"
 DIST="$ROOT/dist/macos"
 WORK="$ROOT/packaging/macos/work"
 
-app="${1:?用法: package.sh dmg <archoera_music.app> <版本> <arch>}"
+app="${1:?用法: package.sh <archoera_music.app> <版本> <arch>}"
 version="${2:?缺少版本号}"
 arch="${3:?缺少架构（arm64 / x64）}"
 

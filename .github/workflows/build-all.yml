@@ -728,7 +728,7 @@ jobs:
         run: |
           set -euo pipefail
           VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
-          bash packaging/macos/package.sh dmg \
+          bash packaging/macos/package.sh \
             "app/build/macos/Build/Products/Release/archoera_music.app" \
             "$VER" "${{ matrix.arch }}"
           ls -la dist/macos
