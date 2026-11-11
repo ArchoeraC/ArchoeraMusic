@@ -6,7 +6,7 @@
 #     加 RUNPATH=$ORIGIN。背景：引擎链接 FFmpeg、scraper 链接 TagLib，二者
 #     soname 跨发行版会 bump（libavformat.so.60→.63、libtag.so.1→.2）；FFmpeg
 #     还依赖大量发行版专属 codec 库。仅内嵌 FFmpeg 本体并不够。
-#  2) 归一化全 bundle 的 RUNPATH（native/ 与 lib/ 下 ELF 一律 $ORIGIN）：
+#  2) 归一化全 bundle 的 RUNPATH（native/ 与 lib/ 下 ELF 一律 ${ORIGIN}）：
 #     去掉构建期泄漏的临时路径（如 $HOME/.local/ffmpeg-minimal/lib、Flutter
 #     ephemeral 目录），否则 Fedora rpmbuild 的 check-rpaths 会直接报错失败。
 #
@@ -82,7 +82,7 @@ while [[ ${#queue[@]} -gt 0 ]]; do
     [[ "$name" =~ $DENY_RE ]] && continue   # 系统库：不内嵌、不遍历其子树
     path="$(awk -v n="$name" '$1==n && $2=="=>" {print $3; exit}' <<<"$ldd_out")"
     [[ -n "$path" && "$path" != "not" && -f "$path" ]] || {
-      echo "警告: 无法解析 $name（来自 $(basename "$obj")），跳过" >&2
+      echo "警告: 无法解析 ${name}（来自 $(basename "$obj")），跳过" >&2
       continue
     }
     cp -L "$path" "$native/$name"

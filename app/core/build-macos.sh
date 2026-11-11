@@ -52,7 +52,7 @@ case "$RID:$HOST_ARCH" in
   osx-arm64:arm64|osx-x64:x86_64) ;;
   *)
     echo "[build-macos] 警告: RID=$RID 与当前主机 $HOST_ARCH 不一致；" >&2
-    echo "[build-macos]       Homebrew / FFmpeg / opus 等依赖也必须是 $TARGET_ARCH，否则链接会失败。" >&2
+    echo "[build-macos]       Homebrew / FFmpeg / opus 等依赖也必须是 ${TARGET_ARCH}，否则链接会失败。" >&2
     ;;
 esac
 

@@ -82,7 +82,7 @@ if ! command -v nasm >/dev/null 2>&1 && ! command -v yasm >/dev/null 2>&1; then
   x86asm_flag="--disable-x86asm"
 fi
 
-# 共享库 RUNPATH：Linux 用 $ORIGIN；macOS 用 @loader_path（同目录解析）
+# 共享库 RUNPATH：Linux 用 ${ORIGIN}；macOS 用 @loader_path（同目录解析）
 if [[ "$(uname -s)" == "Darwin" ]]; then
   extra_ldflags="-Wl,-rpath,@loader_path"
 else
