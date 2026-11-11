@@ -71,7 +71,9 @@ fail() {
 
 is_system_path() {
   case "$1" in
-    /usr/lib/* | /System/Library/* | /System/iOSSupport/*) return 0 ;;
+    # make/pkg 构建的 dylib（如 pkg-config 生成的 PC 里 -L/usr/lib）会带上
+    # /bin/sh 这类"构建机"路径，但它同样是 macOS 系统路径，不算泄漏。
+    /usr/lib/* | /System/Library/* | /System/iOSSupport/* | /bin/*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -108,26 +110,21 @@ require_file "$native/ARCHOERA-NATIVE-MANIFEST.txt"
 is_macho() { file -b "$1" 2>/dev/null | grep -q 'Mach-O'; }
 
 macho_archs() {
-  # 统一输出空格分隔的架构列表（arm64 / x86_64）。
-  # 先用 file(1)（跨平台稳定），缺失时退回 lipo。
-  local f="$1" a
-  if command -v file >/dev/null 2>&1; then
-    a="$(file -b "$f" 2>/dev/null)" || a=""
-    if [[ "$a" == *"universal binary"* || "$a" == *"fat file"* ]]; then
-      printf '%s\n' "universal"
-      return 0
-    fi
-    for a in arm64e arm64 x86_64; do
-      [[ "$a" == arm64e ]] && continue   # arm64e 不单独出包
-      if [[ "$(file -b "$f" 2>/dev/null)" == *" $a "* || "$(file -b "$f" 2>/dev/null)" == *"$a dynamically"* || "$(file -b "$f" 2>/dev/null)" == *"$a executable"* ]]; then
-        printf '%s\n' "$a"
-        return 0
-      fi
-    done
-  fi
+  # 输出单一架构名（arm64 / x86_64 / universal / 空）。
+  # 优先 file(1)（跨平台稳定），缺失时退回 lipo。不用 for...continue 组合，
+  # 避免 macOS bash 3.2 的语法歧义。
+  local f="$1" desc
   if command -v lipo >/dev/null 2>&1; then
-    lipo -archs "$f" 2>/dev/null | tr ' ' '\n' | LC_ALL=C sort -u | tr '\n' ' ' | sed 's/ $//'
+    desc="$(lipo -archs "$f" 2>/dev/null || true)"
+    [[ -n "$desc" ]] && { printf '%s\n' "${desc// / }"; return 0; }
   fi
+  desc="$(file -b "$f" 2>/dev/null || true)"
+  case "$desc" in
+    *universal* | *"fat file"*) printf '%s\n' "universal" ;;
+    *"arm64 "*) printf '%s\n' "arm64" ;;
+    *arm64*) printf '%s\n' "arm64" ;;
+    *x86_64*) printf '%s\n' "x86_64" ;;
+  esac
 }
 
 id_name() {
@@ -206,8 +203,9 @@ while IFS= read -r f; do
       continue
     fi
 
-    # 自身 install_name：不是「加载」，跳过
+    # 自身 install_name / 指向同目录同名库：不是「加载」，跳过
     [[ -n "$self_id" && "$ref" == "$self_id" ]] && continue
+    [[ "$ref" != @* ]] && [[ "$ref" != /* ]] && [[ "$base" == "$(basename "$f")" ]] && continue
 
     if is_system_path "$ref"; then
       system_refs+=("$base")
