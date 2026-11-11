@@ -76,6 +76,9 @@ cd app/core/vault-rs && ./build-test.sh && ./test.sh
 3. `git tag v<version> && git push origin v<version>`（tag 推送后不可删改）。
 4. Actions 中 release 作业停在 **Waiting for review** → Approve：CI 签 `.sig1`、附公钥、按 tag 抽取 CHANGELOG 段落创建 Release。
 
+> 三端产物对照（deb/rpm/AppImage/flatpak/nix、macOS DMG+zip、Windows 安装器+
+> 便携 zip）与本地复现命令见 `docs/packaging.md`。
+>
 > 依赖门禁：Linux 打包前 CI 自动跑 `app/tool/check_bundle_deps.sh`（NEEDED /
 > `$ORIGIN` / 内嵌库实际解析位置 / libssl 禁止项）与
 > `app/tool/smoke_start_linux.sh`（Xvfb 下真实启动）。新增系统库必须同步
