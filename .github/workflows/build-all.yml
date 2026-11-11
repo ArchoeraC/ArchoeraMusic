@@ -595,167 +595,21 @@ jobs:
             Write-Host "OK: $p"
           }
 
-      # ─────────────── macOS：把原生库拷入 .app（native/ 平铺）──────────
-      - name: Bundle native libs into .app (native/ 平铺)
-        if: matrix.os == 'macos'
-        # macOS 无 CMake install 层（Flutter macOS 走 Xcode），FFI 库须在此显式拷入
-        # .app/Contents/native/（NativeLibPaths 祖先链从 exe 向上第 2 级 Contents 命中）。
-        # 与 linux/windows 的 bundle/native/ 平铺布局对齐（ffi-libs-layout 计划）。
-        run: |
-          set -euo pipefail
-          APP="app/build/macos/Build/Products/Release/archoera_music.app"
-          NATIVE="$APP/Contents/native"
-          mkdir -p "$NATIVE"
-          cp app/core/audio-engine/build/archoera-audio-engine "$NATIVE/" || true
-          cp app/core/audio-engine/build/*.dylib "$NATIVE/"
-          cp app/core/scanner/build/*.dylib "$NATIVE/"
-          # 本地曲库搜索索引器（indexer-ffi，.NET NativeAOT）；libe_sqlite3 已随
-          # scanner 拷入，仅在其缺失时由 indexer 兜底（同名同版本）。
-          cp app/core/indexer/build/indexer-ffi.dylib "$NATIVE/"
-          [ -f "$NATIVE/libe_sqlite3.dylib" ] || cp app/core/indexer/build/libe_sqlite3.dylib "$NATIVE/"
-          cp app/core/scraper/build/*.dylib "$NATIVE/"
-          cp app/core/subsonic/build/*.dylib "$NATIVE/"
-          cp app/core/vault-rs/build/archoera-vault "$NATIVE/"
-
-          # 自包含运行库：把引擎(FFmpeg)/scraper(TagLib) 的 dylib 依赖收进 native/
-          # 并把 install_name 改写为 @loader_path，运行期不再依赖构建机 brew 路径
-          # （否则用户机无 brew 时加载失败）。
-          for lib in libarchoera_mediaengine.dylib libarchoera_scraper.dylib; do
-            [[ -f "$NATIVE/$lib" ]] || continue
-            dylibbundler -of -b -x "$NATIVE/$lib" -d "$NATIVE" -p @loader_path
-          done
-
-          # 引擎子进程同样要自包含：它链接的是 CI 里自建的最小 FFmpeg
-          # （/Users/runner/.local/ffmpeg-minimal/lib/libav*.dylib），且该二进制
-          # 没被 codesign 覆盖，改写 load command 后需重新 ad-hoc 签名。
-          dylibbundler -of -b -x "$NATIVE/archoera-audio-engine" -d "$NATIVE" -p @loader_path
-          codesign --force --sign - "$NATIVE/archoera-audio-engine"
-          codesign --force --sign - "$NATIVE/archoera-vault" 2>/dev/null || true
-
-          # install_name 归一化：dylibbundler 只处理上面几个库，其余模块
-          # （downloader / transcoder / log / platform / scanner / indexer …）
-          # 的 install_name 仍带 /Users/runner/... 构建机路径，用户机加载必失败。
-          # 统一改写为 @loader_path/<basename>；无法收拢的依赖直接失败。
-          bash app/tool/fix-macos-loadpaths.sh "$NATIVE"
-
-          # LGPL 合规：随包附 FFmpeg / TagLib 许可文本 + 聚合声明
-          bash app/core/bundle-licenses.sh "$APP/Contents"
-
-          # 防伪公钥随包分发（供用户离线验签；私钥绝不入库/入包）
-          mkdir -p "$APP/Contents/Resources"
-          cp app/tool/watermark_pub.pem "$APP/Contents/Resources/ARCHOERA_PUBKEY.pem"
-
-          # 新增/改写 dylib 会使原 ad-hoc 签名失效（Apple Silicon 拒载未签名 dylib）→ 重签整包
-          codesign --force --deep --sign - "$APP"
-
-          # 原生库完整性清单（SEC-08）：必须在 dylibbundler + codesign **之后**生成——
-          # 二者都会改写 dylib 字节，早于它们生成即失效（Dart 侧将 fail-closed 拒载）。
-          sh app/tool/gen_native_manifest.sh "$NATIVE" "$APP/Contents/MacOS/archoera_music"
-
-          echo "native/ 内容:"
-          ls -la "$NATIVE"
-
-      # macOS 依赖守卫（对应 Linux 的 check_bundle_deps.sh）：架构单一、无构建机
-      # 绝对路径、无 libssl/libcrypto/libcurl、@loader_path/@rpath 全部可解析。
-      - name: Check bundled dependency closure (macOS)
+      # ─────────────── macOS：装配 .app + 依赖守卫 + 打包 ──────────────
+      # 全部逻辑收敛在 packaging/macos/build-release.sh（**macOS 专用**，只在
+      # Mac 上跑，只用 macOS 自带工具），workflow 只负责调用，避免内联 bash
+      # 片段与 Linux 脚本混在一起、也避免 macOS 自带 bash 3.2 的语法差异。
+      #   bundle  : 拷入 native/、dylibbundler 收拢 FFmpeg/TagLib、install_name
+      #             归一化、许可文本、公钥、ad-hoc 重签、生成完整性清单
+      #   verify  : Mach-O 依赖守卫 + dyld 实际 dlopen 全部 FFI 库 + archoerashell
+      #   package : DMG（拖拽安装）+ zip（ditto）
+      - name: Build macOS release (bundle + verify + package)
         if: matrix.os == 'macos'
         shell: bash
         run: |
           set -euo pipefail
-          bash app/tool/check_bundle_deps_macos.sh \
-            "app/build/macos/Build/Products/Release/archoera_music.app" \
-            --arch "${{ matrix.arch }}"
-
-      - name: Verify indexer-ffi bundled (macOS)
-        if: matrix.os == 'macos'
-        # 硬校验：本地曲库搜索索引器 indexer-ffi.dylib 及其 SQLite 依赖必须在
-        # .app/Contents/native/，且计入 SHA-256 完整性清单（SEC-08）。
-        run: |
-          set -euo pipefail
-          NATIVE="app/build/macos/Build/Products/Release/archoera_music.app/Contents/native"
-          for f in indexer-ffi.dylib libe_sqlite3.dylib; do
-            [ -f "$NATIVE/$f" ] || { echo "::error::$f 未打入 macOS 包（indexer 缺失）"; exit 1; }
-          done
-          grep -q 'indexer-ffi.dylib' "$NATIVE/ARCHOERA-NATIVE-MANIFEST.txt" \
-            || { echo "::error::完整性清单缺 indexer-ffi.dylib"; exit 1; }
-          echo "OK: indexer-ffi 已入包并计入清单"
-
-      - name: Verify macOS bundle architecture & load (native/)
-        if: matrix.os == 'macos'
-        # 硬校验：单架构包内所有 Mach-O 必须只有 matrix.arch 一个 slice；
-        # 再用 dyld 实际 dlopen 每个 FFI 库，验证 @loader_path 依赖能解析。
-        # 最后跑一次 archoerashell --version，覆盖静态库链入 + 参数分派。
-        run: |
-          set -euo pipefail
-          APP="app/build/macos/Build/Products/Release/archoera_music.app"
-          NATIVE="$APP/Contents/native"
-          EXPECTED="${{ matrix.arch }}"
-          fail=0
-          check_arch() {
-            f="$1"
-            [ -f "$f" ] || { echo "::error::缺少文件：$f"; fail=1; return 0; }
-            got="$(lipo -archs "$f")"
-            if [ "$got" != "$EXPECTED" ]; then
-              echo "::error::$f 架构为 '$got'，期望 '$EXPECTED'"
-              fail=1
-            fi
-          }
-
-          check_arch "$APP/Contents/MacOS/archoera_music"
-          check_arch "$APP/Contents/Frameworks/FlutterMacOS.framework/Versions/A/FlutterMacOS"
-          check_arch "$NATIVE/archoera-audio-engine"
-          check_arch "$NATIVE/archoera-vault"
-          for f in "$NATIVE"/*.dylib; do check_arch "$f"; done
-
-          if [ "$fail" -ne 0 ]; then exit 1; fi
-
-          # 自包含检查：bundle 内 dylib 不得残留构建机 Homebrew 绝对路径。
-          if otool -L "$NATIVE"/*.dylib | grep -E '/opt/homebrew|/usr/local' >/tmp/homebrew_refs.txt; then
-            echo "::error::native/ 中仍有 Homebrew 绝对路径依赖："
-            cat /tmp/homebrew_refs.txt
-            exit 1
-          fi
-
-          # 实际 dlopen（不调用业务函数）：验证架构、install_name、SQLite 依赖。
-          python3 - "$NATIVE" <<'PY'
-          import ctypes
-          import os
-          import sys
-
-          native = sys.argv[1]
-          failed = []
-          for name in sorted(os.listdir(native)):
-              if not name.endswith(".dylib"):
-                  continue
-              path = os.path.join(native, name)
-              try:
-                  ctypes.CDLL(path)
-                  print(f"OK load: {name}")
-              except OSError as exc:
-                  failed.append(f"{name}: {exc}")
-          if failed:
-              print("::error::以下 FFI 库加载失败：")
-              for item in failed:
-                  print(item)
-              sys.exit(1)
-          PY
-
-          "$APP/Contents/MacOS/archoera_music" archoerashell --version
-          echo "OK: macOS $EXPECTED 单架构 + native/ 加载验证通过"
-
-      # macOS 发行包：DMG（拖拽安装）+ zip（便携）。打包前已在「Verify macOS
-      # bundle architecture & load」步骤校验过单架构、native/ 加载与 shell。
-      # 未做 Developer ID 签名/公证（无付费证书），镜像内附首次打开说明。
-      - name: Package macOS (DMG + zip)
-        if: matrix.os == 'macos'
-        shell: bash
-        run: |
-          set -euo pipefail
-          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
-          bash packaging/macos/package.sh \
-            "app/build/macos/Build/Products/Release/archoera_music.app" \
-            "$VER" "${{ matrix.arch }}"
-          ls -la "$GITHUB_WORKSPACE/dist/macos"
+          bash packaging/macos/build-release.sh all --arch "${{ matrix.arch }}"
+          ls -la dist/macos
 
       - name: Upload artifact (macOS DMG + zip)
         if: matrix.os == 'macos'
@@ -1299,7 +1153,7 @@ jobs:
           while IFS=: read -r fp _; do
             chmod +x "$fp"
           done < <(find artifacts -type f -exec file {} + | grep -i 'ELF\|Mach-O')
-          # macOS：DMG + zip 已由 packaging/macos/package.sh 产出（DMG 可直接
+          # macOS：DMG + zip 已由 packaging/macos/build-release.sh 产出（DMG 可直接
           # 拖入「应用程序」，zip 便于不支持挂载的环境），直接作为独立 asset。
           cp artifacts/ArchoeraMusic-macos-arm64/* assets/
           cp artifacts/ArchoeraMusic-macos-x64/* assets/

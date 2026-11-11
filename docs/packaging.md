@@ -14,7 +14,7 @@ Linux 依赖门禁见 [release-dependency-guard.md](release-dependency-guard.md)
 | Linux | `.AppImage`（通用便携） | `packaging/linux/package.sh appimage` | `ArchoeraMusic-<ver>-x86_64.AppImage` |
 | Linux | `.flatpak` | `packaging/linux/package-flatpak.sh` | `ArchoeraMusic-v<ver>-flatpak-x86_64.flatpak` |
 | Linux | NixOS flake 源构建产物 | `packaging/linux/nix/package.nix` | `ArchoeraMusic-<ver>-nixos-x86_64.tar.gz` |
-| macOS | **`.dmg`（拖拽安装）** | `packaging/macos/package.sh` | `ArchoeraMusic-<ver>-macos-<arm64\|x64>.dmg` |
+| macOS | **`.dmg`（拖拽安装）** | `packaging/macos/build-release.sh` | `ArchoeraMusic-<ver>-macos-<arm64\|x64>.dmg` |
 | macOS | `.zip`（便携） | 同上 | `ArchoeraMusic-<ver>-macos-<arm64\|x64>.zip` |
 | Windows | **Inno Setup 安装器** | `packaging/windows/archoera_music.iss` | `ArchoeraMusic-<ver>-windows-x64-setup.exe` |
 | Windows | 便携 zip | workflow 内 `Compress-Archive` | `ArchoeraMusic-<ver>-windows-x64-portable.zip` |
@@ -45,11 +45,24 @@ Linux 依赖门禁见 [release-dependency-guard.md](release-dependency-guard.md)
 
 ## 3. macOS
 
-由 `packaging/macos/package.sh` 生成（**必须在 macOS 上运行**）：
+**macOS 发布流程全部收敛在一个脚本里**：`packaging/macos/build-release.sh`。
+它**只能在 macOS 上运行**（`uname -s` 不是 Darwin 直接退出 2），只用 macOS
+自带工具（`otool` / `install_name_tool` / `codesign` / `lipo` / `hdiutil` /
+`ditto` / `xcrun`）加 Homebrew 的 `dylibbundler`，不与 Linux 脚本混用。
 
 ```bash
-bash packaging/macos/package.sh <archoera_music.app> <版本> <arm64|x64>
+bash packaging/macos/build-release.sh all --arch arm64
+#   all = bundle → verify → package；任一步失败即整体失败
+#   bundle  : native/ 装配 + dylibbundler + install_name 归一化 + 许可 + 重签 + 清单
+#   verify  : Mach-O 依赖守卫 + dyld 实际 dlopen 全部 FFI 库 + archoerashell --version
+#   package : DMG（拖拽安装）+ zip（ditto）
+#   可选：--app <.app>  --version <ver>  SKIP_DMG=1  ARCHOERA_SKIP_DLOPEN=1
 ```
+
+> **shell 约束**：macOS 自带 `/bin/bash` 永远是 **3.2**（Apple 因 GPLv3 不升级，
+> GitHub 的 macOS runner 同样是 3.2）。因此本仓库所有可能在 macOS 上执行的脚本
+> 都只用 3.2 语法；`app/tool/check_shell_compat.sh` 在 Linux 的 security-audit
+> 里提前拦截 `mapfile` / `declare -A` / `${v^^}` 之类的 4.x 写法。
 
 - **`.dmg`**：`hdiutil -format UDZO -fs HFS+` 打包一个临时舞台目录，内容为
   `ArchoeraMusic.app` + `应用程序` → `/Applications` 的符号链接 +
@@ -115,8 +128,7 @@ bash app/tool/smoke_start_linux.sh dist/linux/*.AppImage   # AppImage 冒烟
 # macOS（需在 Mac 上）
 bash app/core/build-macos.sh osx-arm64
 cd app && flutter build macos --release && cd ..
-bash packaging/macos/package.sh \
-  "app/build/macos/Build/Products/Release/archoera_music.app" 1.0.6 arm64
+bash packaging/macos/build-release.sh all --arch arm64
 hdiutil attach -nobrowse -readonly "dist/macos/ArchoeraMusic-1.0.6-macos-arm64.dmg"
 ```
 

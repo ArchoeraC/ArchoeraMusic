@@ -29,7 +29,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # 默认清单：在 macOS 上执行（或可能被执行）的脚本。
 default_files=(
-  "$ROOT/packaging/macos/package.sh"
+  "$ROOT/packaging/macos/build-release.sh"
   "$ROOT/app/tool/check_bundle_deps_macos.sh"
   "$ROOT/app/tool/check_shell_compat.sh"
   "$ROOT/app/tool/fix-macos-loadpaths.sh"
