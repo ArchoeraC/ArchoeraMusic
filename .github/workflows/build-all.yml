@@ -921,7 +921,7 @@ jobs:
             git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
             taglib curl openssl sqlite nlohmann-json opus \
-            gtk3 dbus libx11 libxi xorg-server-xvfb xorg-x11-xauth mesa
+            gtk3 dbus libx11 libxi xorg-server-xvfb xorg-xauth mesa
           # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Git safe directory (容器属主)
