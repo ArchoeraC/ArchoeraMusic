@@ -49,6 +49,12 @@ bash packaging/linux/build-release.sh all
 - **AppImage**：linuxdeploy 收拢依赖；runner 的 `DT_NEEDED` 之外，Dart 侧按名
   `dlopen` 的 Flutter 插件（`libcnativeapi.so` 等）也会显式 `--library`
   传入，否则打包后启动报 `cannot open shared object file`。
+- **AppStream 元数据**：AppDir 里 `.desktop` 文件名必须等于组件 ID
+  （`awa.archoera.betastudio2.archoera_music.desktop`，与 deb/rpm/arch/nix/flatpak
+  一致），metainfo 以 `<id>.metainfo.xml` 安装，并额外提供同名
+  `<id>.appdata.xml` 别名——appimagetool 只按桌面文件名去找 appdata，缺了会打印
+  "AppStream upstream metadata is missing"。`appstreamcli validate` 应为
+  ✔（只有 developer-info 之类的 info 提示）。
 - **flatpak**：包装预构建 bundle（不源码构建），bundle 整体放 `/app`。
 - **nix**：`package.sh nix` 预置 flake 工作目录，由 NixOS 环境 `nix build`。
 
