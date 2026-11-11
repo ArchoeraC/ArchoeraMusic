@@ -25,7 +25,18 @@ Linux 依赖门禁见 [release-dependency-guard.md](release-dependency-guard.md)
 
 ## 2. Linux
 
-**统一入口** `packaging/linux/package.sh <格式> <bundle> <版本>`。任何格式在
+**构建与自包含**统一入口 `packaging/linux/build-release.sh`（Linux 专用）：
+
+```bash
+bash packaging/linux/build-release.sh all
+#   all = build → prepare → verify；任一步失败即整体失败
+#   build  : 原生模块（build-linux.sh）→ dart analyze → flutter build linux
+#   prepare: bundle-linux-runtime.sh 收拢运行库 + 许可文本 + 公钥
+#   verify : 依赖守卫 + 伴随库在包内 + Xvfb + LD_BIND_NOW 启动冒烟
+#   可选：--bundle <路径>  SKIP_BUILD=1  ARCHOERA_SMOKE_SECONDS=15
+```
+
+**安装包**统一入口 `packaging/linux/package.sh <格式> <bundle> <版本>`。任何格式在
 开头都会先跑 `app/tool/check_bundle_deps.sh`（NEEDED / `$ORIGIN` / 内嵌库实际
 解析位置 / `libssl`·`libcrypto`·`libcurl` 禁止项），不通过直接失败。
 
@@ -61,8 +72,9 @@ bash packaging/macos/build-release.sh all --arch arm64
 
 > **shell 约束**：macOS 自带 `/bin/bash` 永远是 **3.2**（Apple 因 GPLv3 不升级，
 > GitHub 的 macOS runner 同样是 3.2）。因此本仓库所有可能在 macOS 上执行的脚本
-> 都只用 3.2 语法；`app/tool/check_shell_compat.sh` 在 Linux 的 security-audit
-> 里提前拦截 `mapfile` / `declare -A` / `${v^^}` 之类的 4.x 写法。
+> 都只用 3.2 语法：禁用 `mapfile` / `readarray`、`declare -A` / `-n`、
+> `${v^^}` / `${v,,}`、`shopt -s globstar`，并且不要在 `set -u` 下展开可能为空
+> 的数组（用标量或先判长度）。改完在 Mac 上实跑一次。
 
 - **`.dmg`**：`hdiutil -format UDZO -fs HFS+` 打包一个临时舞台目录，内容为
   `ArchoeraMusic.app` + `应用程序` → `/Applications` 的符号链接 +
@@ -115,11 +127,11 @@ FFmpeg、NativeAOT、Rust/Go 模块均为单架构）。部署目标 macOS 14.0�
 ## 5. 本地打包怎么验证
 
 ```bash
-# Linux（本机 x64）
-cd app && flutter build linux --release && cd ..
-bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle
-bash app/tool/check_bundle_deps.sh   app/build/linux/x64/release/bundle
-bash app/tool/smoke_start_linux.sh   app/build/linux/x64/release/bundle
+# Linux（本机 x64）：构建 + 自包含 + 守卫 + 冒烟一条龙
+bash packaging/linux/build-release.sh all
+# 只重跑自包含/守卫（已构建过）
+SKIP_BUILD=1 bash packaging/linux/build-release.sh all
+# 打安装包
 DISTRO_TAG=ubuntu24.04 bash packaging/linux/package.sh deb \
   app/build/linux/x64/release/bundle 1.0.6
 bash packaging/linux/package.sh appimage app/build/linux/x64/release/bundle 1.0.6
