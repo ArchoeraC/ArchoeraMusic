@@ -7,8 +7,8 @@
 #      「系统库允许清单」；未登记的系统依赖直接失败，逼开发者显式决策。
 #   2. 已内嵌的库必须**实际解析到 bundle 内**（防止 RUNPATH 丢失后被构建机的
 #      系统库静默顶替——同一产物换发行版就会启动失败）。
-#   3. 禁止直接依赖 libssl / libcrypto（本项目已改为 Rust staticlib + 托管 MD5；
-#      系统 libcurl 的 TLS 由发行版/AppImage 自行处理）。
+#   3. 禁止直接依赖 libssl / libcrypto / libcurl（加密为 Rust staticlib、
+#      HTTP 为 reqwest + rustls、scanner 曲目 id 为托管 MD5）。
 #   4. RUNPATH 只允许 $ORIGIN 相对路径，防止把构建机绝对路径带进产物
 #      （rpm/arch 的 check-rpaths 也会因此报错）。
 #   5. 检查 NativeAOT 通过 dlopen 使用的伴随库（libe_sqlite3）与关键可执行文件。
@@ -57,9 +57,11 @@ libdir="$bundle/lib"
 
 # 系统库允许清单：仅 ABI 稳定、必须与系统共享的库。
 # 新增第三方系统依赖时，先在 PR 里评估；能内嵌就内嵌，必须系统提供才加到这里。
-readonly ALLOW_RE='^(ld-linux[^/]*\.so\..*|libc\.so\..*|libm\.so\..*|libpthread\.so\..*|libdl\.so\..*|librt\.so\..*|libresolv\.so\..*|libutil\.so\..*|libcrypt\.so\..*|libgcc_s\.so\..*|libstdc\+\+\.so\..*|libatomic\.so\..*|libgomp\.so\..*|libgtk-3\.so\..*|libgdk-3\.so\..*|libgdk_pixbuf-2\.0\.so\..*|libglib-2\.0\.so\..*|libgobject-2\.0\.so\..*|libgio-2\.0\.so\..*|libpango-1\.0\.so\..*|libpangocairo-1\.0\.so\..*|libcairo\.so\..*|libcairo-gobject\.so\..*|libharfbuzz\.so\..*|libatk-1\.0\.so\..*|libepoxy\.so\..*|libfontconfig\.so\..*|libfreetype\.so\..*|libz\.so\..*|libX11\.so\..*|libXext\.so\..*|libXi\.so\..*|libXfixes\.so\..*|libXrender\.so\..*|libxcb\.so\..*|libxkbcommon\.so\..*|libwayland-client\.so\..*|libwayland-cursor\.so\..*|libwayland-egl\.so\..*|libGL[^/]*\.so\..*|libEGL\.so\..*|libgbm\.so\..*|libdrm\.so\..*|libexpat\.so\..*|libpng16\.so\..*|libbrotli[^/]*\.so\..*|libgraphite2\.so\..*|libpixman-1\.so\..*|libthai\.so\..*|libdatrie\.so\..*|libfribidi\.so\..*|libffi\.so\..*|libpcre2-8\.so\..*|libuuid\.so\..*|libmount\.so\..*|libblkid\.so\..*|libselinux\.so\..*|libsystemd\.so\..*|libdbus-1\.so\..*|libcloudproviders\.so\..*|libcurl\.so\..*|libsqlite3\.so\..*)$'
+readonly ALLOW_RE='^(ld-linux[^/]*\.so\..*|libc\.so\..*|libm\.so\..*|libpthread\.so\..*|libdl\.so\..*|librt\.so\..*|libresolv\.so\..*|libutil\.so\..*|libcrypt\.so\..*|libgcc_s\.so\..*|libstdc\+\+\.so\..*|libatomic\.so\..*|libgomp\.so\..*|libgtk-3\.so\..*|libgdk-3\.so\..*|libgdk_pixbuf-2\.0\.so\..*|libglib-2\.0\.so\..*|libgobject-2\.0\.so\..*|libgio-2\.0\.so\..*|libpango-1\.0\.so\..*|libpangocairo-1\.0\.so\..*|libcairo\.so\..*|libcairo-gobject\.so\..*|libharfbuzz\.so\..*|libatk-1\.0\.so\..*|libepoxy\.so\..*|libfontconfig\.so\..*|libfreetype\.so\..*|libz\.so\..*|libX11\.so\..*|libXext\.so\..*|libXi\.so\..*|libXfixes\.so\..*|libXrender\.so\..*|libxcb\.so\..*|libxkbcommon\.so\..*|libwayland-client\.so\..*|libwayland-cursor\.so\..*|libwayland-egl\.so\..*|libGL[^/]*\.so\..*|libEGL\.so\..*|libgbm\.so\..*|libdrm\.so\..*|libexpat\.so\..*|libpng16\.so\..*|libbrotli[^/]*\.so\..*|libgraphite2\.so\..*|libpixman-1\.so\..*|libthai\.so\..*|libdatrie\.so\..*|libfribidi\.so\..*|libffi\.so\..*|libpcre2-8\.so\..*|libuuid\.so\..*|libmount\.so\..*|libblkid\.so\..*|libselinux\.so\..*|libsystemd\.so\..*|libdbus-1\.so\..*|libcloudproviders\.so\..*|libsqlite3\.so\..*)$'
 
-readonly FORBID_RE='^(libssl|libcrypto)\.so(\..*)?$'
+# 禁止项：OpenSSL 与 libcurl。scraper 的加密与 HTTP 都是内嵌 Rust 静态栈
+# （AES/RSA + reqwest/rustls），产物不应再出现这些库的任何 DT_NEEDED。
+readonly FORBID_RE='^(libssl|libcrypto|libcurl)\.so(\..*)?$'
 
 errors=0
 warnings=0
@@ -138,7 +140,7 @@ for f in "${elves[@]}"; do
     [[ -z "$n" ]] && continue
 
     if [[ "$n" =~ $FORBID_RE ]]; then
-      fail "$rel: 禁止直接依赖 $n（OpenSSL 不得直接链接/加载）"
+      fail "$rel: 禁止直接依赖 $n（OpenSSL/libcurl 不得直接链接/加载）"
       continue
     fi
 

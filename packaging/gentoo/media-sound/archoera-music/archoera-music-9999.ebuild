@@ -26,7 +26,6 @@ RDEPEND="
 	media-libs/fribidi
 	x11-libs/libX11
 	x11-libs/libXi
-	net-misc/curl
 	dev-db/sqlite
 	app-arch/xz-utils
 	sys-libs/zlib
@@ -34,8 +33,9 @@ RDEPEND="
 
 # FFmpeg（自建最小纯 LGPL）与 TagLib 已随包内嵌于 native/（RUNPATH=$ORIGIN），
 # 运行期不依赖系统 media-video/ffmpeg、media-libs/taglib。
-# libcurl 的 TLS 依赖由其自身依赖处理；scanner/indexer 的曲目 id 已改为
-# 纯托管 MD5（运行期不再 dlopen libssl），scraper 的加密为内嵌 Rust staticlib。
+# scanner/indexer 的曲目 id 已改为纯托管 MD5（运行期不再 dlopen libssl）；
+# scraper 的加密与 HTTP 均为内嵌 Rust staticlib（AES/RSA + reqwest/rustls），
+# 所以产物不再需要系统 libcurl / OpenSSL。
 S="${WORKDIR}/ArchoeraMusic-linux-x86_64"
 
 src_install() {

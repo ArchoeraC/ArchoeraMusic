@@ -30,7 +30,6 @@
   # 并带 RUNPATH=$ORIGIN，只依赖 libc/libm/libz（store 提供）。故不再需要
   # ffmpeg/taglib 的 buildInputs；这些内嵌 soname 由 $ORIGIN 解析，
   # autoPatchelfHook 对「store 里找不到」忽略即可（见 autoPatchelfIgnoreMissingDeps）。
-, curl # libcurl.so.4（scraper；其 TLS 依赖由 curl 自身 RUNPATH 解析）
 , sqlite # libsqlite3.so.0（scraper）
 , xz
 , zlib

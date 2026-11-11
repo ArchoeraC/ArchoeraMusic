@@ -22,6 +22,8 @@ use core::ffi::{c_char, c_int};
 use core::ptr;
 use std::slice;
 
+mod http;
+
 use aes::cipher::generic_array::GenericArray;
 use aes::cipher::{BlockEncrypt, KeyInit};
 use aes::Aes128;

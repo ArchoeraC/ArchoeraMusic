@@ -224,7 +224,7 @@ jobs:
         # dylib 收进 .app 并改写 install_name（自包含）。nasm 让 x86_64 FFmpeg
         # 启用汇编加速；缺省会自动 --disable-x86asm（Intel 上解码明显变慢）。
         run: |
-          brew install taglib curl openssl sqlite nlohmann-json pkg-config dylibbundler opus nasm
+          brew install taglib sqlite nlohmann-json pkg-config dylibbundler opus nasm
 
       # ───────────────────────── Windows（mingw / vcpkg）───────────────
       - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
@@ -766,7 +766,7 @@ jobs:
           # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
           sudo apt-get install -y \
             build-essential ninja-build pkg-config clang \
-            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libdbus-1-dev libx11-dev libxi-dev libopus-dev \
             patchelf nasm xvfb xauth libgl1-mesa-dri dbus
@@ -826,7 +826,7 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates build-essential cmake ninja-build pkg-config clang sudo \
-            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libopus-dev \
             libdbus-1-dev libx11-dev libxi-dev \
             patchelf nasm xvfb xauth libgl1-mesa-dri dbus \
@@ -873,7 +873,7 @@ jobs:
             git curl wget tar xz which findutils gzip unzip zip jq file \
             gcc gcc-c++ clang cmake ninja-build pkgconf-pkg-config make \
             patchelf nasm \
-            taglib-devel libcurl-devel openssl-devel sqlite-devel \
+            taglib-devel sqlite-devel \
             json-devel gtk3-devel dbus-devel libstdc++-devel libicu \
             opus-devel libX11-devel libXi-devel \
             xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers dbus-daemon \
@@ -920,7 +920,7 @@ jobs:
             base-devel fakeroot debugedit bzip2 gettext gnupg ncurses \
             git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
-            taglib curl openssl sqlite nlohmann-json opus \
+            taglib sqlite nlohmann-json opus \
             gtk3 dbus libx11 libxi xorg-server-xvfb xorg-xauth mesa
           # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -981,12 +981,13 @@ jobs:
         run: |
           sudo apt-get update
           # linuxdeploy 按 ldd 解析并收拢 app 的动态依赖：GTK / X11 / Xi / dbus /
-          # curl / ssl / sqlite / taglib 等运行时库必须存在，否则报
+          # sqlite / taglib 等运行时库必须存在，否则报
           # "Could not find dependency: libXXX.so.N" 直接失败；patchelf 供其改写 RUNPATH。
+          # scraper 的 HTTP 已内嵌（reqwest + rustls），libcurl/libssl 不再参与。
           # binutils：package.sh 的 BUILD-INFO 用 objdump 探测最低 glibc。
           sudo apt-get install -y binutils file patchelf \
             libgtk-3-dev libx11-dev libxi-dev libdbus-1-dev \
-            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            libsqlite3-dev libtag1-dev \
             xvfb xauth libgl1-mesa-dri dbus
           # GitHub Release 资产偶发 504：官方失败时走镜像；下载后校验确实是 ELF。
           fetch_asset() {

@@ -13,7 +13,6 @@
       ]
     },
     "taglib",
-    "curl",
     "sqlite3",
     "nlohmann-json",
     {

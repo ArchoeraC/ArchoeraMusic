@@ -4,7 +4,7 @@
 #
 #  在单个 bash 会话内完成全部原生模块编译（产物与 RID 单架构一致）：
 #    1. audio-engine : CMake（FFmpeg 解码/EQ/FFT + Rust tempo）
-#    2. scraper      : CMake（TagLib / curl；加密由内嵌 Rust staticlib 提供）
+#    2. scraper      : CMake（TagLib；加密与 HTTP 由内嵌 Rust staticlib 提供）
 #    3. scanner      : dotnet publish (NativeAOT) + libe_sqlite3
 #    4. indexer      : dotnet publish (NativeAOT, indexer-ffi) + libe_sqlite3
 #    5. vault        : cargo build（vault-rs，Rust 凭据保险库，单架构）
@@ -17,7 +17,7 @@
 #    - osx-arm64：Apple Silicon（默认）
 #    - osx-x64  ：Intel；需在 Intel 主机或已准备 x86_64 Homebrew/FFmpeg 依赖的环境
 #
-#  依赖（Homebrew 自建 FFmpeg/taglib/curl、CMake、Rust、Go、.NET）由 CI
+#  依赖（Homebrew 自建 FFmpeg/taglib、CMake、Rust、Go、.NET）由 CI
 #  workflow 提前安装或由本地开发环境提供，本脚本只做编译引导（幂等）。
 #
 #  注意：CMake 的 build/ 目录不区分架构；同一工作区切换 RID 前请清理各模块
@@ -70,7 +70,7 @@ if [ -n "$BREW_PREFIX" ]; then
   export CMAKE_PREFIX_PATH="$BREW_PREFIX${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
   export PKG_CONFIG_PATH="$BREW_PREFIX/opt/opus/lib/pkgconfig:$BREW_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 else
-  echo "[build-macos] 警告: 未检测到 Homebrew；scraper/audio-engine 需自行提供 taglib/curl/opus 依赖。" >&2
+  echo "[build-macos] 警告: 未检测到 Homebrew；scraper/audio-engine 需自行提供 taglib/opus 依赖。" >&2
 fi
 
 CMAKE_ARCH_ARGS=(-DCMAKE_OSX_ARCHITECTURES="$CMAKE_ARCH")
