@@ -124,9 +124,10 @@ for f in "${elves[@]}"; do
   )
   [[ ${#needed[@]} -eq 0 ]] && continue
 
-  # 不使用 LD_LIBRARY_PATH：让 ldd 完全按产物自身的 RUNPATH 解析，
-  # 这样「内嵌库存在但 RUNPATH 丢失」会直接暴露（而不是被环境变量掩盖）。
-  ldd_out="$(ldd "$f" 2>&1 || true)"
+  # 显式清掉构建环境里的 LD_LIBRARY_PATH（CI 会把最小 FFmpeg 前缀放进去），
+  # 让 ldd 完全按产物自身的 RUNPATH 解析，这样「内嵌库存在但 RUNPATH 丢失」
+  # 会直接暴露，而不是被环境变量掩盖成构建机路径。
+  ldd_out="$(env -u LD_LIBRARY_PATH -u LD_PRELOAD ldd "$f" 2>&1 || true)"
   if grep -q 'not found' <<<"$ldd_out"; then
     while IFS= read -r line; do
       fail "$rel: 依赖无法解析 → ${line#*$'\t'}"
