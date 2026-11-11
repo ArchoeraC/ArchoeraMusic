@@ -34,6 +34,10 @@ if [[ -z "$fmt" || -z "$bundle" || -z "$version" ]]; then
 fi
 bundle="$(cd "$bundle" && pwd)"
 
+# 发布依赖守卫（任何打包格式都先过一遍）：缺内嵌库、$ORIGIN 失效、
+# 未登记的系统依赖或 libssl/libcrypto 直接依赖都会在此失败。
+bash "$ROOT/app/tool/check_bundle_deps.sh" "$bundle"
+
 # 各包管理器对版本号的限制
 version_deb="$version"                    # deb 允许 . + -
 version_rpm="${version//[+-]/_}"          # rpm 不允许 '+' 与 '-'（- 分隔 version-release）
