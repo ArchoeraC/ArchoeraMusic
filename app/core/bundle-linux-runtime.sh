@@ -45,31 +45,50 @@ if [[ ${#targets[@]} -eq 0 ]]; then
   echo "提示: native/ 内未找到发行版敏感库，跳过闭包收拢" >&2
 fi
 
-collect_deps() {
-  local f
-  # LD_LIBRARY_PATH 指向 native/：优先解析 bundle 内**已内嵌**的库（尤其是自建
-  # 最小 FFmpeg）。否则 ldd 会命中系统 FFmpeg，把其整套视频/图像依赖闭包
-  # （libx264/x265/vpx/aom/jxl/rsvg/icu…，实测 +126MB）拖进来一并内嵌。
-  for f in "$@"; do
-    LD_LIBRARY_PATH="$native${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-      ldd "$f" 2>/dev/null || true
-  done | awk '/=>/ && $3 ~ /^\// {print $3}'
+is_elf() { readelf -h "$1" >/dev/null 2>&1; }
+
+# 只沿**直接 DT_NEEDED** 遍历，并且遇到 DENY_RE（系统库）就停止——
+# 不能使用 `ldd` 的全量传递闭包：那会把 libcurl 的 TLS/HTTP 栈
+# （libssl/libcrypto/libssh2/libnghttp2/ngtcp2/krb5…）整棵拖进 native/。
+# 这些库本身是系统提供的，内嵌它们的依赖既浪费体积，又会把构建机的
+# OpenSSL soname（如 .so.4）带进产物，换发行版后反而成为隐患。
+direct_needed() {
+  readelf -d "$1" 2>/dev/null | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' || true
 }
 
-# 迭代到不动点（ldd 已含传递闭包，多轮仅作保险）
-for _round in 1 2 3; do
-  [[ ${#targets[@]} -gt 0 ]] || break
-  before="$(find "$native" -maxdepth 1 -type f -printf '%f\n' | sort | md5sum)"
-  while IFS= read -r dep; do
-    [[ -n "$dep" ]] || continue
-    name="$(basename "$dep")"
-    [[ "$name" =~ $DENY_RE ]] && continue
-    [[ -e "$native/$name" ]] && continue
-    cp -L "$dep" "$native/$name"
-    echo "  + 内嵌 $name  (← $dep)"
-  done < <(collect_deps "${targets[@]}" | sort -u)
-  after="$(find "$native" -maxdepth 1 -type f -printf '%f\n' | sort | md5sum)"
-  [[ "$before" == "$after" ]] && break
+declare -A processed=()
+queue=()
+
+# 起点：发行版敏感库 + native/ 内已有的全部 ELF（FFmpeg / 模块库等）。
+for f in "${targets[@]}"; do queue+=("$f"); done
+while IFS= read -r -d '' f; do
+  is_elf "$f" && queue+=("$f")
+done < <(find "$native" -maxdepth 1 -type f -print0)
+
+while [[ ${#queue[@]} -gt 0 ]]; do
+  obj="${queue[0]}"
+  queue=("${queue[@]:1}")
+  [[ -n "${processed[$obj]:-}" ]] && continue
+  processed[$obj]=1
+
+  # 一次 ldd 取该对象的解析结果，但只处理它自己的直接 NEEDED。
+  ldd_out="$(ldd "$obj" 2>/dev/null || true)"
+  while IFS= read -r name; do
+    [[ -z "$name" ]] && continue
+    if [[ -e "$native/$name" ]]; then
+      queue+=("$native/$name")
+      continue
+    fi
+    [[ "$name" =~ $DENY_RE ]] && continue   # 系统库：不内嵌、不遍历其子树
+    path="$(awk -v n="$name" '$1==n && $2=="=>" {print $3; exit}' <<<"$ldd_out")"
+    [[ -n "$path" && "$path" != "not" && -f "$path" ]] || {
+      echo "警告: 无法解析 $name（来自 $(basename "$obj")），跳过" >&2
+      continue
+    }
+    cp -L "$path" "$native/$name"
+    echo "  + 内嵌 $name  (← $path)"
+    queue+=("$native/$name")
+  done < <(direct_needed "$obj")
 done
 
 # 归一化 RUNPATH：native/ 与 lib/ 下的 ELF 一律 $ORIGIN
