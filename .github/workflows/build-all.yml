@@ -536,64 +536,22 @@ jobs:
         shell: pwsh
         run: flutter build windows --release
 
-      # ─────────── Windows：Inno Setup 安装器（per-user 免 UAC）+ 便携 zip ───────────
+      # ─────────── Windows：装配 + 校验 + 打包（单脚本）───────────
+      # 逻辑全部在 packaging/windows/build-release.ps1（**Windows 专用**）：
+      #   bundle  : 放入防伪公钥（native/ 由 CMake install 填充）
+      #   verify  : 必需文件齐全 + 完整性清单覆盖 + dumpbin 导入表无构建机路径
+      #   package : 便携 zip + Inno Setup 安装器（默认 per-user 免 UAC）
       - name: Install Inno Setup (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
         run: choco install innosetup -y --no-progress
 
-      - name: Package Windows (Inno Setup installer + portable zip)
+      - name: Build Windows release (bundle + verify + package)
         if: matrix.os == 'windows'
         shell: pwsh
-        working-directory: ${{ github.workspace }}
         run: |
-          $ver = (Select-String -Path "app/pubspec.yaml" -Pattern '^version:').Line.Split(' ')[1].Trim()
-          # Inno 的 VersionInfoVersion 必须是四段数字：1.0.2+0 → 1.0.2.0
-          $verParts = $ver -split '\+'
-          $verNum = if ($verParts.Count -ge 2) { "$($verParts[0]).$($verParts[1])" } else { "$($verParts[0]).0" }
-          $rel = "app\build\windows\x64\runner\Release"
-          $out = "$PWD\build\windows-extra"
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
-
-          # 防伪公钥随包分发（供用户离线验签；私钥绝不入库/入包）
-          Copy-Item "app\tool\watermark_pub.pem" "$rel\ARCHOERA_PUBKEY.pem" -Force
-
-          # 便携 zip：Release 目录整体（含 native/、data/、插件 dll）
-          Compress-Archive -Path "$rel\*" -DestinationPath "$out\ArchoeraMusic-$ver-windows-x64-portable.zip" -Force
-
-          # Inno Setup 安装器（优先 PATH 内 iscc，其次 6.x 默认安装目录）
-          $iscc = Get-Command iscc -ErrorAction SilentlyContinue
-          if ($null -eq $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
-          else { $iscc = $iscc.Source }
-          & $iscc `
-            "/DVersion=$ver" `
-            "/DVersionNumeric=$verNum" `
-            "/DAppDir=$PWD\$rel" `
-            "/DOutputDir=$out" `
-            packaging\windows\archoera_music.iss
-          Get-ChildItem "$out"
-
-      - name: Verify EraSync kernel bundled (Windows)
-        if: matrix.os == 'windows'
-        # 硬校验：EraSync 内核 DLL 必须在 Release 目录（否则运行期加载 mediaengine 失败/闪退）
-        shell: pwsh
-        run: |
-          $p = "app\build\windows\x64\runner\Release\archoera_kernel.dll"
-          if (!(Test-Path $p)) { throw "archoera_kernel.dll 未打入 Windows 包（EraSync 内核缺失）" }
-          Write-Host "OK: $p"
-
-      - name: Verify indexer-ffi bundled (Windows)
-        if: matrix.os == 'windows'
-        # 硬校验：本地曲库搜索索引器 indexer-ffi.dll 及其 SQLite 依赖必须在
-        # Release/native/（CMake install 目标），否则 indexer 功能缺失。
-        shell: pwsh
-        run: |
-          $rel = "app\build\windows\x64\runner\Release"
-          foreach ($f in @("native\indexer-ffi.dll", "native\e_sqlite3.dll")) {
-            $p = Join-Path $rel $f
-            if (!(Test-Path $p)) { throw "$f 未打入 Windows 包（indexer 缺失）" }
-            Write-Host "OK: $p"
-          }
+          pwsh -NoProfile -File packaging/windows/build-release.ps1 all
+          Get-ChildItem build/windows-extra
 
       # ─────────────── macOS：装配 .app + 依赖守卫 + 打包 ──────────────
       # 全部逻辑收敛在 packaging/macos/build-release.sh（**macOS 专用**，只在
@@ -927,9 +885,8 @@ jobs:
           set -euo pipefail
           APPIMAGE="$(find dist/linux -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
           [ -n "$APPIMAGE" ] || { echo "::error::未找到 AppImage 产物"; exit 1; }
-          ARCHOERA_SMOKE_SECONDS=15 \
-            ARCHOERA_SMOKE_ARGS=--appimage-extract-and-run \
-            bash app/tool/smoke_start_linux.sh "$APPIMAGE"
+          # 复用 Linux 平台脚本的启动冒烟逻辑（解包后运行，无需 FUSE）
+          bash packaging/linux/build-release.sh smoke-appimage --appimage "$APPIMAGE"
       - name: Upload artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

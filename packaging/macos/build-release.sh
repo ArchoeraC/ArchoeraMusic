@@ -123,6 +123,260 @@ app_paths() {
   exe="$app/Contents/MacOS/$BIN"
 }
 
+# ─────────────────── install_name 归一化（内置）───────────────────
+# dylibbundler 只处理 -x 指定的库；downloader / transcoder / log / platform /
+# scanner / indexer 等模块的 install_name 仍带构建机路径，用户机加载必失败。
+# 统一把 LC_ID_DYLIB 与同目录可解析的 LC_LOAD_DYLIB 改写为 @loader_path/<name>。
+normalize_loadpaths() {
+  native_dir="$1"
+  nerrors=0
+  nchanged=0
+
+  is_build_path() {
+    case "$1" in
+      @*) return 1 ;;
+      /usr/lib/* | /System/Library/* | /System/iOSSupport/* | /bin/*) return 1 ;;
+      /*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  for dylib in "$native_dir"/*.dylib; do
+    [ -e "$dylib" ] || continue
+    file -b "$dylib" 2>/dev/null | grep -q 'Mach-O' || continue
+    base="$(basename "$dylib")"
+
+    cur_id="$(otool -D "$dylib" 2>/dev/null | tail -n +2 | head -1 || true)"
+    want_id="@loader_path/$base"
+    if [ -n "$cur_id" ] && [ "$cur_id" != "$want_id" ]; then
+      case "$cur_id" in
+        @rpath/* | @executable_path/* | /*)
+          if is_build_path "$cur_id" || [ "${cur_id#@rpath/}" != "$cur_id" ] || [ "${cur_id#@executable_path/}" != "$cur_id" ]; then
+            install_name_tool -id "$want_id" "$dylib"
+            echo "  id   $base: $cur_id → $want_id"
+            nchanged=$((nchanged + 1))
+          fi
+          ;;
+      esac
+    fi
+
+    while IFS= read -r ref; do
+      [ -n "$ref" ] || continue
+      [ "$ref" = "$cur_id" ] && continue
+      case "$ref" in
+        @loader_path/* | @executable_path/*) continue ;;
+        /usr/lib/* | /System/Library/* | /System/iOSSupport/*) continue ;;
+      esac
+
+      dep_base="$(basename "$ref")"
+      if is_build_path "$ref"; then
+        if [ -e "$native_dir/$dep_base" ]; then
+          install_name_tool -change "$ref" "@loader_path/$dep_base" "$dylib"
+          echo "  dep  $base: $ref → @loader_path/$dep_base"
+          nchanged=$((nchanged + 1))
+        else
+          echo "::error::$base: 依赖 $ref 不在 native/ 内（需先 dylibbundler 收拢或补内嵌）" >&2
+          nerrors=$((nerrors + 1))
+        fi
+        continue
+      fi
+
+      if [ "${ref#@}" = "$ref" ] && [ -e "$native_dir/$dep_base" ]; then
+        install_name_tool -change "$ref" "@loader_path/$dep_base" "$dylib"
+        echo "  dep  $base: $ref → @loader_path/$dep_base"
+        nchanged=$((nchanged + 1))
+      fi
+    done < <(otool -L "$dylib" 2>/dev/null | tail -n +2 | awk '{print $1}')
+  done
+
+  [ "$nerrors" -eq 0 ] || die "install_name 归一化失败：$nerrors 项错误"
+  log "install_name 归一化完成：$nchanged 处改写"
+}
+
+# ──────────────────── Mach-O 依赖守卫（内置）────────────────────
+# 1) 每个 LC_LOAD_DYLIB 必须是系统库 / @loader_path·@executable_path 相对路径
+#    （且目标存在）/ 同目录内嵌库 / 自身 install_name；
+# 2) 禁止构建机绝对路径（/Users/…、/opt/homebrew/…、/usr/local/…）；
+# 3) 禁止包内出现 libssl/libcrypto/libcurl（含 libcrypto.N.dylib 改名副本）；
+# 4) @rpath 必须能解析到包内；5) native/ 下每个 Mach-O 只允许目标架构；
+# 6) 关键文件齐全且原生清单覆盖全部 dylib。
+verify_deps() {
+  app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")"
+  app_paths
+  errors=0
+  system_refs=()
+
+  fail() {
+    echo "::error::$*" >&2
+    errors=$((errors + 1))
+  }
+  is_macho() { file -b "$1" 2>/dev/null | grep -q 'Mach-O'; }
+  is_system_path() {
+    case "$1" in
+      /usr/lib/* | /System/Library/* | /System/iOSSupport/* | /bin/*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  is_build_path() {
+    case "$1" in
+      @*) return 1 ;;
+      /*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  is_forbidden() {
+    case "$(basename "$1")" in
+      libssl* | libcrypto* | libcurl*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+  macho_arch() {
+    got="$(lipo -archs "$1" 2>/dev/null || true)"
+    if [ -z "$got" ]; then
+      desc="$(file -b "$1" 2>/dev/null || true)"
+      case "$desc" in
+        *universal* | *"fat file"*) got="universal" ;;
+        *arm64*) got="arm64" ;;
+        *x86_64*) got="x86_64" ;;
+      esac
+    fi
+    printf '%s' "$got"
+  }
+  id_name() { otool -D "$1" 2>/dev/null | tail -n +2 | head -1; }
+  rpaths_of() {
+    otool -l "$1" 2>/dev/null | awk '
+      /cmd LC_RPATH/ { want=1; next }
+      want && /path / { print $2; want=0 }'
+  }
+  resolve_refs() {
+    rdir="$1"
+    rref="$2"
+    robj="$3"
+    case "$rref" in
+      @loader_path/*) printf '%s\n' "$rdir/${rref#@loader_path/}" ;;
+      @executable_path/*) printf '%s\n' "$app/Contents/MacOS/${rref#@executable_path/}" ;;
+      @rpath/*)
+        while IFS= read -r rp; do
+          [ -n "$rp" ] || continue
+          case "$rp" in
+            @loader_path*) printf '%s\n' "$rdir/${rp#@loader_path}/${rref#@rpath/}" ;;
+            @executable_path)
+              printf '%s\n' "$app/Contents/MacOS/${rref#@rpath/}"
+              ;;
+            @executable_path/*)
+              printf '%s\n' "$app/Contents/MacOS/${rp#@executable_path}/${rref#@rpath/}"
+              ;;
+          esac
+        done < <(rpaths_of "$robj")
+        ;;
+      /*) printf '%s\n' "$rref" ;;
+      *) printf '%s\n' "$rdir/$rref" ;;
+    esac
+  }
+
+  require_file() { [ -e "$1" ] || fail "缺少发布必需文件：${1#"$app"/}"; }
+  require_file "$exe"
+  require_file "$native/archoera-audio-engine"
+  require_file "$native/archoera-vault"
+  require_file "$native/libarchoera_mediaengine.dylib"
+  require_file "$native/libarchoera_scraper.dylib"
+  require_file "$native/scanner-ffi.dylib"
+  require_file "$native/indexer-ffi.dylib"
+  require_file "$native/libe_sqlite3.dylib"
+  require_file "$native/ARCHOERA-NATIVE-MANIFEST.txt"
+
+  file_list="$(mktemp "${TMPDIR:-/tmp}/archoera-macos-guard.XXXXXX")"
+  trap 'rm -f "$file_list"' EXIT
+  find "$app/Contents/MacOS" "$native" -type f 2>/dev/null | LC_ALL=C sort > "$file_list" || true
+
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    is_macho "$f" || continue
+    rel="${f#"$app"/}"
+    fdir="$(dirname "$f")"
+
+    bundled_forbidden=0
+    if is_forbidden "$f"; then
+      fail "$rel: 包内出现 $(basename "$f")（加密/HTTP 已是内嵌 Rust 静态栈，不应内嵌 OpenSSL/libcurl）"
+      bundled_forbidden=1
+    fi
+
+    archs="$(macho_arch "$f")"
+    if [ -n "$arch" ] && [ "$archs" != "$arch" ]; then
+      fail "$rel: 架构为 '${archs:-<未知>}'，期望 '$arch'"
+    fi
+
+    self_id="$(id_name "$f")"
+
+    while IFS= read -r ref; do
+      [ -n "$ref" ] || continue
+      dep_base="$(basename "$ref")"
+
+      if [ "$bundled_forbidden" -eq 1 ]; then
+        continue    # 自身副本已按「包内出现」报过
+      fi
+      if is_forbidden "$ref"; then
+        fail "$rel: 禁止依赖 $ref（OpenSSL/libcurl 必须是内嵌 Rust 静态栈）"
+        continue
+      fi
+
+      [ -n "$self_id" ] && [ "$ref" = "$self_id" ] && continue
+      if [ "${ref#@}" = "$ref" ] && [ "${ref#/}" = "$ref" ] && [ "$dep_base" = "$(basename "$f")" ]; then
+        continue    # 裸名指向自己
+      fi
+
+      if is_system_path "$ref"; then
+        system_refs+=("$dep_base")
+        continue
+      fi
+      if is_build_path "$ref"; then
+        fail "$rel: 含构建机绝对路径 $ref（用户机不存在；需改写为 @loader_path 或内嵌）"
+        continue
+      fi
+
+      cands="$(resolve_refs "$fdir" "$ref" "$f")"
+      if [ -z "$cands" ]; then
+        fail "$rel: @rpath 引用 $ref 无法解析（dylib 缺 LC_RPATH 或 rpath 指向构建机）"
+        continue
+      fi
+      found=0
+      first=""
+      while IFS= read -r c; do
+        [ -n "$c" ] || continue
+        [ -z "$first" ] && first="$c"
+        if [ -e "$c" ]; then
+          found=1
+          break
+        fi
+      done <<CANDLIST
+$cands
+CANDLIST
+      if [ "$found" -eq 0 ]; then
+        fail "$rel: 依赖 $ref 无法解析（bundle 内缺少 ${first#"$app"/}）"
+      fi
+    done < <(otool -L "$f" 2>/dev/null | tail -n +2 | awk '{print $1}')
+  done < "$file_list"
+
+  manifest="$native/ARCHOERA-NATIVE-MANIFEST.txt"
+  if [ -f "$manifest" ]; then
+    for f in "$native"/*.dylib; do
+      [ -e "$f" ] || continue
+      grep -q "  $(basename "$f")\$" "$manifest" \
+        || fail "原生清单缺少 $(basename "$f")（清单未覆盖）"
+    done
+  fi
+
+  [ "$errors" -eq 0 ] || die "macOS 依赖守卫失败：$errors 项错误"
+
+  sysdeps="$app/Contents/ARCHOERA-SYSTEM-DEPS.txt"
+  if [ "${#system_refs[@]}" -gt 0 ]; then
+    printf '%s\n' "${system_refs[@]}" | sed '/^$/d' | LC_ALL=C sort -u > "$sysdeps"
+  else
+    : > "$sysdeps"
+  fi
+  log "依赖守卫通过：$(grep -c . "$sysdeps" 2>/dev/null || echo 0) 个系统库引用，架构 $arch"
+}
+
 # ───────────────────────────── bundle ─────────────────────────────
 do_bundle() {
   require_tools otool install_name_tool codesign lipo dylibbundler file
@@ -170,7 +424,7 @@ do_bundle() {
   # （downloader / transcoder / log / platform / scanner / indexer …）的
   # install_name 仍带 /Users/... 构建机路径，用户机加载必失败。
   log "install_name 归一化"
-  bash "$ROOT/app/tool/fix-macos-loadpaths.sh" "$native"
+  normalize_loadpaths "$native"
 
   # LGPL 合规：FFmpeg / TagLib 许可文本 + 聚合声明
   bash "$ROOT/app/core/bundle-licenses.sh" "$app/Contents"
@@ -196,7 +450,7 @@ do_verify() {
   app_paths
 
   log "verify: 依赖守卫（--arch $arch）"
-  bash "$ROOT/app/tool/check_bundle_deps_macos.sh" "$app" --arch "$arch"
+  verify_deps
 
   require_tools lipo otool
   fail=0

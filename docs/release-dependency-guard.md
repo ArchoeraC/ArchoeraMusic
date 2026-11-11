@@ -29,7 +29,7 @@ Linux 二进制通过「运行时按 soname 查找共享库」加载依赖。发
    用 `ldd` 的全量传递闭包，否则会把系统 `libcurl` 的 TLS/HTTP 栈
    （`libssl/libcrypto/libssh2/nghttp2/ngtcp2/krb5…`）整棵拖进产物。
 3. **只有 ABI 稳定的库才允许由系统提供**：当前允许清单见
-   `app/tool/check_bundle_deps.sh` 的 `ALLOW_RE`（glibc/GCC runtime、GTK3 栈、
+   `packaging/linux/build-release.sh` 的 `ALLOW_RE`（glibc/GCC runtime、GTK3 栈、
    X11/Wayland、`libdbus-1`、`libsqlite3` 等）。这些同时在打包 `depends` 中声明。
 4. **禁止直接依赖 `libssl` / `libcrypto`**。产物中已不存在任何 OpenSSL 使用
    路径：scraper 的加密（Rust staticlib）与 HTTP（`reqwest + rustls`）均静态
@@ -42,7 +42,7 @@ Linux 二进制通过「运行时按 soname 查找共享库」加载依赖。发
 ### 3.1 静态依赖守卫
 
 ```bash
-bash app/tool/check_bundle_deps.sh <bundle>
+bash packaging/linux/build-release.sh guard --bundle <bundle>
 ```
 
 逐 ELF 检查：
@@ -61,8 +61,10 @@ bash app/tool/check_bundle_deps.sh <bundle>
 ### 3.2 启动冒烟
 
 ```bash
-bash app/tool/smoke_start_linux.sh <bundle>
+bash packaging/linux/build-release.sh verify --bundle <bundle>
 ```
+（`verify` = 守卫 + 伴随库检查 + 冒烟；冒烟也可单独对 AppImage 执行：
+`bash packaging/linux/build-release.sh smoke-appimage --appimage <文件>`）
 
 在临时 `HOME` / `XDG_*` + Xvfb 虚拟显示下真实拉起 `archoera_music`：
 
@@ -87,18 +89,15 @@ bash app/tool/smoke_start_linux.sh <bundle>
 1. 先判断能否**内嵌**：能内嵌就加入 `bundle-linux-runtime.sh` 的收拢逻辑（不要改
    `DENY_RE` 放行），确认 `$ORIGIN` 生效。
 2. 必须由系统提供时：
-   - 在 `check_bundle_deps.sh` 的 `ALLOW_RE` 增加**精确 soname**；
+   - 在 `packaging/linux/build-release.sh` 的 `ALLOW_RE` 增加**精确 soname**；
    - 同步 `PKGBUILD` / `.spec` / deb `Depends` / `ebuild` / Nix / `vcpkg.json`
      的运行时依赖；
    - 在本文件第 2 节说明理由与 ABI 稳定性判断。
 3. 跑：
 
 ```bash
-# 本地：先按 CI 顺序构建并收拢运行库
-cd app && flutter build linux --release
-bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle
-bash app/tool/check_bundle_deps.sh   app/build/linux/x64/release/bundle
-bash app/tool/smoke_start_linux.sh   app/build/linux/x64/release/bundle
+# 本地：构建 → 装配 → 守卫 → 冒烟（一条命令）
+bash packaging/linux/build-release.sh all
 ```
 
 ## 6. 故障排查
@@ -114,12 +113,11 @@ bash app/tool/smoke_start_linux.sh   app/build/linux/x64/release/bundle
 
 ## 7. 后续待办
 
-- macOS：Mach-O 守卫 `app/tool/check_bundle_deps_macos.sh`（架构单一、无构建机
-  绝对路径、无 `libssl/libcrypto/libcurl` 含改名内嵌副本、`@loader_path/@rpath`
-  全可解析、原生清单覆盖）；`app/tool/fix-macos-loadpaths.sh` 归一化 install_name；
-  发行包为 DMG + zip，全部由 `packaging/macos/build-release.sh` 产出（macOS 专用
-  脚本，装配 + 守卫 + 打包一体；DMG 会挂载回读校验主可执行文件）。待补带 GUI 的
-  启动冒烟（CI 无 WindowServer 时需评估）；
+- macOS：`packaging/macos/build-release.sh` 内置 Mach-O 守卫 `verify_deps`
+  （架构单一、无构建机绝对路径、无 `libssl/libcrypto/libcurl` 含改名内嵌副本、
+  `@loader_path/@rpath` 全可解析、原生清单覆盖）与 `normalize_loadpaths`
+  （install_name 归一化）；发行包为 DMG + zip（DMG 会挂载回读校验主可执行文件）。
+  待补带 GUI 的启动冒烟（CI 无 WindowServer 时需评估）；
 - Windows：PE 导入表检查（`dumpbin /dependents`）+ `Start-Process` 存活冒烟；
 - AppImage：已对最终 `.AppImage`（`--appimage-extract-and-run`）做启动冒烟。
 
