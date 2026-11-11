@@ -73,7 +73,9 @@ else
   echo "[build-macos] 警告: 未检测到 Homebrew；scraper/audio-engine 需自行提供 taglib/opus 依赖。" >&2
 fi
 
-CMAKE_ARCH_ARGS=(-DCMAKE_OSX_ARCHITECTURES="$CMAKE_ARCH")
+# 标量而非数组：macOS 自带 bash 3.2 在 `set -u` 下展开空数组会报
+# unbound variable（与 build-ffmpeg-minimal.sh 里 x86asm_flag 同一原因）。
+CMAKE_ARCH_ARG="-DCMAKE_OSX_ARCHITECTURES=$CMAKE_ARCH"
 
 
 # 自研内核（EraAudio, Zig 静态库）须先于 audio-engine cmake 编译并落 zig-out/
@@ -89,12 +91,12 @@ fi
 
 echo "[build-macos] ===== audio-engine ($TARGET_ARCH) ====="
 cmake -S "$ROOT/audio-engine" -B "$ROOT/audio-engine/build" \
-  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
+  -DCMAKE_BUILD_TYPE=Release "$CMAKE_ARCH_ARG"
 cmake --build "$ROOT/audio-engine/build" -j"$JOBS"
 
 echo "[build-macos] ===== scraper ($TARGET_ARCH) ====="
 cmake -S "$ROOT/scraper" -B "$ROOT/scraper/build" \
-  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
+  -DCMAKE_BUILD_TYPE=Release "$CMAKE_ARCH_ARG"
 cmake --build "$ROOT/scraper/build" -j"$JOBS"
 
 echo "[build-macos] ===== scanner (NativeAOT, RID=$RID) ====="
@@ -130,13 +132,13 @@ bash "$ROOT/subsonic/build.sh"
 # CMake 构建（ObjC++ + AppKit/MediaPlayer/Foundation），产物落 build/out/。
 echo "[build-macos] ===== platform bridge (CMake ObjC++, $TARGET_ARCH) ====="
 cmake -S "$ROOT/../native/platform" -B "$ROOT/../native/platform/build" \
-  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
+  -DCMAKE_BUILD_TYPE=Release "$CMAKE_ARCH_ARG"
 cmake --build "$ROOT/../native/platform/build" -j"$JOBS"
 
 # 统一日志核心（libarchoera_log，C；Dart 载入后注入各原生层的 sink）。
 echo "[build-macos] ===== log core (CMake C, $TARGET_ARCH) ====="
 cmake -S "$ROOT/../native/log" -B "$ROOT/../native/log/build" \
-  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
+  -DCMAKE_BUILD_TYPE=Release "$CMAKE_ARCH_ARG"
 cmake --build "$ROOT/../native/log/build" -j"$JOBS"
 
 # 内嵌原生 CLI（archoerashell）：Rust staticlib，由 Runner.xcodeproj 的

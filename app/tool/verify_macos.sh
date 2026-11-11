@@ -102,7 +102,9 @@ fail=0
 for ARCH in $ARCHS; do
   TARGET="${ARCH}-apple-macos${MIN_MACOS}"
   echo "===== $TARGET ====="
-  objs=()
+  # bash 3.2 + set -u：空数组展开 "${objs[@]}" 会报 unbound variable 并中止，
+  # 故这里累积成字符串（文件名经 %q 转义后按需展开）。
+  objs_args=""
   # core / apl（纯 C++）
   for f in core apl; do
     o="$BUILD_DIR/${ARCH}_${f}.o"
@@ -110,7 +112,7 @@ for ARCH in $ARCHS; do
         -DARCHOERA_PLATFORM_BUILD \
         -I "$PLATFORM_DIR/include" -I "$PLATFORM_DIR/src" \
         -c "$PLATFORM_DIR/src/$f.cpp" -o "$o"; then
-      objs+=("$o")
+      objs_args="$objs_args $(printf '%q' "$o")"
     else
       echo "  编译失败: $f.cpp"; fail=1
     fi
@@ -121,7 +123,7 @@ for ARCH in $ARCHS; do
       -DARCHOERA_PLATFORM_BUILD \
       -I "$PLATFORM_DIR/include" -I "$PLATFORM_DIR/src" \
       -c "$PLATFORM_DIR/src/backend_macos.mm" -o "$o"; then
-    objs+=("$o")
+    objs_args="$objs_args $(printf '%q' "$o")"
   else
     echo "  编译失败: backend_macos.mm"; fail=1
   fi
@@ -131,7 +133,7 @@ for ARCH in $ARCHS; do
       -fuse-ld=lld -dynamiclib \
       -framework Foundation -framework AppKit -framework MediaPlayer \
       -framework UserNotifications -framework CoreFoundation \
-      "${objs[@]}" -o "$dylib"; then
+      $objs_args -o "$dylib"; then
     echo "  → OK  $(file -b "$dylib" | cut -d, -f1-2)"
   else
     echo "  链接失败"; fail=1
