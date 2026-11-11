@@ -14,7 +14,7 @@
 #  ├─ linux-appimage(needs linux-deb)     : AppImage（linuxdeploy 收拢动态依赖）
 #  ├─ linux-flatpak (needs linux-deb)     : .flatpak（包装预构建 bundle）
 #  ├─ linux-nix     (独立源构建)          : NixOS flake 产物 tar.gz（nixpkgs 工具链）
-#  ├─ build         (matrix macos/windows): .app / Inno Setup installer+portable zip
+#  ├─ build         (matrix macos/windows): macOS DMG+zip / Inno Setup installer+portable zip
 #  └─ release       (needs 全部；tag v* 触发)
 #
 #  产物文件名带发行版标识（如 ArchoeraMusic-v<ver>-ubuntu24.04-x86_64.deb、
@@ -719,12 +719,26 @@ jobs:
           "$APP/Contents/MacOS/archoera_music" archoerashell --version
           echo "OK: macOS $EXPECTED 单架构 + native/ 加载验证通过"
 
-      - name: Upload artifact (macOS .app)
+      # macOS 发行包：DMG（拖拽安装）+ zip（便携）。打包前已在「Verify macOS
+      # bundle architecture & load」步骤校验过单架构、native/ 加载与 shell。
+      # 未做 Developer ID 签名/公证（无付费证书），镜像内附首次打开说明。
+      - name: Package macOS (DMG + zip)
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="$(grep '^version:' app/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)"
+          bash packaging/macos/package.sh dmg \
+            "app/build/macos/Build/Products/Release/archoera_music.app" \
+            "$VER" "${{ matrix.arch }}"
+          ls -la dist/macos
+
+      - name: Upload artifact (macOS DMG + zip)
         if: matrix.os == 'macos'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-${{ matrix.artifact }}
-          path: app/build/macos/Build/Products/Release/archoera_music.app
+          path: dist/macos/*
           if-no-files-found: error
 
       - name: Upload artifact (Windows runner Release)
@@ -1240,8 +1254,8 @@ jobs:
           test -d artifacts/ArchoeraMusic-linux-appimage  # Linux AppImage
           test -d artifacts/ArchoeraMusic-linux-flatpak   # Linux .flatpak
           test -d artifacts/ArchoeraMusic-linux-nix       # Linux NixOS tar.gz
-          test -d artifacts/ArchoeraMusic-macos-arm64     # macOS arm64 .app
-          test -d artifacts/ArchoeraMusic-macos-x64       # macOS x86_64 .app
+          test -d artifacts/ArchoeraMusic-macos-arm64     # macOS arm64 DMG + zip
+          test -d artifacts/ArchoeraMusic-macos-x64       # macOS x86_64 DMG + zip
           test -d artifacts/ArchoeraMusic-windows-x64     # Windows runner Release
           test -d artifacts/ArchoeraMusic-windows-extra   # Windows installer + portable
           mkdir -p assets
@@ -1261,11 +1275,11 @@ jobs:
           while IFS=: read -r fp _; do
             chmod +x "$fp"
           done < <(find artifacts -type f -exec file {} + | grep -i 'ELF\|Mach-O')
-          # macOS / Windows 目录型产物压成单文件归档（tar 三端可解）
-          for a in arm64 x64; do
-            tar -czf "assets/ArchoeraMusic-${VER}-macos-$a.tar.gz" \
-              -C "artifacts/ArchoeraMusic-macos-$a" .
-          done
+          # macOS：DMG + zip 已由 packaging/macos/package.sh 产出（DMG 可直接
+          # 拖入「应用程序」，zip 便于不支持挂载的环境），直接作为独立 asset。
+          cp artifacts/ArchoeraMusic-macos-arm64/* assets/
+          cp artifacts/ArchoeraMusic-macos-x64/* assets/
+          # Windows 目录型产物压成单文件归档（tar 三端可解）
           tar -czf "assets/ArchoeraMusic-${VER}-windows-x64.tar.gz" \
             -C artifacts/ArchoeraMusic-windows-x64 .
           # Linux 原始 bundle 与 package.sh tar 纯二进制内容一致，不再重复出包

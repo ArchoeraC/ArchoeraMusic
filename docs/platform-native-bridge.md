@@ -114,8 +114,11 @@ Linux 本机与 Dart 测试都看不见——对应后端在 Linux 上根本不�
 | macOS | **arm64 / x86_64** | 两架构**分别构建、分别发包**；x86_64 为维护模式，要求 macOS 14+ |
 
 - **Windows 32 位（x86）**：Flutter 平台限制（无 32 位构建），**放弃**。
-- **macOS Intel（x86_64）**：自 2026-11-06 起提供独立单架构包
-  （`ArchoeraMusic-<ver>-macos-x64.tar.gz`）。不构建 universal：`native/` 下
+- **macOS 发行包（2026-11 起）**：每个架构同时提供
+  `ArchoeraMusic-<ver>-macos-<arm64|x64>.dmg`（拖拽安装镜像，含 `应用程序`
+  快捷方式与首次打开说明）与 `.zip`（`ditto` 保留符号链接/可执行位，便携解压）。
+  由 `packaging/macos/package.sh` 生成；未做 Developer ID 签名与公证（无付费
+  证书），首次打开需右键「打开」，详见镜像内说明。不构建 universal：`native/` 下
   FFmpeg、scanner/indexer NativeAOT、Rust/Go 模块均按单架构产出，universal
   会显著增加构建复杂度，且 Flutter 已在弃用 universal。
   - 部署目标统一为 **macOS 14.0**（原生依赖 Homebrew/FFmpeg 的实际下限；
