@@ -54,6 +54,11 @@ cd app/core/vault-rs && ./build-test.sh && ./test.sh
 ```
 
 - 改 `app/lib/l10n/*.arb` 后跑 `flutter gen-l10n`，并先跑一次 shell 的 `cargo test`（`build.rs` 从 ARB 生成帮助文案）。
+- **设置搜索索引是生成的，不要手改**：`app/lib/settings/settings/settings_search_index.g.dart` 由 `app/tool/gen_settings_search_index.dart` 扫描设置源码生成（各平台构建脚本会在 `flutter build` 前自动跑）。改了设置项标题/新增设置项后跑：
+  ```bash
+  cd app && dart run tool/gen_settings_search_index.dart
+  ```
+  漏跑只会让新增项暂时搜不到，不会「搜到跳不过」（无效条目不参与索引）。
 - 改了 Zig 内核，构建前先 `rm -f app/core/audio-engine/build/libarchoera_kernel.a`，否则 CMake 会复用旧库。
 - `gen_testdata.sh` 仅在确认容器格式未变时执行（黄金夹具是字节兼容锚点）。
 - 命令行实现只有 Rust 一份；`flutter build` 会自动编译该 staticlib。Windows REPL/脚本用 `archoerashell.exe`；细节见 `docs/mcp.md` §6。

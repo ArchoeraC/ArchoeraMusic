@@ -25,6 +25,13 @@ JOBS="$(nproc)"
 # 自研内核（EraAudio, Zig 静态库）须先于 audio-engine cmake 编译并落 zig-out/
 # （engine CMake 复制 zig-out/lib/libarchoera_kernel.a 链接；kernel 改动后
 #   必须重跑本步，否则陈旧产物会让 EraAudio 行为异常——见 docs/engine-integration-bench.md）
+# ── 设置搜索索引：由设置源码生成（声明式，无需手工登记）─────────────
+# 必须在 flutter build / dart analyze 之前生成，否则索引会落后于设置页。
+if command -v dart >/dev/null 2>&1 && [ -f "$ROOT/../tool/gen_settings_search_index.dart" ]; then
+  echo "[build-linux] ===== 生成设置搜索索引 ====="
+  (cd "$ROOT/.." && dart run tool/gen_settings_search_index.dart) || exit 1
+fi
+
 if command -v zig >/dev/null 2>&1; then
   echo "[build-linux] ===== audio-engine: zig kernel (ReleaseFast) ====="
   # -Dcpu=baseline：内核必须按 x86-64 基线指令集编译。否则 Zig 默认按**构建机
