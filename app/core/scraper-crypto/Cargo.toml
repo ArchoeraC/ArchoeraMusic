@@ -1,9 +1,9 @@
 [package]
 name = "archoera-scraper-crypto"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "ArchoeraMusic 刮削器加密后端（AES / RSA 模幂 / 摘要 / 随机数），替代 OpenSSL::Crypto"
+description = "ArchoeraMusic 刮削器原生后端：加密（AES / RSA 模幂 / 摘要 / 随机数）+ HTTP（rustls）"
 publish = false
 
 [lib]
@@ -18,6 +18,13 @@ md-5 = "0.10"
 sha1 = "0.10"
 num-bigint = "0.4"
 getrandom = "0.2"
+
+# ====== HTTP（替代系统 libcurl）======
+# 与 downloader 同栈：reqwest + rustls（aws-lc-rs 提供者），证书校验走
+# rustls-platform-verifier（Linux 读 OpenSSL 默认 CA 路径、Windows CryptoAPI、
+# macOS Keychain），行为对齐 libcurl 的"系统 CA"语义。
+# 不使用 native-tls：那会重新引入 libssl/OpenSSL 的系统依赖。
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls", "system-proxy", "http2", "gzip", "deflate"] }
 
 [profile.release]
 lto = true

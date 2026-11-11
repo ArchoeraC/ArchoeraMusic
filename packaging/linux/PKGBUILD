@@ -32,10 +32,9 @@ depends=(
   # 引擎/ scraper 的运行库已随 bundle 内嵌并带 RUNPATH=$ORIGIN：引擎用自建
   # 最小 FFmpeg（不依赖系统 ffmpeg），scraper 的 TagLib 也一并内嵌；taglib
   # 保留作兜底（其自身依赖 zlib/gcc-libs 已在列表中）。scanner/indexer 的
-  # 曲目 id 已改为纯托管 MD5，运行期不再 dlopen libssl；系统 libcurl 的 TLS
-  # 依赖由 pacman 按其自身依赖处理。
+  # 曲目 id 已改为纯托管 MD5，运行期不再 dlopen libssl；scraper 的 HTTP 已
+  # 迁到内嵌 Rust（reqwest + rustls），不再链接系统 libcurl/OpenSSL。
   'taglib'
-  'curl'
   'sqlite'
   'xz'
   'zlib'

@@ -61,7 +61,7 @@ MPL-1.1 / 公有领域）。
 | indexer（C#） | `ToolGood.Words` 3.1.0.3 | **Apache-2.0** | 汉字转拼音（词级多音字）、繁简 / 全角互换 |
 | indexer（C#） | `Microsoft.Data.Sqlite` 10.0.12 | MIT | SQLite 的 ADO.NET 提供程序 |
 | indexer（C#） | `SQLitePCLRaw.lib.e_sqlite3` 3.53.3 | **Apache-2.0** | 原生 SQLite（含 FTS5，公有领域），随 FFI 分发 |
-| scraper（C++） | Rust 加密后端（`aes` / `md-5` / `sha1` / `num-bigint` / `getrandom` 等） | MIT OR Apache-2.0 | 替代系统 OpenSSL；staticlib **静态合并**进 `libarchoera_scraper`，逐项见 `app/core/scraper-crypto/THIRD-PARTY-LICENSES.md` |
+| scraper（C++） | Rust 后端（加密：`aes` / `md-5` / `sha1` / `num-bigint` / `getrandom`；HTTP：`reqwest` / `rustls` / `aws-lc-rs` 等） | MIT OR Apache-2.0（TLS 部分含 ISC） | 替代系统 OpenSSL 与 libcurl；staticlib **静态合并**进 `libarchoera_scraper`，逐项见 `app/core/scraper-crypto/THIRD-PARTY-LICENSES.md` |
 
 > 本地曲库搜索索引器另内嵌由 Unicode 数据离线生成的查询表（`data/nfkc.tsv`、
 > `data/def_en2hanzi.tsv`、`data/def_hanzi2en.tsv`、`data/ja_readings.tsv`，派生自
