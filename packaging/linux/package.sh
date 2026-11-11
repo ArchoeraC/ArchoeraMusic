@@ -202,12 +202,19 @@ pkg_appimage() {
   cp -a "$stage_bundle/." "$appdir/usr/bin/"
   chmod +x "$appdir/usr/bin/$BIN"
 
-  sed "s|@EXEC@|$BIN %U|g" "$HERE/archoera-music.desktop.in" \
-    > "$appdir/usr/share/applications/archoera-music.desktop"
+  # 桌面条目文件名 = 应用 ID，与 deb/rpm/arch/nix/flatpak 安装后的名字一致；
+  # AppStream 要求 metainfo 的 <id> / <launchable> 与 .desktop 文件名对齐，
+  # 否则 appimagetool 会报 "AppStream upstream metadata is missing"。
+  local desktop="$appdir/usr/share/applications/$APP_ID.desktop"
+  sed "s|@EXEC@|$BIN %U|g" "$HERE/archoera-music.desktop.in" > "$desktop"
   cp "$stage_icons/hicolor/512x512/apps/$APP_ID.png" \
     "$appdir/usr/share/icons/hicolor/512x512/apps/$APP_ID.png"
   install -m644 "$stage_metainfo" \
     "$appdir/usr/share/metainfo/$APP_ID.metainfo.xml"
+  # appimagetool 只查找 <桌面文件名>.appdata.xml（旧扩展名）；给同一份元数据
+  # 建别名，文件名仍等于组件 ID，不会触发「文件名与组件 ID 不一致」告警。
+  ln -sf "$APP_ID.metainfo.xml" \
+    "$appdir/usr/share/metainfo/$APP_ID.appdata.xml"
 
   # linuxdeploy 装配：收拢可执行文件与发行版敏感库的动态依赖，生成 AppRun。
   # LINUXDEPLOY 由 CI 传入（linuxdeploy-x86_64.AppImage）；缺失时退化为纯拷贝
@@ -232,7 +239,7 @@ pkg_appimage() {
     "$ld" --appdir "$appdir" \
       --executable "$appdir/usr/bin/$BIN" \
       "${lib_args[@]}" \
-      --desktop-file "$appdir/usr/share/applications/archoera-music.desktop" \
+      --desktop-file "$desktop" \
       --icon-file "$appdir/usr/share/icons/hicolor/512x512/apps/$APP_ID.png"
   else
     echo "警告: 未提供 LINUXDEPLOY，AppImage 不收拢依赖（仅构建机同系发行版可用）" >&2
