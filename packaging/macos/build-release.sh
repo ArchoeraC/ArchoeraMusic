@@ -85,7 +85,7 @@ default_arch() {
 [ -n "$arch" ] || arch="$(default_arch)"
 case "$arch" in
   arm64|x86_64) ;;
-  *) echo "错误: --arch 只支持 arm64 / x86_64（收到 $arch）" >&2; exit 2 ;;
+  *) echo "错误: --arch 只支持 arm64 / x86_64（收到 ${arch}）" >&2; exit 2 ;;
 esac
 
 if [ -z "$version" ]; then
@@ -100,7 +100,7 @@ require_tools() {
   for t in "$@"; do
     command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
   done
-  [ -z "$missing" ] || die "缺少工具:$missing（Xcode Command Line Tools / Homebrew）"
+  [ -z "$missing" ] || die "缺少工具:${missing}（Xcode Command Line Tools / Homebrew）"
 }
 
 # 单一架构名（arm64 / x86_64）；非单架构时原样返回（供报错展示）。
@@ -316,7 +316,7 @@ verify_deps() {
         continue    # 自身副本已按「包内出现」报过
       fi
       if is_forbidden "$ref"; then
-        fail "$rel: 禁止依赖 $ref（OpenSSL/libcurl 必须是内嵌 Rust 静态栈）"
+        fail "$rel: 禁止依赖 ${ref}（OpenSSL/libcurl 必须是内嵌 Rust 静态栈）"
         continue
       fi
 
@@ -330,7 +330,7 @@ verify_deps() {
         continue
       fi
       if is_build_path "$ref"; then
-        fail "$rel: 含构建机绝对路径 $ref（用户机不存在；需改写为 @loader_path 或内嵌）"
+        fail "$rel: 含构建机绝对路径 ${ref}（用户机不存在；需改写为 @loader_path 或内嵌）"
         continue
       fi
 
@@ -380,11 +380,11 @@ CANDLIST
 # ───────────────────────────── bundle ─────────────────────────────
 do_bundle() {
   require_tools otool install_name_tool codesign lipo dylibbundler file
-  [ -d "$app" ] || die "找不到 .app: $app（先跑 flutter build macos --release）"
+  [ -d "$app" ] || die "找不到 .app: ${app}（先跑 flutter build macos --release）"
   app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")"
   app_paths
 
-  log "bundle: $app（$arch）"
+  log "bundle: ${app}（${arch}）"
   mkdir -p "$native"
 
   copy_optional() {
@@ -449,7 +449,7 @@ do_verify() {
   app="$(cd "$(dirname "$app")" && pwd)/$(basename "$app")"
   app_paths
 
-  log "verify: 依赖守卫（--arch $arch）"
+  log "verify: 依赖守卫（--arch ${arch}）"
   verify_deps
 
   require_tools lipo otool
@@ -516,7 +516,7 @@ PY
   log "archoerashell --version"
   "$exe" archoerashell --version
 
-  log "verify 完成（$arch）"
+  log "verify 完成（${arch}）"
 }
 
 # ───────────────────────────── package ────────────────────────────

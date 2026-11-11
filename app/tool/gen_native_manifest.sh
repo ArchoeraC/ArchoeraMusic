@@ -80,4 +80,4 @@ done
 # 排序去重后落盘。
 sort -u "$TMP" > "$OUT"
 
-echo "[gen_native_manifest] 已生成 $OUT（$(wc -l < "$OUT" | tr -d ' ') 项）"
+echo "[gen_native_manifest] 已生成 ${OUT}（$(wc -l < "$OUT" | tr -d ' ') 项）"

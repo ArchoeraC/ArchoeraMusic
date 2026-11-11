@@ -22,7 +22,7 @@ PAYLOAD="${ARCHOERA_WM_PAYLOAD:-ARCHOERA DESIGNED|ArchoeraMusic|BetaStudio2|AGPL
 
 mkdir -p "$KEYDIR"
 if [ ! -f "$PRIV" ]; then
-  echo "[watermark] 生成新的 ECDSA P-256 私钥: $PRIV（请离线备份，切勿提交）"
+  echo "[watermark] 生成新的 ECDSA P-256 私钥: ${PRIV}（请离线备份，切勿提交）"
   openssl ecparam -name prime256v1 -genkey -noout -out "$PRIV"
   chmod 600 "$PRIV"
 fi
