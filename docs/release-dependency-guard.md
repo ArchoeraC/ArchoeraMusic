@@ -114,9 +114,11 @@ bash app/tool/smoke_start_linux.sh   app/build/linux/x64/release/bundle
 
 ## 7. 后续待办
 
-- macOS：已有单架构 / Homebrew 绝对路径 / `dlopen` 全部 FFI 库检查与
-  `archoerashell --version` 实跑；发行包为 DMG（打包脚本会挂载并校验 `.app` 主
-  可执行文件）+ zip。待补带 GUI 的启动冒烟（CI 无 WindowServer 时需评估）；
+- macOS：Mach-O 守卫 `app/tool/check_bundle_deps_macos.sh`（架构单一、无构建机
+  绝对路径、无 `libssl/libcrypto/libcurl` 含改名内嵌副本、`@loader_path/@rpath`
+  全可解析、原生清单覆盖）；`app/tool/fix-macos-loadpaths.sh` 归一化 install_name；
+  发行包为 DMG + zip（打包脚本会挂载并校验 `.app` 主可执行文件）。待补带 GUI 的
+  启动冒烟（CI 无 WindowServer 时需评估）；
 - Windows：PE 导入表检查（`dumpbin /dependents`）+ `Start-Process` 存活冒烟；
 - AppImage：已对最终 `.AppImage`（`--appimage-extract-and-run`）做启动冒烟。
 

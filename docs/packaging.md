@@ -60,6 +60,29 @@ bash packaging/macos/package.sh <archoera_music.app> <版本> <arm64|x64>
   会破坏链接结构）。
 - 另外写 `*.info.txt`（bundle id / 版本 / 架构），便于下游核对。
 
+**自包含处理顺序**（`build-all.yml` 的 "Bundle native libs into .app" 步骤）：
+
+1. 拷贝各模块产物到 `Contents/native/`；
+2. `dylibbundler` 收拢 `libarchoera_mediaengine.dylib`、`libarchoera_scraper.dylib`
+   以及引擎子进程 `archoera-audio-engine`（后者的 FFmpeg 来自 CI 自建前缀
+   `~/.local/ffmpeg-minimal/lib`，不收拢就带构建机绝对路径）；
+3. `app/tool/fix-macos-loadpaths.sh` 把所有 dylib 的 `LC_ID_DYLIB` 与可归一化的
+   `LC_LOAD_DYLIB` 改成 `@loader_path/<basename>`——dylibbundler 只管 `-x`
+   指定的库，downloader/transcoder/log/platform/scanner/indexer 等模块的
+   install_name 仍会是 `/Users/runner/...`；
+4. 重新 ad-hoc 签名（`codesign --force --deep --sign -`），因为改写 dylib 会使
+   原签名失效（Apple Silicon 拒载未签名库）；
+5. 生成 `ARCHOERA-NATIVE-MANIFEST.txt`（SEC-08，必须在 3/4 之后）；
+6. `app/tool/check_bundle_deps_macos.sh <app> --arch <arch>` 守卫：单一架构、
+   无构建机绝对路径、无 `libssl/libcrypto/libcurl`（含 `libcrypto.N.dylib`
+   这类改名内嵌副本）、`@loader_path/@rpath` 全部可解析、原生清单覆盖齐全。
+
+> 历史踩坑（已修）：旧产物里 `libarchoera_scraper.dylib` 同时依赖
+> `/usr/lib/libcurl.4.dylib` 和内嵌的 `libcrypto.4.dylib`（dylibbundler 顺着
+> Homebrew curl 收拢来的），而 `archoera-audio-engine` 的 FFmpeg 仍是
+> `/Users/runner/...` 绝对路径。现在 scraper 的 HTTP 已改为 Rust 静态栈，
+> 且上述守卫与 loadpath 归一化都在 CI 门禁里。
+
 **签名与公证**：当前**未做** Developer ID 签名与 Apple 公证（需付费证书）。
 因此首次打开会触发 Gatekeeper 拦截，用户须右键「打开」或在「系统设置 →
 隐私与安全性」点「仍要打开」——DMG 内已附说明。这属于已知限制，不视为打包

@@ -18,7 +18,8 @@
 # =====================================================================
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+# packaging/macos/ → 仓库根（上两级，不是三级：三级会指到工作区父目录）
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_NAME="ArchoeraMusic"
 BUNDLE_ID="com.archoera.archoeraMusic"
 DIST="$ROOT/dist/macos"
