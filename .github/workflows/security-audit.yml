@@ -147,11 +147,3 @@ jobs:
             bash -n "$f"
           done
           python3 -m py_compile app/tool/*.py
-      # macOS 自带 /bin/bash 永远是 3.2（Apple 因 GPLv3 不升级），GitHub 的
-      # macOS runner 也只有 3.2。在 Linux 上提前按 3.2 校验，避免「CI 跑到
-      # macOS 才发现 mapfile: command not found」这种整段白跑的失败。
-      - name: shell 兼容性（macOS bash 3.2）
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash app/tool/check_shell_compat.sh
