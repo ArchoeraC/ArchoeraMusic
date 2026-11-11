@@ -59,7 +59,7 @@ copy_manifest() {
     cp "$src" "$STAGE/src/$dir/"
   else
     # 缺失不致命，但要显式提示：对应生态会从 SBOM 里消失（回归信号）。
-    echo "[gen_sbom] 提示：缺少依赖清单 $src（该生态将不出现在 SBOM）" >&2
+    echo "[gen_sbom] 提示：缺少依赖清单 ${src}（该生态将不出现在 SBOM）" >&2
   fi
 }
 copy_manifest "$ROOT/app/pubspec.lock"                            dart

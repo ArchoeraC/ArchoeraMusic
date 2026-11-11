@@ -198,7 +198,7 @@ do_guard() {
         [ -n "$p" ] || continue
         case "$p" in
           '$ORIGIN'*) ;;
-          *) fail "$rel: RUNPATH 含非 \$ORIGIN 路径：$p（prepare 未归一化？）" ;;
+          *) fail "$rel: RUNPATH 含非 \$ORIGIN 路径：${p}（prepare 未归一化？）" ;;
         esac
       done
     done < <(readelf -d "$f" 2>/dev/null |
@@ -224,7 +224,7 @@ do_guard() {
       [ -n "$n" ] || continue
 
       if printf '%s' "$n" | grep -Eq "$FORBID_RE"; then
-        fail "$rel: 禁止直接依赖 $n（OpenSSL/libcurl 不得直接链接/加载）"
+        fail "$rel: 禁止直接依赖 ${n}（OpenSSL/libcurl 不得直接链接/加载）"
         continue
       fi
 
@@ -249,12 +249,12 @@ do_guard() {
       if [ -n "$local_target" ]; then
         case "$resolved" in
           "$bundle"/*) ;;
-          *) fail "$rel: 已内嵌 $n，但运行时解析到 ${resolved:-<未解析>}（\$ORIGIN 未生效？）" ;;
+          *) fail "$rel: 已内嵌 ${n}，但运行时解析到 ${resolved:-<未解析>}（\$ORIGIN 未生效？）" ;;
         esac
         soname="$(readelf -d "$local_target" 2>/dev/null |
           sed -n 's/.*(SONAME).*\[\(.*\)\]/\1/p' || true)"
         if [ -n "$soname" ] && [ "$soname" != "$n" ]; then
-          fail "$rel: 内嵌 $n 的 SONAME=$soname，与需求名不一致"
+          fail "$rel: 内嵌 $n 的 SONAME=${soname}，与需求名不一致"
         fi
         report_bundled+=("$n -> ${local_target#"$bundle"/}")
         continue
@@ -268,7 +268,7 @@ do_guard() {
         fi
       done
       if [ "$allowed" -eq 0 ]; then
-        fail "$rel: 未登记的系统依赖 $n（能内嵌就内嵌；确需系统提供请加入允许清单）"
+        fail "$rel: 未登记的系统依赖 ${n}（能内嵌就内嵌；确需系统提供请加入允许清单）"
       else
         report_system+=("$n")
       fi
@@ -365,7 +365,7 @@ smoke_run() {
     return 0
   fi
 
-  echo "启动冒烟失败：进程提前退出（rc=$rc）" >&2
+  echo "启动冒烟失败：进程提前退出（rc=${rc}）" >&2
   echo "--- 应用日志（尾部）---" >&2
   tail -80 "$logf" >&2
   exit 1
