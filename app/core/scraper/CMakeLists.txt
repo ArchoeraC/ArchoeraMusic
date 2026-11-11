@@ -199,7 +199,17 @@ elseif(APPLE)
     if(NOT ICONV_LIBRARY)
         message(FATAL_ERROR "scraper-crypto: macOS 上未找到 iconv（Rust std 依赖）")
     endif()
-    target_link_libraries(archoera_scraper PRIVATE "${ICONV_LIBRARY}")
+    # Rust HTTP 栈的 macOS 实现依赖系统框架：rustls-platform-verifier 走
+    # Security.framework（证书/钥匙串），reqwest 代理探测用 SystemConfiguration，
+    # tokio/CF 绑定用 CoreFoundation。静态库不会自动带入这些 -framework。
+    find_library(SECURITY_FRAMEWORK Security REQUIRED)
+    find_library(COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+    find_library(SYSTEMCONFIGURATION_FRAMEWORK SystemConfiguration REQUIRED)
+    target_link_libraries(archoera_scraper PRIVATE
+        "${ICONV_LIBRARY}"
+        "${SECURITY_FRAMEWORK}"
+        "${COREFOUNDATION_FRAMEWORK}"
+        "${SYSTEMCONFIGURATION_FRAMEWORK}")
 else()
     target_link_libraries(archoera_scraper PRIVATE pthread dl m)
     # 导出白名单：只暴露本项目的 C ABI（archoera_scraper_* / era_crypto_* /
@@ -216,23 +226,27 @@ else()
     target_include_directories(archoera_scraper PRIVATE ${SQLite3_INCLUDE_DIRS})
 endif()
 
-# ---------- 依赖守卫 ----------
+# ---------- 依赖守卫（仅 Linux/ELF）----------
 # 回归保护：scraper 不得再链接系统 libcurl / libssl / libcrypto（它们会让
 # 发行版 OpenSSL soname 升级直接打断已发布产物）。HTTP 走 Rust 静态栈。
-find_program(READELF_EXECUTABLE readelf)
-if(READELF_EXECUTABLE)
-    add_custom_command(TARGET archoera_scraper POST_BUILD
-        COMMAND ${CMAKE_COMMAND}
-            -DREADELF=${READELF_EXECUTABLE}
-            -DLIBRARY=$<TARGET_FILE:archoera_scraper>
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_http_deps.cmake"
-        # 去掉 .symtab（Rust std/hyper/rustls 的成千上万个局部符号）：发布包
-        # 从 ~3MB 增至 ~13MB，摘掉调试符号表可回收约 2.5MB，且不影响 unwinding
-        # （.eh_frame 保留）。动态符号表不受影响，FFI 导出照常可见。
-        COMMAND ${CMAKE_STRIP} --strip-unneeded --remove-section=.comment
-            "$<TARGET_FILE:archoera_scraper>"
-        COMMENT "strip archoera_scraper（保留动态符号表与 .eh_frame）"
-        VERBATIM)
+# 只对 ELF 生效：macOS（Mach-O）与 Windows（PE）的依赖检查由各自打包脚本负责，
+# 这里若在非 ELF 平台跑 readelf/strip 会直接报 "Not an ELF file"。
+if(UNIX AND NOT APPLE)
+    find_program(READELF_EXECUTABLE readelf)
+    if(READELF_EXECUTABLE)
+        add_custom_command(TARGET archoera_scraper POST_BUILD
+            COMMAND ${CMAKE_COMMAND}
+                -DREADELF=${READELF_EXECUTABLE}
+                -DLIBRARY=$<TARGET_FILE:archoera_scraper>
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_http_deps.cmake"
+            # 去掉 .symtab（Rust std/hyper/rustls 的成千上万个局部符号）：内嵌
+            # 静态栈后库从 ~3MB 增至 ~9.7MB，摘掉符号表可回收约 2.5MB，且不影响
+            # unwinding（.eh_frame 保留）。动态符号表不受影响，FFI 导出照常可见。
+            COMMAND ${CMAKE_STRIP} --strip-unneeded --remove-section=.comment
+                "$<TARGET_FILE:archoera_scraper>"
+            COMMENT "检查依赖并 strip archoera_scraper（保留动态符号表与 .eh_frame）"
+            VERBATIM)
+    endif()
 endif()
 
 # 安装目标
@@ -278,7 +292,9 @@ if(NOT WIN32)
     target_link_libraries(test_http PRIVATE "${SCRAPER_CRYPTO_LIB}")
     add_dependencies(test_http scraper_crypto)
     if(APPLE)
-        target_link_libraries(test_http PRIVATE "${ICONV_LIBRARY}")
+        target_link_libraries(test_http PRIVATE
+            "${ICONV_LIBRARY}" "${SECURITY_FRAMEWORK}"
+            "${COREFOUNDATION_FRAMEWORK}" "${SYSTEMCONFIGURATION_FRAMEWORK}")
     else()
         target_link_libraries(test_http PRIVATE pthread dl m)
     endif()
