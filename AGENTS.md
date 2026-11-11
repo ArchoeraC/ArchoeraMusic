@@ -60,8 +60,9 @@ cd app/core/vault-rs && ./build-test.sh && ./test.sh
 - Windows 自检：`zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseFast`；严格 MSVC 以 Windows CI 为准。新增 C/ABI 代码不得引入 `unistd.h`/POSIX-only API，线程原语走 `include/compat/pthread.h`。
 
 ### 禁止脚本混合（硬性）
-- **一个平台的构建/打包只用它自己的脚本**：macOS 一律走 `packaging/macos/build-release.sh`（`bundle` / `verify` / `package` / `all`），Windows 走 `build_windows.bat` + `packaging/windows/*.iss`，Linux 走 `packaging/linux/build-release.sh`（`build`/`prepare`/`verify`/`all`；内部调用 `app/core/build-linux.sh`）+ `packaging/linux/package.sh`（打 deb/rpm/AppImage/flatpak/arch/nix）。禁止在某个平台的脚本里调用另一个平台的脚本，也禁止把 macOS 步骤写回通用脚本或 workflow 内联 bash 片段。
+- **一个平台的构建/打包只用它自己的脚本**：macOS 一律走 `packaging/macos/build-release.sh`（`bundle` / `verify` / `package` / `all`），Windows 走 `packaging/windows/build-release.ps1`（`bundle`/`verify`/`package`/`all`；底层构建仍由 `build_windows.bat` 负责）+ `archoera_music.iss`，Linux 走 `packaging/linux/build-release.sh`（`build`/`prepare`/`verify`/`all`；内部调用 `app/core/build-linux.sh`）+ `packaging/linux/package.sh`（打 deb/rpm/AppImage/flatpak/arch/nix）。禁止在某个平台的脚本里调用另一个平台的脚本，也禁止把 macOS 步骤写回通用脚本或 workflow 内联 bash 片段。
 - **不要靠 `if [ "$(uname)" ]` 在共享脚本里分叉**：平台分支意味着改 A 伤 B。需要共享的只有纯数据工具（如 `gen_native_manifest.sh`）；平台特有的工具链调用（`otool`/`codesign`/`hdiutil`/`dylibbundler`、`dumpbin`、`patchelf`/`readelf`）必须各自成文件。
+- **校验逻辑写进对应平台的发布脚本，不单独建检查脚本**：ELF 守卫与启动冒烟在 `packaging/linux/build-release.sh`（`guard`/`verify`/`smoke-appimage`），Mach-O 守卫与 install_name 归一化在 `packaging/macos/build-release.sh`（`verify`/`bundle`），PE 校验在 `packaging/windows/build-release.ps1`（`verify`）。不要在 `app/tool/` 下新增 `check_*.sh` 之类的检查脚本。
 - **workflow 只负责编排**：`build-all.yml` 里 macOS/Windows/Linux 的步骤各调用一个平台脚本，不在 YAML 里写多行 shell 逻辑。
 - **测试只在本地跑，CI 一行都不跑**：`flutter test` / `cargo test` / `ctest` / `go test` / `dotnet test` 等一律不进 `.github/workflows` 与 `.github/actions`。CI 只做编译、依赖守卫、启动冒烟与打包；审阅 workflow 时人工确认没有测试步骤（`dart analyze` 属编译级静态检查，仍保留在 CI）。
 - **macOS 的 shell 约束**：系统自带 `/bin/bash` 恒为 **3.2**（Apple 因 GPLv3 不升级，GitHub macOS runner 同样是 3.2）。macOS 侧脚本不得使用 `mapfile`/`readarray`、`declare -A`/`-n`、`${v^^}`/`${v,,}`、`shopt -s globstar`，且不要在 `set -u` 下展开可能为空的数组。macOS 侧脚本改完请在本机（或 macOS job）上实跑一次 `bash -n` + 该脚本的 `--help`/`verify`，不要只靠 Linux 上的 `bash -n`。
@@ -86,10 +87,10 @@ cd app/core/vault-rs && ./build-test.sh && ./test.sh
 > 三端产物对照（deb/rpm/AppImage/flatpak/nix、macOS DMG+zip、Windows 安装器+
 > 便携 zip）与本地复现命令见 `docs/packaging.md`。
 >
-> 依赖门禁：Linux 打包前 CI 自动跑 `app/tool/check_bundle_deps.sh`（NEEDED /
-> `$ORIGIN` / 内嵌库实际解析位置 / libssl 禁止项）与
-> `app/tool/smoke_start_linux.sh`（Xvfb 下真实启动）。新增系统库必须同步
-> 允许清单并说明理由，详见 `docs/release-dependency-guard.md`。
+> 依赖门禁：Linux 打包前 CI 自动跑 `packaging/linux/build-release.sh guard`
+> （NEEDED / `$ORIGIN` / 内嵌库实际解析位置 / libssl·libcurl 禁止项）与
+> `verify`（Xvfb 下真实启动）。新增系统库必须同步允许清单并说明理由，详见
+> `docs/release-dependency-guard.md`。
 
 验签：
 ```bash

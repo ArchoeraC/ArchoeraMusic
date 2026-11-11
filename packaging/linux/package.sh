@@ -35,8 +35,9 @@ fi
 bundle="$(cd "$bundle" && pwd)"
 
 # 发布依赖守卫（任何打包格式都先过一遍）：缺内嵌库、$ORIGIN 失效、
-# 未登记的系统依赖或 libssl/libcrypto 直接依赖都会在此失败。
-bash "$ROOT/app/tool/check_bundle_deps.sh" "$bundle"
+# 未登记的系统依赖或 libssl/libcrypto/libcurl 直接依赖都会在此失败。
+# 守卫实现在 packaging/linux/build-release.sh 内（Linux 专用脚本）。
+bash "$ROOT/packaging/linux/build-release.sh" guard --bundle "$bundle"
 
 # 各包管理器对版本号的限制
 version_deb="$version"                    # deb 允许 . + -
