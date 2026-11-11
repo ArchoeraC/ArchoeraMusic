@@ -17,6 +17,7 @@
 #    extra_file    额外纳入的文件（如 exe 根的可执行文件、data/app.so）
 #
 #  POSIX sh；`sha256sum` 优先，回退 `shasum -a 256`；出错非零退出。
+#  只用 bash 3.2 / POSIX sh 可用语法（macOS 自带 /bin/bash 仍是 3.2）。
 # =====================================================================
 set -eu
 
