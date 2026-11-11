@@ -218,6 +218,16 @@ pkg_appimage() {
       [[ -f "$appdir/usr/bin/native/$lib" ]] && \
         lib_args+=(--library "$appdir/usr/bin/native/$lib")
     done
+    # Flutter 插件库不是 runner 的 DT_NEEDED（Dart 侧按名 dlopen）；linuxdeploy
+    # 只按 --executable 收集会漏掉，AppImage 里表现为 "libcnativeapi.so: cannot
+    # open shared object file"。显式把 lib/ 下的插件都交给它收拢。
+    for lib in "$appdir/usr/bin/lib"/*.so; do
+      [[ -f "$lib" ]] || continue
+      case "$(basename "$lib")" in
+        libapp.so|libflutter_linux_gtk.so) continue ;;
+      esac
+      lib_args+=(--library "$lib")
+    done
     "$ld" --appdir "$appdir" \
       --executable "$appdir/usr/bin/$BIN" \
       "${lib_args[@]}" \
