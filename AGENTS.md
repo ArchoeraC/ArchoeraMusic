@@ -59,6 +59,16 @@ cd app/core/vault-rs && ./build-test.sh && ./test.sh
 - 命令行实现只有 Rust 一份；`flutter build` 会自动编译该 staticlib。Windows REPL/脚本用 `archoerashell.exe`；细节见 `docs/mcp.md` §6。
 - Windows 自检：`zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseFast`；严格 MSVC 以 Windows CI 为准。新增 C/ABI 代码不得引入 `unistd.h`/POSIX-only API，线程原语走 `include/compat/pthread.h`。
 
+### 禁止脚本混合（硬性）
+- **一个平台的构建/打包只用它自己的脚本**：macOS 一律走 `packaging/macos/build-release.sh`（`bundle` / `verify` / `package` / `all`），Windows 走 `build_windows.bat` + `packaging/windows/*.iss`，Linux 走 `app/core/build-linux.sh` + `packaging/linux/package.sh`。禁止在某个平台的脚本里调用另一个平台的脚本，也禁止把 macOS 步骤写回通用脚本或 workflow 内联 bash 片段。
+- **不要靠 `if [ "$(uname)" ]` 在共享脚本里分叉**：平台分支意味着改 A 伤 B。需要共享的只有纯数据工具（如 `gen_native_manifest.sh`）；平台特有的工具链调用（`otool`/`codesign`/`hdiutil`/`dylibbundler`、`dumpbin`、`patchelf`/`readelf`）必须各自成文件。
+- **workflow 只负责编排**：`build-all.yml` 里 macOS/Windows/Linux 的步骤各调用一个平台脚本，不在 YAML 里写多行 shell 逻辑。
+- **macOS 的 shell 约束**：系统自带 `/bin/bash` 恒为 **3.2**（Apple 因 GPLv3 不升级，GitHub macOS runner 同样是 3.2）。macOS 侧脚本不得使用 `mapfile`/`readarray`、`declare -A`/`-n`、`${v^^}`/`${v,,}`、`shopt -s globstar`，且不要在 `set -u` 下展开可能为空的数组。改完跑：
+  ```bash
+  bash app/tool/check_shell_compat.sh
+  ```
+  （已接入 security-audit，Linux 上即可拦下，不必等 macOS 机时。）
+
 ## 架构约定（摘要，完整规则见 `CONTRIBUTING.md` §4）
 - **系统能力只走 C++ 桥接器**：一律在 `app/native/platform` 实现，Dart 仅经 `apl_*` C ABI 调用；禁止 MethodChannel/插件、`Process.run`、Dart 侧解析平台数据。新增能力流程见 `docs/platform-native-bridge.md`。
 - **最小权限**：运行时不得请求管理员/root，不写 `HKLM`/系统目录，不装服务或驱动；需要提权的能力放弃或降级。唯一例外是 Windows 安装向导的可选 per-machine 模式（默认必须 per-user 免提权）。

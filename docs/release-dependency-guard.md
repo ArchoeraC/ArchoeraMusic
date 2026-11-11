@@ -117,7 +117,8 @@ bash app/tool/smoke_start_linux.sh   app/build/linux/x64/release/bundle
 - macOS：Mach-O 守卫 `app/tool/check_bundle_deps_macos.sh`（架构单一、无构建机
   绝对路径、无 `libssl/libcrypto/libcurl` 含改名内嵌副本、`@loader_path/@rpath`
   全可解析、原生清单覆盖）；`app/tool/fix-macos-loadpaths.sh` 归一化 install_name；
-  发行包为 DMG + zip（打包脚本会挂载并校验 `.app` 主可执行文件）。待补带 GUI 的
+  发行包为 DMG + zip，全部由 `packaging/macos/build-release.sh` 产出（macOS 专用
+  脚本，装配 + 守卫 + 打包一体；DMG 会挂载回读校验主可执行文件）。待补带 GUI 的
   启动冒烟（CI 无 WindowServer 时需评估）；
 - Windows：PE 导入表检查（`dumpbin /dependents`）+ `Start-Process` 存活冒烟；
 - AppImage：已对最终 `.AppImage`（`--appimage-extract-and-run`）做启动冒烟。
