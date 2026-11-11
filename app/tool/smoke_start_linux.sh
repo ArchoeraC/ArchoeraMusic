@@ -65,6 +65,9 @@ export LIBGL_ALWAYS_SOFTWARE=1
 export NO_AT_BRIDGE=1
 # 立即解析所有动态符号：缺库/缺符号在启动阶段就暴露，而不是用到才崩。
 export LD_BIND_NOW=1
+# 构建环境可能为「最小 FFmpeg」设了 LD_LIBRARY_PATH；冒烟必须模拟用户机，
+# 只允许产物自身的 RUNPATH 解析，否则会拿构建前缀掩盖 bundle 缺失。
+unset LD_LIBRARY_PATH LD_PRELOAD
 
 launch=()
 if [[ -z "${DISPLAY:-}" ]]; then
