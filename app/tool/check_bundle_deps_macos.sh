@@ -26,6 +26,9 @@
 #    app/tool/check_bundle_deps_macos.sh <archoera_music.app> [--arch arm64|x86_64]
 #
 #  退出码: 0 通过；1 存在错误；2 用法/工具缺失。
+#
+#  注意：macOS 自带 /bin/bash 仍是 3.2（无 mapfile/readarray），CI 里 `bash`
+#  可能就是 3.2，故全部用 `while IFS= read -r` 读取，避免 mapfile。
 # =====================================================================
 set -euo pipefail
 export LC_ALL=C
@@ -165,9 +168,13 @@ resolve_refs() {
   esac
 }
 
-mapfile -t files < <(find "$app/Contents/MacOS" "$native" -type f 2>/dev/null | LC_ALL=C sort)
+# 不用 mapfile（macOS bash 3.2 无此内建）：先把文件列表写入临时文件再逐行读。
+file_list="$(mktemp "${TMPDIR:-/tmp}/archoera-macos-guard.XXXXXX")"
+trap 'rm -f "$file_list"' EXIT
+find "$app/Contents/MacOS" "$native" -type f 2>/dev/null | LC_ALL=C sort > "$file_list" || true
 
-for f in "${files[@]}"; do
+while IFS= read -r f; do
+  [[ -n "$f" ]] || continue
   is_macho "$f" || continue
   rel="${f#"$app"/}"
   dir="$(dirname "$f")"
@@ -212,20 +219,23 @@ for f in "${files[@]}"; do
       continue
     fi
 
-    mapfile -t cands < <(resolve_refs "$dir" "$ref" "$f")
-    if [[ ${#cands[@]} -eq 0 ]]; then
+    cands="$(resolve_refs "$dir" "$ref" "$f")"
+    if [[ -z "$cands" ]]; then
       fail "$rel: @rpath 引用 $ref 无法解析（dylib 缺 LC_RPATH 或 rpath 指向构建机）"
       continue
     fi
     found=0
-    for c in "${cands[@]}"; do
+    first=""
+    while IFS= read -r c; do
+      [[ -n "$c" ]] || continue
+      [[ -z "$first" ]] && first="$c"
       [[ -e "$c" ]] && { found=1; break; }
-    done
+    done <<<"$cands"
     if [[ $found -eq 0 ]]; then
-      fail "$rel: 依赖 $ref 无法解析（bundle 内缺少 ${cands[0]#"$app"/}）；候选：${cands[*]}"
+      fail "$rel: 依赖 $ref 无法解析（bundle 内缺少 ${first#"$app"/}）"
     fi
   done < <(otool -L "$f" 2>/dev/null | tail -n +2 | awk '{print $1}')
-done
+done < "$file_list"
 
 # 原生清单须覆盖 native/ 下所有 dylib（Dart 侧按清单 fail-closed 校验）
 manifest="$native/ARCHOERA-NATIVE-MANIFEST.txt"
@@ -242,7 +252,12 @@ if [[ $errors -gt 0 ]]; then
   exit 1
 fi
 
-trim() { sed '/^$/d' | LC_ALL=C sort -u; }
-printf '%s\n' "${system_refs[@]}" 2>/dev/null | trim > "$app/Contents/ARCHOERA-SYSTEM-DEPS.txt"
-echo "macOS 依赖守卫通过：$(trim < "$app/Contents/ARCHOERA-SYSTEM-DEPS.txt" | wc -l | tr -d ' ') 个系统库引用，" \
+sysdeps="$app/Contents/ARCHOERA-SYSTEM-DEPS.txt"
+if [[ ${#system_refs[@]} -gt 0 ]]; then
+  printf '%s\n' "${system_refs[@]}" | sed '/^$/d' | LC_ALL=C sort -u > "$sysdeps"
+else
+  : > "$sysdeps"
+fi
+count="$(grep -c . "$sysdeps" 2>/dev/null || echo 0)"
+echo "macOS 依赖守卫通过：${count} 个系统库引用，" \
   "架构 $([[ -n "$want_arch" ]] && echo "$want_arch" || echo '未限定')"
