@@ -252,10 +252,13 @@ NUGETCFG
         pname = "archoera-scraper";
         inherit version;
         src = src;
-        nativeBuildInputs = with pkgs; [ cmake ninja pkg-config ];
-        buildInputs = with pkgs; [ taglib curl openssl sqlite nlohmann_json ];
+        nativeBuildInputs = with pkgs; [ cmake ninja pkg-config cargo rustc ];
+        buildInputs = with pkgs; [ taglib curl sqlite nlohmann_json ];
         strictDeps = false;
         dontConfigure = true;
+        # 加密后端 app/core/scraper-crypto 由 CMake 调 cargo 构建；
+        # netEnv 负责 CARGO_HOME / 证书（与其它 Rust derivation 一致）。
+        preBuild = netEnv;
         buildPhase = ''
           runHook preBuild
           set -euo pipefail
