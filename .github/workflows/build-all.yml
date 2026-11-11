@@ -1032,7 +1032,8 @@ jobs:
         # linuxdeploy 收拢依赖 + AppRun 环境后的真实用户路径。
         run: |
           set -euo pipefail
-          APPIMAGE="$(ls dist/linux/*.AppImage | head -1)"
+          APPIMAGE="$(find dist/linux -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
+          [ -n "$APPIMAGE" ] || { echo "::error::未找到 AppImage 产物"; exit 1; }
           ARCHOERA_SMOKE_SECONDS=15 \
             ARCHOERA_SMOKE_ARGS=--appimage-extract-and-run \
             bash app/tool/smoke_start_linux.sh "$APPIMAGE"
