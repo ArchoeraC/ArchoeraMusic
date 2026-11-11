@@ -16,8 +16,8 @@ Linux 依赖门禁见 [release-dependency-guard.md](release-dependency-guard.md)
 | Linux | NixOS flake 源构建产物 | `packaging/linux/nix/package.nix` | `ArchoeraMusic-<ver>-nixos-x86_64.tar.gz` |
 | macOS | **`.dmg`（拖拽安装）** | `packaging/macos/build-release.sh` | `ArchoeraMusic-<ver>-macos-<arm64\|x64>.dmg` |
 | macOS | `.zip`（便携） | 同上 | `ArchoeraMusic-<ver>-macos-<arm64\|x64>.zip` |
-| Windows | **Inno Setup 安装器** | `packaging/windows/archoera_music.iss` | `ArchoeraMusic-<ver>-windows-x64-setup.exe` |
-| Windows | 便携 zip | workflow 内 `Compress-Archive` | `ArchoeraMusic-<ver>-windows-x64-portable.zip` |
+| Windows | **Inno Setup 安装器** | `packaging/windows/build-release.ps1` + `archoera_music.iss` | `ArchoeraMusic-<ver>-windows-x64-setup.exe` |
+| Windows | 便携 zip | 同上 | `ArchoeraMusic-<ver>-windows-x64-portable.zip` |
 
 所有资产在 release 作业里由 `app/tool/sign_release.sh` 逐个生成 `<asset>.sig1`
 （ECDSA P-256 / SHA-256），并汇总为 `SHA256SUMS`；另有 `ARCHOERA-SBOM.cdx.json`
@@ -37,8 +37,8 @@ bash packaging/linux/build-release.sh all
 ```
 
 **安装包**统一入口 `packaging/linux/package.sh <格式> <bundle> <版本>`。任何格式在
-开头都会先跑 `app/tool/check_bundle_deps.sh`（NEEDED / `$ORIGIN` / 内嵌库实际
-解析位置 / `libssl`·`libcrypto`·`libcurl` 禁止项），不通过直接失败。
+开头都会先跑 `build-release.sh guard`（NEEDED / `$ORIGIN` / 内嵌库实际解析位置 /
+`libssl`·`libcrypto`·`libcurl` 禁止项），不通过直接失败。
 
 各格式要点：
 
@@ -91,14 +91,14 @@ bash packaging/macos/build-release.sh all --arch arm64
 2. `dylibbundler` 收拢 `libarchoera_mediaengine.dylib`、`libarchoera_scraper.dylib`
    以及引擎子进程 `archoera-audio-engine`（后者的 FFmpeg 来自 CI 自建前缀
    `~/.local/ffmpeg-minimal/lib`，不收拢就带构建机绝对路径）；
-3. `app/tool/fix-macos-loadpaths.sh` 把所有 dylib 的 `LC_ID_DYLIB` 与可归一化的
+3. 脚本内置的 `normalize_loadpaths` 把所有 dylib 的 `LC_ID_DYLIB` 与可归一化的
    `LC_LOAD_DYLIB` 改成 `@loader_path/<basename>`——dylibbundler 只管 `-x`
    指定的库，downloader/transcoder/log/platform/scanner/indexer 等模块的
    install_name 仍会是 `/Users/runner/...`；
 4. 重新 ad-hoc 签名（`codesign --force --deep --sign -`），因为改写 dylib 会使
    原签名失效（Apple Silicon 拒载未签名库）；
 5. 生成 `ARCHOERA-NATIVE-MANIFEST.txt`（SEC-08，必须在 3/4 之后）；
-6. `app/tool/check_bundle_deps_macos.sh <app> --arch <arch>` 守卫：单一架构、
+6. 脚本内置的 `verify_deps` 守卫：单一架构、
    无构建机绝对路径、无 `libssl/libcrypto/libcurl`（含 `libcrypto.N.dylib`
    这类改名内嵌副本）、`@loader_path/@rpath` 全部可解析、原生清单覆盖齐全。
 
@@ -118,6 +118,17 @@ FFmpeg、NativeAOT、Rust/Go 模块均为单架构）。部署目标 macOS 14.0�
 
 ## 4. Windows
 
+全部逻辑在 `packaging/windows/build-release.ps1`（Windows 专用）：
+
+```powershell
+pwsh -File packaging/windows/build-release.ps1 all
+#   all = bundle → verify → package
+#   bundle  : 放入防伪公钥（native/ 由 CMake install 填充）
+#   verify  : 必需文件齐全 + 完整性清单覆盖 native/ 全部 DLL + dumpbin 导入表
+#             无构建机绝对路径
+#   package : 便携 zip + Inno Setup 安装器
+```
+
 - **安装器**（`archoera_music.iss`）：`PrivilegesRequired=lowest`，默认
   **per-user 免 UAC**；用户可在向导里主动选 per-machine（唯一允许提权的例外）。
   `Compression=lzma2/max`，`ArchitecturesAllowed=x64compatible`。
@@ -135,7 +146,8 @@ SKIP_BUILD=1 bash packaging/linux/build-release.sh all
 DISTRO_TAG=ubuntu24.04 bash packaging/linux/package.sh deb \
   app/build/linux/x64/release/bundle 1.0.6
 bash packaging/linux/package.sh appimage app/build/linux/x64/release/bundle 1.0.6
-bash app/tool/smoke_start_linux.sh dist/linux/*.AppImage   # AppImage 冒烟
+# AppImage 冒烟（解包运行，不需要 FUSE）
+bash packaging/linux/build-release.sh smoke-appimage --appimage dist/linux/*.AppImage
 
 # macOS（需在 Mac 上）
 bash app/core/build-macos.sh osx-arm64
