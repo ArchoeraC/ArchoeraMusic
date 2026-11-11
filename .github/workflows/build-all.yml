@@ -769,7 +769,7 @@ jobs:
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libdbus-1-dev libx11-dev libxi-dev libopus-dev \
-            patchelf nasm
+            patchelf nasm xvfb xauth libgl1-mesa-dri dbus
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: ./.github/actions/build-linux
         with:
@@ -829,7 +829,8 @@ jobs:
             libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libopus-dev \
             libdbus-1-dev libx11-dev libxi-dev \
-            patchelf nasm git curl wget xz-utils unzip zip jq file
+            patchelf nasm xvfb xauth libgl1-mesa-dri dbus \
+            git curl wget xz-utils unzip zip jq file
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
@@ -875,6 +876,7 @@ jobs:
             taglib-devel libcurl-devel openssl-devel sqlite-devel \
             json-devel gtk3-devel dbus-devel libstdc++-devel libicu \
             opus-devel libX11-devel libXi-devel \
+            xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers dbus-daemon \
             rpm-build zstd libarchive
           # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -919,7 +921,7 @@ jobs:
             git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
             taglib curl openssl sqlite nlohmann-json opus \
-            gtk3 dbus libx11 libxi
+            gtk3 dbus libx11 libxi xorg-server-xvfb xorg-x11-xauth mesa
           # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Git safe directory (容器属主)
@@ -984,7 +986,8 @@ jobs:
           # binutils：package.sh 的 BUILD-INFO 用 objdump 探测最低 glibc。
           sudo apt-get install -y binutils file patchelf \
             libgtk-3-dev libx11-dev libxi-dev libdbus-1-dev \
-            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev
+            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            xvfb xauth libgl1-mesa-dri dbus
           # GitHub Release 资产偶发 504：官方失败时走镜像；下载后校验确实是 ELF。
           fetch_asset() {
             local url="$1" out="$2" prefix
@@ -1024,6 +1027,15 @@ jobs:
           APPIMAGE_RUNTIME_FILE: /tmp/type2-runtime
           LINUXDEPLOY: /tmp/linuxdeploy.AppImage
           APPIMAGE_EXTRACT_AND_RUN: '1'
+      - name: Startup smoke test (AppImage, Xvfb)
+        # 直接跑最终 AppImage（--appimage-extract-and-run，无需 FUSE），覆盖
+        # linuxdeploy 收拢依赖 + AppRun 环境后的真实用户路径。
+        run: |
+          set -euo pipefail
+          APPIMAGE="$(ls dist/linux/*.AppImage | head -1)"
+          ARCHOERA_SMOKE_SECONDS=15 \
+            ARCHOERA_SMOKE_ARGS=--appimage-extract-and-run \
+            bash app/tool/smoke_start_linux.sh "$APPIMAGE"
       - name: Upload artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
