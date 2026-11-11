@@ -625,6 +625,19 @@ jobs:
             dylibbundler -of -b -x "$NATIVE/$lib" -d "$NATIVE" -p @loader_path
           done
 
+          # 引擎子进程同样要自包含：它链接的是 CI 里自建的最小 FFmpeg
+          # （/Users/runner/.local/ffmpeg-minimal/lib/libav*.dylib），且该二进制
+          # 没被 codesign 覆盖，改写 load command 后需重新 ad-hoc 签名。
+          dylibbundler -of -b -x "$NATIVE/archoera-audio-engine" -d "$NATIVE" -p @loader_path
+          codesign --force --sign - "$NATIVE/archoera-audio-engine"
+          codesign --force --sign - "$NATIVE/archoera-vault" 2>/dev/null || true
+
+          # install_name 归一化：dylibbundler 只处理上面几个库，其余模块
+          # （downloader / transcoder / log / platform / scanner / indexer …）
+          # 的 install_name 仍带 /Users/runner/... 构建机路径，用户机加载必失败。
+          # 统一改写为 @loader_path/<basename>；无法收拢的依赖直接失败。
+          bash app/tool/fix-macos-loadpaths.sh "$NATIVE"
+
           # LGPL 合规：随包附 FFmpeg / TagLib 许可文本 + 聚合声明
           bash app/core/bundle-licenses.sh "$APP/Contents"
 
@@ -641,6 +654,17 @@ jobs:
 
           echo "native/ 内容:"
           ls -la "$NATIVE"
+
+      # macOS 依赖守卫（对应 Linux 的 check_bundle_deps.sh）：架构单一、无构建机
+      # 绝对路径、无 libssl/libcrypto/libcurl、@loader_path/@rpath 全部可解析。
+      - name: Check bundled dependency closure (macOS)
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash app/tool/check_bundle_deps_macos.sh \
+            "app/build/macos/Build/Products/Release/archoera_music.app" \
+            --arch "${{ matrix.arch }}"
 
       - name: Verify indexer-ffi bundled (macOS)
         if: matrix.os == 'macos'
@@ -731,7 +755,7 @@ jobs:
           bash packaging/macos/package.sh \
             "app/build/macos/Build/Products/Release/archoera_music.app" \
             "$VER" "${{ matrix.arch }}"
-          ls -la dist/macos
+          ls -la "$GITHUB_WORKSPACE/dist/macos"
 
       - name: Upload artifact (macOS DMG + zip)
         if: matrix.os == 'macos'
