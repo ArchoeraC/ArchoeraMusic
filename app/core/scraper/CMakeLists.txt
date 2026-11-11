@@ -6,7 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ---------- 依赖 ----------
-find_package(CURL REQUIRED)
+# HTTP 不再用系统 libcurl：scraper-crypto（Rust staticlib，reqwest + rustls）
+# 提供同步 HTTP，产物不再通过 libcurl 传递依赖系统 libssl/libcrypto。
 find_package(SQLite3 REQUIRED)  # scraper-state.db 直写
 # SQLite target 命名跨环境不一致：
 #   - CMake 标准 FindSQLite3（≥3.14）与新版 vcpkg：SQLite3::SQLite3
@@ -182,7 +183,6 @@ if(WIN32)
 endif()
 
 target_link_libraries(archoera_scraper PRIVATE
-    CURL::libcurl
     "${SCRAPER_CRYPTO_LIB}"
     nlohmann_json::nlohmann_json
     Taglib::tag
@@ -202,9 +202,11 @@ elseif(APPLE)
     target_link_libraries(archoera_scraper PRIVATE "${ICONV_LIBRARY}")
 else()
     target_link_libraries(archoera_scraper PRIVATE pthread dl m)
-    # 隐藏静态库（Rust std / crates）的导出符号，避免 .so 动态符号表膨胀，
-    # 也避免与进程内其它 Rust 库发生符号插入。scraper 自己的 C++ 符号不受影响。
-    target_link_options(archoera_scraper PRIVATE "LINKER:--exclude-libs,ALL")
+    # 导出白名单：只暴露本项目的 C ABI（archoera_scraper_* / era_crypto_* /
+    # era_http_*），Rust 静态库（std / hyper / rustls…）的全部符号一律 local。
+    # 既缩小 .dynsym，也避免与进程内其它 Rust 库发生符号插入。
+    target_link_options(archoera_scraper PRIVATE
+        "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cmake/scraper_exports.map")
 endif()
 if(SQLITE3_TARGET)
     target_link_libraries(archoera_scraper PRIVATE ${SQLITE3_TARGET})
@@ -212,6 +214,25 @@ else()
     # 无 IMPORTED target：直接用 find_package 探测到的库/头路径
     target_link_libraries(archoera_scraper PRIVATE ${SQLite3_LIBRARIES})
     target_include_directories(archoera_scraper PRIVATE ${SQLite3_INCLUDE_DIRS})
+endif()
+
+# ---------- 依赖守卫 ----------
+# 回归保护：scraper 不得再链接系统 libcurl / libssl / libcrypto（它们会让
+# 发行版 OpenSSL soname 升级直接打断已发布产物）。HTTP 走 Rust 静态栈。
+find_program(READELF_EXECUTABLE readelf)
+if(READELF_EXECUTABLE)
+    add_custom_command(TARGET archoera_scraper POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DREADELF=${READELF_EXECUTABLE}
+            -DLIBRARY=$<TARGET_FILE:archoera_scraper>
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_http_deps.cmake"
+        # 去掉 .symtab（Rust std/hyper/rustls 的成千上万个局部符号）：发布包
+        # 从 ~3MB 增至 ~13MB，摘掉调试符号表可回收约 2.5MB，且不影响 unwinding
+        # （.eh_frame 保留）。动态符号表不受影响，FFI 导出照常可见。
+        COMMAND ${CMAKE_STRIP} --strip-unneeded --remove-section=.comment
+            "$<TARGET_FILE:archoera_scraper>"
+        COMMENT "strip archoera_scraper（保留动态符号表与 .eh_frame）"
+        VERBATIM)
 endif()
 
 # 安装目标
@@ -249,4 +270,17 @@ if(NOT WIN32)
         target_link_libraries(test_crypto PRIVATE pthread dl m)
     endif()
     add_test(NAME test_crypto COMMAND test_crypto)
+
+    # Rust HTTP 后端 C ABI 契约（URL 编码 / 参数校验 / 传输错误；网络用例需
+    # ARCHOERA_ONLINE_TEST=1）。同样直接链 staticlib。
+    add_executable(test_http tests/test_http.cpp)
+    target_include_directories(test_http PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(test_http PRIVATE "${SCRAPER_CRYPTO_LIB}")
+    add_dependencies(test_http scraper_crypto)
+    if(APPLE)
+        target_link_libraries(test_http PRIVATE "${ICONV_LIBRARY}")
+    else()
+        target_link_libraries(test_http PRIVATE pthread dl m)
+    endif()
+    add_test(NAME test_http COMMAND test_http)
 endif()

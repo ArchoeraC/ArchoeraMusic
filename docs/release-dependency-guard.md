@@ -10,8 +10,9 @@ Linux 二进制通过「运行时按 soname 查找共享库」加载依赖。发
 
 - FFmpeg `libavformat.so.60 → .63`、TagLib `libtag.so.1 → .2`（因此引擎/scraper
   改为按发行版分别构建 + 内嵌运行库）；
-- OpenSSL `libcrypto.so.3 → .4`（Arch 升级预告）：scraper 已改为内嵌 Rust
-  staticlib，scanner 曲目 id 已改为纯托管 MD5，产物不再直接依赖 `libssl/libcrypto`。
+- OpenSSL `libcrypto.so.3 → .4`（Arch 升级预告）：scraper 的加密与 HTTP 均已
+  改为内嵌 Rust staticlib（AES/RSA + `reqwest/rustls`），scanner 曲目 id 改为
+  纯托管 MD5，产物不再直接或间接依赖 `libssl/libcrypto`。
 
 `ldd` 在构建机能跑通，并不代表用户机器能跑通——构建机恰好有同名库时，缺失的
 `$ORIGIN`/RUNPATH 会被系统库静默顶替。因此需要**静态依赖守卫 + 真实启动冒烟**。
@@ -29,10 +30,12 @@ Linux 二进制通过「运行时按 soname 查找共享库」加载依赖。发
    （`libssl/libcrypto/libssh2/nghttp2/ngtcp2/krb5…`）整棵拖进产物。
 3. **只有 ABI 稳定的库才允许由系统提供**：当前允许清单见
    `app/tool/check_bundle_deps.sh` 的 `ALLOW_RE`（glibc/GCC runtime、GTK3 栈、
-   X11/Wayland、`libdbus-1`、`libcurl`、`libsqlite3` 等）。这些同时在打包
-   `depends` 中声明。
-4. **禁止直接依赖 `libssl` / `libcrypto`**。Linux 上它们只作为系统 `libcurl`
-   的传递依赖存在；AppImage 由 linuxdeploy 自行收拢。
+   X11/Wayland、`libdbus-1`、`libsqlite3` 等）。这些同时在打包 `depends` 中声明。
+4. **禁止直接依赖 `libssl` / `libcrypto`**。产物中已不存在任何 OpenSSL 使用
+   路径：scraper 的加密（Rust staticlib）与 HTTP（`reqwest + rustls`）均静态
+   链接；`archoera_scraper` 的 CMake 在链接后调用
+   `cmake/check_http_deps.cmake`，一旦重新引入 `libcurl/libssl/libcrypto`
+   会在构建期直接失败。
 
 ## 3. 两道门禁
 
@@ -114,6 +117,8 @@ bash app/tool/smoke_start_linux.sh   app/build/linux/x64/release/bundle
 - macOS：已有单架构 / Homebrew 绝对路径 / `dlopen` 全部 FFI 库检查；待补 `.app`
   级启动冒烟（CI 无 WindowServer 时需评估）；
 - Windows：PE 导入表检查（`dumpbin /dependents`）+ `Start-Process` 存活冒烟；
-- AppImage：对 `--appimage-extract` 后的 AppRun 做一次启动冒烟；
-- 中长期：把 scraper 的 libcurl 迁移到 Rust `reqwest + rustls`（与 downloader
-  同栈），进一步去掉系统 libcurl 的 OpenSSL 传递依赖。
+- AppImage：已对最终 `.AppImage`（`--appimage-extract-and-run`）做启动冒烟。
+
+已完成：scraper 的 HTTP 已从系统 `libcurl` 迁到内嵌 Rust `reqwest + rustls`
+（`app/core/scraper-crypto/src/http.rs`，C ABI `era_http_*`），产物不再有
+`libcurl` / OpenSSL 使用路径。

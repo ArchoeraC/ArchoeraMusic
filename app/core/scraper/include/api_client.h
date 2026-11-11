@@ -17,7 +17,7 @@
 #include "scraper.h"
 #include "scraper_crypto.h"
 #include "scraper_log.h"
-#include <curl/curl.h>
+#include "scraper_http.h"
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <thread>
@@ -119,30 +119,15 @@ inline static double similarity(const std::string& a, const std::string& b) {
     return maxLen > 0 ? 1.0 - static_cast<double>(dist) / maxLen : 0.0;
 }
 
-/// URL 编码（curl_easy_escape 包装）
-inline static std::string urlEncode(const std::string& raw) {
-    CURL* curl = curl_easy_init();
-    if (!curl) return raw;
-    char* escaped = curl_easy_escape(curl, raw.c_str(), raw.size());
-    std::string result(escaped ? escaped : raw);
-    curl_free(escaped);
-    curl_easy_cleanup(curl);
-    return result;
-}
-
 /// MusicBrainz API 客户端
 class MusicBrainzClient {
 public:
     explicit MusicBrainzClient(const ScraperConfig& cfg)
         : cfg_(cfg), lastReq_(std::chrono::steady_clock::now() - std::chrono::hours(1))
     {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
 
-    ~MusicBrainzClient() {
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    ~MusicBrainzClient() = default;
 
     MusicBrainzClient(const MusicBrainzClient&) = delete;
     MusicBrainzClient& operator=(const MusicBrainzClient&) = delete;
@@ -336,16 +321,11 @@ public:
 
     bool httpGet(const std::string& url, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, body, code, err);
+        if (!ok) lastError_ = "GET 失败: " + err;
+        return ok;
     }
 
  private:
@@ -355,7 +335,7 @@ public:
         return similarity(a, b) >= 0.65;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::chrono::steady_clock::time_point lastReq_;
     std::string lastError_;
@@ -367,13 +347,9 @@ public:
     explicit CoverArtArchiveClient(const ScraperConfig& cfg)
         : cfg_(cfg)
     {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
 
-    ~CoverArtArchiveClient() {
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    ~CoverArtArchiveClient() = default;
 
     CoverArtArchiveClient(const CoverArtArchiveClient&) = delete;
     CoverArtArchiveClient& operator=(const CoverArtArchiveClient&) = delete;
@@ -401,19 +377,19 @@ public:
 private:
     bool httpGetBinary(const std::string& url, std::vector<uint8_t>& data, long* code) {
         data.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string text;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, text, code, err);
+        if (!ok) {
+            lastError_ = "GET 失败: " + err;
+            return false;
+        }
+        data.assign(text.begin(), text.end());
+        return true;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -424,13 +400,9 @@ public:
     explicit LrclibClient(const ScraperConfig& cfg)
         : cfg_(cfg)
     {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
 
-    ~LrclibClient() {
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    ~LrclibClient() = default;
 
     LrclibClient(const LrclibClient&) = delete;
     LrclibClient& operator=(const LrclibClient&) = delete;
@@ -476,19 +448,15 @@ public:
 private:
     bool httpGet(const std::string& url, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
 
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, body, code, err);
+        if (!ok) lastError_ = "GET 失败: " + err;
+        return ok;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -498,10 +466,8 @@ private:
 class DeezerClient {
 public:
     explicit DeezerClient(const ScraperConfig& cfg) : cfg_(cfg) {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
-    ~DeezerClient() { if (curl_) curl_easy_cleanup(curl_); }
+    ~DeezerClient() = default;
 
     DeezerClient(const DeezerClient&) = delete;
     DeezerClient& operator=(const DeezerClient&) = delete;
@@ -603,31 +569,28 @@ public:
 private:
     bool httpGet(const std::string& url, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, body, code, err);
+        if (!ok) lastError_ = "GET 失败: " + err;
+        return ok;
     }
 
     bool httpGetBinary(const std::string& url, std::vector<uint8_t>& data, long* code) {
         data.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string text;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, text, code, err);
+        if (!ok) {
+            lastError_ = "GET 失败: " + err;
+            return false;
+        }
+        data.assign(text.begin(), text.end());
+        return true;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -637,10 +600,8 @@ private:
 class ItunesClient {
 public:
     explicit ItunesClient(const ScraperConfig& cfg) : cfg_(cfg) {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
-    ~ItunesClient() { if (curl_) curl_easy_cleanup(curl_); }
+    ~ItunesClient() = default;
 
     ItunesClient(const ItunesClient&) = delete;
     ItunesClient& operator=(const ItunesClient&) = delete;
@@ -725,31 +686,28 @@ public:
 private:
     bool httpGet(const std::string& url, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, body, code, err);
+        if (!ok) lastError_ = "GET 失败: " + err;
+        return ok;
     }
 
     bool httpGetBinary(const std::string& url, std::vector<uint8_t>& data, long* code) {
         data.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string text;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, text, code, err);
+        if (!ok) {
+            lastError_ = "GET 失败: " + err;
+            return false;
+        }
+        data.assign(text.begin(), text.end());
+        return true;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -773,12 +731,8 @@ struct ChineseSong {
 class ChineseMusicClientBase {
 public:
     explicit ChineseMusicClientBase(const ScraperConfig& cfg) : cfg_(cfg) {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
-    virtual ~ChineseMusicClientBase() {
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    virtual ~ChineseMusicClientBase() = default;
 
     ChineseMusicClientBase(const ChineseMusicClientBase&) = delete;
     ChineseMusicClientBase& operator=(const ChineseMusicClientBase&) = delete;
@@ -877,62 +831,23 @@ protected:
     bool httpGet(const std::string& url, std::string& body, long* code,
                  const std::vector<std::pair<std::string, std::string>>& headers = {}) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        struct curl_slist* hdrList = nullptr;
-        for (const auto& h : headers) {
-            hdrList = curl_slist_append(hdrList, (h.first + ": " + h.second).c_str());
-        }
-        if (hdrList) curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, hdrList);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, nullptr);
-        if (hdrList) curl_slist_free_all(hdrList);
-        return res == CURLE_OK;
+        return request("GET", url, headers, nullptr, body, code);
     }
 
     bool httpGetBinary(const std::string& url, std::vector<uint8_t>& data, long* code) {
-        data.clear();
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, nullptr);  // 清除上次请求残留的请求头
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string text;
+        const bool ok = request("GET", url, {}, nullptr, text, code);
+        data.assign(text.begin(), text.end());
+        return ok;
     }
 
     /// HTTP GET 二进制数据（支持自定义请求头，用于封面防盗链 Referer）
     bool httpGetBinaryWithHeaders(const std::string& url, std::vector<uint8_t>& data, long* code,
                                   const std::vector<std::pair<std::string, std::string>>& headers = {}) {
-        data.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        struct curl_slist* hdrList = nullptr;
-        for (const auto& h : headers) {
-            hdrList = curl_slist_append(hdrList, (h.first + ": " + h.second).c_str());
-        }
-        if (hdrList) curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, hdrList);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, nullptr);
-        if (hdrList) curl_slist_free_all(hdrList);
-        return res == CURLE_OK;
+        std::string text;
+        const bool ok = request("GET", url, headers, nullptr, text, code);
+        data.assign(text.begin(), text.end());
+        return ok;
     }
 
     /// HTTP POST 请求
@@ -941,34 +856,25 @@ protected:
                   std::string& body, long* code,
                   const std::vector<std::pair<std::string, std::string>>& headers = {}) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl_, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, postData.c_str());
-        curl_easy_setopt(curl_, CURLOPT_POSTFIELDSIZE, static_cast<long>(postData.size()));
-
-        struct curl_slist* hdrList = nullptr;
-        for (const auto& h : headers) {
-            hdrList = curl_slist_append(hdrList, (h.first + ": " + h.second).c_str());
-        }
-        if (hdrList) curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, hdrList);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-
-        // 重置为 GET 模式并清除自定义请求头
-        curl_easy_setopt(curl_, CURLOPT_HTTPGET, 1L);
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, nullptr);
-        if (hdrList) curl_slist_free_all(hdrList);
-
-        return res == CURLE_OK;
+        return request("POST", url, headers, &postData, body, code);
     }
 
-    CURL* curl_ = nullptr;
+    /// 统一请求入口（替代原 curl 的"复用句柄 + setopt 覆盖"模型）。
+    bool request(const std::string& method, const std::string& url,
+                 const std::vector<std::pair<std::string, std::string>>& headers,
+                 const std::string* postBody, std::string& body, long* code) {
+        std::string err;
+        const bool ok = http_.perform(method, url, cfg_.userAgent, cfg_.requestTimeoutMs,
+                                      headers, postBody, body, code, err);
+        if (!ok) {
+            lastError_ = method + " 失败: " + err;
+            SCRAPER_LOGW(NULL, "[scraper] %s 失败: %s (%s)", method.c_str(),
+                         err.c_str(), url.c_str());
+        }
+        return ok;
+    }
+
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -2064,10 +1970,8 @@ struct AcoustIDResult {
 class AcoustIDClient {
 public:
     explicit AcoustIDClient(const ScraperConfig& cfg) : cfg_(cfg) {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
-    ~AcoustIDClient() { if (curl_) curl_easy_cleanup(curl_); }
+    ~AcoustIDClient() = default;
 
     AcoustIDClient(const AcoustIDClient&) = delete;
     AcoustIDClient& operator=(const AcoustIDClient&) = delete;
@@ -2235,27 +2139,14 @@ private:
     bool httpPost(const std::string& url, const std::string& data,
                   const std::string& contentType, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, data.c_str());
-        curl_easy_setopt(curl_, CURLOPT_POSTFIELDSIZE, static_cast<long>(data.size()));
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, ::archoera::scraper::writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        struct curl_slist* headers = nullptr;
-        std::string ctHeader = "Content-Type: " + contentType;
-        headers = curl_slist_append(headers, ctHeader.c_str());
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, headers);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        if (headers) curl_slist_free_all(headers);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("POST", url, cfg_.userAgent, cfg_.requestTimeoutMs,
+                                      {{"Content-Type", contentType}}, &data, body, code, err);
+        if (!ok) lastError_ = "POST 失败: " + err;
+        return ok;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::chrono::steady_clock::time_point lastReq_ = std::chrono::steady_clock::now();
     std::string lastError_;
