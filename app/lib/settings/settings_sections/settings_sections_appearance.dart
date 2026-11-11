@@ -637,13 +637,14 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
   }
 
   Future<void> _pickBackgroundImage() async {
-    const typeGroup = XTypeGroup(
-      label: 'images',
-      extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'],
+    // 类型组标题会出现在系统文件对话框里，随界面语言本地化（非 const）。
+    final typeGroup = XTypeGroup(
+      label: context.l10n.settingsBackgroundImage,
+      extensions: const ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'],
     );
     String? path;
     try {
-      final file = await openFile(acceptedTypeGroups: const [typeGroup]);
+      final file = await openFile(acceptedTypeGroups: [typeGroup]);
       path = file?.path;
     } catch (_) {
       // 文件选择器不可用时静默忽略（自用项目，无返回值不阻塞）

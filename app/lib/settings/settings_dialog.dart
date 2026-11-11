@@ -34,6 +34,7 @@ import 'search_section.dart';
 import 'security_section.dart';
 import 'settings_anchors.dart';
 import 'settings_categories.dart';
+import '../services/shortcuts/shortcut_action.dart';
 import 'settings_sections.dart';
 import 'streaming_server_list.dart';
 
