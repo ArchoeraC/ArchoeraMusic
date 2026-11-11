@@ -279,7 +279,11 @@ if(NOT WIN32)
     target_link_libraries(test_crypto PRIVATE "${SCRAPER_CRYPTO_LIB}")
     add_dependencies(test_crypto scraper_crypto)
     if(APPLE)
-        target_link_libraries(test_crypto PRIVATE "${ICONV_LIBRARY}")
+        # 与共享库一致：staticlib 带入了 Require 的 HTTP/TLS 栈，链接期需要
+        # Security / CoreFoundation（rustls-platform-verifier / core-foundation）。
+        target_link_libraries(test_crypto PRIVATE
+            "${ICONV_LIBRARY}" "${SECURITY_FRAMEWORK}"
+            "${COREFOUNDATION_FRAMEWORK}" "${SYSTEMCONFIGURATION_FRAMEWORK}")
     else()
         target_link_libraries(test_crypto PRIVATE pthread dl m)
     endif()
