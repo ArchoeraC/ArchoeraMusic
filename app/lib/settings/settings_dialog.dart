@@ -44,6 +44,7 @@ export 'settings_categories.dart';
 
 part 'settings/settings_dialog_actions.dart';
 part 'settings/settings_dialog_view.dart';
+part 'settings/settings_search_index.g.dart';
 
 void showSettingsDialog(BuildContext context, {SettingsCategory? category}) {
   showDialog<void>(
@@ -55,23 +56,14 @@ void showSettingsDialog(BuildContext context, {SettingsCategory? category}) {
 }
 
 class _SearchEntry {
-  const _SearchEntry(
-    this.category,
-    this.title,
-    this.subtitle,
-    this.icon, {
-    this.anchor,
-  });
+  const _SearchEntry(this.category, this.title, this.subtitle, this.icon);
+
   final SettingsCategory category;
+
+  /// 设置项标题（同时作为滚动/高亮锚点，与 [SettingsAnchor] 的 label 一致）。
   final String title;
   final String subtitle;
   final IconData icon;
-
-  /// 滚动/高亮目标的标题（默认同 [title]）。
-  ///
-  /// 仅当搜索条目的标题与设置行/小节标题不一致时指定（如分类级条目、一行
-  /// 内聚合多个开关的「颜色」「法律声明」）；找不到锚点时只切分类不滚动。
-  final String? anchor;
 }
 
 class SettingsDialog extends ConsumerStatefulWidget {
@@ -183,7 +175,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog>
   void _jumpToSearchEntry(_SearchEntry entry) {
     _setCategory(entry.category);
     _clearQuery();
-    final label = entry.anchor ?? entry.title;
+    final label = entry.title;
     // 新分类内容要到下一帧才构建/布局，先等一帧再测量位置。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _revealSetting(label);

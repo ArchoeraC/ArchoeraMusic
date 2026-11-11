@@ -78,6 +78,12 @@ fi
 CMAKE_ARCH_ARG="-DCMAKE_OSX_ARCHITECTURES=$CMAKE_ARCH"
 
 
+# 设置搜索索引由设置源码生成（声明式）：必须在 flutter build 之前更新。
+if command -v dart >/dev/null 2>&1; then
+  echo "[build-macos] ===== 生成设置搜索索引 ====="
+  (cd "$ROOT/.." && dart run tool/gen_settings_search_index.dart) || exit 1
+fi
+
 # 自研内核（EraAudio, Zig 静态库）须先于 audio-engine cmake 编译并落 zig-out/
 # （engine CMake 复制 zig-out/lib/libarchoera_kernel.a 链接；kernel 改动后
 #   必须重跑本步，否则陈旧产物会让 EraAudio 行为异常——见 docs/engine-integration-bench.md）
