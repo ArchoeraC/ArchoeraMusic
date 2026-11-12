@@ -3018,6 +3018,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'Einzelne Datei, begrenzt auf 4 MiB (an Ort und Stelle gekürzt; keine zusätzlichen Dateien).';
 
   @override
+  String get settingsSearchQueryLog => 'Suchabfragen-Protokoll';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      'Protokolliert Suchbegriffe auf diesem Gerät, um die Suchqualität zu verbessern (jederzeit löschbar)';
+
+  @override
+  String get settingsSearchQueryLogOff =>
+      'Protokollierung in Datei ist deaktiviert, Abfragen werden nicht aufgezeichnet';
+
+  @override
+  String get settingsSearchQueryLogCleared => 'Suchabfragen-Protokoll gelöscht';
+
+  @override
   String get settingsSecuritySection => 'Sicheres Vernichten';
 
   @override
@@ -4741,6 +4755,14 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsSearchIndexLrcDesc =>
       'Auch gleichnamige .lrc-Lyrics indexieren (Hauptschalter erforderlich)';
+
+  @override
+  String get settingsSearchIndexRomaji =>
+      'Romanisierung der Liedtexte indexieren';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      'Romanisierung für japanische Liedtexte ohne Umschrift automatisch erzeugen, damit sie per Romaji gefunden werden (etwa doppelte Indexgröße)';
 
   @override
   String get settingsSearchIndexNote =>

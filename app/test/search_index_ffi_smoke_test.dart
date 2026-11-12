@@ -96,7 +96,7 @@ void main() {
     expect(File(searchDb).existsSync(), isTrue);
 
     // 只读打开 search.db，经原生分析器查询。
-    final index = SearchIndex.open(searchDb, analyzer: lib.analyze);
+    final index = SearchIndex.open(searchDb, lib: lib);
     expect(index, isNotNull);
     addTearDown(index!.close);
 
@@ -259,7 +259,7 @@ void main() {
     expect(index.search('kurarin').map((h) => h.trackId), isNot(contains('t2')));
   }, skip: skip);
 
-  test('候选上限：宽命中查询只对有界候选排序（candidateCap）', () async {
+  test('候选上限已撤销：candidateCap 不再裁剪结果（ABI 兼容参数）', () async {
     final lib = IndexerLibrary.load(soPath: soPath);
     final index = await _buildIndex(lib, const [
       ('t1', '共同词元 一'),
@@ -267,14 +267,19 @@ void main() {
       ('t3', '共同词元 三'),
     ]);
     const query = '共同';
-    // cap = 0：无限候选 → 三首都参与排序（原路径）
+    // 该参数曾用 `rowid IN (子查询)` 实现，会让 FTS5 的 bm25 静默返回 0
+    // （相关性排序整体失效）。现保留参数但不再裁剪候选——任何取值都返回全部命中。
     expect(index.search(query, limit: 10, candidateCap: 0).length, 3);
-    // cap = 2：只取有界候选（rowid 顺序前 2）→ 最多 2 条
-    expect(index.search(query, limit: 10, candidateCap: 2).length, 2);
-    // cap = 1：1 条
-    expect(index.search(query, limit: 10, candidateCap: 1).length, 1);
-    // 默认（生产值）远大于命中集 → 与不限等价（窄命中不受影响）
+    expect(index.search(query, limit: 10, candidateCap: 2).length, 3,
+        reason: 'candidateCap 已不裁剪候选');
+    expect(index.search(query, limit: 10, candidateCap: 1).length, 3,
+        reason: 'candidateCap 已不裁剪候选');
     expect(index.search(query, limit: 10).length, 3);
+    // 顺序仍须按相关度（此处三首同分，只断言集合完整）。
+    expect(
+      index.search(query, limit: 10).map((h) => h.trackId).toSet(),
+      {'t1', 't2', 't3'},
+    );
   }, skip: skip);
 
   test('T0 双语 .lrc：英文译文可被英文查询命中、罗马音命中音译行', () async {
@@ -316,7 +321,7 @@ void main() {
     );
     expect(code, 0, reason: 'indexer_run 应返回 0，实际: $text');
 
-    final index = SearchIndex.open(searchDb, analyzer: lib.analyze);
+    final index = SearchIndex.open(searchDb, lib: lib);
     expect(index, isNotNull);
     addTearDown(index!.close);
 
@@ -367,7 +372,7 @@ Future<SearchIndex> _buildIndex(
   );
   expect(code, 0, reason: 'indexer_run 应返回 0，实际: $text');
 
-  final index = SearchIndex.open(searchDb, analyzer: lib.analyze);
+  final index = SearchIndex.open(searchDb, lib: lib);
   expect(index, isNotNull);
   addTearDown(index!.close);
   return index;

@@ -1,10 +1,45 @@
 # ArchoeraMusic — 仓库级忽略
+#
+# 分层约定：
+#   本文件            = 跨项目通用 + 仓库级产物
+#   app/.gitignore    = Flutter / Dart 工程
+#   app/core/*/.gitignore = 各原生子项目（indexer / bench 等）
+# 原则：**宁可不忽略，也不要忽略会被引用的源文件 / 黄金夹具**；构建产物必须忽略。
+# 仓库里"故意入库"的生成物也列在末尾，改之前先看清。
 
-# 根目录大文件（二进制归档/APK）
-*.tar.gz
-*.apk
+# ============================================================================
+# 1. 凭据与私钥（最重要：泄漏即事故）
+# ============================================================================
+*.key
+# 例外：vault 格式「黄金夹具」中的测试密钥（公开测试凭据，非真实凭据；
+# 见 app/core/vault-rs/testdata/README.md）——需入库冻结以锚定字节兼容性。
+!app/core/vault-rs/testdata/**/*.key
+# 防伪签名私钥（绝不入库；公钥 watermark_pub*.pem 需跟踪）
+*_priv.pem
+*_priv.key
 
-# Flutter / Dart
+# ============================================================================
+# 2. 通用：编辑器 / 系统 / 临时文件
+# ============================================================================
+.idea/
+.vscode/
+*.iml
+*.kate-swp
+*.swp
+*.swo
+*~
+*.bak
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# 临时工作目录（各 harness 的生成物落点；可含数百 MB 的语料 / 索引库）
+.work/
+
+# ============================================================================
+# 3. Flutter / Dart
+# ============================================================================
 app/build/
 app/.dart_tool/
 app/.flutter-plugins*
@@ -13,6 +48,36 @@ app/ios/Pods/
 app/.idea/
 app/.metadata
 
+# 本地临时测试（封面取色对照预览等，作者标注不入库）
+app/test/*_manual_test.dart
+
+# ============================================================================
+# 4. Python（工具脚本：bench / audio-engine tests / eta-tools）
+#    这些脚本会生成 __pycache__ 与 .pyc —— 散落在各目录，故在根统一忽略。
+# ============================================================================
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+# 虚拟环境（体积大、平台相关，绝不入库）
+.venv/
+venv/
+
+# ============================================================================
+# 4b. 其他工具缓存
+# ============================================================================
+.cache/
+.clangd/
+
+# ============================================================================
+# 5. C# / .NET（scanner、indexer 等 NativeAOT 项目）
+# ============================================================================
+TestResults/
+*.trx
+
 # scanner（NativeAOT FFI / CLI 构建产物；build/ 由 app/core/scanner/build.sh 产出）
 app/core/scanner/bin/
 app/core/scanner/obj/
@@ -20,98 +85,97 @@ app/core/scanner/build/
 app/core/scanner/scanner-ffi/bin/
 app/core/scanner/scanner-ffi/obj/
 
-# vcpkg manifest 模式默认安装目录（workflow 已用 VCPKG_INSTALLED_DIR 指到 C:\vcpkg\installed，此处兜底）
-app/vcpkg_installed/
-
-# scraper（C++ 刮削器 FFI / CLI 构建产物；build/ 由 app/core/scraper CMake 产出）
-app/core/scraper/build/
+# ============================================================================
+# 6. Rust（cdylib / staticlib / CLI）
+# ============================================================================
+app/core/downloader/target/
+app/core/shell/target/
+app/core/subsonic/transcoder/target/
+app/core/vault-rs/target/
+app/core/vault-rs/build/
 # scraper 加密后端（Rust staticlib，链入 archoera_scraper）
 app/core/scraper-crypto/target/
-
-# C 音频引擎（app/core/audio-engine/build/ 由 cmake 产出）
-app/core/audio-engine/build/
-# EraAudio 基准/变体构建目录（build-min / build-max / build-ac3 等，cmake 产出）
-app/core/audio-engine/build-*/
-app/core/audio-engine/tempo-target/
 app/core/audio-engine/tempo-rs/target/
 
-# 平台能力桥接（app/native/platform/build/ 由 cmake 产出）
-app/native/platform/build/
+# ============================================================================
+# 7. Zig（音频内核）
+# ============================================================================
+app/core/audio-engine/.zig-cache/
+app/core/audio-engine/zig-out/
+app/core/audio-engine/tempo-target/
 
-# 统一日志核心（app/native/log/build/ 由 cmake 产出；MSVC 中间产物 *.obj）
-app/native/log/build/
-app/native/log/*.obj
+# ============================================================================
+# 8. C / C++ 构建产物（cmake / vcpkg）
+# ============================================================================
+# vcpkg manifest 模式默认安装目录（workflow 已用 VCPKG_INSTALLED_DIR
+# 指到 C:\vcpkg\installed，此处兜底）
+app/vcpkg_installed/
 
-# C 音频引擎（本地测试产物：kernel/*.zig 编译出的可执行文件 + 解码输出的媒体数据）
+# 音频引擎（build/ 由 cmake 产出；build-* 为基准/变体目录）
+app/core/audio-engine/build/
+app/core/audio-engine/build-*/
+
+# 音频引擎本地测试产物（kernel/*.zig 编译出的可执行文件 + 解码输出的媒体数据）
 app/core/audio-engine/*_dump
 app/core/audio-engine/*_probe
 app/core/audio-engine/check
 app/core/audio-engine/mdct_dbg_test
 app/core/audio-engine/*.pcm
 
-# subsonic（Go c-shared + Rust 转码器 cdylib；build/ 由 build.sh 产出）
+# scraper（C++ 刮削器 FFI / CLI；build/ 由 app/core/scraper CMake 产出）
+app/core/scraper/build/
+
+# 平台能力桥接（build/ 由 cmake 产出）
+app/native/platform/build/
+
+# 统一日志核心（build/ 由 cmake 产出；MSVC 中间产物 *.obj）
+app/native/log/build/
+app/native/log/*.obj
+
+# subsonic（Go c-shared；build/ 由 build.sh 产出）
 app/core/subsonic/build/
-app/core/subsonic/transcoder/target/
 # build_windows.bat 生成的 Go Windows 版本资源（仅 windows/amd64 生效）
 app/core/subsonic/version_windows_amd64.rc
 app/core/subsonic/version_windows_amd64.syso
 
-# downloader（Rust 下载器 cdylib）
-app/core/downloader/target/
-
-# shell（Rust 内嵌原生 CLI staticlib，链入 runner）
-app/core/shell/target/
-
-
-# vault-rs（Rust 静态凭据保险库；cargo target/ + build.sh / build-test.sh 产物）
-app/core/vault-rs/target/
-app/core/vault-rs/build/
-
-# 打包输出（packaging/linux/package*.sh 的中间暂存与最终产物）
+# ============================================================================
+# 9. 打包 / 发布产物
+# ============================================================================
 dist/
 packaging/linux/work/
 
-# IDE / 编辑器
-.idea/
-.vscode/
-*.iml
-
-# 系统
-.DS_Store
-*.log
-
-*.key
-# 例外：vault 格式「黄金夹具」中的测试密钥（公开测试凭据，非真实凭据；
-# 见 app/core/vault-rs/testdata/README.md）——需入库冻结以锚定字节兼容性。
-!app/core/vault-rs/testdata/**/*.key
-# 防伪签名私钥（绝不入库；公钥 watermark_pub*.pem 需跟踪）
-*_priv.pem
-*_priv.key
-# 内嵌参考仓库（本地保留，不入库/不 submodule；供代码移植参考）
+# ============================================================================
+# 10. 本机专属（不入库）
+# ============================================================================
+# 内嵌参考仓库（本地保留，不入库 / 不做 submodule；供代码移植参考）
 reference/
 
-# 图标素材/候选源（本地提取与对照用；入库的只有 app/eta-tools/eta_icons 定稿集与最终字体）
+# 图标素材 / 候选源（入库的只有 app/eta-tools/eta_icons 定稿集与最终字体）
 Icon化/
 
-# 本地问题截图（仅调试用，不入库）
+# 本地问题截图（仅调试用）
 issuescreenshot/
 
-# 本地补丁归档（分支级 WIP / 回滚补丁；仅本机保留，绝不入库）
+# 本地补丁归档（分支级 WIP / 回滚补丁；仅本机保留）
 patches/
+
+# Trae IDE 本地分享包（Agent 工具产物，仅本机保留）
+.trae-html-share-packages/
 
 # Nix build result symlink
 /result
 /result-*
 
-# 本地临时测试（封面取色对照预览等，作者标注不入库）
-app/test/*_manual_test.dart
+# ============================================================================
+# 11. 大文件归档（仓库不承载二进制分发物）
+# ============================================================================
+*.tar.gz
+*.apk
 
-# 编辑器临时文件（Kate swap / vim swap / 备份）
-*.kate-swp
-*.swp
-*.swo
-*~
-*.bak
-
-# Trae IDE 本地分享包（Agent 工具产物，仅本机保留，不入库）
-.trae-html-share-packages/
+# ============================================================================
+# 12. 故意入库的生成物（**不要**加进忽略；列出以免误伤）
+# ============================================================================
+# app/lib/l10n/generated/         Flutter gen-l10n 产物（构建需要、需评审 diff）
+# app/core/indexer/bench/REPORT.md 基准报告（提交物；数字来自 metrics.json 渲染）
+# app/core/indexer/data/*.tsv       Unihan 派生表（字节兼容锚点）
+# app/core/vault-rs/testdata/**     vault 黄金夹具（见 §1 的 .key 例外）

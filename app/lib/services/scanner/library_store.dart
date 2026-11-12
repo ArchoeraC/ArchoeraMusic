@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math' show min;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';

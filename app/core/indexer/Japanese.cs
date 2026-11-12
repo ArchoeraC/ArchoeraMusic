@@ -12,7 +12,7 @@ namespace Archoera.Indexer;
 /// 日文读音映射（索引期）：**假名 → 罗马字**（<c>data/kana_romaji.tsv</c>）+
 /// **汉字 → 音读 / 训读罗马字**（<c>data/ja_readings.tsv</c>，派生自 Unihan
 /// <c>kJapaneseOn</c> / <c>kJapaneseKun</c>，Unicode License，见
-/// <c>tools/gen_hanzi_data.py</c> 与同目录 THIRD-PARTY-LICENSES.md）。
+/// <c>tools/gen_tables</c> 与同目录 THIRD-PARTY-LICENSES.md）。
 ///
 /// 产出写进独立的 <c>reading_meta_tok</c> / <c>reading_lyrics_tok</c> 列，内容为**字母 bigram**
 /// （与 CJK 的 bigram 索引同构）：查询侧把罗马字查询串也 bigram 成 `AND` 组即可命中去重后的
@@ -25,6 +25,8 @@ namespace Archoera.Indexer;
 ///   <item>假名罗马字给 **Hepburn 主拼 + 常见 Kunrei 变体**（し → shi/si、つ → tsu/tu …）。
 ///         变体只为提高键入召回（有人按训令式打字）；变体展开**按「主拼整串 + 每个歧义假名的
 ///         局部窗口」**计算，成本线性、与串长无关（不做整串变体笛卡尔积，避免长歌词行指数膨胀）；</item>
+///   <item>**罗马字规范形**（v7，T1-1）：bigram 生成前统一折叠为 <see cref="RomajiCanonical"/>
+///         规范形（拼写差异 / 促音 / 长音 / ん 边界），查询侧同构折叠——Hepburn 与训令式双向可搜；</item>
 ///   <item>促音「っ」重复后一音节首辅音（まって → matte）、长音「ー」延长前一元音
 ///         （数据 → deeta）；长元音用重复元音表示，不用 macron（便于纯 ASCII 键入）；</item>
 ///   <item>**已知限制**：汉字读音来自 Unihan 单字 <c>kJapaneseOn/Kun</c>，**不含人名 / 地名
@@ -97,7 +99,8 @@ internal static class Japanese
     public static string ReadingBigrams(string text, bool includeKanjiReadings)
     {
         if (string.IsNullOrEmpty(text)) return "";
-        if (!ContainsKana(text) && !(includeKanjiReadings && ContainsCjk(text))) return "";
+        if (!ContainsKana(text) && !Korean.ContainsHangul(text)
+            && !(includeKanjiReadings && ContainsCjk(text))) return "";
 
         // **必须按出现顺序发射**（与 CJK 分词一致）：读数列要支持「相邻 bigram 短语」= 子串检索，
         // 排序 / 去重都会破坏相邻语义（早期用 SortedSet 导致所有短语查询命中 0）。
@@ -119,6 +122,16 @@ internal static class Japanese
                 continue;
             }
 
+            if (Korean.IsHangul(ch))
+            {
+                // 谚文段 → 国语罗马字（T1-3）；与假名同路写入读音列，查询侧 Latin 读音趟直接复用。
+                var start = i;
+                while (i < text.Length && Korean.IsHangul(text[i])) i++;
+                var romaji = Korean.Romanize(text.AsSpan(start, i - start));
+                if (romaji.Length > 0) AddBigrams(romaji, bigrams);
+                continue;
+            }
+
             if (includeKanjiReadings && ScriptRanges.IsCjk(ch))
             {
                 // 单个汉字读音（不含跨字连读；见类注释的已知限制）
@@ -127,7 +140,7 @@ internal static class Japanese
                     foreach (var reading in readings)
                     {
                         buffer.Clear();
-                        var romaji = ToRomaji(reading, primaryOnly: true);
+                        var romaji = ToRomaji(reading);
                         if (romaji.Length > 0) AddBigrams(romaji, bigrams);
                     }
                 }
@@ -149,29 +162,29 @@ internal static class Japanese
     /// </summary>
     private static void AddKanaRunBigrams(ReadOnlySpan<char> run, List<string> bigrams)
     {
-        var text = run.ToString();
+        var units = SplitKanaUnits(run.ToString());
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
         // 1) 主拼整串（Hepburn 首选拼写）
-        var primary = ToRomaji(text, primaryOnly: true);
-        if (primary.Length > 0) AddBigrams(primary, bigrams);
+        var primary = RomanizeUnits(units, 0, units.Count - 1, altUnit: -1, altIndex: 0);
+        if (primary.Length > 0 && seen.Add(primary)) AddBigrams(primary, bigrams);
 
-        // 2) 局部窗口：下标 i 处若有多个拼写变体，用「i-1..i+1」三字窗口各自算一遍
-        var units = SplitKanaUnits(text);
+        // 2) 局部窗口：下标 i 处若有备选拼写，用「i-1..i+1」三字窗口各自转写一遍。
+        //    注意：窗口必须由**假名单元**直接转写，不能把罗马字拼回假名串（否则非假名会被跳过）。
+        //    规范形折叠后部分备选拼写与主拼等价，用 [seen] 去重，避免索引里重复 bigram。
         var variantCount = 0;
         for (var i = 0; i < units.Count && variantCount < MaxVariantsPerRun; i++)
         {
-            if (Variants(units[i]).Length < 2) continue;
+            var variants = Variants(units[i]);
+            if (variants.Length < 2) continue;
 
-            foreach (var alt in Variants(units[i]))
+            var from = Math.Max(0, i - 1);
+            var to = Math.Min(units.Count - 1, i + 1);
+            for (var altIndex = 1; altIndex < variants.Length; altIndex++)
             {
                 if (variantCount++ >= MaxVariantsPerRun) break;
-                var window = new StringBuilder();
-                for (var k = Math.Max(0, i - 1); k <= Math.Min(units.Count - 1, i + 1); k++)
-                {
-                    window.Append(k == i ? alt : Variants(units[k])[0]);
-                }
-                var romaji = ToRomaji(window.ToString(), primaryOnly: true);
-                if (romaji.Length > 0) AddBigrams(romaji, bigrams);
+                var romaji = RomanizeUnits(units, from, to, i, altIndex);
+                if (romaji.Length > 0 && seen.Add(romaji)) AddBigrams(romaji, bigrams);
             }
         }
     }
@@ -202,22 +215,30 @@ internal static class Japanese
         => KanaTable.Value.TryGetValue(unit, out var v) ? v : new[] { unit };
 
     /// <summary>
-    /// 假名串 → 罗马字（[primaryOnly] 为真只取首选拼写）。
-    /// 促音「っ」重复后一音节首辅音；长音「ー」延长前一元音；其余按最长匹配查表。
+    /// 假名串 → 罗马字（主拼）。
+    /// 促音「っ」重复后一音节首辅音；长音「ー」延长前一元音；「ん」后接元音时写 <c>nn</c>
+    /// （与查询侧 <see cref="RomajiCanonical.Variants"/> 的放宽变体对齐）；其余按最长匹配查表。
     /// </summary>
-    private static string ToRomaji(string kana, bool primaryOnly)
+    private static string ToRomaji(string kana)
     {
-        var sb = new StringBuilder(kana.Length * 2);
-        var pendingGeminate = false;
-        var i = 0;
-        while (i < kana.Length)
-        {
-            var two = i + 1 < kana.Length ? kana.Substring(i, 2) : "";
-            string? unit = null;
-            if (two.Length == 2 && KanaTable.Value.ContainsKey(two)) { unit = two; i += 2; }
-            else if (KanaTable.Value.ContainsKey(kana[i].ToString())) { unit = kana[i].ToString(); i += 1; }
-            else { i++; continue; }   // 非假名：跳过（调用方已按段切分）
+        var units = SplitKanaUnits(kana);
+        return RomanizeUnits(units, 0, units.Count - 1, altUnit: -1, altIndex: 0);
+    }
 
+    /// <summary>
+    /// 把 [from, to] 范围内的假名单元转写为罗马字；[altUnit] 处取第 [altIndex] 个备选拼写。
+    ///
+    /// 促音 / 长音 / ん 的处理与主拼完全一致（同一份逻辑），保证「主拼整串」与
+    /// 「局部窗口变体」不会漂移。
+    /// </summary>
+    private static string RomanizeUnits(
+        IReadOnlyList<string> units, int from, int to, int altUnit, int altIndex)
+    {
+        var sb = new StringBuilder(units.Count * 2);
+        var pendingGeminate = false;
+        for (var i = from; i <= to; i++)
+        {
+            var unit = units[i];
             if (unit == "っ")
             {
                 pendingGeminate = true;
@@ -232,15 +253,28 @@ internal static class Japanese
                 continue;
             }
 
-            var spelling = Variants(unit)[0];
+            if (unit == "ん")
+            {
+                // ん + 元音 → nn + 元音；否则单 n。让「しんえん」类词在规范形下保持 n 边界。
+                var next = i + 1 <= to ? Variants(units[i + 1])[0] : "";
+                sb.Append(next.Length > 0 && "aeiou".IndexOf(next[0]) >= 0 ? "nn" : "n");
+                continue;
+            }
+
+            var variants = Variants(unit);
+            var spelling = i == altUnit && altIndex < variants.Length ? variants[altIndex] : variants[0];
             if (pendingGeminate)
             {
                 pendingGeminate = false;
-                if (spelling.Length > 0) sb.Append(spelling[0]);   // 促音 = 重复后一音节首辅音
+                if (spelling.Length > 0)
+                {
+                    // 促音 = 重复后一音节首辅音；Hepburn 的「っち」写作 tch（而非 cch）。
+                    sb.Append(spelling.Length > 1 && spelling[0] == 'c' && spelling[1] == 'h'
+                        ? 't'
+                        : spelling[0]);
+                }
             }
             sb.Append(spelling);
-
-            if (!primaryOnly) { /* 变体由调用方按窗口展开，此处只产出主拼 */ }
         }
         return sb.ToString();
     }
@@ -256,7 +290,10 @@ internal static class Japanese
         return '\0';
     }
 
-    /// <summary>字母 bigram（含单字符本体，便于 1 字符查询）；只保留 ASCII 字母与数字。</summary>
+    /// <summary>
+    /// 字母 bigram（含单字符本体，便于 1 字符查询）；只保留 ASCII 字母与数字。
+    /// 生成前先折叠为**规范形**（<see cref="RomajiCanonical.Apply"/>），与查询侧同构。
+    /// </summary>
     private static void AddBigrams(string romaji, List<string> bigrams)
     {
         var normalized = new StringBuilder(romaji.Length);
@@ -265,7 +302,7 @@ internal static class Japanese
             var lower = char.ToLowerInvariant(c);
             if ((lower >= 'a' && lower <= 'z') || (lower >= '0' && lower <= '9')) normalized.Append(lower);
         }
-        var s = normalized.ToString();
+        var s = RomajiCanonical.Apply(normalized.ToString());
         if (s.Length == 0) return;
         if (s.Length == 1)
         {

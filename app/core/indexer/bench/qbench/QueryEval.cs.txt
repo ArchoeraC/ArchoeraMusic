@@ -1,0 +1,476 @@
+// ArchoeraMusic
+// Copyright (C) 2026 Archoera && BetaStudio2
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// 本地曲库搜索索引器 P0 —— **召回 / 排序质量**评测（recall@k / precision@k / MRR / NDCG）。
+//
+// 与 qbench 的分工：qbench 量**延迟**（不关心结果对不对），本工具量**结果对不对**。
+// 二者共同构成设计文档 §2.2（预算）与 §2.3（验收基线）的证据链：
+//   - 延迟达标 ≠ 搜索可用；排序失效（如 §4.5 的 candidateCap bug）在 qbench 里只表现为「快」。
+//   - 本工具用**字面标注**做金标准，故能发现「快而错」。
+//
+// 金标准（ground truth）的口径：**曲库文本里字面包含查询目标**的那些曲目。
+//   - 这是「子串搜索」的诚实定义，不依赖被测分析器（避免循环论证）；
+//   - 拼音 / 繁体查询由 spec 给出**目标字串**（`woaini` → `我爱你`，`愛` → `爱`/`愛`），
+//     标注与查询侧归一化后的期望一致；
+//   - 对真实曲库同样适用：手写 spec 即可，无需重跑生成器。
+//
+// 直接复用生产 `SearchSession` / `SearchRequest` / `Analyzer`（同源编译），
+// 量到的就是 Dart 侧 FFI 实际走的路径，不复制兜底趟逻辑。
+//
+// 用法：
+//   qbench eval --library <library.db> --index <search.db>
+//               [--limit 50] [--spec <queries.json>] [--out <json>]
+// 退出码：0 成功；1 参数 / 运行错误。
+
+using System.Text;
+using System.Text.Json;
+using Microsoft.Data.Sqlite;
+
+namespace Archoera.Indexer.Bench;
+
+/// <summary>召回 / 排序质量评测（金标准 = 曲库文本的字面包含）。</summary>
+public static class QueryEval
+{
+    /// <summary>
+    /// 一条评测查询。
+    /// </summary>
+    /// <param name="Name">指标报表里的短名（与 qbench 的 case 名对齐，便于交叉引用）。</param>
+    /// <param name="Text">实际输入搜索框的文本。</param>
+    /// <param name="Targets">金标准目标字串：曲库文本字面包含任一即算相关。</param>
+    /// <param name="Metadata">true = 只标注元数据字段（对应 `scope=metadata`）。</param>
+    private sealed record EvalQuery(string Name, string Text, string[] Targets, bool Metadata);
+
+    /// <summary>
+    /// 稳定的短语查询（不依赖具体语料）：中文子串 / 短语 / 繁体 / 拉丁 / 拼音 / 首字母。
+    ///
+    /// 这些词来自语料生成器的**固定注入短语**（`gen_corpus.py` 的 `INJECT`），
+    /// 换 seed / 规模后依然同形；真实曲库里不存在的条目会被自动计为「无标注」并排除，
+    /// 不会污染汇总。
+    /// </summary>
+    private static readonly EvalQuery[] FixedQueries =
+    {
+        new("cjk_phrase", "\u6211\u597d\u7231\u4f60", new[] { "\u6211\u597d\u7231\u4f60" }, false),
+        new("cjk_with_initials", "\u6211\u7231\u4f60", new[] { "\u6211\u7231\u4f60" }, false),
+        new("cjk_substring", "\u7231\u4f60", new[] { "\u7231\u4f60" }, false),
+        new("traditional", "\u611b", new[] { "\u611b", "\u7231" }, false),
+        new("latin_word", "hello", new[] { "hello" }, false),
+        new("latin_prefix", "love", new[] { "love" }, false),
+        new("pinyin_joined", "woaini", new[] { "\u6211\u7231\u4f60" }, false),
+        new("pinyin_prefix", "wo", new[] { "\u6211" }, false),
+        new("pinyin_initials", "wan", new[] { "\u6211\u7231\u4f60", "\u7231\u4f60" }, false),
+    };
+
+    /// <summary>参与统计的 k（@1 / @5 / @10 / @50）。</summary>
+    private static readonly int[] Cutoffs = { 1, 5, 10, 50 };
+
+    /// <summary>各类相关项规模的分档阈值（窄 / 中 / 宽）。</summary>
+    private const int NarrowMax = 10;
+    private const int MediumMax = 500;
+
+    public static int Run(string[] args)
+    {
+        string? library = null;
+        string? index = null;
+        string? outPath = null;
+        string? specPath = null;
+        var limit = 50;
+
+        for (var i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--library" when i + 1 < args.Length: library = args[++i]; break;
+                case "--index" when i + 1 < args.Length: index = args[++i]; break;
+                case "--spec" when i + 1 < args.Length: specPath = args[++i]; break;
+                case "--out" when i + 1 < args.Length: outPath = args[++i]; break;
+                case "--limit" when i + 1 < args.Length && int.TryParse(args[++i], out var l): limit = l; break;
+                case "-h" or "--help":
+                    Console.Error.WriteLine(
+                        "qbench eval --library <library.db> --index <search.db> "
+                        + "[--limit N] [--spec f.json] [--out f.json]");
+                    return 0;
+            }
+        }
+
+        if (library is null || !File.Exists(library))
+        {
+            Console.Error.WriteLine("缺少有效 --library <library.db>");
+            return 1;
+        }
+        if (index is null || !File.Exists(index))
+        {
+            Console.Error.WriteLine("缺少有效 --index <search.db>");
+            return 1;
+        }
+
+        var queries = specPath is null ? DeriveQueries(library) : LoadSpec(specPath);
+        if (queries.Count == 0)
+        {
+            Console.Error.WriteLine("评测集为空");
+            return 1;
+        }
+
+        var indexIds = ReadIndexTrackIds(index);
+        var rows = new List<QueryRow>();
+
+        foreach (var q in queries)
+        {
+            var relevant = ReadRelevant(library, q);
+            // 缺失标注项 = 索引落后于曲库（增量未收敛）。它会让召回**结构性**上限变低，
+            // 单独报出来，避免把「索引旧了」误读成「分析器不行」。
+            var missing = relevant.Count(id => !indexIds.Contains(id));
+
+            var request = new SearchRequest
+            {
+                Query = q.Text,
+                Limit = limit,
+                Metadata = q.Metadata,
+                Fuzzy = true,        // 生产默认（SearchService.search 的 fuzzy 默认 true）
+                MinExact = 1,        // 生产默认：主趟有命中即短路
+            };
+
+            SearchResult result;
+            try
+            {
+                result = SearchSession.Run(index, request);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[eval] {q.Name} 查询失败：{ex.Message}");
+                return 1;
+            }
+
+            var ranked = result.Items.Select(h => h.TrackId).ToList();
+            rows.Add(Score(q, relevant, ranked, missing, result.Passes));
+
+            var r = rows[^1];
+            Console.WriteLine(
+                $"{q.Name,-20} n_rel={r.NRel,6} found@50={r.FoundAt50,5} "
+                + $"P@10={r.P10,5:F3} R@10={r.R10,5:F3} MRR@10={r.Mrr10,5:F3} NDCG@10={r.Ndcg10,5:F3}"
+                + (r.MissingFromIndex > 0 ? $"  ⚠索引缺 {r.MissingFromIndex}" : ""));
+        }
+
+        var report = BuildReport(index, library, limit, rows);
+        var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
+        if (outPath is not null) File.WriteAllText(outPath, json);
+
+        PrintSummary(rows);
+        Console.WriteLine(json);
+        return 0;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 指标                                                                */
+    /* ------------------------------------------------------------------ */
+
+    private sealed record QueryRow(
+        string Name, string Text, int NRel, int FoundAt50, int MissingFromIndex,
+        double P1, double P5, double P10, double R10, double R50, double Mrr10, double Ndcg10,
+        string Bucket, int Passes);
+
+    private static QueryRow Score(
+        EvalQuery q, HashSet<string> relevant, List<string> ranked, int missing, PassCounts passes)
+    {
+        var k1 = CountRelevant(relevant, ranked, 1);
+        var k5 = CountRelevant(relevant, ranked, 5);
+        var k10 = CountRelevant(relevant, ranked, 10);
+        var k50 = CountRelevant(relevant, ranked, 50);
+        var n = relevant.Count;
+
+        // 首条相关项的排名（1-based）；top-10 内无命中记 0 → MRR 0（惩罚「排得太后」）。
+        var firstRank = 0;
+        for (var i = 0; i < Math.Min(10, ranked.Count); i++)
+        {
+            if (relevant.Contains(ranked[i])) { firstRank = i + 1; break; }
+        }
+
+        var bucket = n switch
+        {
+            <= NarrowMax => "narrow",
+            <= MediumMax => "medium",
+            _ => "broad",
+        };
+
+        return new QueryRow(
+            q.Name, q.Text, n, k50, missing,
+            P(k1, 1), P(k5, 5), P(k10, 10),
+            R(k10, n), R(k50, n),
+            firstRank == 0 ? 0.0 : 1.0 / firstRank,
+            Ndcg(relevant, ranked, 10),
+            bucket,
+            passes.PinyinLoose + passes.Reading + passes.CrossLingual + passes.Fuzzy + passes.CjkFuzzy);
+    }
+
+    private static int CountRelevant(HashSet<string> relevant, List<string> ranked, int k)
+    {
+        var hit = 0;
+        for (var i = 0; i < Math.Min(k, ranked.Count); i++)
+            if (relevant.Contains(ranked[i])) hit++;
+        return hit;
+    }
+
+    /// <summary>precision@k（k 固定按名义值算，命中不足也按 k 计，符合常规定义）。</summary>
+    private static double P(int hits, int k) => k <= 0 ? 0.0 : (double)hits / k;
+
+    /// <summary>recall@k；相关项为 0 时无定义 → 返回 0（该条会在汇总里被排除）。</summary>
+    private static double R(int hits, int nRel) => nRel <= 0 ? 0.0 : Math.Min(1.0, (double)hits / nRel);
+
+    /// <summary>二元相关性 NDCG@k（无分级标注时 IDCG = 理想前 n_rel 条全命中）。</summary>
+    private static double Ndcg(HashSet<string> relevant, List<string> ranked, int k)
+    {
+        if (relevant.Count == 0) return 0.0;
+        double dcg = 0.0;
+        for (var i = 0; i < Math.Min(k, ranked.Count); i++)
+            if (relevant.Contains(ranked[i])) dcg += 1.0 / Math.Log2(i + 2);
+        double idcg = 0.0;
+        for (var i = 0; i < Math.Min(k, relevant.Count); i++)
+            idcg += 1.0 / Math.Log2(i + 2);
+        return idcg <= 0 ? 0.0 : dcg / idcg;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 金标准                                                              */
+    /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 构造默认评测集：**窄 / 中档查询从曲库自动派生**（避免写死只适用于某个语料的标题），
+    /// 宽命中与拼音查询用固定短语。
+    ///
+    /// 为什么自动派生：写死标题会随 `--tracks` / `--vocab` / seed 失效（标题频次完全变了），
+    /// 而「取频次 2–10 的标题」在任何曲库上都成立且仍有意义——曲库里有同名曲目时，
+    /// 搜索必须把这几首都返回。
+    /// </summary>
+    private static List<EvalQuery> DeriveQueries(string library)
+    {
+        var list = new List<EvalQuery>();
+        using var conn = new SqliteConnection(
+            new SqliteConnectionStringBuilder { DataSource = library, Mode = SqliteOpenMode.ReadOnly }.ToString());
+        conn.Open();
+
+        void AddTitles(string prefix, int lo, int hi, int take)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT title, count(*) AS c FROM tracks
+                WHERE title IS NOT NULL AND length(title) >= 2
+                GROUP BY title HAVING count(*) BETWEEN @lo AND @hi
+                ORDER BY c ASC, title LIMIT @n
+                """;
+            cmd.Parameters.AddWithValue("@lo", lo);
+            cmd.Parameters.AddWithValue("@hi", hi);
+            cmd.Parameters.AddWithValue("@n", take);
+            using var reader = cmd.ExecuteReader();
+            var i = 0;
+            while (reader.Read())
+            {
+                var title = reader.GetString(0);
+                list.Add(new EvalQuery($"{prefix}_{++i}", title, new[] { title }, false));
+            }
+        }
+
+        // 窄：2–10 首同名（最能检验「该找到的有没有找到」）
+        AddTitles("title_narrow", 2, 10, 3);
+        // 中档：15–200 首（介于「逐条核对」与「只能看 precision」之间）
+        AddTitles("title_medium", 15, 200, 2);
+
+        // 艺人（元数据范围）：取最高频的两位——真实曲库里同样成立。
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT json_extract(artists, '$[0].name') AS name, count(*) AS c
+                FROM tracks WHERE json_valid(artists)
+                GROUP BY name HAVING name IS NOT NULL AND length(name) > 0 AND c BETWEEN 5 AND 5000
+                ORDER BY c DESC LIMIT 2
+                """;
+            using var reader = cmd.ExecuteReader();
+            var i = 0;
+            while (reader.Read())
+            {
+                var name = reader.GetString(0);
+                list.Add(new EvalQuery($"artist_top_{++i}", name, new[] { name }, true));
+            }
+        }
+        catch (SqliteException)
+        {
+            // 老库 / 非标准 artists 形态：跳过艺人维度，不影响其余指标。
+        }
+
+        list.AddRange(FixedQueries);
+        return list;
+    }
+
+    /// <summary>按 spec 的目标字串，从 `library.db` 取字面包含它们的曲目 id。</summary>
+    private static HashSet<string> ReadRelevant(string library, EvalQuery q)
+    {
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        using var conn = new SqliteConnection(
+            new SqliteConnectionStringBuilder { DataSource = library, Mode = SqliteOpenMode.ReadOnly }.ToString());
+        conn.Open();
+
+        // 元数据范围只标注元数据字段——与 `scope=metadata` 的语义对齐，
+        // 否则「歌词命中」会被算成标注错误。
+        var fields = q.Metadata
+            ? new[] { "title", "artists", "album" }
+            : new[] { "title", "artists", "album", "lyrics", "lyrics_lrc" };
+        var predicates = string.Join(" OR ", fields.Select(f => $"{f} LIKE @p ESCAPE '\\'"));
+        var sql = $"SELECT id FROM tracks WHERE {predicates}";
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+
+        foreach (var target in q.Targets)
+        {
+            cmd.Parameters.Clear();
+            cmd.Parameters.AddWithValue("@p", "%" + EscapeLike(target) + "%");
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) set.Add(reader.GetString(0));
+        }
+        return set;
+    }
+
+    /// <summary>转义 LIKE 通配符（曲名里的 `%` / `_` 不能当通配符用）。</summary>
+    private static string EscapeLike(string s) =>
+        s.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+
+    /// <summary>索引里实际存在的全部 track_id（用于检出「索引落后于曲库」）。</summary>
+    private static HashSet<string> ReadIndexTrackIds(string index)
+    {
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        using var conn = new SqliteConnection(
+            new SqliteConnectionStringBuilder { DataSource = index, Mode = SqliteOpenMode.ReadOnly }.ToString());
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT track_id FROM search_docs";
+        try
+        {
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) set.Add(reader.GetString(0));
+        }
+        catch (SqliteException)
+        {
+            // 索引不可读时返回空集 → 每条都会报 missing，报错信息由调用方给出。
+        }
+        return set;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 报表                                                                */
+    /* ------------------------------------------------------------------ */
+
+    private static object BuildReport(string index, string library, int limit, List<QueryRow> rows)
+        => new
+        {
+            index = Path.GetFullPath(index),
+            library = Path.GetFullPath(library),
+            limit,
+            cutoffs = Cutoffs,
+            queries = rows.Select(r => new
+            {
+                name = r.Name,
+                text = r.Text,
+                n_rel = r.NRel,
+                bucket = r.Bucket,
+                found_at_50 = r.FoundAt50,
+                missing_from_index = r.MissingFromIndex,
+                p1 = Round(r.P1), p5 = Round(r.P5), p10 = Round(r.P10),
+                r10 = Round(r.R10), r50 = Round(r.R50),
+                mrr10 = Round(r.Mrr10), ndcg10 = Round(r.Ndcg10),
+                fallback_passes = r.Passes,
+            }),
+            aggregate = new
+            {
+                all = Aggregate(rows.Where(r => r.NRel > 0)),
+                narrow = Aggregate(rows.Where(r => r.NRel > 0 && r.Bucket == "narrow")),
+                medium = Aggregate(rows.Where(r => r.NRel > 0 && r.Bucket == "medium")),
+                broad = Aggregate(rows.Where(r => r.NRel > 0 && r.Bucket == "broad")),
+                empty_ground_truth = rows.Where(r => r.NRel == 0).Select(r => r.Name).ToArray(),
+                total_missing_from_index = rows.Sum(r => r.MissingFromIndex),
+            },
+        };
+
+    private static object Aggregate(IEnumerable<QueryRow> rows)
+    {
+        var list = rows.ToList();
+        if (list.Count == 0) return new { count = 0 };
+        return new
+        {
+            count = list.Count,
+            p1 = Round(list.Average(r => r.P1)),
+            p5 = Round(list.Average(r => r.P5)),
+            p10 = Round(list.Average(r => r.P10)),
+            r10 = Round(list.Average(r => r.R10)),
+            r50 = Round(list.Average(r => r.R50)),
+            mrr10 = Round(list.Average(r => r.Mrr10)),
+            ndcg10 = Round(list.Average(r => r.Ndcg10)),
+        };
+    }
+
+    private static void PrintSummary(List<QueryRow> rows)
+    {
+        Console.WriteLine();
+        Console.WriteLine("按相关项规模分档（宏平均，空标注集已排除）：");
+        Console.WriteLine($"{"bucket",-8} {"n",3} {"P@1",7} {"P@10",7} {"R@10",7} {"R@50",7} {"MRR@10",7} {"NDCG@10",7}");
+        foreach (var bucket in new[] { "narrow", "medium", "broad" })
+        {
+            var g = rows.Where(r => r.NRel > 0 && r.Bucket == bucket).ToList();
+            if (g.Count == 0) continue;
+            Console.WriteLine(
+                $"{bucket,-8} {g.Count,3} {g.Average(r => r.P1),7:F3} {g.Average(r => r.P10),7:F3} "
+                + $"{g.Average(r => r.R10),7:F3} {g.Average(r => r.R50),7:F3} "
+                + $"{g.Average(r => r.Mrr10),7:F3} {g.Average(r => r.Ndcg10),7:F3}");
+        }
+        var all = rows.Where(r => r.NRel > 0).ToList();
+        if (all.Count > 0)
+        {
+            Console.WriteLine(
+                $"{"ALL",-8} {all.Count,3} {all.Average(r => r.P1),7:F3} {all.Average(r => r.P10),7:F3} "
+                + $"{all.Average(r => r.R10),7:F3} {all.Average(r => r.R50),7:F3} "
+                + $"{all.Average(r => r.Mrr10),7:F3} {all.Average(r => r.Ndcg10),7:F3}");
+        }
+        var empty = rows.Where(r => r.NRel == 0).Select(r => r.Name).ToList();
+        if (empty.Count > 0)
+            Console.WriteLine($"\n⚠ 无标注相关项（不计入汇总）：{string.Join(", ", empty)}");
+        var missing = rows.Sum(r => r.MissingFromIndex);
+        if (missing > 0)
+            Console.WriteLine($"⚠ 标注项中有 {missing} 首不在索引里（索引落后于曲库，召回被结构性压低）");
+    }
+
+    private static double Round(double v) => Math.Round(v, 4, MidpointRounding.AwayFromZero);
+
+    /* ------------------------------------------------------------------ */
+    /* 外部 spec                                                           */
+    /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 读取外部标注 spec（真实曲库用）。格式：
+    /// <code>
+    /// { "queries": [
+    ///     { "name": "my_song", "text": "夜に駆ける", "targets": ["夜に駆ける"], "metadata": false }
+    /// ] }
+    /// </code>
+    /// </summary>
+    private static List<EvalQuery> LoadSpec(string path)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(path, Encoding.UTF8));
+        var list = new List<EvalQuery>();
+        if (!doc.RootElement.TryGetProperty("queries", out var arr)
+            || arr.ValueKind != JsonValueKind.Array)
+        {
+            return list;
+        }
+        foreach (var item in arr.EnumerateArray())
+        {
+            var name = item.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+            var text = item.TryGetProperty("text", out var t) ? t.GetString() ?? "" : "";
+            if (name.Length == 0 || text.Length == 0) continue;
+            var targets = item.TryGetProperty("targets", out var tg) && tg.ValueKind == JsonValueKind.Array
+                ? tg.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToArray()
+                : new[] { text };
+            var metadata = item.TryGetProperty("metadata", out var m)
+                && m.ValueKind is JsonValueKind.True or JsonValueKind.False && m.GetBoolean();
+            list.Add(new EvalQuery(name, text, targets, metadata));
+        }
+        return list;
+    }
+}

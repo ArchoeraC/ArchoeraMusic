@@ -20,6 +20,11 @@ public sealed class DocTokens
     public string AlbumTok { get; init; } = "";
     public string LyricsTok { get; init; } = "";
     public string LyricsTrTok { get; init; } = "";
+
+    /// <summary>
+    /// 音译歌词列：两种来源——LRC 提供的音译层（**整词**词元），或开启「歌词罗马音生成」
+    /// （T2-9）且无音译层时自动生成的歌词读音 **字母 bigram**（与 <c>reading_meta_tok</c> 同构）。
+    /// </summary>
     public string LyricsRomTok { get; init; } = "";
     /// <summary>
     /// 拼音列（**元数据段**，v4 起与歌词段分列）：title/artist/album/filename 的全拼音节。
@@ -49,6 +54,16 @@ public sealed class DocTokens
     /// bigram 会把索引推高约 2×（真实 165 首日文库实测 2.42MB → 4.53MB），故不索引歌词读音。
     /// </summary>
     public string ReadingMetaTok { get; init; } = "";
+
+    /// <summary>
+    /// 读音列的**原文副本**（与 <see cref="ReadingMetaTok"/> 同值，v6 起写入 <c>search_docs.reading_tok</c>）。
+    ///
+    /// contentless FTS 不保存 token 文本，兜底趟无法回读候选的读音串；没有它就只能按 bm25
+    /// 排序，无法区分「整词前缀命中 / 整词包含命中」（T1-4）。副本只在元数据段，
+    /// 单曲数十字节，30k 曲库约 +3–6 MB，可接受。
+    /// </summary>
+    public string ReadingText { get; init; } = "";
+
     public string FilenameTok { get; init; } = "";
 
     /// <summary>索引时的 <c>tracks.file_mtime</c>（脏集判定的版本锚）。</summary>
@@ -78,9 +93,43 @@ public sealed class StoreMeta
     public int AnalyzerVersion { get; set; }
     public bool IndexLrc { get; set; }
     public bool Pinyin { get; set; }
+
+    /// <summary>是否开启了「歌词罗马音生成」（T2-9）；开关变化触发全量重建。</summary>
+    public bool RomajiLyrics { get; set; }
+
     public long AppliedGeneration { get; set; }
     public long BuiltAt { get; set; }
     public long FullBuildAt { get; set; }
+
+    /// <summary>
+    /// 曲库语言画像（v7）：索引内容里是否出现过对应脚本。
+    /// 查询侧据此**跳过不可能命中的兜底趟**（纯拉丁库跳过读数 / 韩文趟，
+    /// 没有汉字可命中的库在跨语言趟里丢掉汉字候选）。
+    ///
+    /// 默认 <c>true</c>（保守：缺键 / 旧库不裁剪），构建收尾时会写入实际值。
+    /// </summary>
+    public bool HasJapanese { get; set; } = true;
+
+    /// <inheritdoc cref="HasJapanese"/>
+    public bool HasKorean { get; set; } = true;
+
+    /// <inheritdoc cref="HasJapanese"/>
+    public bool HasHan { get; set; } = true;
+
+    /// <inheritdoc cref="HasJapanese"/>
+    public bool HasLatin { get; set; } = true;
+
+    /// <summary>
+    /// 距上次 FTS5 全段合并（`optimize`）以来累计**新增 / 改写的曲目数**。
+    ///
+    /// 为什么按曲数而不是次数：退化来自 `contentless_delete` 的墓碑——每次改写留下的
+    /// 删除标记在合并前都会参与查询过滤，实测退化与**累计改写曲数**单调相关
+    /// （`爱你`：20 曲 +34%、60 曲 +73%、120 曲 +103%），而与当下段数关系不大。
+    ///
+    /// 合并是 O(索引) 的全库重写（402MB 实测 4.5–13s），故只在累计量过阈值时才做；
+    /// 旧库缺键按 0 处理（下一次增量会自然累积）。
+    /// </summary>
+    public int UpdatesSinceMerge { get; set; }
 }
 
 /// <summary>

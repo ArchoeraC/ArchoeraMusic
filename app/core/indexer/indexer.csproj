@@ -22,6 +22,8 @@
     <Compile Remove="tests/**" />
     <!-- indexer-ffi/ 是独立 AOT 共享库，不得编入 CLI -->
     <Compile Remove="indexer-ffi/**" />
+    <!-- tools/ 是构建期数据表生成器（独立 .NET 控制台程序），不得编入 CLI -->
+    <Compile Remove="tools/**" />
     <!-- 侧车歌词读取：与 scanner **共用同一源文件**（避免两套解码 / 分层实现漂移）。
          扫描器负责把 .lrc 解析结果写进 library.db，索引器只读 DB（零文件系统访问）。 -->
     <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
@@ -53,6 +55,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="data/nfkc.tsv">
       <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="data/accent_fold.tsv">
+      <LogicalName>Archoera.Indexer.data.accent_fold.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="data/variant_fold.tsv">
+      <LogicalName>Archoera.Indexer.data.variant_fold.tsv</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="data/def_en2hanzi.tsv">
       <LogicalName>Archoera.Indexer.data.def_en2hanzi.tsv</LogicalName>

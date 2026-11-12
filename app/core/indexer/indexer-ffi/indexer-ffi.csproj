@@ -31,6 +31,8 @@
     <Compile Include="../../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
     <Compile Include="../Analyzer.cs" Link="Analyzer.cs" />
     <Compile Include="../Japanese.cs" Link="Japanese.cs" />
+    <Compile Include="../RomajiCanonical.cs" Link="RomajiCanonical.cs" />
+    <Compile Include="../Korean.cs" Link="Korean.cs" />
     <Compile Include="../Pinyin.cs" Link="Pinyin.cs" />
     <Compile Include="../PinyinSegmenter.cs" Link="PinyinSegmenter.cs" />
     <Compile Include="../HanziData.cs" Link="HanziData.cs" />
@@ -39,6 +41,10 @@
     <Compile Include="../FtsStore.cs" Link="FtsStore.cs" />
     <Compile Include="../IndexerEngine.cs" Link="IndexerEngine.cs" />
     <Compile Include="../IndexerJson.cs" Link="IndexerJson.cs" />
+    <Compile Include="../SearchQuery.cs" Link="SearchQuery.cs" />
+    <Compile Include="../FuzzyVocabulary.cs" Link="FuzzyVocabulary.cs" />
+    <Compile Include="../ReadingRanker.cs" Link="ReadingRanker.cs" />
+    <Compile Include="../SearchSession.cs" Link="SearchSession.cs" />
     <Compile Include="../../shared/lyrics/LrcReader.cs" Link="shared/lyrics/LrcReader.cs" />
   </ItemGroup>
 
@@ -54,6 +60,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="../data/nfkc.tsv" Link="data/nfkc.tsv">
       <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../data/accent_fold.tsv" Link="data/accent_fold.tsv">
+      <LogicalName>Archoera.Indexer.data.accent_fold.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../data/variant_fold.tsv" Link="data/variant_fold.tsv">
+      <LogicalName>Archoera.Indexer.data.variant_fold.tsv</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="../data/def_en2hanzi.tsv" Link="data/def_en2hanzi.tsv">
       <LogicalName>Archoera.Indexer.data.def_en2hanzi.tsv</LogicalName>

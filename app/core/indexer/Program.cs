@@ -10,8 +10,8 @@ namespace Archoera.Indexer;
 /// Archoera 本地曲库搜索索引器 CLI。
 ///
 /// 用法：
-///   archoera-indexer build [--full] [--index-lrc] [--no-pinyin] [--db &lt;library.db&gt;]
-///                          [--index &lt;search.db&gt;] [--batch &lt;n&gt;]
+///   archoera-indexer build [--full] [--index-lrc] [--no-pinyin] [--romaji-lyrics]
+///                          [--db &lt;library.db&gt;] [--index &lt;search.db&gt;] [--batch &lt;n&gt;]
 ///   archoera-indexer query &lt;text&gt; [--index &lt;search.db&gt;] [--limit &lt;n&gt;] [--raw]
 ///   archoera-indexer analyze &lt;field&gt; &lt;text&gt;
 ///   archoera-indexer version
@@ -58,9 +58,12 @@ public static class Program
                 case "--full": case "-f": full = true; break;
                 case "--index-lrc": options.IndexLrc = true; break;
                 case "--no-pinyin": options.Pinyin = false; break;
+                case "--romaji-lyrics": options.RomajiLyrics = true; break;
                 case "--db": if (i + 1 < args.Length) dbPath = args[++i]; break;
                 case "--index": if (i + 1 < args.Length) indexPath = args[++i]; break;
                 case "--batch": if (i + 1 < args.Length && int.TryParse(args[++i], out var b)) options.Batch = b; break;
+                case "--merge-every": if (i + 1 < args.Length && int.TryParse(args[++i], out var me) && me > 0)
+                        options.MergeEveryUpdates = me; break;
                 case "--help": case "-h": PrintUsage(); return 0;
             }
         }
@@ -79,7 +82,7 @@ public static class Program
         indexPath ??= Path.Combine(Path.GetDirectoryName(Path.GetFullPath(dbPath)) ?? ".", "search.db");
 
         Log.LogInfo("indexer", $"library={dbPath}");
-        Log.LogInfo("indexer", $"index={indexPath} full={full} index_lrc={options.IndexLrc} pinyin={options.Pinyin}");
+        Log.LogInfo("indexer", $"index={indexPath} full={full} index_lrc={options.IndexLrc} pinyin={options.Pinyin} romaji_lyrics={options.RomajiLyrics}");
 
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
@@ -221,9 +224,11 @@ public static class Program
             Archoera 本地曲库搜索索引器
 
             用法:
-              archoera-indexer build [--full] [--index-lrc] [--no-pinyin]
+              archoera-indexer build [--full] [--index-lrc] [--no-pinyin] [--romaji-lyrics]
                                      [--db <library.db>] [--index <search.db>] [--batch <n>]
+                                     [--merge-every <n>]
                   构建 / 增量更新搜索索引（默认增量）。stdout 输出 JSON 进度与结果。
+                  --merge-every 累计改写多少首后做一次 FTS5 全段合并（默认 30）。
               archoera-indexer query <text> [--index <search.db>] [--limit <n>] [--raw]
                   调试查询（bm25 排序）。默认经分析器归一；--raw 传入原始 FTS5 MATCH 表达式。
               archoera-indexer analyze <field> <text>

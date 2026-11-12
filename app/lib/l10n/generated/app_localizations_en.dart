@@ -2986,6 +2986,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Single file, capped at 4 MiB (truncated in place; no extra files).';
 
   @override
+  String get settingsSearchQueryLog => 'Search query log';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      'Logs query keywords on this device to improve search quality (can be cleared anytime)';
+
+  @override
+  String get settingsSearchQueryLogOff =>
+      'Log-to-disk is off, so queries are not recorded';
+
+  @override
+  String get settingsSearchQueryLogCleared => 'Search query log cleared';
+
+  @override
   String get settingsSecuritySection => 'Secure wipe';
 
   @override
@@ -4692,6 +4706,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsSearchIndexLrcDesc =>
       'Also index .lrc lyrics named after the audio file (master switch required)';
+
+  @override
+  String get settingsSearchIndexRomaji => 'Generate lyrics romaji index';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      'Auto-generate romaji for Japanese lyrics without transliteration so they can be found by romaji (roughly doubles index size)';
 
   @override
   String get settingsSearchIndexNote =>

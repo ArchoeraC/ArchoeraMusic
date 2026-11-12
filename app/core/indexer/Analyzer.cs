@@ -94,8 +94,24 @@ public static class Analyzer
     /// <see cref="LrcReader"/> 从内嵌歌词 / <c>.lrc</c> 拆分出译文 / 音译层并分别分析入库
     /// （T0 多语言层入库）。译文 / 音译层此前恒空，现被填充，输出变化，故递增触发全量重建。
     /// （T1 的查询侧跨语言候选只改 <see cref="AnalyzeQuery"/>，不影响索引侧词元输出。）
+    /// v7：**读音列变化**（T1-1 罗马音规范形）——读音 bigram 由 Hepburn 折叠为规范形
+    /// （<c>sh→s</c> / <c>ch→t</c> / <c>ts→t</c> / <c>fu→hu</c> / <c>j→z</c>、促音与长音折叠、
+    /// <c>ん</c>+元音→<c>nn</c>+元音），输出变化，故递增触发全量重建。
+    /// v8：**助词双写**（T1-2）——<c>は</c> 增加 <c>wa</c>、<c>へ</c> 增加 <c>e</c> 备选拼写
+    /// （<c>を</c> 原有 <c>o/wo</c>），修复局部窗口变体未生效的问题，读音列输出变化。
+    /// v9：**韩文读音列**（T1-3）——谚文经国语罗马字写入 <c>reading_meta_tok</c>，
+    /// 纯韩文曲目从「读音列为空」变为有值，输出变化，故递增触发全量重建。
+    /// v10：**去音符号折叠**（T1-5）——<c>é / ü / ñ / ā</c> 等预组合拉丁字母折叠为 ASCII
+    /// 基字母，组合音标丢弃；含重音字母的曲目（如 <c>Beyoncé</c>）词元由带音符号变为无音符号，
+    /// 输出变化，故递增触发全量重建。
+    /// v11：**异体字补齐**（T1-7）——Unihan <c>kSimplifiedVariant</c> 补齐 ToolGood 未覆盖的
+    /// 日文新字体（鉄→铁、絵→绘、円→圆…）；含新字体的曲目词元变化，故递增触发全量重建。
+    /// v12：**NFKC 表生成器迁移**——<c>data/nfkc.tsv</c> 的生成从 Python <c>unicodedata</c>
+    /// （Unicode 16.0.0）改为纯 .NET <c>string.Normalize(FormKC)</c>（ICU / Unicode 17.0），
+    /// 唯一内容差异是新增 <c>U+A7F1 → S</c>（Unicode 17 新增字符）。表内容变了，
+    /// 按「表变即重建」的既定规则递增版本，避免新旧表混用产生难以复现的词元差异。
     /// </summary>
-    public const int AnalyzerVersion = 6;
+    public const int AnalyzerVersion = 12;
 
     /// <summary>查询侧跨语言候选（<see cref="QueryTokens.CrossLingual"/>）合并去重后的总预算。</summary>
     public const int CrossLingualBudget = 32;
@@ -306,8 +322,9 @@ public static class Analyzer
     }
 
     /// <summary>
-    /// 逐字符 NFKC 兼容折叠 → 小写 → 繁转简（ToolGood.Words 词库）；标点/空白留待
-    /// <see cref="SplitSegments"/> 作分隔符丢弃。
+    /// 逐字符 NFKC 兼容折叠 → **拉丁去音符号折叠** → **异体字补齐（日文新字体 → 简体）**
+    /// → 小写 → 繁转简（ToolGood.Words 词库）；
+    /// 标点/空白留待 <see cref="SplitSegments"/> 作分隔符丢弃。
     ///
     /// 注意：本程序集以 <c>InvariantGlobalization=true</c> 构建（无 ICU），此时
     /// <c>string.Normalize(NormalizationForm.FormKC)</c> 为**空操作**（其表来自 ICU）。
@@ -323,17 +340,41 @@ public static class Analyzer
     /// 繁转简改用 <c>ToolGood.Words.ToSimplifiedChinese</c>（Apache-2.0）：一次对整串调用
     /// （词级、非逐字），取代原先的 <c>data/simp_trad.tsv</c> 查表。
     ///
+    /// **去音符号折叠**（T1-5）：NFKC 只做兼容分解 + 规范合成，重音字母（<c>é</c> / <c>ü</c> /
+    /// <c>ñ</c>）折叠后仍是原字符。这里在 NFKC 之后再过一遍 <c>data/accent_fold.tsv</c>
+    /// （NFD 派生的「预组合字母 → ASCII 基字母」表），并丢弃组合音标码点，
+    /// 使 <c>Beyoncé</c> 与 <c>Beyonce</c>（含分解形 <c>e</c>+U+0301）同形。索引 / 查询两侧
+    /// 走同一函数，故不需要额外的查询侧变体。ł / ø / đ / ß 等无规范分解的字母保持原样。
+    ///
+    /// **异体字补齐**（T1-7）：<c>data/variant_fold.tsv</c> 由 Unihan <c>kSimplifiedVariant</c>
+    /// 派生（日文新字体经 <c>kJapaneseOldVariant</c> 串联：鉄→鐵→铁、絵→繪→绘、円→圓→圆），
+    /// 只补 ToolGood 繁简词库未覆盖的字符，故不改变既有中文繁简规则。
+    /// 索引 / 查询同表，搜「银河铁道」可命中「銀河鉄道の夜」。
+    ///
     /// 近似：NFKC 表**仅逐字符应用**——跨字符规范化组合（如 base + combining 合成）不做，
-    /// 这与 NFKC 完整语义存在已知偏差（见 <c>tools/gen_hanzi_data.py</c> 与报告）。
+    /// 这与 NFKC 完整语义存在已知偏差（见 <c>tools/gen_tables</c> 与报告）。
     /// </summary>
     private static string Normalize(string text)
     {
         if (text.Length == 0) return text;
-        var folded = new StringBuilder(text.Length);
+        var compat = new StringBuilder(text.Length);
         foreach (var rune in text.EnumerateRunes())
         {
             if (HanziData.TryGetCompatibilityFolded(rune.Value, out var replacement))
-                folded.Append(replacement);
+                compat.Append(replacement);
+            else
+                compat.Append(rune.ToString());
+        }
+
+        // 兼容折叠可能产出多个字符（如 Ⅻ → xii），故去重音 / 异体补齐需重新遍历一遍。
+        var folded = new StringBuilder(compat.Length);
+        foreach (var rune in compat.ToString().EnumerateRunes())
+        {
+            if (HanziData.IsCombiningDiacritic(rune.Value)) continue;
+            if (HanziData.TryGetAccentFolded(rune.Value, out var baseLetter))
+                folded.Append(baseLetter);
+            else if (HanziData.TryGetVariantFolded(rune.Value, out var simplified))
+                folded.Append(simplified);
             else
                 folded.Append(rune.ToString());
         }

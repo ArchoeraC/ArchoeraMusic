@@ -36,8 +36,12 @@ public sealed class FtsStore : IIndexStoreAdmin
     /// schema 版本；schema 变更必须递增（触发全量重建）。
     /// v2：external-content → contentless（<c>search_docs</c> 去掉 token 文本列）。
     /// v3：新增独立列 <c>initials_tok</c>（首字母从 <c>pinyin_tok</c> 拆出，见 <see cref="Bm25Weights"/>）。
+    /// v6：<c>search_docs</c> 新增 <c>reading_tok</c>（读音 bigram 原文副本，供兜底趟分档 T1-4）。
+    /// v7：<c>search_meta</c> 新增语言画像（<c>has_japanese</c> / <c>has_korean</c> /
+    ///     <c>has_han</c> / <c>has_latin</c>），供查询侧跳过不可能命中的兜底趟；
+    ///     无表结构变化，仅为让既有库重建后拿到画像。
     /// </summary>
-    public const int SchemaVersionValue = 5;
+    public const int SchemaVersionValue = 7;
 
     /// <summary>FTS 列（顺序 = bm25 权重顺序，冻结）。</summary>
     private const string FtsColumns =
@@ -82,6 +86,11 @@ public sealed class FtsStore : IIndexStoreAdmin
     private bool _sealed;
     private bool _disposed;
 
+    // 模糊层词典（T1-8）：按写入纪元缓存；查询侧只读、不失效。
+    private string[]? _fuzzyVocabulary;
+    private long _fuzzyVocabularyEpoch = -1;
+    private long _writeEpoch;
+
     /// <inheritdoc />
     public int SchemaVersion => SchemaVersionValue;
 
@@ -122,6 +131,22 @@ public sealed class FtsStore : IIndexStoreAdmin
         NextDocId = _build ? 1 : ScalarLong("SELECT COALESCE(MAX(doc_id), 0) + 1 FROM search_docs");
     }
 
+    /// <summary>
+    /// **只读**打开既有索引（查询侧专用）：不建表、不改 <c>journal_mode</c> / <c>synchronous</c>，
+    /// 连接只用于 <see cref="Search"/> / <see cref="ReadMeta"/> / <see cref="ResolveTrackIds"/>。
+    /// 查询会话由 <see cref="SearchSession"/> 按路径缓存复用。
+    /// </summary>
+    public void OpenReadOnly(string path)
+    {
+        if (_conn != null) throw new InvalidOperationException("存储已打开");
+        _path = Path.GetFullPath(path);
+        _tmpPath = _path;
+        _build = false;
+        _conn = new SqliteConnection(ConnectionString(_path, readOnly: true));
+        _conn.Open();
+        Exec("PRAGMA query_only = ON");
+    }
+
     /// <inheritdoc />
     public void Put(long docId, DocTokens f)
     {
@@ -135,8 +160,8 @@ public sealed class FtsStore : IIndexStoreAdmin
             up.CommandText = """
                 INSERT OR REPLACE INTO search_docs
                     (doc_id, track_id, indexed_mtime, indexed_lrc_mtime, indexed_lrc_size,
-                     indexed_generation, schema_version)
-                VALUES (@id, @track, @mtime, @lrcM, @lrcS, @gen, @schema)
+                     indexed_generation, schema_version, reading_tok)
+                VALUES (@id, @track, @mtime, @lrcM, @lrcS, @gen, @schema, @reading)
                 """;
             AddMetaParameters(up, docId, f);
             up.ExecuteNonQuery();
@@ -220,9 +245,12 @@ public sealed class FtsStore : IIndexStoreAdmin
     }
 
     /// <summary>
-    /// **候选集上限**（宽命中查询的工作量上界；0 = 不限）。与 Dart 侧
-    /// `SearchIndex.defaultCandidateCap` 是同一个策略：先按 rowid 顺序取有界候选（无排序、
-    /// 可提前退出），再只给这批候选做 bm25 排序——`ORDER BY bm25` 否则要给**全部命中**打分。
+    /// **候选集上限**（历史参数，已不再裁剪候选；0 = 不限）。
+    ///
+    /// ⚠ 2026-11-12 撤销：原实现「子查询取有界候选 + 外层排序」会让 FTS5 的
+    /// <c>bm25()</c> 在无 <c>MATCH</c> 的外层查询里静默返回 0，相关性排序整体失效。
+    /// 该常量与 <c>Search</c> 的 <c>candidateCap</c> 参数仅为 ABI / 请求 JSON 兼容保留，
+    /// 排序一律走「含 MATCH 的全命中 bm25 排序」（现实现更快且正确）。
     /// </summary>
     public const int DefaultCandidateCap = 5000;
 
@@ -236,26 +264,23 @@ public sealed class FtsStore : IIndexStoreAdmin
         var weights = string.Join(", ", Bm25Weights.Select(
             w => w.ToString(CultureInfo.InvariantCulture)));
         using var cmd = conn.CreateCommand();
-        // candidateCap > 0：先取有界候选再排序；= 0：原路径（全部命中打分），供对照。
-        cmd.CommandText = candidateCap > 0
-            ? $"""
-                SELECT rowid, bm25(search_fts, {weights}) AS score
-                FROM search_fts
-                WHERE rowid IN (
-                    SELECT rowid FROM search_fts WHERE search_fts MATCH @q LIMIT @cap
-                )
-                ORDER BY score
-                LIMIT @limit OFFSET @offset
-                """
-            : $"""
-                SELECT rowid, bm25(search_fts, {weights}) AS score
-                FROM search_fts
-                WHERE search_fts MATCH @q
-                ORDER BY score
-                LIMIT @limit OFFSET @offset
-                """;
+        // bm25 排序必须在**含 `MATCH` 的查询块内**求值——FTS5 的 `bm25()` 在
+        // `rowid IN (SELECT ... MATCH ...)` 这种外层不匹配的写法里**静默返回 0**，
+        // 结果退化为 rowid 顺序而**不报错**（相关性排序整体失效）。
+        //
+        // 历史教训：candidateCap 最初是为了「先取有界候选再排序」省成本，但它用
+        // `WHERE rowid IN (子查询)` 实现，正好踩中上述语义 → 排序失效，且实测并不更快
+        // （宽命中时子查询要跑满一遍才 LIMIT，反而更慢）。故该机制已移除，
+        // 排序交给 FTS5 全命中打分 —— 实测比错误写法更快且结果正确。
+        // candidateCap 参数保留在 ABI 上以兼容旧调用方，但语义上不再裁剪候选。
+        cmd.CommandText = $"""
+            SELECT rowid, bm25(search_fts, {weights}) AS score
+            FROM search_fts
+            WHERE search_fts MATCH @q
+            ORDER BY score
+            LIMIT @limit OFFSET @offset
+            """;
         cmd.Parameters.AddWithValue("@q", matchExpr);
-        if (candidateCap > 0) cmd.Parameters.AddWithValue("@cap", candidateCap);
         cmd.Parameters.AddWithValue("@limit", limit <= 0 ? -1 : limit);
         cmd.Parameters.AddWithValue("@offset", offset < 0 ? 0 : offset);
 
@@ -264,6 +289,124 @@ public sealed class FtsStore : IIndexStoreAdmin
         while (reader.Read())
             results.Add((reader.GetInt64(0), reader.GetDouble(1)));
         return results;
+    }
+
+    /// <summary>批量把 <c>doc_id</c> 映射回 <c>track_id</c>（查询结果组装用）。</summary>
+    public Dictionary<long, string> ResolveTrackIds(IReadOnlyCollection<long> docIds)
+    {        var map = new Dictionary<long, string>(docIds.Count);
+        if (docIds.Count == 0) return map;
+
+        var conn = EnsureOpen();
+        using var cmd = conn.CreateCommand();
+        var names = new List<string>(docIds.Count);
+        var index = 0;
+        foreach (var docId in docIds)
+        {
+            var name = "@id" + index++;
+            names.Add(name);
+            cmd.Parameters.AddWithValue(name, docId);
+        }
+        cmd.CommandText =
+            $"SELECT doc_id, track_id FROM search_docs WHERE doc_id IN ({string.Join(", ", names)})";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read()) map[reader.GetInt64(0)] = reader.GetString(1);
+        return map;
+    }
+
+    /// <summary>
+    /// 批量取候选文档的读音 bigram 原文副本（兜底趟分档用；contentless FTS 回读不到）。
+    /// 无读音（纯中文 / 纯英文）的文档不进入结果字典。
+    /// </summary>
+    public Dictionary<long, string> ResolveReadingTexts(IReadOnlyCollection<long> docIds)
+    {
+        var map = new Dictionary<long, string>(docIds.Count);
+        if (docIds.Count == 0) return map;
+
+        var conn = EnsureOpen();
+        using var cmd = conn.CreateCommand();
+        var names = new List<string>(docIds.Count);
+        var index = 0;
+        foreach (var docId in docIds)
+        {
+            var name = "@id" + index++;
+            names.Add(name);
+            cmd.Parameters.AddWithValue(name, docId);
+        }
+        cmd.CommandText =
+            $"SELECT doc_id, reading_tok FROM search_docs WHERE doc_id IN ({string.Join(", ", names)})";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var text = reader.IsDBNull(1) ? "" : reader.GetString(1);
+            if (text.Length > 0) map[reader.GetInt64(0)] = text;
+        }
+        return map;
+    }
+
+    /// <summary>
+    /// 加载模糊层词典（T1-8）：索引自身的 FTS 词表里可检索的拉丁 / 数字 term，按字典序。
+    ///
+    /// 词典不落盘、不改 schema：每次查询会话首次需要模糊趟时用一条临时连接读
+    /// <c>fts5vocab</c>，随后按写入纪元缓存（本进程内索引更新会让缓存失效重载）。
+    /// 只收 ASCII 小写 / 数字（CJK 由 <see cref="SearchQuery.CjkVariants"/> 负责）。
+    ///
+    /// 注意：<c>PRAGMA query_only</c> 会连 temp 库一起锁死（无法创建 <c>fts5vocab</c> 虚拟表），
+    /// 所以这里用**文件级只读**连接且不设该 pragma——temp 表在内存里，主库不可写。
+    /// 读词表失败时返回空集，调用方退回旧的「无词典过滤」行为（不影响可用性）。
+    /// </summary>
+    public IReadOnlyList<string> LoadFuzzyVocabulary()
+    {
+        if (_fuzzyVocabulary is { } cached && _fuzzyVocabularyEpoch == _writeEpoch) return cached;
+        if (!File.Exists(_path)) return Array.Empty<string>();
+
+        var terms = new List<string>();
+        try
+        {
+            using var conn = new SqliteConnection(ConnectionString(_path, readOnly: true));
+            conn.Open();
+            using (var create = conn.CreateCommand())
+            {
+                create.CommandText =
+                    "CREATE VIRTUAL TABLE temp.fuzzy_vocab USING fts5vocab(main, search_fts, 'col')";
+                create.ExecuteNonQuery();
+            }
+            using (var query = conn.CreateCommand())
+            {
+                query.CommandText = """
+                    SELECT DISTINCT term FROM temp.fuzzy_vocab
+                    WHERE col IN ('title_tok', 'artist_tok', 'album_tok', 'filename_tok',
+                                  'lyrics_tok', 'lyrics_tr_tok')
+                    ORDER BY term
+                    """;
+                using var reader = query.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (reader.IsDBNull(0)) continue;
+                    var term = reader.GetString(0);
+                    if (IsAsciiWord(term)) terms.Add(term);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.LogInfo("indexer", $"模糊词典加载失败，退回无词典过滤: {ex.Message}");
+            terms.Clear();
+        }
+
+        _fuzzyVocabulary = terms.ToArray();
+        _fuzzyVocabularyEpoch = _writeEpoch;
+        return _fuzzyVocabulary;
+    }
+
+    private static bool IsAsciiWord(string term)
+    {
+        if (term.Length == 0) return false;
+        foreach (var c in term)
+        {
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) continue;
+            return false;
+        }
+        return true;
     }
 
     /* ------------------------------------------------------------------ */
@@ -284,16 +427,7 @@ public sealed class FtsStore : IIndexStoreAdmin
         {
             var key = reader.GetString(0);
             var value = reader.IsDBNull(1) ? "" : reader.GetString(1);
-            switch (key)
-            {
-                case "schema_version": meta.SchemaVersion = ParseInt(value); break;
-                case "analyzer_version": meta.AnalyzerVersion = ParseInt(value); break;
-                case "index_lrc": meta.IndexLrc = value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase); break;
-                case "pinyin": meta.Pinyin = value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase); break;
-                case "applied_generation": meta.AppliedGeneration = ParseLong(value); break;
-                case "built_at": meta.BuiltAt = ParseLong(value); break;
-                case "full_build_at": meta.FullBuildAt = ParseLong(value); break;
-            }
+            ApplyMeta(meta, key, value);
         }
         return meta;
     }
@@ -317,9 +451,15 @@ public sealed class FtsStore : IIndexStoreAdmin
             ("analyzer_version", Analyzer.AnalyzerVersion.ToString(CultureInfo.InvariantCulture)),
             ("index_lrc", meta.IndexLrc ? "1" : "0"),
             ("pinyin", meta.Pinyin ? "1" : "0"),
+            ("romaji_lyrics", meta.RomajiLyrics ? "1" : "0"),
             ("applied_generation", meta.AppliedGeneration.ToString(CultureInfo.InvariantCulture)),
             ("built_at", meta.BuiltAt.ToString(CultureInfo.InvariantCulture)),
             ("full_build_at", meta.FullBuildAt.ToString(CultureInfo.InvariantCulture)),
+            ("has_japanese", meta.HasJapanese ? "1" : "0"),
+            ("has_korean", meta.HasKorean ? "1" : "0"),
+            ("has_han", meta.HasHan ? "1" : "0"),
+            ("has_latin", meta.HasLatin ? "1" : "0"),
+            ("updates_since_merge", meta.UpdatesSinceMerge.ToString(CultureInfo.InvariantCulture)),
         })
         {
             key.Value = k;
@@ -430,16 +570,7 @@ public sealed class FtsStore : IIndexStoreAdmin
             {
                 var key = reader.GetString(0);
                 var value = reader.IsDBNull(1) ? "" : reader.GetString(1);
-                switch (key)
-                {
-                    case "schema_version": meta.SchemaVersion = ParseInt(value); break;
-                    case "analyzer_version": meta.AnalyzerVersion = ParseInt(value); break;
-                    case "index_lrc": meta.IndexLrc = value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase); break;
-                    case "pinyin": meta.Pinyin = value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase); break;
-                    case "applied_generation": meta.AppliedGeneration = ParseLong(value); break;
-                    case "built_at": meta.BuiltAt = ParseLong(value); break;
-                    case "full_build_at": meta.FullBuildAt = ParseLong(value); break;
-                }
+                ApplyMeta(meta, key, value);
             }
             return meta;
         }
@@ -473,7 +604,8 @@ public sealed class FtsStore : IIndexStoreAdmin
               doc_id INTEGER PRIMARY KEY,
               track_id TEXT NOT NULL UNIQUE,
               indexed_mtime INTEGER, indexed_lrc_mtime INTEGER, indexed_lrc_size INTEGER,
-              indexed_generation INTEGER, schema_version INTEGER
+              indexed_generation INTEGER, schema_version INTEGER,
+              reading_tok TEXT NOT NULL DEFAULT ''
             )
             """);
         // contentless FTS5：倒排只存 postings / 位置，不重复保存 token 文本；
@@ -497,6 +629,7 @@ public sealed class FtsStore : IIndexStoreAdmin
         cmd.Parameters.AddWithValue("@lrcS", f.IndexedLrcSize);
         cmd.Parameters.AddWithValue("@gen", f.IndexedGeneration);
         cmd.Parameters.AddWithValue("@schema", SchemaVersionValue);
+        cmd.Parameters.AddWithValue("@reading", f.ReadingText);
     }
 
     /// <summary>FTS 倒排行（全部 token 列）的公用参数。</summary>
@@ -520,6 +653,7 @@ public sealed class FtsStore : IIndexStoreAdmin
     private void AfterWrite()
     {
         _pending++;
+        _writeEpoch++;
         if (BatchSize > 0 && _pending >= BatchSize) CommitTx();
     }
 
@@ -670,4 +804,28 @@ public sealed class FtsStore : IIndexStoreAdmin
 
     private static long ParseLong(string value)
         => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : 0;
+
+    private static bool ParseBool(string value)
+        => value == "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary><see cref="ReadMeta"/> 与 <see cref="PeekMeta"/> 共用的键解析（避免两处漂移）。</summary>
+    private static void ApplyMeta(StoreMeta meta, string key, string value)
+    {
+        switch (key)
+        {
+            case "schema_version": meta.SchemaVersion = ParseInt(value); break;
+            case "analyzer_version": meta.AnalyzerVersion = ParseInt(value); break;
+            case "index_lrc": meta.IndexLrc = ParseBool(value); break;
+            case "pinyin": meta.Pinyin = ParseBool(value); break;
+            case "romaji_lyrics": meta.RomajiLyrics = ParseBool(value); break;
+            case "applied_generation": meta.AppliedGeneration = ParseLong(value); break;
+            case "built_at": meta.BuiltAt = ParseLong(value); break;
+            case "full_build_at": meta.FullBuildAt = ParseLong(value); break;
+            case "has_japanese": meta.HasJapanese = ParseBool(value); break;
+            case "has_korean": meta.HasKorean = ParseBool(value); break;
+            case "has_han": meta.HasHan = ParseBool(value); break;
+            case "has_latin": meta.HasLatin = ParseBool(value); break;
+            case "updates_since_merge": meta.UpdatesSinceMerge = ParseInt(value); break;
+        }
+    }
 }

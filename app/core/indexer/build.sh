@@ -8,8 +8,9 @@
 #
 # 依赖：
 #   - .NET 10 SDK（dotnet --version）
-#   - python3（仅当 data/*.tsv 缺失时离线生成；联网无关）
 #   - NuGet 首次还原需网络（Microsoft.Data.Sqlite / SQLitePCLRaw，与 scanner 同版本）
+#   - **不依赖 Python**：所有数据表由纯 .NET 的 tools/gen_tables 生成
+#     （跨语言计划 §4.3 硬性门禁：构建期工具链收敛到 .NET 一套）
 # 使用：./build.sh [RID]     # RID 默认 linux-x64；三端：linux-x64 / win-x64 / osx-x64（或 osx-arm64）
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -23,11 +24,12 @@ esac
 
 mkdir -p build
 
-# 分析器数据表（逐字符 NFKC 兼容折叠）：缺失时离线生成（幂等）。
-# 拼音/繁简/全角由 ToolGood.Words（NuGet）提供，GB18030 由框架 CodePages 提供，无需生成。
-if [ ! -f data/nfkc.tsv ]; then
-  echo "==> 生成 Unicode 兼容折叠表 (data/nfkc.tsv)"
-  python3 tools/gen_hanzi_data.py
+# 分析器数据表：**全部由纯 .NET 的 tools/gen_tables 生成**（无 Python 依赖）。
+# 缺失任意一张即整批生成（幂等、确定性；Unihan 派生表需 reference/unihan/Unihan.zip）。
+if [ ! -f data/nfkc.tsv ] || [ ! -f data/accent_fold.tsv ] || [ ! -f data/variant_fold.tsv ] \
+   || [ ! -f data/ja_readings.tsv ] || [ ! -f data/def_en2hanzi.tsv ] || [ ! -f data/def_hanzi2en.tsv ]; then
+  echo "==> 生成分析器数据表（纯 .NET，无 Python）"
+  dotnet run --project tools/gen_tables
 fi
 
 # 用 -o 固定 publish 输出目录（不依赖 bin/Release/<tfm>/<rid> 路径）

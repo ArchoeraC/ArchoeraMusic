@@ -20,7 +20,7 @@ namespace Archoera.Indexer.Ffi;
 ///       const char* db_path,          // library.db（只读）
 ///       const char* index_path,       // search.db
 ///       int full,                     // 1=重建 0=增量
-///       const char* options_json,     // {"index_lrc":false,"pinyin":true,"batch":0}
+///       const char* options_json,     // {"index_lrc":false,"pinyin":true,"romaji_lyrics":false,"batch":0}
 ///       void (*on_progress)(const char* json),  // 进度 JSON（UTF-8）
 ///       const char** out_result,      // 成功=IndexerResult JSON，失败=错误文本（读后调 indexer_free）
 ///       int* out_len)                 // 结果字节数
@@ -30,6 +30,11 @@ namespace Archoera.Indexer.Ffi;
 ///                        const char** out_tokens, int* out_len)
 ///                                     // 查询侧分析（P4：含连写全拼切分），
 ///                                     // out_tokens = {"tokens","pinyin","initials"} JSON
+///   int  indexer_query(const char* index_path, const char* request_json,
+///                      const char** out_result, int* out_len)
+///                                     // 查询层（编译 / 多趟兜底 / 排序全在库内），
+///                                     // out_result = {"items":[...],"passes":{...}} JSON
+///   void indexer_query_close()        // 释放缓存的只读查询会话（重建 / 删除索引前调用）
 ///   void indexer_set_log_sink(void (*sink)(int, const char*, const char*), int minLevel)
 ///                                     // 注入统一日志 sink（archoera_log_write）；NULL 注销
 /// </summary>
@@ -63,6 +68,10 @@ public static unsafe class IndexerFfi
 
             if (!TryParseOptions(optionsJson, out var options, out var error))
                 return Fail(outResult, outLen, error);
+
+            // 重建 / 增量写入前必须释放只读查询会话：Windows 下打开的只读句柄会阻塞
+            // search.db 的原子替换（File.Move overwrite）。
+            SearchSession.CloseCached();
 
             using var store = new FtsStore();
             var engine = new IndexerEngine(store, onProgress != null
@@ -130,6 +139,41 @@ public static unsafe class IndexerFfi
     }
 
     /// <summary>
+    /// 查询本地索引：查询编译、多趟渐进兜底、bm25 排序与 docId→trackId 映射全部在库内完成，
+    /// Dart 侧只负责组装请求 JSON 与映射结果。只读会话按 <c>index_path</c> 缓存复用。
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "indexer_query")]
+    public static int Query(byte* indexPath, byte* requestJson, byte** outResult, int* outLen)
+    {
+        *outResult = null;
+        *outLen = 0;
+        try
+        {
+            var indexPathStr = PtrToString(indexPath);
+            var requestStr = PtrToString(requestJson);
+            if (string.IsNullOrEmpty(indexPathStr))
+                return Fail(outResult, outLen, "index_path 为空");
+            if (string.IsNullOrWhiteSpace(requestStr))
+                return Fail(outResult, outLen, "request_json 为空");
+            if (!File.Exists(indexPathStr))
+                return Fail(outResult, outLen, $"索引不存在: {indexPathStr}");
+
+            var request = SearchRequest.Parse(requestStr);
+            var result = SearchSession.Run(indexPathStr, request);
+            SetUtf8(outResult, outLen, IndexerJson.QueryResult(result));
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            return Fail(outResult, outLen, ex.Message);
+        }
+    }
+
+    /// <summary>释放缓存的只读查询会话（索引重建 / 删除 / 退出前调用）。</summary>
+    [UnmanagedCallersOnly(EntryPoint = "indexer_query_close")]
+    public static void QueryClose() => SearchSession.CloseCached();
+
+    /// <summary>
     /// 注入统一日志 sink（宿主 Dart 传入 libarchoera_log 的 archoera_log_write 指针）。
     /// 调用约定 C：void (*)(int level, const char* tag, const char* message)。
     /// sink=NULL 注销并回退 stderr；[minLevel] 数值对齐 archoera_log.h：0..4。
@@ -173,8 +217,15 @@ public static unsafe class IndexerFfi
             if (root.TryGetProperty("pinyin", out var py)
                 && (py.ValueKind == JsonValueKind.True || py.ValueKind == JsonValueKind.False))
                 options.Pinyin = py.GetBoolean();
+            if (root.TryGetProperty("romaji_lyrics", out var romaji)
+                && (romaji.ValueKind == JsonValueKind.True || romaji.ValueKind == JsonValueKind.False))
+                options.RomajiLyrics = romaji.GetBoolean();
             if (root.TryGetProperty("batch", out var batch) && batch.ValueKind == JsonValueKind.Number)
                 options.Batch = batch.GetInt32();
+            if (root.TryGetProperty("merge_every_updates", out var merge)
+                && merge.ValueKind == JsonValueKind.Number
+                && merge.TryGetInt32(out var mergeEvery) && mergeEvery > 0)
+                options.MergeEveryUpdates = mergeEvery;
             return true;
         }
         catch (JsonException ex)

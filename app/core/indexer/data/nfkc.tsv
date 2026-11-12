@@ -1,7 +1,7 @@
 # Archoera indexer 逐字符 NFKC 兼容折叠表（生成，勿手改）
-# 来源: Python unicodedata.normalize('NFKC', chr(cp))（Unicode 16.0.0）
+# 来源: Unicode NFKC 规范分解 + 组合（FormKC）
 # 字段: HEXCODE<TAB>HEXOUT1 HEXOUT2 ...；输入/输出均为码点十六进制、空格分隔
-# 生成: tools/gen_hanzi_data.py（离线、确定、遍历 U+0000..U+10FFFF，仅当归一结果≠原字符）
+# 生成: tools/gen_tables（cd app/core/indexer && dotnet run --project tools/gen_tables）
 # 近似: 逐字符应用；跨字符规范化组合（base+combining 合成）不覆盖
 # 跳过: 代理区 U+D800..U+DFFF；归一结果含控制符 / TAB / 换行 的码点
 00A0	0020
@@ -1427,6 +1427,7 @@
 A69C	044A
 A69D	044C
 A770	A76F
+A7F1	0053
 A7F2	0043
 A7F3	0046
 A7F4	0051

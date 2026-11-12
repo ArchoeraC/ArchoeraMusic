@@ -14,7 +14,7 @@
 
 part of '../settings_dialog.dart';
 
-/// 由设置源码生成的搜索索引（250 条）。
+/// 由设置源码生成的搜索索引（252 条）。
 List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
   // 设置行与小节标题（按分类顺序）。
   _SearchEntry(
@@ -1069,6 +1069,12 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
   ),
   _SearchEntry(
     SettingsCategory.storage,
+    l10n.settingsSearchQueryLog,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
     l10n.settingsHistorySection,
     '',
     SettingsCategory.storage.icon,
@@ -1311,6 +1317,12 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
     SettingsCategory.searchIndex,
     l10n.settingsSearchIndexLrc,
     l10n.settingsSearchIndexLrcDesc,
+    SettingsCategory.searchIndex.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.searchIndex,
+    l10n.settingsSearchIndexRomaji,
+    l10n.settingsSearchIndexRomajiDesc,
     SettingsCategory.searchIndex.icon,
   ),
   _SearchEntry(

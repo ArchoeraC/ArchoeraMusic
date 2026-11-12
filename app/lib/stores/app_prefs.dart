@@ -12,6 +12,7 @@ import '../services/log/log.dart';
 import '../services/mcp/mcp_key_store.dart';
 import '../services/playback/playback_session.dart';
 import '../services/render/image_luminance.dart';
+import '../services/search/query_log_file.dart';
 import 'data_dir.dart';
 import 'prefs_mcp.dart';
 import 'prefs_app.dart';
@@ -164,6 +165,8 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state = state.copyWithLogToFile(value);
     state.save();
     Log.setFileEnabled(value);
+    // 查询日志与「日志落盘」同一开关：关闭即停止记录（不装配 sink）。
+    QueryLogger.setEnabled(value, dataDir: resolveDataDir());
   }
 
   /// 设置解码引擎（'stable' = FFmpeg 稳定默认 / 'eraudio' = 自研实验性）。
@@ -950,13 +953,17 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置本地曲库搜索索引开关（总开关 / `.lrc` 子开关）。
+  /// 设置本地曲库搜索索引开关（总开关 / `.lrc` / 歌词罗马音子开关）。
   ///
   /// 同步刷新 [appPrefsSnapshot]：`SearchService` 经该快照判定启用态，
   /// 设置页切换后立即调用 `ensureIndex` / `deactivate` 才能读到新值，
   /// 无需等待应用根组件下一帧重建刷新快照。
-  void setSearchIndex({bool? enabled, bool? indexLrc}) {
-    state = state.copyWithSearchIndex(enabled: enabled, indexLrc: indexLrc);
+  void setSearchIndex({bool? enabled, bool? indexLrc, bool? romajiLyrics}) {
+    state = state.copyWithSearchIndex(
+      enabled: enabled,
+      indexLrc: indexLrc,
+      romajiLyrics: romajiLyrics,
+    );
     state.save();
     appPrefsSnapshot = state;
   }

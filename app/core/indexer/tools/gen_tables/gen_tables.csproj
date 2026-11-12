@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>archoera-gen-tables</AssemblyName>
+    <RootNamespace>Archoera.Indexer.Tools</RootNamespace>
+    <!-- 需要 ICU：NFD 规范分解（运行时分析器不用，故索引器本身仍为 InvariantGlobalization） -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 仅用于「异体字补齐」过滤：判断 ToolGood 繁简词库是否已覆盖该字符 -->
+    <PackageReference Include="ToolGood.Words" Version="3.1.0.3" />
+  </ItemGroup>
+
+</Project>

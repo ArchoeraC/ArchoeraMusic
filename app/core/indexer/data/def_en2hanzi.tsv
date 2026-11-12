@@ -1,7 +1,7 @@
 # Archoera indexer Unihan 释义查询扩展：英文词 → 候选汉字码点（T1，查询侧用）
 # 来源: Unicode Unihan kDefinition（Unicode License，https://www.unicode.org/license.txt）
 # 字段: WORD<TAB>HEX1 HEX2 ...；HEX 为汉字码点（去重、主区优先+码点升序、每词 ≤ 8）
-# 生成: tools/gen_hanzi_data.py gen_hanzi_defs()（去括注/小写/停用词过滤，确定可重跑）
+# 生成: tools/gen_tables（去括注/小写/停用词过滤，确定可重跑）
 abalone	86AB 9B91 9C12 9C8D 9CC6 4C45 311DA
 abandon	5F03 62CB 6487 68C4 3946 3A0A 3C05 3C66
 abashed	39AC 3046B
@@ -5480,7 +5480,6 @@ just	4EC5 50C5 53EA 557B 5C31 5F53 6070 624D
 justice	356C 3676 48D8
 jute	9EBB
 jutting	3FF9 3FFA 30928
-jyu	5DBC
 kangaroo	4D88
 kangxi	4E36 4E3F 4E85 4EA0 513F 5182 5196 51AB
 kangzi	81FC
@@ -6556,7 +6555,7 @@ nautilus	9C29 9CD0 4C38 4C4B
 nave	484B
 navel	80E6 8110 81CD 4421 4440
 navigate	676D 822A 298B2 2CCFA
-nd	4E12 4E59 4E95 4EA2 5C9E 5CF1 5DA9 794A
+nd	5C9E 5CF1 5DA9 794A
 near	4E34 508D 5394 5C31 6328 65C1 6CAA 6EEC
 near-closed	25292
 nearby	3751 3AC4
@@ -7959,7 +7958,6 @@ ray	9B5F 9BC6 9C29 9C4F 9CD0 4C38 4C4B 29E72
 rays	9B66 4959 2B68C
 raze	5277 6472 304FC
 razor	86CF 87F6
-rd	4E19 6C10 9B3C
 re	518D 9E8B
 reach	53CA 5DDF 6406 64D9 66A8 81F3 81FB 849E
 read	4EB8 5538 56B2 7C40 8AAD 8B80 8BFB 95B1
@@ -8415,7 +8413,6 @@ rut	8E94 8ECC 8F51 8F68 30E9B
 ruthenium	91D5 948C
 ruts	8F4D 8F99
 rutted	3EA6
-saan	5DBC
 saber	5251 5263 5271 528D 5292 5294 91FC
 sable	8C82 3E66
 sacchariflorus	837B
@@ -9382,7 +9379,6 @@ squirrel	9F2B 9F2F 4D0E 4D11 4D82
 squirrel-like	4D82
 squirrels	4455
 sr	4932
-st	53C2 7532 89D2 373D
 stab	5033 523A 523E 523F 525A 528C 6233 6354
 stabilize	6549
 stable	53A9 5709 5EC4 5ECF 5ED0 6764 67A5 6803
@@ -9988,7 +9984,6 @@ textile	8534 42D0 2C619
 textiles	5E03 3C5B 3C8D 3C8E 3C94 3C97 3CA5 42EC
 texts	4F3D 5535 695E
 texture	42D0 2C619
-th	4E01 51AC 5371 58C1 594E 5973 5A41 5BA4
 thallium	9248 9389 94CA 30FAC
 than	52DD 591A 591B 6275 6BD4 80DC 8987 8EC8
 thank	8B1D 8C22 91BB 411F 4775
