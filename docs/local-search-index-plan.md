@@ -723,6 +723,13 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
 > **已落地**：`app/core/indexer/bench/qbench/QueryEval.cs.txt`（`qbench eval`）——直接复用生产
 > `SearchSession` / `SearchRequest`，金标准为「曲库文本字面包含目标字串」，输出
 > P@k / R@k / MRR@k / NDCG@k 并按相关项规模分窄 / 中 / 宽三档。基线见 §2.3 与 `bench/REPORT.md` §5.5。
+>
+> **跑法与环境要求**：`bash app/core/indexer/bench/run_bench.sh`（默认 `PROFILE=full`：
+> 30000 曲 / 大词表 / 2 轮，约 15 min，峰值磁盘 ~1.5 GB）。机器吃不住时用 `PROFILE=quick`
+> （3000 曲 / 400 词 / 1 轮，约 2 min）——够判「排序 / 召回是否坏、有无明显回归」，
+> **但不得用于写正式基线数字**。`BENCH_WORK=<dir>` 可换工作目录；空间不足会先给可操作提示。
+> 提交物只有 `REPORT.md`，其余生成物在 `.work/`（已 gitignore）；已有 `metrics.json` 时
+> 可只重渲染报告、不必重跑基准。
 
 ### 8.0 语料真实度（**判读延迟数字前必看**）
 
