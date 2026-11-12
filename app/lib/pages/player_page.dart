@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../app/player_theme.dart';
@@ -21,6 +20,7 @@ import '../stores/app_prefs.dart';
 import '../stores/lyrics_provider.dart';
 import '../stores/player_route_animation.dart';
 import '../stores/providers.dart';
+import '../stores/window_full_screen.dart';
 import '../theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/dialogs/comment_dialog.dart';
@@ -68,12 +68,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   PlayerSharedElementKeys _keysForLayout(String layoutId) => _sharedElementKeys
       .putIfAbsent(layoutId, () => PlayerSharedElementKeys(layoutId));
 
-  /// 当前应用窗口句柄（nativeapi；无窗口环境为 null，能力调用静默跳过）。
-  Window? _window;
-
-  /// 窗口事件监听句柄（dispose 时按 id 注销）。
-  ListenerId? _windowListenerId;
-
   /// 切歌方向（slide 样式用）：播放顺序递增 = 下一首（新封面从右进），
   /// 递减 = 上一首（从左进）。对齐原版 watch(playIndex) 判定。
   bool _slideNext = true;
@@ -112,43 +106,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   double _lastBeatStrength = 1;
 
   /// 窗口是否处于完整全屏（进入全屏/还原按钮的图标与提示切换）。
-  /// 事件驱动：nativeapi 窗口事件（含系统级全屏，如 F11）同步状态，
-  /// 无轮询。
-  bool _isFullScreen = false;
-
-  /// 完整全屏切换（对齐原版 FullPlayer 顶栏 Maximize/Minimize 按钮，
-  /// 由 useWindowControls → Electron setFullScreen 实现，这里走
-  /// nativeapi 的 [Window.isFullScreen]）。
   ///
-  /// Windows 下窗口管理器不保证派发进入/退出全屏事件，若只靠窗口事件
-  /// 同步，按钮图标会停在旧态（必须关掉再打开播放页才会经 initState
-  /// 查询刷新）。这里改为：乐观置位 → 调用 → 以窗口管理器实际状态校准，
-  /// 三端一致即时刷新。
+  /// 由进程级 [windowFullScreenProvider] 提供：**只由窗口事件更新**，页面挂载 /
+  /// 卸载不再读取那个会跨线程阻塞的原生 getter（Windows 下最多等 5s，
+  /// 快速关闭→重开会导致整个应用卡死）。
+  bool get _isFullScreen => ref.watch(windowFullScreenProvider);
+
+  /// 完整全屏切换（对齐原版 FullPlayer 顶栏 Maximize/Minimize 按钮）。
+  ///
+  /// 乐观置位 + 原生写入下沉到 [WindowFullScreenNotifier.toggle]；实际状态仍由
+  /// 窗口事件校准（含系统级全屏，如 F11）。
   Future<void> _toggleFullscreen() async {
-    final window = _window;
-    if (window == null) return;
-    final target = !_isFullScreen;
-    if (mounted) setState(() => _isFullScreen = target);
-    window.isFullScreen = target;
-    _syncFullScreen();
-  }
-
-  /// 以窗口管理器真实全屏状态校准本地标记（系统级全屏 / 平台事件缺失兜底）。
-  void _syncFullScreen() {
-    final v = _window?.isFullScreen ?? false;
-    if (mounted && v != _isFullScreen) {
-      setState(() => _isFullScreen = v);
-    }
-  }
-
-  /// 窗口事件（含系统级全屏，如 F11）：同步播放页全屏按钮状态。
-  void _onWindowEvent(WindowEvent event) {
-    if (!mounted) return;
-    if (event is WindowEnteredFullScreenEvent && !_isFullScreen) {
-      setState(() => _isFullScreen = true);
-    } else if (event is WindowExitedFullScreenEvent && _isFullScreen) {
-      setState(() => _isFullScreen = false);
-    }
+    ref.read(windowFullScreenProvider.notifier).toggle();
   }
 
   void _pokeControls() {
@@ -168,11 +137,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       vsync: this,
       duration: const Duration(milliseconds: 180),
     );
-    // 全屏按钮初始状态 + 监听窗口事件（进入/退出全屏时图标同步）
-    _window = WindowManager.instance.getCurrent();
-    _windowListenerId = _window?.addListener(_onWindowEvent);
-    // 初始全屏状态校准：Windows 平台事件可能缺失，改为主动查询真实状态。
-    _syncFullScreen();
+    // 全屏按钮状态由 windowFullScreenProvider 提供（进程级单次注册原生监听），
+    // 页面挂载路径上不再有任何原生窗口调用。
     // 缓存路由动画写入器（dispose 时不能再经 ref 获取）。
     _routeAnimNotifier = ref.read(playerRouteAnimationProvider.notifier);
   }
@@ -225,10 +191,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   @override
   void dispose() {
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
-    // 清空路由动画（壳层恢复折叠态）。
-    _routeAnimNotifier?.set(null);
-    final listenerId = _windowListenerId;
-    if (listenerId != null) _window?.removeListener(listenerId);
+    // 清空路由动画（壳层恢复折叠态）；旧实例不能清掉新实例刚写入的动画。
+    _routeAnimNotifier?.clear(_routeAnimation);
     _hideTimer?.cancel();
     _coverPulse.dispose();
     super.dispose();
