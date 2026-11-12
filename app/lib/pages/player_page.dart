@@ -6,10 +6,10 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../app/player_theme.dart';
+import '../app/router.dart';
 import '../services/netease/track.dart';
 import '../services/source/source_platform.dart';
 import '../services/lyrics/lyric_line.dart';

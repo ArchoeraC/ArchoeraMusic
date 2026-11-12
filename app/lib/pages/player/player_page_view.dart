@@ -220,7 +220,10 @@ extension _PlayerPageView on _PlayerPageState {
                                         qualityLevels: qualityLevels,
                                         isFullScreen: _isFullScreen,
                                         layoutId: layout.id,
-                                        onClose: () => context.pop(),
+                                        // 统一走收起入口（幂等）：连点关闭时
+                                        // 第二次 pop 会落到下层页面，把用户踢出
+                                        // 当前页面。
+                                        onClose: closePlayerPage,
                                         onSelectLayout: (id) => ref
                                             .read(appPrefsProvider.notifier)
                                             .setCoverLayout(layout: id),
