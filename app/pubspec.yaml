@@ -69,17 +69,31 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 # dart sqlite3 包使用与 scanner-ffi 相同的内置 SQLite（libe_sqlite3，同版本
-# 同实例），避免同一进程内两个 SQLite 版本（系统/内置 3.53.x vs libe 3.50.x）
-# 并行操作同一 WAL 数据库导致写入丢失（增量扫描删除失效）。
-# 使用 source: process——native assets 直接从进程已加载的符号表解析（等价
-# DynamicLibrary.process()），避免按名 dlopen 因 libe_sqlite3.so 无 DT_SONAME
-# 而无法命中预加载句柄（glibc 行为；macOS dlopen 可命中已加载镜像故旧方案可
-# 用）。需应用启动最早处先按绝对路径以 RTLD_GLOBAL 预加载该库，使符号进入
-# 进程全局符号表（见 lib/services/scanner/sqlite_preload.dart）。
+# 同实例），避免同一进程内两个 SQLite 实例并行操作同一 WAL 数据库导致写入丢失。
+#
+# **不能再用 `source: process`（2026-11-12 实测）**：`process` 走
+# `DynamicLibrary.process()`，解析的是**全局符号表**，而 Linux 上 GTK 的依赖链
+# `libgtk-3.so.0 → libtinysparql-3.0.so.0 → libsqlite3.so.0` 在 main() 之前就把
+# 系统 SQLite 装进了全局作用域。ELF 全局符号按**加载顺序**查找，后加载的内置库
+# 永远赢不过它——于是 Dart 用系统 SQLite、scanner/indexer 用内置的，同进程两套
+# 实例（POSIX 锁按进程计，WAL 的 -wal/-shm 互不可见）：写入落进已从目录 unlink
+# 的 WAL、读取停在旧快照、一方 close 时 checkpoint 删掉 WAL 还会让另一方
+# `SQLITE_IOERR`（表现为「加完新媒体刷新不变、元数据改了没反应、索引器
+# disk I/O error」）。
+#
+# 现改为 **Linux 按名加载内置库**（source: system + name: e_sqlite3 →
+# `libe_sqlite3.so`）：启动最早处 preloadBundledSqlite() 已按绝对路径加载它，
+# dlopen 按 SONAME 命中同一句柄（SQLitePCLRaw 3.53.x 的产物带
+# `SONAME libe_sqlite3.so`），全进程只剩一套 SQLite。macOS / Windows 维持
+# `process`（两级命名空间 / 每模块导入表，不存在全局符号遮蔽）。
 hooks:
   user_defines:
     sqlite3:
-      source: process
+      source:
+        linux: system
+        default: process
+      name:
+        linux: e_sqlite3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
