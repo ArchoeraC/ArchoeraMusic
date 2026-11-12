@@ -105,7 +105,10 @@ mixin _LibraryStorePager on Notifier<LibraryState> {
         loadingMore: _hasInFlight,
         error: null,
       );
-    } catch (_) {
+    } catch (e, st) {
+      // 不能静默：读库失败会把列表清空、数量归零且 `error` 仍为 null，
+      // 用户侧表现就是「刷新了但列表/数量没变」，日志里却什么都看不到。
+      Log.w('library', '读取曲库失败（列表回退空）: $e\n$st');
       if (epoch != _pagerEpoch) return;
       state = state.copyWith(
         trackPages: const {},

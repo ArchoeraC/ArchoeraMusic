@@ -15,6 +15,7 @@ import 'library_search_rank.dart';
 import 'local_track.dart';
 import 'tracks_db.dart';
 import '../../stores/app_prefs.dart';
+import '../log/log.dart';
 import '../netease/track.dart';
 import '../search/search_lyric_snippet.dart';
 import '../search/search_service.dart';
