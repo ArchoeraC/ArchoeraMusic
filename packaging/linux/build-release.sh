@@ -106,7 +106,11 @@ do_build() {
   log "build: flutter pub get / analyze / build linux"
   (
     cd "$ROOT/app"
-    flutter pub get
+    # --enforce-lockfile：lockfile 与 pubspec 不一致时**直接失败**，而不是静默
+    # 重新解析依赖。历史上 CI 未设 PUB_HOSTED_URL（pub.dev），而开发者本机常设
+    # 国内镜像，lockfile 里的 hosted URL 与 CI 不一致 → pub 忽略 lockfile 重新
+    # 解析，把 nativeapi 升到 0.5.10（需要更新的 Dart），全平台构建一起红。
+    flutter pub get --enforce-lockfile
     dart analyze lib
     flutter build linux --release
   )
