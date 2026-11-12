@@ -459,6 +459,7 @@ public sealed class FtsStore : IIndexStoreAdmin
             ("has_korean", meta.HasKorean ? "1" : "0"),
             ("has_han", meta.HasHan ? "1" : "0"),
             ("has_latin", meta.HasLatin ? "1" : "0"),
+            ("updates_since_merge", meta.UpdatesSinceMerge.ToString(CultureInfo.InvariantCulture)),
         })
         {
             key.Value = k;
@@ -824,6 +825,7 @@ public sealed class FtsStore : IIndexStoreAdmin
             case "has_korean": meta.HasKorean = ParseBool(value); break;
             case "has_han": meta.HasHan = ParseBool(value); break;
             case "has_latin": meta.HasLatin = ParseBool(value); break;
+            case "updates_since_merge": meta.UpdatesSinceMerge = ParseInt(value); break;
         }
     }
 }

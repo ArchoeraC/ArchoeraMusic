@@ -34,6 +34,7 @@ internal static class EndToEnd
             MultilingualLayers(root);
             RomajiLyrics(root);
             RepeatedFullBuild(root);
+            MergeThreshold(root);
         }
         finally
         {
@@ -272,6 +273,53 @@ internal static class EndToEnd
         Program.Check("连续全量: 三首齐备",
             Scalar(index, "SELECT COUNT(*) FROM search_docs") == 3,
             Scalar(index, "SELECT COUNT(*) FROM search_docs").ToString());
+    }
+
+    /// <summary>
+    /// 合并阈值：增量按**累计改写曲数**计数，过阈值才做 FTS5 全段合并（`optimize`）。
+    ///
+    /// 背景：合并是 O(索引) 的全库重写（402MB 实测 4.5–13s），只改 1 首也要付全额；
+    /// 但永远不做又会让 `contentless_delete` 的墓碑累积、宽命中查询退化
+    /// （实测 `爱你`：20 曲 +34%、60 曲 +73%、120 曲 +103%）。故断言两端行为：
+    /// 计数会累加、过阈值后归零、零脏曲不推进也不触发。
+    /// </summary>
+    private static void MergeThreshold(string root)
+    {
+        var db = Path.Combine(root, "mt-library.db");
+        var index = Path.Combine(root, "mt-search.db");
+        var song = Path.Combine(root, "mt-song.mp3");
+        CreateLibrary(db, generation: 1);
+        using (var conn = Open(db))
+        {
+            InsertTrack(conn, "m1", song, "晴天", """[{"name":"周杰伦"}]""", null, "我爱你", 1);
+        }
+
+        // 阈值调到 2，避免测试里跑 30 次增量。
+        RunEngineDetailed(db, index, full: true, lrc: false, mergeEvery: 2);
+        Program.Check("合并计数: 全量后归零",
+            FtsStore.PeekMeta(index)?.UpdatesSinceMerge == 0,
+            FtsStore.PeekMeta(index)?.UpdatesSinceMerge.ToString());
+
+        Exec(db, "UPDATE tracks SET file_mtime = file_mtime + 1 WHERE id = 'm1'");
+        RunEngineDetailed(db, index, full: false, lrc: false, mergeEvery: 2);
+        Program.Check("合并计数: 第 1 次增量后 = 1（未达阈值→不合并）",
+            FtsStore.PeekMeta(index)?.UpdatesSinceMerge == 1,
+            FtsStore.PeekMeta(index)?.UpdatesSinceMerge.ToString());
+
+        Exec(db, "UPDATE tracks SET file_mtime = file_mtime + 1 WHERE id = 'm1'");
+        RunEngineDetailed(db, index, full: false, lrc: false, mergeEvery: 2);
+        Program.Check("合并计数: 第 2 次增量达阈值后归零（已合并）",
+            FtsStore.PeekMeta(index)?.UpdatesSinceMerge == 0,
+            FtsStore.PeekMeta(index)?.UpdatesSinceMerge.ToString());
+
+        RunEngineDetailed(db, index, full: false, lrc: false, mergeEvery: 2);
+        Program.Check("合并计数: 零脏曲增量不推进计数",
+            FtsStore.PeekMeta(index)?.UpdatesSinceMerge == 0,
+            FtsStore.PeekMeta(index)?.UpdatesSinceMerge.ToString());
+
+        // 合并后索引仍可查询（合并是物理整理，不改内容）。
+        Program.Check("合并后索引仍可命中", MatchContainsTrack(index, Analyzed("我爱你"), "m1"),
+            Analyzed("我爱你"));
     }
 
     /* ------------------------------------------------------------------ */
@@ -637,11 +685,13 @@ internal static class EndToEnd
 
     /// <summary>运行引擎并回传阶段二「取内容」SQL 次数（用于断言未全库读歌词）。</summary>
     private static (IndexerResult Result, int ContentQueries) RunEngineDetailed(
-        string db, string index, bool full, bool lrc)
+        string db, string index, bool full, bool lrc, int mergeEvery = 0)
     {
         using var store = new FtsStore();
         var engine = new IndexerEngine(store);
-        var result = engine.Run(db, index, full, new IndexerOptions { IndexLrc = lrc, Pinyin = true });
+        var options = new IndexerOptions { IndexLrc = lrc, Pinyin = true };
+        if (mergeEvery > 0) options.MergeEveryUpdates = mergeEvery;
+        var result = engine.Run(db, index, full, options);
         return (result, engine.ContentQueries);
     }
 

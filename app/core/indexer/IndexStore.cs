@@ -118,6 +118,18 @@ public sealed class StoreMeta
 
     /// <inheritdoc cref="HasJapanese"/>
     public bool HasLatin { get; set; } = true;
+
+    /// <summary>
+    /// 距上次 FTS5 全段合并（`optimize`）以来累计**新增 / 改写的曲目数**。
+    ///
+    /// 为什么按曲数而不是次数：退化来自 `contentless_delete` 的墓碑——每次改写留下的
+    /// 删除标记在合并前都会参与查询过滤，实测退化与**累计改写曲数**单调相关
+    /// （`爱你`：20 曲 +34%、60 曲 +73%、120 曲 +103%），而与当下段数关系不大。
+    ///
+    /// 合并是 O(索引) 的全库重写（402MB 实测 4.5–13s），故只在累计量过阈值时才做；
+    /// 旧库缺键按 0 处理（下一次增量会自然累积）。
+    /// </summary>
+    public int UpdatesSinceMerge { get; set; }
 }
 
 /// <summary>

@@ -222,6 +222,10 @@ public static unsafe class IndexerFfi
                 options.RomajiLyrics = romaji.GetBoolean();
             if (root.TryGetProperty("batch", out var batch) && batch.ValueKind == JsonValueKind.Number)
                 options.Batch = batch.GetInt32();
+            if (root.TryGetProperty("merge_every_updates", out var merge)
+                && merge.ValueKind == JsonValueKind.Number
+                && merge.TryGetInt32(out var mergeEvery) && mergeEvery > 0)
+                options.MergeEveryUpdates = mergeEvery;
             return true;
         }
         catch (JsonException ex)

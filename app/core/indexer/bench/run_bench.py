@@ -678,40 +678,48 @@ def write_report(m: dict) -> None:
     L.append("")
     L.append("## 4. 增量（非 --full）")
     L.append("")
-    L.append("| 场景 | 脏曲 K | wall ms | durationMs | 峰值 RSS MB | indexed | deleted |")
-    L.append("|---|---|---|---|---|---|---|")
+    L.append("| 场景 | 脏曲 K | wall ms | durationMs | 本次合并 | 峰值 RSS MB | indexed | deleted |")
+    L.append("|---|---|---|---|---|---|---|---|")
+    def merge_cell(x):
+        return "是（含全段合并）" if x.get("merged") else "否"
     for k in sorted(inc):
         x = inc[k]
         name = "零脏曲（no-op）" if k == 0 else "改 file_mtime"
-        L.append(f"| {name} | {k} | {x['wall_ms']:.0f} | {x.get('durationMs')} | {x['rss_mb']:.0f} | "
-                 f"{x.get('indexed')} | {x.get('deleted')} |")
+        L.append(f"| {name} | {k} | {x['wall_ms']:.0f} | {x.get('durationMs')} | {merge_cell(x)} | "
+                 f"{x['rss_mb']:.0f} | {x.get('indexed')} | {x.get('deleted')} |")
     if noop_lrc:
-        L.append(f"| 零脏曲（no-op，**含 .lrc 档**） | 0 | {noop_lrc['wall_ms']:.0f} | {noop_lrc.get('durationMs')} | "
+        L.append(f"| 零脏曲（no-op，**含 .lrc 档**） | 0 | {noop_lrc['wall_ms']:.0f} | "
+                 f"{noop_lrc.get('durationMs')} | {merge_cell(noop_lrc)} | "
                  f"{noop_lrc['rss_mb']:.0f} | {noop_lrc.get('indexed')} | {noop_lrc.get('deleted')} |")
     L.append("")
     if noop.get("durationMs") is not None:
         L.append(f"- **零脏曲 = {noop['durationMs']}ms**：这是增量的**固定开销**（阶段一探测 + 收尾写路径），"
-                 f"**不含任何内容读取**。K=20 与它的差值才是脏曲写路径成本。")
+                 f"**不含任何内容读取**（也不触发分析器初始化）。")
     if inc20.get("durationMs") and inc200.get("durationMs"):
         d20, d200 = inc20["durationMs"], inc200["durationMs"]
         marginal = (d200 - d20) / (200 - 20)
-        L.append(f"- K=20 → {d20}ms；K=200 → {d200}ms：ΔK={200-20} 增加 {d200-d20}ms（**边际 ≈ {marginal:.1f}ms/曲**）"
-                 f"——脏曲部分随 K 近似线性。")
+        L.append(f"- K=20 → {d20}ms；K=200 → {d200}ms：ΔK={200-20} 增加 {d200-d20}ms"
+                 f"（名义边际 ≈ {marginal:.1f}ms/曲）。")
+        if inc200.get("merged") and not inc20.get("merged"):
+            L.append("- ⚠ **该边际不是纯写路径成本**：K=200 那次**跨过了合并阈值**、含一次全段合并，"
+                     "而 K=20 那次没有。看「只写不合并」的成本请参考 K=20（或把 `--merge-every` 调大后复测）。")
+        elif inc20.get("merged") and inc200.get("merged"):
+            L.append("- 两次增量都做了合并，故边际主要由合并成本主导，不代表写路径。")
         if noop.get("durationMs"):
-            L.append(f"- K=20 相对零脏曲多 {d20 - noop['durationMs']}ms：**这笔差值并非内容读取 / 分析的"
-                     f"真实成本**——隔离实测同规模写入只要 13.5ms，其余是下一条说的 `optimize`。"
-                     f"「阶段一探测」本身很轻（零脏曲已含它）。")
+            L.append(f"- K=20 相对零脏曲多 {d20 - noop['durationMs']}ms：其中**真实写入只要 13.5ms/20 首**"
+                     f"（隔离实测），大头是**分析器首次初始化**（Unihan / 读音表 `Lazy<>` 冷加载 ≈1.1s，"
+                     f"进程级一次性）——零脏曲不分析故不含它。「阶段一探测」本身很轻。")
     L.append(f"- 增量预算（「秒级、≈ K 成正比」）{ok(inc_ok)}。")
-    L.append("- **归因（2026-11-12 定位）：耗时绝大部分是 FTS5 的 `optimize`（全段合并），"
-             "不是脏曲写路径。** 隔离实测（402MB 索引）：写入 20/200 首（真实 token 量）"
-             "仅 13.5/89.6ms，而随后的 `INSERT INTO search_fts(search_fts) VALUES('optimize')` "
-             "要 **4511/13009ms**。它不随脏曲数缩小（单曲改动也付全额），因为它重写整个倒排。")
-    L.append("- **这笔成本不能省**：跳过 `optimize` 会让段数累积（+200 首实测 1 段 → 12 段），"
-             "宽命中查询随之退化——独立进程实测 `wan` 56.2→92.0ms、`我爱你` 32.9→90.5ms、"
-             "`爱你` 9.3→17.3ms；排序结果不受影响（逐条一致）。故这是"
-             "「一次全库重写换查询稳定」的取舍，属 FTS5 固有成本。")
-    L.append("- 若要继续压缩该指标，正确方向是**把 merge 移出增量临界路径**（空闲后台维护 / "
-             "按累计脏曲数设阈值），而不是删掉它。")
+    L.append("- **耗时构成（2026-11-12 定位）**：主导项曾是收尾的 FTS5 `optimize`（全段合并）——"
+             "402MB 索引隔离实测 **4.5–13s**，且不随脏曲数缩小（只改 1 首也付全额），因为它重写整个倒排；"
+             "真实写路径只要 13.5ms/20 首。另有约 **1.1s 是进程级一次性开销**"
+             "（Unihan / 读音表的 `Lazy<>` 首次加载），与增量规模无关。")
+    L.append("- **现状：改为按「累计改写曲数」触发合并**（`IndexerOptions.MergeEveryUpdates`，默认 30）。"
+             "合并**不能不做**：跳过它会让 `contentless_delete` 的墓碑累积、宽命中查询退化"
+             "（独立进程实测 `爱你`：20 曲 +34% / 60 曲 +73% / 120 曲 +103%，而排序结果不变）；"
+             "但每次都做又太贵。阈值即两者的折中——常态增量只写不合并，累计约 30 首后的一次增量顺带合并。")
+    L.append("- **分界很重要**：脏曲的*筛选与应用*始终是**同步、完整**的（阶段一探测 + 阶段二写入），"
+             "合并只是物理整理——不改内容、失败也无损（索引仍然正确，下次增量再尝试），二者不可混为一谈。")
     if noop_lrc:
         L.append(f"- `.lrc` 档零脏曲增量 = **{noop_lrc.get('durationMs')}ms**：与不开启时同量级即说明"
                  f"**索引器没有任何文件系统侧车探测**（侧车锚点 `lrc_mtime/size` 来自扫描器写入的"
@@ -831,8 +839,9 @@ def write_report(m: dict) -> None:
     L.append("\\* 「与 N 近似无关」只对**窄命中**查询成立；宽命中集（常见拼音 / 首字母）随 N 线性增长，"
              "见 §5 逐条表与 §8 局限。")
     L.append("")
-    L.append("\\*\\* 增量超标的**根因是 FTS5 `optimize`（全段合并）**，隔离实测 4.5–13s 且不随脏曲数缩小；"
-             "去掉它会让查询退化（`wan` +64%、`我爱你` +175%）。详见 §4 归因。")
+    L.append("\\*\\* 增量的耗时由 FTS5 `optimize`（全段合并，**O(索引)**）主导，与脏曲数无关；"
+             "现按累计改写曲数触发（`MergeEveryUpdates`，默认 30），故 K=200 那次含合并、K=20 那次不含。"
+             "详见 §4。")
     L.append("")
     L.append(f"> 索引体积预算已按实测**校准**：原目标 100–300 MB 是实测前估数，"
              f"实际外推 {budget['extrapolate_n']} 曲 ≈ {idx25k_mb:.0f} MiB（超 6%），"
