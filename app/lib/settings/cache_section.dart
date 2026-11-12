@@ -465,23 +465,22 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               onChanged: (v) => notifier.setLogToFile(v),
             ),
             // 查询日志（本机 JSONL）：为搜索质量调优采集，可随时清除。
+            // 注意：**关闭落盘时也要能清除**——「不再写入」不等于「已记录的已删除」，
+            // 用户关掉日志后更可能想清掉既有记录（对齐 privacy.md「可随时清除」）。
             SettingTile(
               icon: EtaIcons.search3,
               title: l10n.settingsSearchQueryLog,
               subtitle: prefs.logToFile
                   ? l10n.settingsSearchQueryLogOn
                   : l10n.settingsSearchQueryLogOff,
-              enabled: prefs.logToFile,
               trailing: SizedBox(
                 height: 28,
                 child: TextButton(
                   style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-                  onPressed: prefs.logToFile
-                      ? () {
-                          QueryLogger.clear();
-                          toast(l10n.settingsSearchQueryLogCleared);
-                        }
-                      : null,
+                  onPressed: () {
+                    QueryLogger.clear();
+                    toast(l10n.settingsSearchQueryLogCleared);
+                  },
                   child: Text(l10n.commonClear, style: const TextStyle(fontSize: 12)),
                 ),
               ),

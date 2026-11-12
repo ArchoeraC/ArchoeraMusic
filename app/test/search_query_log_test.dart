@@ -198,4 +198,38 @@ void main() {
           returnsNormally);
     });
   });
+
+  group('QueryLogger.clear（关闭落盘后仍可清除既有记录）', () {
+    late Directory tmp;
+    setUp(() => tmp = Directory.systemTemp.createTempSync('query_log_gate'));
+    tearDown(() {
+      QueryLogger.setEnabled(false, dataDir: tmp.path);
+      QueryLogger.debugSetSink(null);
+      try {
+        tmp.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+
+    test('sink 为 null（日志关闭）时 clear 仍删除文件', () {
+      final path = '${tmp.path}/logs/search_queries.jsonl';
+      FileQueryLogSink(path: path)
+          .append(const QueryLogEntry(query: 'woaini', hitCount: 3));
+      expect(File(path).existsSync(), isTrue);
+
+      // 关闭落盘：只停止写入，不应顺手删掉既有记录（否则用户无从取证 / 也无法预期）。
+      QueryLogger.setEnabled(false, dataDir: tmp.path);
+      expect(QueryLogger.enabled, isFalse);
+      expect(File(path).existsSync(), isTrue, reason: '关开关不应静默删除记录');
+
+      // 「可随时清除」必须在关闭态成立——这正是 privacy.md 的承诺。
+      QueryLogger.clear();
+      expect(File(path).existsSync(), isFalse);
+      expect(File('$path.1').existsSync(), isFalse);
+    });
+
+    test('未配置路径时 clear 不抛异常', () {
+      QueryLogger.debugSetSink(null);
+      expect(() => QueryLogger.clear(), returnsNormally);
+    });
+  });
 }
