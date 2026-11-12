@@ -188,13 +188,30 @@ ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_is_done(
  * 单会话暂存源切换（prepare_source / commit_source）的纯计算辅助：commit 时
  * 需从暂存缓冲头部丢弃的交叠 float 样本数（供确定性单测；运行期由引擎内部
  * 用同一函数）：
- *   drop_ms = old_ms - next_start_ms（clamp >= 0）
- *   frames  = llround(drop_ms * rate / 1000)
+ *   drop_ms = old_ms - origin_ms（媒体时间，clamp >= 0）
+ *   frames  = llround(drop_ms * rate / 1000 / tempo_speed)
  *   samples = frames * stage_ch（夹取到 [0, staged]）
- * 参数非法 / 无交叠 → 0。
+ * [origin_ms] 必须是 stage[0] 的真实媒体时间（PCM 回调的**块起始**，不能用
+ * 块起点再减块时长）。stage 里是**变速后**的输出 PCM，故用 tempo_speed 换算
+ * （speed=2 时 10ms 媒体只有 5ms 输出样本）。参数非法 / 无交叠 → 0。
  */
 ARCHOERA_MEDIAENGINE_API size_t archoera_mediaengine_stage_drop_samples(
-    size_t staged, int stage_ch, int rate, double old_ms, double next_start_ms);
+    size_t staged, int stage_ch, int rate, double old_ms, double origin_ms,
+    double tempo_speed);
+
+/**
+ * commit 前的**覆盖性校验**：暂存源是否覆盖旧源解码游标 `old_ms`。
+ *
+ * 判定按**样本**进行（与 `stage_drop_samples` 同一取整）：`drop_frames =
+ * llround((old_ms - origin_ms) * rate / 1000 / tempo_speed)`，要求
+ * `0 <= drop_frames <= staged/ch`。不做毫秒级容差——旧 5ms 容差（@48k 约
+ * 240 帧）会把「seek 晚到 4ms」当成可切换，拼接处丢一小段内容。返回 0 表示
+ * 新源起点晚于游标（续接会跳播）或暂存不足覆盖游标（续接会回放/停滞）——
+ * 此时调用方必须放弃切换、保留旧源，绝不能把新源从错误位置接进 ring。
+ */
+ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_stage_covers(
+    size_t staged, int stage_ch, int rate, double old_ms, double origin_ms,
+    double tempo_speed);
 
 /**
  * M3（docs/audio-memory-source.md §6.1/§6.2）：当前可用内存（MB），供 Dart

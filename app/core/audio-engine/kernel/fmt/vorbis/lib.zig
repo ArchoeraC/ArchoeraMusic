@@ -370,8 +370,14 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *VorbisCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.samples_done);
+}
 
 // ---- VTable 实现 ----
 

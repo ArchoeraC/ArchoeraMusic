@@ -8,13 +8,12 @@
 /// NekoAuth access token（无签名 / 无防重放 / 无客户端指纹）。本类聚合
 /// 登录会话、搜索、收藏（我喜欢）、歌单、播放 URL 与歌词，供各页面 provider 复用。
 ///
-/// **登录方式**（对齐 NekoMusic 最新服务端）：
-/// - PC：NekoAuth OIDC（`/api/user/sso/start` → 浏览器 → `nekomusic://` 深链 →
-///   `/api/user/sso/claim`），见 [startSsoLogin]；
-/// - 扫码：`/api/user/qrlogin/{create,status,claim}`，confirmed 后用创建响应的
-///   `deliveryKey` 领取 token；
-/// - 传统账号密码：服务端已下线，仅供编译期开关 `NEKO_ENABLE_PASSWORD_LOGIN`
-///   重新启用时使用。
+/// **登录方式**：扫码登录（`/api/user/qrlogin/{create,status,claim}`），confirmed
+/// 后用创建响应的 `deliveryKey` 领取 token。
+///
+/// **破坏性变更（2026-11-09）**：已移除 NekoAuth OAuth（浏览器回调 +
+/// `nekomusic://` 深链）与传统账号密码登录；本客户端不再调用
+/// `/api/user/sso/*` 与 `/api/user/login`。
 ///
 /// **边界**：不接入注册 / 邮箱验证码 / 滑块验证 / VIP 开通等付费能力。
 ///
@@ -29,33 +28,20 @@ import 'package:flutter/foundation.dart';
 
 import '../../apis/neko/neko_client.dart';
 import '../../apis/runtime.dart';
-import '../../services/platform/platform_capabilities.dart';
 import '../log/log.dart';
 import '../netease/netease_api.dart' show CoverItem, SearchResult;
 import '../netease/track.dart';
 import 'neko_audio.dart';
 import 'neko_quality.dart';
-import 'neko_sso_bridge.dart';
 import 'neko_types.dart';
 
 /// 会话存储平台键（vault）。
 const String kNekoSessionPlatform = 'neko';
 
-/// OIDC 登录的客户端类型（NekoMusic 只接受 `pc` / `android`）。
-const String _kNekoSsoClient = 'pc';
-
 /// Neko 音源服务。
 class NekoApi extends ChangeNotifier {
-  NekoApi({
-    NekoClient Function(String baseUrl, String? token)? clientFactory,
-    bool autoClaimDeepLink = false,
-  }) : _clientFactory = clientFactory ?? _defaultClient {
-    if (autoClaimDeepLink) {
-      _handoffSub = NekoSsoBridge.handoffs.listen(_onHandoffForColdStart);
-      final pending = NekoSsoBridge.takePending();
-      if (pending != null) unawaited(_claimColdHandoff(pending));
-    }
-  }
+  NekoApi({NekoClient Function(String baseUrl, String? token)? clientFactory})
+    : _clientFactory = clientFactory ?? _defaultClient;
 
   final NekoClient Function(String baseUrl, String? token) _clientFactory;
 
@@ -67,20 +53,6 @@ class NekoApi extends ChangeNotifier {
 
   /// 正在做 401 复核（避免 401 风暴触发并发的探测请求）。
   bool _checkingSession = false;
-
-  /// OAuth 登录代次：取消 / 重新发起时递增，旧流程不再 claim。
-  int _ssoGeneration = 0;
-
-  /// 本次登录流程的取消信号（关闭登录框 / 重新发起时完成）。
-  Completer<void>? _ssoCancel;
-
-  /// 当前是否由本进程临时注册了 `nekomusic://`。
-  bool _ssoSchemeRegistered = false;
-
-  /// 冷启动回调监听（provider 创建时启用；测试默认关闭）。
-  StreamSubscription<String?>? _handoffSub;
-  bool _ssoActive = false;
-  bool _coldClaiming = false;
 
   /// 头像缓存破坏版本（进程内唯一；换图后 URL 变化以绕过 CDN/HTTP 缓存）。
   final int _avatarVersion = DateTime.now().millisecondsSinceEpoch;
@@ -206,194 +178,6 @@ class NekoApi extends ChangeNotifier {
     }
   }
 
-  /// 冷启动 / 登录框已关闭时收到回调：直接用一次性 handoff 领 token，
-  /// 不需要用户在应用内重新点一次登录。
-  void _onHandoffForColdStart(String? handoff) {
-    if (handoff == null || handoff.isEmpty) return;
-    if (_ssoActive || isLoggedIn) return;
-    unawaited(_claimColdHandoff(handoff));
-  }
-
-  Future<void> _claimColdHandoff(String handoff) async {
-    if (_coldClaiming) return;
-    _coldClaiming = true;
-    try {
-      await ssoClaim(handoff);
-      Log.i('neko', '冷启动回调登录成功：${_account?.displayName ?? ''}');
-    } catch (e) {
-      Log.w('neko', '冷启动回调领取失败：$e');
-    } finally {
-      _coldClaiming = false;
-    }
-  }
-
-  @override
-  void dispose() {
-    unawaited(_handoffSub?.cancel());
-    super.dispose();
-  }
-
-  /// 打开 NekoAuth 授权地址（独立按钮；不自动弹浏览器）。
-  int openSsoUrl(String url) => PlatformCapabilities.instance().openUrl(url);
-
-  /// 准备 NekoAuth 登录：临时注册 `nekomusic://`、取一次性授权地址、开始等待回调。
-  ///
-  /// 返回的 [NekoSsoLoginSession.url] 由界面展示 / 复制（可交给任意浏览器），
-  /// `completed` 在收到回调并 claim 成功后完成；`cancel` 用于关闭登录框时清理。
-  /// 本方法**不打开浏览器**。
-  Future<NekoSsoLoginSession> beginSsoLogin({
-    Duration timeout = const Duration(minutes: 5),
-  }) async {
-    final caps = PlatformCapabilities.instance();
-    if (!caps.deepLinkAvailable) {
-      throw NekoApiException('当前平台不支持登录回调');
-    }
-    Log.i('neko', 'SSO 开始：准备临时注册 nekomusic://');
-    // 结束上一次未完成流程，避免两套监听 / 注册并存。
-    cancelSsoLogin();
-    _ssoActive = true;
-    final generation = ++_ssoGeneration;
-    final cancel = Completer<void>();
-    _ssoCancel = cancel;
-    try {
-      final registered = await caps.deepLink.register(kNekoSsoScheme);
-      if (registered) _ssoSchemeRegistered = true;
-      Log.i('neko', 'SSO 开始：nekomusic:// 注册=${registered ? 'ok' : 'failed'}');
-      if (generation != _ssoGeneration) {
-        throw NekoApiException('登录已取消');
-      }
-      if (!registered) {
-        throw NekoApiException('无法注册 nekomusic:// 登录回调');
-      }
-      final url = await ssoStartUrl();
-      if (generation != _ssoGeneration) {
-        throw NekoApiException('登录已取消');
-      }
-      final pending = NekoSsoBridge.waitForHandoff(
-        timeout: timeout,
-        cancel: cancel.future,
-      );
-      Log.i('neko', 'SSO 授权地址已获取，等待用户在浏览器完成登录');
-      final completed = _completeSsoLogin(pending, cancel, generation, caps);
-      return NekoSsoLoginSession(
-        url: url,
-        completed: completed,
-        cancel: cancelSsoLogin,
-      );
-    } catch (_) {
-      await _cleanupSso(cancel, caps);
-      rethrow;
-    }
-  }
-
-  Future<void> _completeSsoLogin(
-    Future<String?> pending,
-    Completer<void> cancel,
-    int generation,
-    PlatformCapabilities caps,
-  ) async {
-    try {
-      final handoff = await pending;
-      if (generation != _ssoGeneration) {
-        throw NekoApiException('登录已取消', kind: NekoErrorKind.network);
-      }
-      if (handoff == null || handoff.isEmpty) {
-        Log.w('neko', 'SSO 等待回调超时 / 已取消');
-        throw NekoApiException('登录超时，请重试', kind: NekoErrorKind.network);
-      }
-      Log.i('neko', 'SSO 收到 handoff，开始 claim');
-      await ssoClaim(handoff);
-      Log.i('neko', 'SSO claim 成功：${_account?.displayName ?? ''}');
-    } finally {
-      await _cleanupSso(cancel, caps);
-    }
-  }
-
-  Future<void> _cleanupSso(
-    Completer<void> cancel,
-    PlatformCapabilities caps,
-  ) async {
-    // 只有当前流程负责注销；若已有新流程接管，注册由新流程管理。
-    if (!identical(_ssoCancel, cancel)) return;
-    _ssoCancel = null;
-    _ssoActive = false;
-    if (!_ssoSchemeRegistered) return;
-    _ssoSchemeRegistered = false;
-    try {
-      await caps.deepLink.unregister(kNekoSsoScheme);
-      Log.i('neko', 'SSO 结束：已注销 nekomusic://');
-    } catch (_) {
-      // 注销失败不影响登录结果（下次登录会重新注册）。
-    }
-  }
-
-  /// 取消正在等待的 OAuth 回调（关闭登录框 / 重新发起时调用）。
-  ///
-  /// 完成取消信号后 `startSsoLogin` 会立即走到 `finally` 注销 `nekomusic://`，
-  /// 不需要等到 5 分钟超时。
-  void cancelSsoLogin() {
-    _ssoGeneration++;
-    final cancel = _ssoCancel;
-    if (cancel != null && !cancel.isCompleted) cancel.complete();
-    NekoSsoBridge.clearPending();
-  }
-
-  /// `POST /api/user/sso/start`：取 NekoAuth 授权地址。
-  Future<String> ssoStartUrl({
-    String client = _kNekoSsoClient,
-    String returnTo = '/',
-  }) async {
-    final body = await _client().postJson(
-      '/api/user/sso/start',
-      body: {'client': client, 'returnTo': returnTo},
-    );
-    _ensureSuccess(body);
-    final data = body['data'];
-    final url = data is Map ? data['url']?.toString() : null;
-    if (url == null || url.isEmpty) {
-      throw NekoApiException('登录响应缺少跳转地址');
-    }
-    return url;
-  }
-
-  /// `POST /api/user/sso/claim`：用一次性 handoff 换取 access token。
-  Future<void> ssoClaim(String handoff) async {
-    final body = await _client().postJson(
-      '/api/user/sso/claim',
-      body: {'handoff': handoff},
-    );
-    _ensureSuccess(body);
-    final data = body['data'];
-    if (data is! Map) throw NekoApiException('登录响应格式异常');
-    final token = data['token']?.toString() ?? '';
-    if (token.isEmpty) throw NekoApiException('登录响应缺少 token');
-    _applyLogin(token, user: _userFrom(data['user']));
-    notifyListeners();
-    unawaited(refreshAccount());
-  }
-
-  /// 传统账号密码登录（**服务端已下线**，仅在 [nekoPasswordLoginEnabled]
-  /// 重新打开时使用；字段名 `email`）。
-  Future<void> loginPassword(String email, String password) async {
-    final body = await _client().postJson(
-      '/api/user/login',
-      body: {'email': email, 'password': password},
-    );
-    _ensureSuccess(body);
-    final data = body['data'];
-    final token = data is Map ? data['token']?.toString() : null;
-    if (token == null || token.isEmpty) {
-      throw NekoApiException('登录响应缺少 token');
-    }
-    _applyLogin(
-      token,
-      user: _userFrom(data is Map ? data['user'] : null) ??
-          NekoUser(id: '', nickname: '', email: email),
-    );
-    notifyListeners();
-    unawaited(refreshAccount());
-  }
-
   /// 创建二维码登录会话。
   ///
   /// 服务端返回渲染好的 [NekoQrSession.qrImage] 与一次性
@@ -426,9 +210,7 @@ class NekoApi extends ChangeNotifier {
       try {
         final decoded = jsonDecode(ev.data);
         if (decoded is! Map) continue;
-        status = NekoQrStatus.fromJson(
-          Map<String, dynamic>.from(decoded),
-        );
+        status = NekoQrStatus.fromJson(Map<String, dynamic>.from(decoded));
       } catch (_) {
         continue;
       }
@@ -466,26 +248,10 @@ class NekoApi extends ChangeNotifier {
     return true;
   }
 
-  /// 找回密码：取一次性的 NekoAuth 网页重置链接。
-  ///
-  /// 重置流程统一由 NekoAuth 网页处理，客户端只取链接
-  /// （`POST /api/user/sso/password-reset-url`）不内嵌表单。
-  Future<String> fetchPasswordResetUrl() async {
-    final body = await _client().postJson(
-      '/api/user/sso/password-reset-url',
-      body: const <String, dynamic>{},
-    );
-    _ensureSuccess(body);
-    final data = body['data'];
-    final url = data is Map ? data['url']?.toString() : null;
-    if (url == null || url.isEmpty) throw NekoApiException('响应缺少重置链接');
-    return url;
-  }
-
   /// 退出登录：吊销服务端 access token 并清理本地会话。
   ///
-  /// **不打开浏览器**：NekoAuth 的浏览器会话由用户自行在账号中心退出；
-  /// 应用内退出只处理自己的 token，避免退出操作又弹出系统浏览器。
+  /// 只吊销本客户端的 token；扫码前若曾在网页端登录，其浏览器会话由用户
+  /// 在账号中心自行退出。
   Future<void> logout() async {
     final token = _token;
     _clearSession();
@@ -908,9 +674,7 @@ class NekoApi extends ChangeNotifier {
       maxQuality: normalizeNekoQuality(data['maxQuality']?.toString()),
       lyrics: data['lyrics']?.toString() ?? '',
       lyricsFormat: data['lyricsFormat']?.toString() ?? 'lrc',
-      lyricsRich: rawRich is Map
-          ? Map<String, dynamic>.from(rawRich)
-          : null,
+      lyricsRich: rawRich is Map ? Map<String, dynamic>.from(rawRich) : null,
       expiresAt: DateTime.now().add(_musicInfoTtl),
     );
     if (_musicInfos.length >= _musicInfoCacheLimit) {
@@ -980,11 +744,7 @@ class NekoApi extends ChangeNotifier {
       final lrc = info.lyrics.trim();
       final rich = info.lyricsRich;
       if (lrc.isEmpty && (rich == null || rich.isEmpty)) return null;
-      return NekoLyricPayload(
-        format: info.lyricsFormat,
-        lrc: lrc,
-        rich: rich,
-      );
+      return NekoLyricPayload(format: info.lyricsFormat, lrc: lrc, rich: rich);
     } catch (_) {
       return null;
     }
@@ -1096,24 +856,6 @@ class NekoApi extends ChangeNotifier {
   }
 }
 
-/// 一次进行中的 NekoAuth 登录（URL 可复制到任意浏览器完成认证）。
-class NekoSsoLoginSession {
-  const NekoSsoLoginSession({
-    required this.url,
-    required this.completed,
-    required this.cancel,
-  });
-
-  /// 一次性 NekoAuth 授权地址（含 state / nonce / PKCE）。
-  final String url;
-
-  /// 回调领取并落盘成功后完成；超时 / 取消 / 失败时抛 [NekoApiException]。
-  final Future<void> completed;
-
-  /// 取消等待并注销 `nekomusic://`（关闭登录框时调用）。
-  final void Function() cancel;
-}
-
 /// 内部：媒体直链缓存项（`/api/music/file` 解析结果，进程内短 TTL）。
 class _NekoMediaUrl {
   const _NekoMediaUrl(this.url, this.expiresAt);
@@ -1124,11 +866,7 @@ class _NekoMediaUrl {
 
 /// 歌词载荷：`neko-v1` 富歌词（逐字）+ LRC 兼容文本。
 class NekoLyricPayload {
-  const NekoLyricPayload({
-    required this.format,
-    required this.lrc,
-    this.rich,
-  });
+  const NekoLyricPayload({required this.format, required this.lrc, this.rich});
 
   /// 服务端歌词格式：`lrc` 或 `neko-v1`。
   final String format;

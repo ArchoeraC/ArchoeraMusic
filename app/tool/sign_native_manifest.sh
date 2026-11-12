@@ -45,7 +45,7 @@ if [ -n "${ARCHOERA_WM_KEY1_PEM:-}" ]; then
 fi
 
 [ -f "$K1" ] || {
-  echo "缺少私钥（设置 ARCHOERA_WM_KEY1_PEM，或放置 $K1）" >&2
+  echo "缺少私钥（设置 ARCHOERA_WM_KEY1_PEM，或放置 ${K1}）" >&2
   exit 1
 }
 

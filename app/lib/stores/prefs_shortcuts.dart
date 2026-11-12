@@ -8,15 +8,26 @@ import 'app_prefs.dart';
 // ── 快捷键域键 ──────────────────────────────────────────────────
 const shortcutsKey = 'shortcuts.bindings';
 
+/// 当前注册表里的动作 id（用于丢弃已下线动作的历史覆盖）。
+final Set<String> _knownActionIds = {
+  for (final action in ShortcutAction.values) action.id,
+};
+
 /// 快捷键偏好：仅存用户覆盖（actionId → 绑定字符串）；未覆盖用注册表默认。
 extension ShortcutPrefs on AppPrefs {
   /// 用户覆盖表（actionId → 绑定字符串）。
+  ///
+  /// 已不存在的动作（例如历史上单独的「播放」「暂停」）会被忽略，避免
+  /// 设置页出现「没有可见覆盖但恢复默认仍可点」的残留状态。
   Map<String, String> get shortcutOverrides {
     final raw = data[shortcutsKey];
     if (raw is! Map) return const {};
     return {
       for (final e in raw.entries)
-        if (e.key is String && e.value is String) e.key as String: e.value as String,
+        if (e.key is String &&
+            e.value is String &&
+            _knownActionIds.contains(e.key))
+          e.key as String: e.value as String,
     };
   }
 

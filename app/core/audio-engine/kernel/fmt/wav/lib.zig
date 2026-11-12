@@ -109,8 +109,25 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+/// 已输出的 PCM 帧数（与 [positionMsImpl] 同一度量，只返回样本精度）。
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const w: *WavCtx = @ptrCast(@alignCast(ctx));
+    const frames: u64 = if (w.codec == .adpcm_swf)
+        w.swf_frames
+    else if (w.codec == .adpcm_zork)
+        w.position_bytes / w.channels
+    else if (isContinuous(w))
+        w.position_bytes * 2 / w.channels
+    else if (w.codec == .adpcm_g726)
+        w.position_bytes * 8 / w.g726.code_size
+    else
+        (w.position_bytes / w.block_align) * samplesPerBlock(w);
+    return @intCast(frames);
+}
 
 /// chunk 循环上界（§13.3 防 DoS）
 const max_chunks: u32 = 512;
@@ -1991,6 +2008,7 @@ test "wav 集成: seek 与 position_ms" {
     try testing.expectEqual(@as(i64, 0), dec.positionMs());
     try dec.seekMs(500);
     try testing.expectEqual(@as(i64, 500), dec.positionMs());
+    try testing.expectEqual(@as(i64, 4000), dec.positionSamples());
 
     var out: [200]u8 = undefined; // 100 帧
     var ch: u8 = 0;

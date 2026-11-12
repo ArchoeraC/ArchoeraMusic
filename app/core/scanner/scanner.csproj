@@ -26,6 +26,8 @@
          library.db（lyrics_lrc* + lrc_mtime/size/checked），索引器 / 播放侧只读 DB。 -->
     <!-- 文本脚本分类（汉字 / 假名 / 谚文 / 拉丁）：与其它模块共用同一源文件 -->
     <Compile Include="../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
+    <!-- 纯托管 MD5（曲目 id）：避免 .NET 在 Linux/macOS 运行期 dlopen 系统 libssl。 -->
+    <Compile Include="../shared/hash/Md5.cs" Link="shared/hash/Md5.cs" />
     <Compile Include="../shared/lyrics/LrcReader.cs" Link="shared/lyrics/LrcReader.cs" />
   </ItemGroup>
 

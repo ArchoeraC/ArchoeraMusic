@@ -27,7 +27,13 @@ class VaultSessionStore implements SessionStore {
   static const List<String> knownPlatforms = [
     'netease',
     'kugou',
+    // 酷狗安装级设备身份（GUID/MID/DEV/dfid）。与登录会话分离：
+    // 退出登录不能丢设备，否则重登会被平台当作新设备（风控信号）。
+    'kugou_device',
     'qqmusic',
+    // QQ 安装级设备身份（GUID/UDID/AndroidID/IMEI/QIMEI）。与登录会话分离：
+    // 退出登录不能丢设备，否则每次重登都被当作新设备（风控信号）。
+    'qqmusic_device',
     'bilibili',
     'neko',
   ];

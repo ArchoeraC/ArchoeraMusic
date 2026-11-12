@@ -2,7 +2,7 @@
 
 本文记录发布流水线（`.github/workflows/`）的供应链防护现状与**信任根取向**，
 对应 [security-review-2026-10-11](security-review-2026-10-11.md) 第五批
-（SEC-21 … SEC-27）与 SEC-08（原生完整性清单）。发布总流程见 [AGENTS.md §发布与签名](../AGENTS.md)。
+（SEC-21 … SEC-28）与 SEC-08（原生完整性清单）。发布总流程见 [AGENTS.md §发布与签名](../AGENTS.md)。
 
 ## 1. 已落地
 
@@ -12,9 +12,10 @@
 | SEC-22 | `protect-main` 开启 **Require review from Code Owners**：CI/签名/打包/水印等关键路径改动无法被非 owner 自合并（owner 为 bypass actor，可自建 PR 自合并） | GitHub ruleset + `.github/CODEOWNERS` |
 | SEC-23 | `release` 作业在签名前**校验发版 tag 指向受保护长分支**（`main` 或 `ArchoeraOS`）的祖先提交，否则拒绝构建/签名 | `build-all.yml` release 作业 |
 | SEC-24 | tag 名经 **`$GITHUB_REF_NAME` 环境变量**注入，`run:` 内不再内插 `${{ github.ref_name }}` | `build-all.yml` |
-| SEC-25 | release 作业生成 **CycloneDX SBOM**：产物侧（FFmpeg / OpenSSL / opus / taglib 等原生库、自家二进制、Go 模块）+ 各生态锁文件（Rust 5× `Cargo.lock`、Dart `pubspec.lock`、Go `go.mod`+`go.sum`、.NET `packages.lock.json`）合并为一份；与**全部**资产一并签 `.sig1` 并列入 `SHA256SUMS`。另写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业、`app/tool/gen_sbom.sh` |
+| SEC-25 | release 作业生成 **CycloneDX SBOM**：产物侧（FFmpeg / opus / taglib 等原生库、AppImage 经 linuxdeploy 收拢的系统库、自家二进制、Go 模块）+ 各生态锁文件（Rust 各 crate `Cargo.lock`、Dart `pubspec.lock`、Go `go.mod`+`go.sum`、.NET `packages.lock.json`）合并为一份；与**全部**资产一并签 `.sig1` 并列入 `SHA256SUMS`。另写入 **构建溯源 attestation**（`actions/attest-build-provenance`，Sigstore/OIDC） | `build-all.yml` release 作业、`app/tool/gen_sbom.sh` |
 | SEC-26 | **各生态漏洞扫描**工作流（`cargo audit` / `govulncheck` / `dotnet list package --vulnerable`）；Dependabot 配置保留但**版本更新已停用**（依赖改为定期手动同步，见 §3） | `.github/dependabot.yml`、`security-audit.yml` |
 | SEC-27 | CI 跑**完整 `flutter test`**（不再只跑 widget 冒烟）+ vault 用例（指向测试二进制）+ subsonic 的 `go test` | `actions/build-linux/action.yml` |
+| SEC-28 | **发布依赖门禁**：Linux 打包前逐 ELF 校验 NEEDED / `$ORIGIN` / 内嵌库实际解析位置，未登记的系统依赖与 `libssl/libcrypto` 直接依赖直接失败；随后在 Xvfb + 临时 HOME/XDG 下真实启动发布包（`LD_BIND_NOW`）做存活冒烟；报告随包写入 `ARCHOERA-DEPENDENCIES.txt` | `packaging/linux/build-release.sh`（`guard`/`verify`）、`packaging/macos/build-release.sh`（`verify`）、`packaging/windows/build-release.ps1`（`verify`）、`actions/build-linux/action.yml`、`packaging/linux/package.sh`、[依赖门禁文档](release-dependency-guard.md) |
 | SEC-08 | release 作业对目录型产物的 `ARCHOERA-NATIVE-MANIFEST.txt` 做 **key1 ECDSA/SHA-256 分离签名**（`.sig1`），运行期内嵌公钥验签 + 摘要 | `build-all.yml` release 作业 + `app/tool/sign_native_manifest.sh` |
 
 ## 2. 信任根：应用层 key1 清单 + 分发渠道（2026-10 定稿）

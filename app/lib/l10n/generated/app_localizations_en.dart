@@ -13,6 +13,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCatRender => 'Performance & Rendering';
 
   @override
+  String get settingsRenderFps => 'Frame rate';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return 'Upper bound of frames per second ($fps FPS); the display refresh rate still caps it';
+  }
+
+  @override
+  String get settingsRenderFpsWarn =>
+      'High frame rates increase GPU load and power draw';
+
+  @override
   String get settingsRenderSubtitle =>
       'GPU acceleration and rendering cost (experimental)';
 
@@ -886,6 +898,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginRiskTitle => 'Login risk notice';
 
   @override
+  String get kugouRiskVerifyTitle => 'KuGou security verification';
+
+  @override
+  String get kugouRiskVerifySmsDescription =>
+      'KuGou requires SMS verification. A code has been sent to the phone number linked to your account.';
+
+  @override
+  String get kugouRiskVerifySmsHint => 'SMS code';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => 'Enter the SMS code';
+
+  @override
+  String get kugouRiskVerifySubmit => 'Verify';
+
+  @override
+  String get kugouRiskVerifyFailed =>
+      'Verification failed. Check the code and try again.';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle =>
+      'Complete verification in the official KuGou app';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      'KuGou requires a Tencent CAPTCHA (TCaptcha), which this version cannot embed in-app. Open the official KuGou app, complete the security verification, then return and try again.';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return 'KuGou requires security verification (type $type). Complete it in the official KuGou app and try again.';
+  }
+
+  @override
   String get loginRiskBody =>
       'Logging into a third-party client involves the following risks. Please confirm before continuing:\n\n- The platform may apply risk control, restrictions or bans to third-party client logins, which may cause account anomalies or limited features;\n- QR / credential login authorizes this software to access the platform with your account; actions such as favoriting, playing and commenting will genuinely affect your account;\n- Login credentials (cookies / tokens, etc.) are stored only on this device, encrypted, and are never uploaded to the developer or any non-platform server;\n- Please comply with the platform\'s terms of service; you bear all consequences of using this software.\n\nContinuing to log in means you have read and accepted the above risks.';
 
@@ -1122,68 +1167,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nekoLoginTitle => 'Sign in to NekoMusic';
-
-  @override
-  String get nekoLoginTabOauth => 'OAuth';
-
-  @override
-  String get nekoOauthTitle => 'Sign in with NekoAuth';
-
-  @override
-  String get nekoOauthDesc =>
-      'Open the one-time link below in any browser to authorize. If your default browser can\'t sign in, copy it to another browser.';
-
-  @override
-  String get nekoOauthOpen => 'Sign in with browser';
-
-  @override
-  String get nekoOauthWaiting => 'Waiting for authorization…';
-
-  @override
-  String get nekoOauthUrlLabel => 'One-time sign-in link';
-
-  @override
-  String get nekoOauthCopy => 'Copy link';
-
-  @override
-  String get nekoOauthCopied => 'Link copied';
-
-  @override
-  String get nekoOauthRefresh => 'Get a new link';
-
-  @override
-  String get nekoOauthFailed => 'Sign-in failed';
-
-  @override
-  String get nekoLoginTabQr => 'QR code';
-
-  @override
-  String get nekoLoginTabPassword => 'Email & password';
-
-  @override
-  String get nekoLoginEmail => 'Email';
-
-  @override
-  String get nekoLoginPassword => 'Password';
-
-  @override
-  String get nekoLoginPasswordHint => 'Enter your password';
-
-  @override
-  String get nekoLoginSubmit => 'Sign in';
-
-  @override
-  String get nekoLoginForgotPassword => 'Forgot password?';
-
-  @override
-  String get nekoForgotCopyHint =>
-      'Reset link copied — open it in your browser to reset';
-
-  @override
-  String get nekoForgotFailed => 'Failed to get reset link';
-
-  @override
-  String get nekoForgotOpened => 'Reset page opened in your browser';
 
   @override
   String get nekoLoginQrHint => 'Scan with the NekoMusic mobile app to sign in';
@@ -2606,7 +2589,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsShowSubtitleOff => 'No aliases in list';
 
   @override
-  String get settingsEnergySaving => 'Energy Saving Mode';
+  String get settingsEnergySaving => 'Spectrum power saving';
 
   @override
   String get settingsEnergySavingNote =>
@@ -2617,14 +2600,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Currently in standard mode';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Unload all memory state when minimized';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'In background (minimize/tray/screen-off), drop page data and caches; rebuild from scratch on restore (may return home, lose scroll). Playback unaffected';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>
@@ -3840,6 +3815,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsBackgroundDimAuto =>
+      'The lower bound follows this image\'s brightness.';
+
+  @override
   String get settingsBackgroundScale => 'Zoom size';
 
   @override
@@ -4938,12 +4917,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutActionPlayPause => 'Play / Pause';
 
   @override
-  String get shortcutActionPlay => 'Play';
-
-  @override
-  String get shortcutActionPause => 'Pause';
-
-  @override
   String get shortcutActionStop => 'Stop';
 
   @override
@@ -5019,7 +4992,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shortcutActionGoStreaming => 'Go to Streaming';
 
   @override
-  String get shortcutActionOpenPlayer => 'Open player';
+  String get shortcutActionOpenPlayer => 'Open / close player';
 
   @override
   String get shortcutActionOpenSettings => 'Open settings';

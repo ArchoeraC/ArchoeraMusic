@@ -61,10 +61,6 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
       // ── 播放控制 ──
       case ShortcutAction.playPause:
         pb.toggle();
-      case ShortcutAction.play:
-        if (!s.playing && s.source != null) pb.toggle();
-      case ShortcutAction.pause:
-        if (s.playing) pb.toggle();
       case ShortcutAction.stop:
         // ignore: discarded_futures
         pb.stop();
@@ -149,8 +145,8 @@ class _ShortcutAction extends Action<_ShortcutIntent> {
       // Router/Navigator 之上，`context.go/push` 会抛「No GoRouter found in
       // context」。故一律用全局 appRouter / rootNavigatorKey 导航。
       case ShortcutAction.openPlayer:
-        // 幂等展开：已在播放页 / push 在途时不重复入栈（见 openPlayerPage）。
-        openPlayerPage();
+        // 打开 / 关闭切换：已在播放页时收起，否则幂等展开。
+        togglePlayerPage();
       case ShortcutAction.openSettings:
         final ctx = rootNavigatorKey.currentContext;
         if (ctx != null) showSettingsDialog(ctx);

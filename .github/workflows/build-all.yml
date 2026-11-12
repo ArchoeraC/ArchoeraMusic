@@ -14,7 +14,7 @@
 #  ├─ linux-appimage(needs linux-deb)     : AppImage（linuxdeploy 收拢动态依赖）
 #  ├─ linux-flatpak (needs linux-deb)     : .flatpak（包装预构建 bundle）
 #  ├─ linux-nix     (独立源构建)          : NixOS flake 产物 tar.gz（nixpkgs 工具链）
-#  ├─ build         (matrix macos/windows): .app / Inno Setup installer+portable zip
+#  ├─ build         (matrix macos/windows): macOS DMG+zip / Inno Setup installer+portable zip
 #  └─ release       (needs 全部；tag v* 触发)
 #
 #  产物文件名带发行版标识（如 ArchoeraMusic-v<ver>-ubuntu24.04-x86_64.deb、
@@ -224,7 +224,7 @@ jobs:
         # dylib 收进 .app 并改写 install_name（自包含）。nasm 让 x86_64 FFmpeg
         # 启用汇编加速；缺省会自动 --disable-x86asm（Intel 上解码明显变慢）。
         run: |
-          brew install taglib curl openssl sqlite nlohmann-json pkg-config dylibbundler opus nasm
+          brew install taglib sqlite nlohmann-json pkg-config dylibbundler opus nasm
 
       # ───────────────────────── Windows（mingw / vcpkg）───────────────
       - name: Install mingw (cgo C 编译器，go -buildmode=c-shared 需要)
@@ -536,195 +536,45 @@ jobs:
         shell: pwsh
         run: flutter build windows --release
 
-      # ─────────── Windows：Inno Setup 安装器（per-user 免 UAC）+ 便携 zip ───────────
+      # ─────────── Windows：装配 + 校验 + 打包（单脚本）───────────
+      # 逻辑全部在 packaging/windows/build-release.ps1（**Windows 专用**）：
+      #   bundle  : 放入防伪公钥（native/ 由 CMake install 填充）
+      #   verify  : 必需文件齐全 + 完整性清单覆盖 + dumpbin 导入表无构建机路径
+      #   package : 便携 zip + Inno Setup 安装器（默认 per-user 免 UAC）
       - name: Install Inno Setup (Windows)
         if: matrix.os == 'windows'
         shell: pwsh
         run: choco install innosetup -y --no-progress
 
-      - name: Package Windows (Inno Setup installer + portable zip)
+      - name: Build Windows release (bundle + verify + package)
         if: matrix.os == 'windows'
         shell: pwsh
-        working-directory: ${{ github.workspace }}
         run: |
-          $ver = (Select-String -Path "app/pubspec.yaml" -Pattern '^version:').Line.Split(' ')[1].Trim()
-          # Inno 的 VersionInfoVersion 必须是四段数字：1.0.2+0 → 1.0.2.0
-          $verParts = $ver -split '\+'
-          $verNum = if ($verParts.Count -ge 2) { "$($verParts[0]).$($verParts[1])" } else { "$($verParts[0]).0" }
-          $rel = "app\build\windows\x64\runner\Release"
-          $out = "$PWD\build\windows-extra"
-          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          pwsh -NoProfile -File packaging/windows/build-release.ps1 all
+          Get-ChildItem build/windows-extra
 
-          # 防伪公钥随包分发（供用户离线验签；私钥绝不入库/入包）
-          Copy-Item "app\tool\watermark_pub.pem" "$rel\ARCHOERA_PUBKEY.pem" -Force
-
-          # 便携 zip：Release 目录整体（含 native/、data/、插件 dll）
-          Compress-Archive -Path "$rel\*" -DestinationPath "$out\ArchoeraMusic-$ver-windows-x64-portable.zip" -Force
-
-          # Inno Setup 安装器（优先 PATH 内 iscc，其次 6.x 默认安装目录）
-          $iscc = Get-Command iscc -ErrorAction SilentlyContinue
-          if ($null -eq $iscc) { $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" }
-          else { $iscc = $iscc.Source }
-          & $iscc `
-            "/DVersion=$ver" `
-            "/DVersionNumeric=$verNum" `
-            "/DAppDir=$PWD\$rel" `
-            "/DOutputDir=$out" `
-            packaging\windows\archoera_music.iss
-          Get-ChildItem "$out"
-
-      - name: Verify EraSync kernel bundled (Windows)
-        if: matrix.os == 'windows'
-        # 硬校验：EraSync 内核 DLL 必须在 Release 目录（否则运行期加载 mediaengine 失败/闪退）
-        shell: pwsh
-        run: |
-          $p = "app\build\windows\x64\runner\Release\archoera_kernel.dll"
-          if (!(Test-Path $p)) { throw "archoera_kernel.dll 未打入 Windows 包（EraSync 内核缺失）" }
-          Write-Host "OK: $p"
-
-      - name: Verify indexer-ffi bundled (Windows)
-        if: matrix.os == 'windows'
-        # 硬校验：本地曲库搜索索引器 indexer-ffi.dll 及其 SQLite 依赖必须在
-        # Release/native/（CMake install 目标），否则 indexer 功能缺失。
-        shell: pwsh
-        run: |
-          $rel = "app\build\windows\x64\runner\Release"
-          foreach ($f in @("native\indexer-ffi.dll", "native\e_sqlite3.dll")) {
-            $p = Join-Path $rel $f
-            if (!(Test-Path $p)) { throw "$f 未打入 Windows 包（indexer 缺失）" }
-            Write-Host "OK: $p"
-          }
-
-      # ─────────────── macOS：把原生库拷入 .app（native/ 平铺）──────────
-      - name: Bundle native libs into .app (native/ 平铺)
+      # ─────────────── macOS：装配 .app + 依赖守卫 + 打包 ──────────────
+      # 全部逻辑收敛在 packaging/macos/build-release.sh（**macOS 专用**，只在
+      # Mac 上跑，只用 macOS 自带工具），workflow 只负责调用，避免内联 bash
+      # 片段与 Linux 脚本混在一起、也避免 macOS 自带 bash 3.2 的语法差异。
+      #   bundle  : 拷入 native/、dylibbundler 收拢 FFmpeg/TagLib、install_name
+      #             归一化、许可文本、公钥、ad-hoc 重签、生成完整性清单
+      #   verify  : Mach-O 依赖守卫 + dyld 实际 dlopen 全部 FFI 库 + archoerashell
+      #   package : DMG（拖拽安装）+ zip（ditto）
+      - name: Build macOS release (bundle + verify + package)
         if: matrix.os == 'macos'
-        # macOS 无 CMake install 层（Flutter macOS 走 Xcode），FFI 库须在此显式拷入
-        # .app/Contents/native/（NativeLibPaths 祖先链从 exe 向上第 2 级 Contents 命中）。
-        # 与 linux/windows 的 bundle/native/ 平铺布局对齐（ffi-libs-layout 计划）。
+        shell: bash
         run: |
           set -euo pipefail
-          APP="app/build/macos/Build/Products/Release/archoera_music.app"
-          NATIVE="$APP/Contents/native"
-          mkdir -p "$NATIVE"
-          cp app/core/audio-engine/build/archoera-audio-engine "$NATIVE/" || true
-          cp app/core/audio-engine/build/*.dylib "$NATIVE/"
-          cp app/core/scanner/build/*.dylib "$NATIVE/"
-          # 本地曲库搜索索引器（indexer-ffi，.NET NativeAOT）；libe_sqlite3 已随
-          # scanner 拷入，仅在其缺失时由 indexer 兜底（同名同版本）。
-          cp app/core/indexer/build/indexer-ffi.dylib "$NATIVE/"
-          [ -f "$NATIVE/libe_sqlite3.dylib" ] || cp app/core/indexer/build/libe_sqlite3.dylib "$NATIVE/"
-          cp app/core/scraper/build/*.dylib "$NATIVE/"
-          cp app/core/subsonic/build/*.dylib "$NATIVE/"
-          cp app/core/vault-rs/build/archoera-vault "$NATIVE/"
+          bash packaging/macos/build-release.sh all --arch "${{ matrix.arch }}"
+          ls -la dist/macos
 
-          # 自包含运行库：把引擎(FFmpeg)/scraper(TagLib) 的 dylib 依赖收进 native/
-          # 并把 install_name 改写为 @loader_path，运行期不再依赖构建机 brew 路径
-          # （否则用户机无 brew 时加载失败）。
-          for lib in libarchoera_mediaengine.dylib libarchoera_scraper.dylib; do
-            [[ -f "$NATIVE/$lib" ]] || continue
-            dylibbundler -of -b -x "$NATIVE/$lib" -d "$NATIVE" -p @loader_path
-          done
-
-          # LGPL 合规：随包附 FFmpeg / TagLib 许可文本 + 聚合声明
-          bash app/core/bundle-licenses.sh "$APP/Contents"
-
-          # 防伪公钥随包分发（供用户离线验签；私钥绝不入库/入包）
-          mkdir -p "$APP/Contents/Resources"
-          cp app/tool/watermark_pub.pem "$APP/Contents/Resources/ARCHOERA_PUBKEY.pem"
-
-          # 新增/改写 dylib 会使原 ad-hoc 签名失效（Apple Silicon 拒载未签名 dylib）→ 重签整包
-          codesign --force --deep --sign - "$APP"
-
-          # 原生库完整性清单（SEC-08）：必须在 dylibbundler + codesign **之后**生成——
-          # 二者都会改写 dylib 字节，早于它们生成即失效（Dart 侧将 fail-closed 拒载）。
-          sh app/tool/gen_native_manifest.sh "$NATIVE" "$APP/Contents/MacOS/archoera_music"
-
-          echo "native/ 内容:"
-          ls -la "$NATIVE"
-
-      - name: Verify indexer-ffi bundled (macOS)
-        if: matrix.os == 'macos'
-        # 硬校验：本地曲库搜索索引器 indexer-ffi.dylib 及其 SQLite 依赖必须在
-        # .app/Contents/native/，且计入 SHA-256 完整性清单（SEC-08）。
-        run: |
-          set -euo pipefail
-          NATIVE="app/build/macos/Build/Products/Release/archoera_music.app/Contents/native"
-          for f in indexer-ffi.dylib libe_sqlite3.dylib; do
-            [ -f "$NATIVE/$f" ] || { echo "::error::$f 未打入 macOS 包（indexer 缺失）"; exit 1; }
-          done
-          grep -q 'indexer-ffi.dylib' "$NATIVE/ARCHOERA-NATIVE-MANIFEST.txt" \
-            || { echo "::error::完整性清单缺 indexer-ffi.dylib"; exit 1; }
-          echo "OK: indexer-ffi 已入包并计入清单"
-
-      - name: Verify macOS bundle architecture & load (native/)
-        if: matrix.os == 'macos'
-        # 硬校验：单架构包内所有 Mach-O 必须只有 matrix.arch 一个 slice；
-        # 再用 dyld 实际 dlopen 每个 FFI 库，验证 @loader_path 依赖能解析。
-        # 最后跑一次 archoerashell --version，覆盖静态库链入 + 参数分派。
-        run: |
-          set -euo pipefail
-          APP="app/build/macos/Build/Products/Release/archoera_music.app"
-          NATIVE="$APP/Contents/native"
-          EXPECTED="${{ matrix.arch }}"
-          fail=0
-          check_arch() {
-            f="$1"
-            [ -f "$f" ] || { echo "::error::缺少文件：$f"; fail=1; return 0; }
-            got="$(lipo -archs "$f")"
-            if [ "$got" != "$EXPECTED" ]; then
-              echo "::error::$f 架构为 '$got'，期望 '$EXPECTED'"
-              fail=1
-            fi
-          }
-
-          check_arch "$APP/Contents/MacOS/archoera_music"
-          check_arch "$APP/Contents/Frameworks/FlutterMacOS.framework/Versions/A/FlutterMacOS"
-          check_arch "$NATIVE/archoera-audio-engine"
-          check_arch "$NATIVE/archoera-vault"
-          for f in "$NATIVE"/*.dylib; do check_arch "$f"; done
-
-          if [ "$fail" -ne 0 ]; then exit 1; fi
-
-          # 自包含检查：bundle 内 dylib 不得残留构建机 Homebrew 绝对路径。
-          if otool -L "$NATIVE"/*.dylib | grep -E '/opt/homebrew|/usr/local' >/tmp/homebrew_refs.txt; then
-            echo "::error::native/ 中仍有 Homebrew 绝对路径依赖："
-            cat /tmp/homebrew_refs.txt
-            exit 1
-          fi
-
-          # 实际 dlopen（不调用业务函数）：验证架构、install_name、SQLite 依赖。
-          python3 - "$NATIVE" <<'PY'
-          import ctypes
-          import os
-          import sys
-
-          native = sys.argv[1]
-          failed = []
-          for name in sorted(os.listdir(native)):
-              if not name.endswith(".dylib"):
-                  continue
-              path = os.path.join(native, name)
-              try:
-                  ctypes.CDLL(path)
-                  print(f"OK load: {name}")
-              except OSError as exc:
-                  failed.append(f"{name}: {exc}")
-          if failed:
-              print("::error::以下 FFI 库加载失败：")
-              for item in failed:
-                  print(item)
-              sys.exit(1)
-          PY
-
-          "$APP/Contents/MacOS/archoera_music" archoerashell --version
-          echo "OK: macOS $EXPECTED 单架构 + native/ 加载验证通过"
-
-      - name: Upload artifact (macOS .app)
+      - name: Upload artifact (macOS DMG + zip)
         if: matrix.os == 'macos'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ArchoeraMusic-${{ matrix.artifact }}
-          path: app/build/macos/Build/Products/Release/archoera_music.app
+          path: dist/macos/*
           if-no-files-found: error
 
       - name: Upload artifact (Windows runner Release)
@@ -766,10 +616,10 @@ jobs:
           # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
           sudo apt-get install -y \
             build-essential ninja-build pkg-config clang \
-            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libstdc++-12-dev \
             libdbus-1-dev libx11-dev libxi-dev libopus-dev \
-            patchelf nasm
+            patchelf nasm xvfb xauth libgl1-mesa-dri dbus
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: ./.github/actions/build-linux
         with:
@@ -826,10 +676,11 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates build-essential cmake ninja-build pkg-config clang sudo \
-            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev \
+            libsqlite3-dev libtag1-dev \
             nlohmann-json3-dev libgtk-3-dev liblzma-dev libopus-dev \
             libdbus-1-dev libx11-dev libxi-dev \
-            patchelf nasm git curl wget xz-utils unzip zip jq file
+            patchelf nasm xvfb xauth libgl1-mesa-dri dbus \
+            git curl wget xz-utils unzip zip jq file
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Git safe directory (容器属主)
         run: git config --global --add safe.directory '*'
@@ -872,9 +723,10 @@ jobs:
             git curl wget tar xz which findutils gzip unzip zip jq file \
             gcc gcc-c++ clang cmake ninja-build pkgconf-pkg-config make \
             patchelf nasm \
-            taglib-devel libcurl-devel openssl-devel sqlite-devel \
+            taglib-devel sqlite-devel \
             json-devel gtk3-devel dbus-devel libstdc++-devel libicu \
             opus-devel libX11-devel libXi-devel \
+            xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers dbus-daemon \
             rpm-build zstd libarchive
           # 不装系统 FFmpeg 开发包：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -918,8 +770,8 @@ jobs:
             base-devel fakeroot debugedit bzip2 gettext gnupg ncurses \
             git curl wget tar xz which findutils unzip zip jq file zstd libarchive \
             cmake ninja clang pkgconf patchelf nasm \
-            taglib curl openssl sqlite nlohmann-json opus \
-            gtk3 dbus libx11 libxi
+            taglib sqlite nlohmann-json opus \
+            gtk3 dbus libx11 libxi xorg-server-xvfb xorg-xauth mesa
           # 不装系统 ffmpeg：引擎改用自建最小 FFmpeg（见 build-linux action）
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Git safe directory (容器属主)
@@ -979,12 +831,14 @@ jobs:
         run: |
           sudo apt-get update
           # linuxdeploy 按 ldd 解析并收拢 app 的动态依赖：GTK / X11 / Xi / dbus /
-          # curl / ssl / sqlite / taglib 等运行时库必须存在，否则报
+          # sqlite / taglib 等运行时库必须存在，否则报
           # "Could not find dependency: libXXX.so.N" 直接失败；patchelf 供其改写 RUNPATH。
+          # scraper 的 HTTP 已内嵌（reqwest + rustls），libcurl/libssl 不再参与。
           # binutils：package.sh 的 BUILD-INFO 用 objdump 探测最低 glibc。
           sudo apt-get install -y binutils file patchelf \
             libgtk-3-dev libx11-dev libxi-dev libdbus-1-dev \
-            libcurl4-openssl-dev libssl-dev libsqlite3-dev libtag1-dev
+            libsqlite3-dev libtag1-dev \
+            xvfb xauth libgl1-mesa-dri dbus
           # GitHub Release 资产偶发 504：官方失败时走镜像；下载后校验确实是 ELF。
           fetch_asset() {
             local url="$1" out="$2" prefix
@@ -1024,6 +878,15 @@ jobs:
           APPIMAGE_RUNTIME_FILE: /tmp/type2-runtime
           LINUXDEPLOY: /tmp/linuxdeploy.AppImage
           APPIMAGE_EXTRACT_AND_RUN: '1'
+      - name: Startup smoke test (AppImage, Xvfb)
+        # 直接跑最终 AppImage（--appimage-extract-and-run，无需 FUSE），覆盖
+        # linuxdeploy 收拢依赖 + AppRun 环境后的真实用户路径。
+        run: |
+          set -euo pipefail
+          APPIMAGE="$(find dist/linux -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
+          [ -n "$APPIMAGE" ] || { echo "::error::未找到 AppImage 产物"; exit 1; }
+          # 复用 Linux 平台脚本的启动冒烟逻辑（解包后运行，无需 FUSE）
+          bash packaging/linux/build-release.sh smoke-appimage --appimage "$APPIMAGE"
       - name: Upload artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
@@ -1226,8 +1089,8 @@ jobs:
           test -d artifacts/ArchoeraMusic-linux-appimage  # Linux AppImage
           test -d artifacts/ArchoeraMusic-linux-flatpak   # Linux .flatpak
           test -d artifacts/ArchoeraMusic-linux-nix       # Linux NixOS tar.gz
-          test -d artifacts/ArchoeraMusic-macos-arm64     # macOS arm64 .app
-          test -d artifacts/ArchoeraMusic-macos-x64       # macOS x86_64 .app
+          test -d artifacts/ArchoeraMusic-macos-arm64     # macOS arm64 DMG + zip
+          test -d artifacts/ArchoeraMusic-macos-x64       # macOS x86_64 DMG + zip
           test -d artifacts/ArchoeraMusic-windows-x64     # Windows runner Release
           test -d artifacts/ArchoeraMusic-windows-extra   # Windows installer + portable
           mkdir -p assets
@@ -1247,11 +1110,11 @@ jobs:
           while IFS=: read -r fp _; do
             chmod +x "$fp"
           done < <(find artifacts -type f -exec file {} + | grep -i 'ELF\|Mach-O')
-          # macOS / Windows 目录型产物压成单文件归档（tar 三端可解）
-          for a in arm64 x64; do
-            tar -czf "assets/ArchoeraMusic-${VER}-macos-$a.tar.gz" \
-              -C "artifacts/ArchoeraMusic-macos-$a" .
-          done
+          # macOS：DMG + zip 已由 packaging/macos/build-release.sh 产出（DMG 可直接
+          # 拖入「应用程序」，zip 便于不支持挂载的环境），直接作为独立 asset。
+          cp artifacts/ArchoeraMusic-macos-arm64/* assets/
+          cp artifacts/ArchoeraMusic-macos-x64/* assets/
+          # Windows 目录型产物压成单文件归档（tar 三端可解）
           tar -czf "assets/ArchoeraMusic-${VER}-windows-x64.tar.gz" \
             -C artifacts/ArchoeraMusic-windows-x64 .
           # Linux 原始 bundle 与 package.sh tar 纯二进制内容一致，不再重复出包
@@ -1260,7 +1123,7 @@ jobs:
 
       # SEC-25：生成 CycloneDX SBOM（随发布分发，供用户/下游核对依赖）。
       # 覆盖范围：发布产物（FFmpeg / OpenSSL / opus / taglib 等原生库、自家
-      # 二进制、Go 模块）+ 各生态锁文件（Rust 5× Cargo.lock、Dart pubspec.lock、
+      # 二进制、Go 模块）+ 各生态锁文件（Rust 各 crate Cargo.lock、Dart pubspec.lock、
       # Go go.mod+go.sum、.NET scanner/indexer 的 packages.lock.json）。
       # 只扫产物目录时 syft 读不到锁文件 → Rust / .NET / Dart 覆盖为 0（旧实现）。
       - name: 安装 syft（SBOM 生成器，pin 版本 + sha256 校验）

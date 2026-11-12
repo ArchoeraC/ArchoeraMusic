@@ -13,6 +13,18 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsCatRender => 'Performance et rendu';
 
   @override
+  String get settingsRenderFps => 'Images par seconde';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return 'Plafond de $fps images par seconde ; la fréquence de l\'écran reste la limite';
+  }
+
+  @override
+  String get settingsRenderFpsWarn =>
+      'Une fréquence élevée augmente la charge GPU et la consommation';
+
+  @override
   String get settingsRenderSubtitle =>
       'Accélération GPU et coût de rendu (expérimental)';
 
@@ -893,6 +905,39 @@ class AppLocalizationsFr extends AppLocalizations {
   String get loginRiskTitle => 'Avertissement de risque de connexion';
 
   @override
+  String get kugouRiskVerifyTitle => 'Vérification de sécurité KuGou';
+
+  @override
+  String get kugouRiskVerifySmsDescription =>
+      'KuGou exige une vérification par SMS. Un code a été envoyé au numéro associé à votre compte.';
+
+  @override
+  String get kugouRiskVerifySmsHint => 'Code SMS';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => 'Saisir le code SMS';
+
+  @override
+  String get kugouRiskVerifySubmit => 'Vérifier';
+
+  @override
+  String get kugouRiskVerifyFailed =>
+      'Échec de la vérification. Vérifiez le code et réessayez.';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle =>
+      'Effectuez la vérification dans l’application officielle KuGou';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      'KuGou exige un CAPTCHA Tencent (TCaptcha), que cette version ne peut pas intégrer dans l’application. Ouvrez l’application officielle KuGou, effectuez la vérification de sécurité, puis réessayez.';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return 'KuGou exige une vérification de sécurité (type $type). Effectuez-la dans l’application officielle KuGou, puis réessayez.';
+  }
+
+  @override
   String get loginRiskBody =>
       'La connexion via un client tiers présente les risques suivants. Veuillez confirmer avant de continuer :\n\n· La plateforme peut appliquer un contrôle des risques, des restrictions ou des bannissements aux connexions de clients tiers, ce qui peut entraîner des anomalies de compte ou des fonctions limitées ;\n· La connexion par QR / identifiants autorise ce logiciel à accéder à la plateforme avec votre compte ; les actions telles que l\'ajout aux favoris, la lecture et les commentaires affecteront réellement votre compte ;\n· Les identifiants de connexion (cookies / jetons, etc.) sont stockés uniquement sur cet appareil, chiffrés, et ne sont jamais envoyés au développeur ni à un serveur non lié à la plateforme ;\n· Respectez les conditions de service de la plateforme ; vous assumez toutes les conséquences de l\'utilisation de ce logiciel.\n\nContinuer la connexion signifie que vous avez lu et accepté les risques ci-dessus.';
 
@@ -1129,70 +1174,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get nekoLoginTitle => 'Se connecter à NekoMusic';
-
-  @override
-  String get nekoLoginTabOauth => 'OAuth';
-
-  @override
-  String get nekoOauthTitle => 'Se connecter avec NekoAuth';
-
-  @override
-  String get nekoOauthDesc =>
-      'Ouvrez le lien à usage unique ci-dessous dans n\'importe quel navigateur. Si votre navigateur par défaut ne peut pas se connecter, copiez-le dans un autre navigateur.';
-
-  @override
-  String get nekoOauthOpen => 'Se connecter dans le navigateur';
-
-  @override
-  String get nekoOauthWaiting => 'En attente de l’autorisation…';
-
-  @override
-  String get nekoOauthUrlLabel => 'Lien de connexion à usage unique';
-
-  @override
-  String get nekoOauthCopy => 'Copier le lien';
-
-  @override
-  String get nekoOauthCopied => 'Lien copié';
-
-  @override
-  String get nekoOauthRefresh => 'Obtenir un nouveau lien';
-
-  @override
-  String get nekoOauthFailed => 'Échec de la connexion';
-
-  @override
-  String get nekoLoginTabQr => 'Code QR';
-
-  @override
-  String get nekoLoginTabPassword => 'E-mail et mot de passe';
-
-  @override
-  String get nekoLoginEmail => 'E-mail';
-
-  @override
-  String get nekoLoginPassword => 'Mot de passe';
-
-  @override
-  String get nekoLoginPasswordHint => 'Saisissez votre mot de passe';
-
-  @override
-  String get nekoLoginSubmit => 'Se connecter';
-
-  @override
-  String get nekoLoginForgotPassword => 'Mot de passe oublié ?';
-
-  @override
-  String get nekoForgotCopyHint =>
-      'Lien de réinitialisation copié — ouvrez-le dans votre navigateur pour réinitialiser';
-
-  @override
-  String get nekoForgotFailed =>
-      'Échec de l\'obtention du lien de réinitialisation';
-
-  @override
-  String get nekoForgotOpened =>
-      'Page de réinitialisation ouverte dans votre navigateur';
 
   @override
   String get nekoLoginQrHint =>
@@ -2650,7 +2631,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'La liste affiche uniquement l\'artiste, sans alias';
 
   @override
-  String get settingsEnergySaving => 'Mode économie d\'énergie';
+  String get settingsEnergySaving => 'Économie d’énergie du spectre';
 
   @override
   String get settingsEnergySavingNote =>
@@ -2662,14 +2643,6 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => 'Actuellement en mode standard';
-
-  @override
-  String get settingsUnloadAllMemory =>
-      'Décharger tout l’état mémoire lors de la réduction';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'En arrière-plan (réduit/barre d’état/écran éteint), abandonne données de page et caches ; reconstruit au retour (retour possible à l’accueil, défilement perdu). Lecture non affectée';
 
   @override
   String get settingsSearchEnergySavingSubtitle =>
@@ -3913,6 +3886,10 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get settingsBackgroundDimAuto =>
+      'La limite inférieure suit la luminosité de cette image.';
+
+  @override
   String get settingsBackgroundScale => 'Zoom';
 
   @override
@@ -5030,12 +5007,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get shortcutActionPlayPause => 'Lecture / Pause';
 
   @override
-  String get shortcutActionPlay => 'Lire';
-
-  @override
-  String get shortcutActionPause => 'Pause';
-
-  @override
   String get shortcutActionStop => 'Arrêter';
 
   @override
@@ -5111,7 +5082,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get shortcutActionGoStreaming => 'Aller au streaming';
 
   @override
-  String get shortcutActionOpenPlayer => 'Ouvrir le lecteur';
+  String get shortcutActionOpenPlayer => 'Ouvrir / fermer le lecteur';
 
   @override
   String get shortcutActionOpenSettings => 'Ouvrir les paramètres';

@@ -15,12 +15,30 @@ class RenderSection extends ConsumerWidget {
     final l10n = context.l10n;
     final prefs = ref.watch(appPrefsProvider);
     final scheme = Theme.of(context).colorScheme;
+    final fps = prefs.renderFps;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SettingSection(
           title: l10n.settingsCatRender,
           children: [
+            SettingSliderTile(
+              icon: EtaIcons.stopwatchOutline,
+              title: l10n.settingsRenderFps,
+              // 超过 60 FPS 追加说明：滑块变色（黄/红）不是主题色，需要解释。
+              subtitle: fps > kRenderFpsWarnFrom
+                  ? '${l10n.settingsRenderFpsDesc(fps: fps)} '
+                        '${l10n.settingsRenderFpsWarn}'
+                  : l10n.settingsRenderFpsDesc(fps: fps),
+              value: fps.toDouble(),
+              min: kRenderFpsMin.toDouble(),
+              max: kRenderFpsMax.toDouble(),
+              divisions: kRenderFpsMax - kRenderFpsMin,
+              label: '$fps FPS',
+              accentColor: renderFpsSliderColor(scheme, fps),
+              onChanged: (v) =>
+                  ref.read(appPrefsProvider.notifier).setRenderFps(v.round()),
+            ),
             SettingSwitchTile(
               icon: EtaIcons.dashboard4Outline,
               title: l10n.settingsRippleShader,
@@ -82,6 +100,35 @@ class RenderSection extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        // 节能 / 休眠属于渲染与功耗策略，放在「性能 / 渲染」内（原在「播放」）。
+        SettingSection(
+          title: l10n.settingsSectionPower,
+          children: [
+            SettingSwitchTile(
+              icon: prefs.powerSaver ? EtaIcons.leaf : EtaIcons.leafOutline,
+              title: l10n.settingsPowerSaver,
+              subtitle: prefs.powerSaver
+                  ? l10n.settingsPowerSaverOn
+                  : l10n.settingsPowerSaverOff,
+              value: prefs.powerSaver,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setPowerSaver(value),
+            ),
+            SettingSwitchTile(
+              icon: prefs.suppressSleep
+                  ? EtaIcons.bedtimeOffOutline
+                  : EtaIcons.moonStarsOutline,
+              title: l10n.settingsSuppressSleep,
+              subtitle: prefs.suppressSleep
+                  ? l10n.settingsSuppressSleepOn
+                  : l10n.settingsSuppressSleepOff,
+              value: prefs.suppressSleep,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setSuppressSleep(value),
             ),
           ],
         ),

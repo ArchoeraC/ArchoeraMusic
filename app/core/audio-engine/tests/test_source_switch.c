@@ -41,6 +41,7 @@
 
 #include "audio_engine.h"
 #include "archoera_mediaengine.h"
+#include "mediaengine_internal.h"
 
 static int g_fail = 0;
 #define CHECK(cond, msg)                                                     \
@@ -57,48 +58,111 @@ static int g_fail = 0;
 static void check_drop_math(void)
 {
     /* 无交叠 / 负交叠 / NaN → 0 */
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 10.0, 10.0) == 0,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 10.0, 10.0, 1.0) == 0,
           "old==next → 0");
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 5.0, 10.0) == 0,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 5.0, 10.0, 1.0) == 0,
           "old<next（clamp）→ 0");
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, NAN, 0.0) == 0,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, NAN, 0.0, 1.0) == 0,
           "NaN → 0");
 
     /* 正常交叠：drop 10ms @48k = 480 帧 × 2ch = 960 样本 */
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 10.0, 0.0) == 960,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 10.0, 0.0, 1.0) == 960,
           "10ms@48k/2ch → 960");
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 20.0, 10.0) == 960,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 20.0, 10.0, 1.0) == 960,
           "相对交叠 10ms → 960");
 
     /* 四舍五入：1.5ms@1000Hz → 2 帧 × 2ch = 4 */
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 1000, 1.5, 0.0) == 4,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 1000, 1.5, 0.0, 1.0) == 4,
           "1.5ms@1000Hz 四舍五入 → 4");
     /* 0.4ms@1000Hz → 0 帧 → 0 */
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 1000, 0.4, 0.0) == 0,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 1000, 0.4, 0.0, 1.0) == 0,
           "0.4ms@1000Hz → 0");
 
     /* 超过暂存量 → 全丢 */
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 100.0, 0.0) == 1000,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 100.0, 0.0, 1.0) == 1000,
           "交叠 > 暂存 → 全丢");
     /* 正好等于暂存量 */
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 1000, 500.0, 0.0) == 1000,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 1000, 500.0, 0.0, 1.0) == 1000,
           "交叠 == 暂存 → 全丢（1000）");
     /* 半帧余量：staged=1001 只需丢 1000，剩 1 样本 */
-    CHECK(archoera_mediaengine_stage_drop_samples(1001, 2, 1000, 500.0, 0.0) == 1000,
+    CHECK(archoera_mediaengine_stage_drop_samples(1001, 2, 1000, 500.0, 0.0, 1.0) == 1000,
           "staged=1001 交叠 1000 → 丢 1000（留 1 样本）");
     /* staged=999 交叠 1000 → 不足 → 全丢 */
-    CHECK(archoera_mediaengine_stage_drop_samples(999, 2, 1000, 500.0, 0.0) == 999,
+    CHECK(archoera_mediaengine_stage_drop_samples(999, 2, 1000, 500.0, 0.0, 1.0) == 999,
           "staged=999 不足 → 全丢");
 
     /* 参数非法 */
-    CHECK(archoera_mediaengine_stage_drop_samples(0, 2, 48000, 100.0, 0.0) == 0,
+    CHECK(archoera_mediaengine_stage_drop_samples(0, 2, 48000, 100.0, 0.0, 1.0) == 0,
           "staged==0 → 0");
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 0, 48000, 100.0, 0.0) == 0,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 0, 48000, 100.0, 0.0, 1.0) == 0,
           "ch<=0 → 0");
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 0, 100.0, 0.0) == 0,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 0, 100.0, 0.0, 1.0) == 0,
           "rate<=0 → 0");
-    CHECK(archoera_mediaengine_stage_drop_samples(1000, -1, 48000, 100.0, 0.0) == 0,
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, -1, 48000, 100.0, 0.0, 1.0) == 0,
           "ch<0 → 0");
+
+    /* 变速：stage 存的是变速后输出 PCM，10ms 媒体在 2× 时只有 5ms 样本。 */
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 10.0, 0.0, 2.0) == 480,
+          "2× 变速：10ms 媒体 → 240 帧/480 样本");
+    CHECK(archoera_mediaengine_stage_drop_samples(4000, 2, 48000, 10.0, 0.0, 0.5) == 1920,
+          "0.5× 变速：10ms 媒体 → 960 帧/1920 样本");
+    CHECK(archoera_mediaengine_stage_drop_samples(1000, 2, 48000, 10.0, 0.0, 0.0) == 960,
+          "非法 speed → 按 1× 兜底");
+
+    /* stage 首样本媒体时间 = PCM 回调块起点；旧实现多减一个块时长，
+       每次切档都会多丢一块（声音前跳）。 */
+    CHECK(era_mediaengine_stage_block_origin_ms(5944.0) == 5944.0,
+          "stage 首块起点 = 回调块起点（不再回退块时长）");
+    CHECK(era_mediaengine_stage_block_origin_ms(0.0) == 0.0,
+          "stage 首块起点 0 保持 0");
+}
+
+/* ── A2. 覆盖性校验：新源必须真的覆盖旧解码游标，才允许无缝续接 ── */
+static void check_stage_covers(void)
+{
+    /* 20s @48k/2ch 的暂存帧数 = 20*48000*2 个 float。 */
+    const size_t frames = 20u * 48000u;
+    const size_t staged = frames * 2u;
+
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000, 12345.0, 0.0, 1.0) == 1,
+          "游标落在暂存区间内 → 可切换");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000,
+                                            19995.0, 0.0, 1.0) == 1,
+          "游标贴近暂存末端（≤5ms）→ 可切换");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000,
+                                            20010.0, 0.0, 1.0) == 0,
+          "游标超出暂存末端 → 拒绝（否则回放/停滞）");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000,
+                                            20003.0, 0.0, 1.0) == 0,
+          "游标仅超出暂存 3ms → 仍拒绝（旧 5ms 容差会丢 3ms 内容）");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000,
+                                            5000.0, 10000.0, 1.0) == 0,
+          "新源起点晚于游标 → 拒绝（否则跳播）");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000,
+                                            9996.0, 10000.0, 1.0) == 0,
+          "新源起点晚 4ms → 拒绝（旧 5ms 容差会跳 4ms）");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000,
+                                            9999.99, 10000.0, 1.0) == 1,
+          "起点误差 <半样本 → 取整吸收，可切换");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000,
+                                            10002.0, 10000.0, 1.0) == 1,
+          "起点早于游标 2ms（可裁剪交叠）→ 可切换");
+    CHECK(archoera_mediaengine_stage_covers(0, 2, 48000, 0.0, 0.0, 1.0) == 1,
+          "无预解码但游标≈起点（同批提交）→ 允许");
+    CHECK(archoera_mediaengine_stage_covers(0, 2, 48000, 1000.0, 0.0, 1.0) == 0,
+          "无预解码且游标远离起点 → 拒绝");
+    CHECK(archoera_mediaengine_stage_covers(staged, 0, 48000, 100.0, 0.0, 1.0) == 0,
+          "ch<=0 → 拒绝");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 0, 100.0, 0.0, 1.0) == 0,
+          "rate<=0 → 拒绝");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000, NAN, 0.0, 1.0) == 0,
+          "NaN 游标 → 拒绝");
+
+    /* 变速：20s 输出样本在 2× 时覆盖 40s 媒体；0.5× 时只覆盖 10s。 */
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000, 30000.0, 0.0, 2.0) == 1,
+          "2× 变速：20s 输出覆盖 40s 媒体");
+    CHECK(archoera_mediaengine_stage_covers(staged, 2, 48000, 15000.0, 0.0, 0.5) == 0,
+          "0.5× 变速：20s 输出仅覆盖 10s 媒体");
 }
 
 /* ── B. 引擎端到端（headless，无设备）────────────────────────── */
@@ -411,7 +475,10 @@ static void run_engine_switch(const char *wav, const char *sdir, int sr,
        next_start 截断到 ms 带来的交叠 ≤ rate/1000 帧，留少量余量。 */
     {
         int64_t hi = ref_total + (int64_t)(sr / 1000) + 64;
-        CHECK(eng_total >= ref_total, "B 总帧数 ≥ 整曲（无缺口）");
+        int64_t lo = ref_total - (int64_t)(sr / 1000) - 64;
+        /* 允许 <1ms 的毫秒级 seek 落点误差（无 position_samples 的内核格式
+           会用 position_ms 兜底裁剪），但缺一个解码块（≥1024 帧）仍会失败。 */
+        CHECK(eng_total >= lo, "B 总帧数 ≥ 整曲 − <1ms（无整块缺口）");
         CHECK(eng_total <= hi, "B 总帧数 ≤ 整曲 + <1ms 交叠（无重复）");
         fprintf(stderr, "        ref_total=%lld eng_total=%lld switched=%.0fms\n",
                 (long long)ref_total, (long long)eng_total, switched_ms);
@@ -563,6 +630,8 @@ int main(void)
 
     /* A. 丢弃公式（不依赖 I/O） */
     check_drop_math();
+    /* A2. 覆盖性校验（切档前必须确认新源真的盖住旧解码游标） */
+    check_stage_covers();
 
     if (!mkdtemp(base)) {
         perror("mkdtemp");

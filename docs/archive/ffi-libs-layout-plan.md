@@ -142,5 +142,5 @@ Windows 对应 `.dll`、macOS 对应 `.dylib`，命名规则沿用各模块现�
 
 - **macOS**：无 CMake install 层，`build-macos.yml` 在 `flutter build` 后显式拷入 `.app/Contents/native/`（`NativeLibPaths` 祖先链从 `Contents/MacOS` 向上第 2 级命中 `Contents/native`）；Homebrew 依赖（ffmpeg 等）install_name 为绝对路径，真机需 Homebrew 环境（既有限制，真机验证待做）。
 - **Windows mingw 运行库**：`archoera_subsonic.dll` 由 mingw（cgo）编译，动态依赖 `libgcc_s_seh-1.dll`/`libwinpthread-1.dll`；`windows/CMakeLists.txt` 经 `find_file` 搜索 choco mingw 目录后 install 到 exe 根目录（Windows 加载器按 exe 目录解析依赖），找不到时静默跳过。
-- **transcoder Dart 注入**：计划要求 `subsonic_controller.dart` 注入绝对路径（Go 侧 dlopen）；当前内置 Subsonic 服务端在 Dart 主进程尚未接入（`SubsonicController` 仅在 `app/tool/subsonic_smoke.dart` 使用），该注入点留待服务端生命周期接入时同步（`NativeModule.transcoder` 已就绪）。
+- **transcoder Dart 注入**：计划要求 `subsonic_controller.dart` 注入绝对路径（Go 侧 dlopen）；当前内置 Subsonic 服务端在 Dart 主进程尚未接入（`SubsonicController` 仅在当时的 `app/tool/subsonic_smoke.dart` 手工冒烟脚本里使用，该脚本已删除），该注入点留待服务端生命周期接入时同步（`NativeModule.transcoder` 已就绪）。
 - **vault 随包分发**：三平台均已把 `archoera-vault` 装入 `native/`（vault-4 按需 spawn 的基础）。

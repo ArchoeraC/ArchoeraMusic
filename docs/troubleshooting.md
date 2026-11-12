@@ -88,12 +88,12 @@
 
 ### 1.4 Linux 启动缺依赖
 
-发布包声明了 GTK / D-Bus / SQLite / OpenSSL 等运行库。若启动即报共享库缺失，按发行版补齐：
+发布包声明了 GTK / D-Bus / SQLite 等运行库。若启动即报共享库缺失，按发行版补齐：
 
 ```bash
 # Debian / Ubuntu（deb 包的 Depends 已覆盖，手动解包时需要）
 sudo apt install libgtk-3-0 libdbus-1-3 libepoxy0 libfontconfig1 libfribidi0 \
-  libx11-6 libxi6 libatk-bridge2.0-0 libcurl4 libssl3 libsqlite3-0 liblzma5
+  libx11-6 libxi6 libatk-bridge2.0-0 libsqlite3-0 liblzma5
 ```
 
 AppImage 在无 FUSE 的环境可解包运行：`./ArchoeraMusic-*.AppImage --appimage-extract-and-run`。

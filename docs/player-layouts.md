@@ -58,16 +58,46 @@ app/lib/pages/player/layouts/
   取 90% 宽右对齐；`lyricsAlign = left` 对 `simple`（原文/译文左对齐、
   其余行 0.95 缩放、上下 25% 渐隐）与 `amll` 物理墙同时生效。歌词颜色
   统一走偏好（已唱/未唱/跟随主题/跟随封面）。控制区在左栏内，不使用
-  共享底栏。
+  共享底栏。进度与音量共用 `PlayerSliderRow` 栅格 + `PlaybackSlider`
+  （同一套轨道/悬停样式，左右边缘严格对齐；样式参数由调用方声明，
+  后续加槽位不用再各摆 Row）。开关歌词时左栏用 `AnimatedAlign`
+  平移居中（600ms），歌词槽同时滑出，不整棵替换布局。默认布局同理：
+  无歌词时封面列用 `AnimatedAlign` 在主体内居中，位移由布局约束推导，
+  不依赖 `coverLyricRatio` 的固定换算比例。
+
+### 4.1 播放页内布局切换
+
+顶栏新增「布局」菜单（`_LayoutMenuButton`），选项直接来自
+`playerLayouts` 注册表；选中写回 `player.coverLayout`，与设置页同一份偏好。
+
+切换采用**共享元素**思路（对齐 SPlayer-Next 的 View Transitions，而不是整页
+滑动/交叉淡入）：三类内容由各布局统一包进 `PlayerSharedElementBoundary`
+— 封面、曲目信息（标题/副标题）、歌词。切换时 `PlayerLayoutSwitcher` 先测量
+**旧布局**三个边界的实际矩形；新布局立即挂载并按最终位置排版，首帧测量出
+三个共享元素的**自然矩形**后，对它们施加「自然矩形 ← 旧矩形」的位移 + 缩放
+变换（500ms `cubic-bezier(0.4, 0, 0.2, 1)`，与 SPlayer-Next 一致），随动画
+归零。因此中间帧展示的是**新布局自己的封面渐隐、新字号歌词和实时滚动**，
+不会出现旧截图飞到一半或新元素提前出现在终点的问题；旧布局只保留其余
+chrome 参与淡出，退场期间 `TickerMode` 冻结。
+
+目标矩形全部由布局实际的 `RenderBox` 实时测量，不写死屏幕坐标；封面按
+`object-fit: cover` 语义等比缩放并裁切（避免方形/整幅面板互切时拉伸画面），
+歌词/信息按矩形非等比缩放（字号与行宽连续过渡）。性能模式 / 减少动画时由
+`animDuration` 直切。`PlayerBackground` 保持常驻不重建。
+
+> 歌词槽在共享元素飞行期间会关闭 `ClipRect` 裁切，否则歌词无法离开右侧栏；
+> 相关布局的 `Stack` 使用 `Clip.none`，由播放页最外层 `ClipRect` 负责页面边界。
 
 ## 5. 性能纪律（vutron 为例）
 
-- **不新增渲染器**：`simple` 复用 `LyricsView`（行高实测缓存 + 懒加载列表），
-  `amll` 复用 v7 物理墙；对齐作为段落属性 + 缓存键，不重算行高；
+- **不新增渲染器**：`simple` 用重写后的 `LyricsView`（自绘视口 + 行高实测缓存 +
+  线性滚动，只构建视口附近的行），`amll` 复用 v7 物理墙；对齐作为段落属性 +
+  缓存键，不重算行高；
 - **不做重复模糊**：封面投影用一层 `BoxShadow`，不复制封面再做 blur；
-- **静态遮罩**：歌词上下渐隐用 SPlayer `.lyric-area` 的 10%/25% 非线性
-  `ShaderMask`（0→60%→100%→100%→60%→0），整幅封面布局的顶/底遮罩用
-  SPlayer `cover-mask` 的 8 段非线性 alpha，避免色阶与硬边；
+- **静态遮罩**：歌词上下渐隐默认**逐行 alpha**（simple 与 amll 都支持，
+  零离屏层；曲线沿用 SPlayer `.lyric-area` 的 0→60%→100%→100%→60%→0）；
+  `ShaderMask` 仅作回退（`render.lyricsEdgeFade=shader`）。整幅封面布局的顶/底
+  遮罩用 SPlayer `cover-mask` 的 8 段非线性 alpha，避免色阶与硬边；
 - **封面渐隐**：优先用 `shaders/cover_mask.frag` 的横向直线距离 + 低频噪声
   扰动（每首封面用稳定 seed 轻微移动直线位置，避免机械的规则边界）；着色器
   不可用时回退同形状的 `LinearGradient`，测试环境走回退路径；

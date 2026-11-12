@@ -33,6 +33,14 @@ const OggFlacCtx = struct {
     stream: FlacStream,
     /// callback reader 的 peek 缓冲（io.Reader.buffer，16KB）
     peek_buf: []u8,
+    /// 输出采样率（position_samples/seek 换算）
+    sample_rate: u32 = 0,
+    /// 时长（µs；0 = 未知），seek 目标钳制用
+    duration_us: i64 = 0,
+    /// seek 后内层 FLAC 从该绝对样本开始（position = base + inner.position）
+    base_samples: i64 = 0,
+    /// callback reader 的 size_hint（mapping 头 + 全部帧数据字节数）
+    size_hint: u64 = 0,
 };
 
 const FlacStream = struct {
@@ -108,13 +116,32 @@ fn streamSeek(ctx: *anyopaque, off: i64, whence: i32, buffered: usize) bool {
     return true;
 }
 
+/// 构造/重建喂给内层 FLAC 的 callback reader（open 与 seek 复用）。
+fn makeFlacReader(f: *OggFlacCtx) io.Reader {
+    return .{
+        .kind = .callback,
+        .on_read = streamRead,
+        .on_seek = streamSeek,
+        .ctx = &f.stream,
+        .buffer = f.peek_buf,
+        .size_hint = f.size_hint,
+    };
+}
+
 const VTable = decoder.Decoder.VTable;
 const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+/// 绝对样本位置 = seek 定位基点 + 内层 FLAC 相对位置。
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *OggFlacCtx = @ptrCast(@alignCast(ctx));
+    return f.base_samples + f.flac.positionSamples();
+}
 
 pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error!decoder.Decoder {
     const ctx = try allocator.create(OggFlacCtx);
@@ -194,14 +221,8 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     ctx.stream.pending = pkt_buf[0..pending_len];
 
     // callback reader：把 "fLaC"+blocks + 帧拼接喂给 FLAC 解码器
-    var flac_reader = io.Reader{
-        .kind = .callback,
-        .on_read = streamRead,
-        .on_seek = streamSeek,
-        .ctx = &ctx.stream,
-        .buffer = ctx.peek_buf,
-        .size_hint = total_data,
-    };
+    ctx.size_hint = total_data;
+    var flac_reader = makeFlacReader(ctx);
     ctx.flac = try flac.open(allocator, &flac_reader, info);
     // 时长补齐：Ogg-FLAC 的 STREAMINFO total_samples 常为 0（流式 muxer，
     // 如 ffmpeg 写 Ogg 时无法预知总样本数）→ FLAC 层报 unknown。用尾窗扫描
@@ -219,6 +240,8 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
         }
     }
     info.format_name = "ogg-flac";
+    ctx.sample_rate = info.sample_rate;
+    ctx.duration_us = info.duration_us;
     return .{ .vtable = &vtable, .ctx = ctx };
 }
 
@@ -308,15 +331,63 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
 }
 
 fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
-    // Ogg-FLAC seek：需按 Ogg granule 定位帧 + 配合内层 FLAC 状态重建
-    _ = ctx;
-    _ = ms;
-    return error.UnsupportedFormat;
+    const f: *OggFlacCtx = @ptrCast(@alignCast(ctx));
+    if (f.sample_rate == 0) return error.UnsupportedFormat;
+
+    var target_ms = ms;
+    if (target_ms < 0) target_ms = 0;
+    if (f.duration_us > 0) {
+        const dur_ms = @divTrunc(f.duration_us, 1000);
+        if (target_ms > dur_ms) target_ms = dur_ms;
+    }
+    const target_sample: i64 = @intCast(
+        (@as(u128, @intCast(target_ms)) * f.sample_rate) / 1000,
+    );
+
+    // 按 Ogg granule 定位到包含目标的页（页 granule = 页内末包末样本）。
+    // 目标 ≤ 页 granule ⇒ 该页第一包起点 = 上一页 granule（prev）。
+    f.stream.pending = &.{};
+    if (target_sample == 0) {
+        try f.demux.reset();
+        f.base_samples = 0;
+        // 回到曲首必须跳过 mapping 头与全部 metadata packet（与 open 相同）：
+        // demux.reset() 后第一包是 `0x7F"FLAC"` 映射头，直接喂给内层 FLAC
+        // 会被当成坏帧；找到首个音频帧（0xFF 同步）后作为 pending。
+        while (true) {
+            const p = (try f.demux.nextPacket()) orelse return error.Corrupt;
+            if (p.data.len >= 2 and p.data[0] == 0xFF) {
+                if (p.data.len > f.stream.pkt_buf.len) return error.Corrupt;
+                @memcpy(f.stream.pkt_buf[0..p.data.len], p.data);
+                f.stream.pending = f.stream.pkt_buf[0..p.data.len];
+                break;
+            }
+        }
+    } else {
+        const prev = try f.demux.seekToGranule(target_sample);
+        f.base_samples = if (prev > 0) prev else 0;
+    }
+
+    // 重建 callback 流：先重发 "fLaC"+metadata，再从 pending / 定位页续帧。
+    f.stream.first_done = false;
+    f.stream.cur = &.{};
+    f.stream.cur_pos = 0;
+    f.stream.eof = false;
+
+    // 内层 FLAC 必须从目标页的首帧重新解析（帧间状态/位置归零）；metadata
+    // 复用 first，不重新读文件头。position_samples = base + inner.position。
+    // 先建新解码器再释放旧的：open 失败时旧对象仍有效，绝不留下悬垂 vtable。
+    var tmp_info: decoder.Info = undefined;
+    var reader = makeFlacReader(f);
+    const new_flac = try flac.open(f.allocator, &reader, &tmp_info);
+    f.flac.deinit();
+    f.flac = new_flac;
 }
 
 fn positionMsImpl(ctx: *anyopaque) i64 {
     const f: *OggFlacCtx = @ptrCast(@alignCast(ctx));
-    return f.flac.positionMs();
+    if (f.sample_rate == 0) return f.flac.positionMs();
+    const total = f.base_samples + f.flac.positionSamples();
+    return @intCast(@divTrunc(@as(i128, total) * 1000, @as(i128, f.sample_rate)));
 }
 
 fn deinitImpl(ctx: *anyopaque) void {
@@ -372,6 +443,25 @@ test "oggflac: open Info 时长（末页 granule 补齐 STREAMINFO total_samples
         total += n;
     }
     try testing.expect(total > 20000); // ≈0.5s 单声道 s16
+}
+
+test "oggflac: seek 150ms 后再 seek 0 与从头解码一致（重放元数据后跳过映射头）" {
+    var info: decoder.Info = undefined;
+    var reader = io.Reader.openMem(multi_oga);
+    var dc = try open(testing.allocator, &reader, &info);
+    defer dc.deinit();
+
+    var ref: [8192]u8 = undefined;
+    var ch: u8 = 0;
+    const n = try dc.read(&ref, 4096, &ch);
+    try testing.expect(n > 0);
+
+    try dc.seekMs(150);
+    try dc.seekMs(0);
+    var got: [8192]u8 = undefined;
+    const m = try dc.read(&got, 4096, &ch);
+    try testing.expectEqual(n, m);
+    try testing.expectEqualSlices(u8, ref[0..n], got[0..m]);
 }
 
 test "oggflac: EOS 页缺失 → estimate 降级" {

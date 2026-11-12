@@ -38,14 +38,6 @@
 				<string>archoera</string>
 			</array>
 		</dict>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.archoera.nekomusic.oauth</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>nekomusic</string>
-			</array>
-		</dict>
 	</array>
 </dict>
 </plist>

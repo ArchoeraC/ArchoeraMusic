@@ -4,12 +4,14 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/log/log.dart';
 import '../services/mcp/mcp_key_store.dart';
 import '../services/playback/playback_session.dart';
+import '../services/render/image_luminance.dart';
 import '../services/search/query_log_file.dart';
 import 'data_dir.dart';
 import 'prefs_mcp.dart';
@@ -110,8 +112,28 @@ AppPrefs? appPrefsSnapshot;
 /// 按 key 读取当前偏好值（未就绪返回 null）；作为 [setRuntime] 的 getSetting。
 dynamic readAppPref(String key) => appPrefsSnapshot?.data[key];
 
+/// 图片背景亮度采样器（测试可覆盖为固定值）。
+///
+/// 真实采样要读盘 + 解码；widget 测试跑在 fake-async 里，文件句柄可能活到
+/// tearDown 之后（Windows 上删临时目录会因文件占用失败），故测试环境默认
+/// 返回 null（= 保留用户自己的遮罩），真实测量由独立单测覆盖。
+final backgroundLuminanceSamplerProvider =
+    Provider<Future<double?> Function(String path)>(
+      (ref) => _defaultLuminanceSampler,
+    );
+
+Future<double?> _defaultLuminanceSampler(String path) {
+  if (Platform.environment.containsKey('FLUTTER_TEST')) {
+    return Future<double?>.value();
+  }
+  return sampleImageLuminance(path);
+}
+
 /// 偏好控制器（UI 读写入口；设置页切换后即时持久化）。
 class AppPrefsNotifier extends Notifier<AppPrefs> {
+  /// 亮度采样请求序号：换图 / 清图后作废在途结果，避免旧图的下限覆盖新图。
+  int _luminanceRequest = 0;
+
   @override
   AppPrefs build() {
     final prefs = AppPrefs.load();
@@ -125,8 +147,10 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
           .copyWithDevFpsMonitor(false)
           .copyWithDevDownloadModule(false);
       reset.save();
+      _refreshLuminanceIfNeeded(reset.backgroundImage);
       return reset;
     }
+    _refreshLuminanceIfNeeded(prefs.backgroundImage);
     return prefs;
   }
 
@@ -537,6 +561,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置渲染帧数上限（30~165 FPS；越界值收敛）。
+  void setRenderFps(int fps) {
+    state = state.copyWithRenderFps(fps);
+    state.save();
+  }
+
   /// 设置自定义主色（null = 恢复默认亮蓝）。
   void setAccent(int? accent) {
     state = state.copyWithAccent(accent);
@@ -564,6 +594,9 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置图片背景配置（选图 / 模糊 / 遮罩 / 缩放）。
   ///
   /// [image] 为 null 时保留现有背景图；清除请显式传 [clearImage]=true。
+  ///
+  /// 选图后会在后台重新测量亮度（可读性遮罩下限）；采样完成前**保留**旧
+  /// 下限，避免亮图换暗图时遮罩先掉下去再升回来造成闪动。
   void setBackground({
     String? image,
     bool clearImage = false,
@@ -577,6 +610,40 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       blur: blur,
       dim: dim,
       scale: scale,
+    );
+    state.save();
+    if (clearImage) {
+      // 作废在途采样：旧图的亮度不得再写回。
+      _luminanceRequest++;
+    } else if (image != null) {
+      unawaited(_refreshLuminance(image));
+    }
+  }
+
+  void _refreshLuminanceIfNeeded(String? image) {
+    if (image == null || image.isEmpty) return;
+    unawaited(_refreshLuminance(image));
+  }
+
+  /// 重新测量背景图亮度，并发布对应的可读性遮罩下限。
+  ///
+  /// 采样失败（文件被删 / 解码失败）时清掉缓存值，回落到用户自己的遮罩；
+  /// 值没变则不重建 state、不写盘（启动时每次都会重采样，避免无谓 IO）。
+  Future<void> _refreshLuminance(String path) async {
+    final request = ++_luminanceRequest;
+    double? luminance;
+    try {
+      luminance = await ref.read(backgroundLuminanceSamplerProvider)(path);
+    } catch (_) {
+      luminance = null;
+    }
+    if (!ref.mounted || request != _luminanceRequest) return;
+    // 采样期间又换了图：结果已过期。
+    if (state.backgroundImage != path) return;
+    if (luminance == state.backgroundLuminance) return;
+    state = state.copyWithBackground(
+      luminance: luminance,
+      clearLuminance: luminance == null,
     );
     state.save();
   }
@@ -933,7 +1000,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     bool? hideVipTag,
     bool? hideQualityTag,
     bool? showSubtitle,
-    bool? unloadAllMemory,
   }) {
     state = state.copyWithPreset(
       performanceMode: performanceMode,
@@ -944,7 +1010,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
       hideVipTag: hideVipTag,
       hideQualityTag: hideQualityTag,
       showSubtitle: showSubtitle,
-      unloadAllMemory: unloadAllMemory,
     );
     state.save();
   }

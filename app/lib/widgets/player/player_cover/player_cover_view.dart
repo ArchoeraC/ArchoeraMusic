@@ -17,6 +17,8 @@ class PlayerCoverBlock extends StatelessWidget {
     required this.pulse,
     required this.beatStrength,
     required this.l10n,
+    this.coverBoundaryKey,
+    this.infoBoundaryKey,
   });
 
   final double size;
@@ -29,6 +31,10 @@ class PlayerCoverBlock extends StatelessWidget {
   final double beatStrength;
   final AppLocalizations l10n;
 
+  /// 布局切换共享元素边界（可空：独立使用时不参与过渡）。
+  final GlobalKey? coverBoundaryKey;
+  final GlobalKey? infoBoundaryKey;
+
   double _pulseDelta(double t) {
     final peak = 0.002 + 0.022 * beatStrength;
     if (t <= 0.5) return peak * (t / 0.5);
@@ -39,36 +45,48 @@ class PlayerCoverBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedScale(
-          scale: playing ? 1.0 : 0.9,
-          duration: animDuration(context, const Duration(milliseconds: 500)),
-          curve: Curves.easeOutBack,
-          child: AnimatedBuilder(
-            animation: pulse,
-            builder: (context, child) => Transform.scale(
-              scale: 1 + _pulseDelta(pulse.value),
-              child: child,
-            ),
-            child: _PlayerCoverCard(
-              size: size,
-              cover: current?.cover,
-              colorScheme: colorScheme,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        _PlayerCoverMeta(
-          hasContent: hasContent,
-          title: title,
-          subtitle: subtitle,
-          l10n: l10n,
-          theme: theme,
+    Widget cover = AnimatedScale(
+      scale: playing ? 1.0 : 0.9,
+      duration: animDuration(context, const Duration(milliseconds: 500)),
+      curve: Curves.easeOutBack,
+      child: AnimatedBuilder(
+        animation: pulse,
+        builder: (context, child) =>
+            Transform.scale(scale: 1 + _pulseDelta(pulse.value), child: child),
+        child: _PlayerCoverCard(
+          size: size,
+          cover: current?.cover,
           colorScheme: colorScheme,
         ),
-      ],
+      ),
+    );
+    Widget meta = _PlayerCoverMeta(
+      hasContent: hasContent,
+      title: title,
+      subtitle: subtitle,
+      l10n: l10n,
+      theme: theme,
+      colorScheme: colorScheme,
+    );
+    final coverKey = coverBoundaryKey;
+    if (coverKey != null) {
+      cover = PlayerSharedElementBoundary(
+        kind: PlayerSharedElement.cover,
+        boundaryKey: coverKey,
+        child: cover,
+      );
+    }
+    final infoKey = infoBoundaryKey;
+    if (infoKey != null) {
+      meta = PlayerSharedElementBoundary(
+        kind: PlayerSharedElement.info,
+        boundaryKey: infoKey,
+        child: meta,
+      );
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [cover, const SizedBox(height: 20), meta],
     );
   }
 }

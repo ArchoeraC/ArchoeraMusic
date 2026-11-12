@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/downloader/download_controller.dart';
+import '../services/kugou/kugou_api.dart';
 import '../services/log/log.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
@@ -15,6 +16,8 @@ import '../services/search/search_service.dart';
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../widgets/common/splash_screen.dart';
+import '../widgets/dialogs/kugou_risk_verify_dialog.dart';
+import 'router.dart';
 
 /// 启动时初始化NT登录态（匿名注册 + 读取持久化账号）。
 class AuthBootstrap extends ConsumerStatefulWidget {
@@ -30,6 +33,8 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
   @override
   void initState() {
     super.initState();
+    // 酷狗 SSA 验证需要 UI：把对话框处理器注入 API 层（协议仍留在 API 层）。
+    _registerKugouRiskVerify(ref.read(kugouApiProvider));
     // 异步初始化：不阻塞首帧渲染
     Future<void>.microtask(() async {
       try {
@@ -71,8 +76,19 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
     });
   }
 
+  void _registerKugouRiskVerify(KugouApi api) {
+    api.riskVerifyHandler = (info) async {
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx == null) return KgRiskVerifyOutcome.failed;
+      return showKugouRiskVerifyDialog(ctx, api: api, info: info);
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
+    // vault 解锁后 kugouApiProvider 会被 invalidate，新实例需要重新注入
+    // 验证处理器（否则 SSA 只报“请稍后重试”，不弹验证框）。
+    ref.listen(kugouApiProvider, (_, next) => _registerKugouRiskVerify(next));
     // 登录态变化（含启动 init 后）时同步红心集合；
     // KG ChangeNotifier 会因头像刷新等任意 notify，故只监听 userid
     // 实际变化（登录/登出）才同步，避免普通 API 调用触发全量重同步。

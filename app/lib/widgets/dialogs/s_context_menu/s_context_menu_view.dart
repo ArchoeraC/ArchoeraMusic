@@ -89,9 +89,8 @@ extension _SContextMenuOverlayView on _SContextMenuOverlayState {
                               ),
                               child: Divider(
                                 height: 1,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.outline.withValues(alpha: 0.4),
+                                color: Theme.of(context).colorScheme.outline
+                                    .withValues(alpha: 0.4),
                               ),
                             )
                           : _MenuItem(item: item, onClose: widget.onClose),

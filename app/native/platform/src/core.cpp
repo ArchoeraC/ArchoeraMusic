@@ -20,8 +20,9 @@ void* g_user_data = nullptr;
 std::atomic<AplLogFn> g_log_sink{nullptr};
 
 // 进程级事件槽：回调可能是异步 NativeCallable.listener，Dart 稍后读取指针，
-// 若指向栈内存届时已失效。事件低速率，覆盖竞争可接受（至多读到更新的一条，
-// 绝不读垃圾）。
+// 若指向栈内存届时已失效。事件低速率，高频状态事件覆盖竞争可接受；但**一次性
+// 事件（deep link）必须由消费方从 pending 缓冲补取**，不能只依赖本信号
+// （Dart FfiSystemDeepLink 在任意平台事件后 drain）。
 AplEvent g_event_slot{};
 
 }  // namespace

@@ -35,7 +35,7 @@
 #include <cctype>
 #include <iostream>
 #include <cstdlib>
-#include <openssl/evp.h>
+#include "scraper_crypto.h"
 #include <cstdio>
 
 namespace archoera::scraper {
@@ -402,12 +402,10 @@ private:
     /// 确保同一文件在不同工具中产生相同的 track ID。
     std::string generateId(const std::string& path) {
         unsigned char digest[16];
-        EVP_MD_CTX* ctx = EVP_MD_CTX_new();
-        if (!ctx) return path; // 降级
-        EVP_DigestInit_ex(ctx, EVP_md5(), nullptr);
-        EVP_DigestUpdate(ctx, path.data(), path.size());
-        EVP_DigestFinal_ex(ctx, digest, nullptr);
-        EVP_MD_CTX_free(ctx);
+        if (era_crypto_md5(reinterpret_cast<const unsigned char*>(path.data()),
+                           path.size(), digest) != ERA_CRYPTO_OK) {
+            return path; // 降级
+        }
 
         char hex[33];
         for (int i = 0; i < 16; ++i)

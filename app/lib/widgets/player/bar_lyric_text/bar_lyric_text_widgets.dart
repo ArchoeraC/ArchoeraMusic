@@ -13,8 +13,7 @@ extension _BarLyricTextView on _BarLyricTextState {
     final prefs = ref.watch(appPrefsProvider);
     final showTranslation = prefs.showTranslation;
     final groups =
-        ref.watch(currentLyricsProvider).value ??
-        const <LyricGroup>[];
+        ref.watch(currentLyricsProvider).value ?? const <LyricGroup>[];
 
     final idx = lyricIndexAt(groups, positionMs);
     if (idx < 0) return SizedBox(height: widget.height);
@@ -73,11 +72,9 @@ extension _BarLyricTextView on _BarLyricTextState {
         duration: animDuration(context, const Duration(milliseconds: 220)),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final painter = TextPainter(
-              text: span,
-              maxLines: 1,
-              textDirection: TextDirection.ltr,
-            )..layout();
+            // 与 Text 实际渲染同源（DefaultTextStyle + 文本缩放）测量，
+            // 否则字体/缩放差异会让循环滚动接缝差几 px。
+            final painter = _measureLyricSpan(context, span);
             if (painter.width > constraints.maxWidth) {
               if (useKaraoke) {
                 return _KaraokeFollow(
@@ -113,6 +110,26 @@ extension _BarLyricTextView on _BarLyricTextState {
       ),
     );
   }
+}
+
+/// 与 `Text.rich` 实际渲染一致的文本测量：合并 [DefaultTextStyle] 并带上
+/// MediaQuery 文本缩放。旧实现只测裸 span（默认字体、未缩放），与实际渲染
+/// 宽度可能差几 px —— 循环滚动在接缝处就会「瞬间回跳到归位」。
+TextPainter _measureLyricSpan(BuildContext context, TextSpan span) {
+  final defaultStyle = DefaultTextStyle.of(context);
+  final style = MediaQuery.boldTextOf(context)
+      ? defaultStyle.style.merge(const TextStyle(fontWeight: FontWeight.bold))
+      : defaultStyle.style;
+  return TextPainter(
+    text: TextSpan(style: style, children: [span]),
+    maxLines: 1,
+    textDirection: TextDirection.ltr,
+    textScaler: MediaQuery.textScalerOf(context),
+    textWidthBasis: defaultStyle.textWidthBasis,
+    textHeightBehavior:
+        defaultStyle.textHeightBehavior ??
+        DefaultTextHeightBehavior.maybeOf(context),
+  )..layout();
 }
 
 /// 歌词换行过渡：旧行滚出、新行滚入（竖向平移）。
@@ -206,7 +223,7 @@ class _LyricRollState extends State<_LyricRoll>
       child: AnimatedBuilder(
         animation: _ctrl,
         builder: (context, _) {
-          // easeOutCubic：起步快、收尾稳，读起来像「滚过去」而非「弹过去」。
+          // 近线性：起步/收尾速度一致，读起来像「整条滚过去」而不是「窜一下」。
           final t = Curves.easeOutCubic.transform(_ctrl.value);
           // 新行位移：前进时 1→0（自下方上移入位），倒退时 -1→0。
           final incoming = _rollUp ? 1 - t : t - 1;
@@ -303,7 +320,12 @@ class _MarqueeState extends State<_Marquee>
 
   late final AnimationController _ctrl;
   Timer? _startTimer;
-  double? _textWidth;
+
+  /// 循环一周期应平移的像素数（对齐 CSS `-50% - gap/2`）。
+  double? _distance;
+
+  /// 实际渲染行的锚点（用于按真实行宽计算位移，避免测量/渲染宽度差）。
+  final GlobalKey _rowKey = GlobalKey();
 
   @override
   void initState() {
@@ -326,7 +348,7 @@ class _MarqueeState extends State<_Marquee>
       _ctrl
         ..stop()
         ..value = 0;
-      _textWidth = null;
+      _distance = null;
       if (widget.playing) {
         _startTimer = Timer(const Duration(milliseconds: 2000), _start);
       }
@@ -335,8 +357,8 @@ class _MarqueeState extends State<_Marquee>
     }
     if (widget.playing != oldWidget.playing) {
       if (widget.playing) {
-        // 恢复播放：已测宽则接续滚动，否则重新走延迟启动。
-        if (_textWidth != null) {
+        // 恢复播放：已测距则接续滚动，否则重新走延迟启动。
+        if (_distance != null) {
           _ctrl.repeat();
         } else {
           _startTimer?.cancel();
@@ -353,15 +375,19 @@ class _MarqueeState extends State<_Marquee>
 
   void _start() {
     if (!mounted || !widget.playing) return;
-    final painter = TextPainter(
-      text: widget.span,
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout();
-    _textWidth = painter.width;
-    _ctrl.duration = Duration(
-      milliseconds: ((painter.width + _gap) / _speed * 1000).round(),
-    );
+    // 按压好的真实行宽取位移（行宽 = 文本 + 间距 + 文本）；拿不到布局时
+    // 退回与 Text 同源的文本测量。
+    final rowBox = _rowKey.currentContext?.findRenderObject() as RenderBox?;
+    final rowWidth = (rowBox != null && rowBox.hasSize)
+        ? rowBox.size.width
+        : 0.0;
+    final width = rowWidth > 0
+        ? rowWidth
+        : 2 * _measureLyricSpan(context, widget.span).width + _gap;
+    final distance = (width + _gap) / 2;
+    if (distance <= 0) return;
+    _distance = distance;
+    _ctrl.duration = Duration(milliseconds: (distance / _speed * 1000).round());
     _ctrl.repeat();
     setState(() {});
   }
@@ -379,14 +405,14 @@ class _MarqueeState extends State<_Marquee>
       child: AnimatedBuilder(
         animation: _ctrl,
         builder: (context, _) {
-          final w = _textWidth ?? 0;
-          final dx = w <= 0 ? 0.0 : -_ctrl.value * (w + _gap);
+          final dx = -(_distance ?? 0) * _ctrl.value;
           return OverflowBox(
             alignment: Alignment.centerLeft,
             maxWidth: double.infinity,
             child: Transform.translate(
               offset: Offset(dx, 0),
               child: Row(
+                key: _rowKey,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text.rich(widget.span, maxLines: 1),

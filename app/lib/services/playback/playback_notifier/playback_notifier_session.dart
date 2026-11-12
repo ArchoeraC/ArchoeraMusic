@@ -388,44 +388,47 @@ mixin _PlaybackNotifierSession
     final track = state.track;
     if (track == null || state.source == null) return;
     if (quality == state.quality) return;
+    // 占位必须在**任何 await 之前**：解析 URL 也是异步的，连点两次会各发一次
+    // prepare_source，后一次 discard 掉前一次的 stage，两个 commit 互相踩踏。
     if (_qualitySwitchBusy) return;
-    _log('切换音质（无缝）→ ${qualityLabels[quality] ?? quality}');
-
-    var resumeMs = state.position.inMilliseconds;
-    if (track.duration > 0 && resumeMs >= track.duration) resumeMs = 0;
-
-    final String? url;
-    try {
-      url = await resolvePlaySource(ref, track, quality: quality, log: _log);
-    } catch (e) {
-      _log('音质切换解析异常: $e');
-      return;
-    }
-    if (url == null || url.isEmpty) {
-      _log('音质切换失败：无可用播放源（可能为 VIP / 版权限制）');
-      return;
-    }
-
-    // 无当前会话：退回普通加载（带断点续播）。
-    final engine = _engine;
-    if (engine == null) {
-      _pendingPauseAfterReady = !state.playing;
-      await load(
-        url,
-        bitrate: qualityBitrate[quality] ?? 128000,
-        title: track.title,
-        subtitle: track.artistNames,
-        trackId: track.id,
-        track: track,
-        quality: quality,
-        offsetMs: resumeMs,
-      );
-      return;
-    }
-
     _qualitySwitchBusy = true;
-    state = state.copyWith(buffering: true);
+    AudioEngineProcess? engine;
     try {
+      _log('切换音质（无缝）→ ${qualityLabels[quality] ?? quality}');
+
+      var resumeMs = state.position.inMilliseconds;
+      if (track.duration > 0 && resumeMs >= track.duration) resumeMs = 0;
+
+      final url = await resolvePlaySource(
+        ref,
+        track,
+        quality: quality,
+        log: _log,
+      );
+      if (url == null || url.isEmpty) {
+        _log('音质切换失败：无可用播放源（可能为 VIP / 版权限制）');
+        return;
+      }
+
+      // 无当前会话：退回普通加载（带断点续播）。
+      engine = _engine;
+      if (engine == null) {
+        _pendingPauseAfterReady = !state.playing;
+        await load(
+          url,
+          bitrate: qualityBitrate[quality] ?? 128000,
+          title: track.title,
+          subtitle: track.artistNames,
+          trackId: track.id,
+          track: track,
+          quality: quality,
+          offsetMs: resumeMs,
+        );
+        return;
+      }
+
+      state = state.copyWith(buffering: true);
+
       // 1) 预打开 + 预解码新源到暂存缓冲（当前源继续播）。
       final ready = Completer<bool>();
       final sub = engine.events.listen((e) {
@@ -436,49 +439,72 @@ mixin _PlaybackNotifierSession
           if (!ready.isCompleted) ready.complete(false);
         }
       });
-      await engine.prepareSource(url);
-      final ok = await ready.future.timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => false,
-      );
-      await sub.cancel();
-      if (!ok || _engine != engine) {
+      final bool ok;
+      try {
+        await engine.prepareSource(url);
+        ok = await ready.future.timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => false,
+        );
+      } finally {
+        await sub.cancel();
+      }
+      if (!identical(_engine, engine)) return;
+      if (!ok) {
         state = state.copyWith(buffering: false);
         _log('音质切换未生效（保留当前音质）');
         return;
       }
 
       // 2) 在旧源解码游标处接管（引擎内切换，环形缓冲兜底）。
-      final switched = Completer<void>();
+      // 引擎会在提交前校验暂存源是否真的覆盖旧游标（在线转码流忽略 Range /
+      // 不支持 seek 时会失败）；失败必须保留旧音质，不能把「声音已换、标签已
+      // 换、进度条没动」的错误状态写进 state。
+      final switched = Completer<bool>();
       final sub2 = engine.events.listen((e) {
         if (e is EngineSourceSwitched) {
-          if (!switched.isCompleted) switched.complete();
+          if (!switched.isCompleted) switched.complete(true);
         } else if (e is EngineSourceError) {
           _log('切换失败: ${e.message}');
-          if (!switched.isCompleted) switched.complete();
+          if (!switched.isCompleted) switched.complete(false);
         }
       });
-      await engine.commitSource();
-      await switched.future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {},
+      final bool committed;
+      try {
+        await engine.commitSource();
+        committed = await switched.future.timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => true, // 无事件（极慢提交）：按已提交处理，不误伤音质
+        );
+      } finally {
+        await sub2.cancel();
+      }
+      if (!identical(_engine, engine)) return;
+      if (!committed) {
+        state = state.copyWith(buffering: false);
+        _log('音质切换未生效（新源无法对齐当前进度），保留当前音质');
+        return;
+      }
+
+      state = state.copyWith(
+        buffering: false,
+        quality: quality,
+        title: track.title,
+        subtitle: track.artistNames,
+        trackId: track.id,
+        track: track,
       );
-      await sub2.cancel();
-      if (_engine != engine) return;
+      // 新管线按初始 cfg 建立，运行时效果（EQ/PEQ/限幅/归一化/变速）需重新下发，
+      // 否则切档后用户设置的播放速度会被重置（表现为变速）。
+      unawaited(applyAudioEffects());
+      _log('音质切换完成（无缝）→ ${qualityLabels[quality] ?? quality}');
+    } catch (e) {
+      _log('音质切换异常: $e');
+      if (identical(_engine, engine)) {
+        state = state.copyWith(buffering: false);
+      }
     } finally {
       _qualitySwitchBusy = false;
     }
-    state = state.copyWith(
-      buffering: false,
-      quality: quality,
-      title: track.title,
-      subtitle: track.artistNames,
-      trackId: track.id,
-      track: track,
-    );
-    // 新管线按初始 cfg 建立，运行时效果（EQ/PEQ/限幅/归一化/变速）需重新下发，
-    // 否则切档后用户设置的播放速度会被重置（表现为变速）。
-    unawaited(applyAudioEffects());
-    _log('音质切换完成（无缝）→ ${qualityLabels[quality] ?? quality}');
   }
 }

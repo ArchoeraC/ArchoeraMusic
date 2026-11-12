@@ -4,6 +4,25 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
+## [未发布] - 2026-11-09
+
+> [!WARNING]
+> **破坏性更新**：NekoMusic 登录已拆除 NekoAuth OAuth 与账号密码，只保留
+> 扫码登录；`nekomusic://` 深链与平台桥接 `apl_open_url` 一并删除。旧版本
+> 升级后需用 NekoMusic 手机 App 扫码重新登录（vault 中已有的 token 仍可继续
+> 使用）。
+
+你好喵～
+本次带来了以下的更新喵：
+
+1、NekoMusic 登录改为**仅扫码**：移除 NekoAuth OAuth（浏览器授权 + `nekomusic://` 回调）以及账号密码 / 忘记密码入口，登录框不再有 tab 切换
+2、`nekomusic://` 从 macOS `Info.plist`、三端命令行 / AppleEvent / D-Bus 白名单和 `main.dart` 深链识别中删除；`archoera://` 深链保持不变
+3、平台桥接 **ABI v6 → v7（破坏性）**：删除只服务于 Neko 忘记密码的 `apl_open_url` / `APL_CAP_OPEN_URL`；`NekoSsoBridge`、`NekoSsoLoginSession`、`beginSsoLogin` / `ssoStartUrl` / `ssoClaim` / `cancelSsoLogin` 等 Dart 接口同步删除
+4、`NekoApi` 重构为纯扫码：移除 `/api/user/sso/*`、`/api/user/login`、`/api/user/sso/password-reset-url` 调用与冷启动 handoff 监听；这些服务端接口属于破坏性移除，不再由本客户端调用
+5、文档同步：`neko-source-identity.md` 重写为仅扫码，`platform-native-bridge.md` 记录 ABI v7 删除项
+
+我喜欢你！
+
 ## [1.0.6+4] - 2026-11-08
 
 > [!NOTE]

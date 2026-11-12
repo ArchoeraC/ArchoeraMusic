@@ -469,23 +469,12 @@ class _EmptyLyrics extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            EtaIcons.fileMusicOutline,
-            size: 42,
-            color: scheme.onSurfaceVariant.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            context.l10n.commonNoLyrics,
-            style: TextStyle(
-              fontSize: 13,
-              color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
+      child: Text(
+        context.l10n.commonNoLyrics,
+        style: TextStyle(
+          fontSize: 13,
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+        ),
       ),
     );
   }

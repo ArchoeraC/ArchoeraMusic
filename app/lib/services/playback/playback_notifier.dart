@@ -168,7 +168,8 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
       return;
     }
     final prefs = ref.read(appPrefsProvider);
-    final wanted = !prefs.performanceMode &&
+    final wanted =
+        !prefs.performanceMode &&
         (prefs.enableSpectrum || prefs.barSpectrum) &&
         state.playing;
     final peak = prefs.spectrumPeakHold;
@@ -268,7 +269,7 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
     }
   }
 
-  /// 引擎音量渐变（默认约 250ms，easeOut）：每 ~16ms 推送一次引擎音量，
+  /// 引擎音量渐变（默认约 250ms，线性）：每 ~16ms 推送一次引擎音量，
   /// 听感平滑过渡。用于退出弹窗的降半/回升与切歌淡入；**不修改
   /// `state.volume`**（UI 音量控件显示值保持不变），也不写 prefs。
   ///
@@ -356,10 +357,8 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   }
 
   /// 由本地响度分析结果计算归一化兜底增益（dB）。见 [normalizationGainDb]。
-  double _normalizationGainDb(Track? track) => normalizationGainDb(
-    lufs: track?.loudnessLufs,
-    peak: track?.loudnessPeak,
-  );
+  double _normalizationGainDb(Track? track) =>
+      normalizationGainDb(lufs: track?.loudnessLufs, peak: track?.loudnessPeak);
 
   void _log(String line);
 }

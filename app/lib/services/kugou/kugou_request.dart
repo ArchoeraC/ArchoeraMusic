@@ -28,8 +28,11 @@ const kgSearchHotUrl = 'http://mobilecdn.kugou.com/api/v3/search/hot';
 /// 兜底搜索：songsearch.kugou.com（无封面）
 const kgSearchUrl = 'https://songsearch.kugou.com/song_search_v2';
 
-/// 设备注册：拿真实 dfid（v5/url 前置条件）
-const kgRegisterUrl = 'https://userservice.kugou.com/risk/v2/r_register_dev';
+/// 设备注册：拿真实 dfid（v5/url 前置条件）。
+///
+/// 2026-10 上游 `1c73c64` 将 v2 升级为 v3（`/register/dev` 获取失败修复），
+/// v2 会频繁返回空 dfid，进而让客户端不断换设备重试，触发风控。
+const kgRegisterUrl = 'https://userservice.kugou.com/risk/v3/r_register_dev';
 
 /// 取歌曲 URL（签名 + key）
 const kgSongUrl = 'https://gateway.kugou.com/v5/url';
@@ -57,8 +60,21 @@ const kgLyricHeaders = <String, String>{
 /// android 客户端 UA（对齐 KuGouMusicApi request.js）
 const kgAndroidUa = 'Android15-1070-11083-46-0-DiscoveryDRADProtocol-wifi';
 
-/// v5/url 基础请求参数（对齐 KuGouMusicApi module/song_url.js，
-/// 概念版 lite：MoeKoeMusic 后端 --platform=lite，appid 3116/clientver 11440）
+/// 概念版 lite 的 gitversion（验证码登录 t1/t2 设备信封的一部分）。
+const kgLiteGitVersion = '5f0b7c4';
+
+/// 概念版验证码登录 t1 的固定 key/iv（AES-256-CBC）。
+const _kgLiteT1Key = '5e4ef500e9597fe004bd09a46d8add98';
+const _kgLiteT1Iv = '04bd09a46d8add98';
+
+/// 概念版验证码登录 t2 的固定 key/iv（AES-256-CBC）。
+const _kgLiteT2Key = 'fd14b35e3f81af3817a20ae7adae7020';
+const _kgLiteT2Iv = '17a20ae7adae7020';
+
+/// v5/url 基础请求参数（对齐 KuGouMusicApi module/song_url.js）。
+///
+/// 注意：取流接口的 `clientver` 上游固定为 11430（比 lite 默认 11440 旧），
+/// 与 `version` 一致；沿用 11440 会与官方 lite 客户端参数对不上。
 const kgSongUrlBase = <String, dynamic>{
   'album_id': 0,
   'area_code': 1,
@@ -74,7 +90,7 @@ const kgSongUrlBase = <String, dynamic>{
   'ppage_id': '356753938,823673182,967485191',
   'cdnBackup': 1,
   'module': '',
-  'clientver': 11440,
+  'clientver': 11430,
 };
 
 /// register_dev 的设备信息（对齐 module/register_dev.js 默认值）
@@ -134,13 +150,26 @@ Future<dynamic> kgGet(
     if (res.statusCode != 200) {
       throw KgApiException('KG HTTP ${res.statusCode}');
     }
+    final ssaCode = _kgSsaCode(res);
     final bytes = <int>[];
     await for (final chunk in res) {
       bytes.addAll(chunk);
     }
-    return jsonDecode(
-      kgCleanResponse(utf8.decode(bytes, allowMalformed: true)),
-    );
+    final text = kgCleanResponse(utf8.decode(bytes, allowMalformed: true));
+    dynamic body;
+    try {
+      body = jsonDecode(text);
+    } on FormatException {
+      // 非 JSON 且带 ssa：无法判断业务结果，按需要验证处理。
+      if (ssaCode != null) throw KgRiskVerifyException(ssaCode);
+      rethrow;
+    }
+    // ssa-code 在成功响应上也可能出现（上游会附着 edt/sid）；只有业务
+    // 确实失败时才中断，避免把已经成功的登录/操作误判为风控失败。
+    if (ssaCode != null && _kgBodyIsFailure(body)) {
+      throw KgRiskVerifyException(ssaCode);
+    }
+    return body;
   } finally {
     client.close(force: true);
   }
@@ -162,14 +191,45 @@ Future<Uint8List> kgPost(
     if (res.statusCode != 200) {
       throw KgApiException('KG POST HTTP ${res.statusCode}');
     }
+    final ssaCode = _kgSsaCode(res);
     final bytes = <int>[];
     await for (final chunk in res) {
       bytes.addAll(chunk);
+    }
+    if (ssaCode != null) {
+      // JSON 响应能判断成功/失败；加密/二进制响应无法判断，按需要验证处理
+      // （register_dev 失败会走 _safeDfid 的降级路径，不会误伤登录成功）。
+      try {
+        final text = kgCleanResponse(utf8.decode(bytes, allowMalformed: true));
+        final body = jsonDecode(text);
+        if (_kgBodyIsFailure(body)) throw KgRiskVerifyException(ssaCode);
+      } on FormatException {
+        throw KgRiskVerifyException(ssaCode);
+      }
     }
     return Uint8List.fromList(bytes);
   } finally {
     client.close(force: true);
   }
+}
+
+/// 读取 SSA 事件 id（响应头大小写不敏感，兼容 `ssa`）。
+String? _kgSsaCode(HttpClientResponse res) {
+  for (final name in const ['ssa-code', 'ssa']) {
+    final value = res.headers.value(name)?.trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  return null;
+}
+
+/// 兼容两种失败码约定：status=0 或 error_code 非 0/200。
+bool _kgBodyIsFailure(dynamic body) {
+  if (body is! Map) return false;
+  final status = body['status'];
+  if (status is num && status == 0) return true;
+  final raw = body['error_code'] ?? body['errcode'] ?? body['err_code'];
+  final code = raw is num ? raw.toInt() : int.tryParse('$raw') ?? 0;
+  return code != 0 && code != 200;
 }
 
 /// KG 业务异常
@@ -180,6 +240,20 @@ class KgApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// 服务端返回 `ssa-code`：需要完成二次安全验证后才能重试原请求。
+///
+/// [eventId] 是风控事件 id，交给 UI 走 `/get/verify/info` → `/sidedt`。
+class KgRiskVerifyException extends KgApiException {
+  KgRiskVerifyException(this.eventId) : super('KG 要求安全验证（eventid=$eventId）');
+
+  final String eventId;
+}
+
+/// 验证未完成/验证后仍被拦截：这是给用户看的最终提示。
+class KgRiskVerifyRequiredException extends KgApiException {
+  KgRiskVerifyRequiredException(super.message);
 }
 
 /// 按「签名原文」拼接 query：`key=value`（空值保留 `=`，逗号等不做
@@ -205,7 +279,9 @@ Future<String> kgQrKey({String? mid}) async {
     'appid': 1001,
     'type': 1,
     'plat': 4,
-    'qrcode_txt': '$kgQrLoginPage?appid=$kgSrcAppid&',
+    // 对齐 login_qr_key.js：qrcode_txt 里的 appid 用当前平台 appid
+    // （lite=3116），不是 srcappid；旧实现填 2919 会与 appid=1001 不一致。
+    'qrcode_txt': '$kgQrLoginPage?appid=$kgLiteAppid&',
     'srcappid': kgSrcAppid,
     'dfid': '-',
     'mid': mid,
@@ -228,7 +304,11 @@ Future<String> kgQrKey({String? mid}) async {
 /// 对齐 KuGouMusicApi module/login_qr_check.js：GET /v2/get_userinfo_qrcode，
 /// web 签名。返回 {status, token, userid, nickname}：
 /// status 0=已过期 / 1=等待扫码 / 2=已扫待确认 / 4=登录成功（带 token）。
-Future<Map<String, dynamic>> kgQrCheck(String key, {String? mid}) async {
+Future<Map<String, dynamic>> kgQrCheck(
+  String key, {
+  String? mid,
+  String? dev,
+}) async {
   mid ??= kgCalcMid(kgRandomString(16));
   final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   final params = <String, dynamic>{
@@ -236,6 +316,9 @@ Future<Map<String, dynamic>> kgQrCheck(String key, {String? mid}) async {
     'appid': kgLiteAppid,
     'srcappid': kgSrcAppid,
     'qrcode': key,
+    // 对齐 login_qr_check.js：轮询也要带稳定设备名，缺失会被当作
+    // 另一台设备在确认登录，提高二次验证概率。
+    if (dev != null && dev.isNotEmpty) 'dev': dev,
     'dfid': '-',
     'mid': mid,
     'uuid': '-',
@@ -294,11 +377,108 @@ Future<Map<String, dynamic>> kgGetMyInfo({
   return data;
 }
 
+// ─── SSA 安全验证（对齐 module/get_verify_info.js / verify_user_info.js）──
+
+/// 获取风控验证信息（`/verifyservice/v3/get_verify_info`）。
+///
+/// 返回 data（通常含 `v_type`、`txappid`）；23=腾讯 TCaptcha，32=短信。
+Future<Map<String, dynamic>> kgGetVerifyInfo(
+  String eventId, {
+  String dfid = '-',
+  String? mid,
+  String? token,
+  String? userid,
+}) async {
+  final resp = await kgGateway(
+    '/verifyservice/v3/get_verify_info',
+    method: 'POST',
+    body: {
+      'eventid': eventId,
+      'userid': int.tryParse(userid ?? '') ?? 0,
+      'platid': 2,
+      'rtype': 1,
+      'wasm': 1,
+      'i': '',
+      'sid': '',
+      'edt': '',
+    },
+    dfid: dfid,
+    mid: mid,
+    token: token,
+    userid: userid,
+  );
+  final data = resp is Map ? resp['data'] : null;
+  if (data is Map) return Map<String, dynamic>.from(data);
+  if (resp is Map) return Map<String, dynamic>.from(resp);
+  return const {};
+}
+
+/// 提交 SSA 验证（`/v4/verify_user_info`）。
+///
+/// 对齐 verify_user_info.js：
+/// - v_type=23（腾讯）：`verifycode` + AES({}) 的 `params/pk`；
+/// - v_type=32（短信）：`code` + AES({code}) 的 `params/pk`。
+/// `sid/edt` 由 [kgGenerateSidEdt] 生成。
+Future<Map<String, dynamic>> kgVerifyUserInfo({
+  required String eventId,
+  required int vType,
+  required String sid,
+  required String edt,
+  String verifyCode = '',
+  String dfid = '-',
+  String? mid,
+  String? token,
+  String? userid,
+}) async {
+  final body = <String, dynamic>{
+    'eventid': eventId,
+    'userid': int.tryParse(userid ?? '') ?? 0,
+    'platid': 2,
+    'v_type': vType,
+    'wasm': 1,
+    'i': '',
+    'sid': sid,
+    'edt': edt,
+  };
+
+  if (vType == 23 || vType == 32) {
+    final tempKey = kgRandomString(16).toLowerCase();
+    final payload = vType == 23
+        ? <String, dynamic>{}
+        : <String, dynamic>{'code': verifyCode};
+    body['params'] = kgAesEncryptHex256(jsonEncode(payload), tempKey);
+    body['pk'] = kgRsaRawEncryptHex(jsonEncode({'key': tempKey})).toUpperCase();
+    if (vType == 23) {
+      body['verifycode'] = verifyCode;
+    } else {
+      body['code'] = verifyCode;
+    }
+  }
+
+  final resp = await kgGateway(
+    '/v4/verify_user_info',
+    method: 'POST',
+    query: {'clientver': 11510},
+    body: body,
+    baseUrl: 'https://verifyservice.kugou.com',
+    dfid: dfid,
+    mid: mid,
+    token: token,
+    userid: userid,
+  );
+  return resp is Map ? Map<String, dynamic>.from(resp) : const {};
+}
+
 // ─── 账号登录（对齐 KuGouMusicApi module/login*.js，lite 平台）───────────
 
-Map<String, String> _kgLoginHeaders(String mid, int ts, {String? router}) => {
+Map<String, String> _kgLoginHeaders(
+  String mid,
+  int ts, {
+  String dfid = '-',
+  String? router,
+}) => {
   'User-Agent': kgAndroidUa,
-  'dfid': '-',
+  'dfid': dfid,
   'clienttime': '$ts',
   'mid': mid,
   'kg-rc': '1',
@@ -337,12 +517,16 @@ Map<String, dynamic> _kgDecodeLoginData(
 }
 
 /// 手机验证码发送（对齐 module/captcha_sent.js）。
-Future<void> kgCaptchaSent({required String mobile, String? mid}) async {
+Future<void> kgCaptchaSent({
+  required String mobile,
+  String? mid,
+  String dfid = '-',
+}) async {
   mid ??= kgCalcMid(kgRandomString(16));
   final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   final body = jsonEncode({'businessid': 5, 'mobile': mobile, 'plat': 3});
   final q = <String, dynamic>{
-    'dfid': '-',
+    'dfid': dfid,
     'mid': mid,
     'uuid': '-',
     'appid': kgLiteAppid,
@@ -356,7 +540,7 @@ Future<void> kgCaptchaSent({required String mobile, String? mid}) async {
   final bytes = await kgPost(
     uri,
     body: body,
-    headers: _kgLoginHeaders(mid, ts),
+    headers: _kgLoginHeaders(mid, ts, dfid: dfid),
   );
   final resp = jsonDecode(utf8.decode(bytes, allowMalformed: true));
   if (resp is! Map || (resp['status'] as num?)?.toInt() != 1) {
@@ -372,6 +556,8 @@ Future<Map<String, dynamic>> kgLoginByPwd({
   required String username,
   required String password,
   String? mid,
+  String dfid = '-',
+  String? dev,
 }) async {
   mid ??= kgCalcMid(kgRandomString(16));
   final tsMs = DateTime.now().millisecondsSinceEpoch;
@@ -388,18 +574,18 @@ Future<Map<String, dynamic>> kgLoginByPwd({
     'plat': 1,
     'support_multi': 1,
     'clienttime_ms': tsMs,
-    't1':
-        '562a6f12a6e803453647d16a08f5f0c2ff7eee692cba2ab74cc4c8ab47fc467561a7c6b586ce7dc46a63613b246737c03a1dc8f8d162d8ce1d2c71893d19f1d4b797685a4c6d3d81341cbde65e488c4829a9b4d42ef2df470eb102979fa5adcdd9b4eecfea8b909ff7599abeb49867640f10c3c70fc444effca9d15db44a9a6c907731e2bb0f22cd9b3536380169995693e5f0e2424e3378097d3813186e3fe96bbe7023808a0981b4e2b6135a76faac',
-    't2':
-        '31c4daf4cf480169ccea1cb7d4a209295865a9d2b788510301694db229b87807469ea0d41b4d4b9173c2151da7294aeebfc9738df154bbdf11a4e117bb5dff6a3af8ce5ce333e681c1f29a44038f27567d58992eb81283e080778ac77db1400fdf49b7cf7e26be2e5af4da7830cc3be4',
+    't1': '562a6f12a6e803453647d16a08f5f0c2ff7eee692cba2ab74cc4c8ab47fc467561a7c6b586ce7dc46a63613b246737c03a1dc8f8d162d8ce1d2c71893d19f1d4b797685a4c6d3d81341cbde65e488c4829a9b4d42ef2df470eb102979fa5adcdd9b4eecfea8b909ff7599abeb49867640f10c3c70fc444effca9d15db44a9a6c907731e2bb0f22cd9b3536380169995693e5f0e2424e3378097d3813186e3fe96bbe7023808a0981b4e2b6135a76faac',
+    't2': '31c4daf4cf480169ccea1cb7d4a209295865a9d2b788510301694db229b87807469ea0d41b4d4b9173c2151da7294aeebfc9738df154bbdf11a4e117bb5dff6a3af8ce5ce333e681c1f29a44038f27567d58992eb81283e080778ac77db1400fdf49b7cf7e26be2e5af4da7830cc3be4',
     't3': 'MCwwLDAsMCwwLDAsMCwwLDA=',
+    // 对齐 login.js：账号密码登录体也要带稳定设备名。
+    if (dev != null && dev.isNotEmpty) 'dev': dev,
     'username': username,
     'params': paramsEnc,
     'pk': pk,
   };
   final body = jsonEncode(dataMap);
   final q = <String, dynamic>{
-    'dfid': '-',
+    'dfid': dfid,
     'mid': mid,
     'uuid': '-',
     'appid': kgLiteAppid,
@@ -413,7 +599,12 @@ Future<Map<String, dynamic>> kgLoginByPwd({
   final bytes = await kgPost(
     uri,
     body: body,
-    headers: _kgLoginHeaders(mid, ts, router: 'login.user.kugou.com'),
+    headers: _kgLoginHeaders(
+      mid,
+      ts,
+      dfid: dfid,
+      router: 'login.user.kugou.com',
+    ),
   );
   final resp = jsonDecode(utf8.decode(bytes, allowMalformed: true));
   if (resp is! Map<String, dynamic>) throw KgApiException('登录响应异常');
@@ -426,10 +617,22 @@ Future<Map<String, dynamic>> kgLoginByPwd({
 }
 
 /// 手机验证码登录（对齐 module/login_cellphone.js：v7/login_by_verifycode）。
+///
+/// 新版 lite 协议把设备信封从静态常量升级为按 GUID / MAC / DEV / 时间
+/// 现场生成：
+/// - `t1 = AES-CBC("|<clienttime_ms>")`
+/// - `t2 = AES-CBC("<guid>|0f6072…|<mac>|<dev>|<clienttime_ms>")`
+/// 同时 body 需要 `dfid` / `dev` / `gitversion`，query 需要真实 `dfid`。
+/// 仍沿用旧的 `t1=0,t2=0,t3=...` 会被服务端当作非官方客户端，验证码
+/// 登录更容易触发二次验证。
 Future<Map<String, dynamic>> kgLoginByVerifyCode({
   required String mobile,
   required String code,
   String? mid,
+  required String guid,
+  required String mac,
+  required String dev,
+  String dfid = '-',
 }) async {
   mid ??= kgCalcMid(kgRandomString(16));
   final tsMs = DateTime.now().millisecondsSinceEpoch;
@@ -445,21 +648,31 @@ Future<Map<String, dynamic>> kgLoginByVerifyCode({
   final pk = kgRsaRawEncryptHex(
     jsonEncode({'clienttime_ms': tsMs, 'key': tempKey}),
   ).toUpperCase();
+
+  final t1 = kgAesEncryptHexRawKeyIv('|$tsMs', _kgLiteT1Key, _kgLiteT1Iv);
+  final t2 = kgAesEncryptHexRawKeyIv(
+    '$guid|0f607264fc6318a92b9e13c65db7cd3c|$mac|$dev|$tsMs',
+    _kgLiteT2Key,
+    _kgLiteT2Iv,
+  );
+
   final dataMap = <String, dynamic>{
     'plat': 1,
     'support_multi': 1,
-    't1': 0,
-    't2': 0,
+    't1': t1,
+    't2': t2,
     'clienttime_ms': tsMs,
     'mobile': masked,
     'key': kgSignParamsKey('$tsMs'),
     'pk': pk,
     'params': paramsEnc,
-    't3': 'MCwwLDAsMCwwLDAsMCwwLDA=',
+    'dfid': dfid,
+    'dev': dev,
+    'gitversion': kgLiteGitVersion,
   };
   final body = jsonEncode(dataMap);
   final q = <String, dynamic>{
-    'dfid': '-',
+    'dfid': dfid,
     'mid': mid,
     'uuid': '-',
     'appid': kgLiteAppid,
@@ -474,7 +687,7 @@ Future<Map<String, dynamic>> kgLoginByVerifyCode({
     uri,
     body: body,
     headers: {
-      ..._kgLoginHeaders(mid, ts),
+      ..._kgLoginHeaders(mid, ts, dfid: dfid),
       'support-calm': '1',
       'User-Agent': 'Android16-1070-11440-130-0-LOGIN-wifi',
     },
@@ -501,19 +714,27 @@ Map<String, String> _kgBaseHeaders(String mid, int ts) => {
   'kg-rf': 'B9EDA08A64250DEFFBCADDEE00F8F25F',
 };
 
-/// 注册设备 → 返回 (dfid)。dfid 用于后续 /v5/url 请求。
+/// 注册设备 → 返回 (dfid)。dfid 用于后续 /v5/url 等请求。
 ///
-/// 对齐 KuGouMusicApi：POST userservice.kugou.com/risk/v2/r_register_dev，
+/// 对齐 KuGouMusicApi：POST userservice.kugou.com/risk/v3/r_register_dev，
 /// AES-CBC 加密设备信息 + RSA-PKCS1 加密 {aes, uid, token}，android 签名。
 /// 采用概念版 lite 平台（appid 3116/clientver 11440/lite 盐/lite 公钥，
 /// 对齐 MoeKoeMusic 后端 --platform=lite；标准版参数已被官方风控）。
-/// [mid] 可传入外部生成（保持与 /v5/url 同一设备身份），缺省内部随机。
-Future<String> kgRegisterDevice({String? mid}) async {
+///
+/// [mid]/[guid] 必须来自持久化的 [KugouDevice]（同一安装长期复用），
+/// 否则每次注册都是「新设备」，是账号风控的高危信号。缺省仅用于测试兜底。
+Future<String> kgRegisterDevice({
+  String? mid,
+  String? guid,
+  String dfid = '-',
+}) async {
   mid ??= kgCalcMid(kgRandomString(16));
+  guid ??= kgMd5(kgRandomString(24));
+  // 首次注册时调用方可能传空串（设备还没有 dfid）；服务端按 '-' 识别。
+  final effectiveDfid = dfid.isEmpty ? '-' : dfid;
   final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-  // imei/uuid 用 32 位 hex 设备标识（对齐 KUGOU_API_GUID = md5(getGuid())）
-  final guid = kgMd5(kgRandomString(24));
+  // imei/uuid 用同一设备 GUID（对齐 KUGOU_API_GUID = UUID v4）
   final device = <String, dynamic>{..._kgDevice, 'imei': guid, 'uuid': guid};
 
   // AES 加密设备信息（密钥随请求回传，用于解密响应）
@@ -530,7 +751,7 @@ Future<String> kgRegisterDevice({String? mid}) async {
     'part': 1,
     'platid': 1,
     'p': p,
-    'dfid': '-',
+    'dfid': effectiveDfid,
     'mid': mid,
     'uuid': '-',
     'appid': kgLiteAppid,
@@ -545,7 +766,7 @@ Future<String> kgRegisterDevice({String? mid}) async {
     body: cipher,
     headers: {
       'User-Agent': kgAndroidUa,
-      'dfid': '-',
+      'dfid': effectiveDfid,
       'clienttime': '$ts',
       'mid': mid,
       'kg-rc': '1',
@@ -559,25 +780,36 @@ Future<String> kgRegisterDevice({String? mid}) async {
   final text = kgAesDecryptString(base64.encode(bytes), secretKey);
   final body = jsonDecode(text);
   if (body is! Map<String, dynamic>) throw KgApiException('register_dev 响应异常');
-  final dfid = body['data'] is Map ? body['data']['dfid']?.toString() : null;
-  if (dfid == null || dfid.isEmpty) {
+  final registered = body['data'] is Map
+      ? body['data']['dfid']?.toString()
+      : null;
+  if (registered == null || registered.isEmpty) {
     throw KgApiException('register_dev 未返回 dfid: $text');
   }
-  return dfid;
+  return registered;
 }
 
 /// 校验网关响应：`status:0` / `error_code` 非 0/200 视为业务失败（抛异常）。
 /// 成功码约定不统一：多数网关接口用 0，部分通道（歌词系）用 200，两值均放行。
 void _checkKgStatus(dynamic body) {
   if (body is! Map) return;
+  // 某些网关把风控事件 id 放在 body 里（request.js 的 ssaCode 兼容字段）。
+  final ssa = body['ssaCode'] ?? body['ssa_code'] ?? body['ssa-code'];
+  if (ssa is String && ssa.trim().isNotEmpty) {
+    throw KgRiskVerifyException(ssa.trim());
+  }
+  final raw = body['error_code'] ?? body['errcode'] ?? body['err_code'] ?? 0;
+  final code = raw is num ? raw.toInt() : int.tryParse('$raw') ?? 0;
+  // MoeKoeMusic 将 20028 视为账号级风控（即使没有 ssa-code 头）。
+  if (code == 20028) {
+    throw KgRiskVerifyRequiredException('酷狗要求完成安全验证（20028），请在酷狗官方客户端完成验证后重试。');
+  }
   final status = body['status'];
   if (status is num && status == 0) {
     throw KgApiException(
       'KG status=0: ${body['error_msg'] ?? body['msg'] ?? body}',
     );
   }
-  final raw = body['error_code'] ?? body['errcode'] ?? body['err_code'] ?? 0;
-  final code = raw is num ? raw.toInt() : int.tryParse('$raw') ?? 0;
   if (code != 0 && code != 200) {
     throw KgApiException('KG error_code=$code: ${body['error_msg'] ?? body}');
   }

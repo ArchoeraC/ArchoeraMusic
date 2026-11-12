@@ -25,6 +25,7 @@ import '../../../widgets/player/cover_switcher.dart';
 import '../../../widgets/player/player_cover.dart';
 import '../../../widgets/player/player_lyrics_block.dart';
 import '../../../widgets/player/player_lyrics_slot.dart';
+import '../../../widgets/player/player_shared_elements.dart';
 import 'player_layout.dart';
 
 class PosterPlayerLayout extends PlayerLayout {
@@ -60,13 +61,16 @@ class PosterPlayerLayout extends PlayerLayout {
   Widget? buildBackdrop(BuildContext context, PlayerLayoutContext c) {
     if (c.fullscreenCoverWidth <= 0) return null;
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         Positioned(
           left: 0,
           top: 0,
           bottom: 0,
           width: c.fullscreenCoverWidth.clamp(0.0, c.pageWidth),
-          child: RepaintBoundary(
+          child: PlayerSharedElementBoundary(
+            kind: PlayerSharedElement.cover,
+            boundaryKey: c.sharedKeys[PlayerSharedElement.cover],
             child: CoverSwitcher(
               coverKey: c.coverKey,
               style: c.transitionStyle,
@@ -95,11 +99,15 @@ class PosterPlayerLayout extends PlayerLayout {
         final coverInset =
             (c.pageWidth * textStartFraction - kPlayerPageHorizontalPadding)
                 .clamp(0.0, box.maxWidth);
-        final info = _PosterTrackInfo(
-          hasContent: c.hasContent,
-          title: c.title,
-          subtitle: c.subtitle,
-          l10n: c.l10n,
+        final info = PlayerSharedElementBoundary(
+          kind: PlayerSharedElement.info,
+          boundaryKey: c.sharedKeys[PlayerSharedElement.info],
+          child: _PosterTrackInfo(
+            hasContent: c.hasContent,
+            title: c.title,
+            subtitle: c.subtitle,
+            l10n: c.l10n,
+          ),
         );
         return RepaintBoundary(
           child: Row(
@@ -129,7 +137,10 @@ class PosterPlayerLayout extends PlayerLayout {
                             builder: (context) => Padding(
                               // 右栏原本留 64px，全屏封面模式下歌词偏窄；收到 24px。
                               padding: const EdgeInsets.only(right: 24),
-                              child: RepaintBoundary(
+                              child: PlayerSharedElementBoundary(
+                                kind: PlayerSharedElement.lyrics,
+                                boundaryKey:
+                                    c.sharedKeys[PlayerSharedElement.lyrics],
                                 child: PlayerLyricsBlock(
                                   hasLyrics: c.hasLyrics,
                                   lyricScale: lyricScale,

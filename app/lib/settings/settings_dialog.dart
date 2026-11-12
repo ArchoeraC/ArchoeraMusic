@@ -10,7 +10,8 @@
 /// 本文件保留弹窗骨架：分类导航 / 搜索 / 开发者长按开启逻辑。
 library;
 
-import 'dart:async' show Timer;
+import 'dart:async' show Timer, unawaited;
+import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,7 +32,9 @@ import 'history_section.dart';
 import 'scans_section.dart';
 import 'search_section.dart';
 import 'security_section.dart';
+import 'settings_anchors.dart';
 import 'settings_categories.dart';
+import '../services/shortcuts/shortcut_action.dart';
 import 'settings_sections.dart';
 import 'streaming_server_list.dart';
 
@@ -41,6 +44,7 @@ export 'settings_categories.dart';
 
 part 'settings/settings_dialog_actions.dart';
 part 'settings/settings_dialog_view.dart';
+part 'settings/settings_search_index.g.dart';
 
 void showSettingsDialog(BuildContext context, {SettingsCategory? category}) {
   showDialog<void>(
@@ -53,7 +57,10 @@ void showSettingsDialog(BuildContext context, {SettingsCategory? category}) {
 
 class _SearchEntry {
   const _SearchEntry(this.category, this.title, this.subtitle, this.icon);
+
   final SettingsCategory category;
+
+  /// 设置项标题（同时作为滚动/高亮锚点，与 [SettingsAnchor] 的 label 一致）。
   final String title;
   final String subtitle;
   final IconData icon;
@@ -69,7 +76,8 @@ class SettingsDialog extends ConsumerStatefulWidget {
   ConsumerState<SettingsDialog> createState() => _SettingsDialogState();
 }
 
-class _SettingsDialogState extends ConsumerState<SettingsDialog> {
+class _SettingsDialogState extends ConsumerState<SettingsDialog>
+    with SingleTickerProviderStateMixin {
   late SettingsCategory _category =
       widget.initialCategory ?? SettingsCategory.appearance;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -93,10 +101,39 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   double _catIndicatorHeight = 0;
   bool _catIndicatorReady = false;
 
+  /// 右侧内容区锚点（搜索跳转的高亮框用它做坐标参照系）。
+  final GlobalKey _contentHostKey = GlobalKey();
+
+  /// 右侧内容滚动控制（切分类回顶 / 搜索跳转定位用）。
+  final ScrollController _contentScrollCtrl = ScrollController();
+
+  /// 搜索跳转后的「闪几下」高亮（相对内容区的位置）。
+  Rect? _flashRect;
+  late final AnimationController _flashCtrl;
+
+  /// 高亮脉冲次数与总时长。
+  static const int _flashPulses = 3;
+  static const Duration _flashDuration = Duration(milliseconds: 1300);
+
   @override
   void initState() {
     super.initState();
+    _flashCtrl = AnimationController(vsync: this, duration: _flashDuration)
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _flashRect = null);
+        }
+      });
     _loadVersion();
+  }
+
+  @override
+  void dispose() {
+    _flashCtrl.dispose();
+    _searchCtrl.dispose();
+    _contentScrollCtrl.dispose();
+    _devHoldTimer?.cancel();
+    super.dispose();
   }
 
   void _setVersion(String version) {
@@ -115,7 +152,14 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   }
 
   void _setCategory(SettingsCategory category) {
-    setState(() => _category = category);
+    // 切分类即取消上一轮高亮（它的坐标已无意义），并把内容区回到顶部：
+    // 否则新分类会继承上一个分类的滚动偏移。
+    _flashCtrl.stop();
+    if (_contentScrollCtrl.hasClients) _contentScrollCtrl.jumpTo(0);
+    setState(() {
+      _category = category;
+      _flashRect = null;
+    });
   }
 
   void _setQuery(String query) {
@@ -125,6 +169,53 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog> {
   void _clearQuery() {
     _searchCtrl.clear();
     setState(() => _query = '');
+  }
+
+  /// 搜索命中：切到所属分类 → 滚到对应设置行 → 闪几下高亮。
+  void _jumpToSearchEntry(_SearchEntry entry) {
+    _setCategory(entry.category);
+    _clearQuery();
+    final label = entry.title;
+    // 新分类内容要到下一帧才构建/布局，先等一帧再测量位置。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _revealSetting(label);
+    });
+  }
+
+  /// 定位 [label] 对应的设置行；内容可能异步挂载（服务器列表等），少量帧重试。
+  void _revealSetting(String label, {int attempt = 0}) {
+    if (!mounted) return;
+    final target = settingsAnchors.lookup(label);
+    if (target == null) {
+      if (attempt >= 8) return;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _revealSetting(label, attempt: attempt + 1),
+      );
+      return;
+    }
+    unawaited(_scrollToAndFlash(target));
+  }
+
+  Future<void> _scrollToAndFlash(BuildContext target) async {
+    // 滚到视口上方 18% 处（留出上下文），再在落点闪高亮。
+    await Scrollable.ensureVisible(
+      target,
+      alignment: 0.18,
+      duration: animDuration(context, const Duration(milliseconds: 320)),
+      curve: Curves.easeOutCubic,
+    );
+    if (!mounted || !target.mounted) return;
+    _startFlash(target);
+  }
+
+  /// 在目标行位置播放高亮脉冲（[SettingsDialog] 关闭或无尺寸时静默跳过）。
+  void _startFlash(BuildContext target) {
+    final host = _contentHostKey.currentContext?.findRenderObject();
+    final box = target.findRenderObject();
+    if (host is! RenderBox || box is! RenderBox || !box.hasSize) return;
+    final topLeft = host.globalToLocal(box.localToGlobal(Offset.zero));
+    setState(() => _flashRect = topLeft & box.size);
+    _flashCtrl.forward(from: 0);
   }
 
   void _setCategoryIndicator(double left, double top, double height) {

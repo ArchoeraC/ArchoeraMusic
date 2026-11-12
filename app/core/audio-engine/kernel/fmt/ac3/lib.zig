@@ -187,8 +187,15 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+/// seek 后首个待输出样本 = 已丢弃帧数 × AC3 帧长（≤ 目标，C 层裁前导）。
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *DecoderCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.frames_done * t.AC3_FRAME_SIZE);
+}
 
 fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const f: *DecoderCtx = @ptrCast(@alignCast(ctx));

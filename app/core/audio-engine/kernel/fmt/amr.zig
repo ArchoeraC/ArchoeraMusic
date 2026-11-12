@@ -152,8 +152,14 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *Ctx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.samples_done);
+}
 
 fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const f: *Ctx = @ptrCast(@alignCast(ctx));
