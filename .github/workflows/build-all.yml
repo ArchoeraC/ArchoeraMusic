@@ -400,7 +400,11 @@ jobs:
           dotnet-version: '10.0.x'
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
-          channel: stable
+          # 固定 Flutter 版本（与本地开发/`pubspec.lock` 对齐），不要用 channel: stable：
+          # 2026-11-12 stable 滚到 3.50.0 后，`nativeapi`（经 window_manager 0.6 引入）
+          # 的 `Isolate.create` 在该版本已被移除，全平台 kernel_snapshot 一起编译失败。
+          # 升级 Flutter 前请先确认 nativeapi / cnativeapi 已支持目标版本。
+          flutter-version: '3.47.9'
           cache: true
 
       # ──────────────────── Zig 0.17（EraAudio kernel）────────────────
@@ -506,7 +510,9 @@ jobs:
       # ───────────── Flutter pub get / analyze（统一在 app/）─────────────
       - name: Flutter pub get
         working-directory: app
-        run: flutter pub get
+        # --enforce-lockfile：lockfile 与解析结果不一致时立即失败（否则 pub 会
+        # 静默重新解析，把 nativeapi 升到需要更新 Dart 的 0.5.10，见 build-release.sh）。
+        run: flutter pub get --enforce-lockfile
 
       - name: Analyze
         working-directory: app
