@@ -636,7 +636,7 @@ PY
 ) || true
 case "$OUT" in
   err*主程序*) : ;;
-  *) fail "打包布局下父进程非预期主程序应拒绝（got: $OUT）";;
+  *) fail "打包布局下父进程非预期主程序应拒绝（got: ${OUT}）";;
 esac
 pass "独立运行拒绝（打包布局：父进程 exe 非预期主程序）"
 
@@ -671,17 +671,17 @@ LD_PRELOAD_OUT=$(LD_PRELOAD=/nonexistent/archoera-inject-test.so \
   "$VAULT" serve "$DATA_M2B" <<<'handshake AAAA BBBB' 2>/dev/null) || LD_PRELOAD_RC=$?
 case "$LD_PRELOAD_OUT" in
   err*拒绝运行*) : ;;
-  *) fail "LD_PRELOAD 非空应被 vault 拒绝（got: $LD_PRELOAD_OUT）";;
+  *) fail "LD_PRELOAD 非空应被 vault 拒绝（got: ${LD_PRELOAD_OUT}）";;
 esac
-[ "$LD_PRELOAD_RC" = "87" ] || fail "沙箱被蓄意破坏应以退出码 87 终止（got $LD_PRELOAD_RC）"
+[ "$LD_PRELOAD_RC" = "87" ] || fail "沙箱被蓄意破坏应以退出码 87 终止（got ${LD_PRELOAD_RC}）"
 LD_AUDIT_RC=0
 LD_AUDIT_OUT=$(LD_AUDIT=/nonexistent/archoera-inject-test.so \
   "$VAULT" serve "$DATA_M2B" <<<'handshake AAAA BBBB' 2>/dev/null) || LD_AUDIT_RC=$?
 case "$LD_AUDIT_OUT" in
   err*拒绝运行*) : ;;
-  *) fail "LD_AUDIT 非空应被 vault 拒绝（got: $LD_AUDIT_OUT）";;
+  *) fail "LD_AUDIT 非空应被 vault 拒绝（got: ${LD_AUDIT_OUT}）";;
 esac
-[ "$LD_AUDIT_RC" = "87" ] || fail "沙箱被蓄意破坏应以退出码 87 终止（got $LD_AUDIT_RC）"
+[ "$LD_AUDIT_RC" = "87" ] || fail "沙箱被蓄意破坏应以退出码 87 终止（got ${LD_AUDIT_RC}）"
 pass "加载器注入拒绝（LD_PRELOAD / LD_AUDIT → err + 退出码 87：自毁并连带主程序退出）"
 
 # ════════════════════════════════════════════════════════════════════

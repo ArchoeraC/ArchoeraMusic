@@ -17,6 +17,9 @@ class FluidBackgroundStyle extends PlayerBackgroundStyle {
   String get id => 'fluid';
 
   @override
+  bool get needsPreview => true;
+
+  @override
   Widget build(BuildContext context, PlayerBackgroundContext c) {
     if (!c.hasCover) return c.gradient;
     final fluid = c.fluid;
@@ -33,6 +36,7 @@ class FluidBackgroundStyle extends PlayerBackgroundStyle {
           fps: fluid.fps,
           freezeOnPause: fluid.freezeOnPause,
           beat: fluid.beat,
+          onReady: c.onReady,
         ),
       ],
     );

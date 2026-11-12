@@ -24,8 +24,6 @@ import '../../l10n/l10n.dart';
 import 'lyrics_edge_fade.dart';
 import '../common/anim.dart';
 
-import 'package:archoera_music/eta/icon/eta_icons.dart';
-
 part 'lyrics_view/lyrics_view_widgets.dart';
 
 /// 歌词滚动渲染。

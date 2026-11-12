@@ -39,6 +39,13 @@ Widget _wrap(Widget child) => ProviderScope(
 );
 
 void main() {
+  test('离屏尺寸按物理像素计算（不再漏乘 DPR）', () {
+    expect(fluidRenderSize(1920, 1080, 1, 0.5), (width: 960, height: 540));
+    // 高 DPI：与上游 clientWidth * DPR * renderScale 同档。
+    expect(fluidRenderSize(1920, 1080, 2, 0.5), (width: 1920, height: 1080));
+    expect(fluidRenderSize(1, 1, 1, 0.25), (width: 1, height: 1));
+  });
+
   testWidgets('无封面时构建且无异常', (tester) async {
     await tester.pumpWidget(_wrap(const FluidBackground()));
     await tester.pump(const Duration(milliseconds: 50));

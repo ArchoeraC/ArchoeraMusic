@@ -144,8 +144,14 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *DecoderCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.samples_done);
+}
 
 // ---------------------------------------------------------------------------
 // 元数据专用快路径（probe-only，§8.4.2①）：整读文件后仅调 sv7/sv8 `parse`

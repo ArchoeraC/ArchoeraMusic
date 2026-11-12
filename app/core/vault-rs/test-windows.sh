@@ -28,7 +28,7 @@ command -v wine >/dev/null 2>&1 || skip "未检测到 wine"
 command -v winepath >/dev/null 2>&1 || skip "未检测到 winepath"
 command -v lld-link >/dev/null 2>&1 || skip "未检测到 lld-link（LLVM）"
 command -v python3 >/dev/null 2>&1 || skip "未检测到 python3"
-[ -d "$MSVC_ROOT/VC/Tools/MSVC" ] || skip "未检测到 msvc-wine 布局（MSVC_ROOT=$MSVC_ROOT）"
+[ -d "$MSVC_ROOT/VC/Tools/MSVC" ] || skip "未检测到 msvc-wine 布局（MSVC_ROOT=${MSVC_ROOT}）"
 
 MSVC_VER="$(ls "$MSVC_ROOT/VC/Tools/MSVC" | sort -V | tail -1)"
 SDK_VER="$(ls "$MSVC_ROOT/Windows Kits/10/Lib" | sort -V | tail -1)"
@@ -84,7 +84,7 @@ cp "$PROBE_DIR/target/x86_64-pc-windows-msvc/release/probe-parent.exe" build/pro
 LINUX_BIN="$PWD/build/archoera-vault-test"
 TESTDATA="$PWD/testdata"        # 黄金夹具（C# 活体 oracle 已删除，见 testdata/README.md）
 
-echo "[test-windows] 运行 Wine 端到端（wine $(wine --version 2>/dev/null) / MSVC $MSVC_VER / SDK $SDK_VER）"
+echo "[test-windows] 运行 Wine 端到端（wine $(wine --version 2>/dev/null) / MSVC $MSVC_VER / SDK ${SDK_VER}）"
 python3 - "$PWD/build/archoera-vault-test.exe" "$PWD/build/probe-parent.exe" "$LINUX_BIN" "$TESTDATA" <<'PY'
 # -*- coding: utf-8 -*-
 """Wine 端到端断言。argv: <vault.exe> <probe.exe> <linux-bin> <testdata>"""

@@ -66,6 +66,7 @@ class RippleBackground extends StatefulWidget {
     this.renderScale = 1.0,
     this.damageClippedDynamic = false,
     this.fallbackColor = const Color(0xFF141420),
+    this.onReady,
   });
 
   /// 封面地址；为空时只渲染 [fallbackColor]。
@@ -126,6 +127,9 @@ class RippleBackground extends StatefulWidget {
   /// 无封面时的底色。
   final Color fallbackColor;
 
+  /// 封面纹理可绘制时回调一次（供播放页淡出模糊封面预览层）。
+  final VoidCallback? onReady;
+
   @override
   State<RippleBackground> createState() => _RippleBackgroundState();
 }
@@ -149,6 +153,9 @@ class _RippleBackgroundState extends State<RippleBackground>
 
   ImageStream? _stream;
   ImageStreamListener? _listener;
+
+  /// [RippleBackground.onReady] 只上报一次。
+  bool _reportedReady = false;
 
   /// 背景封面解码目标长边（物理像素）；0 = 尚未在 [didChangeDependencies] 计算。
   int _decodePx = 0;
@@ -184,7 +191,8 @@ class _RippleBackgroundState extends State<RippleBackground>
     final mq = MediaQuery.maybeOf(context);
     if (mq == null) return 2048;
     final s = mq.size;
-    final longest = (s.width > s.height ? s.width : s.height) * mq.devicePixelRatio;
+    final longest =
+        (s.width > s.height ? s.width : s.height) * mq.devicePixelRatio;
     return longest.round().clamp(256, 2048);
   }
 
@@ -245,6 +253,16 @@ class _RippleBackgroundState extends State<RippleBackground>
     _ticker.start();
   }
 
+  /// 封面已解码（CPU 路径可绘制 / GPU 路径纹理随后可用）后上报就绪：
+  /// 延后到帧末，保证预览层淡出前水纹至少已实际绘制过一帧。
+  void _reportReady() {
+    if (_reportedReady || widget.onReady == null) return;
+    _reportedReady = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onReady?.call();
+    });
+  }
+
   // ── GPU 着色器 ───────────────────────────────────────────────────────
 
   Future<void> _loadShader() async {
@@ -291,6 +309,7 @@ class _RippleBackgroundState extends State<RippleBackground>
       _current = img;
       _static.prepareCover(img, transition: transition);
       _repaint.notify();
+      _reportReady();
     }, onError: (_, _) {});
     _listener = listener;
     _stream = provider.resolve(ImageConfiguration.empty)..addListener(listener);

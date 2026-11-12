@@ -6,10 +6,10 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../app/player_theme.dart';
+import '../app/router.dart';
 import '../services/netease/track.dart';
 import '../services/source/source_platform.dart';
 import '../services/lyrics/lyric_line.dart';
@@ -20,17 +20,21 @@ import '../stores/app_prefs.dart';
 import '../stores/lyrics_provider.dart';
 import '../stores/player_route_animation.dart';
 import '../stores/providers.dart';
+import '../stores/window_full_screen.dart';
 import '../theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 import '../widgets/dialogs/comment_dialog.dart';
 import '../widgets/dialogs/sleep_timer_dialogs.dart';
 import '../widgets/player/playback_progress_slider.dart';
 import '../widgets/player/player_controls_row.dart';
+import '../widgets/player/player_layout_switcher.dart';
+import '../widgets/player/player_shared_elements.dart';
 import '../widgets/player/background/player_background.dart';
 import '../widgets/player/quality_menu.dart';
 import '../widgets/player/spectrum_view.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/common/anim.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 import 'player/layouts/player_layout.dart';
@@ -58,11 +62,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   /// 拖动中的进度（ms）；null = 跟随播放器实时位置。
   double? _dragMs;
 
-  /// 当前应用窗口句柄（nativeapi；无窗口环境为 null，能力调用静默跳过）。
-  Window? _window;
+  /// 布局切换共享元素边界（按布局 id 缓存；同一布局内 GlobalKey 稳定）。
+  final Map<String, PlayerSharedElementKeys> _sharedElementKeys = {};
 
-  /// 窗口事件监听句柄（dispose 时按 id 注销）。
-  ListenerId? _windowListenerId;
+  PlayerSharedElementKeys _keysForLayout(String layoutId) => _sharedElementKeys
+      .putIfAbsent(layoutId, () => PlayerSharedElementKeys(layoutId));
 
   /// 切歌方向（slide 样式用）：播放顺序递增 = 下一首（新封面从右进），
   /// 递减 = 上一首（从左进）。对齐原版 watch(playIndex) 判定。
@@ -77,10 +81,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   /// 指针是否在播放页窗口内（自动沉浸：离开窗口立即隐藏顶/底栏）。
   bool _pointerInside = true;
 
-  /// 路由进入动画是否已完成：完成前不挂载重内容（背景 / 歌词块），
-  /// 对齐原版 FullPlayer 的 `lyricMounted`（`@after-enter` 后才挂载）
-  /// 与 PlayerBackground 延迟挂载。普通 chrome（顶栏 / 封面 / 控件）不受影响。
+  /// 路由进入动画是否已完成：完成前不挂载重内容（歌词块、背景的水纹 / 流体
+  /// 层），对齐原版 FullPlayer 的 `lyricMounted` 与 `visualizerMounted`
+  /// （均在 `@after-enter` 之后才挂载）。播放页背景本身（预览层）从第一帧就
+  /// 挂载，普通 chrome（顶栏 / 封面 / 控件）不受影响。
   bool _contentMounted = false;
+
+  /// 退出动画是否进行中：收起时暂停水纹/流体的逐帧渲染，只保留最后一帧，
+  /// 把帧预算让给壳层重排 + 路由下滑，避免收起卡顿。
+  bool _closing = false;
 
   /// 当前 `ModalRoute` 的进入/退出动画（在 [didChangeDependencies] 绑定，
   /// 状态变更驱动 [_contentMounted]；同时写入 provider 供壳层驱动收起动效）。
@@ -97,43 +106,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   double _lastBeatStrength = 1;
 
   /// 窗口是否处于完整全屏（进入全屏/还原按钮的图标与提示切换）。
-  /// 事件驱动：nativeapi 窗口事件（含系统级全屏，如 F11）同步状态，
-  /// 无轮询。
-  bool _isFullScreen = false;
-
-  /// 完整全屏切换（对齐原版 FullPlayer 顶栏 Maximize/Minimize 按钮，
-  /// 由 useWindowControls → Electron setFullScreen 实现，这里走
-  /// nativeapi 的 [Window.isFullScreen]）。
   ///
-  /// Windows 下窗口管理器不保证派发进入/退出全屏事件，若只靠窗口事件
-  /// 同步，按钮图标会停在旧态（必须关掉再打开播放页才会经 initState
-  /// 查询刷新）。这里改为：乐观置位 → 调用 → 以窗口管理器实际状态校准，
-  /// 三端一致即时刷新。
+  /// 由进程级 [windowFullScreenProvider] 提供：**只由窗口事件更新**，页面挂载 /
+  /// 卸载不再读取那个会跨线程阻塞的原生 getter（Windows 下最多等 5s，
+  /// 快速关闭→重开会导致整个应用卡死）。
+  bool get _isFullScreen => ref.watch(windowFullScreenProvider);
+
+  /// 完整全屏切换（对齐原版 FullPlayer 顶栏 Maximize/Minimize 按钮）。
+  ///
+  /// 乐观置位 + 原生写入下沉到 [WindowFullScreenNotifier.toggle]；实际状态仍由
+  /// 窗口事件校准（含系统级全屏，如 F11）。
   Future<void> _toggleFullscreen() async {
-    final window = _window;
-    if (window == null) return;
-    final target = !_isFullScreen;
-    if (mounted) setState(() => _isFullScreen = target);
-    window.isFullScreen = target;
-    _syncFullScreen();
-  }
-
-  /// 以窗口管理器真实全屏状态校准本地标记（系统级全屏 / 平台事件缺失兜底）。
-  void _syncFullScreen() {
-    final v = _window?.isFullScreen ?? false;
-    if (mounted && v != _isFullScreen) {
-      setState(() => _isFullScreen = v);
-    }
-  }
-
-  /// 窗口事件（含系统级全屏，如 F11）：同步播放页全屏按钮状态。
-  void _onWindowEvent(WindowEvent event) {
-    if (!mounted) return;
-    if (event is WindowEnteredFullScreenEvent && !_isFullScreen) {
-      setState(() => _isFullScreen = true);
-    } else if (event is WindowExitedFullScreenEvent && _isFullScreen) {
-      setState(() => _isFullScreen = false);
-    }
+    ref.read(windowFullScreenProvider.notifier).toggle();
   }
 
   void _pokeControls() {
@@ -153,11 +137,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       vsync: this,
       duration: const Duration(milliseconds: 180),
     );
-    // 全屏按钮初始状态 + 监听窗口事件（进入/退出全屏时图标同步）
-    _window = WindowManager.instance.getCurrent();
-    _windowListenerId = _window?.addListener(_onWindowEvent);
-    // 初始全屏状态校准：Windows 平台事件可能缺失，改为主动查询真实状态。
-    _syncFullScreen();
+    // 全屏按钮状态由 windowFullScreenProvider 提供（进程级单次注册原生监听），
+    // 页面挂载路径上不再有任何原生窗口调用。
     // 缓存路由动画写入器（dispose 时不能再经 ref 获取）。
     _routeAnimNotifier = ref.read(playerRouteAnimationProvider.notifier);
   }
@@ -185,15 +166,23 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   ///
   /// 只在进入动画完成后置真；退出时保持内容挂载直到路由销毁。
   void _syncContentMounted() {
-    if (_routeAnimation?.status == AnimationStatus.completed &&
-        !_contentMounted) {
+    final status = _routeAnimation?.status;
+    final closing = status == AnimationStatus.reverse;
+    if (closing != _closing) {
+      setState(() => _closing = closing);
+    }
+    if (status == AnimationStatus.completed && !_contentMounted) {
       setState(() => _contentMounted = true);
     }
   }
 
-  /// 路由转场状态 → 重内容挂载态（进入完成才挂载背景/歌词）。
+  /// 路由转场状态 → 重内容挂载态（进入完成才挂载背景/歌词）与退出暂停。
   void _onRouteAnimationStatus(AnimationStatus status) {
     if (!mounted) return;
+    final closing = status == AnimationStatus.reverse;
+    if (closing != _closing) {
+      setState(() => _closing = closing);
+    }
     if (status == AnimationStatus.completed && !_contentMounted) {
       setState(() => _contentMounted = true);
     }
@@ -202,10 +191,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   @override
   void dispose() {
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
-    // 清空路由动画（壳层恢复折叠态）。
-    _routeAnimNotifier?.set(null);
-    final listenerId = _windowListenerId;
-    if (listenerId != null) _window?.removeListener(listenerId);
+    // 清空路由动画（壳层恢复折叠态）；旧实例不能清掉新实例刚写入的动画。
+    _routeAnimNotifier?.clear(_routeAnimation);
     _hideTimer?.cancel();
     _coverPulse.dispose();
     super.dispose();
@@ -220,9 +207,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     final maxAsync = platform.maxQualityProvider(track);
     final maxQuality = maxAsync == null
         ? null
-        : ref
-              .watch(maxAsync)
-              .maybeWhen(data: (v) => v, orElse: () => null);
+        : ref.watch(maxAsync).maybeWhen(data: (v) => v, orElse: () => null);
     return platform.availableQualities(track, maxQuality: maxQuality);
   }
 
@@ -236,5 +221,27 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   @override
-  Widget build(BuildContext context) => _buildPage(context);
+  Widget build(BuildContext context) {
+    // 切歌方向（slide 样式）与封面节拍：在 ConsumerState 的 build 内注册，
+    // 避免放进子 Builder 时 debug 模式触发 ref.listen 的 build 断言。
+    ref.listen(playbackProvider.select((s) => s.queueIndex), (prev, next) {
+      if (prev != null && prev != next) {
+        _slideNext = next > prev;
+      }
+    });
+    ref.listen(playbackProvider.select((s) => s.fft), (prev, next) {
+      final p = ref.read(appPrefsProvider);
+      if (!p.coverBeatScale || p.performanceMode) return;
+      final strength = next?.beatStrength ?? 0;
+      if (strength <= 0) return;
+      _lastBeatStrength = strength;
+      _coverPulse.forward(from: 0);
+    });
+    // 播放页固定暗色主题：背景恒为暗色体系，前景（文字/图标/歌词等）
+    // 不随应用浅色模式反色。见 [playerThemeProvider]。
+    return Theme(
+      data: ref.watch(playerThemeProvider),
+      child: Builder(builder: (context) => _buildPage(context)),
+    );
+  }
 }

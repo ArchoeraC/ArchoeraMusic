@@ -83,56 +83,22 @@ runs:
         echo "PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig" >> "$GITHUB_ENV"
         echo "LD_LIBRARY_PATH=$PREFIX/lib" >> "$GITHUB_ENV"
 
-    # 原生模块一站式入口（audio-engine / scraper / scanner / indexer / vault /
-    # subsonic / platform），逻辑只落一处，对齐 build_windows.bat。
-    - name: Build native modules
+    # 原生模块（audio-engine / scraper / scanner / indexer / vault / subsonic /
+    # platform）→ dart analyze → flutter build linux：
+    # 逻辑只落一处（与 build_windows.bat / build-macos.sh 对齐）。
+    - name: Build native modules + Flutter Linux
       shell: bash
-      run: bash app/core/build-linux.sh
+      run: bash packaging/linux/build-release.sh build
 
-    # 测试只在本地/发布前按 AGENTS.md 的「提交前必跑」门禁执行；CI 只负责
-    # 编译与打包（测试曾把整条流水线拖到数十分钟甚至挂死，见 #185 后续讨论）。
-
-    - name: Flutter pub get
+    # 自包含运行库（FFmpeg/TagLib 收拢 + RUNPATH=$ORIGIN）+ 许可文本 + 公钥。
+    - name: Prepare Linux bundle (runtime libs / licenses / pubkey)
       shell: bash
-      working-directory: app
-      run: flutter pub get
+      run: bash packaging/linux/build-release.sh prepare
 
-    - name: Analyze
+    # 依赖守卫（NEEDED / $ORIGIN / 内嵌库实际解析位置 / libssl·libcrypto·libcurl
+    # 禁止项）+ 伴随库在包内 + Xvfb 启动冒烟，全部收敛在 Linux 专用脚本里。
+    - name: Verify Linux bundle (deps guard + Xvfb smoke)
       shell: bash
-      working-directory: app
-      run: dart analyze lib
-
-    - name: Build Flutter Linux (release)
-      shell: bash
-      working-directory: app
-      run: flutter build linux --release
-
-    # 自包含运行库：把 FFmpeg/TagLib 的传递依赖闭包收进 native/ 并加 RUNPATH=$ORIGIN，
-    # 产物不再依赖目标发行版的 soname（防系统库差异/升级导致加载断裂）。
-    - name: Bundle self-contained runtime libs
-      shell: bash
-      run: bash app/core/bundle-linux-runtime.sh app/build/linux/x64/release/bundle
-
-    - name: Verify indexer-ffi bundled (Linux)
-      shell: bash
-      # 硬校验：本地曲库搜索索引器（indexer-ffi.so）及其 SQLite 依赖必须进
-      # bundle/native/，且计入 SHA-256 完整性清单（SEC-08，由 bundle-linux-runtime.sh
-      # 末尾调用的 gen_native_manifest.sh 生成）。
-      run: |
-        set -euo pipefail
-        NATIVE=app/build/linux/x64/release/bundle/native
-        for f in indexer-ffi.so libe_sqlite3.so; do
-          [ -f "$NATIVE/$f" ] || { echo "::error::$f 未打入 Linux bundle"; exit 1; }
-        done
-        grep -q 'indexer-ffi.so' "$NATIVE/ARCHOERA-NATIVE-MANIFEST.txt" \
-          || { echo "::error::完整性清单缺 indexer-ffi.so"; exit 1; }
-        echo "OK: indexer-ffi 已入包并计入清单"
-
-    # LGPL 合规：随包附 FFmpeg / TagLib 许可文本 + 聚合声明（见根 THIRD-PARTY-NOTICES.md）
-    - name: Bundle third-party licenses (LGPL 合规)
-      shell: bash
-      run: bash app/core/bundle-licenses.sh app/build/linux/x64/release/bundle
-
-    - name: Embed public key into Linux bundle (防伪)
-      shell: bash
-      run: cp app/tool/watermark_pub.pem app/build/linux/x64/release/bundle/ARCHOERA_PUBKEY.pem
+      env:
+        ARCHOERA_SMOKE_SECONDS: "15"
+      run: bash packaging/linux/build-release.sh verify

@@ -43,10 +43,10 @@ pub const dsp = @import("dsp/lib.zig");
 pub const log = @import("log.zig");
 
 /// 内核版本（语义化版本，与 build.zig.zon 保持同步）
-pub const version: std.SemanticVersion = .{ .major = 0, .minor = 1, .patch = 0 };
+pub const version: std.SemanticVersion = .{ .major = 0, .minor = 2, .patch = 0 };
 
 /// 内核版本字符串（"major.minor.patch"），供 C ABI 的 zk_version 查询使用
-pub const version_string = "0.1.0";
+pub const version_string = "0.2.0";
 
 // ---------------------------------------------------------------------------
 // C ABI 桥接（docs/audio-kernel-zig.md §16.1，头契约：include/kernel_bridge.h）

@@ -34,6 +34,11 @@ if [[ -z "$fmt" || -z "$bundle" || -z "$version" ]]; then
 fi
 bundle="$(cd "$bundle" && pwd)"
 
+# 发布依赖守卫（任何打包格式都先过一遍）：缺内嵌库、$ORIGIN 失效、
+# 未登记的系统依赖或 libssl/libcrypto/libcurl 直接依赖都会在此失败。
+# 守卫实现在 packaging/linux/build-release.sh 内（Linux 专用脚本）。
+bash "$ROOT/packaging/linux/build-release.sh" guard --bundle "$bundle"
+
 # 各包管理器对版本号的限制
 version_deb="$version"                    # deb 允许 . + -
 version_rpm="${version//[+-]/_}"          # rpm 不允许 '+' 与 '-'（- 分隔 version-release）
@@ -135,7 +140,7 @@ Priority: optional
 Architecture: amd64
 Maintainer: io.awa.archoera.betastudio2 <noreply@github.com>
 Homepage: $REPO_URL
-Depends: libc6, libstdc++6, zlib1g, libgtk-3-0 | libgtk-3-0t64, libdbus-1-3, libepoxy0, libfontconfig1, libfribidi0, libx11-6, libxi6, libatk-bridge2.0-0, libcloudproviders0, libcurl4, libssl3, libsqlite3-0, liblzma5
+Depends: libc6, libstdc++6, zlib1g, libgtk-3-0 | libgtk-3-0t64, libdbus-1-3, libepoxy0, libfontconfig1, libfribidi0, libx11-6, libxi6, libatk-bridge2.0-0, libcloudproviders0, libsqlite3-0, liblzma5
 Description: An open-source music player
  Connect to alternative music services, support offline playback, local
  library scanning and a built-in subsonic-compatible server.
@@ -197,12 +202,19 @@ pkg_appimage() {
   cp -a "$stage_bundle/." "$appdir/usr/bin/"
   chmod +x "$appdir/usr/bin/$BIN"
 
-  sed "s|@EXEC@|$BIN %U|g" "$HERE/archoera-music.desktop.in" \
-    > "$appdir/usr/share/applications/archoera-music.desktop"
+  # 桌面条目文件名 = 应用 ID，与 deb/rpm/arch/nix/flatpak 安装后的名字一致；
+  # AppStream 要求 metainfo 的 <id> / <launchable> 与 .desktop 文件名对齐，
+  # 否则 appimagetool 会报 "AppStream upstream metadata is missing"。
+  local desktop="$appdir/usr/share/applications/$APP_ID.desktop"
+  sed "s|@EXEC@|$BIN %U|g" "$HERE/archoera-music.desktop.in" > "$desktop"
   cp "$stage_icons/hicolor/512x512/apps/$APP_ID.png" \
     "$appdir/usr/share/icons/hicolor/512x512/apps/$APP_ID.png"
   install -m644 "$stage_metainfo" \
     "$appdir/usr/share/metainfo/$APP_ID.metainfo.xml"
+  # appimagetool 只查找 <桌面文件名>.appdata.xml（旧扩展名）；给同一份元数据
+  # 建别名，文件名仍等于组件 ID，不会触发「文件名与组件 ID 不一致」告警。
+  ln -sf "$APP_ID.metainfo.xml" \
+    "$appdir/usr/share/metainfo/$APP_ID.appdata.xml"
 
   # linuxdeploy 装配：收拢可执行文件与发行版敏感库的动态依赖，生成 AppRun。
   # LINUXDEPLOY 由 CI 传入（linuxdeploy-x86_64.AppImage）；缺失时退化为纯拷贝
@@ -214,10 +226,20 @@ pkg_appimage() {
       [[ -f "$appdir/usr/bin/native/$lib" ]] && \
         lib_args+=(--library "$appdir/usr/bin/native/$lib")
     done
+    # Flutter 插件库不是 runner 的 DT_NEEDED（Dart 侧按名 dlopen）；linuxdeploy
+    # 只按 --executable 收集会漏掉，AppImage 里表现为 "libcnativeapi.so: cannot
+    # open shared object file"。显式把 lib/ 下的插件都交给它收拢。
+    for lib in "$appdir/usr/bin/lib"/*.so; do
+      [[ -f "$lib" ]] || continue
+      case "$(basename "$lib")" in
+        libapp.so|libflutter_linux_gtk.so) continue ;;
+      esac
+      lib_args+=(--library "$lib")
+    done
     "$ld" --appdir "$appdir" \
       --executable "$appdir/usr/bin/$BIN" \
       "${lib_args[@]}" \
-      --desktop-file "$appdir/usr/share/applications/archoera-music.desktop" \
+      --desktop-file "$desktop" \
       --icon-file "$appdir/usr/share/icons/hicolor/512x512/apps/$APP_ID.png"
   else
     echo "警告: 未提供 LINUXDEPLOY，AppImage 不收拢依赖（仅构建机同系发行版可用）" >&2

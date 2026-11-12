@@ -259,7 +259,7 @@ install(CODE "
 
 # === vcpkg 运行时 DLL（FFmpeg 等动态依赖）===
 # audio-engine（archoera_mediaengine.dll / scraper）经 vcpkg import libs 动态链接
-# ffmpeg/taglib/curl 等（triplet x64-windows-release 为动态构建）；运行时必须把
+# ffmpeg/taglib 等（triplet x64-windows-release 为动态构建）；运行时必须把
 # vcpkg_installed/<triplet>/bin/*.dll 一并分发到 exe 根目录——Windows 加载器按
 # exe 目录解析 archoera_mediaengine.dll 的依赖，缺 FFmpeg DLL 会直接加载失败
 #（表现为播放稳定跳过所有歌曲）。triplet 与 build_windows.bat 对齐。

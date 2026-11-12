@@ -11,17 +11,14 @@
 ///   `archoera://playlist/<id>`         打开流媒体歌单详情
 ///   `archoera://artist/<id>`           打开流媒体歌手详情
 ///
-/// `://`（仅用于 Auth 登录回调）：
-///   `://sso/complete?handoff=<一次性交接码>`
-///
 /// 启动期（播放现场恢复完成前）到达的链接先缓冲，[markReady] 后统一派发。
+/// 未知 scheme（例如已移除的 `://` 登录回调）一律忽略。
 library;
 
 import 'dart:async';
 
 import '../../app/router.dart';
 import '../log/log.dart';
-import '..//_sso_bridge.dart';
 import '../platform/system_deep_link.dart';
 
 class DeepLinkRouter {
@@ -58,21 +55,12 @@ class DeepLinkRouter {
   }
 
   void _dispatch(Uri uri) {
-    if (uri.scheme == kSsoScheme) {
-      // Auth 登录回调：投递给登录流程，不改动页面路由。
-      Log.i(
-        'deeplink',
-        '收到 Auth 回调 host=${uri.host} path=${uri.path} '
-            'handoff=${uri.queryParameters.containsKey('handoff')}',
-      );
-      SsoBridge.handleUri(uri);
-      unawaited(deepLink.activateWindow());
+    if (uri.scheme != 'archoera') {
+      Log.i('deeplink', '忽略未知深链 scheme=${uri.scheme}');
       return;
     }
-    if (uri.scheme != 'archoera') return;
     final path = uri.pathSegments;
-    String seg(int i) =>
-        i < path.length ? Uri.decodeComponent(path[i]) : '';
+    String seg(int i) => i < path.length ? Uri.decodeComponent(path[i]) : '';
     switch (uri.host) {
       case 'player':
         openPlayerPage();

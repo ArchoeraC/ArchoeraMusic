@@ -264,7 +264,7 @@ setSpeed / setPitch / setPitchSync       → 命令 FIFO set_tempo_*（重启生
 | 二进制 | 语言 | 调用方 | 协议 |
 |---|---|---|---|
 | `archoera-scanner` | C#（TagLibSharp）| **Dart FFI 直连（进程内）** | FFI 结果/进度直返；SQLite 直写（§8） |
-| `archoera-scraper` | C++（libcurl + TagLib）| **Dart FFI 直连（进程内）** | FFI 进度回调 + 结果直返 |
+| `archoera-scraper` | C++（TagLib；AES/RSA/MD5/SHA1 与 HTTP 均走内嵌 Rust staticlib，不依赖系统 OpenSSL/libcurl）| **Dart FFI 直连（进程内）** | FFI 进度回调 + 结果直返 |
 | `archoera-audio-engine` | C（FFmpeg + miniaudio）| **主引擎**（Dart FFI 库内加载，2026-08-07）| FFI：`archoera_mediaengine_*`（库内线程转码 PCM 落盘 + miniaudio 自播 + pollEvent FIFO）；CLI 模式保留 stdout OGG + fd3/fd4 |
 | `tempo-rs` | Rust（signalsmith-stretch）| 静态链接进 C 引擎 | C FFI（`HAS_TEMPO` 条件编译）|
 | Go `subsonic` | Go | **Dart FFI 直连（Go c-shared，可选启用）** | 库内提供服务；与独立服务端共享同一份代码（build tag 区分） |
@@ -283,10 +283,11 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - 登录：二维码（login_qr_create/key/check）→ Flutter 展示二维码 + 轮询
 
 ### 7.2 KuGou（首期）
-1. **更新克隆**：`KuGouMusicApi/` = MakcRe/KuGouMusicApi **v1.5.1（2026-02-05）手动拷贝**（非 git 仓库）；上游 main 分支持续更新（2026-08-05 仍有提交），确认落后。本机可直连 GitHub。
-   - 操作：`git clone https://github.com/MakcRe/KuGouMusicApi.git` 到工作区替换旧目录，保留旧目录做 diff 参考
+1. **上游基线**：MakcRe/KuGouMusicApi **v1.6.3（2026-11-04）** + MoeKoeMusic `1.7.2`（2026-11-08，内置同一 API）。新版设备注册/登录/风控分析见
+   [`docs/kugou-risk-control.md`](kugou-risk-control.md)。
+   - 参考克隆放在工作区 `SPlayer-Next/`，不参与本项目构建
 2. **提取核心**：`util/crypto.js`（token/签名）、`util/request.js`、`util/runtime.js`、各 `module/*.js`（160+ 端点）逻辑
-3. **移植进模块架构**：以纯 Dart 移植为落地形态（`app/lib/core/apis/kugou/`，search/lyric 等已可用），按需从 KuGouMusicApi 补：
+3. **移植进模块架构**：以纯 Dart 移植为落地形态（`app/lib/services/kugou/` + `app/lib/apis/kugou/`，search/lyric/登录/取流等已可用），按需从 KuGouMusicApi 补：
    - `song_url`（音源 URL）、`rank_list`/`rank_info`（榜单）、`playlist_detail`/`sheet_*`（歌单）、`search_suggest`、`comment_*`、`login*` 等
    - 注意 `platform` 完整版 vs `lite` 概念版 token 不通用，自用选定一版并在 modules 内封装隔离
 4. KRC 歌词解析：已有 `core/krc.ts`（KRC → 标准时间轴），直接复用
@@ -456,7 +457,8 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 **渲染（Flutter）**
 - **歌词引擎 Dart 移植（重点工程）**：原项目 `Lyrics/engine/`（AMLL：line-builder / word-builder / spring / line-animations / emphasize / interlude / scroll-preroll / split-words）→ Apple Music 风格逐字/逐词高亮动画、弹簧曲线、间奏处理（详见 §10.7）
   - **表现层对齐已实现（2026-09-20）**：时钟 vsync 插值、羽化渐变扫亮、非激活行失焦/缩放景深、
-    逐词上浮、长音强调辉光、间奏三点、背景人声行 —— 见 [lyrics-amll-alignment.md](lyrics-amll-alignment.md)。
+    逐词上浮、长音强调辉光、间奏识别、背景人声行 —— 见 [lyrics-amll-alignment.md](lyrics-amll-alignment.md)。
+    （AMLL 的间奏三点等待动画已按产品要求移除。）
     仍未移植：换行平衡（line-balancer）、ruby/罗马音、对唱布局、scroll-preroll。
 - 翻译行：双行模式（原文 + 译文），可开关
 - 无歌词回退：显示"纯音乐 / 无歌词"状态
@@ -669,3 +671,5 @@ ArchoeraMusic/
 20. ~~sidecar 播放路径收窄~~（已随 2026-09-06 去侧车化整体废弃）
 21. **内存播放（不落盘）模式（2026-09-08 决策；S1 引擎 C / S2 Dart 接线与设置已实现，S3 基准收尾待办）**：桌面播放**默认内存模式**（独立开关，与 Stable/EraAudio、SongCache 均独立）；解码 PCM 驻留进程内「全量块列表」（与 `stream.pcm` 文件块同构，达 cap 才滚动淘汰），频谱由引擎频谱线程直接读块列表并 50ms 事件推送（v2 破坏性更新；App 不再使用 `pcm_window` FFI 拉窗），不写 `stream.wav/.pcm`；无设备 + 内存模式 → error（不文件回退）；`cap`：auto（按可用内存均衡，**32 MiB 硬上限**，查询故障回落、append 后记账强制淘汰、绝不越过用户设限；驻留仅供频谱取帧，另配 8 MiB 块缓冲复用池，`destroy` 时 `malloc_trim` 归还 OS）/ 自定义 / 无上限（须显式警告内存过载后果）。文件模式（设置关 / `ARCHOERA_ENGINE_FILE_MODE=1`）保留现状字节级行为。规格与验收：`docs/audio-memory-playback.md`。
 22. **MCP 控制服务（2026-10-07，可选）**：默认关闭；开启后默认仅绑定回环 `127.0.0.1`（非特权端口），可手动开启「允许局域网访问」绑定 `0.0.0.0`（默认关、需用户确认 + 仍要求密钥）。以标准协议（MCP Streamable HTTP / REST / WebSocket，均 JSON-RPC 2.0 / HTTP+JSON）暴露播放/队列/搜索/曲库/偏好只读/外观/收藏/历史/歌词能力；默认要求访问密钥、能力组默认全关。纯 Dart 实现（`dart:io`，事件循环驱动、无轮询），不参与播放链路（仍为进程内 FFI），是对「桌面端零 TCP 端口」的显式可选例外。另随二进制内置命令行客户端 `archoera_music archoerashell ...`（类 Unix 语法，经 REST 与运行实例通信，不启动 GUI）。详见 `docs/mcp.md`。
+23. **图片背景可读性下限（2026-11-09，移植自 ArchoeraCX）**：图片外观（`appearanceStyle=image`）强制暗色主题后正文恒为 `#ECECEC`，仅靠用户设置的遮罩（0.3~0.9）在亮图上可能仍不可读。选图/启动时把图片解码成 32×32、取不透明像素相对亮度的 **90 分位**（避免亮天空/灯被暗部平均掉），反解出让正文达到 4.5:1 的最小黑色遮罩，作为遮罩滑块的**下限**（封顶 0.75）。生效值 = max(用户值, 下限)，存盘 `appearance.backgroundDim` 仍是用户意图（换成暗图会自动回落）；下限采样值缓存为 `appearance.backgroundLuminance` 保证重启首帧正确，并在后台重采样。采样在 widget 测试环境跳过（避免临时图被后台读句柄锁住）。
+24. **渲染帧数上限（2026-11-09）**：设置「性能 / 渲染」新增 30~165 FPS 的全局帧率上限（默认 60；>60 滑块转黄、>100 转红）。经既有 `PowerSavingFrameBinding.scheduleFrame` 合并帧请求实现（Flutter 无公开帧率 API）：目标帧率不低于显示器刷新率时不节流，否则按 `1/fps` 提前 4% 合并（避免定时器与 vsync 同刻偶发丢帧）；与节能档位取更严格者（失焦/熄屏仍 1 FPS，最小化仍停帧）。它只是上限，实际帧率仍受 vsync 与 GPU 负载约束。

@@ -41,8 +41,14 @@ const vtable = decoder.Decoder.VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *SpeexCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(f.samples_done);
+}
 
 /// SpeexHeader（Ogg packet0，对照 libspeex header.h / oggparsespeex.c）
 pub const SpeexHeader = struct {

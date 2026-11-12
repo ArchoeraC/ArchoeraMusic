@@ -75,7 +75,7 @@ if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
   else
     cat >&2 <<EOF
 找不到 macOS SDK。请任选其一：
-  - 加 --download 自动下载（$SDK_MIRROR）
+  - 加 --download 自动下载（${SDK_MIRROR}）
   - 手动下载解压到 $SDK_DIR_DEFAULT/
   - 用 --sdk <path> 或 ARCHOERA_MACOS_SDK=<path> 指定
 （macOS SDK 为 Apple 许可，仅本地构建用途，勿入库。）
@@ -87,7 +87,7 @@ fi
 # ── 工具链检查 ─────────────────────────────────────────────────────
 command -v "$CC" >/dev/null 2>&1 || { echo "缺少编译器: $CC" >&2; exit 1; }
 LD="${LD:-ld64.lld}"
-command -v "$LD" >/dev/null 2>&1 || { echo "缺少链接器: $LD（LLVM lld）" >&2; exit 1; }
+command -v "$LD" >/dev/null 2>&1 || { echo "缺少链接器: ${LD}（LLVM lld）" >&2; exit 1; }
 
 BUILD_DIR="${ARCHOERA_VERIFY_BUILD:-$(mktemp -d /tmp/archoera-macos-verify.XXXXXX)}"
 mkdir -p "$BUILD_DIR"
@@ -102,7 +102,9 @@ fail=0
 for ARCH in $ARCHS; do
   TARGET="${ARCH}-apple-macos${MIN_MACOS}"
   echo "===== $TARGET ====="
-  objs=()
+  # bash 3.2 + set -u：空数组展开 "${objs[@]}" 会报 unbound variable 并中止，
+  # 故这里累积成字符串（文件名经 %q 转义后按需展开）。
+  objs_args=""
   # core / apl（纯 C++）
   for f in core apl; do
     o="$BUILD_DIR/${ARCH}_${f}.o"
@@ -110,7 +112,7 @@ for ARCH in $ARCHS; do
         -DARCHOERA_PLATFORM_BUILD \
         -I "$PLATFORM_DIR/include" -I "$PLATFORM_DIR/src" \
         -c "$PLATFORM_DIR/src/$f.cpp" -o "$o"; then
-      objs+=("$o")
+      objs_args="$objs_args $(printf '%q' "$o")"
     else
       echo "  编译失败: $f.cpp"; fail=1
     fi
@@ -121,7 +123,7 @@ for ARCH in $ARCHS; do
       -DARCHOERA_PLATFORM_BUILD \
       -I "$PLATFORM_DIR/include" -I "$PLATFORM_DIR/src" \
       -c "$PLATFORM_DIR/src/backend_macos.mm" -o "$o"; then
-    objs+=("$o")
+    objs_args="$objs_args $(printf '%q' "$o")"
   else
     echo "  编译失败: backend_macos.mm"; fail=1
   fi
@@ -131,7 +133,7 @@ for ARCH in $ARCHS; do
       -fuse-ld=lld -dynamiclib \
       -framework Foundation -framework AppKit -framework MediaPlayer \
       -framework UserNotifications -framework CoreFoundation \
-      "${objs[@]}" -o "$dylib"; then
+      $objs_args -o "$dylib"; then
     echo "  → OK  $(file -b "$dylib" | cut -d, -f1-2)"
   else
     echo "  链接失败"; fail=1
@@ -142,13 +144,13 @@ done
 # 导出符号抽查（新增 ABI 是否在）
 DYLIB_ONE="$(ls "$BUILD_DIR"/libarchoera_platform_*.dylib 2>/dev/null | head -1 || true)"
 if [ -n "$DYLIB_ONE" ] && command -v llvm-nm >/dev/null 2>&1; then
-  echo "===== 导出符号抽查（$DYLIB_ONE）====="
+  echo "===== 导出符号抽查（${DYLIB_ONE}）====="
   llvm-nm --defined-only "$DYLIB_ONE" | grep -E '_apl_(system_theme_set_events|system_accent_set_events|window_set_events|abi_version)$' || true
   echo
 fi
 
 if [ "$fail" = "0" ]; then
-  echo "✅ macOS 端编译+链接通过（$ARCHS）"
+  echo "✅ macOS 端编译+链接通过（${ARCHS}）"
 else
   echo "❌ macOS 端验证失败" >&2
 fi

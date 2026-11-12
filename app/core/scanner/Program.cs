@@ -290,9 +290,5 @@ public static class Program
         };
     }
 
-    private static string Md5Hex(string input)
-    {
-        var bytes = System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    private static string Md5Hex(string input) => Archoera.Hash.Md5.Hex(input);
 }

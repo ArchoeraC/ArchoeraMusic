@@ -6,7 +6,7 @@
 > （`test/frame_probe_test.dart`），见 §5.1/D1；**真机基线仍待**（本机 WSL 无 GPU）；
 > **D2a 歌词墙稳态烘焙已实现（2026-11-03）**：整层档稳态每帧只贴图 + 激活行，
 > 见 §4.2c；
-> **歌词表现层已对齐 AMLL（§4.2b：时钟插值/羽化扫亮/景深/逐词动画/间奏点/背景人声）**；
+> **歌词表现层已对齐 AMLL（§4.2b：时钟插值/羽化扫亮/景深/逐词动画/间奏识别/背景人声；间奏三点等待动画已移除）**；
 > P2 背景：封面预烘焙 + CPU 网格已优化并生效，**全分辨率 GLSL 因集显扛不住默认关闭**；
 > **P2b 由 `runtime-resource-optimization.md` R1 细化并取代**（不是单一半分辨率，
 > 而是「静态层缓存 + 损伤区动态层 + 降采样」组合）；P4 字形图集 / P5 自适应画质规划中。
@@ -62,7 +62,8 @@
    - `paint()` 对**每个可见行每帧**新建 `TextPainter` 并 `layout()`（`:51`、`_painterFor` `:96`）；
    - 每行一次 `saveLayer`（`:53`）——离屏渲染目标，iGPU 上尤其贵；
    - 翻译行再建一个 `TextPainter`（`:72`）。
-   - 简单引擎 `LyricsView` 更甚：每次 build 对**全部行**重算高度（`lyrics_view/lyrics_view_widgets.dart:18-21`）。
+   - 简单引擎 `LyricsView` 更甚：每次 build 对**全部行**重算高度——**2026-11-09 已重写**
+     （自绘视口 + 行高缓存 + 线性滚动，见 §4.2）。
 3. **频谱** `app/lib/widgets/player/spectrum_view/spectrum_view_painter.dart`
    - 20fps 重绘（`pushIntervalMs = 50`），`bars` 模式每根 bar 一次 `drawRRect`（`:125`）；
      宽屏下 bar 数多 → draw call 多。量级最小，优先级最低。
@@ -191,11 +192,15 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
   `buildFluidWarpMesh` 逐行照搬上游 `updateMesh`（含 gl-matrix 列主序矩阵与 5 组预设 /
   `cp-generate` 随机生成），把「未 aspect 校正的 NDC `pos` → 纹理坐标 `v_uv`」前向栅格化
   进 `drawVertices`（顶点色 = RG 存 `v_uv`，`BlendMode.dst`），`Picture.toImageSync` 出图。
-  **每首歌只烘焙一次**（`256×256`，subdiv=50），窗口缩放不需重烘焙。
+  **每首歌只烘焙一次**（`512×512`，subdiv=50），窗口缩放不需重烘焙。
 - **片元单 pass**（`app/shaders/fluid.frag`）：屏幕 uv → **逆 aspect**（还原上游顶点着色器）
   → 查位移图得 `v_uv` → 旋转/缩放 → **镜像重复**采封面 → 音量 alpha/晕影/dither → 预乘输出。
   uniform 扁平布局 `FluidUniforms`（uSize/uAspect/uVolume/uSinAngle/uCosAngle/uAlpha，
   sampler uWarp/uCover），含与 `.frag` 一致性的单元测试。
+  ⚠️ **两张采样纹理都必须显式 `FilterQuality.low`（双线性）**：Flutter
+  `FragmentShader.setImageSampler` 默认是 `FilterQuality.none`（最近邻），会把 32×32
+  封面与位移贴图放大成色块/折线；上游 WebGL 两张纹理均为 `LINEAR`。水纹着色器的
+  `uCoverFrom/uCoverTo` 同理。
 - **封面预烘焙**（`fluid_cover.dart`）：封面压到 32×32 → 上游四步色调（对比度 0.4 →
   饱和 3.0 → 对比度 1.7 → 亮度 0.75，中间不夹取故合并成**单个颜色矩阵**）→
   `blurImage(radius=2, quality=4)` 盒式模糊，均为纯 CPU 字节运算，逐位移植且可单测。
@@ -203,7 +208,8 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
   （`drawRect` 时引擎会**拷贝** uniforms，故复用同一 `FragmentShader` 安全）；旧状态在
   新状态 alpha 达 1.1 后释放。上游 `meshStates` 语义一致。
 - **设置项完整对齐上游**：`player.playerBg*` → 流速（0.1~10，默认 4）/ 渲染比例
-  （0.5~2，默认 0.5，`renderScale` 低分辨率离屏）/ 帧率上限（24~120，默认 30）/
+  （0.5~2，默认 0.5，`renderScale` 低分辨率离屏；尺寸按 **逻辑像素 × DPR × scale**
+  计算，与上游 `clientWidth * devicePixelRatio * renderScale` 同档，高 DPI 下不漏分辨率）/ 帧率上限（24~120，默认 30）/
   暂停冻结（默认 false）/ 低频节拍脉动（默认 false，移植 `getBassPulse` 80~180Hz +
   attack/decay 平滑）。性能模式停表呈现静态帧。
 - **回退**：着色器不可用 / `ARCHOERA_FLUID_SHADER=0` / 位移图烘焙失败 / `flutter test`
@@ -231,13 +237,17 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
    - 半分辨率、单 pass。
 
 - 简单引擎 `LyricsView` 的 O(N) 每 build 全量测高同样按 1 收敛。
-- **简单引擎（默认档）位置 tick 只重建当前行（2026-11-03）**：位置 tick（~20Hz）
-  原先会让整个 `ListView` 重建全部可见行；现非当前行返回**缓存的同一 widget
-  实例**（`Element.updateChild` 对 identical widget 短路 → 不重建、不重绘），
-  行高列表也只在「当前行翻转 / 分组 / 宽度 / 样式」变化时重算（换行约每几秒
-  一次，而非每 tick 跑 O(行数)）。当前行因逐字扫亮仍每 tick 重建（必要）。
-  回归：`test/lyrics_view_rebuild_test.dart`（20 tick 内构造 ≤ 当前行数、缓存
-  命中 ≥ tick 数；跨行翻转不串行）。
+- **简单引擎（默认档）2026-11-09 重写：自绘视口 + 线性滚动**：
+  - 不再用 `ListView` + 每次换行 `animateTo(easeOutCubic)`；单
+    `AnimationController` 驱动滚动偏移，换行按恒定速度（约 0.34 px/ms）
+    线性插值，大幅 seek 直接吸附（避免慢速滑过整首歌）。
+  - 只构建视口 ± 一屏的行；行高用 `TextPainter` 实测并缓存，位置 tick
+    （~20Hz）**0 次排版**。
+  - 当前行按离视口中心距离连续变化颜色 / 缩放 / 透明度；逐字歌词按片段
+    时长连续扫亮（不是「唱到就整字换色」）。
+  - 上下渐隐直接乘进行颜色（零离屏层），`wall` 档对 simple 也生效。
+  - 回归：`lyrics_view_test`（换行 / 居中 / 跳转）、`lyrics_view_rebuild_test`
+    （视口窗口 < 50 行、20 tick 0 次 TextPainter 排版）。
 - **歌词上下渐隐 / 全屏封面右缘渗入：保持 `ShaderMask`（dstIn）**。
   2026-11-03 曾尝试「`RepaintBoundary` + dstOut 叠加」免每帧离屏层——软件
   光栅下逐像素等价（差 ≤ 2/255）、测试通过，但**真机上 dstOut 未被边界
@@ -255,8 +265,8 @@ Animations，逐 `<span>` 可独立变换）。本轮把 AMLL 的表现层补齐
 | 逐字渲染 | `lyrics_fragment_render.dart`：整行段落取 `getBoxesForRange` 逐字盒 + 逐字左对齐小段落（缓存） | 每行 1 次整行 layout + 2N 次小段落（换行时一次性） |
 | 羽化扫亮 | 逐字 dstIn 线性渐变遮罩（未唱 α0.4 → 已唱 α1.0），当前扫过字 1 层 `saveLayer` | 每帧 1 层（仅激活行） |
 | 景深 | 非激活行失焦（默认「整层一次 + 1/4 重采样」，可切逐行 σ=`min(5,1+距离)`）+ 弹簧化 `scale 0.97` + 距离透明度；帧预算守卫自动降级 | 默认档每帧 **1** 个离屏层（像素量 1/4）；逐行档 ≈ 可见行数层 |
-| 逐词上浮/长音强调 | `lyrics_word_anim.dart`（AMLL float + emphasize 脉冲：辉光/缩放/推挤/bob） | 长音字/词每帧重建 1 个小段落 |
-| 间奏三点 | `interlude_dots.dart`（≥7s 空隙；依次点亮 + 呼吸 + 两段退场） | 3 个圆，可忽略 |
+| 逐词上浮/长音强调 | `lyrics_word_anim.dart`（AMLL float + emphasize 脉冲：缩放/推挤/bob；辉光已停用） | 复用预渲染段落，0 段/帧（原为 1 个小段落/帧） |
+| 间奏 | `interlude_dots.dart`：仅 `computeInterludes` 识别 ≥7s 空隙（锚点/高亮用）；**三点等待动画已移除** | 无绘制成本 |
 | 背景人声行 | 解析整行括号 → `isBG`；0.7× 字号、0.4 透明度、以 0.4× 行距挂在上一行下方（占位，不再与下一行重叠） | 无额外成本 |
 | 行距/行高度量 | `kLyricLineHeightEm 1.2` + `kLyricLineGapEm 1.0`（AMLL wrapper 内边距等效 0.8，适度放宽） | 无 |
 | 换行弹簧 | `spring_policy.dart`：按行间隔自适应（170~220，ζ≈1.1 不过冲）；仅播放推进带级联；新歌整墙飞入 | 无（减少过冲反而更省重绘） |
@@ -293,7 +303,7 @@ compose 滤镜链（降采样 → blur → 升采样）」，且非激活行段�
    换行只为新进入视口的行烘 1~2 张，不再把可见十几行全量重烘（那会在换行
    后首帧造成一次明显尖峰，真机 FrameTiming 图可见）。
 3. **稳态每帧**：逐行 `drawImageRect` 贴图 + 激活行（clipRect 替代 α=1 的
-   saveLayer）+ 间奏三点。**整层高斯 saveLayer 与全部非激活段落重放消失**。
+   saveLayer）。**整层高斯 saveLayer 与全部非激活段落重放消失**。
 4. **过渡帧**（换行级联/悬停/seek/浏览）：**基座同样复用烘焙图**（行在动，
    但模糊外观不变 → 贴图跟随 y 移动即可；激活外观仍逐帧重绘），
    仅在强度动画中（悬停渐变）回退逐行统一 σ 高斯。观感等价实测：过渡帧
@@ -340,7 +350,7 @@ compose 滤镜链（降采样 → blur → 升采样）」，且非激活行段�
 优先级更高，用于现场 A/B（不改设置、不重编译）：
 
 ```bash
-ARCHOERA_LYRICS_FADE=wall     # 默认：物理墙逐行 alpha（仅 amll 引擎）
+ARCHOERA_LYRICS_FADE=wall     # 默认：逐行 alpha（amll 与 simple 引擎都支持）
 ARCHOERA_LYRICS_FADE=shader   # 回退：外层 ShaderMask（任意引擎都正确）
 ARCHOERA_LYRICS_FADE=off      # 不渐隐（仅诊断，会露硬边）
 
@@ -352,8 +362,8 @@ ARCHOERA_COVER_MASK=off       # 跳过全屏封面右缘渗入遮罩（仅诊断
   `Paint.color` alpha，与烘焙的位置无关缓存天然兼容）。
 - 曲线与 `LyricsEdgeFade` 的停点逐段一致（`test/lyrics_edge_fade_test.dart`
   断言停点、夹紧、中段恒 1）。
-- simple 引擎未接入逐行模式（列表项是独立 widget，需逐项传 alpha），自动回退
-  `shader`。
+- **simple 引擎已接入逐行模式（2026-11-09 重写后）**：每行颜色直接乘
+  `lyricsEdgeFadeAt(行中心 / 视口高)`，不再回退 `shader`。
 
 **成本模型（为什么全屏才严重）**：
 
