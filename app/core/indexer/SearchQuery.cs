@@ -470,8 +470,14 @@ internal static class SearchQuery
             }
             else if (useVocabulary && IsFuzzyEligible(clean[index]))
             {
-                // 词典确认该词元没有任何 Damerau ≤1 的真实词条：模糊趟不可能命中，整支放弃。
-                return null;
+                // 词表只覆盖文本列（见 FtsStore.LoadFuzzyVocabulary）；拼音 / 首字母 /
+                // 读音列里的词条不在其中，所以「词表无候选」≠「索引里不存在」。
+                // 退回无词表的变体枚举，保住旧召回（如 "woo" 的删除变体 "wo" 只存在于拼音列）。
+                var bare = EditDistanceOneVariants(clean[index])
+                    .Select(v => prefix ? Quote(v) + "*" : Quote(v))
+                    .ToList();
+                if (bare.Count > maxVariants) bare = bare.GetRange(0, maxVariants);
+                chunks.Add(bare.Count == 1 ? bare[0] : "(" + string.Join(" OR ", bare) + ")");
             }
             else
             {

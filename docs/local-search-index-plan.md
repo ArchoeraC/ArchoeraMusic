@@ -505,7 +505,8 @@ Dart 侧 `search_index.dart` 只是薄 FFI 客户端（组装请求 JSON、映�
    `fts5vocab(main, search_fts, 'col')` 懒加载 `DISTINCT term`（只留 a-z/0-9 词条，约万级、单库数百 KB 内存），
    按写入纪元缓存；`FuzzyVocabulary.PrefixRange` 二分取每个 ≤1 变体的前缀区间，
    区间 ≤32 时用 `MyersWithinOne`（位并行 Levenshtein ≤1，>64 字符退有界 DP）+ 相邻换位逐条精筛后入表达式，
-   区间过大退回前缀匹配；某可扩展词元无候选则整趟返回 `null`。词表**不落盘、不改 schema、
+   区间过大退回前缀匹配；某可扩展词元在词表无候选时，**该词元退回无词表的变体枚举**（词表只扫文本列，
+   拼音 / 首字母 / 读音列里的词条不在其中，整支放弃会丢召回；回归用例 `SearchLayerTests.FuzzyVocabularyRecall`）。词表**不落盘、不改 schema、
    不递增 AnalyzerVersion**；加载失败（或只读库不可建 temp 虚拟表）自动退回旧的纯变体枚举行为。
    3000 曲语料实测词表仅 3755 条，模糊查询延迟下降约 3–5%（`latin_swap` limit=50：5.26→4.16ms）。
 5. **CJK 变体趟**（仍不足且查询含 CJK）`SearchQuery.CjkVariants`：取查询的 CJK 子序列生成
