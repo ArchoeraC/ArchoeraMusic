@@ -6,29 +6,28 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../log/log.dart';
 import '../native_integrity.dart';
 import '../native_lib_paths.dart';
 
 /// 预加载内置 SQLite（`libe_sqlite3`），统一 dart sqlite3 包与
-/// scanner-ffi（SQLitePCLRaw）所用的 SQLite 实例。
+/// scanner-ffi / indexer-ffi（SQLitePCLRaw）所用的 SQLite 实例。
 ///
-/// 背景：dart sqlite3 包（3.5.x）默认在构建期编译/下载自己的 SQLite
-/// （如 3.53.x），与 scanner-ffi 内置的 `libe_sqlite3`（3.50.x）版本不一致。
-/// 同一进程内两个不同版本的 SQLite 并行操作同一 WAL 数据库时，版本较新的
-/// 实例一旦打开连接（checkpoint/读 WAL），较旧实例的写入提交会静默丢失
-/// （表现为增量扫描的删除不生效）。通过 pubspec `hooks.user_defines.sqlite3`
-/// 将 dart sqlite3 包指向 `source: process`（native assets 从进程符号表
-/// 解析），再在本函数中按绝对路径以 RTLD_GLOBAL 加载一次，使符号进入进程
-/// 全局符号表，dart sqlite3 与 scanner-ffi 命中同一库实例，版本完全一致。
+/// 背景：同一进程内出现两套 SQLite 实例时，POSIX 文件锁按**进程**计，双方互相
+/// 看不见对方的锁与 WAL，同一 `library.db` 上的写入会丢、读取停在旧快照。
 ///
-/// 为什么不用 `source: system`：`libe_sqlite3.so`（NuGet SQLitePCLRaw 官方
-/// 产物）没有 DT_SONAME，glibc 按名 dlopen 无法命中已加载句柄，而 dart
-/// sqlite3 3.5.x 的 native assets（@ffi.Native）在每个 isolate 首次使用时
-/// 都按名 dlopen——导致按名失败（历史记录/收藏缓存/本地曲库全部静默挂）。
-/// 曾尝试运行时 setenv LD_LIBRARY_PATH，但 glibc 在进程启动时已缓存该变量，
-/// 后续 dlopen 不生效；shell 层设置只在手动启动时可用，不能作产品级修复。
-/// `process` 模式绕过按名 dlopen，直接查进程符号表，对每个 isolate 均有效。
+/// Linux 的结论（2026-11-12 实测）：**不能依赖全局符号顺序**。GTK 的依赖链
+/// `libgtk-3 → libtinysparql-3.0 → libsqlite3.so.0` 在 `main()` 之前就把系统
+/// SQLite 装进全局作用域，而 ELF 全局符号按加载顺序查找——后加载的内置库赢不过
+/// 它，`source: process` 的 dart sqlite3 实际绑到的是系统库。因此 Linux 在
+/// `pubspec.yaml` 里改成 `source: system` + `name: e_sqlite3`，由本函数先按绝对
+/// 路径加载内置库（其 SONAME 为 `libe_sqlite3.so`），dart sqlite3 再按名 dlopen
+/// 时命中同一句柄，全进程只剩一套实例。
+///
+/// macOS / Windows 仍走 `source: process`：两级命名空间 / 每模块导入表不存在
+/// 上述全局符号遮蔽，这里只需把内置库按绝对路径加载进进程。
 ///
 /// 必须在任何 `sqlite3.open` 之前调用（应用入口 [main] 最早处）。
 void preloadBundledSqlite({String? path}) {
@@ -46,6 +45,7 @@ void preloadBundledSqlite({String? path}) {
     // 遮蔽问题，走默认加载。
     NativeIntegrity.verifyOrThrow(resolved);
     DynamicLibrary.open(resolved);
+    _logBoundSqliteVersion();
     return;
   }
 
@@ -68,14 +68,34 @@ void preloadBundledSqlite({String? path}) {
   NativeIntegrity.verifyOrThrow(resolved);
   final cstr = resolved.toNativeUtf8();
   try {
-    // RTLD_GLOBAL 使符号进入全局符号表，`source: process` 的 native assets
-    // 才能在任意 isolate 命中；RTLD_DEEPBIND 防系统 libsqlite3.so 全局符号
-    // 遮蔽内置库的内部符号解析。
+    // RTLD_GLOBAL 使符号进入全局符号表（macOS / Windows 的 native assets 仍按
+    // `source: process` 命中）；RTLD_DEEPBIND 防系统 libsqlite3.so 全局符号遮蔽
+    // 内置库的内部符号解析。Linux 的 dart sqlite3 已改为按 SONAME 命中本句柄
+    // （见 pubspec.yaml 的 hooks 说明），不再依赖全局符号顺序。
     final handle = dlopen(cstr, rtldNow | rtldGlobal | rtldDeepbind);
     if (handle == nullptr) {
       throw StateError('dlopen($resolved) 失败');
     }
   } finally {
     calloc.free(cstr);
+  }
+
+  // 诊断：Dart 侧实际绑定的 SQLite 版本必须与内置库一致（3.53.x）。若打出系统
+  // 版本（如 3.54.1），说明进程里又出现了第二套实例 —— 那会让扫描写入与列表读取
+  // 落在不同实例上（WAL 的 -wal/-shm 互不可见），表现为「刷新后数量不变」。
+  _logBoundSqliteVersion();
+}
+
+/// 是否已打印过绑定版本（预加载会被 main / scanner / indexer 各调一次，只记一行）。
+bool _sqliteVersionLogged = false;
+
+/// 记录 dart sqlite3 实际绑定的版本（诊断用；失败不影响启动）。
+void _logBoundSqliteVersion() {
+  if (_sqliteVersionLogged) return;
+  _sqliteVersionLogged = true;
+  try {
+    Log.i('sqlite', 'dart sqlite3 = ${sqlite.sqlite3.version.libVersion}');
+  } catch (err) {
+    Log.w('sqlite', 'dart sqlite3 绑定失败: $err');
   }
 }
