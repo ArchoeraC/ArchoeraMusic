@@ -248,7 +248,9 @@ ToolGood.Words（NuGet，静态编入）提供，SQLite 由 `libe_sqlite3` 随�
 
 1. 黄金向量全绿（新增样例先行入表，规则改动先改向量再改实现）；
 2. qbench P95 不高于基线 +10%，索引体积增幅记录在案；
-3. 标注查询集召回@k / MRR 有可量化提升（沿用 local-search-index-plan.md §2.3 方法）；
+3. 标注查询集召回@k / MRR 有可量化提升——用 `qbench eval`（`bench/qbench/QueryEval.cs.txt`）
+   在同一语料上对比改动前后：**窄查询看 R@50、宽查询看 P@10 / NDCG@10**
+   （方法与基线见 `local-search-index-plan.md` §2.3、`bench/REPORT.md` §5.5）；
 4. `AnalyzerVersion` 递增次数攒批合并，避免用户侧反复全量重建。
 
 ## 6. 移植映射表（灰度完成后执行，见 NekoMusic 仓库《跨语言搜索与歌词索引增强方案.md》）

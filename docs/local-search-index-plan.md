@@ -118,7 +118,31 @@
 
 ### 2.3 验收基线
 
-用一组标注中文歌词查询（§8）对比四种 analyzer 的召回@k / MRR，**先用数据定分析器参数**，再谈存储。
+用一组标注查询对比 analyzer 的召回@k / MRR，**先用数据定分析器参数**，再谈存储。
+
+**已落地（2026-11-12）**：`qbench eval`（`app/core/indexer/bench/qbench/QueryEval.cs.txt`，与 qbench
+同项目、同源编译）直接复用生产 `SearchSession` 测真实查询路径。金标准取
+**「曲库文本字面包含目标字串」**（不依赖被测分析器，避免循环论证）；拼音 / 繁体查询由评测集给出
+目标字串（`woaini` → `我爱你`、`愛` → `愛`/`爱`）。查询集窄 / 中档**从曲库自动派生**
+（同名曲目 2–10 首、15–200 首），宽命中与拼音用固定短语，因此换 `--tracks` / `--vocab` / seed 后不会失效。
+
+合成语料（30000 曲 / 大词表）基线：
+
+| 分档 | 条数 | P@1 | P@10 | R@10 | R@50 | MRR@10 | NDCG@10 |
+|---|---|---|---|---|---|---|---|
+| 窄（≤10 首） | 3 | 1.000 | 0.433 | 1.000 | 1.000 | 1.000 | 1.000 |
+| 中（11–500 首） | 2 | 1.000 | 1.000 | 0.667 | 1.000 | 1.000 | 1.000 |
+| 宽（>500 首） | 11 | 0.909 | 0.936 | 0.003 | 0.013 | 0.955 | 0.931 |
+
+判读：
+- **窄查询 R@50 = 1.000**：该找到的全部找到（`P@10` 低只是因为相关项只有 4–5 首，前 10 条必然掺入非相关项）。
+- **宽查询 P@10 = 0.936 / NDCG@10 = 0.931**：排序没有退化（这是 §4.5 那次 bug 的直接对照）。
+- 唯一弱项是**单音节拼音 / 首字母**：`wo` P@10 = 0.800、`wan` P@10 = 0.500 / NDCG@10 = 0.452。
+  成因是查询意图本身多解——`wan` 既是「我爱你」的首字母（w-a-n），也是「万 / 晚 / 完」的拼音前缀，
+  两者都算合理命中，**不是排序缺陷**。
+
+真实曲库可用 `qbench eval --library … --index … --spec <queries.json>` 提供人工标注集
+（格式见 `QueryEval.LoadSpec`）。本项已接入基准报告 `bench/REPORT.md` §5.5。
 
 ### 2.4 总开关与默认行为（**默认关闭，用户手动开启**）
 
@@ -669,6 +693,10 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
 
 建议以脚本 + 小样本先行（可复用 `app/core/scanner/bench` 的形式）。
 
+> **已落地**：`app/core/indexer/bench/qbench/QueryEval.cs.txt`（`qbench eval`）——直接复用生产
+> `SearchSession` / `SearchRequest`，金标准为「曲库文本字面包含目标字串」，输出
+> P@k / R@k / MRR@k / NDCG@k 并按相关项规模分窄 / 中 / 宽三档。基线见 §2.3 与 `bench/REPORT.md` §5.5。
+
 ### 8.0 语料真实度（**判读延迟数字前必看**）
 
 性能基准用的确定性语料由**固定小词表**拼装（约 90 个词组 + 20 个标题）。这让常用词元
@@ -827,6 +855,10 @@ void indexer_set_log_sink(void (*sink)(int, const char*, const char*), int min_l
   时，行内显示命中歌词窗口（次要样式、单行省略，`SongRow.lyricSnippet`）。片段在**页加载异步路径**
   批量取歌词（`TracksDb.lyricsByIds`）算好缓存到 `LibraryState.lyricSnippets`，行渲染只同步查表；
   **拼音 / 首字母命中歌词无字面片段**（返回 null，不显示）。关闭态零成本。
+- **「播放全部」在宽查询下下沉后台 isolate**：`_allTracks()` 在索引排行路径且命中数 > 1000 时，
+  经 `Isolate.run` 调 `TracksDb.fetchByIdsTask`（同源 `listTracksByIds`，在子 isolate 内 open/close）。
+  实测 30000 曲库取 10000 行 ≈ **132ms**（查询 61ms + 构造 71ms），同步执行会卡 UI 一帧以上；
+  少量 id 仍原地取（省 isolate 启动）。`TrackRow` 是纯 Dart 数据，可零拷贝转移。
 
 ### 9.4 构建与打包
 
