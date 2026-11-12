@@ -4765,6 +4765,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Auch gleichnamige .lrc-Lyrics indexieren (Hauptschalter erforderlich)';
 
   @override
+  String get settingsSearchIndexRomaji =>
+      'Romanisierung der Liedtexte indexieren';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      'Romanisierung für japanische Liedtexte ohne Umschrift automatisch erzeugen, damit sie per Romaji gefunden werden (etwa doppelte Indexgröße)';
+
+  @override
   String get settingsSearchIndexNote =>
       'Der Index ist abgeleitet: standardmäßig aus und kostenlos; beim Aktivieren werden im Hintergrund Zeit und Speicher belegt (bei 10.000 Titeln einige hundert MB); bei Fehlern wird automatisch auf die einfache Suche zurückgefallen.';
 

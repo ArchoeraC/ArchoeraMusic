@@ -13,6 +13,7 @@ void main() {
       final prefs = AppPrefs();
       expect(prefs.enableLocalSearchIndex, isFalse);
       expect(prefs.indexLrc, isFalse);
+      expect(prefs.romajiLyrics, isFalse);
     });
 
     test('copyWithSearchIndex 读写总开关', () {
@@ -27,6 +28,15 @@ void main() {
       final prefs = AppPrefs().copyWithSearchIndex(enabled: true, indexLrc: true);
       expect(prefs.enableLocalSearchIndex, isTrue);
       expect(prefs.indexLrc, isTrue);
+    });
+
+    test('copyWithSearchIndex 读写歌词罗马音子开关', () {
+      final prefs = AppPrefs()
+          .copyWithSearchIndex(enabled: true, romajiLyrics: true);
+      expect(prefs.romajiLyrics, isTrue);
+      expect(prefs.indexLrc, isFalse, reason: '未传 indexLrc 时不受影响');
+      final same = prefs.copyWithSearchIndex();
+      expect(same.romajiLyrics, isTrue, reason: '未传字段保持不变');
     });
 
     test('copyWithSearchIndex 往返：未传字段保持不变', () {
@@ -44,6 +54,7 @@ void main() {
     test('键值语义（search.index.*）', () {
       expect(enableLocalSearchIndexKey, 'search.index.enabled');
       expect(indexLrcKey, 'search.index.lrc');
+      expect(romajiLyricsKey, 'search.index.romaji_lyrics');
       final prefs = AppPrefs(initialData: {
         enableLocalSearchIndexKey: true,
         indexLrcKey: true,

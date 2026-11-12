@@ -4715,6 +4715,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Also index .lrc lyrics named after the audio file (master switch required)';
 
   @override
+  String get settingsSearchIndexRomaji => 'Generate lyrics romaji index';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      'Auto-generate romaji for Japanese lyrics without transliteration so they can be found by romaji (roughly doubles index size)';
+
+  @override
   String get settingsSearchIndexNote =>
       'The index is derived data: off by default and free; enabling builds it in the background using time and disk (hundreds of MB for 10k tracks), and failures fall back to basic search automatically.';
 

@@ -147,6 +147,9 @@ class SearchService {
   /// `.lrc` 侧车歌词子开关（仅总开关开启时才有意义）。
   bool get indexLrc => appPrefsSnapshot?.indexLrc ?? false;
 
+  /// 歌词罗马音生成子开关（仅总开关开启时才有意义；T2-9）。
+  bool get romajiLyrics => appPrefsSnapshot?.romajiLyrics ?? false;
+
   /// 搜索：返回命中的 `trackId`（已按相关度排序）；未开启 / 未就绪 / 失败
   /// 一律返回 null，调用方回退 `LIKE`。空关键字同样返回 null（等于原列表）。
   ///
@@ -463,19 +466,23 @@ class SearchService {
   void _closeIndexLocked() {
     _index?.close();
     _index = null;
+    // C# 侧按 search.db 路径缓存只读查询会话：重建 / 删除 / 关闭前显式释放，
+    // 否则 Windows 上残留句柄会阻塞 search.db 的替换（File.Move）。
+    _lib?.closeQuery();
   }
 
   SearchIndex? _openIndexLocked() {
     final lib = _lib;
-    final index = SearchIndex.open(
-      defaultSearchDbPath(),
-      analyzer: lib == null ? null : (q) => lib.analyze(q),
-    );
+    if (lib == null) {
+      _status = LocalSearchStatus.error('未找到索引器模块');
+      return null;
+    }
+    _closeIndexLocked();
+    final index = SearchIndex.open(defaultSearchDbPath(), lib: lib);
     if (index == null) {
       _status = LocalSearchStatus.error('search.db 不可用（schema 不符或损坏）');
       return null;
     }
-    _closeIndexLocked();
     _index = index;
     _status = LocalSearchStatus.ready;
     return index;
@@ -500,8 +507,11 @@ class SearchService {
         debugLibraryDbPathOverride ?? LibraryScanner.defaultDbPath();
     final searchDb = defaultSearchDbPath();
     File(searchDb).parent.createSync(recursive: true);
-    final optionsJson =
-        jsonEncode({'index_lrc': indexLrc, 'pinyin': true});
+    final optionsJson = jsonEncode({
+      'index_lrc': indexLrc,
+      'pinyin': true,
+      'romaji_lyrics': romajiLyrics,
+    });
 
     final callable =
         NativeCallable<Void Function(Pointer<Void>)>.listener(_handleProgress);

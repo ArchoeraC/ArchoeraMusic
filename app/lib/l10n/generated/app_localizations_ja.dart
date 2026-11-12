@@ -4551,6 +4551,13 @@ class AppLocalizationsJa extends AppLocalizations {
       '音声ファイルと同名の .lrc 歌詞も索引します（マスタースイッチが必要）';
 
   @override
+  String get settingsSearchIndexRomaji => '歌詞のローマ字索引を生成';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      '音訳のない日本語歌詞からローマ字を自動生成し、ローマ字で検索できるようにします（索引サイズは約2倍）';
+
+  @override
   String get settingsSearchIndexNote =>
       '索引は派生データです：既定はオフでコストゼロ。有効化すると初回構築に時間とディスク（1万曲で数百 MB 程度）を使用し、失敗時は自動で基本検索にフォールバックします。';
 

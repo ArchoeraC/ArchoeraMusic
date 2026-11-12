@@ -1432,6 +1432,8 @@
   "settingsSearchIndexEnableOff": "關閉：使用基本搜尋（標題 / 演出者 / 專輯），不建立索引、零磁碟占用",
   "settingsSearchIndexLrc": "索引 .lrc 側車歌詞",
   "settingsSearchIndexLrcDesc": "同時索引與音訊同名的 .lrc 歌詞（需先啟用總開關）",
+  "settingsSearchIndexRomaji": "產生歌詞羅馬音索引",
+  "settingsSearchIndexRomajiDesc": "日語歌詞沒有音譯時自動產生羅馬音，可用羅馬字搜尋（索引體積約增加一倍）",
   "settingsSearchIndexNote": "索引是衍生資料：預設關閉零成本；開啟後首次建立會占用時間與磁碟（隨曲庫成長，約數百 MB @ 萬首），建立失敗會自動回退基本搜尋。",
   "settingsSectionSearchIndexStatus": "狀態與維護",
   "settingsSearchIndexStatusDisabled": "未啟用",
