@@ -535,7 +535,7 @@ def write_report(m: dict) -> None:
     L.append("")
     L.append("> 对象：**真实产物** `app/core/indexer`（C# FTS5 索引器，`FtsStore` + `Analyzer` + `IndexerEngine`）。")
     L.append("> harness：`app/core/indexer/bench/`（确定性语料生成器 + 跑测编排 + 进程内查询 harness，"
-             "MATCH 构造与生产查询编译器 `search_query.dart` 同构）。")
+             "MATCH 构造与生产查询编译器 `app/core/indexer/SearchQuery.cs` 同构）。")
     L.append("> 判定依据：设计文档 `docs/local-search-index-plan.md` §2.2（预算）/ §5.5（条件触发）/ §7.3–7.4 / §8 / §10（P0/P5）。")
     cmd = f"`bash app/core/indexer/bench/run_bench.sh`（N={n}"
     cmd += "，`--with-lrc`" if with_lrc else ""
@@ -786,7 +786,7 @@ def write_report(m: dict) -> None:
              f"{len(m['query'][f'A@{app_limit}']['queries'])} 条（中文子串 / 短语 / 繁体 / 中文+首字母 / 拼音连写 / "
              "单音节拼音前缀 / 首字母 / 拉丁前缀 / 整词），非完整 §8 标注集；"
              "未测召回@k / MRR / NDCG（那是 P0 分析器评估，非本 P5 性能问题）。")
-    L.append("6. **查询语义**：MATCH 构造与生产查询编译层 `search_query.dart` 同构——词法支（CJK 连续 bigram 引号短语 + "
+    L.append("6. **查询语义**：MATCH 构造与生产查询编译层 `app/core/indexer/SearchQuery.cs` 同构——词法支（CJK 连续 bigram 引号短语 + "
              "unigram `AND`、末拉丁 / 数字 `*`）、拼音支（单音节 `*` 前缀；**≥2 音节相邻短语**）、"
              "首字母支、跨语言支，各支 `OR`；LIMIT 覆盖 "
              f"{'、'.join(str(x) for x in limits)}（后者 = 生产曲库页 `kSearchIndexRankLimit`）。"

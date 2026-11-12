@@ -61,7 +61,7 @@ STOPWORDS = frozenset(
     """.split()
 )
 
-_WORD_RE = re.compile(r"[a-z][a-z'\-]+")
+_WORD_RE = re.compile(r"(?<![a-z0-9])[a-z][a-z'\-]+")
 _PAREN_RE = re.compile(r"\([^)]*\)|\[[^\]]*\]")
 
 
@@ -121,8 +121,12 @@ def ensure_unihan() -> Path:
 def parse_definition(value: str) -> set[str]:
     """Unihan kDefinition 值 → 规范英文词集合。
 
-    步骤：去 (...) / [...] 括注 → 小写 → 按词形切分（`[a-z][a-z'-]+`）→ 去尾部
-    连字符 / 撇号 → 过滤停用词与长度 < 2 的词。
+    步骤：去 (...) / [...] 括注 → 小写 → 按词形切分（`[a-z][a-z'-]+`，且词首不能紧跟
+    字母 / 数字）→ 去尾部连字符 / 撇号 → 过滤停用词与长度 < 2 的词。
+
+    词首边界（`(?<![a-z0-9])`）用于避免序数后缀碎片：`13th lunar mansion` 里旧正则会在
+    `t` 起匹配出 `th`，同理有 `nd` / `rd` / `st`（粤语罗马字偶见 `jyu` / `saan`）。这些碎片
+    作为跨语言候选会命中大量英文曲目（实测 `th` 覆盖 10.7% 文档），且不含任何释义信息。
     """
     cleaned = _PAREN_RE.sub(" ", value).lower()
     words: set[str] = set()

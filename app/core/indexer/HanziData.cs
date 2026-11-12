@@ -21,7 +21,8 @@ namespace Archoera.Indexer;
 ///   <item>GB18030 / GBK 解码 → .NET 框架内置 <c>CodePagesEncodingProvider</c>
 ///         （<see cref="LrcReader"/> 调用），不再内嵌双字节表。</item>
 /// </list>
-/// 本类因此只保留 NFKC 兼容折叠（ToolGood 不折叠 <c>ﬁ</c> / <c>①</c> 等兼容字）
+/// 本类因此只保留 NFKC 兼容折叠（ToolGood 不折叠 <c>ﬁ</c> / <c>①</c> 等兼容字）、
+/// 拉丁去音符号折叠（<c>accent_fold.tsv</c>，NFKC 不折叠 <c>é</c> 等重音字母）
 /// 与查询侧 Unihan 释义扩展表。
 ///
 /// 表格式：<c>HEXCODE&lt;TAB&gt;HEXOUT1 HEXOUT2 …</c>（输入 / 输出均为码点十六进制，
@@ -38,6 +39,8 @@ namespace Archoera.Indexer;
 internal static class HanziData
 {
     private const string CompatibilityResource = "Archoera.Indexer.data.nfkc.tsv";
+    private const string AccentResource = "Archoera.Indexer.data.accent_fold.tsv";
+    private const string VariantResource = "Archoera.Indexer.data.variant_fold.tsv";
     private const string GlossEnToHanziResource = "Archoera.Indexer.data.def_en2hanzi.tsv";
     private const string GlossHanziToEnResource = "Archoera.Indexer.data.def_hanzi2en.tsv";
 
@@ -47,6 +50,20 @@ internal static class HanziData
     /// </summary>
     private static readonly Lazy<Dictionary<int, string>> CompatibilityTable =
         new(static () => LoadCodePoints(CompatibilityResource));
+
+    /// <summary>
+    /// 拉丁去音符号折叠表（码点 → ASCII 基字母），由 <c>tools/gen_tables</c> 以 Unicode
+    /// 规范分解（NFD）离线生成。索引 / 查询两侧同表，保证 <c>Beyoncé</c> 与 <c>Beyonce</c> 同形。
+    /// </summary>
+    private static readonly Lazy<Dictionary<int, string>> AccentTable =
+        new(static () => LoadCodePoints(AccentResource));
+
+    /// <summary>
+    /// 异体字 → 简体补齐表（Unihan <c>kSimplifiedVariant</c>，日文新字体经旧字体串联），
+    /// 只收录 ToolGood.Words 繁简词库未覆盖的字符（主要是鉄 / 絵 / 円 / 広 / 変 / 楽 / 駅）。
+    /// </summary>
+    private static readonly Lazy<Dictionary<int, string>> VariantTable =
+        new(static () => LoadCodePoints(VariantResource));
 
     /// <summary>英文词 → 候选汉字**码点**列表（Unihan kDefinition，T1 查询侧）。</summary>
     private static readonly Lazy<Dictionary<string, IReadOnlyList<int>>> GlossEnToHanziTable =
@@ -67,6 +84,42 @@ internal static class HanziData
 
     /// <summary>NFKC 兼容折叠表条目数（诊断用；触发加载）。</summary>
     public static int CompatibilityEntryCount => CompatibilityTable.Value.Count;
+
+    /// <summary>
+    /// 拉丁去音符号折叠查表：命中时经 <paramref name="folded"/> 回传 ASCII 基字母；
+    /// 未命中（已是无重音字母，或 ł / ø / đ 等无规范分解的字母）返回 <c>false</c>，
+    /// 调用方保持原码点。
+    /// </summary>
+    public static bool TryGetAccentFolded(int codePoint, out string folded)
+        => AccentTable.Value.TryGetValue(codePoint, out folded!);
+
+    /// <summary>去音符号折叠表条目数（诊断用；触发加载）。</summary>
+    public static int AccentEntryCount => AccentTable.Value.Count;
+
+    /// <summary>
+    /// 异体字补齐查表：命中时回传简体目标（Unihan <c>kSimplifiedVariant</c>；
+    /// 日文新字体 <c>鉄 → 鐵 → 铁</c> 已由生成器串联）。
+    /// </summary>
+    public static bool TryGetVariantFolded(int codePoint, out string simplified)
+        => VariantTable.Value.TryGetValue(codePoint, out simplified!);
+
+    /// <summary>异体字补齐表条目数（诊断用；触发加载）。</summary>
+    public static int VariantEntryCount => VariantTable.Value.Count;
+
+    /// <summary>
+    /// 组合音标（combining diacritic）判定：这些码点本身无独立字形，只修饰前一字母。
+    /// 折叠时**直接丢弃**，让「预组合形」（é）与「基字母 + 组合音标」（e + U+0301）
+    /// 产出同一结果。
+    ///
+    /// 只覆盖拉丁 / 通用修饰区，**不含**日文浊点 U+3099 / U+309A、希伯来点、阿拉伯符等
+    /// 有语义的标记，避免改变其它文字的语义。
+    /// </summary>
+    public static bool IsCombiningDiacritic(int codePoint) => codePoint is
+        >= 0x0300 and <= 0x036F or
+        >= 0x1AB0 and <= 0x1AFF or
+        >= 0x1DC0 and <= 0x1DFF or
+        >= 0x20D0 and <= 0x20FF or
+        >= 0xFE20 and <= 0xFE2F;
 
     /// <summary>
     /// Unihan 释义查询扩展（英文 → 候选汉字码点）：命中时经 <paramref name="codes"/> 回传

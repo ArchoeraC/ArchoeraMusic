@@ -32,6 +32,7 @@ internal static class EndToEnd
             LrcReading(root);
             SidecarDirectoryCache(root);
             MultilingualLayers(root);
+            RomajiLyrics(root);
             RepeatedFullBuild(root);
         }
         finally
@@ -88,8 +89,8 @@ internal static class EndToEnd
         Program.Check("世代化: 无 search.db.tmp", !File.Exists(index + ".tmp"));
         Program.Check("世代化: 无 search.db.tmp-wal", !File.Exists(index + ".tmp-wal"));
 
-        Program.Check("meta.analyzer_version==6", Meta(index, "analyzer_version") == "6", Meta(index, "analyzer_version"));
-        Program.Check("meta.schema_version==5", Meta(index, "schema_version") == "5", Meta(index, "schema_version"));
+        Program.Check("meta.analyzer_version==11", Meta(index, "analyzer_version") == "11", Meta(index, "analyzer_version"));
+        Program.Check("meta.schema_version==7", Meta(index, "schema_version") == "7", Meta(index, "schema_version"));
         Program.Check("meta.index_lrc==0", Meta(index, "index_lrc") == "0", Meta(index, "index_lrc"));
         Program.Check("meta.pinyin==1", Meta(index, "pinyin") == "1", Meta(index, "pinyin"));
         Program.Check("meta.applied_generation==5", Meta(index, "applied_generation") == "5", Meta(index, "applied_generation"));
@@ -100,8 +101,8 @@ internal static class EndToEnd
             Scalar(index, "SELECT COUNT(*) FROM search_fts").ToString());
 
         // ---- contentless v2 语义 ----
-        Program.Check("contentless: search_docs 仅 7 列元数据",
-            Scalar(index, "SELECT COUNT(*) FROM pragma_table_info('search_docs')") == 7,
+        Program.Check("contentless: search_docs 8 列（v6 增读音副本）",
+            Scalar(index, "SELECT COUNT(*) FROM pragma_table_info('search_docs')") == 8,
             Scalar(index, "SELECT COUNT(*) FROM pragma_table_info('search_docs')").ToString());
         Program.Check("contentless: search_docs 无 token 文本列（title_tok/pinyin_meta_tok）",
             Scalar(index, "SELECT COUNT(*) FROM pragma_table_info('search_docs') WHERE name IN ('title_tok','pinyin_meta_tok')") == 0);
@@ -555,11 +556,84 @@ internal static class EndToEnd
     }
 
     /* ------------------------------------------------------------------ */
+    /* T2-9 歌词罗马音生成（可选增强）                                     */
+    /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 开关关闭：<c>lyrics_rom_tok</c> 只含 LRC 音译层（此处 tK 的整词 sora）。
+    /// 开关开启：无音译层的日语歌词自动生成读音 bigram（tJ 的 空 → so or ra），
+    /// 已有用户音译不被覆盖；开关变化触发全量重建；查询侧读音趟能命中生成列。
+    /// </summary>
+    private static void RomajiLyrics(string root)
+    {
+        var work = Path.Combine(root, "romaji");
+        Directory.CreateDirectory(work);
+        var db = Path.Combine(work, "library.db");
+        var index = Path.Combine(work, "search.db");
+        var dir = Path.Combine(work, "m");
+        Directory.CreateDirectory(dir);
+
+        CreateLibrary(db, generation: 1);
+        using (var conn = Open(db))
+        {
+            // tJ：日语歌词（含假名、无音译层）→ 开启后应由「空」的读音 そら 生成 bigram。
+            InsertTrack(conn, "tJ", Path.Combine(dir, "j.mp3"), "夜に駆ける", "[]", null, "空は青い", 1);
+            // tK：带 LRC 音译层（整词 sora）→ 开启后也不得被生成内容覆盖。
+            InsertTrack(conn, "tK", Path.Combine(dir, "k.mp3"), "Sidecar", "[]", null, null, 2);
+            SetSidecar(conn, "tK", "[00:01.00]空\n", romaji: "[00:01.00]sora\n");
+        }
+
+        const string SoraPhrase = "{lyrics_rom_tok} : (\"so or ra\")";
+
+        // ---- 默认关：不生成歌词读音 ----
+        var off = RunEngine(db, index, full: true, options: new IndexerOptions { IndexLrc = true });
+        Program.Check("歌词罗马音: 默认关 indexed==2", off.Indexed == 2, off.Indexed.ToString());
+        Program.Check("歌词罗马音: 默认关 meta.romaji_lyrics==0",
+            Meta(index, "romaji_lyrics") == "0", Meta(index, "romaji_lyrics"));
+        Program.Check("歌词罗马音: 默认关不生成 tJ 读音 bigram", MatchCount(index, SoraPhrase) == 0,
+            MatchCount(index, SoraPhrase).ToString());
+        Program.Check("歌词罗马音: 默认关 LRC 音译整词仍在（tK）",
+            MatchContainsTrack(index, "{lyrics_rom_tok} : \"sora\"", "tK"));
+
+        // ---- 开启（增量请求也会因选项变化升级为全量）----
+        var on = RunEngine(db, index, full: false,
+            options: new IndexerOptions { IndexLrc = true, RomajiLyrics = true });
+        Program.Check("歌词罗马音: 开关变化触发全量", on.Full);
+        Program.Check("歌词罗马音: 开启 meta.romaji_lyrics==1",
+            Meta(index, "romaji_lyrics") == "1", Meta(index, "romaji_lyrics"));
+        Program.Check("歌词罗马音: tJ 生成读音 bigram 可命中", MatchContainsTrack(index, SoraPhrase, "tJ"));
+        Program.Check("歌词罗马音: 用户音译未被覆盖（tK 整词仍在）",
+            MatchContainsTrack(index, "{lyrics_rom_tok} : \"sora\"", "tK"));
+        var readingExpr = SearchQuery.CompileReading(Analyzer.AnalyzeQuery("sora"), metadata: false);
+        Program.Check("歌词罗马音: 查询侧读音趟命中生成列",
+            readingExpr is not null && MatchContainsTrack(index, readingExpr, "tJ"), readingExpr ?? "(null)");
+
+        // ---- 再关闭：清理生成内容 ----
+        var back = RunEngine(db, index, full: false, options: new IndexerOptions { IndexLrc = true });
+        Program.Check("歌词罗马音: 关闭触发全量", back.Full);
+        Program.Check("歌词罗马音: 关闭后 tJ 读音 bigram 归零", MatchCount(index, SoraPhrase) == 0,
+            MatchCount(index, SoraPhrase).ToString());
+    }
+
+    /* ------------------------------------------------------------------ */
     /* 引擎 / fixture 辅助                                                 */
     /* ------------------------------------------------------------------ */
 
-    private static IndexerResult RunEngine(string db, string index, bool full, bool lrc)
+    internal static IndexerResult RunEngine(string db, string index, bool full, bool lrc)
         => RunEngineDetailed(db, index, full, lrc).Result;
+
+    /// <summary>按显式选项运行引擎（T2-9 等开关需要）。</summary>
+    private static IndexerResult RunEngine(string db, string index, bool full, IndexerOptions options)
+        => RunEngineDetailed(db, index, full, options).Result;
+
+    private static (IndexerResult Result, int ContentQueries) RunEngineDetailed(
+        string db, string index, bool full, IndexerOptions options)
+    {
+        using var store = new FtsStore();
+        var engine = new IndexerEngine(store);
+        var result = engine.Run(db, index, full, options);
+        return (result, engine.ContentQueries);
+    }
 
     /// <summary>运行引擎并回传阶段二「取内容」SQL 次数（用于断言未全库读歌词）。</summary>
     private static (IndexerResult Result, int ContentQueries) RunEngineDetailed(
@@ -571,7 +645,7 @@ internal static class EndToEnd
         return (result, engine.ContentQueries);
     }
 
-    private static void CreateLibrary(string path, long? generation)
+    internal static void CreateLibrary(string path, long? generation)
     {
         if (File.Exists(path)) File.Delete(path);
         using var conn = Open(path);
@@ -617,7 +691,7 @@ internal static class EndToEnd
         cmd.ExecuteNonQuery();
     }
 
-    private static void InsertTrack(
+    internal static void InsertTrack(
         SqliteConnection conn, string id, string path, string title,
         string artists, string? album, string? lyrics, long mtime)
     {
@@ -637,7 +711,7 @@ internal static class EndToEnd
         cmd.ExecuteNonQuery();
     }
 
-    private static SqliteConnection Open(string path)
+    internal static SqliteConnection Open(string path)
     {
         // 走 FtsStore.ConnectionString（Pooling=False）：断言必须读**当前**文件。
         // 若沿用连接池，世代化替换（tmp → search.db 改名）后池里仍留着指向旧 inode
@@ -738,7 +812,7 @@ internal static class EndToEnd
         return tokens.Count == 0 ? "\"\"" : string.Join(' ', tokens);
     }
 
-    private static void TryDelete(string dir)
+    internal static void TryDelete(string dir)
     {
         try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
         catch { /* 临时目录清理失败不影响测试结果 */ }

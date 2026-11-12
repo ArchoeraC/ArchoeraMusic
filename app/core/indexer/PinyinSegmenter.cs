@@ -97,6 +97,14 @@ internal static class PinyinSegmenter
     });
 
     /// <summary>
+    /// 是否为**有效拼音音节**（纯 <c>a</c>–<c>z</c> 且在派生音节表内）。
+    /// 供查询侧模糊音扩展做门控：英文词（<c>hello</c>）不在表内，不会被
+    /// 「h↔f」之类的规则误改成 <c>fello</c>。
+    /// </summary>
+    public static bool IsSyllable(string word)
+        => word.Length > 0 && Table.Value.Items.Contains(word);
+
+    /// <summary>
     /// 尝试把一个纯 ASCII 拉丁词按有效拼音音节**完整**切分。
     /// 成功时把音节序列写入 <paramref name="syllables"/>（先清空）并返回 <c>true</c>；
     /// 非纯 <c>a</c>–<c>z</c> / 空串 / 长度越界 / 无法完整覆盖 /
