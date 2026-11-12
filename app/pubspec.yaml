@@ -55,7 +55,10 @@ dependencies:
   qr: ^4.0.0
   sqlite3: ^3.5.1
   file_selector: ^1.1.0
-  window_manager: ^0.7.0
+  # 0.7.x 要求 Dart ^3.14（Flutter ≥3.50）；Nix 源构建用的 nixpkgs Flutter 仍是
+  # 3.47（Dart 3.13），此时 pub 会解析到 0.6.x。两者 API 在本项目用到的部分一致，
+  # 故用区间约束让两套工具链各自解析（等 nixpkgs 跟进 Flutter 3.50 后可收紧）。
+  window_manager: '>=0.6.0 <0.8.0'
   geolocator: ^14.0.3
 dev_dependencies:
   flutter_test:
