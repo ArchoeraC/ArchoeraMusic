@@ -128,25 +128,33 @@ class QueryLogger {
 
   static QueryLogSink? _sink;
 
-  /// 装配 sink（`main` 启动时按偏好调用；[prefs] 为空串则不装配）。
+  /// 日志文件路径：**与开关无关**地记住，`clear()` 才可能在开关关闭时照样生效。
+  ///
+  /// 关闭日志落盘只表示「不再写入」，不等于「已记录的内容已删除」；用户关掉日志后
+  /// 往往更想清掉既有记录（隐私预期），故清除动作不得依赖 [_sink]。
+  static String? _logPath;
+
+  static String _pathFor(String dataDir) =>
+      '$dataDir/logs/search_queries.jsonl';
+
+  /// 装配 sink（`main` 启动时按偏好调用；[prefs] 关闭落盘则不装配）。
   static void configure({required String dataDir, required AppPrefs prefs}) {
+    _logPath = _pathFor(dataDir);
     if (!prefs.logToFile) {
       _sink = null;
       return;
     }
-    _sink =
-        _sink ??
-        FileQueryLogSink(path: '$dataDir/logs/search_queries.jsonl');
+    _sink = _sink ?? FileQueryLogSink(path: _logPath!);
   }
 
   /// 运行期开关（与「日志落盘」开关联动；关闭即停止记录）。
   static void setEnabled(bool enabled, {required String dataDir}) {
+    _logPath = _pathFor(dataDir);
     if (!enabled) {
       _sink = null;
       return;
     }
-    _sink ??=
-        FileQueryLogSink(path: '$dataDir/logs/search_queries.jsonl');
+    _sink ??= FileQueryLogSink(path: _logPath!);
   }
 
   static bool get enabled => _sink != null;
@@ -155,9 +163,16 @@ class QueryLogger {
   static void record(QueryLogEntry entry) => _sink?.append(entry);
 
   /// 清除日志（设置页动作）。
+  ///
+  /// **不依赖 [_sink]**：开关关闭时也要能删掉此前落盘的记录（否则「可随时清除」不成立）。
   static void clear() {
     final sink = _sink;
-    if (sink is FileQueryLogSink) sink.clear();
+    if (sink is FileQueryLogSink) {
+      sink.clear();
+      return;
+    }
+    final path = _logPath;
+    if (path != null) FileQueryLogSink(path: path).clear();
   }
 
   /// 测试接缝：注入替身 / 复位。
