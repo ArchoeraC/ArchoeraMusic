@@ -14,6 +14,7 @@ import '../../stores/app_prefs.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/ink_clip.dart';
+import '../common/smooth_wheel_scroll_controller.dart';
 import '../common/toast.dart';
 import '../dialogs/track_context_menu.dart';
 import 'scroll_float_actions.dart';
@@ -147,7 +148,10 @@ class _SongListState extends ConsumerState<SongList> {
   static const _reachBottomOffset = 400.0;
 
   /// 列表滚动控制器（供浮动「回到顶部 / 定位播放」按钮使用）。
-  final ScrollController _scrollCtrl = ScrollController();
+  ///
+  /// 用 [SmoothWheelScrollController]：滚轮 / 触控板滚动带短时缓动；触摸拖拽
+  /// 与键盘滚动不经过 `pointerScroll`，行为与原生完全一致。
+  final ScrollController _scrollCtrl = SmoothWheelScrollController();
 
   /// 行间步进（行高 68 + 行外上下 padding 4×2）与列表顶部 padding，
   /// 与 [song_row.dart] 的 SongRow 布局一致，用于定位行偏移计算。
