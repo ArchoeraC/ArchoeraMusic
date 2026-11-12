@@ -240,6 +240,7 @@ extension _DownloadPageView on _DownloadPageState {
     }
     return ListView.separated(
       key: const PageStorageKey('page.download'),
+      controller: _scroll,
       itemCount: state.tasks.length,
       separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (context, i) {
