@@ -32,17 +32,29 @@
   <ItemGroup>
     <!-- harness 源码（.cs.txt：内容为 C#，显式编译，不被 CLI 通配命中） -->
     <Compile Include="QueryBench.cs.txt" />
+    <!-- P0 质量评测（recall@k / MRR / NDCG）；与 qbench 同项目以复用下面这整套
+         生产源码 Link —— 另起项目会把这份清单抄一遍，正是此前多次漂移的来源。 -->
+    <Compile Include="QueryEval.cs.txt" />
 
     <!-- 与 tests/ 同源共享生产分析器 / 存储（显式 Link，不复制逻辑）：
          只取查询路径所需的最小闭包，不含 Program / IndexerEngine / LrcReader。 -->
     <Compile Include="../../Analyzer.cs" Link="Analyzer.cs" />
     <Compile Include="../../Japanese.cs" Link="Japanese.cs" />
+    <Compile Include="../../RomajiCanonical.cs" Link="RomajiCanonical.cs" />
+    <Compile Include="../../Korean.cs" Link="Korean.cs" />
     <Compile Include="../../Pinyin.cs" Link="Pinyin.cs" />
     <Compile Include="../../PinyinSegmenter.cs" Link="PinyinSegmenter.cs" />
     <Compile Include="../../HanziData.cs" Link="HanziData.cs" />
     <Compile Include="../../Log.cs" Link="Log.cs" />
     <Compile Include="../../IndexStore.cs" Link="IndexStore.cs" />
     <Compile Include="../../FtsStore.cs" Link="FtsStore.cs" />
+    <!-- 查询编译器与渐进会话直接复用生产源码（v7 起）：此前 qbench 自行复刻
+         BuildPasses，已多次与生产漂移（漏拼音模糊音 / 读音分档 / 模糊趟）。
+         同源编译保证 harness 量到的就是生产路径。 -->
+    <Compile Include="../../SearchQuery.cs" Link="SearchQuery.cs" />
+    <Compile Include="../../FuzzyVocabulary.cs" Link="FuzzyVocabulary.cs" />
+    <Compile Include="../../ReadingRanker.cs" Link="ReadingRanker.cs" />
+    <Compile Include="../../SearchSession.cs" Link="SearchSession.cs" />
     <Compile Include="../../../shared/text/ScriptRanges.cs" Link="shared/text/ScriptRanges.cs" />
   </ItemGroup>
 
@@ -58,6 +70,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="../../data/nfkc.tsv" Link="data/nfkc.tsv">
       <LogicalName>Archoera.Indexer.data.nfkc.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../data/accent_fold.tsv" Link="data/accent_fold.tsv">
+      <LogicalName>Archoera.Indexer.data.accent_fold.tsv</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="../../data/variant_fold.tsv" Link="data/variant_fold.tsv">
+      <LogicalName>Archoera.Indexer.data.variant_fold.tsv</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="../../data/def_en2hanzi.tsv" Link="data/def_en2hanzi.tsv">
       <LogicalName>Archoera.Indexer.data.def_en2hanzi.tsv</LogicalName>

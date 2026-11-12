@@ -4,8 +4,8 @@
 
 /// 本地曲库搜索索引（indexer）Dart 侧共享数据模型。
 ///
-/// 纯数据（无 FFI / 无 IO）：供查询表达式编译（`search_query.dart`）、原生
-/// 绑定（`indexer_ffi.dart`）与服务编排（`search_service.dart`）复用。
+/// 纯数据（无 FFI / 无 IO）：供原生查询（`indexer_ffi.dart` → C# `SearchQuery` /
+/// `SearchSession`）、绑定与服务编排（`search_service.dart`）复用。
 /// 字段语义对齐 `app/core/indexer` 的 C ABI / JSON（设计文档
 /// `docs/local-search-index-plan.md` §9.2 / §9.3）。
 library;

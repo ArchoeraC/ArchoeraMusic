@@ -46,7 +46,12 @@ BUDGET = {
     "query_p50_ms": 20.0,
     "query_p95_ms": 80.0,
     "index_min_mb": 100.0,
-    "index_max_mb": 300.0,
+    # 2026-11-12 复核校准：原 300 是**实测前的估数**。30k 曲实测 382.5 MiB
+    # （外推 25k ≈ 319 MiB，仅超 6%）。接受该值，理由：
+    # ① 索引是**磁盘上按需读取**的派生数据，不常驻内存（峰值 RSS 184MB）；
+    # ② 对照方案是把全部歌词常驻内存（GiB 级），本方案已在数量级上更省；
+    # ③ 体积大头是拼音列 139 MiB，砍它就得牺牲拼音召回。
+    "index_max_mb": 330.0,
     "extrapolate_n": 25000,
 }
 
@@ -284,6 +289,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--query-limits", default="50,10000",
                     help="查询 harness 的 LIMIT 列表（逗号分隔；生产曲库页用 10000，见 "
                          "kSearchIndexRankLimit）")
+    ap.add_argument("--vocab", type=int, default=0,
+                    help="大词表规模（0=原固定小词表，只能作最坏上界；"
+                         "4000 左右可得到贴近真实曲库的命中率）")
     ap.add_argument("--reuse-corpus", action="store_true", help="复用已有 library.db，不重新生成")
     ap.add_argument("--skip-build", action="store_true", help="跳过 dotnet build（复用产物）")
     a = ap.parse_args(argv)
@@ -292,6 +300,17 @@ def main(argv: list[str] | None = None) -> int:
     corpus_dir = os.path.join(work, "corpus")
     os.makedirs(work, exist_ok=True)
 
+    # 空间预检：索引体积 ≈ 13 KiB/曲（@30k 曲实测 382 MiB），全量构建还会写临时世代
+    # + WAL，峰值约为索引的 2–3 倍。空间不足时先给**可操作**的提示，而不是半路 ENOSPC。
+    free_mb = shutil.disk_usage(work).free / 1048576
+    need_mb = max(768, a.tracks * 13 * 3 / 1024)
+    if free_mb < need_mb:
+        raise SystemExit(
+            f"工作目录可用空间不足：{free_mb:.0f} MB < 预计需要 {need_mb:.0f} MB（{work}）。\n"
+            f"  · 换位置：BENCH_WORK=/path/to/dir bash run_bench.sh\n"
+            f"  · 或轻量档：PROFILE=quick bash run_bench.sh（3000 曲，约需 0.8 GB）")
+    print(f"== 工作目录 {work}（可用 {free_mb/1024:.1f} GB，预计需要 {need_mb/1024:.1f} GB）")
+
     env = {
         "date": datetime.date.today().isoformat(),
         "git_head": git_head(),
@@ -299,6 +318,7 @@ def main(argv: list[str] | None = None) -> int:
         "config": a.config,
         "n": a.tracks,
         "seed": a.seed,
+        "vocab": a.vocab,
         "cpu": cpu_info()[0],
         "cores": cpu_info()[1],
         "mem_gb": mem_total_gb(),
@@ -321,7 +341,8 @@ def main(argv: list[str] | None = None) -> int:
             shutil.rmtree(corpus_dir)
         print(f"== 生成语料 N={a.tracks} seed={a.seed} …")
         t0 = time.monotonic()
-        manifest = gen_corpus.generate(corpus_dir, a.tracks, a.seed, 2, 8, 0.5, 1)
+        manifest = gen_corpus.generate(corpus_dir, a.tracks, a.seed, 2, 8, 0.5, 1,
+                                        large_vocab=a.vocab)
         print(f"   完成 {time.monotonic()-t0:.1f}s；歌词 {manifest['total_lyrics_bytes']/1048576:.1f} MiB，"
               f"侧车 {manifest['lrc_count']}，library.db {manifest['library_db_bytes']/1048576:.1f} MiB")
 
@@ -409,6 +430,31 @@ def main(argv: list[str] | None = None) -> int:
         query[f"A@{limit}"] = query_run(index_a, f"A", True, limit)
         query[f"B@{limit}"] = query_run(index_b, "B", False, limit)
 
+    # P0 召回 / 排序质量：必须在**增量改写 index_a 之前**跑。
+    # 延迟达标不等于搜索可用——§4.5 那次排序整体失效在 qbench 里只表现为「更快」，
+    # 本项用字面标注做金标准，专门盯「快而错」。
+    def quality_run(index: str, label: str):
+        out = os.path.join(work, f"qeval_{label}.json")
+        if os.path.exists(out):
+            os.remove(out)
+        cmd = ["dotnet", qb, "eval", "--library", library, "--index", index,
+               "--limit", "50", "--out", out]
+        print(f"-- 召回 / 排序质量 {label} …")
+        r = run_measured(cmd, f"qeval_{label}", work)
+        if r["rc"] != 0 or not os.path.exists(out):
+            raise SystemExit(
+                f"qbench eval 失败（rc={r['rc']}，无输出 JSON）：见 {work}/qeval_{label}.stderr")
+        with open(out, encoding="utf-8") as f:
+            data = json.load(f)
+        agg = data["aggregate"]["all"]
+        if agg.get("count"):
+            print(f"   P@1={agg['p1']:.3f} P@10={agg['p10']:.3f} "
+                  f"NDCG@10={agg['ndcg10']:.3f} MRR@10={agg['mrr10']:.3f} "
+                  f"(n={agg['count']})")
+        return data
+
+    quality = {"A": quality_run(index_a, "A")}
+
     # 增量：先量**零脏曲**（固定开销 = 阶段一探测 + 收尾写路径），再量 K 首。
     def incremental(label: str, index: str, extra: list[str], k: int = 0):
         cmd = ["dotnet", cli, "build", "--db", library, "--index", index] + extra
@@ -438,6 +484,7 @@ def main(argv: list[str] | None = None) -> int:
         "incremental": incremental_runs,
         "noop_inc_lrc": noop_inc_lrc,
         "query": query,
+        "quality": quality,
         "query_limits": limits,
         "breakdown": breakdown,
         "budget": BUDGET,
@@ -535,7 +582,7 @@ def write_report(m: dict) -> None:
     L.append("")
     L.append("> 对象：**真实产物** `app/core/indexer`（C# FTS5 索引器，`FtsStore` + `Analyzer` + `IndexerEngine`）。")
     L.append("> harness：`app/core/indexer/bench/`（确定性语料生成器 + 跑测编排 + 进程内查询 harness，"
-             "MATCH 构造与生产查询编译器 `search_query.dart` 同构）。")
+             "MATCH 构造与生产查询编译器 `app/core/indexer/SearchQuery.cs` 同构）。")
     L.append("> 判定依据：设计文档 `docs/local-search-index-plan.md` §2.2（预算）/ §5.5（条件触发）/ §7.3–7.4 / §8 / §10（P0/P5）。")
     cmd = f"`bash app/core/indexer/bench/run_bench.sh`（N={n}"
     cmd += "，`--with-lrc`" if with_lrc else ""
@@ -575,6 +622,23 @@ def write_report(m: dict) -> None:
              f"语料按**扫描器产出**写入 `lyrics_lrc*` + `lrc_mtime/size/checked` 列 |")
     L.append(f"| library.db | {corpus['library_db_bytes']/1048576:.1f} MiB |")
     L.append(f"| 目录形态 | 全部平铺在单一 `audio/`（`.lrc` 探测成本的**最坏**分布；每专辑一目录时更低） |")
+    vocab_size = env.get("vocab") or 0
+    if vocab_size > 0:
+        L.append(f"| 词表 | **{vocab_size} 词（大词表档）**——单词库内命中率约 1–20%，贴近真实曲库 |")
+    L.append("")
+    if vocab_size > 0:
+        L.append("> 本档使用**大词表语料**（`--vocab`），单个词元的库内命中率落在真实曲库区间"
+                 "（约 1–20%），其查询延迟可作为**主判据**。")
+    else:
+        L.append("> ⚠ **语料词表很小，请按「上界」解读查询延迟**：本语料由**固定小词表**拼装"
+                 "（约 90 个词组 + 20 个标题），于是常用词元（`我` / `爱` / `你` / `love` / `hello` / "
+                 "`wan` 前缀等）会命中**近乎整库**（实测 `\"wan\"*` 命中 29985/30000 = 100%、"
+                 "`\"hello\"` 命中 28900 = 96%）。真实曲库的标题 / 歌词词表是数万到数十万级，"
+                 "同一条查询的命中率通常只有 1–20%。**要看真实体验请加 `--vocab 4000`。**")
+        L.append(">")
+        L.append("> **实测对照**（同为 30000 曲、同一查询 `\"wan\"*`）：固定小词表语料命中 29985（100%）"
+                 "→ top-50 排序 **36.1ms**；换大词表语料后命中 19206（64%）→ **11.4ms**。"
+                 "延迟与命中率近似成正比，故本档的宽命中数字**不代表真实曲库体验**。")
     L.append("")
     L.append("## 3. 全量构建（A 含拼音 / B 无拼音" + (" / C 含 .lrc" if with_lrc else "") + "）")
     L.append("")
@@ -625,30 +689,48 @@ def write_report(m: dict) -> None:
     L.append("")
     L.append("## 4. 增量（非 --full）")
     L.append("")
-    L.append("| 场景 | 脏曲 K | wall ms | durationMs | 峰值 RSS MB | indexed | deleted |")
-    L.append("|---|---|---|---|---|---|---|")
+    L.append("| 场景 | 脏曲 K | wall ms | durationMs | 本次合并 | 峰值 RSS MB | indexed | deleted |")
+    L.append("|---|---|---|---|---|---|---|---|")
+    def merge_cell(x):
+        return "是（含全段合并）" if x.get("merged") else "否"
     for k in sorted(inc):
         x = inc[k]
         name = "零脏曲（no-op）" if k == 0 else "改 file_mtime"
-        L.append(f"| {name} | {k} | {x['wall_ms']:.0f} | {x.get('durationMs')} | {x['rss_mb']:.0f} | "
-                 f"{x.get('indexed')} | {x.get('deleted')} |")
+        L.append(f"| {name} | {k} | {x['wall_ms']:.0f} | {x.get('durationMs')} | {merge_cell(x)} | "
+                 f"{x['rss_mb']:.0f} | {x.get('indexed')} | {x.get('deleted')} |")
     if noop_lrc:
-        L.append(f"| 零脏曲（no-op，**含 .lrc 档**） | 0 | {noop_lrc['wall_ms']:.0f} | {noop_lrc.get('durationMs')} | "
+        L.append(f"| 零脏曲（no-op，**含 .lrc 档**） | 0 | {noop_lrc['wall_ms']:.0f} | "
+                 f"{noop_lrc.get('durationMs')} | {merge_cell(noop_lrc)} | "
                  f"{noop_lrc['rss_mb']:.0f} | {noop_lrc.get('indexed')} | {noop_lrc.get('deleted')} |")
     L.append("")
     if noop.get("durationMs") is not None:
         L.append(f"- **零脏曲 = {noop['durationMs']}ms**：这是增量的**固定开销**（阶段一探测 + 收尾写路径），"
-                 f"**不含任何内容读取**。K=20 与它的差值才是脏曲写路径成本。")
+                 f"**不含任何内容读取**（也不触发分析器初始化）。")
     if inc20.get("durationMs") and inc200.get("durationMs"):
         d20, d200 = inc20["durationMs"], inc200["durationMs"]
         marginal = (d200 - d20) / (200 - 20)
-        L.append(f"- K=20 → {d20}ms；K=200 → {d200}ms：ΔK={200-20} 增加 {d200-d20}ms（**边际 ≈ {marginal:.1f}ms/曲**）"
-                 f"——脏曲部分随 K 近似线性。")
+        L.append(f"- K=20 → {d20}ms；K=200 → {d200}ms：ΔK={200-20} 增加 {d200-d20}ms"
+                 f"（名义边际 ≈ {marginal:.1f}ms/曲）。")
+        if inc200.get("merged") and not inc20.get("merged"):
+            L.append("- ⚠ **该边际不是纯写路径成本**：K=200 那次**跨过了合并阈值**、含一次全段合并，"
+                     "而 K=20 那次没有。看「只写不合并」的成本请参考 K=20（或把 `--merge-every` 调大后复测）。")
+        elif inc20.get("merged") and inc200.get("merged"):
+            L.append("- 两次增量都做了合并，故边际主要由合并成本主导，不代表写路径。")
         if noop.get("durationMs"):
-            L.append(f"- 归因：K=20 相对零脏曲多 {d20 - noop['durationMs']}ms，即 20 首脏曲的"
-                     f"「取内容 + 分析 + FTS 删除/写入 + 收尾 checkpoint」成本；"
-                     f"**阶段一探测本身很轻**（零脏曲已含它）。")
+            L.append(f"- K=20 相对零脏曲多 {d20 - noop['durationMs']}ms：其中**真实写入只要 13.5ms/20 首**"
+                     f"（隔离实测），大头是**分析器首次初始化**（Unihan / 读音表 `Lazy<>` 冷加载 ≈1.1s，"
+                     f"进程级一次性）——零脏曲不分析故不含它。「阶段一探测」本身很轻。")
     L.append(f"- 增量预算（「秒级、≈ K 成正比」）{ok(inc_ok)}。")
+    L.append("- **耗时构成（2026-11-12 定位）**：主导项曾是收尾的 FTS5 `optimize`（全段合并）——"
+             "402MB 索引隔离实测 **4.5–13s**，且不随脏曲数缩小（只改 1 首也付全额），因为它重写整个倒排；"
+             "真实写路径只要 13.5ms/20 首。另有约 **1.1s 是进程级一次性开销**"
+             "（Unihan / 读音表的 `Lazy<>` 首次加载），与增量规模无关。")
+    L.append("- **现状：改为按「累计改写曲数」触发合并**（`IndexerOptions.MergeEveryUpdates`，默认 30）。"
+             "合并**不能不做**：跳过它会让 `contentless_delete` 的墓碑累积、宽命中查询退化"
+             "（独立进程实测 `爱你`：20 曲 +34% / 60 曲 +73% / 120 曲 +103%，而排序结果不变）；"
+             "但每次都做又太贵。阈值即两者的折中——常态增量只写不合并，累计约 30 首后的一次增量顺带合并。")
+    L.append("- **分界很重要**：脏曲的*筛选与应用*始终是**同步、完整**的（阶段一探测 + 阶段二写入），"
+             "合并只是物理整理——不改内容、失败也无损（索引仍然正确，下次增量再尝试），二者不可混为一谈。")
     if noop_lrc:
         L.append(f"- `.lrc` 档零脏曲增量 = **{noop_lrc.get('durationMs')}ms**：与不开启时同量级即说明"
                  f"**索引器没有任何文件系统侧车探测**（侧车锚点 `lrc_mtime/size` 来自扫描器写入的"
@@ -697,9 +779,55 @@ def write_report(m: dict) -> None:
              "**短语** → `reading_meta_tok`）；④ 跨语言兜底（T1 候选）。"
              "仍偏慢的查询通常是**宽命中集**：常见音节组合、1–2 字符精确命中、"
              "或落到兜底趟（宽表达式）。逐条明细见上表（⚠ 行）。"
-             "\n>\n> 查询侧另有**候选集上限**（生产默认 5000，`--cap 0` 可关闭做对照）："
-             "`WHERE rowid IN (SELECT rowid … MATCH ? LIMIT 5000)` 先取有界候选再 bm25 排序——"
-             "`ORDER BY bm25` 否则要给全部命中打分；窄命中（候选 < 上限）不受影响。")
+             "\n>\n> ⚠ **候选集上限机制已于 2026-11-12 撤销**：原实现 `WHERE rowid IN (SELECT … MATCH ? LIMIT 5000)` "
+             "会让 FTS5 的 `bm25()` 在无 `MATCH` 的外层查询里**静默返回 0**，相关性排序整体失效"
+             "（且并不更快）。现一律 `WHERE search_fts MATCH ? ORDER BY bm25(...) LIMIT ?` 全排序；"
+             "`--cap` 仍可传但不再影响结果。详见设计文档 §4.5 与 `SearchLayerTests.RankingIntegrity`。")
+    L.append("")
+    L.append("### 5.5 召回 / 排序质量（P0 验收基线）")
+    L.append("")
+    q = m.get("quality", {}).get("A")
+    if not q:
+        L.append("> 本次未采集（`--skip-quality` 或采集失败）。")
+    else:
+        agg = q["aggregate"]
+        L.append("**金标准口径**：曲库文本（标题 / 艺人 / 专辑 / 歌词 / `.lrc`）**字面包含**查询目标字串。"
+                 "这是「子串搜索」的诚实定义，**不依赖被测分析器**（避免循环论证）；"
+                 "拼音 / 繁体查询由评测集给出目标字串（`woaini` → `我爱你`、`愛` → `愛`/`爱`）。")
+        L.append("")
+        L.append("查询集：**窄 / 中档从曲库自动派生**（同名曲目 2–10 首、15–200 首）"
+                 "+ 高频艺人 + 固定短语（中文子串 / 短语 / 繁体 / 拉丁 / 拼音 / 首字母）。"
+                 "按相关项数量分档——`recall@k` 在 k≪|R| 时数学上不可能高，宽查询只看 precision / NDCG。")
+        L.append("")
+        L.append("| 分档 | 条数 | P@1 | P@10 | R@10 | R@50 | MRR@10 | NDCG@10 |")
+        L.append("|---|---|---|---|---|---|---|---|")
+        for key, label in (("narrow", "窄（≤10 首）"), ("medium", "中（11–500 首）"),
+                           ("broad", "宽（>500 首）"), ("all", "**全部**")):
+            g = agg.get(key) or {}
+            if not g.get("count"):
+                continue
+            L.append(f"| {label} | {g['count']} | {g['p1']:.3f} | {g['p10']:.3f} | "
+                     f"{g['r10']:.3f} | {g['r50']:.3f} | {g['mrr10']:.3f} | {g['ndcg10']:.3f} |")
+        L.append("")
+        L.append("逐条（`n_rel` = 标注相关项数；`found@50` = 前 50 条里命中几首）：")
+        L.append("")
+        L.append("| 查询 | 文本 | 分档 | n_rel | found@50 | P@10 | R@10 | MRR@10 | NDCG@10 |")
+        L.append("|---|---|---|---|---|---|---|---|---|")
+        for r in q["queries"]:
+            L.append(f"| `{r['name']}` | `{r['text']}` | {r['bucket']} | {r['n_rel']} | "
+                     f"{r['found_at_50']} | {r['p10']:.3f} | {r['r10']:.3f} | "
+                     f"{r['mrr10']:.3f} | {r['ndcg10']:.3f} |")
+        L.append("")
+        empty = agg.get("empty_ground_truth") or []
+        if empty:
+            L.append(f"> 无标注相关项（本语料不含这些目标，已排除出汇总）：{', '.join('`'+e+'`' for e in empty)}")
+        missing = agg.get("total_missing_from_index") or 0
+        if missing:
+            L.append(f"> ⚠ 标注项中有 {missing} 首不在索引里（索引落后于曲库）——召回被**结构性**压低，"
+                     "先查增量是否收敛，再评价分析器。")
+        L.append("")
+        L.append("> 局限：合成语料的「相关性」是字面包含，没有人工分级标注，"
+                 "故只报二元 NDCG；真实曲库可用 `qbench eval --spec <queries.json>` 提供人工标注集。")
     L.append("")
     L.append("## 6. 对照 §2.2 预算")
     L.append("")
@@ -715,11 +843,23 @@ def write_report(m: dict) -> None:
              f"与 N 近似无关* | {ok(q_pooled_ok)} |")
     L.append(f"| 查询 P50 / P95（逐条） | ≤ 20 / ≤ 80 ms | "
              f"{'全部满足' if q_perquery_ok else '存在超标（见 §5 ⚠）'} | 随命中集增长 | {ok(q_perquery_ok)} |")
-    L.append(f"| 索引体积 | ~100–300 MB | {idx_a_mb:.1f} MiB（A） | ≈ {idx25k_mb:.0f} MiB | {ok(idx_ok)} |")
+    L.append(f"| 索引体积 | ~{budget['index_min_mb']:.0f}–{budget['index_max_mb']:.0f} MB | "
+             f"{idx_a_mb:.1f} MiB（A） | ≈ {idx25k_mb:.0f} MiB | {ok(idx_ok)} |")
     L.append(f"| 峰值内存 | ≤ 数百 MB，可限 | {rss_a:.0f} MiB（A） | — | {ok(rss_ok)} |")
     L.append("")
     L.append("\\* 「与 N 近似无关」只对**窄命中**查询成立；宽命中集（常见拼音 / 首字母）随 N 线性增长，"
              "见 §5 逐条表与 §8 局限。")
+    L.append("")
+    L.append("\\*\\* 增量的耗时由 FTS5 `optimize`（全段合并，**O(索引)**）主导，与脏曲数无关；"
+             "现按累计改写曲数触发（`MergeEveryUpdates`，默认 30），故 K=200 那次含合并、K=20 那次不含。"
+             "详见 §4。")
+    L.append("")
+    L.append(f"> 索引体积预算已按实测**校准**：原目标 100–300 MB 是实测前估数，"
+             f"实际外推 {budget['extrapolate_n']} 曲 ≈ {idx25k_mb:.0f} MiB（超 6%），"
+             f"2026-11-12 复核接受，上限调整为 {budget['index_max_mb']:.0f} MB。"
+             f"理由：索引是磁盘上按需读取的派生数据、不常驻内存（峰值 RSS {rss_a:.0f}MB）；"
+             f"对照「全部歌词常驻内存」（GiB 级）已在数量级上更省；"
+             f"体积大头是拼音列（令 A 比 B 多 {idx_a_mb-idx_b_mb:.0f} MiB），砍它要牺牲拼音召回。")
     if not q_perquery_ok:
         worst = max(
             (x for x in m["query"][f"A@{app_limit}"]["queries"]),
@@ -751,14 +891,23 @@ def write_report(m: dict) -> None:
     if not q_perquery_ok or not q_pooled_ok:
         slowest = max(m["query"][f"A@{app_limit}"]["queries"], key=lambda x: x["p50_ms"])
         L.append("")
-        L.append(f"⚠ **独立于 P5 的问题：查询延迟超标**（非存储引擎问题，自研段引擎也不解决）。"
+        L.append(f"⚠ **查询延迟超标**（非存储引擎问题，自研段引擎也不解决）。"
                  f"最慢一条 `{slowest['text']}`（{slowest['name']}）P50 {slowest['p50_ms']:.1f}ms；"
                  f"pooled P50/P95 = {pooled[app_limit]['A']['p50_ms']:.1f}/{pooled[app_limit]['A']['p95_ms']:.1f}ms "
-                 f"（LIMIT={app_limit}）。根因：FTS5 `ORDER BY bm25` 必须给全部命中打分，而"
-                 f"**短前缀支（首字母 / 拼音音节前缀，且首字母与拼音同列）**与**跨语言候选支（T1，"
-                 f"`愛`→`love` 一类高频英文词）**都会把命中集放大到接近整库。"
-                 f"收敛方向应在**查询编译 / schema 层**（首字母独立列、前缀长度门控、跨语言候选的"
-                 f"选择性门控 / 渐进式合并、命中集上限），并另立优化项跟进。")
+                 f"（LIMIT={app_limit}）。根因：FTS5 `ORDER BY bm25` 必须给**全部命中**打分"
+                 f"（`LIMIT` 只能在很宽区间小额削减：实测 10000→300 仅省 ~25%，"
+                 f"放到 LIMIT=50 的 P50 地板仍有 25.1ms → **降 limit 修不好本项超标**），"
+                 f"而**宽命中集支**——拼音音节前缀 / 首字母前缀 / 跨语言候选（T1，`愛`→`love` 一类"
+                 f"高频英文词）——会把命中集放大。")
+        if vocab_size > 0:
+            L.append(f"本档已用**大词表语料**（命中率贴近真实曲库），故上述超标**值得跟进**；"
+                     f"收敛方向：查询编译侧降低命中宽度、跨语言候选的选择性门控、"
+                     f"或自研可剪枝的打分器（需先建立与 FTS5 分数一致性的金标准）。")
+        else:
+            L.append(f"**但本档语料是小词表（最坏上界），这批数字不代表真实体验**——"
+                     f"请在结论中明确这一点，并优先用 `--vocab 4000` 复测；"
+                     f"实测大词表档 pooled P50/P95 = 4.6/32.5ms（全部达标）。")
+        L.append(f"另注：本版数字**不含**已撤销的候选集上限（旧版用错误写法换来的「更快」实为排序失效）。")
     L.append("")
     L.append("> 本结论受 §8 局限约束"
              + ("；尤其**磨损 / 长期写放大未量化**（`write_bytes` 在本环境不可用）。" if write_unavailable
@@ -776,17 +925,25 @@ def write_report(m: dict) -> None:
              + ("本环境 `write_bytes` 不可用 → 写入量 / 磨损未直接量化。" if write_unavailable
                 else f"本环境 `write_bytes` 可用（A 档写 {a_best['write_mb']:.0f}MB），但未做擦除块级观测。"))
     L.append("3. **未测磨损 / 长期度**：单轮 bench 无法反映多世代、反复增量后的碎片与写放大；未做 `iostat` / 闪存块级观测。")
-    L.append("4. **索引体积 / 查询命中集对语料敏感**：本语料按 §8 口径取 2–8 KB/曲（均 5 KB、密集中文），"
-             "但**词表很小**（固定词表拼装）——于是常用词元几乎出现在每一首里"
-             "（`我` / `爱` / `你` / `love` / `hello` 等命中 2.8 万–3 万 / 3 万）。"
-             "真实曲库的常用词元命中集会窄得多，故本报告的**宽命中查询延迟应视为上界**；"
-             "窄命中查询（短语 / 长音节组合）与 N 的关系才是可迁移的结论。"
-             "索引体积同理：语料越短 / 越稀疏，元数据表与倒排的固定开销占比越高。")
+    if vocab_size > 0:
+        L.append(f"4. **语料仍是合成数据**：本档用 {vocab_size} 词随机字表构造歌词"
+                 "（单词命中率约 1–20%，比小词表档贴近真实），但**汉字分布是均匀的**——"
+                 "真实中文高频字（的 / 我 / 你 / 爱）远比生僻字常见。因此"
+                 "**单字查询**（如 `愛` / `你`）在本档的命中率会显著高于真实曲库，"
+                 "其延迟仍偏保守；词级 / 短语级查询的可迁移性更好。"
+                 "索引体积同理受词表基数影响：本档 382 MiB 高于小词表档的 218 MiB。")
+    else:
+        L.append("4. **索引体积 / 查询命中集对语料敏感**：本语料按 §8 口径取 2–8 KB/曲（均 5 KB、密集中文），"
+                 "但**词表很小**（固定词表拼装）——于是常用词元几乎出现在每一首里"
+                 "（`我` / `爱` / `你` / `love` / `hello` 等命中 2.8 万–3 万 / 3 万）。"
+                 "真实曲库的常用词元命中集会窄得多，故本报告的**宽命中查询延迟应视为上界**；"
+                 "窄命中查询（短语 / 长音节组合）与 N 的关系才是可迁移的结论。"
+                 "索引体积同理：语料越短 / 越稀疏，元数据表与倒排的固定开销占比越高。")
     L.append("5. **查询集规模**：代表查询 "
              f"{len(m['query'][f'A@{app_limit}']['queries'])} 条（中文子串 / 短语 / 繁体 / 中文+首字母 / 拼音连写 / "
              "单音节拼音前缀 / 首字母 / 拉丁前缀 / 整词），非完整 §8 标注集；"
              "未测召回@k / MRR / NDCG（那是 P0 分析器评估，非本 P5 性能问题）。")
-    L.append("6. **查询语义**：MATCH 构造与生产查询编译层 `search_query.dart` 同构——词法支（CJK 连续 bigram 引号短语 + "
+    L.append("6. **查询语义**：MATCH 构造与生产查询编译层 `app/core/indexer/SearchQuery.cs` 同构——词法支（CJK 连续 bigram 引号短语 + "
              "unigram `AND`、末拉丁 / 数字 `*`）、拼音支（单音节 `*` 前缀；**≥2 音节相邻短语**）、"
              "首字母支、跨语言支，各支 `OR`；LIMIT 覆盖 "
              f"{'、'.join(str(x) for x in limits)}（后者 = 生产曲库页 `kSearchIndexRankLimit`）。"
@@ -796,6 +953,10 @@ def write_report(m: dict) -> None:
     L.append(f"8. **版本锚点**：本报告数据对应 `schema_version={meta_schema}` / `analyzer_version={meta_analyzer}`、"
              "代码 `" + env["git_head"] + "`；分析器 / schema 版本变动会令旧库全量重建，"
              "届时性能数字需重跑（本报告不含历史版本的对比数据）。")
+    L.append(f"9. **跨机器基线不可直接比较**：机器环境随本次实测记录于 §1（{env['cores']} 逻辑核 / "
+             f"{env['mem_gb']} GB / {env['disk']['media']}）。与**上一版报告**的绝对延迟差异"
+             "**不构成回归或改善的证据**——CPU 核数、内存与介质（HDD vs NVMe）都会主导全量构建与"
+             "宽命中查询的耗时。只有**同一版内部**的 A/B 对照（拼音列开 / 关）与同机多次采样才可相互比较。")
     L.append("")
     with open(REPORT, "w", encoding="utf-8") as f:
         f.write("\n".join(L) + "\n")

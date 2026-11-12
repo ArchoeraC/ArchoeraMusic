@@ -14,6 +14,8 @@ import '../../stores/app_prefs.dart';
 import '../log/log.dart';
 import '../scanner/library_scanner.dart';
 import 'indexer_ffi.dart';
+import 'query_log.dart';
+import 'query_log_file.dart';
 import 'search_index.dart';
 import 'search_models.dart';
 
@@ -147,6 +149,9 @@ class SearchService {
   /// `.lrc` 侧车歌词子开关（仅总开关开启时才有意义）。
   bool get indexLrc => appPrefsSnapshot?.indexLrc ?? false;
 
+  /// 歌词罗马音生成子开关（仅总开关开启时才有意义；T2-9）。
+  bool get romajiLyrics => appPrefsSnapshot?.romajiLyrics ?? false;
+
   /// 搜索：返回命中的 `trackId`（已按相关度排序）；未开启 / 未就绪 / 失败
   /// 一律返回 null，调用方回退 `LIKE`。空关键字同样返回 null（等于原列表）。
   ///
@@ -171,7 +176,10 @@ class SearchService {
     try {
       final index = await _resolveIndexForSearch();
       if (index == null) return null;
-      return index.search(
+      final started = QueryLogger.enabled ? DateTime.now() : null;
+      // 计数器是累加值：记录前先取快照，查询后再求差，才能得到**本次**实际趟次。
+      final before = index.passCounts;
+      final hits = index.search(
         keyword,
         scope: scope,
         limit: limit,
@@ -179,10 +187,46 @@ class SearchService {
         fuzzy: fuzzy,
         minExact: fuzzyMinExact,
       );
+      if (started != null) {
+        _recordQuery(
+          keyword,
+          hits,
+          index.passCounts - before,
+          started,
+          scope == LocalSearchScope.metadata,
+        );
+      }
+      return hits;
     } catch (err) {
       Log.w('search', '本地索引搜索失败，回退 LIKE: $err');
       _status = LocalSearchStatus.error('$err');
       return null;
+    }
+  }
+
+  /// 记录一次查询（**只在本机、仅日志落盘开启时**；T2-7 助词容错矩阵的数据来源）。
+  ///
+  /// 失败一律吞掉：查询日志是诊断增强，绝不阻断搜索主路径。
+  void _recordQuery(
+    String keyword,
+    List<LocalSearchHit>? hits,
+    PassCounts passes,
+    DateTime started,
+    bool metadataOnly,
+  ) {
+    try {
+      if (!shouldLogQuery(keyword)) return;
+      QueryLogger.record(
+        QueryLogEntry(
+          query: keyword,
+          hitCount: hits?.length ?? 0,
+          passes: passesOf(passes),
+          elapsedMs: DateTime.now().difference(started).inMilliseconds,
+          metadataOnly: metadataOnly,
+        ),
+      );
+    } catch (err) {
+      Log.d('search', '查询日志写入失败（已忽略）: $err');
     }
   }
 
@@ -463,19 +507,23 @@ class SearchService {
   void _closeIndexLocked() {
     _index?.close();
     _index = null;
+    // C# 侧按 search.db 路径缓存只读查询会话：重建 / 删除 / 关闭前显式释放，
+    // 否则 Windows 上残留句柄会阻塞 search.db 的替换（File.Move）。
+    _lib?.closeQuery();
   }
 
   SearchIndex? _openIndexLocked() {
     final lib = _lib;
-    final index = SearchIndex.open(
-      defaultSearchDbPath(),
-      analyzer: lib == null ? null : (q) => lib.analyze(q),
-    );
+    if (lib == null) {
+      _status = LocalSearchStatus.error('未找到索引器模块');
+      return null;
+    }
+    _closeIndexLocked();
+    final index = SearchIndex.open(defaultSearchDbPath(), lib: lib);
     if (index == null) {
       _status = LocalSearchStatus.error('search.db 不可用（schema 不符或损坏）');
       return null;
     }
-    _closeIndexLocked();
     _index = index;
     _status = LocalSearchStatus.ready;
     return index;
@@ -500,8 +548,11 @@ class SearchService {
         debugLibraryDbPathOverride ?? LibraryScanner.defaultDbPath();
     final searchDb = defaultSearchDbPath();
     File(searchDb).parent.createSync(recursive: true);
-    final optionsJson =
-        jsonEncode({'index_lrc': indexLrc, 'pinyin': true});
+    final optionsJson = jsonEncode({
+      'index_lrc': indexLrc,
+      'pinyin': true,
+      'romaji_lyrics': romajiLyrics,
+    });
 
     final callable =
         NativeCallable<Void Function(Pointer<Void>)>.listener(_handleProgress);
