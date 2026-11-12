@@ -17,6 +17,15 @@ public sealed class IndexerOptions
     /// <summary>是否生成拼音列（默认 true；false 时 <c>pinyin_tok</c> 留空，供 §7.4 A/B）。</summary>
     public bool Pinyin { get; set; } = true;
 
+    /// <summary>
+    /// 是否为日语歌词生成罗马音（T2-9 可选增强，默认 false）。
+    ///
+    /// 仅在**没有 LRC 音译层**时生效：把已有分析结果里的歌词读音 bigram 落进
+    /// <c>lyrics_rom_tok</c>，使罗马字查询可命中歌词。歌词读音体积约为原文的 2×，
+    /// 故默认关闭、由用户在设置里显式开启。
+    /// </summary>
+    public bool RomajiLyrics { get; set; }
+
     /// <summary>内部批量事务条数（0 = 使用存储默认）。</summary>
     public int Batch { get; set; }
 }
@@ -119,6 +128,36 @@ internal static class IndexerJson
         w.WriteBoolean("full", r.Full);
         w.WriteNumber("generation", r.Generation);
         w.WriteNumber("durationMs", r.DurationMs);
+        w.WriteEndObject();
+    });
+
+    /// <summary>
+    /// 查询层（<see cref="SearchSession"/>）结果序列化：<c>items</c> 为按趟次合并去重后的
+    /// top-k（含 <c>trackId</c> / bm25 <c>score</c>），<c>passes</c> 记录本次实际执行的兜底趟。
+    /// </summary>
+    public static string QueryResult(SearchResult result) => Write(w =>
+    {
+        w.WriteStartObject();
+        w.WriteString("type", "result");
+        w.WriteNumber("count", result.Items.Count);
+        w.WritePropertyName("items");
+        w.WriteStartArray();
+        foreach (var hit in result.Items)
+        {
+            w.WriteStartObject();
+            w.WriteString("trackId", hit.TrackId);
+            w.WriteNumber("score", hit.Score);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+        w.WritePropertyName("passes");
+        w.WriteStartObject();
+        w.WriteNumber("pinyinLoose", result.Passes.PinyinLoose);
+        w.WriteNumber("reading", result.Passes.Reading);
+        w.WriteNumber("crossLingual", result.Passes.CrossLingual);
+        w.WriteNumber("fuzzy", result.Passes.Fuzzy);
+        w.WriteNumber("cjkFuzzy", result.Passes.CjkFuzzy);
+        w.WriteEndObject();
         w.WriteEndObject();
     });
 

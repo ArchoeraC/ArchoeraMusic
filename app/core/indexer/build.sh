@@ -30,6 +30,13 @@ if [ ! -f data/nfkc.tsv ]; then
   python3 tools/gen_hanzi_data.py
 fi
 
+# 拉丁去音符号折叠表（NFD 派生）与异体字 → 简体补齐表（Unihan 派生）：
+# 由纯 .NET 生成器产出，不依赖 Python。
+if [ ! -f data/accent_fold.tsv ] || [ ! -f data/variant_fold.tsv ]; then
+  echo "==> 生成去音符号 / 异体字折叠表 (data/accent_fold.tsv, data/variant_fold.tsv)"
+  dotnet run --project tools/gen_tables
+fi
+
 # 用 -o 固定 publish 输出目录（不依赖 bin/Release/<tfm>/<rid> 路径）
 echo "==> 发布 indexer FFI (NativeAOT, $RID)"
 APPVER="$(sed -n 's/^version:[[:space:]]*//p' "$(dirname "$0")/../../pubspec.yaml" | head -1)"
