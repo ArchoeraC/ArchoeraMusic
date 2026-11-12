@@ -7,10 +7,11 @@
 
 ## 1. 现状核实（v5 已覆盖的部分，勿重复建设）
 
-查询侧已是**四趟渐进架构**（`app/core/indexer/SearchSession.cs`；Dart `search_index.dart`
+查询侧已是**六段渐进架构**（`app/core/indexer/SearchSession.cs`；Dart `search_index.dart`
 只是薄 FFI 客户端，经 `indexer_query` 调用）：
 主趟（精确表达式）→ 拼音宽松兜底（漏字/换位）→ **日文读音兜底**（拉丁词元 bigram
-AND 到 `reading_meta_tok`）→ **跨语言兜底**（`love` → `"爱" OR "恋"`，Unihan 释义）。
+AND 到 `reading_meta_tok` / `lyrics_rom_tok`）→ **跨语言兜底**（`love` → `"爱" OR "恋"`，Unihan 释义）
+→ 模糊兜底（编辑距离 ≤1，词典化）→ **CJK 容错**（删除 / 换位变体）。
 另有受限替换容错（元音互替/邻键，变体预算 500）与 3 字符起前缀的门控。
 **所以「拉丁搜日文歌」「英文搜中文歌」已部分可用；真正缺口如下。**
 
@@ -46,7 +47,7 @@ AND 到 `reading_meta_tok`）→ **跨语言兜底**（`love` → `"爱" OR "恋
 | T1-5 accent folding | ✅ **已实施（2026-11-11）**：新增 `data/accent_fold.tsv`（488 条，NFD 派生的「预组合拉丁字母 → ASCII 基字母」表），在 `Analyzer.Normalize` 的 NFKC 之后应用，并丢弃组合音标码点（é 与 e+U+0301 同形）；索引 / 查询共用同一函数。表由 **纯 .NET** 生成器 `tools/gen_tables` 产出（无需 Python / ICU 运行时）。**AnalyzerVersion 9→10**；ł/ø/đ 等无规范分解字母保持原样（已知限制） | vectors：`Beyoncé → beyonce`、`e+U+0301 → beyonce`、`Señor über ā → senor uber a`、`Łódź → łodz` | 并入 NekoMusic `TextNormalizer`（同一 TSV 可直接复用） |
 | T1-6 拼音音节级模糊 | ✅ **已实施（2026-11-11）**：`SearchQuery.CompilePinyinLoose` 对每个**有效拼音音节**（`PinyinSegmenter.IsSyllable` 门控，英文词不扩展）按声母 `zh/z、ch/c、sh/s、n/l、f/h`、韵母 `ang/an、eng/en、ing/in` **双向**展开（原形 + 声母 + 韵母 + 组合，每音节 ≤4），同音节 `OR`、音节间 `AND`；只存在于兜底趟，主路径零成本、**不递增 AnalyzerVersion** | vectors：`周伦` → `(zhou OR zou) AND (lun* OR nun*)`、`zongguo` → `(zong OR zhong) ∧ guo`、`shanghai` 4 变体封顶、`hello world` 不套用 n/l·f/h；端到端 `zoulun` 仅走拼音兜底命中「周杰伦」 | NekoMusic `PinyinUtil.searchVariants` 同规则 + `MusicSearchRanker` 降档 |
 | T1-7 日文新字体归一 | ✅ **已实施（2026-11-11）**：实测确认 ToolGood 繁简词库**不覆盖**日文新字体（`鉄/絵/円/広/変/楽/駅` 原样保留，而其旧字体 `鐵/繪/圓/廣/變/樂/驛` 能正常转简）。新增 `data/variant_fold.tsv`（3170 条）：从 Unihan `kSimplifiedVariant` 取繁→简，日文新字体经 `kJapaneseOldVariant` 串联旧字体再取简体（`鉄→鐵→铁`），并**只保留 ToolGood 未覆盖的字符**，不覆盖既有中文繁简规则；在 `Analyzer.Normalize` 中于 ToolGood 之前应用，索引 / 查询双端同表。表由 `tools/gen_tables` 从 `reference/unihan/Unihan.zip` 生成。**AnalyzerVersion 10→11** | vectors：`鉄道→铁道`、`絵→绘`、`広島→广岛`、`楽園→乐园`、`銀河鉄道 ≡ 银河铁道` 词元；端到端搜「银河铁道」主趟命中「銀河鉄道の夜」且不触发兜底 | NekoMusic `TextNormalizer` 管线同表复用（该侧 ChineseConverter 同样只有简繁词典） |
-| T1-8 模糊层词典化 | ✅ **已实施（2026-11-11）**：不做 SymSpell 删除词典落盘，直接以**索引真实词表**做变体过滤——`FtsStore.LoadFuzzyVocabulary()` 从 `fts5vocab(main, search_fts, 'col')` 懒加载 `DISTINCT term`（只留 ASCII 词，按写入纪元 `_writeEpoch` 缓存失效），`FuzzyVocabulary.PrefixRange` 二分取前缀区间，`MyersWithinOne`（位并行 Levenshtein ≤1，>64 字符退回有界 DP）叠加相邻换位做精筛；`VocabularyExpressions` 对区间 ≤32 的词条逐个精确复核后入表达式，区间过大退回前缀匹配，某可扩展词元无候选则整支返回 `null`（不再枚举不存在变体）。词表**不落盘、不改 schema、不递增 AnalyzerVersion**；加载失败自动退回旧「500 变体枚举」行为 | 黄金向量：`hlelo` 命中词表 `hello` 且不产出 `ehllo`；端到端 `hlelo` 仅由模糊趟召回（`Fuzzy==1`）；3000 曲确定性语料 qbench（limit=10000）`latin_typo` 5.31→5.05ms、`latin_swap` 5.26→5.08ms；limit=50 时 `latin_typo` 4.26→4.09ms、`latin_swap` 5.26→4.16ms（词表仅 3755 条，收益约 3–5%） | NekoMusic 查询侧同构（其变体展开更朴素，收益更大） |
+| T1-8 模糊层词典化 | ✅ **已实施（2026-11-11）**：不做 SymSpell 删除词典落盘，直接以**索引真实词表**做变体过滤——`FtsStore.LoadFuzzyVocabulary()` 从 `fts5vocab(main, search_fts, 'col')` 懒加载 `DISTINCT term`（只留 ASCII 词，按写入纪元 `_writeEpoch` 缓存失效），`FuzzyVocabulary.PrefixRange` 二分取前缀区间，`MyersWithinOne`（位并行 Levenshtein ≤1，>64 字符退回有界 DP）叠加相邻换位做精筛；`VocabularyExpressions` 对区间 ≤32 的词条逐个精确复核后入表达式，区间过大退回前缀匹配；某可扩展词元在词表无候选时，**该词元退回无词表的变体枚举**——词表只扫文本列，拼音 / 首字母 / 读音列里的词条不在其中，整支放弃会丢召回（回归用例 `SearchLayerTests.FuzzyVocabularyRecall`）。词表**不落盘、不改 schema、不递增 AnalyzerVersion**；加载失败自动退回旧「500 变体枚举」行为 | 黄金向量：`hlelo` 命中词表 `hello` 且不产出 `ehllo`；端到端 `hlelo` 仅由模糊趟召回（`Fuzzy==1`）；3000 曲确定性语料 qbench（limit=10000）`latin_typo` 5.31→5.05ms、`latin_swap` 5.26→5.08ms；limit=50 时 `latin_typo` 4.26→4.09ms、`latin_swap` 5.26→4.16ms（词表仅 3755 条，收益约 3–5%） | NekoMusic 查询侧同构（其变体展开更朴素，收益更大） |
 
 **范围外（本期明确不做，避免评审遗漏追问）**：西里尔/希腊/阿拉伯/天城文等其它文字的
 拉丁转写不在本期范围——机制上与 T1-3 同型（Unicode 数据派生映射表），表可后加，
@@ -73,7 +74,7 @@ AND 到 `reading_meta_tok`）→ **跨语言兜底**（`love` → `"爱" OR "恋
    查询侧：无日 / 韩内容时**永久跳过读音兜底趟**；跨语言趟按候选脚本**定向裁剪**——
    `has_han=false` 时丢掉汉字候选（不可能命中），`has_latin=false` 时丢掉英文释义候选；
    因此纯英文库仍保留「爱 → love」方向，不是把整趟砍掉（比原计划更保守，避免误伤召回）。
-   绝大多数纯英文曲库从四趟降到两趟，主路径零改动。
+   绝大多数纯英文曲库的读音段被永久跳过（主趟 + 拼音宽松 + 跨语言即可覆盖），主路径零改动。
    实现在 [IndexerEngine.cs](file:///home/betastudio2/文档/ArchoeraMusic/app/core/indexer/IndexerEngine.cs) 的
    `ScriptProfile` 与 [SearchSession.cs](file:///home/betastudio2/文档/ArchoeraMusic/app/core/indexer/SearchSession.cs) 的
    `FilterCrossLingual`；测试见 `SearchLayerTests.LanguageProfile`。
@@ -87,21 +88,25 @@ AND 到 `reading_meta_tok`）→ **跨语言兜底**（`love` → `"爱" OR "恋
    无需额外失效逻辑；返回结果按只读共享（高亮缓存 `_cache` 同模式先例）。
    测试见 `SearchLayerTests.QueryResultCache`（重复命中 / 参数不串键 / 容量淘汰 /
    CloseCached 失效）。
-3. ⬜ **兜底趟合并决策（未实施）**：画像显示日文占比高的曲库，读音兜底支可并入主趟 OR
-   （列过滤后该支本来就便宜），省一次往返；占比低的维持独立趟。以 qbench 数据定阈值。
-4. ⬜ **大命中集早停（未实施 —— 且实测对本项目的超标查询无效）**：原设想是「主趟命中数超过阈值
+3. ❌ **兜底趟合并（评估后不实施）**：把读音支并入主趟 OR 看似省一次往返，但代价是
+   **主趟已命中的查询也要付读音 MATCH**（当前只在主趟 0 命中时才执行读音趟），常见路径反而更慢；
+   且读音命中与精确命中进入同一 bm25 池，可能把弱读音命中排到精确命中之前——**排序精度有风险**。
+   结论：保持独立兜底趟；除非 qbench + 逐条排序金标能同时证明「延迟下降且 P@k / NDCG 无损」。
+4. ❌ **大命中集早停（不实施 —— 实测对本项目的超标查询无效）**：原设想是「主趟命中数超过阈值
    即跳过兜底趟」。但 2026-11-12 复测发现：**所有超预算查询的 `passes` 都是 1**——它们在主趟
    就已命中并短路，根本不会执行兜底趟，因此该项对本项目的延迟超标**零收益**。
    真正的成本在主趟的 MATCH 求值 + bm25 全命中打分（`LIMIT` 只能在很宽区间上小额削减，
    见 §4.8；打分器替换已评估否决，见 §4.7）。若要继续降延迟，方向应是**降低命中宽度**，
    而非加早停判据。
-5. ⬜ **变体预算复核（未实施）**：500 的上限对长查询仍可能造出巨型 MATCH；按词元数动态收紧
-   （如每词元 ≤8 变体 × 词元数上限）。当前仍是 `SearchQuery.DefaultMaxFuzzyVariants = 500` 写死。
+5. ❌ **变体预算动态收紧（不实施 —— 会降召回）**：按词元数收紧变体上限，等于主动丢掉
+   真实存在的 ≤1 变体。当前 500 已把单趟 MATCH 规模限定住，且实测超预算查询的 `passes`
+   均为 1（根本走不到模糊趟）；为收益殆尽的延迟优化牺牲召回不符合本项目底线。
+   若要继续优化，应降低命中宽度（查询编译侧的选择性门控，见 §4.7 末尾建议）或改进索引布局，而不是砍变体。
 6. ✅ **撤销候选集上限（2026-11-12，修正静默失效的生产 bug）**：原 `candidateCap` 用
    `rowid IN (SELECT … MATCH … LIMIT N)` 实现，导致 FTS5 的 `bm25()` 在外层无 `MATCH` 时
    **静默返回 0**——默认 cap=5000 下所有查询的相关性排序实际失效（实测 top200 全零分）。
    该机制既错又不快，已移除；回归用例 `SearchLayerTests.RankingIntegrity`。
-7. ⬜ **换掉 FTS5 打分器（自建倒排 + WAND/MaxScore）——评估后判定收益不足，暂不实施**：
+7. ❌ **换掉 FTS5 打分器（自建倒排 + WAND/MaxScore）——评估后判定收益不足，不实施**：
    2026-11-12 做过完整评估，结论如下（供后续复查，勿重复踩坑）：
    - **精度风险高**：复刻 FTS5 的 bm25 需要精确对齐 `idf = max(1e-6, ln((N-n+0.5)/(n+0.5)))`、
      **按列**的 `tf` / `|D|` / `avgdl` 语义。原型实测按教科书公式自实现，与 FTS5 的 top-50
@@ -119,7 +124,7 @@ AND 到 `reading_meta_tok`）→ **跨语言兜底**（`love` → `"爱" OR "恋
      **真实曲库不存在这个性能问题**，故没有为它重写打分器的必要。
    - 若未来在真实大库上确实出现延迟问题，正确顺序是：① 先降命中宽度（查询编译侧的选择性
      门控）；② 再考虑自研打分器，且**必须**先建立「与 FTS5 逐条分数一致」的金标准测试。
-8. ⬜ **降低排行上限 `kSearchIndexRankLimit`（10000）—— 量化后决定保持不动**：
+8. ❌ **降低排行上限 `kSearchIndexRankLimit`（10000）—— 量化后决定保持不动**：
    2026-11-12 实测（30000 曲 / 大词表语料 / 生产同构 `ORDER BY bm25(...)` SQL）：
    - **精度无损**：`ORDER BY score LIMIT N` 取的就是全排序前 N 名。实测 `limit=300` /
      `limit=900` 与 `limit=10000` 的 top-300 / top-900 **逐条位置相同且可复现**
@@ -133,7 +138,7 @@ AND 到 `reading_meta_tok`）→ **跨语言兜底**（`love` → `"爱" OR "恋
    - 另注 `limit=300` 与 `900` 几乎同速（43.6 vs 44.3ms）——「要降就降到 900」，
      单独降到 1 页是白丢页数。
    **决定：保持 10000 不动。** 真正的杠杆是降低命中宽度（§4.4），不是砍排行上限。
-6. 每项优化前后用 qbench 记录 P50/P95 与命中数，防「提速丢召回」。
+9. **评测纪律**：每项优化前后用 qbench 记录 P50/P95 与命中数，防「提速丢召回」。
 
 ### 4.1 经典算法方案评估（非神经网络向量）
 
@@ -265,7 +270,7 @@ ToolGood.Words（NuGet，静态编入）提供，SQLite 由 `libe_sqlite3` 随�
 | T1-4 兜底趟分档 | `MusicSearchRanker` 档位表（该侧无多趟架构，直接按档打分） |
 | T1-7 新字体→简体表 | `ChineseConverter` 输出后追加同表归一（`TextNormalizer` 管线内） |
 | T1-8 + §4.1 算法 | SymSpell 删除变体词典、Roaring Bitmap、gram sketch、WAND 三件套整体移植 |
-| 四趟渐进 + 语言画像 + LRU 思路 | LIKE 候选筛选下的「ASCII 词条才挂读音/拼音分支」已是同思想；缓存照搬 |
+| 渐进兜底趟 + 语言画像 + LRU 思路 | LIKE 候选筛选下的「ASCII 词条才挂读音/拼音分支」已是同思想；缓存照搬 |
 
 ## 7. 红线
 

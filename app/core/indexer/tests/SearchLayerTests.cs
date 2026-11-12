@@ -26,6 +26,7 @@ internal static class SearchLayerTests
         ProgressiveQuery();
         LanguageProfile();
         QueryResultCache();
+        FuzzyVocabularyRecall();
         RankingIntegrity();
     }
 
@@ -543,6 +544,50 @@ internal static class SearchLayerTests
             Program.Check("查询缓存: 最旧条目被淘汰后重查",
                 SearchSession.DebugCacheMisses == evictedBefore + 1,
                 $"{SearchSession.DebugCacheMisses}/{evictedBefore}");
+        }
+        finally
+        {
+            SearchSession.CloseCached();
+            EndToEnd.TryDelete(root);
+        }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 模糊词表回退（T1-8 召回保护）                                       */
+    /* ------------------------------------------------------------------ */
+
+    private static void FuzzyVocabularyRecall()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(), "archoera-fuzzy-vocab-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var db = Path.Combine(root, "library.db");
+            var index = Path.Combine(root, "search.db");
+            var media = Path.Combine(root, "media");
+            Directory.CreateDirectory(media);
+
+            EndToEnd.CreateLibrary(db, generation: 1);
+            using (var conn = EndToEnd.Open(db))
+            {
+                EndToEnd.InsertTrack(conn, "p1", Path.Combine(media, "a.mp3"), "我",
+                    "[]", null, null, 1000);
+                EndToEnd.InsertTrack(conn, "p2", Path.Combine(media, "b.mp3"), "Hello",
+                    """[{"name":"ADELE"}]""", null, null, 2000);
+            }
+            EndToEnd.RunEngine(db, index, full: true, lrc: false);
+            SearchSession.CloseCached();
+
+            // "woo" 的删除变体 "wo" 只存在于拼音列（曲名「我」），而词表只扫文本列。
+            // 词表非空（hello / adele）时，旧实现会因「无候选」整支放弃 → 丢召回。
+            var pinyinHit = Run(index, "woo", fuzzy: true);
+            Program.Check("模糊词表: 无候选时回退枚举并命中拼音列",
+                Has(pinyinHit, "p1") && pinyinHit.Passes.Fuzzy == 1, Dump(pinyinHit));
+
+            // 词表有候选时仍走词典化路径：hlelo → hello。
+            var vocabHit = Run(index, "hlelo", fuzzy: true);
+            Program.Check("模糊词表: 有候选时仍走词表", Has(vocabHit, "p2"), Dump(vocabHit));
         }
         finally
         {
