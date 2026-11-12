@@ -300,6 +300,17 @@ def main(argv: list[str] | None = None) -> int:
     corpus_dir = os.path.join(work, "corpus")
     os.makedirs(work, exist_ok=True)
 
+    # 空间预检：索引体积 ≈ 13 KiB/曲（@30k 曲实测 382 MiB），全量构建还会写临时世代
+    # + WAL，峰值约为索引的 2–3 倍。空间不足时先给**可操作**的提示，而不是半路 ENOSPC。
+    free_mb = shutil.disk_usage(work).free / 1048576
+    need_mb = max(768, a.tracks * 13 * 3 / 1024)
+    if free_mb < need_mb:
+        raise SystemExit(
+            f"工作目录可用空间不足：{free_mb:.0f} MB < 预计需要 {need_mb:.0f} MB（{work}）。\n"
+            f"  · 换位置：BENCH_WORK=/path/to/dir bash run_bench.sh\n"
+            f"  · 或轻量档：PROFILE=quick bash run_bench.sh（3000 曲，约需 0.8 GB）")
+    print(f"== 工作目录 {work}（可用 {free_mb/1024:.1f} GB，预计需要 {need_mb/1024:.1f} GB）")
+
     env = {
         "date": datetime.date.today().isoformat(),
         "git_head": git_head(),
