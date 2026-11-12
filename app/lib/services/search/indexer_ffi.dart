@@ -96,6 +96,11 @@ class IndexerLibrary {
   );
   late final _AnalyzeDart _analyze = _lib
       .lookupFunction<_AnalyzeNative, _AnalyzeDart>('indexer_analyze');
+  late final _QueryDart _query = _lib.lookupFunction<_QueryNative, _QueryDart>(
+    'indexer_query',
+  );
+  late final _QueryCloseDart _queryClose = _lib
+      .lookupFunction<_QueryCloseNative, _QueryCloseDart>('indexer_query_close');
 
   /// 同步阻塞执行构建 / 增量（须在子 isolate 调用，避免阻塞 UI 线程）。
   ///
@@ -211,6 +216,45 @@ class IndexerLibrary {
     }
   }
 
+  /// 执行本地索引查询：查询编译、多趟渐进兜底、bm25 排序与 docId 映射均在 C# 内完成。
+  ///
+  /// 返回 `(exitCode, resultText)`：成功时 `resultText` 为结果 JSON，失败时为错误文本。
+  /// 结果内存由本方法释放；旧版库缺少 `indexer_query` 时返回 `(1, 错误文本)` 而非抛出。
+  (int, String) query({
+    required String indexPath,
+    required String requestJson,
+  }) {
+    final index = indexPath.toNativeUtf8();
+    final request = requestJson.toNativeUtf8();
+    final out = calloc<Pointer<Utf8>>();
+    final outLen = calloc<Int32>();
+    try {
+      final code = _query(index, request, out, outLen);
+      final resultPtr = out.value;
+      final text = resultPtr == nullptr
+          ? ''
+          : resultPtr.cast<Utf8>().toDartString(length: outLen.value);
+      if (resultPtr != nullptr) _free(resultPtr.cast());
+      return (code, text);
+    } catch (e) {
+      return (1, 'indexer_query 不可用: $e');
+    } finally {
+      calloc.free(index);
+      calloc.free(request);
+      calloc.free(out);
+      calloc.free(outLen);
+    }
+  }
+
+  /// 释放 C# 侧缓存的只读查询会话（索引重建 / 删除 / 退出前调用）。
+  void closeQuery() {
+    try {
+      _queryClose();
+    } catch (_) {
+      // 旧版库无此符号：忽略。
+    }
+  }
+
   /// 释放 indexer-ffi 侧（NativeMemory.Alloc）分配的内存。
   void free(Pointer<Void> ptr) => _free(ptr);
 
@@ -266,6 +310,24 @@ typedef _AnalyzeDart =
       Pointer<Pointer<Utf8>>,
       Pointer<Int32>,
     );
+
+typedef _QueryNative =
+    Int32 Function(
+      Pointer<Utf8> indexPath,
+      Pointer<Utf8> requestJson,
+      Pointer<Pointer<Utf8>> outResult,
+      Pointer<Int32> outLen,
+    );
+typedef _QueryDart =
+    int Function(
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Pointer<Pointer<Utf8>>,
+      Pointer<Int32>,
+    );
+
+typedef _QueryCloseNative = Void Function();
+typedef _QueryCloseDart = void Function();
 
 typedef _SetLogSinkNative =
     Void Function(Pointer<NativeFunction<LogWriteNative>> fn, Int32 minLevel);

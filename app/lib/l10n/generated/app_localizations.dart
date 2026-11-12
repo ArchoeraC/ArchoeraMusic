@@ -8342,6 +8342,18 @@ abstract class AppLocalizations {
   /// **'同时索引与音频同名的 .lrc 歌词（需先启用总开关）'**
   String get settingsSearchIndexLrcDesc;
 
+  /// No description provided for @settingsSearchIndexRomaji.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'生成歌词罗马音索引'**
+  String get settingsSearchIndexRomaji;
+
+  /// No description provided for @settingsSearchIndexRomajiDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'日语歌词没有音译时自动生成罗马音，可用罗马字搜索（索引体积约增加一倍）'**
+  String get settingsSearchIndexRomajiDesc;
+
   /// No description provided for @settingsSearchIndexNote.
   ///
   /// In zh_CN, this message translates to:
