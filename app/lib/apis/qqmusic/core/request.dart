@@ -6,10 +6,18 @@
 ///
 /// - 统一走 u.y.qq.com/cgi-bin/musicu.fcg 的 `{ comm, request: {module, method, param} }` 协议
 /// - 首次请求前先调 music.getSession.session 拿 uid/sid/userip，缓存 1 小时
-/// - 无加密：API 本身明文 JSON POST，靠 UA + QIMEI36 等 comm 字段伪装客户端
+/// - 无加密：API 本身明文 JSON POST，靠设备身份伪装客户端
+///   （`core/device.dart` 持久化 GUID/QIMEI，`core/qimei.dart` 注册 q36）
 /// - 登录态：Cookie（qm_keyst / qm_str_musicid / p_skey 等）经宿主
 ///   [getRuntime().sessionStore]（平台键 'qqmusic'）持久化，请求自动注入
 /// - 登出 / 登录变更会使匿名 session 失效（避免跨账号复用）
+///
+/// **风控策略**（2026-11 优化）：
+/// - 所有出站统一过 [qmPaced] 节奏闸门（限并发 3、最小间隔 150ms）；
+/// - 重试只对传输级瞬时错误生效，且**总次数收窄到 1 次**（旧实现每次业务
+///   失败最多打 3 次，叠加上层重试可达 9 次，实测足以触发 `inner=2001`）；
+/// - 命中风控 → 记 [qmNoteRisk] 全局冷却（60s 起指数退避），冷却期直接失败
+///   不联网。
 library;
 
 import 'dart:convert';
@@ -18,6 +26,9 @@ import 'dart:io';
 import '../../runtime.dart';
 import 'config.dart';
 import 'credential.dart';
+import 'device.dart';
+import 'pacing.dart';
+import 'qimei.dart';
 
 /// QM 错误分类（请求层归一后供上层展示/重试决策）。
 enum QmErrorKind {
@@ -81,9 +92,14 @@ int _sessionGeneration = 0;
 /// 内存中的用户 cookie（null = 尚未从宿主 store 加载）。
 Map<String, String>? _userCookies;
 
-/// 重试次数与退避
-const _maxRetry = 2;
-const _retryBackoffMs = 300;
+/// 重试次数与退避。
+///
+/// **只对传输级瞬时错误重试，且仅 1 次**：旧实现 `_maxRetry = 2`（共 3 次），
+/// 叠加上层模块自己的 2 次重试，一次用户搜索最多能打出 9 个请求。实测同一
+/// 出口连打 4 次即进入 `inner=2001` 风控，因此这里收到 1 次，并交给
+/// [qmPaced] 统一限速。
+const _maxRetry = 1;
+const _retryBackoffMs = 400;
 
 /// 风控 / 限流内码（实测 search 被拦时 `request.code=2001`，
 /// `data.meta.is_filter=-12`、结果体为空）。供桌面等异构响应归一复用。
@@ -133,6 +149,7 @@ Map<String, String> qmGetQQMusicCookies() {
 /// 丢弃 cookies 内存缓存（**解锁成功后调用**）：下次读取即从宿主存储重取。
 void qmReloadQQMusicCookies() {
   _userCookies = null;
+  qmReloadQQMusicDevice(); // 设备身份同样是进程级缓存，见 core/device.dart
   _invalidateSession();
 }
 
@@ -198,12 +215,27 @@ void _invalidateSession() {
 ///
 /// 传输级错误（网络/超时/非 JSON 响应）抛 [QmRequestException]（kind=transient、
 /// retryable=true），由 [qmRequest] 决定是否重试。
+///
+/// **节奏闸门在此统一入口生效**（限并发 + 最小间隔）：包括自建请求体的
+/// `search.dart`（桌面签名）与 `song_url.dart`（GetVkey）——这两条是最容易
+/// 被限流的路径，旧实现完全绕过重试/退避逻辑。测试注入 fake 时同样经过闸门，
+/// 但 fake 极快，不会引入可感知延迟。
 Future<Map<String, dynamic>> qmPostRaw(
   Map<String, dynamic> body, {
   Map<String, String>? extraHeaders,
   String? url,
 }) {
-  return qmHttpTransport(body, extraHeaders: extraHeaders, url: url);
+  return qmPaced(
+    () => qmHttpTransport(body, extraHeaders: extraHeaders, url: url),
+  );
+}
+
+/// 确保设备已拿到 QIMEI（只在真实传输层调用，避免 fake 传输时联网）。
+///
+/// 失败静默：上报失败只意味着请求少一个 `QIMEI36` 字段，不应连带业务失败。
+Future<void> _ensureDeviceQimei() async {
+  if (qmGetDevice().qimeiFresh) return;
+  await qmEnsureQimei();
 }
 
 /// 可注入的 GET 传输（默认直连；测试注入 fake）。
@@ -288,6 +320,7 @@ Future<Map<String, dynamic>> _defaultTransport(
   Map<String, String>? extraHeaders,
   String? url,
 }) async {
+  await _ensureDeviceQimei();
   final cookies = qmGetQQMusicCookies();
   final cookieStr = qmSessionToCookieHeader(cookies);
   final headers = <String, String>{
@@ -513,6 +546,17 @@ Future<T> qmRequest<T>(
   bool session = true,
   Map<String, dynamic>? comm,
 }) async {
+  // 全局风控冷却：命中过 risk 后的一段时间内直接失败，**不联网**。
+  // 继续重试只会把限流阈值/处罚时间刷得更长（实测 2001 会持续数十秒）。
+  final cooling = qmRiskCooldownRemaining();
+  if (cooling > Duration.zero) {
+    throw QmRequestException(
+      'QM已触发风控，冷却中（剩余 ${(cooling.inSeconds + 1)}s），'
+      '请稍后再试',
+      kind: QmErrorKind.risk,
+      inner: qmRiskInnerCode,
+    );
+  }
   if (session) await _ensureSession();
 
   Map<String, dynamic> buildBody() {
@@ -541,9 +585,9 @@ Future<T> qmRequest<T>(
 
   // 瞬时网络错误自动重试（带退避）；业务码错误：
   // - inner/outer = 2001（风控/限流）或 `meta.is_filter<0`（额外验证/风控过滤）
-  //   **均不自动重试**，直接抛 risk，避免刷高风控；
+  //   **均不自动重试**，直接抛 risk 并记全局冷却（[qmNoteRisk]）；
   // - 鉴权失败（1000 未登录 / 2001 会话异常）先尝试刷新 musickey 重试一次；
-  // - 其余非零业务码按上游做法退避重试后再抛 code。
+  // - 其余非零业务码**不重试**（旧实现重试 2 次，与上层重试叠加过度）。
   Object? lastErr;
   var triedRefresh = false;
   for (var attempt = 0; attempt <= _maxRetry; attempt++) {
@@ -560,6 +604,7 @@ Future<T> qmRequest<T>(
           // 服务端以 code 0 放行的「额外验证 / 风控过滤」响应（搜索/浏览类
           // 接口带 meta.is_filter）。归一到 qmRiskInnerCode 同一风控族，
           // 让 UI 冷却与「停止自动重试」逻辑一致；真实原因保留在 message。
+          qmNoteRisk();
           throw QmRequestException(
             'QM接口触发额外验证/风控过滤'
             '（meta.is_filter=$filterValue，结果被过滤为空），已停止自动重试',
@@ -568,6 +613,7 @@ Future<T> qmRequest<T>(
             inner: qmRiskInnerCode,
           );
         }
+        qmNoteSuccess();
         return reqData as T;
       }
       // 鉴权失败：刷新凭据后重试一次（对齐上游 autoRefresh 语义）
@@ -585,6 +631,7 @@ Future<T> qmRequest<T>(
       final risk =
           outerCode == qmRiskInnerCode || innerCode == qmRiskInnerCode;
       if (risk) {
+        qmNoteRisk();
         throw QmRequestException(
           'QM接口拦截：请求过于频繁或触发风控'
           '（outer=$outerCode inner=$innerCode）',
@@ -593,10 +640,8 @@ Future<T> qmRequest<T>(
           inner: innerCode,
         );
       }
-      if (attempt < _maxRetry) {
-        await _delay(_retryBackoffMs * (attempt + 1));
-        continue;
-      }
+      // 业务码错误不重试：参数错/无权限/资源不存在都不会因为重试而恢复，
+      // 重试只会增加风控计数。
       throw QmRequestException(
         'QM API 错误: outer=$outerCode inner=$innerCode',
         kind: QmErrorKind.code,
@@ -604,7 +649,7 @@ Future<T> qmRequest<T>(
         inner: innerCode,
       );
     } on QmRequestException {
-      // 已归一为最终错误（risk 立即抛；code 在耗尽重试后抛）：不再自动重试
+      // 已归一为最终错误（risk 立即抛）：不再自动重试
       rethrow;
     } catch (err) {
       // 传输级（网络/超时/JSON）错误

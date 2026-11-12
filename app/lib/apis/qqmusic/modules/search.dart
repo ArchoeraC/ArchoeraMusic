@@ -20,6 +20,8 @@ import 'dart:convert';
 import 'dart:math';
 
 import '../core/config.dart';
+import '../core/device.dart';
+import '../core/pacing.dart';
 import '../core/request.dart';
 import '../core/sign.dart';
 import '../core/types.dart';
@@ -32,10 +34,13 @@ String _stripHighlight(String? text) =>
 int _numOf(dynamic v) =>
     v is num ? v.toInt() : (v != null ? int.tryParse('$v') ?? 0 : 0);
 
-/// 桌面 comm：`ct=19` 取全量音质；`guid`/`wid` 为公开客户端常量。
+/// 桌面 comm：`ct=19` 取全量音质。
 ///
 /// 已登录时注入 `uin/qq/authst/tmeLoginType=2`（对齐 core/request.dart 的
 /// 移动 comm 组装；未登录为访客 `uin=0`/`tmeLoginType=0`）。
+///
+/// `guid` 取自持久化设备身份（旧实现是社区共享的硬编码常量——所有用户都用
+/// 同一个 GUID，是很容易被聚类的特征）。`wid` 仍是客户端公开常量。
 Map<String, dynamic> _desktopComm() {
   final cookies = qmGetQQMusicCookies();
   final uin = qmGetQQMusicUin();
@@ -46,7 +51,7 @@ Map<String, dynamic> _desktopComm() {
     '_os_version': '6.2.9200-2',
     'ct': '19',
     'cv': '2151',
-    'guid': '1F70E520B2EAA7D25E11760783C53CA9',
+    'guid': qmGetDevice().guid.toUpperCase(),
     'patch': '118',
     'psrf_access_token_expiresAt': 0,
     'psrf_qqaccess_token': '',
@@ -72,9 +77,12 @@ String _genSearchId() {
       '${rnd.nextInt(100000).toString().padLeft(5, '0')}';
 }
 
-/// 瞬时错误重试次数与退避（对齐 core/request.dart；风控不重试）。
-const int _maxRetry = 2;
-const int _retryBackoffMs = 300;
+/// 瞬时错误重试次数与退避（只对传输级错误；风控/业务码不重试）。
+///
+/// 旧实现为 2（共 3 次），叠加上请求层重试，一次搜索最多 9 个请求；实测
+/// 同出口连打 4 次即触发 `inner=2001`，故收窄到 1 次。
+const int _maxRetry = 1;
+const int _retryBackoffMs = 400;
 
 Future<void> _delay(int ms) => Future.delayed(Duration(milliseconds: ms));
 
@@ -88,8 +96,19 @@ Future<Map<String, dynamic>> _desktopSearch(
   int limit,
   int searchType,
 ) async {
+  // 全局风控冷却：命中过 risk 后冷却期内直接失败，不联网（见 core/pacing.dart）。
+  final cooling = qmRiskCooldownRemaining();
+  if (cooling > Duration.zero) {
+    throw QmRequestException(
+      'QM已触发风控，冷却中（剩余 ${(cooling.inSeconds + 1)}s），请稍后再试',
+      kind: QmErrorKind.risk,
+      inner: qmRiskInnerCode,
+    );
+  }
+  final comm = _desktopComm();
+  final userAgent = qmHeaders['User-Agent'] ?? '';
   final body = <String, dynamic>{
-    'comm': _desktopComm(),
+    'comm': comm,
     'music.search.SearchCgiService': <String, dynamic>{
       'module': 'music.search.SearchCgiService',
       'method': 'DoSearchForQQMusicDesktop',
@@ -107,15 +126,15 @@ Future<Map<String, dynamic>> _desktopSearch(
   final sign = qmZzcSign(jsonEncode(body));
   final url = '$qmDesktopApiUrl?sign=$sign';
 
-  // 瞬时错误自动重试（带退避）；风控（2001 / is_filter<0）**不重试**，
-  // 其余非零业务码退避重试后再抛（对齐 core/request.dart 语义）。
+  // 瞬时错误自动重试（带退避）；风控（2001 / is_filter<0）**不重试并记全局
+  // 冷却**；业务码不重试（参数/权限问题重试也不会恢复）。
   Object? lastErr;
   for (var attempt = 0; attempt <= _maxRetry; attempt++) {
     try {
       final data = await qmPostRaw(
         body,
         url: url,
-        extraHeaders: const {'User-Agent': 'QQMusic 14090508(android 12)'},
+        extraHeaders: {'User-Agent': userAgent},
       );
       final node = data['music.search.SearchCgiService'];
       final nodeMap = node is Map ? node : const <String, dynamic>{};
@@ -130,6 +149,7 @@ Future<Map<String, dynamic>> _desktopSearch(
         final metaMap = metaRaw is Map ? metaRaw : const <String, dynamic>{};
         final filter = metaMap['is_filter'];
         if (filter is num && filter.toInt() < 0) {
+          qmNoteRisk();
           throw QmRequestException(
             'QM搜索触发额外验证/风控过滤（meta.is_filter=$filter），已停止自动重试',
             kind: QmErrorKind.risk,
@@ -137,9 +157,11 @@ Future<Map<String, dynamic>> _desktopSearch(
             inner: qmRiskInnerCode,
           );
         }
+        qmNoteSuccess();
         return dataMap;
       }
       final risk = outer == qmRiskInnerCode || inner == qmRiskInnerCode;
+      if (risk) qmNoteRisk();
       throw QmRequestException(
         risk
             ? 'QM搜索被拦截：请求过于频繁或触发风控（outer=$outer inner=$inner）'
@@ -149,9 +171,10 @@ Future<Map<String, dynamic>> _desktopSearch(
         inner: inner,
       );
     } on QmRequestException catch (e) {
-      // risk 立即抛（不重试）；code 耗尽重试后抛。
-      if (e.kind == QmErrorKind.risk || attempt >= _maxRetry) rethrow;
+      // risk 立即抛（不重试）；业务码同样不重试。
+      if (e.kind == QmErrorKind.risk || e.kind == QmErrorKind.code) rethrow;
       lastErr = e;
+      if (attempt >= _maxRetry) break;
     } catch (err) {
       lastErr = err;
       if (attempt >= _maxRetry) break;

@@ -11,10 +11,11 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import '../core/config.dart';
 import '../core/credential.dart';
+import '../core/device.dart';
+import '../core/pacing.dart';
 import '../core/request.dart';
 import '../core/types.dart';
 
@@ -44,21 +45,26 @@ const _qqQualityTemplates = <_QualityCandidate>[
   _QualityCandidate('C400', '.m4a', 'lq'),
 ];
 
+/// 单次请求最多携带的候选文件名个数。
+///
+/// 服务端对 `filename` 数组长度有上限，且一次带 9 个档位会被视为「批量刷取」
+/// 特征。按目标档位只发「该档 + 下一档（外加 128k 兜底）」，通常 2~3 个。
+const int _kMaxCandidates = 3;
+
 /// 根据首选音质生成顺位候选列表
 List<_QualityCandidate> _qualityCandidates(String preferredLevel) {
   final target = preferredLevel.toLowerCase();
   final index = _qqQualityTemplates.indexWhere((t) => t.level == target);
-  if (index >= 0) return _qqQualityTemplates.sublist(index);
-  return _qqQualityTemplates;
-}
-
-String _randGuid() {
-  final r = Random();
-  final sb = StringBuffer();
-  for (var i = 0; i < 32; i++) {
-    sb.write(r.nextInt(16).toRadixString(16));
+  final ordered =
+      index >= 0 ? _qqQualityTemplates.sublist(index) : _qqQualityTemplates;
+  if (ordered.length <= _kMaxCandidates) return ordered;
+  final picked = ordered.take(_kMaxCandidates).toList();
+  // 兜底：非 lq 请求时，末尾补 128k（服务端按账号权限逐档降级，128k 覆盖最广）。
+  final fallback = _qqQualityTemplates.last;
+  if (picked.isNotEmpty && picked.last.level != fallback.level) {
+    picked[picked.length - 1] = fallback;
   }
-  return sb.toString();
+  return picked;
 }
 
 /// 探活超时：同时覆盖「响应头」与「读取判定所需字节」两个阶段。
@@ -115,13 +121,27 @@ QmModule qmSongUrl = (params) async {
   final candidates = _qualityCandidates(targetLevel);
   final filenames = candidates.map((c) => '${c.prefix}$fileBase${c.ext}').toList();
 
+  // 风控冷却期内直接失败：取流是最高频、最容易被限流的路径，继续请求只会
+  // 把账号处罚时间刷得更长（见 core/pacing.dart）。
+  final cooling = qmRiskCooldownRemaining();
+  if (cooling > Duration.zero) {
+    return <String, dynamic>{
+      'code': 403,
+      'message': 'QM已触发风控，冷却中（剩余 ${cooling.inSeconds + 1}s），请稍后再试',
+      'data': <Map<String, dynamic>>[<String, dynamic>{'id': mid, 'url': ''}],
+    };
+  }
+
   final cookies = qmGetQQMusicCookies();
   final uin = qmGetQQMusicUin();
   final musickey = cookies['qm_keyst'] ?? cookies['qqmusic_key'] ?? '';
   final loggedIn = uin != '0' && musickey.isNotEmpty;
   final cookieStr = qmSessionToCookieHeader(cookies);
   final gtk = qmHash33(musickey, 5381);
-  final guid = _randGuid();
+  // GUID 必须是**稳定设备身份**：旧实现每次取流都随机生成，同一账号短时间
+  // 在无数「新设备」上取流，是设备农场特征（风控主因之一）。
+  final device = qmGetDevice();
+  final guid = device.guid;
 
   final body = <String, dynamic>{
     'comm': <String, dynamic>{
@@ -142,6 +162,10 @@ QmModule qmSongUrl = (params) async {
       // 否则登录账号被当访客，VIP / 高音质档位取不到 purl。
       if (loggedIn) 'authst': musickey,
       if (loggedIn) 'tmeLoginType': 2,
+      // 设备指纹（真实客户端都会带；缺省则退化为「无头请求」特征）。
+      'udid': device.udid,
+      'OpenUDID': device.openUdid,
+      if (device.qimei36.isNotEmpty) 'QIMEI36': device.qimei36,
     },
     'req_0': <String, dynamic>{
       'module': 'music.vkey.GetVkey',
@@ -165,11 +189,14 @@ QmModule qmSongUrl = (params) async {
     'Cookie': ?cookieStr,
     'Referer': 'https://y.qq.com/',
     'Origin': 'https://y.qq.com',
-    'User-Agent': qmWebUa,
+    // 与 comm 保持同一套设备 UA（旧实现这里用桌面 Chrome UA、comm 用 Android
+    // 客户端字段，UA/comm 互相矛盾本身就是可疑信号）。
+    'User-Agent': device.userAgent,
   };
 
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
   try {
+    await qmAcquireSlot();
     final req = await client.postUrl(Uri.parse(qmApiUrl));
     headers.forEach((k, v) => req.headers.set(k, v));
     req.add(utf8.encode(jsonEncode(body)));
@@ -184,7 +211,22 @@ QmModule qmSongUrl = (params) async {
         data = Map<String, dynamic>.from(req0['data'] as Map);
       }
     }
-    final infos = (data?['midurlinfo'] as List?) ?? const [];
+    // 风控信号（`inner=2001`）→ 全局冷却。这条路径过去完全绕过风控识别，
+    // 会一直按音质档位重试到播放失败。
+    //
+    // 注意 **不能**把 `retcode=104009`（`msg` 形如 `<ip>;invalidq;`）也算作
+    // 风控：访客/无版权/未登录时它就是正常语义，误判会让一次播放失败连带
+    // 冻结 60s 的搜索。它只说明「这一批 filename 整体无效」，因此下面直接
+    // 跳过逐档探活。
+    final req0 = json['req_0'];
+    final req0Code = req0 is Map ? _num(req0['code']) : 0;
+    if (json['code'] == qmRiskInnerCode || req0Code == qmRiskInnerCode) {
+      qmNoteRisk();
+    }
+    final batchInvalid = req0Code != 0;
+    final infos = batchInvalid
+        ? const <Object>[]
+        : ((data?['midurlinfo'] as List?) ?? const []);
     final sipList = data?['sip'];
     final sips = <String>[];
     if (sipList is List) {
@@ -235,6 +277,7 @@ QmModule qmSongUrl = (params) async {
     // 请求异常 → 统一落到下方 403（与 TS 语义一致：避免抛出细节）
   } finally {
     client.close();
+    qmReleaseSlot();
   }
 
   return <String, dynamic>{
@@ -243,4 +286,7 @@ QmModule qmSongUrl = (params) async {
     'data': <Map<String, dynamic>>[<String, dynamic>{'id': mid, 'url': ''}],
   };
 };
+
+int _num(Object? v) =>
+    v is num ? v.toInt() : (v == null ? 0 : int.tryParse('$v') ?? 0);
 
