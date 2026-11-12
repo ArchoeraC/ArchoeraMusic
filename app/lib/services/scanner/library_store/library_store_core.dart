@@ -29,7 +29,8 @@ mixin _LibraryStoreCore on Notifier<LibraryState> {
       } else {
         dirs = const [];
       }
-    } catch (_) {
+    } catch (e, st) {
+      Log.w('library', '读取扫描目录失败（按空目录处理）: $e\n$st');
       dirs = const [];
     }
     state = state.copyWith(initialized: true, scanDirs: dirs);
