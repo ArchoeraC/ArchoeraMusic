@@ -1,10 +1,12 @@
 # bench 运行期产物（生成语料 / search.db / .NET 构建产物）——不入库。
 # 生成的 library.db / search.db 体积可达数百 MB，禁止随仓库分发。
-.work/
+#
+# 工作目录 `.work/`、`__pycache__/`、`*.pyc` 已由**根 .gitignore 统一忽略**，
+# 此处不再重复；下面只留 bench 专属项。
 qbench/bin/
 qbench/obj/
-__pycache__/
-*.pyc
+
+# 基准用 SQLite 库（含 WAL 侧车与世代化临时库）
 *.db
 *.db-wal
 *.db-shm
