@@ -8,7 +8,7 @@
 #
 # 用法：bash app/core/indexer/bench/run_bench.sh [额外 run_bench.py 参数]
 # 可覆写环境变量：TRACKS / SEED / ROUNDS / REPEATS / WARMUP / QUERY_LIMITS /
-#                INCREMENTAL_K / WITH_LRC / CONFIG / BENCH_WORK
+#                INCREMENTAL_K / WITH_LRC / CONFIG / BENCH_WORK / VOCAB
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -21,6 +21,8 @@ QUERY_LIMITS="${QUERY_LIMITS:-50,10000}"
 INCREMENTAL_K="${INCREMENTAL_K:-20,200}"
 CONFIG="${CONFIG:-Release}"
 WORK="${BENCH_WORK:-$(pwd)/.work}"
+# VOCAB>0 使用大词表语料（真实命中率，作主判据）；默认 0 = 固定小词表（最坏上界）。
+VOCAB="${VOCAB:-0}"
 
 WITH_LRC_FLAG=()
 if [ -n "${WITH_LRC:-}" ]; then WITH_LRC_FLAG=(--with-lrc); fi
@@ -32,4 +34,5 @@ exec python3 run_bench.py \
   --tracks "$TRACKS" --seed "$SEED" \
   --rounds "$ROUNDS" --repeats "$REPEATS" --warmup "$WARMUP" \
   --query-limits "$QUERY_LIMITS" \
-  --incremental-k "$INCREMENTAL_K" --config "$CONFIG" --work "$WORK" "${WITH_LRC_FLAG[@]}" "$@"
+  --incremental-k "$INCREMENTAL_K" --config "$CONFIG" --work "$WORK" \
+  --vocab "$VOCAB" "${WITH_LRC_FLAG[@]}" "$@"

@@ -5410,6 +5410,30 @@ abstract class AppLocalizations {
   /// **'单文件，上限 4 MiB（原地截断，不产生额外文件）。'**
   String get settingsLogToFileNote;
 
+  /// No description provided for @settingsSearchQueryLog.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'搜索查询日志'**
+  String get settingsSearchQueryLog;
+
+  /// No description provided for @settingsSearchQueryLogOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'记录本机查询关键词，用于改进搜索质量（可随时清除）'**
+  String get settingsSearchQueryLogOn;
+
+  /// No description provided for @settingsSearchQueryLogOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'日志写入磁盘已关闭，不记录查询'**
+  String get settingsSearchQueryLogOff;
+
+  /// No description provided for @settingsSearchQueryLogCleared.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已清除搜索查询日志'**
+  String get settingsSearchQueryLogCleared;
+
   /// No description provided for @settingsSecuritySection.
   ///
   /// In zh_CN, this message translates to:

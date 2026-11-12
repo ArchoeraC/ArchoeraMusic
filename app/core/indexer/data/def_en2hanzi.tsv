@@ -1,7 +1,7 @@
 # Archoera indexer Unihan 释义查询扩展：英文词 → 候选汉字码点（T1，查询侧用）
 # 来源: Unicode Unihan kDefinition（Unicode License，https://www.unicode.org/license.txt）
 # 字段: WORD<TAB>HEX1 HEX2 ...；HEX 为汉字码点（去重、主区优先+码点升序、每词 ≤ 8）
-# 生成: tools/gen_hanzi_data.py gen_hanzi_defs()（去括注/小写/停用词过滤，确定可重跑）
+# 生成: tools/gen_tables（去括注/小写/停用词过滤，确定可重跑）
 abalone	86AB 9B91 9C12 9C8D 9CC6 4C45 311DA
 abandon	5F03 62CB 6487 68C4 3946 3A0A 3C05 3C66
 abashed	39AC 3046B

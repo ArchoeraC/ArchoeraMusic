@@ -10,7 +10,7 @@ namespace Archoera.Indexer;
 /// <summary>
 /// 内嵌 Unicode NFKC 兼容折叠表（<c>data/nfkc.tsv</c>）的加载与查询。
 ///
-/// 表由 <c>tools/gen_hanzi_data.py</c> 离线生成，以 <c>EmbeddedResource</c> 编入程序集
+/// 表由 <c>tools/gen_tables</c>（纯 .NET）离线生成，以 <c>EmbeddedResource</c> 编入程序集
 /// （csproj 内固定 <c>LogicalName</c>，无动态反射），NativeAOT 安全。
 /// 仅在首次访问时惰性加载一次并缓存为字典；线程安全性由 <see cref="Lazy{T}"/> 保证。
 ///
@@ -46,7 +46,7 @@ internal static class HanziData
 
     /// <summary>
     /// 逐字符 NFKC 兼容折叠表（全范围，含非 BMP）：码点 → 已解码的折叠结果字符串。
-    /// 由 <c>tools/gen_hanzi_data.py</c> 以 Python <c>unicodedata</c> 离线生成（逐字符）。
+    /// 由 <c>tools/gen_tables</c> 以 .NET <c>string.Normalize(FormKC)</c> 离线生成（逐字符）。
     /// </summary>
     private static readonly Lazy<Dictionary<int, string>> CompatibilityTable =
         new(static () => LoadCodePoints(CompatibilityResource));

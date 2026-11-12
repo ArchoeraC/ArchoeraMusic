@@ -3064,6 +3064,21 @@ class AppLocalizationsEs extends AppLocalizations {
       'Archivo único, limitado a 4 MiB (truncado in situ; sin archivos adicionales).';
 
   @override
+  String get settingsSearchQueryLog => 'Registro de consultas de búsqueda';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      'Registra los términos de búsqueda en este dispositivo para mejorar la calidad (se puede borrar en cualquier momento)';
+
+  @override
+  String get settingsSearchQueryLogOff =>
+      'El registro en disco está desactivado, las consultas no se guardan';
+
+  @override
+  String get settingsSearchQueryLogCleared =>
+      'Registro de consultas de búsqueda borrado';
+
+  @override
   String get settingsSecuritySection => 'Destrucción segura';
 
   @override

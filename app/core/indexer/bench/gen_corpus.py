@@ -111,18 +111,51 @@ def make_line(rng: random.Random) -> str:
     return line + rng.choice(END)
 
 
-def gen_lyrics(rng: random.Random, min_bytes: int, max_bytes: int) -> str:
-    """生成 2–8 KB（字节）的多行中文歌词；代表查询词概率注入，部分行随机转繁体。"""
+def gen_lyrics(rng: random.Random, min_bytes: int, max_bytes: int,
+               vocab: list[str] | None = None) -> str:
+    """生成 2–8 KB（字节）的多行中文歌词；代表查询词概率注入，部分行随机转繁体。
+
+    [vocab] 非空时改用**大词表**随机拼词（每词从数千词里取），使单个词元的库内
+    命中率落在真实曲库区间（约 1–20%）。默认 `None` 走原固定小词表——
+    后者会让常用词命中近乎整库，只能作为**最坏上界**参考（见 §2 语料说明）。
+    """
     target = rng.randint(min_bytes, max_bytes)
     lines = [line for line, p in INJECT if rng.random() < p]
     total = sum(len(l.encode("utf-8")) + 1 for l in lines)
     while total < target:
-        line = make_line(rng)
+        line = make_line_vocab(rng, vocab) if vocab else make_line(rng)
         if rng.random() < 0.15:  # 约 15% 行转繁体，制造繁简互通
             line = line.translate(TRAD)
         lines.append(line)
         total += len(line.encode("utf-8")) + 1
     return "\n".join(lines)
+
+
+def build_large_vocab(rng: random.Random, size: int = 4000) -> list[str]:
+    """构造 `size` 个随机二字词（来自常用汉字区）。
+
+    词表大 → 单个词元在库内的命中率低（约 N_words/词表大小），贴近真实曲库。
+    """
+    hanzi = [chr(c) for c in range(0x4E00, 0x4E00 + 3000)]
+    words: list[str] = []
+    seen: set[str] = set()
+    while len(words) < size:
+        w = rng.choice(hanzi) + rng.choice(hanzi)
+        if w in seen:
+            continue
+        seen.add(w)
+        words.append(w)
+    return words
+
+
+def make_line_vocab(rng: random.Random, vocab: list[str]) -> str:
+    """大词表模式下的一行歌词（结构与 [make_line] 一致，仅换词源）。"""
+    n = rng.randint(3, 7)
+    words = [rng.choice(vocab) for _ in range(n)]
+    line = words[0]
+    for w in words[1:]:
+        line += rng.choice(CONN) + w
+    return line + rng.choice(END)
 
 
 def gen_lrc(rng: random.Random, lyrics: str) -> str:
@@ -174,7 +207,12 @@ CREATE TABLE IF NOT EXISTS _scanner_meta (generation INTEGER);
 
 
 def generate(out_dir: str, tracks: int, seed: int, min_kb: int, max_kb: int,
-             lrc_ratio: float, generation: int) -> dict:
+             lrc_ratio: float, generation: int, large_vocab: int = 0) -> dict:
+    """生成语料。
+
+    [large_vocab] > 0 时改用该规模的大词表（真实命中率）；0 = 原固定小词表
+    （常用词命中近乎整库，只能作**最坏上界**参考）。
+    """
     audio_dir = os.path.join(out_dir, "audio")
     os.makedirs(audio_dir, exist_ok=True)
     db_path = os.path.join(out_dir, "library.db")
@@ -185,6 +223,12 @@ def generate(out_dir: str, tracks: int, seed: int, min_kb: int, max_kb: int,
     rows = []
     lrc_count = 0
     total_lyrics_bytes = 0
+    vocab_rng = random.Random(seed ^ 0x5EED)
+    vocab = build_large_vocab(vocab_rng, large_vocab) if large_vocab > 0 else None
+    titles = TITLES
+    if vocab:
+        # 标题也从大词表取，避免 20 个固定标题把「元数据命中」放大到整库。
+        titles = ["".join(vocab_rng.choice(vocab) for _ in range(3)) for _ in range(2000)]
 
     conn = sqlite3.connect(db_path)
     try:
@@ -196,12 +240,12 @@ def generate(out_dir: str, tracks: int, seed: int, min_kb: int, max_kb: int,
             rng = random.Random(seed * 1_000_003 + i)
             tid = f"t{i:07d}"
             path = os.path.join(audio_dir, f"{tid}.mp3")
-            title = rng.choice(TITLES)
+            title = rng.choice(titles)
             artists = [{"name": rng.choice(ARTISTS)}]
             if rng.random() < 0.25:
                 artists.append({"name": rng.choice(ARTISTS)})
             album = {"name": rng.choice(ALBUMS)}
-            lyrics = gen_lyrics(rng, min_bytes, max_bytes)
+            lyrics = gen_lyrics(rng, min_bytes, max_bytes, vocab)
             total_lyrics_bytes += len(lyrics.encode("utf-8"))
             mtime = 1_600_000_000_000 + i * 1000
 

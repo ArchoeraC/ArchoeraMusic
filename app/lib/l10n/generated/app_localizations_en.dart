@@ -3011,6 +3011,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Single file, capped at 4 MiB (truncated in place; no extra files).';
 
   @override
+  String get settingsSearchQueryLog => 'Search query log';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      'Logs query keywords on this device to improve search quality (can be cleared anytime)';
+
+  @override
+  String get settingsSearchQueryLogOff =>
+      'Log-to-disk is off, so queries are not recorded';
+
+  @override
+  String get settingsSearchQueryLogCleared => 'Search query log cleared';
+
+  @override
   String get settingsSecuritySection => 'Secure wipe';
 
   @override

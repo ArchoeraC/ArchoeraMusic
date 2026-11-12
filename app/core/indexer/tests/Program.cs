@@ -52,7 +52,7 @@ public static class Program
 
     private static void RunDirectAssertions()
     {
-        Assert("AnalyzerVersion == 11", Analyzer.AnalyzerVersion == 11,
+        Assert("AnalyzerVersion == 12", Analyzer.AnalyzerVersion == 12,
             Analyzer.AnalyzerVersion.ToString());
 
         // 假名 / 谚文：子串分词（bigram+unigram），**不进拼音 / 首字母列**。
