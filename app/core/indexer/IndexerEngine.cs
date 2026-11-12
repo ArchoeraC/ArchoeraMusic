@@ -139,6 +139,10 @@ public sealed class IndexerEngine
         var state = needFull ? new Dictionary<string, DocState>(StringComparer.Ordinal) : admin.LoadState();
         var nextDocId = needFull ? 1L : admin.NextDocId;
 
+        // 距上次全段合并累计的改写曲数（全量构建从 0 起算）。合并只在过阈值时做，
+        // 见 IndexerOptions.MergeEveryUpdates 的注释与实测数据。
+        var updatesSinceMerge = needFull ? 0 : (prev?.UpdatesSinceMerge ?? 0);
+
         long generation = ReadScannerGeneration(libraryPath);
 
         var total = CountTracks(libraryPath);
@@ -242,6 +246,13 @@ public sealed class IndexerEngine
 
         Fire("commit", "");
 
+        updatesSinceMerge += indexed + deleted;
+        var shouldMerge = needFull
+            || (indexed + deleted > 0
+                && options.MergeEveryUpdates > 0
+                && updatesSinceMerge >= options.MergeEveryUpdates);
+        if (shouldMerge) updatesSinceMerge = 0;
+
         admin.WriteMeta(new StoreMeta
         {
             IndexLrc = options.IndexLrc,
@@ -254,14 +265,18 @@ public sealed class IndexerEngine
             HasKorean = profile.Korean,
             HasHan = profile.Han,
             HasLatin = profile.Latin,
+            UpdatesSinceMerge = updatesSinceMerge,
         });
 
         // FTS5 的 `optimize` 是**全段合并**：402MB 级索引实测 4.5–13s，且不随脏曲数缩小
-        // （只改 1 首也要付全额）。它独占增量的耗时（K=20 实测 6433ms 中约 4.5s 是它），
-        // 但**不能省**：跳过合并会让段数累积（实测 +200 首 → 12 段），宽命中查询随之退化
-        // （`wan` 56→92ms、`我爱你` 33→90ms）。写路径本身仅 ~0.3ms/曲，故这是
-        // 「一次全库重写换查询稳定」的取舍，属 FTS5 固有成本，非缺陷。
-        _store.Optimize();
+        // （只改 1 首也要付全额）。但它**不能永远不做**：跳过合并会让 contentless_delete 的
+        // 墓碑累积，宽命中查询随之退化（实测 `爱你` 20 曲 +34% / 60 曲 +73% / 120 曲 +103%）。
+        // 故按「累计改写曲数」过阈值才合并（全量构建收尾总是合并）。
+        //
+        // 注意：脏曲的**筛选与应用始终是同步、完整**的（阶段一/二），合并只是物理整理，
+        // 不改内容、失败也无损（索引仍然正确，下次增量再尝试）——两者不能混为一谈。
+        if (shouldMerge)
+            _store.Optimize();
         _store.Commit();
         admin.Seal();
 
@@ -277,6 +292,8 @@ public sealed class IndexerEngine
             Full = needFull,
             Generation = generation,
             DurationMs = stopwatch.ElapsedMilliseconds,
+            Merged = shouldMerge,
+            UpdatesSinceMerge = updatesSinceMerge,
         };
     }
 

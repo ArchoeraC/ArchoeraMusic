@@ -28,6 +28,20 @@ public sealed class IndexerOptions
 
     /// <summary>内部批量事务条数（0 = 使用存储默认）。</summary>
     public int Batch { get; set; }
+
+    /// <summary>累计改写多少首曲目后触发 FTS5 全段合并（见 <see cref="StoreMeta.UpdatesSinceMerge"/>）。</summary>
+    ///
+    /// <remarks>
+    /// 合并是 O(索引) 的全库重写（402MB 实测 4.5–13s），**与脏曲数无关**——只改 1 首也要付全额。
+    /// 而跳过合并会让 `contentless_delete` 的墓碑累积、查询随之退化（实测 `爱你`：20 曲 +34%、
+    /// 60 曲 +73%、120 曲 +103%）。默认 30 是两者之间的折中：常态增量只写不合并（亚秒级），
+    /// 累计约 30 首后的一次增量顺带合并，把查询退化压在 ~±40% 以内。
+    /// 测试可调小以验证计数与触发。
+    /// </remarks>
+    public int MergeEveryUpdates { get; set; } = DefaultMergeEveryUpdates;
+
+    /// <summary>合并阈值默认值（见 <see cref="MergeEveryUpdates"/>）。</summary>
+    public const int DefaultMergeEveryUpdates = 30;
 }
 
 /// <summary>索引进度（stdout JSON / FFI 回调共用）。</summary>
@@ -56,6 +70,15 @@ public sealed class IndexerResult
     public bool Full { get; set; }
     public long Generation { get; set; }
     public long DurationMs { get; set; }
+
+    /// <summary>
+    /// 本次是否执行了 FTS5 全段合并（`optimize`）。合并是 O(索引) 的全库重写，
+    /// 会是增量耗时的主要构成——报告/诊断据此区分「写路径慢」与「合并慢」。
+    /// </summary>
+    public bool Merged { get; set; }
+
+    /// <summary>本次结束后距下次合并还累计了多少首改写（见 <see cref="StoreMeta.UpdatesSinceMerge"/>）。</summary>
+    public int UpdatesSinceMerge { get; set; }
 }
 
 /// <summary>
@@ -128,6 +151,8 @@ internal static class IndexerJson
         w.WriteBoolean("full", r.Full);
         w.WriteNumber("generation", r.Generation);
         w.WriteNumber("durationMs", r.DurationMs);
+        w.WriteBoolean("merged", r.Merged);
+        w.WriteNumber("updatesSinceMerge", r.UpdatesSinceMerge);
         w.WriteEndObject();
     });
 

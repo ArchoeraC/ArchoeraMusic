@@ -62,6 +62,8 @@ public static class Program
                 case "--db": if (i + 1 < args.Length) dbPath = args[++i]; break;
                 case "--index": if (i + 1 < args.Length) indexPath = args[++i]; break;
                 case "--batch": if (i + 1 < args.Length && int.TryParse(args[++i], out var b)) options.Batch = b; break;
+                case "--merge-every": if (i + 1 < args.Length && int.TryParse(args[++i], out var me) && me > 0)
+                        options.MergeEveryUpdates = me; break;
                 case "--help": case "-h": PrintUsage(); return 0;
             }
         }
@@ -224,7 +226,9 @@ public static class Program
             用法:
               archoera-indexer build [--full] [--index-lrc] [--no-pinyin] [--romaji-lyrics]
                                      [--db <library.db>] [--index <search.db>] [--batch <n>]
+                                     [--merge-every <n>]
                   构建 / 增量更新搜索索引（默认增量）。stdout 输出 JSON 进度与结果。
+                  --merge-every 累计改写多少首后做一次 FTS5 全段合并（默认 30）。
               archoera-indexer query <text> [--index <search.db>] [--limit <n>] [--raw]
                   调试查询（bm25 排序）。默认经分析器归一；--raw 传入原始 FTS5 MATCH 表达式。
               archoera-indexer analyze <field> <text>
