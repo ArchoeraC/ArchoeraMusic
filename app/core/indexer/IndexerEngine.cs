@@ -256,6 +256,11 @@ public sealed class IndexerEngine
             HasLatin = profile.Latin,
         });
 
+        // FTS5 的 `optimize` 是**全段合并**：402MB 级索引实测 4.5–13s，且不随脏曲数缩小
+        // （只改 1 首也要付全额）。它独占增量的耗时（K=20 实测 6433ms 中约 4.5s 是它），
+        // 但**不能省**：跳过合并会让段数累积（实测 +200 首 → 12 段），宽命中查询随之退化
+        // （`wan` 56→92ms、`我爱你` 33→90ms）。写路径本身仅 ~0.3ms/曲，故这是
+        // 「一次全库重写换查询稳定」的取舍，属 FTS5 固有成本，非缺陷。
         _store.Optimize();
         _store.Commit();
         admin.Seal();
