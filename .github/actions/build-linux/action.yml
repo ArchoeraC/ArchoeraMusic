@@ -39,10 +39,10 @@ runs:
     - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
       with:
         # 固定 Flutter 版本（与本地开发/`pubspec.lock` 对齐），不要用 channel: stable：
-        # 2026-11-12 stable 滚到 3.50.0 后，`nativeapi`（经 window_manager 0.6 引入）
-        # 的 `Isolate.create` 在该版本已被移除，全平台 kernel_snapshot 一起编译失败。
-        # 升级 Flutter 前请先确认 nativeapi / cnativeapi 已支持目标版本。
-        flutter-version: '3.47.9'
+        # 依赖链（window_manager 0.7 → nativeapi 0.6）要求 Dart ^3.14 / Flutter ≥3.50；
+        # 不要改回 channel: stable（会随上游漂移，2026-11-12 曾因此全平台失败）。
+        # 升级前请同时确认 nativeapi / cnativeapi / window_manager 三者的 SDK 约束。
+        flutter-version: '3.50.0'
         cache: true
 
     # Zig 0.17（EraAudio kernel）。归档名按 0.15.1+ 新规则 zig-<arch>-<os>；
