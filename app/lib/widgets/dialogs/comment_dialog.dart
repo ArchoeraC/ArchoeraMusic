@@ -21,6 +21,7 @@ import '../../services/source/media_request_headers.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../common/glass_surface.dart';
+import '../common/smooth_wheel_scroll_controller.dart';
 import '../player/s_controls.dart';
 import '../common/toast.dart';
 import 'comment_platform.dart';
@@ -67,7 +68,8 @@ class _CommentDialogState extends ConsumerState<CommentDialog> {
   NeteaseCommentPage? _page;
   bool _loading = true;
   bool _failed = false;
-  final ScrollController _scroll = ScrollController();
+  // 滚轮/触控板滚动带短时缓动；触摸拖拽与键盘滚动不受影响。
+  final ScrollController _scroll = SmoothWheelScrollController();
 
   /// 发送评论输入框（[CommentPlatform.supportsSend] 时显示）。
   final TextEditingController _input = TextEditingController();
