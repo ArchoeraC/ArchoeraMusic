@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import '../apis/lyric/format.dart' show lyricFormatIds;
 import 'app_prefs.dart';
 
 // ── 歌词域键（lyrics. 前缀）────────────────────────────────────
@@ -48,14 +49,23 @@ const List<String> lyricPlatforms = ['netease', 'qqmusic', 'kugou'];
 /// 默认歌词来源顺序（当前平台无歌词时按此顺序回退到其它平台）。
 const List<String> defaultLyricSourceOrder = ['netease', 'qqmusic', 'kugou'];
 
-/// 歌词格式标识：yrc/qrc/krc 为逐字富格式，lrc 为标准格式。
-const List<String> lyricFormats = ['yrc', 'qrc', 'krc', 'lrc'];
+/// 用户可排序的歌词格式（来自跨平台格式注册表 `lyricFormatIds`）。
+///
+/// yrc/qrc/krc 为逐字富格式，lrc 为标准格式；Neko 的 `neko-v1` 属平台扩展
+/// 富格式，不单列，跟随 `preferWordByWord` 的逐字类别。
+const List<String> lyricFormats = lyricFormatIds;
 
-/// 默认歌词格式优先级（逐字优先，其次标准 LRC）。
-const List<String> defaultLyricFormatOrder = ['yrc', 'qrc', 'krc', 'lrc'];
+/// 默认歌词格式优先级（逐字优先，其次标准 LRC；顺序即注册表默认值）。
+const List<String> defaultLyricFormatOrder = lyricFormatIds;
 
 /// 失焦档位可选值（`amll.blurQuality`；与 `LyricsBlurQuality` 一一对应）。
-const List<String> amllBlurQualities = ['auto', 'fast', 'lite', 'quality', 'off'];
+const List<String> amllBlurQualities = [
+  'auto',
+  'fast',
+  'lite',
+  'quality',
+  'off',
+];
 
 /// 归一化「顺序」列表：仅保留白名单内、去重，缺失项按 [fallback] 补齐。
 List<String> _normalizeOrder(
@@ -219,8 +229,8 @@ extension AmllLyricsPrefs on AppPrefs {
       amllWordSweepKey: ?wordSweep,
       amllHidePassedKey: ?hidePassed,
       amllEnableScaleKey: ?enableScale,
-      amllBlurQualityKey: ?(blurQuality != null &&
-              amllBlurQualities.contains(blurQuality)
+      amllBlurQualityKey:
+          ?(blurQuality != null && amllBlurQualities.contains(blurQuality)
           ? blurQuality
           : null),
       amllSpringPresetKey: ?springPreset,

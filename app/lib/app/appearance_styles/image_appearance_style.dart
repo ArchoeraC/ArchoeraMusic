@@ -49,7 +49,8 @@ class ImageAppearanceStyle extends AppearanceStyle {
         ),
         blurSigma: prefs.backgroundBlur.toDouble(),
         scale: prefs.backgroundScale,
-        dim: prefs.backgroundDim,
+        // 取用户意图与可读性下限的高者：亮图自动加深遮罩，暗图不额外压暗。
+        dim: prefs.effectiveBackgroundDim,
       ),
     );
   }

@@ -13,6 +13,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCatRender => '性能 / 渲染';
 
   @override
+  String get settingsRenderFps => '渲染帧数';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '每秒渲染的上限（$fps FPS，实际受显示器刷新率限制）';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '高帧率会明显增加 GPU 占用与耗电';
+
+  @override
   String get settingsRenderSubtitle => 'GPU 加速与渲染开销（实验）';
 
   @override
@@ -864,6 +875,36 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loginRiskTitle => '登录风险提示';
 
   @override
+  String get kugouRiskVerifyTitle => '酷狗安全验证';
+
+  @override
+  String get kugouRiskVerifySmsDescription => '酷狗要求完成短信验证，验证码已发送到账号绑定的手机号。';
+
+  @override
+  String get kugouRiskVerifySmsHint => '短信验证码';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => '请输入短信验证码';
+
+  @override
+  String get kugouRiskVerifySubmit => '提交验证';
+
+  @override
+  String get kugouRiskVerifyFailed => '验证未通过，请检查验证码后重试。';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle => '需要在酷狗官方客户端完成验证';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      '酷狗要求腾讯人机验证（TCaptcha），当前版本无法在应用内嵌网页完成。请打开酷狗官方客户端完成安全验证后，再回到本应用重试。';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return '酷狗要求完成安全验证（类型 $type），请在酷狗官方客户端完成后重试。';
+  }
+
+  @override
   String get loginRiskBody =>
       '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
 
@@ -1092,66 +1133,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get nekoLoginTitle => '登录 NekoMusic';
-
-  @override
-  String get nekoLoginTabOauth => 'OAuth 登录';
-
-  @override
-  String get nekoOauthTitle => '使用 NekoAuth 登录';
-
-  @override
-  String get nekoOauthDesc => '在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。';
-
-  @override
-  String get nekoOauthOpen => '在浏览器中登录';
-
-  @override
-  String get nekoOauthWaiting => '等待授权完成…';
-
-  @override
-  String get nekoOauthUrlLabel => '一次性登录地址';
-
-  @override
-  String get nekoOauthCopy => '复制链接';
-
-  @override
-  String get nekoOauthCopied => '链接已复制';
-
-  @override
-  String get nekoOauthRefresh => '重新获取';
-
-  @override
-  String get nekoOauthFailed => '登录失败';
-
-  @override
-  String get nekoLoginTabQr => '扫码登录';
-
-  @override
-  String get nekoLoginTabPassword => '账号密码';
-
-  @override
-  String get nekoLoginEmail => '邮箱';
-
-  @override
-  String get nekoLoginPassword => '密码';
-
-  @override
-  String get nekoLoginPasswordHint => '请输入密码';
-
-  @override
-  String get nekoLoginSubmit => '登录';
-
-  @override
-  String get nekoLoginForgotPassword => '忘记密码？';
-
-  @override
-  String get nekoForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
-
-  @override
-  String get nekoForgotFailed => '获取重置链接失败';
-
-  @override
-  String get nekoForgotOpened => '已在浏览器中打开重置页';
 
   @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
@@ -2498,7 +2479,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsShowSubtitleOff => '列表不展示别名';
 
   @override
-  String get settingsEnergySaving => '节能模式';
+  String get settingsEnergySaving => '频谱节能';
 
   @override
   String get settingsEnergySavingNote =>
@@ -2509,13 +2490,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '当前为标准模式';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化时卸载全部内存状态';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      '后台（最小化/托盘/熄屏）丢弃页面数据与缓存，恢复后从零重建（可能回到首页、丢滚动位置）；播放不受影响';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低频谱取帧频率以节省 CPU';
@@ -3660,6 +3634,9 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get settingsBackgroundDimAuto => '图片较亮，下限已按亮度自动抬高';
+
+  @override
   String get settingsBackgroundScale => '缩放大小';
 
   @override
@@ -4691,12 +4668,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutActionPlayPause => '播放 / 暂停';
 
   @override
-  String get shortcutActionPlay => '播放';
-
-  @override
-  String get shortcutActionPause => '暂停';
-
-  @override
   String get shortcutActionStop => '停止';
 
   @override
@@ -4772,7 +4743,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shortcutActionGoStreaming => '前往流媒体';
 
   @override
-  String get shortcutActionOpenPlayer => '打开播放页';
+  String get shortcutActionOpenPlayer => '打开 / 关闭播放页';
 
   @override
   String get shortcutActionOpenSettings => '打开设置';
@@ -6234,6 +6205,17 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsCatRender => '性能 / 渲染';
 
   @override
+  String get settingsRenderFps => '渲染帧数';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '每秒渲染的上限（$fps FPS，实际受显示器刷新率限制）';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '高帧率会明显增加 GPU 占用与耗电';
+
+  @override
   String get settingsRenderSubtitle => 'GPU 加速与渲染开销（实验）';
 
   @override
@@ -7085,6 +7067,36 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get loginRiskTitle => '登录风险提示';
 
   @override
+  String get kugouRiskVerifyTitle => '酷狗安全验证';
+
+  @override
+  String get kugouRiskVerifySmsDescription => '酷狗要求完成短信验证，验证码已发送到账号绑定的手机号。';
+
+  @override
+  String get kugouRiskVerifySmsHint => '短信验证码';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => '请输入短信验证码';
+
+  @override
+  String get kugouRiskVerifySubmit => '提交验证';
+
+  @override
+  String get kugouRiskVerifyFailed => '验证未通过，请检查验证码后重试。';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle => '需要在酷狗官方客户端完成验证';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      '酷狗要求腾讯人机验证（TCaptcha），当前版本无法在应用内嵌网页完成。请打开酷狗官方客户端完成安全验证后，再回到本应用重试。';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return '酷狗要求完成安全验证（类型 $type），请在酷狗官方客户端完成后重试。';
+  }
+
+  @override
   String get loginRiskBody =>
       '登录第三方客户端存在以下风险，请确认后继续：\n\n· 平台可能对第三方客户端登录进行风控、限制或封禁，可能导致账号异常、功能受限；\n· 扫码 / 账号登录等同于授权本软件以你的账号访问对应平台，收藏、播放、评论等操作会真实作用于你的账号；\n· 登录凭据（Cookie / Token 等）仅保存在本机并加密存储，不会上传至开发者或任何非平台服务器；\n· 请遵守对应平台的服务条款，因使用本软件产生的一切后果由你自行承担。\n\n继续登录即表示你已阅读并同意上述风险。';
 
@@ -7313,66 +7325,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get nekoLoginTitle => '登录 NekoMusic';
-
-  @override
-  String get nekoLoginTabOauth => 'OAuth 登录';
-
-  @override
-  String get nekoOauthTitle => '使用 NekoAuth 登录';
-
-  @override
-  String get nekoOauthDesc => '在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。';
-
-  @override
-  String get nekoOauthOpen => '在浏览器中登录';
-
-  @override
-  String get nekoOauthWaiting => '等待授权完成…';
-
-  @override
-  String get nekoOauthUrlLabel => '一次性登录地址';
-
-  @override
-  String get nekoOauthCopy => '复制链接';
-
-  @override
-  String get nekoOauthCopied => '链接已复制';
-
-  @override
-  String get nekoOauthRefresh => '重新获取';
-
-  @override
-  String get nekoOauthFailed => '登录失败';
-
-  @override
-  String get nekoLoginTabQr => '扫码登录';
-
-  @override
-  String get nekoLoginTabPassword => '账号密码';
-
-  @override
-  String get nekoLoginEmail => '邮箱';
-
-  @override
-  String get nekoLoginPassword => '密码';
-
-  @override
-  String get nekoLoginPasswordHint => '请输入密码';
-
-  @override
-  String get nekoLoginSubmit => '登录';
-
-  @override
-  String get nekoLoginForgotPassword => '忘记密码？';
-
-  @override
-  String get nekoForgotCopyHint => '重置链接已复制，请在浏览器中打开并完成重置';
-
-  @override
-  String get nekoForgotFailed => '获取重置链接失败';
-
-  @override
-  String get nekoForgotOpened => '已在浏览器中打开重置页';
 
   @override
   String get nekoLoginQrHint => '请使用 NekoMusic 手机 App 扫码登录';
@@ -8719,7 +8671,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsShowSubtitleOff => '列表不展示别名';
 
   @override
-  String get settingsEnergySaving => '节能模式';
+  String get settingsEnergySaving => '频谱节能';
 
   @override
   String get settingsEnergySavingNote =>
@@ -8730,13 +8682,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsEnergySavingOff => '当前为标准模式';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化时卸载全部内存状态';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      '后台（最小化/托盘/熄屏）丢弃页面数据与缓存，恢复后从零重建（可能回到首页、丢滚动位置）；播放不受影响';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低频谱取帧频率以节省 CPU';
@@ -9881,6 +9826,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsBackgroundDimAuto => '图片较亮，下限已按亮度自动抬高';
+
+  @override
   String get settingsBackgroundScale => '缩放大小';
 
   @override
@@ -10912,12 +10860,6 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get shortcutActionPlayPause => '播放 / 暂停';
 
   @override
-  String get shortcutActionPlay => '播放';
-
-  @override
-  String get shortcutActionPause => '暂停';
-
-  @override
   String get shortcutActionStop => '停止';
 
   @override
@@ -10993,7 +10935,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get shortcutActionGoStreaming => '前往流媒体';
 
   @override
-  String get shortcutActionOpenPlayer => '打开播放页';
+  String get shortcutActionOpenPlayer => '打开 / 关闭播放页';
 
   @override
   String get shortcutActionOpenSettings => '打开设置';
@@ -12455,6 +12397,17 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsCatRender => '效能 / 渲染';
 
   @override
+  String get settingsRenderFps => '渲染影格數';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '每秒渲染的上限（$fps FPS，實際受螢幕刷新率限制）';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '高影格率會明顯增加 GPU 佔用與耗電';
+
+  @override
   String get settingsRenderSubtitle => 'GPU 加速與渲染開銷（實驗）';
 
   @override
@@ -13306,6 +13259,36 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get loginRiskTitle => '登入風險提示';
 
   @override
+  String get kugouRiskVerifyTitle => '酷狗安全驗證';
+
+  @override
+  String get kugouRiskVerifySmsDescription => '酷狗要求完成簡訊驗證，驗證碼已傳送到帳號綁定的手機號碼。';
+
+  @override
+  String get kugouRiskVerifySmsHint => '簡訊驗證碼';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => '請輸入簡訊驗證碼';
+
+  @override
+  String get kugouRiskVerifySubmit => '提交驗證';
+
+  @override
+  String get kugouRiskVerifyFailed => '驗證未通過，請檢查驗證碼後重試。';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle => '需要在酷狗官方客戶端完成驗證';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      '酷狗要求騰訊人機驗證（TCaptcha），目前版本無法在應用程式內嵌網頁完成。請開啟酷狗官方客戶端完成安全驗證後，再回到本應用程式重試。';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return '酷狗要求完成安全驗證（類型 $type），請在酷狗官方客戶端完成後重試。';
+  }
+
+  @override
   String get loginRiskBody =>
       '登入第三方用戶端存在以下風險，請確認後繼續：\n\n· 平台可能對第三方用戶端登入進行風控、限制或封禁，可能導致帳號異常、功能受限；\n· 掃碼 / 帳號登入等同於授權本軟體以您的帳號存取對應平台，收藏、播放、評論等操作會實際作用於您的帳號；\n· 登入憑證（Cookie / Token 等）僅保存在本機並加密儲存，不會上傳至開發者或任何非平台伺服器；\n· 請遵守對應平台的服務條款，因使用本軟體產生的一切後果由您自行承擔。\n\n繼續登入即表示您已閱讀並同意上述風險。';
 
@@ -13534,66 +13517,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get nekoLoginTitle => '登入 NekoMusic';
-
-  @override
-  String get nekoLoginTabOauth => 'OAuth 登入';
-
-  @override
-  String get nekoOauthTitle => '使用 NekoAuth 登入';
-
-  @override
-  String get nekoOauthDesc => '在任意瀏覽器開啟下方的一次性網址完成授權；若預設瀏覽器無法登入，可複製到其它瀏覽器。';
-
-  @override
-  String get nekoOauthOpen => '在瀏覽器中登入';
-
-  @override
-  String get nekoOauthWaiting => '等待授權完成…';
-
-  @override
-  String get nekoOauthUrlLabel => '一次性登入網址';
-
-  @override
-  String get nekoOauthCopy => '複製連結';
-
-  @override
-  String get nekoOauthCopied => '連結已複製';
-
-  @override
-  String get nekoOauthRefresh => '重新取得';
-
-  @override
-  String get nekoOauthFailed => '登入失敗';
-
-  @override
-  String get nekoLoginTabQr => '掃碼登入';
-
-  @override
-  String get nekoLoginTabPassword => '帳號密碼';
-
-  @override
-  String get nekoLoginEmail => '信箱';
-
-  @override
-  String get nekoLoginPassword => '密碼';
-
-  @override
-  String get nekoLoginPasswordHint => '請輸入密碼';
-
-  @override
-  String get nekoLoginSubmit => '登入';
-
-  @override
-  String get nekoLoginForgotPassword => '忘記密碼？';
-
-  @override
-  String get nekoForgotCopyHint => '重設連結已複製，請在瀏覽器中開啟並完成重設';
-
-  @override
-  String get nekoForgotFailed => '取得重設連結失敗';
-
-  @override
-  String get nekoForgotOpened => '已在瀏覽器中開啟重設頁面';
 
   @override
   String get nekoLoginQrHint => '請使用 NekoMusic 手機 App 掃碼登入';
@@ -14940,7 +14863,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsShowSubtitleOff => '列表不展示別名';
 
   @override
-  String get settingsEnergySaving => '節能模式';
+  String get settingsEnergySaving => '頻譜節能';
 
   @override
   String get settingsEnergySavingNote =>
@@ -14951,13 +14874,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsEnergySavingOff => '目前為標準模式';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化時卸載全部記憶體狀態';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      '背景（最小化/系統匣/關螢幕）丟棄頁面資料與快取，恢復後從零重建（可能回到首頁、遺失捲動位置）；播放不受影響';
 
   @override
   String get settingsSearchEnergySavingSubtitle => '降低頻譜取幀頻率以節省 CPU';
@@ -16102,6 +16018,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   }
 
   @override
+  String get settingsBackgroundDimAuto => '圖片較亮，下限已按亮度自動抬高';
+
+  @override
   String get settingsBackgroundScale => '縮放大小';
 
   @override
@@ -17134,12 +17053,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get shortcutActionPlayPause => '播放 / 暫停';
 
   @override
-  String get shortcutActionPlay => '播放';
-
-  @override
-  String get shortcutActionPause => '暫停';
-
-  @override
   String get shortcutActionStop => '停止';
 
   @override
@@ -17215,7 +17128,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get shortcutActionGoStreaming => '前往串流';
 
   @override
-  String get shortcutActionOpenPlayer => '開啟播放頁';
+  String get shortcutActionOpenPlayer => '開啟 / 關閉播放頁';
 
   @override
   String get shortcutActionOpenSettings => '開啟設定';

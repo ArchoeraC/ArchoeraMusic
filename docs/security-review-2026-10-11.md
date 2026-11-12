@@ -305,7 +305,8 @@
 - **状态（2026-10-31 → 2026-11-08）**：2026-10-27 的整体移除曾回滚（revert `a1c261e1`），随后改为自有身份；
   **2026-11-08 NekoMusic 服务端又移除了客户端 UA 分流、防重放与实例身份校验**，客户端已同步删除
   `X-Neko-Client-*` / `X-Neko-Nonce` / PoW / 实例签名，只保留官方锚定 UA 形状（仅用于 SEO/SPA 表示），
-  登录改走 NekoAuth OAuth。详见 `docs/neko-source-identity.md`。
+  登录短暂改走 NekoAuth OAuth；**2026-11-09 起 OAuth / 账号密码整体移除，
+  客户端只保留扫码登录**（破坏性变更，见 CHANGELOG）。详见 `docs/neko-source-identity.md`。
 
 ---
 

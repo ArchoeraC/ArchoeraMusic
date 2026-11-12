@@ -19,6 +19,7 @@ library;
 import '../netease/track.dart';
 import '../../apis/bilibili/core/config.dart'
     show kBilibiliReferer, kBilibiliUserAgent;
+import '../../apis/qqmusic/core/device.dart' show qmGetDevice;
 import '../../apis/runtime.dart';
 import '../../stores/providers.dart';
 
@@ -223,8 +224,10 @@ class _QqMusicDownloadPlatform extends DownloadPlatform {
   @override
   List<List<String>> requestHeaders(Track track, String quality) {
     // QQ CDN 需 UA/Referer；带登录态时补 Cookie（GetVkey 直链鉴权）。
+    // UA 取安装级设备身份，与取流请求（apis/qqmusic/modules/song_url.dart）
+    // 保持同一套指纹——UA 前后不一致本身是可聚类信号。
     final headers = <List<String>>[
-      const ['User-Agent', 'QQMusic 14090008(android 15)'],
+      ['User-Agent', qmGetDevice().userAgent],
       const ['Referer', 'https://y.qq.com'],
     ];
     final cookies = getRuntime().sessionStore.get('qqmusic');

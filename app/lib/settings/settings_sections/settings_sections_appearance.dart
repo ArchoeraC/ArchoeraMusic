@@ -56,6 +56,9 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
     final appearanceStyle = appearanceStyleFor(prefs.appearanceStyle);
     // 图片风格「有效」才有背景子项可调（无图时回退 solid，对齐原版 effectiveStyle）
     final imageStyle = appearanceStyle.effectiveImageBackground(prefs);
+    // 遮罩滑块：下限随背景图亮度自动抬高（可读性下限），显示值取两者高者。
+    final dimFloor = prefs.backgroundDimFloor;
+    final dimValue = prefs.effectiveBackgroundDim;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -173,14 +176,21 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
                 SettingSliderTile(
                   icon: EtaIcons.moonOutline,
                   title: l10n.settingsBackgroundDim,
-                  subtitle: l10n.settingsBackgroundDimDesc(
-                    dim: prefs.backgroundDim,
-                  ),
-                  value: prefs.backgroundDim,
-                  min: 0.3,
-                  max: 0.9,
-                  divisions: 12,
-                  label: '${(prefs.backgroundDim * 100).round()}%',
+                  // 亮图会自动抬高下限：补一句说明，避免用户以为滑块坏了
+                  // （拖不到更低，或者显示值比自己上次设的高）。
+                  subtitle: dimFloor > kBackgroundDimMin + 0.001
+                      ? '${l10n.settingsBackgroundDimDesc(dim: (dimValue * 100).round())} '
+                            '${l10n.settingsBackgroundDimAuto}'
+                      : l10n.settingsBackgroundDimDesc(
+                          dim: (dimValue * 100).round(),
+                        ),
+                  value: dimValue,
+                  min: dimFloor,
+                  max: kBackgroundDimMax,
+                  divisions: ((kBackgroundDimMax - dimFloor) * 100)
+                      .round()
+                      .clamp(1, 100),
+                  label: '${(dimValue * 100).round()}%',
                   onChanged: (v) => notifier.setBackground(dim: v),
                 ),
                 SettingSliderTile(
@@ -627,13 +637,14 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
   }
 
   Future<void> _pickBackgroundImage() async {
-    const typeGroup = XTypeGroup(
-      label: 'images',
-      extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'],
+    // 类型组标题会出现在系统文件对话框里，随界面语言本地化（非 const）。
+    final typeGroup = XTypeGroup(
+      label: context.l10n.settingsBackgroundImage,
+      extensions: const ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'],
     );
     String? path;
     try {
-      final file = await openFile(acceptedTypeGroups: const [typeGroup]);
+      final file = await openFile(acceptedTypeGroups: [typeGroup]);
       path = file?.path;
     } catch (_) {
       // 文件选择器不可用时静默忽略（自用项目，无返回值不阻塞）

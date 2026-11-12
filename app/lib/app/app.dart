@@ -24,7 +24,6 @@ import '../widgets/common/toast.dart';
 import '../widgets/common/vault_crash_gate.dart';
 import '../widgets/common/vault_unlock_gate.dart';
 import '../widgets/common/vault_version_gate.dart';
-import 'background_unload_gate.dart';
 import 'appearance_styles/appearance_style_registry.dart';
 import 'bootstrap.dart';
 import 'router.dart';
@@ -131,10 +130,6 @@ class ArchoeraMusicApp extends ConsumerWidget {
                 // 影响 SplashGate 及以下（Navigator/路由/浮层），隐式 Animated*
                 // 组件会自动按 disableAnimations 退化为 0 时长（Flutter 内建支持）。
                 var appChild = child ?? const SizedBox.shrink();
-                // 后台卸载门：开启后台卸载设置且进入后台时，把整棵路由子树
-                // （Navigator/所有页面/弹窗）卸为纯色；MaterialApp 与各启动门
-                // （Splash/Vault）保持挂载，恢复时不会重放 Splash。
-                appChild = BackgroundUnloadGate(child: appChild);
                 Widget gate = SplashGate(
                   engine: prefs.engine,
                   child: SchemeIntroGate(

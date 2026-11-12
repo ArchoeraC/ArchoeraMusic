@@ -17,6 +17,7 @@ import '../pages/streaming/album_detail_page.dart';
 import '../pages/streaming/artist_detail_page.dart';
 import '../pages/streaming/playlist_detail_page.dart';
 import '../pages/streaming/streaming_page.dart';
+import 'player_route_curves.dart';
 import 'shell.dart';
 
 /// 根导航器 key（供 MaterialApp 外的组件，如托盘确认弹窗，定位根 Navigator）。
@@ -128,23 +129,26 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => CustomTransitionPage(
         key: state.pageKey,
         // 非不透明：过渡期间 Overlay 仍绘制下方主页，才能看到主页同步收缩
-        // （不透明路由会立刻把下方路由 offstage）。展开动画结束后壳内容已被
-        // ShellExpandTransition 卸载为轻量占位，背后绘制开销可忽略。
+        // （不透明路由会立刻把下方路由 offstage）。展开动画结束后壳内容由
+        // ShellExpandTransition 停绘/停布局（State 保留），背后绘制开销为零。
         opaque: false,
-        transitionDuration: const Duration(milliseconds: 500),
-        reverseTransitionDuration: const Duration(milliseconds: 500),
+        transitionDuration: kPlayerRouteTransitionDuration,
+        reverseTransitionDuration: kPlayerRouteTransitionDuration,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           // 性能模式（MediaQuery.disableAnimations）：播放页直切，无展开动效
           if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
             return child;
           }
-          // 纯垂直上滑（对齐原版 FullPlayer：enter/leave 均
-          // `translate-y-full → 0`，500ms cubic-bezier(0.7,0,0.3,1)）。
-          // 壳层由壳路由的 secondaryAnimation 驱动同一节奏，天然同步。
+          // 纯垂直上滑（对齐原版 FullPlayer 的 `translate-y-full → 0`，
+          // 时长见 `kPlayerRouteTransitionDuration`）。
+          // 曲线改成单峰：展开先快后慢、收起先慢后快（见
+          // `player_route_curves.dart`）；收起走 reverseCurve，Flutter 直接把它
+          // 作用在 1 → 0 的递减值上，因此两条曲线都用 ease-out 形状。
+          // 壳层由 `ShellExpandTransition` 用同一组曲线驱动，天然同步。
           final curved = CurvedAnimation(
             parent: animation,
-            curve: const Cubic(0.7, 0, 0.3, 1),
-            reverseCurve: const Cubic(0.7, 0, 0.3, 1),
+            curve: kPlayerRouteOpenCurve,
+            reverseCurve: kPlayerRouteCloseCurve,
           );
           return SlideTransition(
             position: Tween<Offset>(
@@ -166,6 +170,13 @@ final appRouter = GoRouter(
 /// push，若不加防护会不断叠加播放页路由（表现为「播放页可被无限打开」）。
 bool _playerRouteInFlight = false;
 
+/// 播放页收起动画是否在途（防止快捷键连按重复 pop 掉下层页面）。
+bool _playerRouteClosing = false;
+
+/// 当前顶层路由是否已是全屏播放页。
+bool get isPlayerPageOpen =>
+    appRouter.routerDelegate.currentConfiguration.uri.path == '/player';
+
 /// 展开全屏播放页（幂等）。
 ///
 /// 双重防护，避免重复入栈：
@@ -175,9 +186,28 @@ bool _playerRouteInFlight = false;
 /// 快捷键（`ShortcutAction.openPlayer`）与播放条封面统一走此入口。
 void openPlayerPage() {
   if (_playerRouteInFlight) return;
-  if (appRouter.routerDelegate.currentConfiguration.uri.path == '/player') {
+  if (isPlayerPageOpen) {
     return;
   }
   _playerRouteInFlight = true;
-  appRouter.push('/player').whenComplete(() => _playerRouteInFlight = false);
+  appRouter.push('/player').whenComplete(() {
+    _playerRouteInFlight = false;
+    _playerRouteClosing = false;
+  });
+}
+
+/// 收起全屏播放页（幂等；收起动画期间重复调用忽略）。
+void closePlayerPage() {
+  if (_playerRouteClosing || !isPlayerPageOpen) return;
+  _playerRouteClosing = true;
+  appRouter.pop();
+}
+
+/// 打开 / 关闭全屏播放页（快捷键 `ShortcutAction.openPlayer` 的切换入口）。
+void togglePlayerPage() {
+  if (isPlayerPageOpen) {
+    closePlayerPage();
+  } else {
+    openPlayerPage();
+  }
 }

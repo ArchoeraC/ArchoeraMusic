@@ -11,6 +11,22 @@
 /// 只需换算成一个布尔传入。
 library;
 
+/// 跨平台歌词格式注册表（用户可在「歌词格式顺序」里排序）。
+///
+/// 只收录**多个平台通用**的格式标识；平台扩展的逐字富格式（如 NekoMusic
+/// 的 [kNekoV1LyricsFormat]）不单独暴露给用户排序，而是通过
+/// [pickLyricFormat] 的 `wordByWord` 类别跟随「逐字优先 / 标准 LRC 优先」。
+const List<String> lyricFormatIds = ['yrc', 'qrc', 'krc', 'lrc'];
+
+/// NekoMusic 富歌词格式标识（平台扩展逐字格式，`neko-v1` JSON）。
+const String kNekoV1LyricsFormat = 'neko-v1';
+
+/// 格式是否为逐字（富）格式（含平台扩展格式）。
+bool isRichLyricFormat(String format) => switch (format.trim().toLowerCase()) {
+  'yrc' || 'qrc' || 'krc' || kNekoV1LyricsFormat => true,
+  _ => false,
+};
+
 /// 一个主歌词候选：内容 + 格式标签 + 是否逐字（富格式）。
 class LyricFormatCandidate {
   const LyricFormatCandidate({
@@ -22,7 +38,7 @@ class LyricFormatCandidate {
   /// 原始文本（可为 null/空 = 无此格式）。
   final String? content;
 
-  /// 格式标签（'yrc' / 'qrc' / 'krc' / 'lrc'）。
+  /// 格式标签（`yrc` / `qrc` / `krc` / `lrc`，或平台扩展如 `neko-v1`）。
   final String format;
 
   /// 是否逐字（富）格式。
@@ -40,7 +56,7 @@ class LyricFormatCandidate {
   for (final c in candidates) {
     final text = c.content?.trim();
     if (text == null || text.isEmpty) continue;
-    if (c.wordByWord) {
+    if (c.wordByWord || isRichLyricFormat(c.format)) {
       firstWord ??= c;
     } else {
       firstPlain ??= c;

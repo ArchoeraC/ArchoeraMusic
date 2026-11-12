@@ -10,7 +10,9 @@ extension _SideBarView on _SideBarState {
     final colorScheme = theme.colorScheme;
     final l10n = context.l10n;
     final prefs = ref.watch(appPrefsProvider);
-    final collapsed = prefs.sidebarCollapsed;
+    // 内容布局用 _layoutCollapsed（过渡中在不可见时切到目标态）；
+    // 开关动作始终针对最新目标态。
+    final collapsed = _layoutCollapsed;
     final navStyle = sidebarNavStyleFor(prefs.sidebarNavStyle);
     final indicator = navStyle.slidingIndicator && _indicatorReady
         ? navStyle.buildContainerIndicator(
@@ -21,15 +23,19 @@ extension _SideBarView on _SideBarState {
             height: _indicatorHeight,
           )
         : null;
-    final width = collapsed ? 64.0 : 240.0;
-    // 布局完成后测量选中项位置（折叠/展开切换后指示条跟随）
+    // 布局完成后测量选中项位置（折叠/展开到位后指示条重新定位）
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateIndicator());
 
-    return AnimatedContainer(
-      duration: animDuration(context, const Duration(milliseconds: 200)),
-      curve: Curves.easeOutCubic,
-      width: width,
-      color: colorScheme.surfaceContainerLow,
+    // 折叠/展开：渐隐 → 宽度线性推进（160ms）→ 到位后渐显。
+    ref.listen<bool>(appPrefsProvider.select((p) => p.sidebarCollapsed), (
+      previous,
+      next,
+    ) {
+      if (previous != next) _animateSidebarCollapse(next);
+    });
+
+    return AnimatedBuilder(
+      animation: _collapseCtrl,
       child: Column(
         children: [
           // Logo（对齐 SideBarLogo.vue：点击回首页，hover 放大）
@@ -59,35 +65,22 @@ extension _SideBarView on _SideBarState {
                         children: [
                           // Logo（白标：完全跟随全局主题对比色——底 primaryContainer、标 onPrimaryContainer）
                           const AppLogo(size: 30),
-                          // 折叠时文字淡出（保留宽度占位过渡）
-                          AnimatedOpacity(
-                            duration: animDuration(
-                              context,
-                              const Duration(milliseconds: 200),
-                            ),
-                            opacity: collapsed ? 0 : 1,
-                            child: AnimatedContainer(
-                              duration: animDuration(
-                                context,
-                                const Duration(milliseconds: 200),
-                              ),
-                              width: collapsed ? 0 : 110,
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 10),
-                                child: Text(
-                                  'Archoera',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.3,
-                                    color: colorScheme.primary,
-                                  ),
+                          // 折叠态不显示文字（整体渐隐时无需单独过渡）
+                          if (!collapsed)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 10),
+                              child: Text(
+                                'Archoera',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.3,
+                                  color: colorScheme.primary,
                                 ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -154,7 +147,7 @@ extension _SideBarView on _SideBarState {
               tooltip: collapsed ? l10n.sidebarExpand : l10n.sidebarCollapse,
               onPressed: () => ref
                   .read(appPrefsProvider.notifier)
-                  .setSidebar(collapsed: !collapsed),
+                  .setSidebar(collapsed: !prefs.sidebarCollapsed),
               icon: Icon(
                 collapsed ? EtaIcons.menu : EtaIcons.menu,
                 size: 20,
@@ -164,6 +157,17 @@ extension _SideBarView on _SideBarState {
           ),
         ],
       ),
+      builder: (context, child) {
+        final opacity = _contentOpacity;
+        return Container(
+          width: _displayWidth,
+          color: colorScheme.surfaceContainerLow,
+          child: IgnorePointer(
+            ignoring: opacity < 1,
+            child: Opacity(opacity: opacity, child: child),
+          ),
+        );
+      },
     );
   }
 

@@ -48,7 +48,7 @@ Future<void> _pump(WidgetTester tester, {required bool showTimes}) async {
       overrides: [
         appPrefsProvider.overrideWith(_Prefs.new),
         playbackProvider.overrideWith(_FakePlayback.new),
-        currentLyricsProvider.overrideWith((ref) async => _groups),
+        currentLyricsProvider.overrideWith((ref) => const AsyncData(_groups)),
       ],
       child: MaterialApp(
         home: Scaffold(
@@ -81,9 +81,7 @@ void main() {
       location: tester.getCenter(find.byType(PlaybackProgressSlider)),
     );
     await tester.pump();
-    await mouse.moveTo(
-      tester.getCenter(find.byType(PlaybackProgressSlider)),
-    );
+    await mouse.moveTo(tester.getCenter(find.byType(PlaybackProgressSlider)));
     await tester.pumpAndSettle();
 
     // 指针落在轨道中部（≈10s）→ 对应 2s 起的「第二行」。
@@ -96,10 +94,7 @@ void main() {
   testWidgets('悬停时间气泡跟随指针、不铺满进度条', (tester) async {
     await _pump(tester, showTimes: false);
     final slider = tester.getRect(find.byType(PlaybackSlider));
-    final target = Offset(
-      slider.left + slider.width * 0.6,
-      slider.center.dy,
-    );
+    final target = Offset(slider.left + slider.width * 0.6, slider.center.dy);
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: target);
     await tester.pump();
@@ -127,7 +122,7 @@ void main() {
         overrides: [
           appPrefsProvider.overrideWith(_Prefs.new),
           playbackProvider.overrideWith(_FakePlayback.new),
-          currentLyricsProvider.overrideWith((ref) async => _groups),
+          currentLyricsProvider.overrideWith((ref) => const AsyncData(_groups)),
         ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,

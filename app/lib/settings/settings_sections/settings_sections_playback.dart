@@ -679,34 +679,6 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         ),
         const SizedBox(height: 20),
         SettingSection(
-          title: l10n.settingsSectionPower,
-          children: [
-            SettingSwitchTile(
-              icon: prefs.powerSaver ? EtaIcons.leaf : EtaIcons.leafOutline,
-              title: l10n.settingsPowerSaver,
-              subtitle: prefs.powerSaver
-                  ? l10n.settingsPowerSaverOn
-                  : l10n.settingsPowerSaverOff,
-              value: prefs.powerSaver,
-              onChanged: (value) =>
-                  ref.read(appPrefsProvider.notifier).setPowerSaver(value),
-            ),
-            SettingSwitchTile(
-              icon: prefs.suppressSleep
-                  ? EtaIcons.bedtimeOffOutline
-                  : EtaIcons.moonStarsOutline,
-              title: l10n.settingsSuppressSleep,
-              subtitle: prefs.suppressSleep
-                  ? l10n.settingsSuppressSleepOn
-                  : l10n.settingsSuppressSleepOff,
-              value: prefs.suppressSleep,
-              onChanged: (value) =>
-                  ref.read(appPrefsProvider.notifier).setSuppressSleep(value),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        SettingSection(
           title: l10n.settingsSectionSleepTimer,
           children: [
             SettingTile(
@@ -824,9 +796,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
               divisions: 20,
               label: 'γ ${prefs.spectrumGammaValue.toStringAsFixed(2)}',
               enabled: prefs.spectrumGamma,
-              onChanged: (v) => ref
-                  .read(appPrefsProvider.notifier)
-                  .setSpectrumGammaValue(v),
+              onChanged: (v) =>
+                  ref.read(appPrefsProvider.notifier).setSpectrumGammaValue(v),
             ),
             SettingSwitchTile(
               icon: EtaIcons.chartLine,
@@ -854,9 +825,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
                   '${prefs.spectrumTiltValue >= 0 ? '+' : ''}'
                   '${prefs.spectrumTiltValue.toStringAsFixed(1)} dB/oct',
               enabled: prefs.spectrumTilt,
-              onChanged: (v) => ref
-                  .read(appPrefsProvider.notifier)
-                  .setSpectrumTiltValue(v),
+              onChanged: (v) =>
+                  ref.read(appPrefsProvider.notifier).setSpectrumTiltValue(v),
             ),
             SettingSwitchTile(
               icon: prefs.spectrumPeakHold

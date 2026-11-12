@@ -23,7 +23,7 @@
 /// （[SliderThemeData.trackShape] 的几何），保证悬停切换时轨道位置
 /// 不跳变；不硬编码留白，避免与实际 Slider 轨道错位。
 ///
-/// 布局注意：外层 SizedBox(height: 48) 锁定高度——Slider 须作为**非定位**
+/// 布局注意：外层 SizedBox(height: [PlaybackSlider.height]) 锁定高度——Slider 须作为**非定位**
 /// 子元素决定 Stack 尺寸；若全部子元素都是 Positioned，Stack 会取
 /// constraints.biggest 撑满可用区域（如 Column 剩余高度），把播放页
 /// 主体/控制区挤出屏幕。
@@ -46,6 +46,10 @@ class PlaybackSlider extends StatefulWidget {
     this.glow = false,
     this.showTooltip = true,
     this.tooltipLyric,
+    this.height = 48,
+    this.allowPrank = true,
+    this.trackHeight,
+    this.showThumb = true,
     this.onChanged,
     this.onChangeEnd,
   });
@@ -55,6 +59,21 @@ class PlaybackSlider extends StatefulWidget {
 
   /// 缓冲中：轨道叠加流动指示条（进度样式自动降透明）。
   final bool buffering;
+
+  /// 固定高度：轨道在其中垂直居中；调用方按行高声明（音量行更紧凑）。
+  final double height;
+
+  /// 是否参与愚人节「反向进度条」特效。音量条等非进度用途应关闭，
+  /// 否则反向映射会落到音量上。
+  final bool allowPrank;
+
+  /// 轨道粗细；null = 跟随主题（当前 3px）。Vutron 经典布局按设计稿
+  /// 声明为 4px（对齐 SPlayer-Next 默认 SSlider）。
+  final double? trackHeight;
+
+  /// 是否显示滑块圆点；false = 始终纯细条（悬停不展开 Material Slider、
+  /// 拖动也不画跟随圆点）。Vutron 经典布局用这个声明去掉高亮球。
+  final bool showThumb;
 
   /// 切歌过渡中：已播放段外围叠加呼吸发光（对齐 SPlayer「播放过渡时进度条
   /// 已播放部分发光」）；缓冲态下不叠加（流动指示本身已提示活动）。

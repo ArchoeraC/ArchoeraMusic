@@ -92,6 +92,36 @@ pub fn psInit(self: *PSCtx) void {
     pst.psTableInit();
 }
 
+/// seek 用软复位：清空时域/QMF 延迟与逐帧参数，但保留 PS 头配置
+/// （enable_iid/icc、量化模式、带宽数等）。PS 头不保证每帧重复，整块清零
+/// 会让目标帧无法重建立体声像；历史缓冲由 seek pre-roll 重新填满。
+pub fn resetTransition(self: *PSCtx) void {
+    const c = &self.common;
+    c.frame_class = 0;
+    c.num_env_old = 0;
+    c.num_env = 0;
+    c.border_position = @splat(-1);
+    c.iid_par = @splat(@splat(0));
+    c.icc_par = @splat(@splat(0));
+    c.ipd_par = @splat(@splat(0));
+    c.opd_par = @splat(@splat(0));
+    c.is34bands_old = 0;
+    self.in_buf = @splat(@splat(@splat(0)));
+    self.delay = @splat(@splat(@splat(0)));
+    self.ap_delay = @splat(@splat(@splat(@splat(0))));
+    self.peak_decay_nrg = @splat(0);
+    self.power_smooth = @splat(0);
+    self.peak_decay_diff_smooth = @splat(0);
+    self.H11 = @splat(@splat(@splat(0)));
+    self.H12 = @splat(@splat(@splat(0)));
+    self.H21 = @splat(@splat(@splat(0)));
+    self.H22 = @splat(@splat(@splat(0)));
+    self.Lbuf = @splat(@splat(@splat(0)));
+    self.Rbuf = @splat(@splat(@splat(0)));
+    self.opd_hist = @splat(0);
+    self.ipd_hist = @splat(0);
+}
+
 // ---------------- VLC 解码（规范哈夫曼，复用 sbr.zig 逻辑） ----------------
 
 /// 解码 PS Huffman（table_idx 0..9）。返回符号（含 offset）。

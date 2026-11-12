@@ -122,7 +122,24 @@ extension _SettingsDialogView on _SettingsDialogState {
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                  child: _buildContent(scheme, l10n),
+                  // Stack 作为搜索跳转高亮的坐标参照系（_contentHostKey）。
+                  child: Stack(
+                    key: _contentHostKey,
+                    fit: StackFit.expand,
+                    children: [
+                      _buildContent(scheme, l10n),
+                      if (_flashRect != null)
+                        Positioned.fromRect(
+                          rect: _flashRect!,
+                          child: IgnorePointer(
+                            child: SettingsRowFlash(
+                              animation: _flashCtrl,
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -132,471 +149,32 @@ extension _SettingsDialogView on _SettingsDialogState {
     );
   }
 
+  /// 搜索索引 = 源码生成的设置项标题（`settings_search_index.g.dart`）
+  /// + 快捷键动作（标题由 [ShortcutAction] 动态生成，无法静态扫描）。
+  ///
+  /// 索引完全由设置源码派生：新增/改名设置项只要跑一次
+  /// `dart run tool/gen_settings_search_index.dart`（各平台构建脚本会自动跑），
+  /// 无需手工登记。可见性（开发者模式、下载模块）仍由
+  /// [SettingsCategory.visible] 在展示时过滤，不影响关于页长按等彩蛋逻辑。
   List<_SearchEntry> _buildSearchIndex(AppLocalizations l10n) {
-    return [
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsThemeMode,
-        l10n.settingsThemeModeDesc,
-        EtaIcons.moonOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsThemeSource,
-        l10n.settingsSearchThemeSourceSubtitle,
-        EtaIcons.palette2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsGlobalTint,
-        l10n.settingsSearchGlobalTintSubtitle,
-        EtaIcons.tonalityOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsAppearanceStyle,
-        l10n.settingsSearchBackgroundSubtitle,
-        EtaIcons.picOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsRouteTransition,
-        l10n.settingsSearchRouteTransitionSubtitle,
-        EtaIcons.magic2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsSidebarCollapsed,
-        l10n.settingsSearchSidebarSubtitle,
-        EtaIcons.menu,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsSidebarCustomize,
-        l10n.settingsSidebarCustomizeDesc,
-        EtaIcons.listCheck2,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsFloatingBar,
-        l10n.settingsSearchFloatingBarSubtitle,
-        EtaIcons.miniplayerOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsSectionFont,
-        l10n.settingsSearchFontSubtitle,
-        EtaIcons.fontOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsLanguageTitle,
-        l10n.settingsSearchLanguageSubtitle,
-        EtaIcons.translateOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsCoverRadius,
-        l10n.settingsSearchCoverRadiusSubtitle,
-        EtaIcons.square,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsWeather,
-        l10n.settingsSearchWeatherSubtitle,
-        EtaIcons.sunOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.appearance,
-        l10n.settingsPassthrough,
-        l10n.settingsSearchPassthroughSubtitle,
-        EtaIcons.highQualityOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsSessionMemory,
-        l10n.settingsSearchSessionMemorySubtitle,
-        EtaIcons.history,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsAutoPlay,
-        l10n.settingsSearchAutoPlaySubtitle,
-        EtaIcons.playCircleOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsSpectrum,
-        l10n.settingsSearchSpectrumSubtitle,
-        EtaIcons.soundLine,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsSpectrumBarWidth,
-        l10n.settingsSearchSpectrumWidthSubtitle,
-        EtaIcons.columnsOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsTransitionStyle,
-        l10n.settingsTransitionStyleDesc,
-        EtaIcons.magic2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsCoverLayout,
-        l10n.settingsCoverLayoutDesc,
-        EtaIcons.square,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsShowProgressLyric,
-        l10n.settingsShowProgressLyricDesc,
-        EtaIcons.fileMusicOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsTimeFormat,
-        l10n.settingsTimeFormatDesc,
-        EtaIcons.stopwatchOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsShowPlaybackSource,
-        l10n.settingsShowPlaybackSourceDesc,
-        EtaIcons.serverOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.playback,
-        l10n.settingsRegisterProtocol,
-        l10n.settingsRegisterProtocolDesc,
-        EtaIcons.link,
-      ),
-      _SearchEntry(
-        SettingsCategory.audioEffects,
-        l10n.settingsSectionEqualizer,
-        l10n.settingsAudioEffectsSubtitle,
-        EtaIcons.soundLine,
-      ),
-      _SearchEntry(
-        SettingsCategory.audioEffects,
-        l10n.settingsNormalization,
-        l10n.settingsNormalizationDesc,
-        EtaIcons.transferHorizontal,
-      ),
-      _SearchEntry(
-        SettingsCategory.audioEffects,
-        l10n.settingsPlaybackSpeed,
-        l10n.settingsPlaybackSpeedDesc,
-        EtaIcons.stopwatchOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.audioEffects,
-        l10n.settingsPitch,
-        l10n.settingsPitchDesc,
-        EtaIcons.music2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.audioEffects,
-        l10n.settingsChannelMerge,
-        l10n.settingsChannelMergeDesc,
-        EtaIcons.speakerOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.audioEffects,
-        l10n.settingsChorusEnabled,
-        l10n.settingsChorusEnabledDesc,
-        EtaIcons.music2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.audioEffects,
-        l10n.settingsPeq,
-        l10n.settingsSectionPeqDesc,
-        EtaIcons.chartLine,
-      ),
-      _SearchEntry(
-        SettingsCategory.audioEffects,
-        l10n.settingsLowfreq,
-        l10n.settingsSectionLowfreqDesc,
-        EtaIcons.dashboard3,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsPlayerLyrics,
-        l10n.settingsSearchPlayerLyricsSubtitle,
-        EtaIcons.fileMusicOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsBarLyrics,
-        l10n.settingsBarLyricsOn,
-        EtaIcons.bookOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsBarEnhancedLyrics,
-        l10n.settingsBarEnhancedLyricsOn,
-        EtaIcons.micOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsLyricFontSize,
-        l10n.settingsSearchLyricFontSizeSubtitle,
-        EtaIcons.fontSize,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsSearchColorTitle,
-        l10n.settingsSearchColorSubtitle,
-        EtaIcons.paletteOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsLyricSourceOrder,
-        l10n.settingsLyricSourceOrderDesc,
-        EtaIcons.serverOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsLyricFormatOrder,
-        l10n.settingsLyricFormatOrderDesc,
-        EtaIcons.fileMusicOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.lyrics,
-        l10n.settingsSectionLyricExclude,
-        l10n.settingsLyricExcludeRulesDesc,
-        EtaIcons.magic2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.preset,
-        l10n.settingsEnergySaving,
-        l10n.settingsSearchEnergySavingSubtitle,
-        EtaIcons.leafOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.preset,
-        l10n.settingsPerformanceMode,
-        l10n.settingsPerformanceModeOn,
-        EtaIcons.flashOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.preset,
-        l10n.settingsSearchDjModeTitle,
-        l10n.settingsDjModeOn,
-        EtaIcons.magic3Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.preset,
-        l10n.settingsUncensor,
-        l10n.settingsSearchUncensorSubtitle,
-        EtaIcons.magic2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.preset,
-        l10n.settingsHideVip,
-        l10n.settingsSearchHideVipSubtitle,
-        EtaIcons.medalOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.preset,
-        l10n.settingsHideQuality,
-        l10n.settingsSearchHideQualitySubtitle,
-        EtaIcons.highQualityOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.preset,
-        l10n.settingsShowSubtitle,
-        l10n.settingsSearchSubtitleSubtitle,
-        EtaIcons.subtitleOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.render,
-        l10n.settingsRippleShader,
-        l10n.settingsRippleShaderDesc,
-        EtaIcons.dashboard4Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.render,
-        l10n.settingsRippleLowRes,
-        l10n.settingsRippleLowResDesc,
-        EtaIcons.magic2Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.render,
-        l10n.settingsRippleDamageClip,
-        l10n.settingsRippleDamageClipDesc,
-        EtaIcons.flashOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.download,
-        l10n.settingsDataDir,
-        l10n.settingsSearchDownloadDirSubtitle,
-        EtaIcons.folderOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.download,
-        l10n.settingsSearchFilenameTitle,
-        l10n.settingsSearchFilenameSubtitle,
-        EtaIcons.fontSizeOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.download,
-        l10n.settingsDownloadConcurrent,
-        l10n.settingsSearchConcurrentSubtitle,
-        EtaIcons.dashboard4Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.download,
-        l10n.settingsDownloadSpeedLimit,
-        l10n.settingsSearchSpeedLimitSubtitle,
-        EtaIcons.dashboard4Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.download,
-        l10n.settingsDownloadQuality,
-        l10n.settingsSearchQualitySubtitle,
-        EtaIcons.highQualityOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.download,
-        l10n.settingsDownloadGrouping,
-        l10n.settingsSearchGroupingSubtitle,
-        EtaIcons.foldersOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.download,
-        l10n.settingsDownloadHistoryLimit,
-        l10n.settingsSearchHistoryLimitSubtitle,
-        EtaIcons.historyOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.storage,
-        l10n.settingsDataDir,
-        l10n.settingsSearchStorageSubtitle,
-        EtaIcons.folderOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.storage,
-        l10n.settingsSectionCache,
-        l10n.settingsCacheNote,
-        EtaIcons.broomOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.storage,
-        l10n.settingsSongCache,
-        l10n.settingsSearchSongCacheSubtitle,
-        EtaIcons.pinOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.storage,
-        l10n.settingsSecuritySection,
-        l10n.settingsSecurityNote,
-        EtaIcons.wastebasketOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.scrape,
-        l10n.settingsCatScrape,
-        l10n.settingsScrapeSubtitle,
-        EtaIcons.magic3,
-      ),
-      _SearchEntry(
-        SettingsCategory.scanner,
-        l10n.settingsCatScanner,
-        l10n.settingsScannerSubtitle,
-        EtaIcons.search3Outline,
-      ),
-      _SearchEntry(
-        SettingsCategory.scanner,
-        l10n.settingsScanAnalyzeLoudness,
-        l10n.settingsScanAnalyzeLoudnessOff,
-        EtaIcons.soundLine,
-      ),
-      _SearchEntry(
-        SettingsCategory.searchIndex,
-        l10n.settingsSearchIndexEnable,
-        l10n.settingsSearchIndexEnableOff,
-        EtaIcons.search2,
-      ),
-      _SearchEntry(
-        SettingsCategory.searchIndex,
-        l10n.settingsSearchIndexLrc,
-        l10n.settingsSearchIndexLrcDesc,
-        EtaIcons.fileMusicOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.mediaSource,
-        l10n.settingsCatMediaSource,
-        l10n.settingsMediaSourceSubtitle,
-        EtaIcons.serverOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.mediaSource,
-        l10n.settingsDefaultSource,
-        l10n.settingsDefaultSourceDesc,
-        EtaIcons.serverOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.experimentalSource,
-        l10n.settingsCatExperimentalSource,
-        l10n.settingsExperimentalSourceSubtitle,
-        EtaIcons.flaskOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.experimentalSource,
-        l10n.settingsNekoEnable,
-        l10n.settingsNekoEnableDesc,
-        EtaIcons.flaskOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.experimentalSource,
-        l10n.settingsNekoTitle,
-        l10n.settingsNekoNote,
-        EtaIcons.flaskOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.mcp,
-        l10n.settingsMcpTitle,
-        l10n.settingsMcpSubtitle,
-        EtaIcons.chipOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.about,
-        l10n.settingsVersion,
-        l10n.settingsSearchAboutSubtitle,
-        EtaIcons.informationOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.about,
-        l10n.settingsSectionDeclaration,
-        l10n.settingsDeclarationEntryDesc,
-        EtaIcons.bookOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.about,
-        l10n.settingsSectionPrivacy,
-        l10n.settingsPrivacyEntryDesc,
-        EtaIcons.shieldOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.about,
-        l10n.settingsSectionFontCredits,
-        l10n.settingsFontCreditsEntryDesc,
-        EtaIcons.fontOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.about,
-        l10n.settingsSectionThirdPartyLicenses,
-        l10n.settingsThirdPartyLicensesEntryDesc,
-        EtaIcons.docmentOutline,
-      ),
-      _SearchEntry(
-        SettingsCategory.developer,
-        l10n.settingsDevFpsMonitor,
-        l10n.settingsDevFpsMonitorDesc,
-        EtaIcons.heartbeatOutline,
-      ),
+    final all = <_SearchEntry>[
+      ..._generatedSettingsSearchIndex(l10n),
+      for (final a in ShortcutAction.values)
+        _SearchEntry(
+          SettingsCategory.shortcuts,
+          shortcutActionLabel(l10n, a),
+          l10n.shortcutHintEdit,
+          SettingsCategory.shortcuts.icon,
+        ),
     ];
+    // 同一分类内按标题去重：小节标题与设置行可能同名（如「界面语言」既是
+    // 小节名也是设置项名），重复条目会让结果列表出现两条一模一样的文字。
+    // 保留后出现的（设置行在后，副标题更有信息量；锚点也指向它）。
+    final byTitle = <String, _SearchEntry>{};
+    for (final e in all) {
+      byTitle['${e.category.name}\u0000${e.title}'] = e;
+    }
+    return byTitle.values.toList(growable: false);
   }
 
   Widget _buildCategoryItem(
@@ -659,14 +237,20 @@ extension _SettingsDialogView on _SettingsDialogState {
                           color: selected ? scheme.primary : scheme.onSurface,
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          cat.label(l10n),
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: selected ? scheme.primary : scheme.onSurface,
+                        Flexible(
+                          child: Text(
+                            cat.label(l10n),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: selected
+                                  ? scheme.primary
+                                  : scheme.onSurface,
+                            ),
                           ),
                         ),
                       ],
@@ -711,6 +295,7 @@ extension _SettingsDialogView on _SettingsDialogState {
           Expanded(
             child: InkClip(
               child: SingleChildScrollView(
+                controller: _contentScrollCtrl,
                 child: switch (_category) {
                   SettingsCategory.appearance => const AppearanceSection(),
                   SettingsCategory.playback => const PlaybackSection(),
@@ -865,10 +450,7 @@ extension _SettingsDialogView on _SettingsDialogState {
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           hoverColor: scheme.onSurface.withValues(alpha: 0.05),
-          onTap: () {
-            _setCategory(e.category);
-            _clearQuery();
-          },
+          onTap: () => _jumpToSearchEntry(e),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
@@ -891,16 +473,20 @@ extension _SettingsDialogView on _SettingsDialogState {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        e.subtitle,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      if (e.subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          e.subtitle,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.7,
+                            ),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -937,6 +523,43 @@ extension _SettingsDialogView on _SettingsDialogState {
       start = idx + q.length;
     }
     return spans;
+  }
+}
+
+/// 搜索命中的设置行高亮：在目标位置脉冲 [SettingsDialog] 设置的高亮框。
+///
+/// 只画描边 + 淡填充、不拦截指针事件；3 次脉冲后由外层清掉 [Rect] 移除。
+class SettingsRowFlash extends StatelessWidget {
+  const SettingsRowFlash({
+    super.key,
+    required this.animation,
+    required this.color,
+  });
+
+  final Animation<double> animation;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        final t = animation.value.clamp(0.0, 1.0);
+        // 每个周期 0 → 1 → 0；t=1 时相位归零，强度自然回到 0。
+        final phase = (t * _SettingsDialogState._flashPulses) % 1.0;
+        final intensity = math.sin(phase * math.pi).abs() * (1 - t * 0.2);
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10 * intensity),
+            border: Border.all(
+              color: color.withValues(alpha: 0.9 * intensity),
+              width: 1.6,
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.control),
+          ),
+        );
+      },
+    );
   }
 }
 

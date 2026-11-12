@@ -175,8 +175,26 @@ const List<BundledThirdPartyLicense> bundledThirdPartyLicenses = [
     licenseId: 'curl License（MIT/X 派生）',
     homeUrl: 'https://curl.se/docs/copyright.html',
   ),
+  // 加密后端改为编译期内嵌的纯 Rust 实现（app/core/scraper-crypto，
+  // 替代原先动态链接的系统 OpenSSL::Crypto）。
   BundledThirdPartyLicense(
-    name: 'OpenSSL',
+    name: 'scraper — Rust crates（aes/md-5/sha1/num-bigint/getrandom）',
+    licenseId: 'MIT OR Apache-2.0',
+    homeUrl: 'https://crates.io',
+    assetPath: 'assets/licenses/Apache-2.0.txt',
+  ),
+  // 传递依赖 generic-array 仅 MIT 单许可：MIT 正文必须与 Apache-2.0 同时随包。
+  BundledThirdPartyLicense(
+    name: 'scraper — Rust crates 传递依赖（generic-array 等，MIT）',
+    licenseId: 'MIT',
+    homeUrl: 'https://github.com/fizyk20/generic-array',
+    assetPath: 'assets/licenses/MIT.txt',
+  ),
+  // OpenSSL 不再是任何自家模块的直接依赖：scraper 用内嵌 Rust staticlib，
+  // scanner 的曲目 id 用纯托管 MD5，indexer 不用加密。Linux 上它仅作为
+  // 系统 libcurl 的传递依赖存在（AppImage 会随 libcurl 一并收拢）。
+  BundledThirdPartyLicense(
+    name: 'OpenSSL（Linux 系统 libcurl 的传递依赖）',
     licenseId: 'Apache-2.0',
     homeUrl: 'https://www.openssl.org',
     assetPath: 'assets/licenses/Apache-2.0.txt',

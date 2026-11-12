@@ -9,6 +9,9 @@
     <p>ArchoeraMusic is an open-source music player that connects to alternative music services, supports offline playback, local library scanning and a built-in subsonic-compatible server.</p>
   </description>
   <launchable type="desktop-id">awa.archoera.betastudio2.archoera_music.desktop</launchable>
+  <provides>
+    <binary>archoera_music</binary>
+  </provides>
   <url type="homepage">https://github.com/ArchoeraC/ArchoeraMusic</url>
   <url type="bugtracker">https://github.com/ArchoeraC/ArchoeraMusic/issues</url>
   <releases>

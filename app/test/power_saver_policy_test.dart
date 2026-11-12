@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:archoera_music/services/platform/system_window.dart';
 import 'package:archoera_music/services/power/power_saver.dart';
 
 void main() {
@@ -28,5 +29,44 @@ void main() {
     final p = powerSaverRenderPolicy(PowerSaverReason.none);
     expect(p.stopRendering, isFalse);
     expect(p.interval, Duration.zero);
+  });
+
+  group('桥接窗口状态合并', () {
+    test('minimized=false 清除残留，前台不再被误降频', () {
+      final next = mergeBridgeWindowState(
+        const SystemWindowState(minimized: false, focused: true),
+        minimized: true,
+        focused: false,
+        screenOff: true,
+        hidden: false,
+      );
+      expect(next.minimized, isFalse);
+      expect(next.focused, isTrue);
+      expect(next.screenOff, isFalse);
+    });
+
+    test('托盘隐藏时忽略 minimized=false（后台停帧不被误恢复）', () {
+      final next = mergeBridgeWindowState(
+        const SystemWindowState(minimized: false, focused: false),
+        minimized: true,
+        focused: true,
+        screenOff: false,
+        hidden: true,
+      );
+      expect(next.minimized, isTrue);
+    });
+
+    test('minimized=true 置位；失焦保留熄屏状态', () {
+      final next = mergeBridgeWindowState(
+        const SystemWindowState(minimized: true, focused: false),
+        minimized: false,
+        focused: true,
+        screenOff: true,
+        hidden: false,
+      );
+      expect(next.minimized, isTrue);
+      expect(next.focused, isFalse);
+      expect(next.screenOff, isTrue);
+    });
   });
 }
