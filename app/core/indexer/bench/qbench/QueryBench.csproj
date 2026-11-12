@@ -32,6 +32,9 @@
   <ItemGroup>
     <!-- harness 源码（.cs.txt：内容为 C#，显式编译，不被 CLI 通配命中） -->
     <Compile Include="QueryBench.cs.txt" />
+    <!-- P0 质量评测（recall@k / MRR / NDCG）；与 qbench 同项目以复用下面这整套
+         生产源码 Link —— 另起项目会把这份清单抄一遍，正是此前多次漂移的来源。 -->
+    <Compile Include="QueryEval.cs.txt" />
 
     <!-- 与 tests/ 同源共享生产分析器 / 存储（显式 Link，不复制逻辑）：
          只取查询路径所需的最小闭包，不含 Program / IndexerEngine / LrcReader。 -->

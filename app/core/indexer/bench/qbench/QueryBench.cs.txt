@@ -53,6 +53,10 @@ public static class QueryBench
 
     public static int Main(string[] args)
     {
+        // 子命令：`eval` = P0 召回 / 排序质量评测（默认 = 延迟测量）。
+        if (args.Length > 0 && args[0] == "eval")
+            return QueryEval.Run(args[1..]);
+
         string? index = null;
         string? outPath = null;
         var label = "A";
