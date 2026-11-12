@@ -165,7 +165,7 @@ void _playerExpandRegression() {
 }
 
 /// 回归（2026-10）：聚焦搜索框后立刻展开全屏播放页 —— 壳内容（含 NavHeader）
-/// 随 [ShellExpandTransition] 卸载，下拉面板必须同步摘除。
+/// 随 [ShellExpandTransition] 停绘/收起，下拉面板必须同步摘除。
 ///
 /// 旧实现把「移除 OverlayEntry」挂在 `_panelCtrl.reverse().whenComplete(...)` 上，
 /// 而 dispose 紧接着就销毁了 controller：ticker 被取消，`TickerFuture` **永不
@@ -196,13 +196,19 @@ void _shellUnmountRegression() {
           home: Scaffold(
             body: ShellExpandTransition(
               animation: expandCtrl,
-              placeholder: const SizedBox.shrink(),
               child: const NavHeader(),
             ),
           ),
         ),
       ),
     );
+
+    // 模拟 PlayerPage 写入路由动画（真实应用里由 provider 驱动）。
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(NavHeader)),
+    );
+    container.read(playerRouteAnimationProvider.notifier).set(expandCtrl);
+    await tester.pump();
 
     // 聚焦展开下拉（推进到指定时刻）
     await tester.tap(find.byType(TextField));
@@ -214,26 +220,29 @@ void _shellUnmountRegression() {
       reason: '聚焦后应展开下拉',
     );
 
-    // 播放页展开：壳内容随动画结束被卸载（NavHeader dispose）
+    // 播放页展开：壳内容随动画结束停绘（Offstage，State 保留）
     expandCtrl.forward();
     await tester.pumpAndSettle();
-    expect(find.byType(NavHeader), findsNothing, reason: '壳内容应已卸载');
+    expect(find.byType(NavHeader), findsNothing, reason: '壳内容应停绘');
+    expect(
+      find.byType(NavHeader, skipOffstage: false),
+      findsOneWidget,
+      reason: '壳内容不应被卸载',
+    );
 
     // 浮层必须随之摘除：否则会永久卡在根 Overlay 左上角
     expect(
       find.byType(SingleChildScrollView),
       findsNothing,
-      reason: '壳内容卸载后下拉浮层必须移除（旧实现 whenComplete 永不触发 → 卡死）',
+      reason: '壳内容收起后下拉浮层必须移除（旧实现 whenComplete 永不触发 → 卡死）',
     );
   }
 
-  testWidgets('搜索下拉展开后壳内容卸载（播放页完全展开）→ 浮层不残留', (tester) async {
+  testWidgets('搜索下拉展开后壳内容停绘（播放页完全展开）→ 浮层不残留', (tester) async {
     await unmountWhileOpen(tester, openAnimation: const Duration(seconds: 1));
   });
 
-  testWidgets('聚焦后立刻展开播放页（下拉动画途中壳内容卸载）→ 浮层不残留', (
-    tester,
-  ) async {
+  testWidgets('聚焦后立刻展开播放页（下拉动画途中壳内容停绘）→ 浮层不残留', (tester) async {
     await unmountWhileOpen(
       tester,
       openAnimation: const Duration(milliseconds: 120),
@@ -284,25 +293,42 @@ void _searchBarKeepsOpenRegression() {
     // 展开
     await tester.tap(textField);
     await tester.pumpAndSettle();
-    expect(find.byType(SingleChildScrollView), findsOneWidget, reason: '聚焦后应展开下拉');
+    expect(
+      find.byType(SingleChildScrollView),
+      findsOneWidget,
+      reason: '聚焦后应展开下拉',
+    );
     expect(tester.getSize(textField).width, closeTo(420, 0.5));
 
     // ① 再次点击搜索框本身：必须**保持展开**（修复前被拦截层判为「点外部」→ 收起）
     await tester.tap(textField);
     await tester.pumpAndSettle();
-    expect(find.byType(SingleChildScrollView), findsOneWidget,
-        reason: '点击输入框不应收起搜索栏');
-    expect(tester.getSize(textField).width, closeTo(420, 0.5), reason: '保持展开宽度');
+    expect(
+      find.byType(SingleChildScrollView),
+      findsOneWidget,
+      reason: '点击输入框不应收起搜索栏',
+    );
+    expect(
+      tester.getSize(textField).width,
+      closeTo(420, 0.5),
+      reason: '保持展开宽度',
+    );
 
     // ② 输入文字后点「清除」按钮：同属内部操作，仍保持展开
     await tester.enterText(textField, '周杰伦');
     await tester.pumpAndSettle();
-    final clearBtn = find.descendant(of: textField, matching: find.byType(IconButton));
+    final clearBtn = find.descendant(
+      of: textField,
+      matching: find.byType(IconButton),
+    );
     expect(clearBtn, findsOneWidget, reason: '有内容时应出现清除按钮');
     await tester.tap(clearBtn);
     await tester.pumpAndSettle();
-    expect(find.byType(SingleChildScrollView), findsOneWidget,
-        reason: '点清除按钮不应收起搜索栏（修复前被拦截层挡住）');
+    expect(
+      find.byType(SingleChildScrollView),
+      findsOneWidget,
+      reason: '点清除按钮不应收起搜索栏（修复前被拦截层挡住）',
+    );
 
     // ③ 点组外：收起，且**外部收到这次点击**（旧拦截层会吞掉首次外部点击）
     await tester.tapAt(const Offset(200, 500));
@@ -314,11 +340,7 @@ void _searchBarKeepsOpenRegression() {
 }
 
 /// 断言面板顶边贴搜索框底边、左对齐、宽度一致且位于搜索框下方。
-void _expectAligned(
-  WidgetTester tester,
-  Finder textField,
-  Finder panel,
-) {
+void _expectAligned(WidgetTester tester, Finder textField, Finder panel) {
   final searchBox = tester.getBottomLeft(textField);
   final panelTopLeft = tester.getTopLeft(panel);
   final panelSize = tester.getSize(panel);

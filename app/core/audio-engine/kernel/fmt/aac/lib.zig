@@ -107,6 +107,9 @@ pub const Aac = struct {
     out_pos: usize = 0, // 已消费输出字节游标
     pos_samples: u64 = 0,
     stat_frames: u64 = 0,
+    /// 当前帧的绝对序号（自打开/复位起），供 SBR HF 噪声相位做确定性播种：
+    /// 相位必须是「帧位置」的纯函数，否则 seek 后无法与连续解码对齐。
+    frame_seq: u32 = 0,
 
     pub fn initCommon(self: *Aac, gpa: std.mem.Allocator, cfg: asc.M4ACfg) Error!void {
         const si: usize = if (!cfg.sampling_explicit)
@@ -135,6 +138,7 @@ pub const Aac = struct {
         self.out_pos = 0;
         self.pos_samples = 0;
         self.stat_frames = 0;
+        self.frame_seq = 0;
         self.mdct_long = mdct_mod.Mdct(f32).init(1024);
         self.mdct_short = mdct_mod.Mdct(f32).init(128);
         self.mdct_ltp = mdct_mod.Mdct(f32).initLtp();
@@ -177,6 +181,48 @@ pub const Aac = struct {
             s.sample_rate = @as(i32, @intCast(self.cfg.sample_rate)) * 2;
             self.sbr = s;
         }
+    }
+
+    /// 单帧**输出**样本数（每声道）：SBR 启用时为核心 frame_samples 的 2×。
+    /// 容器 seek/位置换算必须用它，不能再用 core 的 frame_samples。
+    pub fn outFrameSamples(self: *const Aac) usize {
+        return if (self.sbr_enabled)
+            @as(usize, self.frame_samples) * 2
+        else
+            @as(usize, self.frame_samples);
+    }
+
+    /// 清除跨帧解码历史（MDCT overlap `saved`/`output`、Main 预测器、LTP、
+    /// SBR QMF、元素类型），保留配置与已分配的槽位。
+    ///
+    /// seek 后必须调用：AAC 帧的 IMDCT 输出 = 本帧前半 + **上一帧保存的后半**，
+    /// 直接跳到目标帧解码会得到「零 overlap」的第一帧（与整曲连续解码不同），
+    /// 跨档拼接处即为可闻顿挫。配合 pre-roll 一帧（丢弃其输出）即可让目标帧
+    /// 的 overlap 与连续解码一致。
+    pub fn resetHistory(self: *Aac) void {
+        for (0..4) |ty| {
+            for (0..MAX_ELEM_ID) |id| {
+                if (self.che[ty][id]) |c| {
+                    c.ch[0] = .{};
+                    c.ch[1] = .{};
+                    c.ms_mask = @splat(false);
+                    c.max_sfb_ste = 0;
+                    c.coup = .{};
+                }
+            }
+        }
+        if (self.sbr) |s| {
+            // 软复位：保留 SBR 头配置（头不保证每帧重复），只清跨帧历史。
+            s.resetTransition();
+        }
+        self.prev_elem_type = -1;
+        self.random_state = 0x1f2e3d4c;
+        self.frame_seq = 0;
+        // SBR 开关与输出采样率是**流属性**（探测一次即确定），不随历史重置
+        // 回退：否则隐式 HE-AAC 在 seek/reset 后会退回 core 采样率，
+        // outFrameSamples 少算一半，位置换算与裁剪整体错位。
+        self.out_pos = 0;
+        self.out_buf.clearRetainingCapacity();
     }
 
     /// 元素首次出现时独立小堆分配该槽位并整块零化（历史缓冲 output/saved/
@@ -1659,7 +1705,7 @@ pub const Aac = struct {
             // SBR：对每个 che 的声道做高频重建（HE-AAC 上采样到 2×）
             if (self.sbr_enabled and (le.ty == 0 or le.ty == 1)) {
                 if (self.sbr) |sbr| {
-                    try sbr_mod.apply(sbr, le.ty, che.ch[0].output[0..1024], che.ch[1].output[0..1024], 16, &self.sbr_buf, &self.sbr_buf2);
+                    try sbr_mod.apply(sbr, le.ty, che.ch[0].output[0..1024], che.ch[1].output[0..1024], 16, &self.sbr_buf, &self.sbr_buf2, self.frame_seq);
                 }
             }
             // AFTER_IMDCT 耦合（独立：时域相加）
@@ -1711,6 +1757,7 @@ pub const Aac = struct {
         }
         self.pos_samples += n;
         self.stat_frames += 1;
+        self.frame_seq +%= 1;
     }
 };
 

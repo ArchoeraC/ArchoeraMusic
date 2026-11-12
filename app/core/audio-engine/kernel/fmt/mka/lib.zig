@@ -554,8 +554,14 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+fn positionSamplesImpl(octx: *anyopaque) i64 {
+    const ctx: *Ctx = @ptrCast(@alignCast(octx));
+    return @intCast(ctx.pos_frames);
+}
 
 // ---------------------------------------------------------------------------
 // open

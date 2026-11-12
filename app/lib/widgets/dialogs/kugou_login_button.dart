@@ -17,6 +17,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../common/glass_blur.dart';
 import '../common/qr_image_view.dart';
 
@@ -29,6 +30,7 @@ import '../../l10n/l10n.dart';
 import '../common/toast.dart';
 import '../common/anim.dart';
 import 'login_risk_notice.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'kugou_login_button/kugou_login_button_view.dart';
@@ -62,7 +64,9 @@ class _KugouLoginButtonState extends ConsumerState<KugouLoginButton> {
     final ok = await showKugouLoginDialog(context);
     if (ok && mounted) {
       setState(() {});
-      _toast(context.l10n.loginKugouSuccessVip(platform: context.l10n.brandKugou));
+      _toast(
+        context.l10n.loginKugouSuccessVip(platform: context.l10n.brandKugou),
+      );
     }
   }
 

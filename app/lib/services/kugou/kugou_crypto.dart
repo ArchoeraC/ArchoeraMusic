@@ -50,6 +50,20 @@ const kgLitePublicKeyPem = '''-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDECi0Np2UR87scwrvTr72L6oO01rBbbBPriSDFPxr3Z5syug0O24QyQO8bg27+0+4kBzTBTBOZ/WWU0WryL1JSXRTXLgFVxtzIY41Pe7lPOgsfTCn5kZcvKhYKJesKnnJDNr5/abvTGf+rHG3YRwsCHcQ08/q6ifSioBszvb3QiwIDAQAB
 -----END PUBLIC KEY-----''';
 
+/// SSA 行为指纹的 RSA-OAEP-SHA256 公钥（2048bit，SPKI PEM）。
+///
+/// 来源：KuGouMusicApi `util/generate_simulate.js`（从酷狗 WASM 客户端
+/// 提取）。只用于加密一次性 AES key，服务端用对应私钥解 `sid`。
+const kgSsaPublicKeyPem = '''-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoW2+Ylo8ALePSQTP0xBF
+lFmEOHvBD9tS+s7DBlfKEu3RzzvZTaX1JtYbX4+AVUqj6ARz8IM+CKByqGFvbHN/
+W64XxNI+q7z36ajCL3VTJ2W5G9MCJitc6oGbire4NQfhaEq0nC+hxBWQvCbIFflA
+2ItrLUbSU7z1bHA/a+jlQm4OWvY+IKnTryOJTPuT1yNOVjbJ8wBLKy2DgQr9pPqW
+PmEQtGpR5IM9V8Kao6PaSdKYOWGbX3i2+RzIKhvZUxxtJwdVbqPlDPlW9h4/xIBc
+56Lgvr4aIl8nFtwbj4UJVUTFuGrs0tY9H/tXvZ22dUCKuGxW/gW7ZF+gXz6vHtYa
+rQIDAQAB
+-----END PUBLIC KEY-----''';
+
 /// 随机字符串字符池（1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ）
 const _kgPool = '1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -144,6 +158,63 @@ String kgAesEncryptHex256(String plain, String tempKey) {
   );
   final out = cipher.process(utf8.encode(plain));
   return out.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+}
+
+/// AES-CBC 加密（key/iv 直接作为 UTF-8 字节，不做 MD5 派生）→ 小写 hex。
+///
+/// 对齐 KuGouMusicApi `cryptoAesEncrypt(data, {key, iv})`：lite 登录的
+/// t1/t2 使用客户端内置的固定 key/iv（32/16 字符），不能走
+/// [kgAesEncryptHex256] 的 md5 派生路径。key 为 32 字符时即 AES-256。
+String kgAesEncryptHexRawKeyIv(String plain, String key, String iv) {
+  final out = _kgAesEncryptRaw(utf8.encode(plain), key, iv);
+  return out.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+}
+
+/// AES-CBC 加密（key/iv 直接作为 UTF-8 字节）→ base64。
+///
+/// SSA 行为指纹的 `edt` 使用固定 IV `kugousecurity123`、16 字符 key，
+/// 与登录 t1/t2 的 hex 输出不同。
+String kgAesEncryptBase64RawKeyIv(String plain, String key, String iv) =>
+    base64.encode(_kgAesEncryptRaw(utf8.encode(plain), key, iv));
+
+/// AES-CBC 解密（base64 密文，key/iv 直接作为 UTF-8 字节）→ utf8 文本。
+///
+/// 仅用于测试/诊断 SSA `edt`；生产流程不需要解密自己生成的密文。
+String kgAesDecryptBase64RawKeyIv(String cipherB64, String key, String iv) {
+  final plain = _kgAesDecryptRaw(base64.decode(cipherB64), key, iv);
+  return utf8.decode(plain, allowMalformed: true);
+}
+
+Uint8List _kgAesEncryptRaw(List<int> plain, String key, String iv) {
+  final block = CBCBlockCipher(AESEngine()) as BlockCipher;
+  final cipher = PaddedBlockCipherImpl(PKCS7Padding(), block);
+  cipher.init(
+    true,
+    PaddedBlockCipherParameters<CipherParameters, CipherParameters>(
+      ParametersWithIV<CipherParameters>(
+        KeyParameter(utf8.encode(key)),
+        utf8.encode(iv),
+      ),
+      null,
+    ),
+  );
+  return cipher.process(Uint8List.fromList(plain));
+}
+
+Uint8List _kgAesDecryptRaw(List<int> cipherText, String key, String iv) {
+  final block = CBCBlockCipher(AESEngine()) as BlockCipher;
+  final cipher = PaddedBlockCipherImpl(PKCS7Padding(), block);
+  cipher.init(
+    false,
+    PaddedBlockCipherParameters<CipherParameters, CipherParameters>(
+      ParametersWithIV<CipherParameters>(
+        KeyParameter(utf8.encode(key)),
+        utf8.encode(iv),
+      ),
+      null,
+    ),
+  );
+  return cipher.process(Uint8List.fromList(cipherText));
 }
 
 /// AES-256-CBC 解密（hex 密文 → utf8 文本）。对齐 `cryptoAesDecrypt`。
@@ -253,6 +324,17 @@ String kgRsaRawEncryptHex(String jsonStr, {String pem = kgLitePublicKeyPem}) {
       .map((b) => b.toRadixString(16).padLeft(2, '0'))
       .join()
       .toUpperCase();
+}
+
+/// RSA-OAEP-SHA256 加密 → base64。对齐 node-forge
+/// `publicKey.encrypt(data, 'RSA-OAEP', {md: sha256, mgf1: sha256})`。
+///
+/// 仅用于 SSA `sid`：加密一次性 AES key（16 字节 ASCII）。
+String kgRsaOaepSha256Base64(List<int> data, {String pem = kgSsaPublicKeyPem}) {
+  final (n, e) = _parseKgPublicKey(pem);
+  final cipher = OAEPEncoding.withSHA256(RSAEngine());
+  cipher.init(true, PublicKeyParameter<RSAPublicKey>(RSAPublicKey(n, e)));
+  return base64.encode(cipher.process(Uint8List.fromList(data)));
 }
 
 // ─── 请求签名（signature / signKey） ─────────────────────────────────────

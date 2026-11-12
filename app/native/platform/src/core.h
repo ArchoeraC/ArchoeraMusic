@@ -38,7 +38,7 @@ constexpr uint32_t CAP_DEEP_LINK = 1u << 9;
 constexpr uint32_t CAP_REVEAL_PATH = 1u << 10;
 constexpr uint32_t CAP_TRAY = 1u << 11;
 constexpr uint32_t CAP_SECURE_FILE = 1u << 12;
-constexpr uint32_t CAP_OPEN_URL = 1u << 13;
+// 1u << 13 保留：原 CAP_OPEN_URL（ABI v7 移除，勿复用）。
 constexpr uint32_t CAP_ELEVATION = 1u << 14;
 
 // ── 事件类型 / 命令 ───────────────────────────────────────────────

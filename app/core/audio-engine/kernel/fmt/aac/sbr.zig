@@ -74,8 +74,6 @@ const SbrData = struct {
     t_env: [9]u8 = @splat(0),
     t_env_num_env_old: u8 = 0,
     t_q: [3]u8 = @splat(0),
-    f_indexnoise: u32 = 0,
-    f_indexsine: u32 = 0,
 };
 
 pub const Sbr = struct {
@@ -147,6 +145,64 @@ pub const Sbr = struct {
 
     pub fn deinit(self: *Sbr) void {
         _ = self;
+    }
+
+    /// seek 用「软复位」：清空时域/QMF/包络等跨帧状态，但**保留 SBR 头配置**
+    /// （start/kx/m/频谱表/能量表等）。HE-AAC 的 SBR 头是流属性且不一定每帧
+    /// 重复；若像 zeroState 那样连头一起清零，seek 后目标帧没有头就无法
+    /// 反量化高频，首段输出会退化为静音/错误（需等到下一个头才恢复）。
+    /// QMF 分析/合成与包络历史由 seek 的 pre-roll 帧重新填满。
+    pub fn resetTransition(self: *Sbr) void {
+        for (&self.data) |*ch_data| {
+            ch_data.bs_frame_class = 0;
+            ch_data.bs_add_harmonic_flag = 0;
+            ch_data.bs_num_env = 0;
+            ch_data.bs_freq_res = @splat(0);
+            ch_data.bs_num_noise = 0;
+            ch_data.bs_df_env = @splat(0);
+            ch_data.bs_df_noise = @splat(0);
+            ch_data.bs_invf_mode = @splat(@splat(0));
+            ch_data.bs_add_harmonic = @splat(0);
+            ch_data.bs_amp_res = 0;
+            ch_data.synthesis_filterbank_samples = @splat(0);
+            ch_data.analysis_filterbank_samples = @splat(0);
+            ch_data.synthesis_filterbank_samples_offset = SYN_BUF_SIZE - 1152;
+            ch_data.e_a = .{ -1, -1 };
+            ch_data.bw_array = @splat(0);
+            ch_data.W = @splat(@splat(@splat(@splat(0))));
+            ch_data.Ypos = 0;
+            ch_data.Y = @splat(@splat(@splat(@splat(0))));
+            ch_data.g_temp = @splat(@splat(0));
+            ch_data.q_temp = @splat(@splat(0));
+            ch_data.s_indexmapped = @splat(@splat(0));
+            ch_data.env_facs_q = @splat(@splat(0));
+            ch_data.env_facs = @splat(@splat(0));
+            ch_data.noise_facs_q = @splat(@splat(0));
+            ch_data.noise_facs = @splat(@splat(0));
+            ch_data.t_env = @splat(0);
+            ch_data.t_env_num_env_old = 0;
+            ch_data.t_q = @splat(0);
+        }
+        self.kx_and_m_pushed = 0;
+        self.ready_for_dequant = 0;
+        self.X_low = @splat(@splat(@splat(0)));
+        self.X_high = @splat(@splat(@splat(0)));
+        self.X = @splat(@splat(@splat(@splat(0))));
+        self.alpha0 = @splat(@splat(0));
+        self.alpha1 = @splat(@splat(0));
+        self.e_origmapped = @splat(@splat(0));
+        self.q_mapped = @splat(@splat(0));
+        self.s_mapped = @splat(@splat(0));
+        self.e_curr = @splat(@splat(0));
+        self.q_m = @splat(@splat(0));
+        self.s_m = @splat(@splat(0));
+        self.gain = @splat(@splat(0));
+        self.qmf_filter_scratch = @splat(@splat(0));
+        self.out_l = @splat(0);
+        self.out_r = @splat(0);
+        self.X_saved = @splat(@splat(@splat(@splat(0))));
+        // PS（HE-AAC v2）：同样只清历史/逐帧参数，保留头配置。
+        psmod.resetTransition(&self.ps);
     }
 
     /// 清零全部未定义状态缓冲（对齐 FFmpeg av_mallocz：calloc 零初始化）
@@ -400,8 +456,6 @@ fn makeFDerived(self: *Sbr) bool {
     }
     if (!hfCalcNpatches(self, )) return false;
     makeFTablelim(self, );
-    self.data[0].f_indexnoise = 0;
-    self.data[1].f_indexnoise = 0;
     return true;
 }
 
@@ -1600,13 +1654,26 @@ fn hfGFilt(self: *Sbr, ch_data: *SbrData, i: usize, kx: u32, m_max: u32, ixh: us
     }
 }
 
+/// HF 噪声/正弦相位种子：必须是**帧序号的纯函数**。SBR 的噪声相位游标原本
+/// 是跨帧累加的绝对状态（每帧随时隙推进），seek 无法在不重解全部前序帧的
+/// 情况下还原；改为按帧序号确定性播种后，连续解码与任意 seek 得到相同相位，
+/// 且仍是伪随机序列（不影响听感，只改变高频抖动相位的生成方式）。
+fn hfNoiseSeed(frame_seq: u32) u32 {
+    var x: u32 = frame_seq *% 0x9E3779B1;
+    x ^= x >> 16;
+    x *%= 0x7FEB352D;
+    x ^= x >> 15;
+    return x;
+}
+
 /// sbr_hf_assemble
-fn sbrHfAssemble(self: *Sbr, ch_data: *SbrData, e_a: *const [2]i32) void {
+fn sbrHfAssemble(self: *Sbr, ch_data: *SbrData, e_a: *const [2]i32, frame_seq: u32) void {
     const h_SL: usize = 4 * @as(usize, @intFromBool(self.bs_smoothing_mode == 0));
     const kx = self.kx[1];
     const m_max = self.m[1];
-    var indexnoise = ch_data.f_indexnoise;
-    var indexsine = ch_data.f_indexsine;
+    const seed = hfNoiseSeed(frame_seq);
+    var indexnoise = seed & 0x1ff;
+    var indexsine = (seed >> 9) & 3;
 
     if (self.reset != 0) {
         var i: usize = 0;
@@ -1680,8 +1747,6 @@ fn sbrHfAssemble(self: *Sbr, ch_data: *SbrData, e_a: *const [2]i32) void {
             indexsine = (indexsine + 1) & 3;
         }
     }
-    ch_data.f_indexnoise = indexnoise;
-    ch_data.f_indexsine = indexsine;
 }
 
 /// sbr_x_gen
@@ -1723,7 +1788,7 @@ fn sbrXGen(self: *Sbr, X: *[2][38][64]f32, ch: u32, num_time_slots: u32) void {
 }
 
 /// 主入口：ff_aac_sbr_apply
-pub fn apply(self: *Sbr, id_aac: i32, L: []f32, R: []f32, num_time_slots: u32, out_l: []f32, out_r: []f32) !void {
+pub fn apply(self: *Sbr, id_aac: i32, L: []f32, R: []f32, num_time_slots: u32, out_l: []f32, out_r: []f32, frame_seq: u32) !void {
     if (self.start == 0) {
         // 纯上采样路径：QMF 分析 + 合成（跳过 HF）
         const nch: usize = if (id_aac == 1) 2 else 1;
@@ -1775,7 +1840,7 @@ pub fn apply(self: *Sbr, id_aac: i32, L: []f32, R: []f32, num_time_slots: u32, o
                 if (sbrMapping(self, ch_data, &ch_data.e_a)) {
                     sbrEnvEstimate(self, ch_data);
                     sbrGainCalc(self, ch_data, &ch_data.e_a);
-                    sbrHfAssemble(self, ch_data, &ch_data.e_a);
+                    sbrHfAssemble(self, ch_data, &ch_data.e_a, frame_seq);
                 }
             }
         }

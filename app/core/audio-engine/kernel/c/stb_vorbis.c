@@ -1034,12 +1034,12 @@ static int ilog(int32 n)
    if (n < (1 << 14))
         if (n < (1 <<  4))            return  0 + log2_4[n      ];
         else if (n < (1 <<  9))       return  5 + log2_4[n >>  5];
-             else                     return 10 + log2_4[n >> 10];
+        else                          return 10 + log2_4[n >> 10];
    else if (n < (1 << 24))
              if (n < (1 << 19))       return 15 + log2_4[n >> 15];
              else                     return 20 + log2_4[n >> 20];
-        else if (n < (1 << 29))       return 25 + log2_4[n >> 25];
-             else                     return 30 + log2_4[n >> 30];
+   else if (n < (1 << 29))            return 25 + log2_4[n >> 25];
+   else                               return 30 + log2_4[n >> 30];
 }
 
 #ifndef M_PI
@@ -1401,7 +1401,7 @@ static int set_file_offset(stb_vorbis *f, unsigned int loc)
    #endif
    f->eof = 0;
    if (USE_MEMORY(f)) {
-      if (f->stream_start + loc >= f->stream_end || f->stream_start + loc < f->stream_start) {
+      if (loc >= f->stream_len) {
          f->stream = f->stream_end;
          f->eof = 1;
          return 0;

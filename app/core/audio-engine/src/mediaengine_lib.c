@@ -258,6 +258,27 @@ typedef struct ArchoeraMediaEngine {
     double  stage_origin_ms;    /* stage[0] 真实媒体时间（首回调反推，消 ms 截断误差） */
     int     stage_have_origin;  /* stage_origin_ms 已捕获 */
     int     stage_rate;         /* 暂存 PCM 采样率（管线输出采样率） */
+    /* 暂存管线的变速倍率（tempo off → 1.0）。stage 里是**变速后**的输出 PCM：
+       10ms 媒体在 speed=2 时只有 5ms 输出样本，因此 drop/覆盖校验必须按
+       media = output * speed 换算，否则非 1× 播放下切档会少/多丢样本。 */
+    double  stage_tempo_speed;
+    /* 暂存管线的建源配置（输出格式锁定为活动管线；UNIX 路径/URL 由
+       staged_source 提供）。p_next 的 open/seek 在预取线程执行——网络慢时
+       绝不能阻塞实时引擎线程，否则旧源 ring 欠载（热切瞬间的顿挫）。 */
+    EngineConfig stage_cfg;
+    /* 运行时 DSP 状态缓存：PEQ / 低频管理 / 多声道合并不在 EngineConfig 里，
+       命令原先只作用于 e->p。暂存管线与 seek 重建的新管线若不复放这些状态，
+       切档/拖进度后会出现「前一段少 PEQ/低切、随后突然恢复」的听感突变。 */
+    float   peq_bands[PARAMETRIC_EQ_MAX_BANDS * 4];
+    int     peq_count;
+    int     peq_enabled;
+    float   peq_preamp_db;
+    int     lowfreq_enabled;
+    float   lf_hpf_freq;
+    int     lf_hpf_order;
+    float   lf_bass_gain;
+    float   lf_bass_freq;
+    int     channel_merge_enabled;
     int64_t p_start_ms;         /* 当前管线解码起点的绝对 ms（pipeline_get_position 相对它） */
     /* 暂存新源 URL（prepare 时 dup；commit 转正为 e->source，discard/destroy 释放）。
        旧实现只在 commit 换 e->p 而不换 e->source → 切档后 seek 重建仍用**旧档位**
@@ -1156,10 +1177,18 @@ static int64_t me_now_ms(void)
     return (int64_t)ts.tv_sec * 1000 + (int64_t)(ts.tv_nsec / 1000000);
 }
 
+/* stage[0] 的媒体时间：PCM 回调的 position_ms 已是**块起始**，不能再减块时长。
+   白盒回归用（见 mediaengine_internal.h）。 */
+double era_mediaengine_stage_block_origin_ms(double block_start_ms)
+{
+    return block_start_ms;
+}
+
 /* 暂存源 PCM 回调：新源预解码 PCM 追加进 stage（交织 float），达容量上限即
-   置 stage_full。首个回调反推 stage[0] 的真实媒体时间（= 本块末位置 - 本块
-   时长）——pipeline 的 start_offset 被截断到整 ms，用真实起点才能与旧源
-   decode cursor 做样本级对齐，消除切换瞬间的亚毫秒错位（高音量可闻的顿挫）。
+   置 stage_full。首个回调记录 stage[0] 的真实媒体时间（**块起始**；pipeline
+   的 start_offset 被截断到整 ms，用真实起点才能与旧源 decode cursor 做样本级
+   对齐，消除切换瞬间的亚毫秒错位）。注意 position_ms 是块起始而非块末，旧
+   实现再减一个块时长会导致每次切档多丢一块。
    仅预取线程调用（p_next 独占），无需持锁。 */
 static void on_stage_out(const float *pcm, int samples, int channels,
                          double position_ms, void *user_data)
@@ -1168,8 +1197,12 @@ static void on_stage_out(const float *pcm, int samples, int channels,
     size_t add;
     if (!e || !pcm || samples <= 0 || channels <= 0) return;
     if (!e->stage_have_origin && e->stage_rate > 0) {
-        e->stage_origin_ms = position_ms
-            - (double)samples * 1000.0 / (double)e->stage_rate;
+        /* position_ms 是**本块起始**的媒体时间（见 pipeline.c 的
+           `process_dsp_chain`：resampler 累计输出 − 本块输入帧数），stage[0]
+           就是本块首样本——不能再减本块时长（回归见
+           `era_mediaengine_stage_block_origin_ms`）。 */
+        e->stage_origin_ms =
+            era_mediaengine_stage_block_origin_ms(position_ms);
         e->stage_have_origin = 1;
     }
     if (e->stage_ch <= 0) e->stage_ch = channels;
@@ -1216,13 +1249,81 @@ static void stage_emit_ready_event(ArchoeraMediaEngine *e)
     ev_enqueue(e, buf);
 }
 
+/* 把当前会话的运行时 DSP 状态复放到任意管线（暂存管线 / seek 重建管线）。
+   EngineConfig 已覆盖 EQ/响度/限幅/变速；PEQ、低频管理、多声道合并只在
+   命令里，必须单独缓存并复放，否则切档/seek 后会短暂丢失这些效果。 */
+static void apply_engine_effects(ArchoeraMediaEngine *e, AudioPipeline *p)
+{
+    if (!e || !p) return;
+    pipeline_set_eq_gains(p, e->cfg.eq_gains);
+    pipeline_set_preamp(p, e->cfg.eq_preamp_db);
+    pipeline_set_normalization_enabled(p, e->cfg.normalization);
+    pipeline_set_normalization_gain(p, e->cfg.normalization_gain);
+    pipeline_set_normalization_album(p, e->cfg.normalization_album);
+    pipeline_set_limiter_enabled(p, e->cfg.limiter_enabled);
+    /* 阈值只在创建时按 cfg 生效（set_limiter 命令只切开关；音量走 player，
+       不改阈值）。这里无需也不应重设阈值。 */
+    pipeline_set_tempo_enabled(p, e->cfg.tempo_enabled);
+    pipeline_set_tempo_speed(p, e->cfg.tempo_speed);
+    pipeline_set_tempo_pitch(p, e->cfg.tempo_pitch);
+    pipeline_set_tempo_pitch_sync(p, e->cfg.tempo_pitch_sync);
+    if (e->peq_count > 0) {
+        pipeline_set_peq_bands(p, e->peq_bands, e->peq_count);
+    }
+    pipeline_set_peq_enabled(p, e->peq_enabled != 0);
+    pipeline_set_peq_preamp(p, e->peq_preamp_db);
+    if (e->lowfreq_enabled) {
+        if (e->lf_hpf_freq > 0.0f) {
+            pipeline_set_lowfreq_hpf(p, e->lf_hpf_freq, e->lf_hpf_order);
+        }
+        pipeline_set_lowfreq_bass(p, e->lf_bass_gain, e->lf_bass_freq);
+    }
+    pipeline_set_lowfreq_enabled(p, e->lowfreq_enabled != 0);
+    pipeline_set_channel_merge_enabled(p, e->channel_merge_enabled != 0);
+}
+
 /* 预取线程：边播旧源边在另一核上预解码新源，维持「领先实时 lead 秒」的缓冲。
    stage 仅在本线程 stage_busy=1 期间被独占；commit/discard 置 stage_stop 并
    join 后由引擎线程接管。 */
 static void *stage_prefetch_thread(void *arg)
 {
     ArchoeraMediaEngine *e = (ArchoeraMediaEngine *)arg;
+    AudioPipeline *p;
+
+    /* 建源（打开容器/TLS/探测 + seek 到旧游标）放在预取线程：在线 Hi-Res 的
+       首次连接/Range seek 可能耗时数百 ms～数秒。若在引擎线程同步执行，ring
+       里约 1.4s 的旧源 PCM 会被耗尽 → 切档瞬间可闻顿挫（EraAudio HTTP 与
+       FFmpeg AVIO 一样）。引擎线程只登记 stage/启动线程，继续喂旧源。 */
+    p = pipeline_create_with_headers(e->staged_source, e->headers,
+                                     &e->stage_cfg, dummy_output, NULL);
+    if (!p) {
+        char msg[320], esc[384], buf[512];
+        snprintf(msg, sizeof(msg), "prepare create failed: %s",
+                 e->staged_source ? e->staged_source : "(null)");
+        json_escape_str(msg, esc, sizeof(esc));
+        snprintf(buf, sizeof(buf),
+                 "{\"type\":\"source_error\",\"message\":\"%s\"}", esc);
+        ev_enqueue(e, buf);
+        pthread_mutex_lock(&e->stage_lock);
+        e->next_ready = 0;
+        e->stage_stop = 1;
+        pthread_mutex_unlock(&e->stage_lock);
+        return NULL;
+    }
+    pipeline_set_playback_streaming(p, true);
+    pipeline_set_pcm_out_cb(p, on_stage_out, e);
+    /* 复放运行时 DSP（PEQ/低频/多声道合并等）：stage PCM 从这里起就带全部
+       效果，切档后不会出现「先少一段效果再突然恢复」的听感跳变。 */
+    apply_engine_effects(e, p);
+
     pthread_mutex_lock(&e->stage_lock);
+    e->p_next = p;
+    if (e->stage_stop) {
+        /* 建源期间已被 commit/discard 接管：p_next 归调用方处理（commit 转正，
+           discard 销毁），本线程不进入解码。 */
+        pthread_mutex_unlock(&e->stage_lock);
+        return NULL;
+    }
     while (!e->stage_stop) {
         if (stage_target_reached(e)) {
             struct timespec ts;
@@ -1238,6 +1339,13 @@ static void *stage_prefetch_thread(void *arg)
         e->stage_busy = 1;
         pthread_mutex_unlock(&e->stage_lock);
         ssize_t n = pipeline_process(e->p_next);
+        /* 预解码只需领先实时 1.5s，没必要占满整核与实时引擎线程争抢 CPU
+           （Hi-Res 解码 + 重采样在低核设备上最容易把旧源 ring 挤到欠载）。
+           每次 process ≈ 40ms 音频，1ms 让步的预取开销 <3%。 */
+        if (n > 0) {
+            struct timespec yield_ts = {0, 1000000L};
+            nanosleep(&yield_ts, NULL);
+        }
         pthread_mutex_lock(&e->stage_lock);
         e->stage_busy = 0;
         if (e->stage_stop) break; /* 已被 discard/commit 接管，勿再发事件 */
@@ -1281,28 +1389,57 @@ static void mediaengine_stage_stop_join(ArchoeraMediaEngine *e, int interrupt_ne
 }
 
 /* 计算 commit 时需从 stage 头部丢弃的交叠 float 样本数：
-     drop_ms = old_ms - next_start_ms（clamp >= 0）
-     frames  = llround(drop_ms * rate / 1000)
+     drop_ms = old_ms - origin_ms（clamp >= 0；origin = stage[0] 媒体时间）
+     frames  = llround(drop_ms * rate / 1000 / tempo_speed)
      samples = frames * stage_ch（夹取到 [0, staged]）
    参数非法 / 无交叠 → 0。纯函数，供测试直接调用。 */
 size_t archoera_mediaengine_stage_drop_samples(size_t staged, int stage_ch,
                                                int rate, double old_ms,
-                                               double next_start_ms)
+                                               double origin_ms,
+                                               double tempo_speed)
 {
     double drop_ms;
     long long frames;
     unsigned long long max_frames;
     size_t samples;
     if (staged == 0 || stage_ch <= 0 || rate <= 0) return 0;
-    drop_ms = old_ms - next_start_ms;
+    if (!(tempo_speed > 0.0)) tempo_speed = 1.0; /* NaN/非法 → 按原速 */
+    drop_ms = old_ms - origin_ms;
     if (!(drop_ms > 0.0)) return 0; /* 含 NaN → 不丢弃 */
-    frames = llround(drop_ms * (double)rate / 1000.0);
+    /* drop_ms 是媒体时间；stage 存的是变速后的输出样本（speed>1 更少）。 */
+    frames = llround(drop_ms * (double)rate / 1000.0 / tempo_speed);
     if (frames <= 0) return 0;
     /* 防乘法溢出：所需帧数超过暂存帧数 → 全丢 */
     max_frames = (unsigned long long)(staged / (size_t)stage_ch);
     if ((unsigned long long)frames > max_frames) return staged;
     samples = (size_t)frames * (size_t)stage_ch;
     return samples > staged ? staged : samples;
+}
+
+int archoera_mediaengine_stage_covers(size_t staged, int stage_ch, int rate,
+                                      double old_ms, double origin_ms,
+                                      double tempo_speed)
+{
+    long long staged_frames;
+    long long drop_frames;
+    double delta;
+    if (stage_ch <= 0 || rate <= 0) return 0;
+    if (!(tempo_speed > 0.0)) tempo_speed = 1.0;
+    delta = old_ms - origin_ms;
+    if (isnan(delta)) return 0;
+    staged_frames = (long long)(staged / (size_t)stage_ch);
+    /* 按**样本**判定，不做毫秒级容差：drop_frames 就是把 stage 头部裁到旧
+       游标所需的帧数（与 stage_drop_samples 同一取整）。llround 天然吸收
+       亚样本取整误差：
+         - drop_frames > staged_frames：暂存不够覆盖游标 → 续接会回放/停顿；
+         - drop_frames < 0：新源起点晚于游标 → 会跳过一截内容（>半样本才
+           会得到负值）。
+       旧实现的 5ms 容差（@48k≈240 帧）会把「晚到 4ms」的 seek 当成可切换，
+       拼接处丢 4ms 内容 → 高音量下正是可闻顿挫。 */
+    drop_frames = llround(delta * (double)rate / 1000.0 / tempo_speed);
+    if (drop_frames < 0) return 0;
+    if (drop_frames > staged_frames) return 0;
+    return 1;
 }
 
 /* 丢弃暂存新源 + 释放 stage（幂等；未使用则空操作）。引擎线程/destroy 调用。 */
@@ -1320,6 +1457,7 @@ static void mediaengine_discard_next(ArchoeraMediaEngine *e)
     e->stage_cap = 0;
     e->stage_ch = 0;
     e->stage_rate = 0;
+    e->stage_tempo_speed = 1.0;
     e->stage_full = 0;
     e->stage_eof = 0;
     e->stage_ready_sent = 0;
@@ -1376,6 +1514,15 @@ static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
         ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"no active source\"}");
         return;
     }
+    /* 暂停态上次 commit 的 carry 还没喂进 ring（stage 缓冲同时承载 carry）。
+       此时再 prepare 会 discard 掉尚未播出的音频 → 恢复播放后进度向前跳一段。
+       必须先恢复播放让主循环 flush carry，再允许再次切档。 */
+    if (e->carry_pending) {
+        ev_enqueue(e,
+                   "{\"type\":\"source_error\",\"message\":\"previous carry pending; "
+                   "resume playback before switching quality again\"}");
+        return;
+    }
 
     mediaengine_discard_next(e); /* 已有暂存源：先丢弃 */
 
@@ -1398,34 +1545,26 @@ static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
        **未重建**的 player → 变调/变速（默认 passthrough 下必现）。锁定后
        新源必要时做一次重采样，ring/设备格式始终不变。 */
     cfg.output_sample_rate = pipeline_get_output_sample_rate(e->p);
-    if (cfg.output_sample_rate <= 0) cfg.output_sample_rate = e->cfg.output_sample_rate;
     cfg.output_channels = pipeline_get_output_channels(e->p);
-    if (cfg.output_channels <= 0) cfg.output_channels = e->cfg.output_channels;
-
-    e->p_next = pipeline_create_with_headers(url, e->headers, &cfg, dummy_output, NULL);
-    if (!e->p_next) {
-        char msg[320], esc[384], buf[512];
-        snprintf(msg, sizeof(msg), "prepare create failed: %s", url);
+    /* 活动管线的输出格式必须有效；无效说明管线自身已损坏。不再用 48000/ch2
+       猜测——猜错会让 stage 与 player 的 feed 格式不一致（变调/错位）。 */
+    if (cfg.output_sample_rate <= 0 || cfg.output_channels <= 0) {
+        char msg[192], esc[224], buf[320];
+        snprintf(msg, sizeof(msg),
+                 "invalid active output format (rate=%d ch=%d)",
+                 cfg.output_sample_rate, cfg.output_channels);
         json_escape_str(msg, esc, sizeof(esc));
         snprintf(buf, sizeof(buf),
                  "{\"type\":\"source_error\",\"message\":\"%s\"}", esc);
         ev_enqueue(e, buf);
         return;
     }
-    pipeline_set_playback_streaming(e->p_next, true);
-
-    rate = pipeline_get_output_sample_rate(e->p_next);
-    if (rate <= 0) rate = pipeline_get_output_sample_rate(e->p);
-    if (rate <= 0) rate = 48000;
-    ch = pipeline_get_output_channels(e->p_next);
-    if (ch <= 0) ch = e->cfg.output_channels > 0 ? e->cfg.output_channels : 2;
+    rate = cfg.output_sample_rate;
+    ch = cfg.output_channels;
     cap = (size_t)((double)rate * (STAGE_CAP_MS / 1000.0)) * (size_t)ch;
     if (cap == 0) cap = (size_t)rate * (size_t)ch;
     e->stage = (float *)malloc(cap * sizeof(float));
     if (!e->stage) {
-        pipeline_signal_shutdown(e->p_next);
-        pipeline_destroy(e->p_next);
-        e->p_next = NULL;
         ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"stage alloc failed\"}");
         return;
     }
@@ -1433,6 +1572,11 @@ static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
     e->stage_len = 0;
     e->stage_ch = ch;
     e->stage_rate = rate;
+    /* 暂存管线与活动管线同速（e->cfg 由 set_tempo* 命令同步）：stage 里是
+       变速后 PCM，drop/覆盖校验按 media = output * speed 换算。 */
+    e->stage_tempo_speed =
+        (cfg.tempo_enabled && cfg.tempo_speed > 0.0f) ? (double)cfg.tempo_speed
+                                                       : 1.0;
     e->stage_full = 0;
     e->stage_eof = 0;
     e->stage_ready_sent = 0;
@@ -1440,30 +1584,35 @@ static void handle_prepare_source(ArchoeraMediaEngine *e, const char *line)
     e->stage_origin_ms = 0.0;
     e->next_start_ms = base_ms;
     e->next_ready = 1;
+    /* t0 取「登记准备」时刻（含预取线程内的建源耗时）：stage 覆盖性按
+       媒体时间推进，建源越慢需要的暂存越多，不能把这段墙钟漏掉。 */
     e->stage_t0_ms = me_now_ms();
     e->stage_stop = 0;
     e->stage_busy = 0;
-    pipeline_set_pcm_out_cb(e->p_next, on_stage_out, e);
+    e->p_next = NULL;
+    e->stage_cfg = cfg;
+    /* 暂存新源 URL：预取线程用它建源，commit 时转正为活动源（seek/重建据此
+       用新档位，见 commit）。必须在启动线程前落定。 */
+    free(e->staged_source);
+    e->staged_source = strdup(url);
 
-    /* 独立预取线程：把新源解码从实时引擎线程剥离（旧源照常喂环），避免争抢
-       造成旧源欠载顿挫。source_ready 由该线程在「缓冲富余达标/EOF/超时」异步发。 */
+    /* 独立预取线程：**建源 + 解码**都在该线程内完成（旧源照常喂环），避免
+       网络建源/预解码争抢实时引擎线程造成旧源欠载顿挫。source_ready 由该线程
+       在「缓冲富余达标/EOF/超时」异步发。 */
     if (pthread_create(&e->stage_thread, NULL, stage_prefetch_thread, e) != 0) {
-        pipeline_signal_shutdown(e->p_next);
-        pipeline_destroy(e->p_next);
-        e->p_next = NULL;
         free(e->stage);
         e->stage = NULL;
         e->stage_cap = 0;
         e->stage_ch = 0;
         e->stage_rate = 0;
+        e->stage_tempo_speed = 1.0;
         e->next_ready = 0;
+        free(e->staged_source);
+        e->staged_source = NULL;
         ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"stage thread failed\"}");
         return;
     }
     e->stage_thread_on = 1;
-    /* 暂存新源 URL：commit 时转正为活动源（seek/重建据此用新档位，见 commit）。 */
-    free(e->staged_source);
-    e->staged_source = strdup(url);
 }
 
 /* commit_source：停止并汇合预取线程后，把已预解码的 stage 续喂同一 ring，新源
@@ -1478,32 +1627,63 @@ static void handle_commit_source(ArchoeraMediaEngine *e)
     int rate, ch;
     size_t drop, remain;
 
+    /* 先停止并汇合预取线程：建源也在该线程内，若调用方在 source_ready 前就
+       commit（测试同批下发），必须等建源结束再判断 p_next/stage。此后
+       p_next/stage 独占归引擎线程（不打断 p_next，保留其解码位置接力续播）。 */
+    mediaengine_stage_stop_join(e, 0);
     if (!e->p_next || !e->stage || !e->next_ready) {
+        mediaengine_discard_next(e);
         ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"no staged source\"}");
         return;
     }
-    /* 停止并汇合预取线程：此后 p_next/stage 独占归引擎线程（不打断 p_next，
-       保留其解码位置以便接力续播）。 */
-    mediaengine_stage_stop_join(e, 0);
     /* 调用方可能在预取线程发出 source_ready 前就 commit（如测试同批下发）：
        补发一次，保证 ready→switched 事件握手始终完整。 */
     if (!e->stage_ready_sent) {
         e->stage_ready_sent = 1;
         stage_emit_ready_event(e);
     }
+    /* 预取期间用户可能改了效果：把最新状态复放到即将转正的管线（已暂存的
+       采样无法回溯，但转正后的新解码不会继续少效果）。 */
+    apply_engine_effects(e, e->p_next);
 
     old_ms = (double)e->p_start_ms + pipeline_get_position(e->p) * 1000.0;
-    rate = e->stage_rate > 0 ? e->stage_rate
-                             : pipeline_get_output_sample_rate(e->p_next);
-    if (rate <= 0) rate = pipeline_get_output_sample_rate(e->p);
-    if (rate <= 0) rate = 48000;
-    ch = e->stage_ch > 0 ? e->stage_ch : e->cfg.output_channels;
-    if (ch <= 0) ch = 2;
+    rate = e->stage_rate;
+    ch = e->stage_ch;
+    /* stage 分配时已校验输出格式；走到这里仍非法说明状态被破坏，直接放弃
+       切换（不猜测 48000/ch2——猜错会变调/错位）。 */
+    if (rate <= 0 || ch <= 0) {
+        mediaengine_discard_next(e);
+        ev_enqueue(e, "{\"type\":\"source_error\",\"message\":\"invalid staged format\"}");
+        return;
+    }
     /* stage[0] 真实媒体时间（首回调反推）；未跑预解码则退化为建源起点。 */
     origin_ms = e->stage_have_origin ? e->stage_origin_ms : e->next_start_ms;
 
+    /* 覆盖性校验：新源的 seek 落点必须真的落在旧解码游标附近。在线转码流
+       忽略 Range / 不支持 seek 时，av_seek_frame 可能"成功"但重新从 0 解码；
+       旧实现会把 20s 暂存全丢光后仍提交，新源从 ~20s 接入而进度条显示原先
+       位置 → 声音与进度条错位（切档后严重跳播）。这种切换必须整体放弃，
+       保留旧源，并由 Dart 侧维持原音质。 */
+    if (!archoera_mediaengine_stage_covers(e->stage_len, ch, rate, old_ms,
+                                           origin_ms, e->stage_tempo_speed)) {
+        char msg[256], esc[320], buf[384];
+        double staged_ms = (double)(e->stage_len / (size_t)ch) * 1000.0
+                           / (double)rate * e->stage_tempo_speed;
+        snprintf(msg, sizeof(msg),
+                 "staged source misaligned (cursor=%.0fms origin=%.0fms "
+                 "staged=%.0fms)：新源 seek 落点不覆盖旧解码游标，已放弃切换",
+                 old_ms, origin_ms, staged_ms);
+        json_escape_str(msg, esc, sizeof(esc));
+        snprintf(buf, sizeof(buf),
+                 "{\"type\":\"source_error\",\"message\":\"%s\"}", esc);
+        mediaengine_discard_next(e);
+        ev_enqueue(e, buf);
+        return;
+    }
+
     drop = archoera_mediaengine_stage_drop_samples(e->stage_len, ch, rate,
-                                                   old_ms, origin_ms);
+                                                   old_ms, origin_ms,
+                                                   e->stage_tempo_speed);
     remain = e->stage_len - drop;
 
     /* 把剩余新源 PCM 移到 stage 头部作为「待喂余量」。 */
@@ -1536,10 +1716,15 @@ static void handle_commit_source(ArchoeraMediaEngine *e)
        (int64_t) 而非 llround 保持一致）；session_offset_ms 是 rel 事件零点
        （= cfg.start_offset_ms），切档不改变，后续 seek 仍正确。 */
     e->p_start_ms = (int64_t)e->next_start_ms;
+    /* 会话的规范输出格式改为切档后的实际格式：后续 seek 重建 / 下一轮
+       prepare 都以它为准，避免 passthrough（e->cfg=0）下跟随新源采样率。 */
+    e->cfg.output_sample_rate = rate;
+    e->cfg.output_channels = ch;
     e->next_ready = 0;
     e->next_start_ms = 0.0;
     e->stage_cap = 0;
     e->stage_rate = 0;
+    e->stage_tempo_speed = 1.0;
     e->stage_full = 0;
     e->stage_eof = 0;
     e->stage_ready_sent = 0;
@@ -1569,6 +1754,7 @@ static void handle_commit_source(ArchoeraMediaEngine *e)
         e->stage_cap = 0;
         e->stage_ch = 0;
         e->stage_rate = 0;
+        e->stage_tempo_speed = 1.0;
         e->carry_pending = 0;
     }
 
@@ -1800,9 +1986,14 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
     if (strcmp(type, "set_eq") == 0) {
         float gains[EQ_BANDS] = {0};
         int n = json_get_float_array(line, "gains", gains, EQ_BANDS);
-        if (n > 0) pipeline_set_eq_gains(e->p, gains);
+        if (n > 0) {
+            int i;
+            for (i = 0; i < EQ_BANDS; i++) e->cfg.eq_gains[i] = gains[i];
+            pipeline_set_eq_gains(e->p, gains);
+        }
         double preamp = 0;
         if (json_get_number(line, "preamp", &preamp) == 0) {
+            e->cfg.eq_preamp_db = (float)preamp;
             pipeline_set_preamp(e->p, (float)preamp);
         }
     } else if (strcmp(type, "set_peq") == 0) {
@@ -1811,36 +2002,47 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
         int n = json_get_float_array(line, "bands", bands,
                                      PARAMETRIC_EQ_MAX_BANDS * 4);
         if (n > 0 && n % 4 == 0) {
+            int i;
+            e->peq_count = n / 4;
+            for (i = 0; i < n; i++) e->peq_bands[i] = bands[i];
             pipeline_set_peq_bands(e->p, bands, n / 4);
         }
         bool peq_enabled = true;
         if (json_get_bool(line, "enabled", &peq_enabled) == 0) {
+            e->peq_enabled = peq_enabled ? 1 : 0;
             pipeline_set_peq_enabled(e->p, peq_enabled);
         }
         double peq_preamp = 0;
         if (json_get_number(line, "preamp", &peq_preamp) == 0) {
+            e->peq_preamp_db = (float)peq_preamp;
             pipeline_set_peq_preamp(e->p, (float)peq_preamp);
         }
     } else if (strcmp(type, "set_lowfreq") == 0) {
         /* 方向① D2：次声/低频管理 */
         bool lf_enabled = true;
         if (json_get_bool(line, "enabled", &lf_enabled) == 0) {
+            e->lowfreq_enabled = lf_enabled ? 1 : 0;
             pipeline_set_lowfreq_enabled(e->p, lf_enabled);
         }
         double hpf_freq = -1.0, hpf_order = 2.0;
         if (json_get_number(line, "hpf_freq", &hpf_freq) == 0) {
             if (json_get_number(line, "hpf_order", &hpf_order) != 0) hpf_order = 2.0;
+            e->lf_hpf_freq = (float)hpf_freq;
+            e->lf_hpf_order = (int)hpf_order;
             pipeline_set_lowfreq_hpf(e->p, (float)hpf_freq, (int)hpf_order);
         }
         double bass_gain = 0.0, bass_freq = 100.0;
         if (json_get_number(line, "bass_gain", &bass_gain) == 0) {
             if (json_get_number(line, "bass_freq", &bass_freq) != 0) bass_freq = 100.0;
+            e->lf_bass_gain = (float)bass_gain;
+            e->lf_bass_freq = (float)bass_freq;
             pipeline_set_lowfreq_bass(e->p, (float)bass_gain, (float)bass_freq);
         }
     } else if (strcmp(type, "set_channel_merge") == 0) {
         /* 多声道合并：设备只有单侧发声时的兜底（默认关） */
         bool enabled = false;
         if (json_get_bool(line, "enabled", &enabled) == 0) {
+            e->channel_merge_enabled = enabled ? 1 : 0;
             pipeline_set_channel_merge_enabled(e->p, enabled);
         }
     } else if (strcmp(type, "set_chorus") == 0) {
@@ -1890,13 +2092,18 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
         json_get_bool(line, "enabled", &enabled);
         json_get_number(line, "gain_db", &gain_db);
         json_get_bool(line, "album", &album);
-        /* 先设兜底增益与取用口径，再设开关：最后一次 apply 用最终状态。 */
+        /* 先设兜底增益与取用口径，再设开关：最后一次 apply 用最终状态。
+           同步到 cfg，暂存管线（prepare_source）才能从同一 DSP 状态起播。 */
+        e->cfg.normalization_gain = (float)gain_db;
+        e->cfg.normalization_album = album ? 1 : 0;
+        e->cfg.normalization = enabled;
         pipeline_set_normalization_gain(e->p, (float)gain_db);
         pipeline_set_normalization_album(e->p, album ? 1 : 0);
         pipeline_set_normalization_enabled(e->p, enabled);
     } else if (strcmp(type, "set_limiter") == 0) {
         bool enabled = true;
         if (json_get_bool(line, "enabled", &enabled) == 0) {
+            e->cfg.limiter_enabled = enabled;
             pipeline_set_limiter_enabled(e->p, enabled);
         }
     } else if (strcmp(type, "set_fft") == 0) {
@@ -1938,16 +2145,21 @@ static void handle_command(ArchoeraMediaEngine *e, const char *line)
     } else if (strcmp(type, "set_tempo_speed") == 0) {
         double speed = 1.0;
         if (json_get_number(line, "speed", &speed) == 0) {
+            /* 同步到会话 cfg：prepare_source 克隆它建暂存管线；否则暂存管线
+               按初始 1× 预解码，非 1× 播放时切档会速度突变/丢样本。 */
+            e->cfg.tempo_speed = (float)speed;
             pipeline_set_tempo_speed(e->p, (float)speed);
         }
     } else if (strcmp(type, "set_tempo_pitch") == 0) {
         double semitones = 0.0;
         if (json_get_number(line, "semitones", &semitones) == 0) {
+            e->cfg.tempo_pitch = (float)semitones;
             pipeline_set_tempo_pitch(e->p, (float)semitones);
         }
     } else if (strcmp(type, "set_tempo") == 0) {
         bool enabled = true;
         if (json_get_bool(line, "enabled", &enabled) == 0) {
+            e->cfg.tempo_enabled = enabled;
             pipeline_set_tempo_enabled(e->p, enabled);
         }
     } else if (strcmp(type, "get_status") == 0) {
@@ -2033,6 +2245,16 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
     mediaengine_discard_next(e);
 
     cfg2.start_offset_ms = abs_start_ms;
+    /* 输出格式必须锁定为**当前活动管线**（= player 的 feed 格式）。passthrough
+       会话的 e->cfg.output_sample_rate 仍是 0；若切档后活动管线已被锁到旧源
+       采样率（如 Hi-Res 96k 活动时切到 LQ，管线输出仍为 96k），重建却跟随
+       新源采样率，player 仍按旧 feed 率消费 → 变调/变速。 */
+    if (e->p) {
+        int active_rate = pipeline_get_output_sample_rate(e->p);
+        int active_ch = pipeline_get_output_channels(e->p);
+        if (active_rate > 0) cfg2.output_sample_rate = active_rate;
+        if (active_ch > 0) cfg2.output_channels = active_ch;
+    }
     /* 1) 先建新管线（含解码 seek；native 失败内部已回退 FFmpeg）——旧会话不动。
        磁盘源走 pipeline_create；store 会话（整曲驻留可 seek）经 AVIO-mem 重建，
        游标从目标偏移继续从同一 store 解码。 */
@@ -2041,6 +2263,9 @@ static int mediaengine_stream_rebuild(ArchoeraMediaEngine *e, int64_t abs_start_
         : pipeline_create_with_headers(e->source, e->headers, &cfg2, dummy_output, NULL);
     if (!np) return -1;
     pipeline_set_playback_streaming(np, true);
+    /* 新管线从 e->cfg 建出（EQ/响度/限幅/变速），但 PEQ/低频/多声道合并
+       不在 cfg 里：seek 后必须复放，否则这些效果会静默消失。 */
+    apply_engine_effects(e, np);
 
     /* 2) 新管线就绪 → 停旧设备/缓冲、销毁旧管线与输出文件 */
     if (e->player && e->player_stream_mode) {
@@ -2091,7 +2316,9 @@ static int mediaengine_spectrum_start(ArchoeraMediaEngine *e)
     if (!e || !e->p) return -1;
 
     sr = pipeline_get_output_sample_rate(e->p);
-    if (sr <= 0) sr = 48000;
+    /* 活动管线输出格式无效说明管线本身已损坏：不猜 48k 建频谱
+     * （猜错会让频点整体偏移）；直接拒绝启动，由调用方保持静默。 */
+    if (sr <= 0) return -1;
 
     if (e->spectrum_sr != sr) {
         /* 采样率变化：旧表/环/文件索引全部按旧率，直接丢弃重建。 */
@@ -2172,8 +2399,9 @@ static int mediaengine_stream_begin(ArchoeraMediaEngine *e)
     popts.volume = e->last_volume; /* 首块 PCM 即按会话音量出声，避免满音量爆音 */
     rate = pipeline_get_output_sample_rate(e->p);
     ch = e->cfg.output_channels;
-    if (rate <= 0) rate = 48000;
-    if (ch <= 0) ch = 2;
+    /* 输出格式无效时不启动流式播放器（猜 48k/ch2 会变调/错位）；返回 0
+     * 让会话保持既有文件播放路径，由 pipeline 自身报错诊断。 */
+    if (rate <= 0 || ch <= 0) return 0;
     e->player = player_stream_open(e->sink_id, &popts, rate, ch,
                                    player_event_cb, e);
     if (!e->player) {
@@ -2616,6 +2844,14 @@ static ArchoeraMediaEngine *mediaengine_create_impl(const char *source,
     if (!e) return NULL;
     e->spectrum_gamma = 1.0f; /* 默认 γ=1.0（关闭） */
     e->spectrum_tilt = 0.0f;  /* 默认无高频倾斜 */
+    /* 运行时 DSP 缓存默认值（与 pipeline 创建时的旁通状态一致）。 */
+    e->peq_enabled = 0;
+    e->peq_preamp_db = 0.0f;
+    e->lf_hpf_freq = -1.0f;
+    e->lf_hpf_order = 2;
+    e->lf_bass_gain = 0.0f;
+    e->lf_bass_freq = 100.0f;
+    e->channel_merge_enabled = 0;
 
     e->store = store; /* 非空 = store 内存源会话；生命周期归调用方，destroy 不释放 */
     e->source = source ? strdup(source) : NULL;

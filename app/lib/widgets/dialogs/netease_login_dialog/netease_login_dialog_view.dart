@@ -261,7 +261,9 @@ extension _NeteaseLoginDialogView on _NeteaseLoginDialogState {
             SizedBox(
               height: 48,
               child: FilledButton.tonal(
-                onPressed: (_phoneBusy || _codeCountdown > 0) ? null : _sendCode,
+                onPressed: (_phoneBusy || _codeCountdown > 0)
+                    ? null
+                    : _sendCode,
                 child: Text(
                   _codeCountdown > 0
                       ? '${_codeCountdown}s'

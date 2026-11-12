@@ -6,6 +6,36 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+/// 用户帧率上限（FPS）→ 最小帧间隔。
+///
+/// 语义与 [PowerSavingFrameBinding.setFrameInterval] 一致：间隔内合并帧请求，
+/// 到期才派发下一帧。约定：
+/// - `fps <= 0` → [Duration.zero]（不限制）；
+/// - [displayRefreshRate] 已知且目标帧率不低于它 → 不节流（超过刷新率的
+///   目标没有意义，再快也只能跟着 vsync 出帧）；
+/// - 否则提前 4%（至少 0.2ms、至多 1ms）到期：定时器若正好与 vsync 同刻，
+///   会偶发白丢一整帧（表现为「突然掉到一半帧率」）；4% 的代价是实际帧率
+///   可能比目标高 2~4%，仍低于「每帧都出」的满帧。
+Duration frameIntervalForFps(int fps, {double displayRefreshRate = 0}) {
+  if (fps <= 0) return Duration.zero;
+  if (displayRefreshRate > 0 && fps >= displayRefreshRate - 0.5) {
+    return Duration.zero;
+  }
+  final targetUs = 1000000 / fps;
+  final slackUs = (targetUs * 0.04).clamp(200.0, 1000.0);
+  final micros = (targetUs - slackUs).round();
+  return Duration(microseconds: micros < 1000 ? 1000 : micros);
+}
+
+/// 合并「节能档位」与「用户帧率上限」：取更严格（间隔更长 = 帧率更低）者。
+///
+/// [Duration.zero] 表示不限制，因此任一为零时直接取另一个。
+Duration effectiveFrameInterval(Duration powerInterval, Duration userInterval) {
+  if (powerInterval == Duration.zero) return userInterval;
+  if (userInterval == Duration.zero) return powerInterval;
+  return powerInterval > userInterval ? powerInterval : userInterval;
+}
+
 /// 全局帧节流 Binding（节能模式的渲染层）。
 ///
 /// Flutter 公开 API 无法直接设置帧率（`SchedulerBinding.framesEnabled` 只有
@@ -67,8 +97,11 @@ class PowerSavingFrameBinding extends WidgetsFlutterBinding {
     }
   }
 
-  /// 设置最小帧间隔（如 5 FPS = 200ms）。[Duration.zero] 恢复满帧，
-  /// 并立即补一帧，避免 UI 停留在节流前的最后一帧。
+  /// 设置最小帧间隔（如 5 FPS = 200ms）。[Duration.zero] 恢复满帧。
+  ///
+  /// 变更后**总是补一次帧请求**：取消 pending 定时器会让本轮帧请求落空，而
+  /// Ticker 要等一帧结束才会再次 `scheduleTick`——不补就会一直停到下一次
+  /// 输入事件（用户拖动帧率滑块这类「非零间隔之间切换」最容易撞上）。
   void setFrameInterval(Duration interval) {
     if (interval < Duration.zero) {
       interval = Duration.zero;
@@ -79,9 +112,7 @@ class PowerSavingFrameBinding extends WidgetsFlutterBinding {
     _minFrameInterval = interval;
     _pendingFrameTimer?.cancel();
     _pendingFrameTimer = null;
-    if (interval == Duration.zero) {
-      scheduleFrame();
-    }
+    scheduleFrame();
   }
 
   @override

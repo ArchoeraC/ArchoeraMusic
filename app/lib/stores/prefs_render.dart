@@ -7,11 +7,20 @@ import 'app_prefs.dart';
 // ── 渲染 / 显卡加速域键（render. 前缀）─────────────────────────────
 //
 // 「性能 / 渲染」分类的可选开关（见 docs/runtime-resource-optimization.md）：
-// 水纹渲染器（GPU 着色器 / CPU 网格）、动态层降分辨率、损伤区裁剪。
+// 水纹渲染器（GPU 着色器 / CPU 网格）、动态层降分辨率、损伤区裁剪、歌词边缘
+// 渐隐实现、全局渲染帧数上限。
 const rippleShaderKey = 'render.rippleShader';
 const rippleLowResKey = 'render.rippleLowRes';
 const rippleDamageClipKey = 'render.rippleDamageClip';
 const lyricsEdgeFadeKey = 'render.lyricsEdgeFade';
+const renderFpsKey = 'render.fpsCap';
+
+/// 渲染帧数上限的可调范围（设置页滑块）。
+const int kRenderFpsMin = 30;
+const int kRenderFpsMax = 165;
+
+/// 默认渲染帧数上限：60 FPS（设置页在该值及以下用主题色，以上转黄/红）。
+const int kRenderFpsDefault = 60;
 
 /// 水纹 GPU 着色器（默认开）。关闭则走 CPU 网格回退路径。
 ///
@@ -63,6 +72,24 @@ extension RenderPrefs on AppPrefs {
     if (v is String && lyricsEdgeFadeValues.contains(v)) return v;
     return defaultLyricsEdgeFade;
   }
+
+  /// 渲染帧数上限（[kRenderFpsMin]~[kRenderFpsMax]，默认 60）。
+  ///
+  /// 只是**上限**：真正的出帧节奏还受显示器刷新率与节能档位限制
+  /// （见 `frame_governor.dart`）。
+  int get renderFps =>
+      ((data[renderFpsKey] as num?)?.toInt() ?? kRenderFpsDefault).clamp(
+        kRenderFpsMin,
+        kRenderFpsMax,
+      );
+
+  /// 设置渲染帧数上限（越界值收敛到 [kRenderFpsMin]~[kRenderFpsMax]）。
+  AppPrefs copyWithRenderFps(int fps) => AppPrefs(
+    initialData: {
+      ...data,
+      renderFpsKey: fps.clamp(kRenderFpsMin, kRenderFpsMax),
+    },
+  );
 
   /// 设置歌词区上下渐隐实现（非法值回退默认）。
   AppPrefs copyWithLyricsEdgeFade(String value) => AppPrefs(

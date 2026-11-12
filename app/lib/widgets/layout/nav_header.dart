@@ -32,6 +32,7 @@ import '../player/s_controls.dart';
 import '../common/anim.dart';
 import '../common/glass_blur.dart';
 import '../common/toast.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'nav_header/nav_header_accounts.dart';
@@ -111,9 +112,9 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   @override
   void initState() {
     super.initState();
-    // 文本取自 [navSearchQueryProvider]（真值）：壳内容被卸载（播放页完全展开）后
-    // 重建时，由 provider 回填——否则搜索框会空，而 `/search` 页仍按路由 `?q=`
-    // 展示旧查询的结果（不一致）。
+    // 文本取自 [navSearchQueryProvider]（真值）：页面切换 / 顶栏重建时由
+    // provider 回填——否则搜索框会空，而 `/search` 页仍按路由 `?q=` 展示旧
+    // 查询的结果（不一致）。
     _searchCtrl = TextEditingController(
       text: ref.read(navSearchQueryProvider) ?? '',
     );
@@ -132,11 +133,10 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   void dispose() {
     _searchFocus.removeListener(_onSearchFocusChanged);
     _suggestDebounce?.cancel();
-    // 浮层必须**同步**摘除，不能等收起动画：壳内容被卸载（全屏播放页完全
-    // 展开 → [ShellExpandTransition] 卸掉 NavHeader）时，controller 随即被
-    // dispose，任何挂在动画完成回调上的移除都不会再执行 → 入口永久留在根
-    // Overlay：锚点（LayerLink target）消失后 follower 退化为左上角，旧 State
-    // 的 TapRegion 组也已不存在 → 「下拉卡死在左上角且无法解除」。
+    // 浮层必须**同步**摘除，不能等收起动画：顶栏被停绘/收起时 controller
+    // 可能随路由变化失活，任何挂在动画完成回调上的移除都不会再执行 → 入口
+    // 永久留在根 Overlay：锚点（LayerLink target）消失后 follower 退化为
+    // 左上角，旧 State 的 TapRegion 组也已不存在 → 「下拉卡死在左上角且无法解除」。
     _removeSearchOverlay();
     _playerRouteAnim?.removeListener(_onPlayerRouteExpand);
     _playerRouteAnim = null;
@@ -217,11 +217,12 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     _onPlayerRouteExpand();
   }
 
-  /// 播放页开始展开（壳内容随后整体缩放淡出、最终卸载）→ 收起搜索下拉。
+  /// 播放页开始展开（壳内容随后整体缩放淡出、最终停绘）→ 收起搜索下拉。
   ///
   /// 下拉浮层在**根 Overlay** 里（见 [_buildSearchOverlay]），不在壳子树内，
-  /// 因此不会随壳内容淡出；不主动收起会悬停在播放页上方，直到壳内容卸载才
-  /// 消失（那已经是「卡住」的观感）。
+  /// 因此不会随壳内容淡出。这里必须**同步**摘除：壳内容停绘时 `TickerMode`
+  /// 会暂停本 State 的动画，面板的收起反转可能永远走不到 `dismissed`，
+  /// 浮层会永久悬在播放页左上角。
   void _onPlayerRouteExpand() {
     final anim = _playerRouteAnim;
     if (anim == null ||
@@ -234,6 +235,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     } else {
       _hideSearchDropdown();
     }
+    // 不等收起动画：见上方注释。
+    _removeSearchOverlay();
   }
 
   /// 下拉浮层：只放**锚定面板**（外部点击收起改由 [TapRegion] 按组判定，见 [_searchTapGroup]）。
@@ -247,36 +250,37 @@ class _NavHeaderState extends ConsumerState<NavHeader>
       child: Stack(
         children: [
           CompositedTransformFollower(
-          link: _searchLayerLink,
-          // 面板顶边（followerAnchor topLeft）对齐搜索框底边
-          // （targetAnchor bottomLeft）——Noctalia 式「嵌入」：面板紧贴
-          // 搜索框下方、顶边圆角归零，视觉一体无间隙
-          targetAnchor: Alignment.bottomLeft,
-          followerAnchor: Alignment.topLeft,
-          offset: Offset.zero,
-          child: ListenableBuilder(
-            listenable: _searchListenable,
-            builder: (_, _) => _SearchDropdown(
-              width: _searchWidth,
-              query: _searchCtrl.text.trim(),
-              panelCtrl: _panelCtrl,
-              hot: _hot,
-              hotLoading: _hotLoading,
-              kugouHot: _kugouHot,
-              kugouHotLoading: _kugouHotLoading,
-              suggest: _suggest,
-              suggestLoading: _suggestLoading,
-              onSearch: _submitSearch,
-              onRemove: (word) =>
-                  ref.read(appPrefsProvider.notifier).removeSearchHistory(word),
-              onClear: () =>
-                  ref.read(appPrefsProvider.notifier).clearSearchHistory(),
-              onPickSong: _playSuggestSong,
-              onPickAlbum: _openSuggestAlbum,
-              onPickArtist: _openSuggestArtist,
-              onPickPlaylist: _openSuggestPlaylist,
+            link: _searchLayerLink,
+            // 面板顶边（followerAnchor topLeft）对齐搜索框底边
+            // （targetAnchor bottomLeft）——Noctalia 式「嵌入」：面板紧贴
+            // 搜索框下方、顶边圆角归零，视觉一体无间隙
+            targetAnchor: Alignment.bottomLeft,
+            followerAnchor: Alignment.topLeft,
+            offset: Offset.zero,
+            child: ListenableBuilder(
+              listenable: _searchListenable,
+              builder: (_, _) => _SearchDropdown(
+                width: _searchWidth,
+                query: _searchCtrl.text.trim(),
+                panelCtrl: _panelCtrl,
+                hot: _hot,
+                hotLoading: _hotLoading,
+                kugouHot: _kugouHot,
+                kugouHotLoading: _kugouHotLoading,
+                suggest: _suggest,
+                suggestLoading: _suggestLoading,
+                onSearch: _submitSearch,
+                onRemove: (word) => ref
+                    .read(appPrefsProvider.notifier)
+                    .removeSearchHistory(word),
+                onClear: () =>
+                    ref.read(appPrefsProvider.notifier).clearSearchHistory(),
+                onPickSong: _playSuggestSong,
+                onPickAlbum: _openSuggestAlbum,
+                onPickArtist: _openSuggestArtist,
+                onPickPlaylist: _openSuggestPlaylist,
+              ),
             ),
-          ),
           ),
         ],
       ),
@@ -285,7 +289,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
 
   /// 搜索框输入变化：空 → 热搜；非空 → 300ms debounce 拉建议。
   void _onSearchChanged(String text) {
-    // 文本先写回 provider（真值）：跨壳内容卸载保留，且与搜索页展示的查询一致。
+    // 文本先写回 provider（真值）：跨页面保留，且与搜索页展示的查询一致。
     ref.read(navSearchQueryProvider.notifier).set(text);
     _suggestDebounce?.cancel();
     final query = text.trim();
@@ -399,9 +403,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   /// - KG：建议只有 songid，按歌名搜索取 hash + 封面（[suggestSongToTrack]）。
   Future<void> _playSuggestSong(SuggestSongItem song) async {
     // 建议条目按来源经注册表解析为完整曲目 + 直链（NT 取详情 / KG 取 hash）。
-    final resolved = await sourcePlatform(
-      song.source,
-    ).resolveSuggestSong(ref, song);
+    final resolved = await sourcePlatform(song.source)
+        .resolveSuggestSong(ref, song);
     if (!mounted) return;
     final url = resolved?.url;
     if (resolved == null || url == null || url.isEmpty) {
@@ -426,9 +429,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
       source: album.source,
     );
     // 按来源经注册表分发专辑详情（不再硬编码 KG / NT 分支）。
-    sourcePlatform(
-      album.source,
-    ).openCover(context, ref, SourceSearchKind.album, cover);
+    sourcePlatform(album.source)
+        .openCover(context, ref, SourceSearchKind.album, cover);
   }
 
   /// 建议歌手：NT歌手热门歌曲弹窗。
@@ -473,7 +475,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
         selection: TextSelection.collapsed(offset: value.length),
       );
     });
-    // 播放页展开（壳内容即将缩放淡出并卸载）→ 收起搜索下拉（浮层不在壳内，
+    // 播放页展开（壳内容即将缩放淡出并停绘）→ 收起搜索下拉（浮层不在壳内，
     // 不随淡出；见 [_onPlayerRouteExpand]）。
     ref.listen(
       playerRouteAnimationProvider,
@@ -497,17 +499,17 @@ class _NavHeaderState extends ConsumerState<NavHeader>
               groupId: _searchTapGroup,
               onTapOutside: (_) => _searchFocus.unfocus(),
               child: _NavHeaderSearchField(
-              layerLink: _searchLayerLink,
-              widthAnimation: _widthCtrl,
-              collapsedWidth: _searchCollapsedWidth,
-              expandedWidth: _searchExpandedWidth,
-              searchFocus: _searchFocus,
-              searchCtrl: _searchCtrl,
-              hintText: l10n.navHeaderSearchHint,
-              onChanged: _onSearchChanged,
-              onSubmitted: _submitSearch,
-              onTapOutside: (_) {},
-            ),
+                layerLink: _searchLayerLink,
+                widthAnimation: _widthCtrl,
+                collapsedWidth: _searchCollapsedWidth,
+                expandedWidth: _searchExpandedWidth,
+                searchFocus: _searchFocus,
+                searchCtrl: _searchCtrl,
+                hintText: l10n.navHeaderSearchHint,
+                onChanged: _onSearchChanged,
+                onSubmitted: _submitSearch,
+                onTapOutside: (_) {},
+              ),
             ),
             const Spacer(),
             // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）

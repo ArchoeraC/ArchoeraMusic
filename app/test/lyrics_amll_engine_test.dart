@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /// 歌词 v7 引擎「AMLL 对齐」新增能力的回归测试：
-/// 播放时钟插值、逐字渲染几何、间奏三点、背景人声行、景深（缩放/失焦）。
+/// 播放时钟插值、逐字渲染几何、间奏识别、背景人声行、景深（缩放/失焦）。
 library;
 
 import 'dart:math' as math;
@@ -289,66 +289,6 @@ void main() {
     });
   });
 
-  group('间奏三点动画', () {
-    test('空隙过短 → 不显示', () {
-      // 总空隙 < 7s：不产生间奏。
-      expect(
-        resolveInterludeDots(startMs: 0, endMs: 5000, nowMs: 1000).visible,
-        isFalse,
-      );
-      // 恰好 7s：身体段足够，可见。
-      expect(
-        resolveInterludeDots(startMs: 0, endMs: 7000, nowMs: 1200).visible,
-        isTrue,
-      );
-    });
-
-    test('中途可见、三点依次点亮且第 3 点最晚', () {
-      const start = 0;
-      const end = 20000;
-      final early = resolveInterludeDots(
-        startMs: start,
-        endMs: end,
-        nowMs: 1500,
-      );
-      expect(early.visible, isTrue);
-      expect(early.opacity, greaterThan(0));
-      expect(early.dots[0], greaterThan(early.dots[1]));
-      expect(early.dots[1], greaterThanOrEqualTo(early.dots[2]));
-
-      final late = resolveInterludeDots(
-        startMs: start,
-        endMs: end,
-        nowMs: 16000,
-      );
-      expect(late.visible, isTrue);
-      expect(late.dots[2], greaterThan(early.dots[2]));
-      // 亮度落在 [0.2, 0.9]。
-      for (final d in late.dots) {
-        expect(d, greaterThanOrEqualTo(0.0));
-        expect(d, lessThanOrEqualTo(1.0));
-      }
-    });
-
-    test('退场段淡出到接近 0 并缩放收小', () {
-      final st = resolveInterludeDots(startMs: 0, endMs: 20000, nowMs: 19990);
-      expect(st.visible, isTrue);
-      expect(st.opacity, lessThan(0.35));
-      expect(st.scale, lessThan(1.0));
-    });
-
-    test('区间外不可见', () {
-      expect(
-        resolveInterludeDots(startMs: 0, endMs: 20000, nowMs: 20001).visible,
-        isFalse,
-      );
-      expect(
-        resolveInterludeDots(startMs: 0, endMs: 20000, nowMs: -1).visible,
-        isFalse,
-      );
-    });
-  });
-
   group('背景人声行解析', () {
     test('整行圆括号 → isBG 且剥掉括号', () {
       final groups = parseLyricGroups(
@@ -397,7 +337,8 @@ void main() {
 
   group('QRC（QQ 音乐逐字）解析', () {
     test('XML 外壳解开 + 绝对字级时间转相对偏移', () {
-      const xml = '<?xml version="1.0" encoding="utf-8"?>\n'
+      const xml =
+          '<?xml version="1.0" encoding="utf-8"?>\n'
           '<QrcInfos>\n<QrcHeadInfo SaveTime="1" Version="100"/>\n'
           '<LyricInfo LyricCount="1">\n'
           '<Lyric_1 LyricType="1" LyricContent="[ti:测试]\n'
@@ -435,10 +376,7 @@ void main() {
         format: 'qrc',
       );
       expect(a.single.original.text, 'a)b');
-      expect(
-        a.single.fragments!.map((f) => f.text).toList(),
-        ['a', ')', 'b'],
-      );
+      expect(a.single.fragments!.map((f) => f.text).toList(), ['a', ')', 'b']);
       final b = parseLyricGroups(
         content: '[0,2000]a((0,500)(b(500,500)\n',
         format: 'qrc',
@@ -455,7 +393,8 @@ void main() {
     });
 
     test('罗马音子行为 QRC XML 时按 romajiFormat 解析', () {
-      const roma = '<?xml version="1.0" encoding="utf-8"?>\n'
+      const roma =
+          '<?xml version="1.0" encoding="utf-8"?>\n'
           '<QrcInfos><LyricInfo><Lyric_1 LyricType="1" '
           'LyricContent="[ti:x]\n[0,1000]kimi(0,500)no(500,500)"/>'
           '</LyricInfo></QrcInfos>';
@@ -507,7 +446,11 @@ void main() {
         format: 'lrc',
       );
       expect(groups.map((g) => g.original.timeMs).toList(), [1000, 2000, 3000]);
-      expect(groups.map((g) => g.original.text).toList(), ['重复行', '第二行', '重复行']);
+      expect(groups.map((g) => g.original.text).toList(), [
+        '重复行',
+        '第二行',
+        '重复行',
+      ]);
       expect(groups.every((g) => g.fragments == null), isTrue);
     });
 
@@ -530,7 +473,8 @@ void main() {
 
     test('行内尾随和声（逐字行）背景子行带相对片段', () {
       final groups = parseLyricGroups(
-        content: '[00:10.000]<0,500>主<500,500>歌'
+        content:
+            '[00:10.000]<0,500>主<500,500>歌'
             '<1000,500>（<1500,500>和<2000,500>声<2500,500>）\n',
         format: 'yrc',
       );
@@ -776,9 +720,8 @@ void main() {
           isBG: true,
         ),
       ];
-      final out = const LyricPipeline([
-        UncensorLyricProcessor(),
-      ]).process(groups, const LyricProcessContext(uncensor: true));
+      final out = const LyricPipeline([UncensorLyricProcessor()])
+          .process(groups, const LyricProcessContext(uncensor: true));
       expect(out, hasLength(1));
       expect(out.single.isBG, isTrue, reason: 'isBG 必须保留');
       expect(out.single.romaji, 'f**k ro', reason: 'romaji 必须保留');
@@ -866,7 +809,7 @@ void main() {
       }
     });
 
-    testWidgets('间奏期间不高亮任何行且显示三点', (tester) async {
+    testWidgets('间奏期间不高亮任何行（不再绘制三点）', (tester) async {
       final groups = [
         LyricGroup(
           original: const LyricLine(timeMs: 0, text: '第一句'),
@@ -887,8 +830,7 @@ void main() {
       await settle(tester);
       dynamic s = stateOf(tester);
       expect(s.debugActive(), -1);
-      expect(s.debugDotsVisible(), isTrue);
-      // 锚点停在间奏前一行（三点画在它下方）。
+      // 锚点停在间奏前一行。
       expect(s.debugAnchor(), 0);
 
       // 回到第一行
@@ -896,7 +838,6 @@ void main() {
       await settle(tester);
       s = stateOf(tester);
       expect(s.debugActive(), 0);
-      expect(s.debugDotsVisible(), isFalse);
     });
 
     testWidgets('超长前奏（首行之前）间奏锚点为 0', (tester) async {
@@ -910,7 +851,6 @@ void main() {
       await settle(tester);
       dynamic s = stateOf(tester);
       expect(s.debugActive(), -1);
-      expect(s.debugDotsVisible(), isTrue);
       expect(s.debugAnchor(), 0);
       expect(tester.takeException(), isNull);
     });

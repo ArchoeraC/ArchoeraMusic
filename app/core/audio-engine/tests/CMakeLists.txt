@@ -174,6 +174,22 @@ add_test(NAME test_source_switch COMMAND test_source_switch)
 set_tests_properties(test_source_switch PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
+# 跨采样率切档（Hi-Res 96k ↔ LQ 44.1k）的 seek + 重采样对齐回归：
+# 暂存管线按活动管线输出率锁定，断言 seek 后首块 position_ms 与波形都对齐。
+add_executable(test_resample_seek_align test_resample_seek_align.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tempo.c
+)
+target_link_libraries(test_resample_seek_align PRIVATE audio_engine_static)
+target_include_directories(test_resample_seek_align PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_resample_seek_align
+         COMMAND test_resample_seek_align
+                 ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(test_resample_seek_align PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
 # FFmpeg 解码器 seek 样本级对齐（跨档无缝切换拼接）：fixture = 真实 FLAC 帧，
 # 断言 seek 后输出严格从目标样本起（未裁剪时会命中关键帧，差可达数千样本）。
 add_executable(test_decoder_seek_trim test_decoder_seek_trim.c)
@@ -186,6 +202,20 @@ add_test(NAME test_decoder_seek_trim
          COMMAND test_decoder_seek_trim
                  ${CMAKE_CURRENT_SOURCE_DIR}/native_seek_fixture.flac)
 set_tests_properties(test_decoder_seek_trim PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# 容器 start_time ≠ 0（TS/HLS/带 edit-list 的 MP4）时的 seek 回归：
+# offset_ms 是媒体相对时间，av_seek_frame 目标必须加 start_time；否则落曲首。
+add_executable(test_decoder_start_time test_decoder_start_time.c)
+target_link_libraries(test_decoder_start_time PRIVATE audio_engine_static)
+target_include_directories(test_decoder_start_time PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+add_test(NAME test_decoder_start_time
+         COMMAND test_decoder_start_time
+                 ${CMAKE_CURRENT_SOURCE_DIR}/start_time_fixture.mkv)
+set_tests_properties(test_decoder_start_time PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
 # FFmpeg 解码器 ReplayGain 元数据提取：含标签 fixture 命中 track/album 增益+峰值，
@@ -240,6 +270,40 @@ add_test(NAME test_native_seek_trim_mp3_noxing
          COMMAND test_native_seek_trim
                  ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/mp3/samples/noxing.mp3)
 set_tests_properties(test_native_seek_trim_mp3_noxing PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# AAC seek 样本级对齐：AAC 的 IMDCT 依赖上一帧 overlap，seek 后必须 pre-roll
+# 一帧（m4a 还要处理 elst priming 的媒体/解码时间差），否则切档拼接处顿挫。
+add_test(NAME test_native_seek_trim_aac_m4a
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/t48_m.m4a)
+set_tests_properties(test_native_seek_trim_aac_m4a PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+add_test(NAME test_native_seek_trim_aac_adts
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/t44_st.aac)
+set_tests_properties(test_native_seek_trim_aac_adts PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# HE-AAC（SBR，隐式信令 ASC/AOT2 + SBR 扩展）：info 采样率必须为 2× 核心率、
+# seek 换算按 SBR 帧长（2048）且预热 SBR 状态，否则半速/整体错位。
+add_test(NAME test_native_seek_trim_he_aac_m4a
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/he_st.m4a)
+set_tests_properties(test_native_seek_trim_he_aac_m4a PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+add_test(NAME test_native_seek_trim_he_aac_adts
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../samples/aac/he_st.aac)
+set_tests_properties(test_native_seek_trim_he_aac_adts PROPERTIES
+    PASS_REGULAR_EXPRESSION "ALL PASS")
+
+# Ogg-FLAC 精确 seek：按 Ogg granule 定位页 + 重建内层 FLAC（此前直接
+# UnsupportedFormat → 外层回退 FFmpeg；现在原生也支持样本级落点）。
+add_test(NAME test_native_seek_trim_oggflac
+         COMMAND test_native_seek_trim
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../kernel/fmt/samples/oggflac_multi.oga)
+set_tests_properties(test_native_seek_trim_oggflac PROPERTIES
     PASS_REGULAR_EXPRESSION "ALL PASS")
 
 # SegmentStore（在线纯内存源，M1，docs/audio-memory-source.md）：单调填充 +

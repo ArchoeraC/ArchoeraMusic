@@ -11,6 +11,14 @@
 | `Microsoft.Data.Sqlite` | 10.0.12 | MIT | SQLite 的 ADO.NET 提供程序 |
 | `SQLitePCLRaw.lib.e_sqlite3` | 3.53.3 | **Apache-2.0** | 原生 SQLite 静态库（随 FFI 分发为 `libe_sqlite3`/`e_sqlite3.dll`，**含 FTS5**；pin 版本消除 CVE-2025-6965，与 `app/core/indexer` 同栈） |
 
+## 运行期加密依赖（2026-11 起）
+
+曲目 id 使用**自研纯托管 MD5**（`app/core/shared/hash/Md5.cs`，RFC 1321；非第三方），
+不再调用 `System.Security.Cryptography.MD5`。原因：Linux/macOS 上该 API 会经 .NET 的
+OpenSSL shim 在运行期 `dlopen` 系统 libssl/libcrypto，发行版升级 OpenSSL soname 会让
+NativeAOT 产物报 “No usable version of libssl was found”。因此本模块**不直接依赖
+OpenSSL**；除随包分发的 `libe_sqlite3` 外，其余运行库由 .NET 运行时自带。
+
 ## TagLibSharp（LGPL-2.1）声明
 
 `TagLibSharp` 以 **GNU Lesser General Public License v2.1（LGPL-2.1）** 发布，

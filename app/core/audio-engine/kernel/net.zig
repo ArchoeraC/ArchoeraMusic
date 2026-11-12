@@ -279,7 +279,10 @@ fn ensureCaBundle() NetError!void {
         if (g_ca.map.count() != 0) src = "SSL_CERT_FILE";
     }
     if (envNonEmpty("SSL_CERT_DIR")) |dirs| {
-        var it = std.mem.splitScalar(u8, dirs, ':');
+        // OpenSSL 语义：目录列表分隔符随平台不同——Windows 用 ';'（':' 是盘符），
+        // 其余平台用 ':'。用错分隔符会把 "C:\certs" 拆碎，导致证书目录失效。
+        const sep: u8 = if (builtin.os.tag == .windows) ';' else ':';
+        var it = std.mem.splitScalar(u8, dirs, sep);
         while (it.next()) |dir| {
             const path = std.mem.trim(u8, dir, " \t");
             if (path.len != 0) caAddDir(io, now, path);
@@ -854,6 +857,11 @@ pub const HttpStream = struct {
     /// 跟随重定向（最多 max_redirects）。
     fn start(self: *HttpStream, range_start: u64) NetError!void {
         var redirects: usize = 0;
+        // 实际请求的 Range 起点。服务端可能把 Range **向上**对齐（返回起点
+        // 比请求晚），此时必须回退请求起点重试；逻辑游标仍是 range_start。
+        var request_start: u64 = range_start;
+        var overshoot_retries: usize = 0;
+        const max_overshoot_retries: usize = 6;
         while (true) {
             var host_buf: [host_max + 16]u8 = undefined;
             const parts = try parseUrl(self.cur_url, &host_buf);
@@ -863,7 +871,7 @@ pub const HttpStream = struct {
             const target = target_buf[0..parts.target.len];
 
             self.connect(parts.tls, parts.host, parts.port) catch |e| return e;
-            try self.sendGet(parts.host_header, target, range_start);
+            try self.sendGet(parts.host_header, target, request_start);
             const head = self.receiveHead() catch |e| {
                 self.disconnect();
                 return e;
@@ -916,6 +924,20 @@ pub const HttpStream = struct {
                 }
                 self.body_remaining = head.content_length;
             }
+            // 服务端把 Range **向上**对齐（206 起点晚于请求）：无法向后补齐，
+            // 否则 seek 会整体偏晚（且音质切换的 stage origin 会与实际内容错位）。
+            // 回退请求起点重试，拿到「起点 ≤ 目标」的响应后再前向丢弃对齐。
+            if (start_off > range_start) {
+                self.disconnect();
+                if (request_start == 0 or overshoot_retries >= max_overshoot_retries) {
+                    return error.SeekFailed;
+                }
+                overshoot_retries += 1;
+                const backoff = @max(@as(u64, 64) << 10, request_start / 4);
+                request_start = if (request_start > backoff) request_start - backoff else 0;
+                continue;
+            }
+
             self.net_pos = start_off;
 
             // 服务端未精确满足 Range：**前向丢弃差值对齐到请求偏移**。
@@ -1582,6 +1604,25 @@ fn handleConn(ts: *TestServer, stream: std.Io.net.Stream) void {
         w.flush() catch {};
         return;
     }
+    if (std.mem.eql(u8, target, "/upshift")) {
+        // 206 但 Content-Range 起点**高于**请求偏移 8 字节（服务端向块/帧边界
+        // 向上对齐）。客户端必须回退 Range 重试，否则 seek 整体偏晚。
+        const s2: u64 = if (has_range and start > 0)
+            @min(start + 8, payload.len)
+        else
+            start;
+        const b2 = payload[@intCast(s2)..];
+        var h2: [512]u8 = undefined;
+        const hs2 = std.fmt.bufPrint(
+            &h2,
+            "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {d}-{d}/{d}\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
+            .{ s2, last, payload.len, b2.len },
+        ) catch return;
+        w.writeAll(hs2) catch return;
+        w.writeAll(b2) catch return;
+        w.flush() catch {};
+        return;
+    }
     const hs = std.fmt.bufPrint(
         &hdr,
         "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {d}-{d}/{d}\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
@@ -1785,6 +1826,25 @@ test "HttpStream: 206 Content-Range 起点低于请求偏移时前向对齐（�
     try testing.expectEqual(@as(usize, 2000), try readAllInto(hs, &pre));
     try testing.expect(hs.seek(1000, 0, 0));
     // 服务端返回 Content-Range: bytes 992-…（低 8 字节）：必须丢弃 8 字节对齐到 1000。
+    var got: [64]u8 = undefined;
+    try testing.expectEqual(@as(usize, 64), try readAllInto(hs, &got));
+    try testing.expectEqualSlices(u8, payload[1000..1064], &got);
+}
+
+test "HttpStream: 206 起点高于请求偏移时回退重试（不偏晚）" {
+    const payload = try makeTestPayload(testing.allocator, 5000);
+    defer testing.allocator.free(payload);
+    const ts = try TestServer.start(payload);
+    defer ts.stopAndDestroy();
+
+    const url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/upshift", .{ts.port});
+    defer testing.allocator.free(url);
+
+    const hs = try HttpStream.open(testing.allocator, url);
+    defer hs.close();
+    // /upshift 对 Range 请求向上对齐 8 字节；客户端应回退 Range 到 0 重试，
+    // 再前向丢弃到 1000，使读取内容严格从 payload[1000] 起（而不是 1008）。
+    try testing.expect(hs.seek(1000, 0, 0));
     var got: [64]u8 = undefined;
     try testing.expectEqual(@as(usize, 64), try readAllInto(hs, &got));
     try testing.expectEqualSlices(u8, payload[1000..1064], &got);
