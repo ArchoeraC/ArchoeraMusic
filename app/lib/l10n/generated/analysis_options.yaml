@@ -1,0 +1,12 @@
+# 生成目录的局部分析配置（Flutter 3.50 起生效）。
+#
+# Flutter 3.50 把 Material / Cupertino 拆成 `material_ui` / `cupertino_ui` 包，
+# 而 `gen-l10n` 输出里的 `GlobalMaterialLocalizations` / `GlobalCupertinoLocalizations`
+# 仍从 `flutter_localizations` 导出（上游生成器尚未跟进），在 Dart 3.14 下被标为
+# deprecated_member_use。
+#
+# 本文件只对**生成代码**静默这一条 info，其它问题照常上报（不要把它挪到
+# `app/analysis_options.yaml`，那会全局屏蔽该 lint）。
+analyzer:
+  errors:
+    deprecated_member_use: ignore
