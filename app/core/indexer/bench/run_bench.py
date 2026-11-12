@@ -667,10 +667,20 @@ def write_report(m: dict) -> None:
         L.append(f"- K=20 → {d20}ms；K=200 → {d200}ms：ΔK={200-20} 增加 {d200-d20}ms（**边际 ≈ {marginal:.1f}ms/曲**）"
                  f"——脏曲部分随 K 近似线性。")
         if noop.get("durationMs"):
-            L.append(f"- 归因：K=20 相对零脏曲多 {d20 - noop['durationMs']}ms，即 20 首脏曲的"
-                     f"「取内容 + 分析 + FTS 删除/写入 + 收尾 checkpoint」成本；"
-                     f"**阶段一探测本身很轻**（零脏曲已含它）。")
+            L.append(f"- K=20 相对零脏曲多 {d20 - noop['durationMs']}ms：**这笔差值并非内容读取 / 分析的"
+                     f"真实成本**——隔离实测同规模写入只要 13.5ms，其余是下一条说的 `optimize`。"
+                     f"「阶段一探测」本身很轻（零脏曲已含它）。")
     L.append(f"- 增量预算（「秒级、≈ K 成正比」）{ok(inc_ok)}。")
+    L.append("- **归因（2026-11-12 定位）：耗时绝大部分是 FTS5 的 `optimize`（全段合并），"
+             "不是脏曲写路径。** 隔离实测（402MB 索引）：写入 20/200 首（真实 token 量）"
+             "仅 13.5/89.6ms，而随后的 `INSERT INTO search_fts(search_fts) VALUES('optimize')` "
+             "要 **4511/13009ms**。它不随脏曲数缩小（单曲改动也付全额），因为它重写整个倒排。")
+    L.append("- **这笔成本不能省**：跳过 `optimize` 会让段数累积（+200 首实测 1 段 → 12 段），"
+             "宽命中查询随之退化——独立进程实测 `wan` 56.2→92.0ms、`我爱你` 32.9→90.5ms、"
+             "`爱你` 9.3→17.3ms；排序结果不受影响（逐条一致）。故这是"
+             "「一次全库重写换查询稳定」的取舍，属 FTS5 固有成本。")
+    L.append("- 若要继续压缩该指标，正确方向是**把 merge 移出增量临界路径**（空闲后台维护 / "
+             "按累计脏曲数设阈值），而不是删掉它。")
     if noop_lrc:
         L.append(f"- `.lrc` 档零脏曲增量 = **{noop_lrc.get('durationMs')}ms**：与不开启时同量级即说明"
                  f"**索引器没有任何文件系统侧车探测**（侧车锚点 `lrc_mtime/size` 来自扫描器写入的"
@@ -743,6 +753,9 @@ def write_report(m: dict) -> None:
     L.append("")
     L.append("\\* 「与 N 近似无关」只对**窄命中**查询成立；宽命中集（常见拼音 / 首字母）随 N 线性增长，"
              "见 §5 逐条表与 §8 局限。")
+    L.append("")
+    L.append("\\*\\* 增量超标的**根因是 FTS5 `optimize`（全段合并）**，隔离实测 4.5–13s 且不随脏曲数缩小；"
+             "去掉它会让查询退化（`wan` +64%、`我爱你` +175%）。详见 §4 归因。")
     if not q_perquery_ok:
         worst = max(
             (x for x in m["query"][f"A@{app_limit}"]["queries"]),
