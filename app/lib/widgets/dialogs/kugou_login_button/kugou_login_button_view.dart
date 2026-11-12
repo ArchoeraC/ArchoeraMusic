@@ -50,7 +50,8 @@ extension _KugouLoginButtonView on _KugouLoginButtonState {
                 Text(
                   session == null
                       ? l10n.loginKugouLogin(platform: l10n.brandKugou)
-                      : (nickname ?? l10n.loginKugouLoggedIn(platform: l10n.brandKugou)),
+                      : (nickname ??
+                            l10n.loginKugouLoggedIn(platform: l10n.brandKugou)),
                   style: theme.textTheme.bodyMedium,
                 ),
               ],
@@ -277,7 +278,9 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
             SizedBox(
               height: 48,
               child: FilledButton.tonal(
-                onPressed: (_phoneBusy || _codeCountdown > 0) ? null : _sendCode,
+                onPressed: (_phoneBusy || _codeCountdown > 0)
+                    ? null
+                    : _sendCode,
                 child: Text(
                   _codeCountdown > 0
                       ? '${_codeCountdown}s'

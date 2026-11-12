@@ -408,8 +408,14 @@ const dts_vtable = decoder2.Decoder.VTable{
     .read = dtsRead,
     .seek_ms = dtsSeek,
     .position_ms = dtsPos,
+    .position_samples = dtsPositionSamples,
     .deinit = dtsDeinit,
 };
+
+fn dtsPositionSamples(ctx: *anyopaque) i64 {
+    const self: *DtsCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(self.cursor);
+}
 
 fn dtsRead(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const self: *DtsCtx = @ptrCast(@alignCast(ctx));
@@ -684,8 +690,14 @@ const stream_vtable = decoder2.Decoder.VTable{
     .read = streamRead,
     .seek_ms = streamSeek,
     .position_ms = streamPos,
+    .position_samples = streamPositionSamples,
     .deinit = streamDeinit,
 };
+
+fn streamPositionSamples(ctx: *anyopaque) i64 {
+    const self: *StreamCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(self.cursor);
+}
 
 fn streamRead(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const self: *StreamCtx = @ptrCast(@alignCast(ctx));

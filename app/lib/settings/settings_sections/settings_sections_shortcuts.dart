@@ -41,9 +41,8 @@ class ShortcutsSection extends ConsumerWidget {
             TextButton.icon(
               onPressed: prefs.shortcutOverrides.isEmpty
                   ? null
-                  : () => ref
-                        .read(appPrefsProvider.notifier)
-                        .resetAllShortcuts(),
+                  : () =>
+                        ref.read(appPrefsProvider.notifier).resetAllShortcuts(),
               icon: const Icon(EtaIcons.refresh, size: 16),
               label: Text(l10n.shortcutResetAll),
             ),
@@ -82,7 +81,7 @@ class ShortcutsSection extends ConsumerWidget {
         : formatBinding(binding, isMac: isMac);
     return SettingTile(
       icon: action.icon,
-      title: _actionLabel(l10n, action),
+      title: shortcutActionLabel(l10n, action),
       subtitle: conflict ? l10n.shortcutConflict : l10n.shortcutHintEdit,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -97,8 +96,9 @@ class ShortcutsSection extends ConsumerWidget {
                 color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: (conflict ? scheme.error : scheme.outline)
-                      .withValues(alpha: conflict ? 0.9 : 0.4),
+                  color: (conflict ? scheme.error : scheme.outline).withValues(
+                    alpha: conflict ? 0.9 : 0.4,
+                  ),
                 ),
               ),
               child: Text(
@@ -213,7 +213,7 @@ class _ShortcutCaptureDialogState extends State<_ShortcutCaptureDialog> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            _actionLabel(l10n, widget.action),
+            shortcutActionLabel(l10n, widget.action),
             style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
           ),
           const SizedBox(height: 14),
@@ -226,7 +226,9 @@ class _ShortcutCaptureDialogState extends State<_ShortcutCaptureDialog> {
               decoration: BoxDecoration(
                 color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: scheme.outline.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: scheme.outline.withValues(alpha: 0.4),
+                ),
               ),
               child: Text(
                 preview.isEmpty
@@ -300,36 +302,35 @@ String _categoryLabel(AppLocalizations l10n, ShortcutCategory cat) =>
       ShortcutCategory.navigation => l10n.shortcutCategoryNavigation,
     };
 
-String _actionLabel(AppLocalizations l10n, ShortcutAction a) => switch (a) {
-  ShortcutAction.playPause => l10n.shortcutActionPlayPause,
-  ShortcutAction.play => l10n.shortcutActionPlay,
-  ShortcutAction.pause => l10n.shortcutActionPause,
-  ShortcutAction.stop => l10n.shortcutActionStop,
-  ShortcutAction.next => l10n.shortcutActionNext,
-  ShortcutAction.previous => l10n.shortcutActionPrevious,
-  ShortcutAction.likeToggle => l10n.shortcutActionLikeToggle,
-  ShortcutAction.shuffleToggle => l10n.shortcutActionShuffleToggle,
-  ShortcutAction.repeatCycle => l10n.shortcutActionRepeatCycle,
-  ShortcutAction.reload => l10n.shortcutActionReload,
-  ShortcutAction.seekBackward => l10n.shortcutActionSeekBackward,
-  ShortcutAction.seekForward => l10n.shortcutActionSeekForward,
-  ShortcutAction.seekBackwardLong => l10n.shortcutActionSeekBackwardLong,
-  ShortcutAction.seekForwardLong => l10n.shortcutActionSeekForwardLong,
-  ShortcutAction.volumeUp => l10n.shortcutActionVolumeUp,
-  ShortcutAction.volumeDown => l10n.shortcutActionVolumeDown,
-  ShortcutAction.muteToggle => l10n.shortcutActionMuteToggle,
-  ShortcutAction.jumpToFirst => l10n.shortcutActionJumpToFirst,
-  ShortcutAction.jumpToLast => l10n.shortcutActionJumpToLast,
-  ShortcutAction.clearQueue => l10n.shortcutActionClearQueue,
-  ShortcutAction.goHome => l10n.shortcutActionGoHome,
-  ShortcutAction.goLibrary => l10n.shortcutActionGoLibrary,
-  ShortcutAction.goSearch => l10n.shortcutActionGoSearch,
-  ShortcutAction.goLiked => l10n.shortcutActionGoLiked,
-  ShortcutAction.goFavorites => l10n.shortcutActionGoFavorites,
-  ShortcutAction.goHistory => l10n.shortcutActionGoHistory,
-  ShortcutAction.goDownload => l10n.shortcutActionGoDownload,
-  ShortcutAction.goStreaming => l10n.shortcutActionGoStreaming,
-  ShortcutAction.openPlayer => l10n.shortcutActionOpenPlayer,
-  ShortcutAction.openSettings => l10n.shortcutActionOpenSettings,
-  ShortcutAction.back => l10n.shortcutActionBack,
-};
+String shortcutActionLabel(AppLocalizations l10n, ShortcutAction a) =>
+    switch (a) {
+      ShortcutAction.playPause => l10n.shortcutActionPlayPause,
+      ShortcutAction.stop => l10n.shortcutActionStop,
+      ShortcutAction.next => l10n.shortcutActionNext,
+      ShortcutAction.previous => l10n.shortcutActionPrevious,
+      ShortcutAction.likeToggle => l10n.shortcutActionLikeToggle,
+      ShortcutAction.shuffleToggle => l10n.shortcutActionShuffleToggle,
+      ShortcutAction.repeatCycle => l10n.shortcutActionRepeatCycle,
+      ShortcutAction.reload => l10n.shortcutActionReload,
+      ShortcutAction.seekBackward => l10n.shortcutActionSeekBackward,
+      ShortcutAction.seekForward => l10n.shortcutActionSeekForward,
+      ShortcutAction.seekBackwardLong => l10n.shortcutActionSeekBackwardLong,
+      ShortcutAction.seekForwardLong => l10n.shortcutActionSeekForwardLong,
+      ShortcutAction.volumeUp => l10n.shortcutActionVolumeUp,
+      ShortcutAction.volumeDown => l10n.shortcutActionVolumeDown,
+      ShortcutAction.muteToggle => l10n.shortcutActionMuteToggle,
+      ShortcutAction.jumpToFirst => l10n.shortcutActionJumpToFirst,
+      ShortcutAction.jumpToLast => l10n.shortcutActionJumpToLast,
+      ShortcutAction.clearQueue => l10n.shortcutActionClearQueue,
+      ShortcutAction.goHome => l10n.shortcutActionGoHome,
+      ShortcutAction.goLibrary => l10n.shortcutActionGoLibrary,
+      ShortcutAction.goSearch => l10n.shortcutActionGoSearch,
+      ShortcutAction.goLiked => l10n.shortcutActionGoLiked,
+      ShortcutAction.goFavorites => l10n.shortcutActionGoFavorites,
+      ShortcutAction.goHistory => l10n.shortcutActionGoHistory,
+      ShortcutAction.goDownload => l10n.shortcutActionGoDownload,
+      ShortcutAction.goStreaming => l10n.shortcutActionGoStreaming,
+      ShortcutAction.openPlayer => l10n.shortcutActionOpenPlayer,
+      ShortcutAction.openSettings => l10n.shortcutActionOpenSettings,
+      ShortcutAction.back => l10n.shortcutActionBack,
+    };

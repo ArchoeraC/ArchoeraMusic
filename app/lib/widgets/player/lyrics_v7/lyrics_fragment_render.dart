@@ -150,9 +150,12 @@ LyricsFragmentRender? buildLyricsFragmentRender({
   if (lineText.trim() != trimmed) return null;
   final lead = joinedText.length - joinedText.trimLeft().length;
 
-  final layoutBuilder = ui.ParagraphBuilder(
-    _pStyleCenter(fontFamily, fontSize, weight, lineHeightEm, textAlign),
-  )..pushStyle(_uStyle(fontFamily, fontSize, weight, played, height: lineHeightEm));
+  final layoutBuilder =
+      ui.ParagraphBuilder(
+        _pStyleCenter(fontFamily, fontSize, weight, lineHeightEm, textAlign),
+      )..pushStyle(
+        _uStyle(fontFamily, fontSize, weight, played, height: lineHeightEm),
+      );
   layoutBuilder.addText(joinedText.trim());
   layoutBuilder.pop();
   final layout = layoutBuilder.build()
@@ -240,9 +243,18 @@ ui.Paragraph _fragParagraph({
   double lineHeightEm = kLyricLineHeightEm,
   List<ui.Shadow>? shadows,
 }) {
-  final b = ui.ParagraphBuilder(_pStyle(fontFamily, fontSize, weight, lineHeightEm));
+  final b = ui.ParagraphBuilder(
+    _pStyle(fontFamily, fontSize, weight, lineHeightEm),
+  );
   b.pushStyle(
-    _uStyle(fontFamily, fontSize, weight, color, height: lineHeightEm, shadows: shadows),
+    _uStyle(
+      fontFamily,
+      fontSize,
+      weight,
+      color,
+      height: lineHeightEm,
+      shadows: shadows,
+    ),
   );
   b.addText(text);
   b.pop();
@@ -250,33 +262,7 @@ ui.Paragraph _fragParagraph({
 }
 
 /// 供 painter 构建「强调辉光」变体（每帧重建，仅少数长音字/词）。
-ui.Paragraph buildGlowFragment({
-  required String? fontFamily,
-  required double fontSize,
-  required FontWeight weight,
-  required double maxWidth,
-  required Color color,
-  required String text,
-  required double glowAlpha,
-  required double blurRadius,
-  double lineHeightEm = kLyricLineHeightEm,
-}) {
-  return _fragParagraph(
-    fontFamily: fontFamily,
-    fontSize: fontSize,
-    weight: weight,
-    maxWidth: maxWidth,
-    color: color,
-    text: text,
-    lineHeightEm: lineHeightEm,
-    shadows: [
-      ui.Shadow(
-        color: const Color(0xFFFFFFFF).withValues(alpha: glowAlpha.clamp(0.0, 1.0)),
-        blurRadius: blurRadius,
-      ),
-    ],
-  );
-}
+/// 已停用：文字发光会显著增加光栅化成本，长音强调改为仅复用预渲染段落。
 
 ui.ParagraphStyle _pStyleCenter(
   String? family,

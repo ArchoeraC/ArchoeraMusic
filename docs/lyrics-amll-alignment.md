@@ -2,7 +2,8 @@
 
 > 状态：**已实现（2026-09-20）**。
 > 范围：AMLL 引擎（`lyrics.engine = 'amll'`）的**表现层**——时钟、扫亮、景深、
-> 逐词动画、间奏点、背景人声行。布局/弹簧/缓存的既有设计不变。
+> 逐词动画、间奏识别、背景人声行。布局/弹簧/缓存的既有设计不变。
+> （间奏三点等待动画已移除：间奏期间保持不点亮任何行、锚点停在间奏前一行。）
 > 上游参考：`amll-dev/applemusic-like-lyrics`（`packages/core/src/lyric-player`，MIT）。
 > 关联：[player-render-optimization.md](player-render-optimization.md) §4.2 / §4.2b、
 > [architecture.md](architecture.md) §10.2。
@@ -32,8 +33,8 @@ Flutter 的 `ui.Paragraph` 做不到逐 run 变换、也不能给文字直接加
 | `mask-image` 渐变扫亮（未唱 .4 / 已唱 1.0，羽化 `wordFadeWidth×字高`） | 逐字 `dstIn` 线性渐变遮罩 | `lyrics_fragment_render.dart` + painter |
 | 非激活行 `blur(1+distance)` + `scale .97` + opacity | 指数平滑的 `_blur` / `_scale` / `_fade`（无逐行弹簧对象） | `lyrics_physics_wall_state.dart` |
 | `float` 每词 0→-0.05em（BG ×2） | `resolveWordAnim` 的 `dy` | `lyrics_word_anim.dart` |
-| `emphasize` 长音脉冲（`empEasing` 0→1→0）+ 白辉光 + 缩放 + 推挤 + bob | 同参数；辉光用 `ui.TextStyle.shadows` | `lyrics_word_anim.dart` + painter |
-| `interlude-dots`（≥7s 空隙） | `computeInterludes` + `resolveInterludeDots` | `interlude_dots.dart` |
+| `emphasize` 长音脉冲（`empEasing` 0→1→0）+ 白辉光 + 缩放 + 推挤 + bob | 同参数；辉光**已停用**（不复用 `ui.TextStyle.shadows`，避免逐帧重建阴影段落），缩放/推挤/bob 保留 | `lyrics_word_anim.dart` + painter |
+| `interlude-dots`（≥7s 空隙） | 仅保留 `computeInterludes`（锚点/高亮）；**三点等待动画已删除** | `interlude_dots.dart` |
 | `isBG` 背景人声（整行括号判定） | `LyricGroup.isBG`（解析期剥离括号） | `services/lyrics/lyric_line.dart` |
 | `cubic-bezier` 手搓缓动 | `cubicBezier` / `empathEasing` | `curves.dart` |
 | `getPosYSpringPolicy` 按行间隔自适应弹簧 | `resolvePosYSpringPolicy` | `spring_policy.dart` |
@@ -108,10 +109,9 @@ Flutter 的 `ui.Paragraph` 做不到逐 run 变换、也不能给文字直接加
 
 - 空隙起点 = 上一行**真实唱完**时间（有逐字时取字级结束时间，否则取
   `endMs`＝下一行起始 → 普通 LRC 不产生间奏，与 AMLL 一致）。
-- 布局：间奏之后的行整体下移「三点 + 上下留白」，空隙本身成为三点位置；
-  锚点停在间奏前一行。
-- 间奏期间 `active = -1`（不高亮任何行，对齐 AMLL 清空高亮集合），三点做
-  依次点亮 + 呼吸 + 两段式退场。
+- 布局：不再为三点预留额外垂直空间；锚点停在间奏前一行。
+- 间奏期间 `active = -1`（不高亮任何行，对齐 AMLL 清空高亮集合），
+  **不绘制三点等待动画**（按产品要求移除）。
 
 ### 3.6 背景人声
 
@@ -230,7 +230,7 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
 |---|---|---|
 | **行窗口** | 维持 `[_winStart, _winEnd)`：只有视口 ± 自适应余量（`max(视口高 × 0.6, 180px)`）内的行参与弹簧/过渡；边界按**行本体**（中心 ± 半高）判定，半可见的行也留在窗口内；窗口外 `Spring1D.park()`（**不重建求解器**，不参与每帧） | 换行时不再为全量行重建闭式解（原来每行 3 个闭包）；每帧循环从 O(歌长) 降到 O(视口) |
 | **按需测量行高** | 视口外用 `estimateLineHeight()` 估算，进视口才 `computeLineHeight()` 实测；中心用 O(N) 纯算术重算 | 拖字号/改窗口宽度不再为整首逐行 `TextPainter.layout()` |
-| **重绘抑制** | `_tick` 只在「弹簧在动 / 过渡在动 / 激活行有逐字片段（扫亮在推）/ 间奏三点可见」时才 `notify()` | 整行级歌词（无逐字）不再按 60fps 重绘整墙，只在位置事件（~20Hz）重绘 |
+| **重绘抑制** | `_tick` 只在「弹簧在动 / 过渡在动 / 激活行有逐字片段（扫亮在推）」时才 `notify()` | 整行级歌词（无逐字）不再按 60fps 重绘整墙，只在位置事件（~20Hz）重绘 |
 | **失焦（对齐上游）** | 除高亮行外**每一行**都失焦，两档：默认「整层一次 + 1/4 重采样」（1 个离屏层、像素量 1/4，半径统一 σ=4）；可切「逐行 σ=`min(5,1+距离)`」（最贴上游梯度）；悬停时全部取消 | 逐行档是本机基准里最贵的一项（900×600 场景：无失焦 6.3ms → 逐行 28.5ms）；整层 1/4 重采样降到 16.2ms 且层数恒定。见 `docs/player-render-optimization.md` §4.2 |
 | **失焦档位可选（用户决定）** | `amll.blurQuality`：自动 / 流畅（整层）/ 轻量（零高斯伪散焦）/ 画质（逐行）/ 关闭；**显式档位不吃自动降级** | 机器差异太大（独显/核显/无 GPU），把权衡交给用户；自动档才带兜底 |
 | **失焦自动降级** | 帧预算守卫（`LyricsBlurBudget`）：歌词墙在动时若连续多帧「光栅超 14ms 且 UI 线程正常」，就 latch 成关闭失焦（只降不升） | 不同机器（独显/核显/软件光栅/Windows Impeller）差一个数量级，编译期猜不出来；宁可不糊也不要卡 |
@@ -258,7 +258,7 @@ AMLL 正常播放**不用固定弹簧**，而是按当前行与上一行的时�
   压暗（背景行仍 ×0.4）。对齐 AMLL `computeLineBlur` 在 `isUserScrolling` 时直接
   返回 0、`computeGroupPresentation` 仍给 1.0 的行为。
 - **高亮与布局解耦**：手动浏览期间只冻结**滚动锚点**，`active`（高亮行）与间奏
-  三点仍按播放位置推进，不会卡在开始浏览时的那一行；5s 回弹时按**当前**播放
+  锚点仍按播放位置推进，不会卡在开始浏览时的那一行；5s 回弹时按**当前**播放
   位置重新取锚点，避免「先弹回旧行再跳新行」。
 - **拖动进度条时高亮跟随**：`PlayerLyricsBlock(dragMs:)` 在拖动期间用**拖动位置**
   驱动歌词（高亮与滚动跟手指），并冻结内部时钟（拖动位置是用户目标，不是播放
@@ -315,7 +315,7 @@ headless 基准：无失焦 **6.3ms**、逐行失焦 **28.5ms**、整层 1/4 重
 ## 6. 测试
 
 - `test/lyrics_amll_engine_test.dart`：时钟外推/钳制/重锚、缓动曲线、
-  间奏识别与三点动画、背景人声解析（含逐字剥括号）、逐字渲染几何与回退、
+  间奏识别（不再绘制三点）、背景人声解析（含逐字剥括号）、逐字渲染几何与回退、
   **行纵向弹簧策略**（Seek/间奏/歌末/按间隔自适应/阻尼比 ζ≈1.1）、
   **排版度量**（间距常量、中心距、音译＋译文计入行高）、
   **罗马音与背景人声共存**（解析挂载、重建保留 `romaji`+`isBG`）、
@@ -417,6 +417,30 @@ headless 基准：无失焦 **6.3ms**、逐行失焦 **28.5ms**、整层 1/4 重
   推断 / 容错；
 - `lyrics_engine_test.dart`：TTML 覆盖优先 / 未启用回退 / 非 TTML 平台不请求；
 - `lyrics_prefs_test.dart`：TTML 偏好默认值 / 写入读回 / 非法模板回落。
+
+### 7.6 NekoMusic `neko-v1` 富歌词与格式注册表（2026-11-09）
+
+新版 NekoMusic 服务端在音乐详情里返回 `lyricsFormat: neko-v1` 与
+`lyricsRich` JSON（行内 `words[]` 逐字、`translation` / `romanization`、
+`background`、显式 `endMs`），同时保留兼容 LRC。
+
+- **解析归属**：`neko-v1` 与 YRC/QRC/KRC 一样在通用解码器
+  （`services/lyrics/lyric_line.dart` 的 `parseLyricGroups`）里解析；来源层
+  不自行解析整首歌词。
+- **来源注册**：`_NekoSource.lyricSources` 仍返回 `NekoLyricSource`，id 与
+  `SourcePlatform.source` 一致；`online = true` 只用于「Neko 自身歌词不可信
+  时回退标准源」，`neko` 不进入用户来源顺序 `lyricPlatforms`，因此不会污染
+  其它平台的候选。
+- **格式注册表**：`apis/lyric/format.dart` 新增 `lyricFormatIds`（用户可排序的
+  跨平台格式）与 `kNekoV1LyricsFormat`（平台扩展格式）。`neko-v1` 不单列在
+  「歌词格式顺序」设置里，而是作为逐字候选交给 `pickLyricFormat`，跟随
+  `preferWordByWord` 的「逐字 / 标准 LRC」类别。
+- **回退语义**：`NekoLyricSource` 只做 I/O + 广告预检（
+  `neko_lyrics.nekoV1HasDisplayableLine`），再用 `pickLyricFormat` 在富歌词与
+  兼容 LRC 之间选择；首选格式缺失时回退另一类（例如用户选「标准 LRC 优先」
+  但服务端只有富歌词时仍能显示），两类都不可用才返回 null 交给引擎换源。
+- **守卫测试**：`test/lyrics_source_registry_test.dart` 校验歌词来源注册表
+  id 与音源一致、全局唯一，以及 Neko 来源的回退边界。
 
 ---
 

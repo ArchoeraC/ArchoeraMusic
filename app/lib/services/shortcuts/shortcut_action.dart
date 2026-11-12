@@ -29,8 +29,6 @@ enum ShortcutCategory {
 enum ShortcutAction {
   // ── 播放控制 ──
   playPause('space', ShortcutCategory.playback, EtaIcons.playCircle),
-  play('', ShortcutCategory.playback, EtaIcons.play),
-  pause('', ShortcutCategory.playback, EtaIcons.pause),
   stop('', ShortcutCategory.playback, EtaIcons.stop),
   next('', ShortcutCategory.playback, EtaIcons.skipForward),
   previous('', ShortcutCategory.playback, EtaIcons.skipPrevious),

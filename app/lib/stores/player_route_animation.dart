@@ -25,4 +25,14 @@ class PlayerRouteAnimationNotifier extends Notifier<Animation<double>?> {
     if (identical(state, animation)) return;
     state = animation;
   }
+
+  /// 清空路由动画，**仅当当前值仍是 [animation]** 时生效。
+  ///
+  /// 关闭后迅速重开时新旧 `PlayerPage` 实例会短暂重叠：旧实例 `dispose` 若直接
+  /// `set(null)`，会把新实例刚写入的动画一起清掉，壳层随之永久停在折叠态。
+  void clear(Animation<double>? animation) {
+    if (animation == null) return;
+    if (!identical(state, animation)) return;
+    state = null;
+  }
 }

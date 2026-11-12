@@ -273,11 +273,26 @@ pub const Demux = struct {
     pub fn seekToGranule(self: *Demux, target: i64) Error!i64 {
         try self.reset();
         var prev_granule: i64 = 0;
+        // 最近一个「页首不是续段」的页：该页第一包从 prev_granule 起完整开始。
+        // 若命中的目标页本身是 continued（首包从上一页续过来，单独从该页起读
+        // 只能拿到残缺 packet），则回退到最近的完整页起点，避免把半包喂给
+        // FLAC 解码器；base 用该页之前的 granule（= 首包起始样本）。
+        var clean_start: u64 = 0;
+        var clean_prev: i64 = 0;
+        var have_clean = false;
         while (true) {
             if (!try self.loadPage()) return error.Corrupt;
-            const g = self.page.?.granule;
+            const pg = self.page.?;
+            const g = pg.granule;
+            if ((pg.header_type & HEADER_TYPE_CONTINUED) == 0) {
+                clean_start = self.page_start;
+                clean_prev = prev_granule;
+                have_clean = true;
+            }
             if (g >= target) {
-                const start: i64 = @intCast(self.page_start);
+                const want_clean = (pg.header_type & HEADER_TYPE_CONTINUED) != 0;
+                const start: u64 = if (want_clean and have_clean) clean_start else self.page_start;
+                const base: i64 = if (want_clean and have_clean) clean_prev else prev_granule;
                 self.page = null;
                 self.seg_idx = 0;
                 self.payload_off = 0;
@@ -287,8 +302,8 @@ pub const Demux = struct {
                 self.pkt_ready = false;
                 self.eos = false;
                 self.final_granule = 0;
-                try self.reader.seek(start, .start);
-                return prev_granule;
+                try self.reader.seek(@intCast(start), .start);
+                return base;
             }
             prev_granule = g;
         }

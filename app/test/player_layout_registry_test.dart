@@ -8,8 +8,11 @@
 /// - 未知 id 一律回退 `default`（旧数据/降级安全）。
 library;
 
+import 'dart:ui' show Locale;
+
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/pages/player/layouts/player_layout.dart';
 import 'package:archoera_music/stores/prefs_player.dart';
 
@@ -30,5 +33,14 @@ void main() {
   test('每个布局 id 唯一', () {
     final ids = playerLayouts.map((layout) => layout.id).toList();
     expect(ids.toSet().length, ids.length);
+  });
+
+  test('每个布局都有非空且互不相同的本地化名称', () {
+    final l10n = lookupAppLocalizations(const Locale('zh'));
+    final labels = {
+      for (final layout in playerLayouts) playerLayoutLabel(l10n, layout.id),
+    };
+    expect(labels, hasLength(playerLayouts.length));
+    expect(labels.any((label) => label.trim().isEmpty), isFalse);
   });
 }

@@ -103,8 +103,9 @@ flutter build linux --release
 ```
 
 > **可选：启用 NekoMusic 音源**。该音源默认关闭，在「设置 → 实验性音源」
-> 打开即可；登录统一走 NekoAuth（浏览器 OAuth / 扫码），不再需要构建期
-> 注入客户端标识，也不需要额外 `--dart-define`。
+> 打开即可；登录统一走扫码（NekoAuth OAuth / 账号密码已于 2026-11-09 移除，
+> 破坏性变更见 CHANGELOG），不再需要构建期注入客户端标识，也不需要额外
+> `--dart-define`。
 
 **产物位置**：`app/build/linux/x64/release/bundle/`
 - `archoera_music`（可执行文件）

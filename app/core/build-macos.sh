@@ -4,7 +4,7 @@
 #
 #  在单个 bash 会话内完成全部原生模块编译（产物与 RID 单架构一致）：
 #    1. audio-engine : CMake（FFmpeg 解码/EQ/FFT + Rust tempo）
-#    2. scraper      : CMake（openssl keg-only 需 CMAKE_PREFIX_PATH）
+#    2. scraper      : CMake（TagLib；加密与 HTTP 由内嵌 Rust staticlib 提供）
 #    3. scanner      : dotnet publish (NativeAOT) + libe_sqlite3
 #    4. indexer      : dotnet publish (NativeAOT, indexer-ffi) + libe_sqlite3
 #    5. vault        : cargo build（vault-rs，Rust 凭据保险库，单架构）
@@ -17,7 +17,7 @@
 #    - osx-arm64：Apple Silicon（默认）
 #    - osx-x64  ：Intel；需在 Intel 主机或已准备 x86_64 Homebrew/FFmpeg 依赖的环境
 #
-#  依赖（Homebrew FFmpeg/taglib/openssl、CMake、Rust、Go、.NET）由 CI
+#  依赖（Homebrew 自建 FFmpeg/taglib、CMake、Rust、Go、.NET）由 CI
 #  workflow 提前安装或由本地开发环境提供，本脚本只做编译引导（幂等）。
 #
 #  注意：CMake 的 build/ 目录不区分架构；同一工作区切换 RID 前请清理各模块
@@ -52,7 +52,7 @@ case "$RID:$HOST_ARCH" in
   osx-arm64:arm64|osx-x64:x86_64) ;;
   *)
     echo "[build-macos] 警告: RID=$RID 与当前主机 $HOST_ARCH 不一致；" >&2
-    echo "[build-macos]       Homebrew / FFmpeg / opus 等依赖也必须是 $TARGET_ARCH，否则链接会失败。" >&2
+    echo "[build-macos]       Homebrew / FFmpeg / opus 等依赖也必须是 ${TARGET_ARCH}，否则链接会失败。" >&2
     ;;
 esac
 
@@ -63,18 +63,26 @@ esac
 export MACOSX_DEPLOYMENT_TARGET=14.0
 
 # Homebrew 前缀随架构变化：Apple Silicon 在 /opt/homebrew，Intel 在 /usr/local。
-# openssl 是 keg-only，必须显式加入 CMAKE_PREFIX_PATH；opus 的 pkg-config
-# 路径用于 FFmpeg --enable-libopus（本地构建时 CI 已预置最小 FFmpeg 时也保留）。
+# opus 的 pkg-config 路径用于 FFmpeg --enable-libopus（本地构建时 CI 已预置最小
+# FFmpeg 时也保留）。
 BREW_PREFIX="$(brew --prefix 2>/dev/null || true)"
 if [ -n "$BREW_PREFIX" ]; then
-  export CMAKE_PREFIX_PATH="$BREW_PREFIX/opt/openssl:$BREW_PREFIX${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+  export CMAKE_PREFIX_PATH="$BREW_PREFIX${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
   export PKG_CONFIG_PATH="$BREW_PREFIX/opt/opus/lib/pkgconfig:$BREW_PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 else
-  echo "[build-macos] 警告: 未检测到 Homebrew；scraper/audio-engine 需自行提供 OpenSSL/opus 依赖。" >&2
+  echo "[build-macos] 警告: 未检测到 Homebrew；scraper/audio-engine 需自行提供 taglib/opus 依赖。" >&2
 fi
 
-CMAKE_ARCH_ARGS=(-DCMAKE_OSX_ARCHITECTURES="$CMAKE_ARCH")
+# 标量而非数组：macOS 自带 bash 3.2 在 `set -u` 下展开空数组会报
+# unbound variable（与 build-ffmpeg-minimal.sh 里 x86asm_flag 同一原因）。
+CMAKE_ARCH_ARG="-DCMAKE_OSX_ARCHITECTURES=$CMAKE_ARCH"
 
+
+# 设置搜索索引由设置源码生成（声明式）：必须在 flutter build 之前更新。
+if command -v dart >/dev/null 2>&1; then
+  echo "[build-macos] ===== 生成设置搜索索引 ====="
+  (cd "$ROOT/.." && dart run tool/gen_settings_search_index.dart) || exit 1
+fi
 
 # 自研内核（EraAudio, Zig 静态库）须先于 audio-engine cmake 编译并落 zig-out/
 # （engine CMake 复制 zig-out/lib/libarchoera_kernel.a 链接；kernel 改动后
@@ -89,12 +97,12 @@ fi
 
 echo "[build-macos] ===== audio-engine ($TARGET_ARCH) ====="
 cmake -S "$ROOT/audio-engine" -B "$ROOT/audio-engine/build" \
-  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
+  -DCMAKE_BUILD_TYPE=Release "$CMAKE_ARCH_ARG"
 cmake --build "$ROOT/audio-engine/build" -j"$JOBS"
 
-echo "[build-macos] ===== scraper (openssl keg-only, $TARGET_ARCH) ====="
+echo "[build-macos] ===== scraper ($TARGET_ARCH) ====="
 cmake -S "$ROOT/scraper" -B "$ROOT/scraper/build" \
-  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
+  -DCMAKE_BUILD_TYPE=Release "$CMAKE_ARCH_ARG"
 cmake --build "$ROOT/scraper/build" -j"$JOBS"
 
 echo "[build-macos] ===== scanner (NativeAOT, RID=$RID) ====="
@@ -130,13 +138,13 @@ bash "$ROOT/subsonic/build.sh"
 # CMake 构建（ObjC++ + AppKit/MediaPlayer/Foundation），产物落 build/out/。
 echo "[build-macos] ===== platform bridge (CMake ObjC++, $TARGET_ARCH) ====="
 cmake -S "$ROOT/../native/platform" -B "$ROOT/../native/platform/build" \
-  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
+  -DCMAKE_BUILD_TYPE=Release "$CMAKE_ARCH_ARG"
 cmake --build "$ROOT/../native/platform/build" -j"$JOBS"
 
 # 统一日志核心（libarchoera_log，C；Dart 载入后注入各原生层的 sink）。
 echo "[build-macos] ===== log core (CMake C, $TARGET_ARCH) ====="
 cmake -S "$ROOT/../native/log" -B "$ROOT/../native/log/build" \
-  -DCMAKE_BUILD_TYPE=Release "${CMAKE_ARCH_ARGS[@]}"
+  -DCMAKE_BUILD_TYPE=Release "$CMAKE_ARCH_ARG"
 cmake --build "$ROOT/../native/log/build" -j"$JOBS"
 
 # 内嵌原生 CLI（archoerashell）：Rust staticlib，由 Runner.xcodeproj 的

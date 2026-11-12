@@ -10,12 +10,11 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 /// 音乐库搜索框：文本由外部（[LibraryState.searchQuery]，见
 /// `services/scanner/library_store.dart`）**单向驱动**，组件自身不持有真值。
 ///
-/// 为什么必须这样：播放页完全展开时 [`ShellExpandTransition`](../../app/shell.dart)
-/// 会把整个壳内容**卸载**（释放列表 / 图片内存），关闭播放页后本组件被重建。
-/// 而搜索条件存在 Riverpod store 里（非 autoDispose，不随页面卸载消失）——
-/// 若文本框自持状态（`SInput` 不传 `controller` 时正是如此），就会出现
-/// 「**搜索框空了，但列表仍是筛选结果**」的不一致：用户看到的输入框等于没搜，
-/// 列表却少了曲目，而且无从还原（除非重启或手动再搜一次）。
+/// 为什么必须这样：顶栏/页面在路由切换或重建时会被重新挂载，而搜索条件
+/// 存在 Riverpod store 里（非 autoDispose，不随组件销毁消失）——若文本框
+/// 自持状态（`SInput` 不传 `controller` 时正是如此），就会出现「**搜索框
+/// 空了，但列表仍是筛选结果**」的不一致：用户看到的输入框等于没搜，列表
+/// 却少了曲目，而且无从还原（除非重启或手动再搜一次）。
 ///
 /// 语义：`query`（store）是唯一真值来源——
 ///  - 初次构建：按 [query] 回填（卸载重建后同样回填，搜索不丢）；

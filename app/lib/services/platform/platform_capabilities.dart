@@ -110,8 +110,9 @@ class PlatformCapabilities {
   /// 系统主题色**推送**流：桥接在订阅时立即推当前值，之后推变化
   /// （Dart 不主动查询）。桥接不可用时为空流。
   Stream<Color> get accentEvents =>
-      (_bindings?.accentEvents ?? const Stream.empty())
-          .map((e) => Color.fromARGB(255, e.r, e.g, e.b));
+      (_bindings?.accentEvents ?? const Stream.empty()).map(
+        (e) => Color.fromARGB(255, e.r, e.g, e.b),
+      );
 
   bool get systemThemeAvailable => caps & aplCapSystemTheme != 0;
 
@@ -142,17 +143,6 @@ class PlatformCapabilities {
     final b = _bindings;
     if (b == null || caps & aplCapRevealPath == 0) return aplErrUnsupported;
     return b.revealPath(path);
-  }
-
-  /// 是否具备「系统默认方式打开 http(s) URL」能力。
-  bool get openUrlAvailable => caps & aplCapOpenUrl != 0;
-
-  /// 用系统默认应用（浏览器）打开 [url]。
-  /// 桥接不可用/无该能力返回 [aplErrUnsupported]；非 http(s) 返回错误码。
-  int openUrl(String url) {
-    final b = _bindings;
-    if (b == null || caps & aplCapOpenUrl == 0) return aplErrUnsupported;
-    return b.openUrl(url);
   }
 
   static PlatformCapabilities? _instance;

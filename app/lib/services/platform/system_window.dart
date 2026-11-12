@@ -38,8 +38,11 @@ abstract interface class SystemWindow {
   /// 不 toast——后台优化类，见 facade §5 降级两档）。
   Future<bool> setEvents(bool on);
 
-  /// 状态快照流（订阅即收到当前已知状态；能力缺失时空流）。
+  /// 状态快照流（订阅即收到后续状态；能力缺失时空流）。
   Stream<SystemWindowState> get state;
+
+  /// 最近一次已知状态（订阅方应立即应用一次，避免错过订阅前的快照）。
+  SystemWindowState get current;
 
   /// 执行失败 / 后端断连上抛（UI toast 由消费方决定；本能力默认仅日志）。
   Stream<PlatformCapabilityFailure> get failures;
@@ -59,6 +62,10 @@ class NoopSystemWindow implements SystemWindow {
 
   @override
   Stream<SystemWindowState> get state => const Stream.empty();
+
+  @override
+  SystemWindowState get current =>
+      const SystemWindowState(minimized: false, focused: true);
 
   @override
   Stream<PlatformCapabilityFailure> get failures => const Stream.empty();

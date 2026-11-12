@@ -375,14 +375,30 @@ void unregisterScreen() {
 // ── 窗口状态（子类化 Flutter 顶层 WndProc）+ WM_APPCOMMAND 媒体键 ──
 WNDPROC g_orig_wndproc = nullptr;
 HWND g_hwnd = nullptr;
-std::atomic<bool> g_minimized{false};
-std::atomic<bool> g_focused{true};
 std::atomic<bool> g_window_events{false};
 
+// 直接从系统查询前台状态，而不是只依赖 WM_ACTIVATE 累计出的布尔值：
+// - 同进程的其它顶层窗口（原生文件对话框、托盘菜单宿主等）激活时，主窗口
+//   仍算「应用在前台」，不应降频；
+// - 最小化 / 隐藏（含系统还原路径未按预期派发消息的情况）一律以
+//   IsIconic / IsWindowVisible 为准，避免残留后台态把前台窗口降到 1 FPS。
 void emitWindow() {
     if (!g_window_events.load(std::memory_order_acquire)) return;
-    dispatch(makeWindowState(g_minimized.load(std::memory_order_acquire),
-                             g_focused.load(std::memory_order_acquire)));
+    const HWND hwnd = g_hwnd;
+    bool minimized = false;
+    bool focused = false;
+    if (hwnd != nullptr) {
+        minimized = ::IsIconic(hwnd) != 0 || ::IsWindowVisible(hwnd) == 0;
+        if (!minimized) {
+            const HWND foreground = ::GetForegroundWindow();
+            DWORD pid = 0;
+            if (foreground != nullptr) {
+                ::GetWindowThreadProcessId(foreground, &pid);
+            }
+            focused = foreground != nullptr && pid == ::GetCurrentProcessId();
+        }
+    }
+    dispatch(makeWindowState(minimized, focused));
 }
 
 // 现代 Windows 把媒体键（含蓝牙 AVRCP）经 SMTC 派发；SMTC 非当前会话/仅前台时
@@ -420,23 +436,20 @@ bool dispatchAppCommand(LPARAM lparam) {
 LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch (msg) {
         case WM_SIZE:
-            g_minimized.store(wparam == SIZE_MINIMIZED,
-                              std::memory_order_release);
+            // 消息只作为「状态可能已变化」的触发；真实状态统一由
+            // emitWindow() 向系统查询（见上方说明）。
             emitWindow();
             break;
-        case WM_ACTIVATE: {
-            const bool focused = (static_cast<unsigned>(wparam) & 0xffff) != 0;
-            g_focused.store(focused, std::memory_order_release);
+        case WM_ACTIVATE:
+        case WM_ACTIVATEAPP:
             emitWindow();
             break;
-        }
         case WM_SHOWWINDOW:
             // 显示/隐藏（关闭到托盘 / 托盘还原）：隐藏同样视为不可见 → 降频；
             // 显示即复位。**不能**用 WM_CLOSE 判定——关闭是否真的隐藏由
             // window_manager 的 preventClose + Dart 侧决策（退出/隐藏/询问）
             // 决定：用户取消关闭确认框、或还原窗口后，WM_CLOSE 会让状态永久
             // 停在「已最小化」而误降频。
-            g_minimized.store(wparam == 0, std::memory_order_release);
             emitWindow();
             break;
         case WM_APPCOMMAND:
@@ -904,10 +917,21 @@ constexpr wchar_t kDeepLinkClass[] = L"ArchoeraMusic.DeepLink";
 constexpr wchar_t kDeepLinkMapName[] = L"Local\\ArchoeraMusic.DeepLink.Uri";
 constexpr UINT kDeepLinkPushMsg = WM_APP + 0x52;
 constexpr DWORD kDeepLinkMapSize = 8192;
-HWND g_deeplink_hwnd = nullptr;
-HANDLE g_deeplink_map = nullptr;
+// 隐藏窗口必须运行在**自己的消息循环线程**上：Dart FFI 调用发生在 UI
+// task runner，该线程不一定泵 Win32 消息；窗口若建在 UI 线程，
+// `PostMessage` 会永远停在队列里（表现为第二实例转发了 URI 但首实例无回调）。
+std::atomic<HWND> g_deeplink_hwnd{nullptr};
+HANDLE g_deeplink_map = nullptr;  // 仅深链线程访问
+std::thread* g_deeplink_thread = nullptr;
+std::atomic<bool> g_deeplink_stop{false};
+std::mutex g_deeplink_ready_mutex;
+std::condition_variable g_deeplink_ready_cv;
+bool g_deeplink_ready = false;
+bool g_deeplink_ok = false;
 std::mutex g_deeplink_mutex;
 std::string g_deeplink_pending;  // UTF-8；单条待取
+
+void deepLinkThreadProc();
 
 std::wstring utf8ToWideLocal(const char* s) {
     if (s == nullptr) return std::wstring();
@@ -953,13 +977,6 @@ std::string extractUrlFromCommandLine(const wchar_t* cmd) {
         }
         if (token.size() >= wprefix.size() &&
             ::_wcsnicmp(token.c_str(), wprefix.c_str(), wprefix.size()) == 0) {
-            return wideToUtf8Local(token.c_str());
-        }
-        // NekoAuth 登录回调（NekoMusic 固定使用 nekomusic://）。
-        const std::wstring nekoprefix = L"nekomusic://";
-        if (token.size() >= nekoprefix.size() &&
-            ::_wcsnicmp(token.c_str(), nekoprefix.c_str(),
-                        nekoprefix.size()) == 0) {
             return wideToUtf8Local(token.c_str());
         }
     }
@@ -1013,34 +1030,105 @@ LRESULT CALLBACK deepLinkWndProc(HWND hwnd, UINT msg, WPARAM wparam,
     } else if (msg == WM_APP + 0x51) {
         activateFlutterWindow();
         return 0;
+    } else if (msg == WM_DESTROY) {
+        ::PostQuitMessage(0);
+        return 0;
     }
     return ::DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
-void ensureDeepLinkWindow() {
-    if (g_deeplink_hwnd != nullptr) return;
+void deepLinkThreadProc() {
+    const HINSTANCE inst = ::GetModuleHandleW(nullptr);
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = deepLinkWndProc;
-    wc.hInstance = ::GetModuleHandleW(nullptr);
+    wc.hInstance = inst;
     wc.lpszClassName = kDeepLinkClass;
     ::RegisterClassExW(&wc);  // 已注册返回 0，忽略
-    g_deeplink_hwnd = ::CreateWindowExW(
+
+    HWND hwnd = ::CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, kDeepLinkClass,
-        L"ArchoeraMusic.DeepLink", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr,
-        wc.hInstance, nullptr);
-    if (g_deeplink_map == nullptr) {
-        g_deeplink_map = ::CreateFileMappingW(
-            INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, kDeepLinkMapSize,
-            kDeepLinkMapName);
+        L"ArchoeraMusic.DeepLink", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, inst,
+        nullptr);
+    HANDLE map = nullptr;
+    if (hwnd != nullptr) {
+        map = ::CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE,
+                                   0, kDeepLinkMapSize, kDeepLinkMapName);
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_deeplink_ready_mutex);
+        g_deeplink_hwnd.store(hwnd, std::memory_order_release);
+        g_deeplink_map = map;
+        g_deeplink_ok = hwnd != nullptr && map != nullptr;
+        g_deeplink_ready = true;
+    }
+    g_deeplink_ready_cv.notify_all();
+    if (hwnd == nullptr) return;
+
+    // stop 覆盖「窗口尚未创建时 destroy 已到达」的启动期竞态。
+    if (!g_deeplink_stop.load(std::memory_order_acquire)) {
+        MSG msg;
+        while (::GetMessageW(&msg, nullptr, 0, 0) > 0) {
+            ::TranslateMessage(&msg);
+            ::DispatchMessageW(&msg);
+        }
+    }
+
+    if (g_deeplink_map != nullptr) {
+        ::CloseHandle(g_deeplink_map);
+        g_deeplink_map = nullptr;
+    }
+    ::DestroyWindow(hwnd);
+    ::UnregisterClassW(kDeepLinkClass, inst);
+    {
+        std::lock_guard<std::mutex> lock(g_deeplink_ready_mutex);
+        g_deeplink_hwnd.store(nullptr, std::memory_order_release);
+        g_deeplink_ok = false;
+        // 保持 ready=true：表示「初始化已完成 / 线程可 join」，避免
+        // destroyDeepLinkWindow 在读取就绪态时永久等待。
+        g_deeplink_ready = true;
     }
 }
 
-void destroyDeepLinkWindow() {
-    if (g_deeplink_hwnd != nullptr) {
-        ::DestroyWindow(g_deeplink_hwnd);
-        g_deeplink_hwnd = nullptr;
+void ensureDeepLinkWindow() {
+    if (g_deeplink_thread == nullptr) {
+        g_deeplink_stop.store(false, std::memory_order_release);
+        {
+            std::lock_guard<std::mutex> lock(g_deeplink_ready_mutex);
+            g_deeplink_ready = false;
+            g_deeplink_ok = false;
+        }
+        try {
+            g_deeplink_thread = new std::thread(deepLinkThreadProc);
+        } catch (...) {
+            g_deeplink_thread = nullptr;
+            std::lock_guard<std::mutex> lock(g_deeplink_ready_mutex);
+            g_deeplink_ready = true;
+            g_deeplink_ok = false;
+            return;
+        }
     }
+    std::unique_lock<std::mutex> lock(g_deeplink_ready_mutex);
+    g_deeplink_ready_cv.wait(lock, [] { return g_deeplink_ready; });
+}
+
+void destroyDeepLinkWindow() {
+    g_deeplink_stop.store(true, std::memory_order_release);
+    HWND hwnd = nullptr;
+    {
+        std::unique_lock<std::mutex> lock(g_deeplink_ready_mutex);
+        if (g_deeplink_thread != nullptr) {
+            g_deeplink_ready_cv.wait(lock, [] { return g_deeplink_ready; });
+            hwnd = g_deeplink_hwnd.load(std::memory_order_acquire);
+        }
+    }
+    if (hwnd != nullptr) ::PostMessageW(hwnd, WM_CLOSE, 0, 0);
+    if (g_deeplink_thread != nullptr) {
+        if (g_deeplink_thread->joinable()) g_deeplink_thread->join();
+        delete g_deeplink_thread;
+        g_deeplink_thread = nullptr;
+    }
+    g_deeplink_stop.store(false, std::memory_order_release);
 }
 
 // scheme 会拼进 HKCU 注册表路径：只允许小写字母 / 数字 / 连字符。
@@ -1117,6 +1205,25 @@ int32_t deepLinkTakeWin(AplString* out) {
     return 1;
 }
 
+struct DeepLinkWindowSearch {
+    DWORD self_pid = 0;
+    HWND found = nullptr;
+};
+
+BOOL CALLBACK findOtherDeepLinkWindow(HWND hwnd, LPARAM lp) {
+    auto* search = reinterpret_cast<DeepLinkWindowSearch*>(lp);
+    DWORD pid = 0;
+    ::GetWindowThreadProcessId(hwnd, &pid);
+    // 必须跳过本进程：第二实例在 apl_init 时也可能建过同名隐藏窗口，
+    // FindWindow 若命中自己就会把 URI 投回本进程，首实例永远收不到。
+    if (pid == search->self_pid) return TRUE;
+    wchar_t cls[64] = {0};
+    if (::GetClassNameW(hwnd, cls, 64) == 0) return TRUE;
+    if (std::wcscmp(cls, kDeepLinkClass) != 0) return TRUE;
+    search->found = hwnd;
+    return FALSE;
+}
+
 int32_t deepLinkForwardWin() {
     const std::string url = extractUrlFromCommandLine(::GetCommandLineW());
     if (url.empty()) return 0;
@@ -1138,9 +1245,11 @@ int32_t deepLinkForwardWin() {
     ::UnmapViewOfFile(view);
     ::CloseHandle(map);
 
-    HWND target = ::FindWindowW(kDeepLinkClass, nullptr);
-    if (target == nullptr) return ERR_BACKEND;
-    if (::PostMessageW(target, kDeepLinkPushMsg, 0, 0) == 0) {
+    DeepLinkWindowSearch search;
+    search.self_pid = ::GetCurrentProcessId();
+    ::EnumWindows(findOtherDeepLinkWindow, reinterpret_cast<LPARAM>(&search));
+    if (search.found == nullptr) return ERR_BACKEND;
+    if (::PostMessageW(search.found, kDeepLinkPushMsg, 0, 0) == 0) {
         return ERR_BACKEND;
     }
     return 1;
@@ -1459,14 +1568,15 @@ uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
            CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
-           CAP_SECURE_FILE | CAP_OPEN_URL | CAP_ELEVATION;
+           CAP_SECURE_FILE | CAP_ELEVATION;
 }
 
 int32_t init() {
     setAumid();             // 显式 AUMID（媒体浮出/任务栏分组 + Toast 身份）
     ensureToastShortcut();  // Toast 前提：开始菜单快捷方式带同一 AUMID
-    // 协议唤醒：隐藏消息窗口（接收次实例 WM_COPYDATA）+ 冷启动 argv 中的 URI。
-    ensureDeepLinkWindow();
+    // 协议唤醒：冷启动 argv 中的 URI 先入队；隐藏消息窗口只在**首实例**
+    // 通过 appInstanceAcquire 后创建（见下方），避免第二实例建同名窗口后
+    // 把自己的 URI 投回自己。
     {
         const std::string cold =
             extractUrlFromCommandLine(::GetCommandLineW());
@@ -1579,7 +1689,10 @@ int32_t mediaSetWindow(int64_t) {
 }
 
 int32_t appInstanceAcquire() {
-    if (g_instance_mutex != nullptr) return 1;  // 幂等
+    if (g_instance_mutex != nullptr) {
+        ensureDeepLinkWindow(); // 幂等：保证隐藏窗口/共享内存存在
+        return 1;
+    }
     HANDLE h = ::CreateMutexW(nullptr, FALSE, L"Local\\ArchoeraMusic.SingleInstance");
     if (h == nullptr) return ERR_BACKEND;
     if (::GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -1587,6 +1700,9 @@ int32_t appInstanceAcquire() {
         return 0;  // 已有实例持有
     }
     g_instance_mutex = h;
+    // 只有首实例接收次实例转发；第二实例不建隐藏窗口（否则 FindWindow
+    // 可能命中自己，URI 回环后随第二实例退出而丢失）。
+    ensureDeepLinkWindow();
     return 1;
 }
 
@@ -1700,16 +1816,6 @@ int32_t revealPath(const char* path) {
     const HRESULT hr = ::SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
     ::ILFree(pidl);
     return SUCCEEDED(hr) ? OK : ERR_BACKEND;
-}
-
-int32_t openUrl(const char* url) {
-    if (url == nullptr || *url == '\0') return ERR_STATE;
-    const std::wstring w = utf8ToWideLocal(url);
-    if (w.empty()) return ERR_BACKEND;
-    // 交给 shell 的默认 http(s) 处理器（浏览器）；不拼命令行、不执行其他内容。
-    const auto r = reinterpret_cast<INT_PTR>(::ShellExecuteW(
-        nullptr, L"open", w.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
-    return r > 32 ? OK : ERR_BACKEND;
 }
 
 // ── 安全文件原语（Win32 CreateFileW；见 APL_CAP_SECURE_FILE）────────

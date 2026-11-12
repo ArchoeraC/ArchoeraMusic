@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/qqmusic/api.dart';
 import 'package:archoera_music/apis/qqmusic/core/config.dart';
+import 'package:archoera_music/apis/qqmusic/core/device.dart';
 import 'package:archoera_music/apis/qqmusic/core/request.dart';
 
 /// 已记录的业务请求 body（comm / request.module / request.param）。
@@ -112,25 +113,30 @@ void main() {
   });
 
   group('config：Android 客户端伪装（对齐 config.ts）', () {
-    test('UA / Referer / Content-Type', () {
-      expect(qmHeaders['User-Agent'], 'QQMusic 14090008(android 15)');
+    test('UA / Referer / Content-Type（UA 随设备档案）', () {
+      final device = qmGetDevice();
+      expect(qmHeaders['User-Agent'], device.userAgent);
+      expect(qmHeaders['User-Agent'], 'QQMusic ${device.cv}(android ${device.osVer})');
       expect(qmHeaders['Referer'], 'https://y.qq.com');
       expect(qmHeaders['Content-Type'], 'application/json');
     });
 
-    test('getCommonParams 逐字段', () {
+    test('getCommonParams 逐字段（设备身份来自持久化指纹，不再全零）', () {
       final c = qmGetCommonParams();
+      final device = qmGetDevice();
       expect(c['ct'], 11);
-      expect(c['cv'], 14090008);
-      expect(c['v'], 14090008);
+      expect(c['cv'], device.cv);
+      expect(c['v'], device.cv);
       expect(c['chid'], '10003505');
-      expect(c['os_ver'], '15');
-      expect(c['phonetype'], '24122RKC7C');
+      expect(c['os_ver'], device.osVer);
+      expect(c['phonetype'], device.model);
       expect(c['tmeAppID'], 'qqmusic');
       expect(c['nettype'], 'NETWORK_WIFI');
-      expect(c['udid'], '0');
-      expect(c['OpenUDID'], '0');
-      expect(c['QIMEI36'], '0');
+      // 设备身份字段：旧实现写死 '0'（脚本指纹），现在必须来自持久化设备。
+      expect(c['udid'], device.udid);
+      expect(c['OpenUDID'], device.openUdid);
+      expect(c['aid'], device.androidId);
+      expect(c['QIMEI36'], isNot('0'));
       expect(c['uin'], '0');
     });
   });

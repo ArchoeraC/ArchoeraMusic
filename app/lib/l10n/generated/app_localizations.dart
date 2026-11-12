@@ -116,6 +116,24 @@ abstract class AppLocalizations {
   /// **'性能 / 渲染'**
   String get settingsCatRender;
 
+  /// No description provided for @settingsRenderFps.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'渲染帧数'**
+  String get settingsRenderFps;
+
+  /// No description provided for @settingsRenderFpsDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'每秒渲染的上限（{fps} FPS，实际受显示器刷新率限制）'**
+  String settingsRenderFpsDesc({required Object fps});
+
+  /// No description provided for @settingsRenderFpsWarn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'高帧率会明显增加 GPU 占用与耗电'**
+  String get settingsRenderFpsWarn;
+
   /// No description provided for @settingsRenderSubtitle.
   ///
   /// In zh_CN, this message translates to:
@@ -1704,6 +1722,60 @@ abstract class AppLocalizations {
   /// **'登录风险提示'**
   String get loginRiskTitle;
 
+  /// No description provided for @kugouRiskVerifyTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗安全验证'**
+  String get kugouRiskVerifyTitle;
+
+  /// No description provided for @kugouRiskVerifySmsDescription.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗要求完成短信验证，验证码已发送到账号绑定的手机号。'**
+  String get kugouRiskVerifySmsDescription;
+
+  /// No description provided for @kugouRiskVerifySmsHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'短信验证码'**
+  String get kugouRiskVerifySmsHint;
+
+  /// No description provided for @kugouRiskVerifyCodeRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入短信验证码'**
+  String get kugouRiskVerifyCodeRequired;
+
+  /// No description provided for @kugouRiskVerifySubmit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'提交验证'**
+  String get kugouRiskVerifySubmit;
+
+  /// No description provided for @kugouRiskVerifyFailed.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'验证未通过，请检查验证码后重试。'**
+  String get kugouRiskVerifyFailed;
+
+  /// No description provided for @kugouRiskVerifyTcaptchaTitle.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'需要在酷狗官方客户端完成验证'**
+  String get kugouRiskVerifyTcaptchaTitle;
+
+  /// No description provided for @kugouRiskVerifyTcaptchaBody.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗要求腾讯人机验证（TCaptcha），当前版本无法在应用内嵌网页完成。请打开酷狗官方客户端完成安全验证后，再回到本应用重试。'**
+  String get kugouRiskVerifyTcaptchaBody;
+
+  /// No description provided for @kugouRiskVerifyUnsupported.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'酷狗要求完成安全验证（类型 {type}），请在酷狗官方客户端完成后重试。'**
+  String kugouRiskVerifyUnsupported({required int type});
+
   /// No description provided for @loginRiskBody.
   ///
   /// In zh_CN, this message translates to:
@@ -2135,126 +2207,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'登录 NekoMusic'**
   String get nekoLoginTitle;
-
-  /// No description provided for @nekoLoginTabOauth.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'OAuth 登录'**
-  String get nekoLoginTabOauth;
-
-  /// No description provided for @nekoOauthTitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'使用 NekoAuth 登录'**
-  String get nekoOauthTitle;
-
-  /// No description provided for @nekoOauthDesc.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'在任意浏览器打开下面的一次性地址完成授权；若默认浏览器无法登录，可复制到其它浏览器。'**
-  String get nekoOauthDesc;
-
-  /// No description provided for @nekoOauthOpen.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'在浏览器中登录'**
-  String get nekoOauthOpen;
-
-  /// No description provided for @nekoOauthWaiting.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'等待授权完成…'**
-  String get nekoOauthWaiting;
-
-  /// No description provided for @nekoOauthUrlLabel.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'一次性登录地址'**
-  String get nekoOauthUrlLabel;
-
-  /// No description provided for @nekoOauthCopy.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'复制链接'**
-  String get nekoOauthCopy;
-
-  /// No description provided for @nekoOauthCopied.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'链接已复制'**
-  String get nekoOauthCopied;
-
-  /// No description provided for @nekoOauthRefresh.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'重新获取'**
-  String get nekoOauthRefresh;
-
-  /// No description provided for @nekoOauthFailed.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'登录失败'**
-  String get nekoOauthFailed;
-
-  /// No description provided for @nekoLoginTabQr.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'扫码登录'**
-  String get nekoLoginTabQr;
-
-  /// No description provided for @nekoLoginTabPassword.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'账号密码'**
-  String get nekoLoginTabPassword;
-
-  /// No description provided for @nekoLoginEmail.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'邮箱'**
-  String get nekoLoginEmail;
-
-  /// No description provided for @nekoLoginPassword.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'密码'**
-  String get nekoLoginPassword;
-
-  /// No description provided for @nekoLoginPasswordHint.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'请输入密码'**
-  String get nekoLoginPasswordHint;
-
-  /// No description provided for @nekoLoginSubmit.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'登录'**
-  String get nekoLoginSubmit;
-
-  /// No description provided for @nekoLoginForgotPassword.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'忘记密码？'**
-  String get nekoLoginForgotPassword;
-
-  /// No description provided for @nekoForgotCopyHint.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'重置链接已复制，请在浏览器中打开并完成重置'**
-  String get nekoForgotCopyHint;
-
-  /// No description provided for @nekoForgotFailed.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'获取重置链接失败'**
-  String get nekoForgotFailed;
-
-  /// No description provided for @nekoForgotOpened.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'已在浏览器中打开重置页'**
-  String get nekoForgotOpened;
 
   /// No description provided for @nekoLoginQrHint.
   ///
@@ -4717,7 +4669,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsEnergySaving.
   ///
   /// In zh_CN, this message translates to:
-  /// **'节能模式'**
+  /// **'频谱节能'**
   String get settingsEnergySaving;
 
   /// No description provided for @settingsEnergySavingNote.
@@ -4737,18 +4689,6 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'当前为标准模式'**
   String get settingsEnergySavingOff;
-
-  /// No description provided for @settingsUnloadAllMemory.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'最小化时卸载全部内存状态'**
-  String get settingsUnloadAllMemory;
-
-  /// No description provided for @settingsUnloadAllMemorySubtitle.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'后台（最小化/托盘/熄屏）丢弃页面数据与缓存，恢复后从零重建（可能回到首页、丢滚动位置）；播放不受影响'**
-  String get settingsUnloadAllMemorySubtitle;
 
   /// No description provided for @settingsSearchEnergySavingSubtitle.
   ///
@@ -6802,6 +6742,12 @@ abstract class AppLocalizations {
   /// **'叠加的黑色遮罩透明度（{dim}%），越高前景越易读'**
   String settingsBackgroundDimDesc({required Object dim});
 
+  /// No description provided for @settingsBackgroundDimAuto.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'图片较亮，下限已按亮度自动抬高'**
+  String get settingsBackgroundDimAuto;
+
   /// No description provided for @settingsBackgroundScale.
   ///
   /// In zh_CN, this message translates to:
@@ -8703,18 +8649,6 @@ abstract class AppLocalizations {
   /// **'播放 / 暂停'**
   String get shortcutActionPlayPause;
 
-  /// No description provided for @shortcutActionPlay.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'播放'**
-  String get shortcutActionPlay;
-
-  /// No description provided for @shortcutActionPause.
-  ///
-  /// In zh_CN, this message translates to:
-  /// **'暂停'**
-  String get shortcutActionPause;
-
   /// No description provided for @shortcutActionStop.
   ///
   /// In zh_CN, this message translates to:
@@ -8868,7 +8802,7 @@ abstract class AppLocalizations {
   /// No description provided for @shortcutActionOpenPlayer.
   ///
   /// In zh_CN, this message translates to:
-  /// **'打开播放页'**
+  /// **'打开 / 关闭播放页'**
   String get shortcutActionOpenPlayer;
 
   /// No description provided for @shortcutActionOpenSettings.

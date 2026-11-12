@@ -5,8 +5,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
-using System.Security.Cryptography;
 using System.Text;
+using Archoera.Hash;
 using Archoera.Lyrics;
 using TagLibFile = TagLib.File;
 
@@ -942,11 +942,7 @@ public sealed class ScannerEngine
         });
     }
 
-    private static string Md5Hex(string input)
-    {
-        var bytes = MD5.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
-    }
+    private static string Md5Hex(string input) => Md5.Hex(input);
 
     private static long ToUnixMs(DateTime dt)
     {

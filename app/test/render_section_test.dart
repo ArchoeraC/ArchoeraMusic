@@ -11,6 +11,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/settings/settings_sections.dart';
+import 'package:archoera_music/settings/settings_widgets.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
 
 /// 不落盘的偏好容器（避免测试写入真实 prefs.json）。
@@ -30,6 +31,11 @@ class _NoSavePrefs extends AppPrefsNotifier {
       lowRes: lowRes,
       damageClip: damageClip,
     );
+  }
+
+  @override
+  void setRenderFps(int fps) {
+    state = state.copyWithRenderFps(fps);
   }
 }
 
@@ -73,6 +79,52 @@ void main() {
 
     await pick('Off', 'Per-line');
     expect(container.read(appPrefsProvider).lyricsEdgeFade, 'wall');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('渲染帧数：30~165 滑条，>60 转黄、>100 转红', (tester) async {
+    final container = ProviderContainer(
+      overrides: [appPrefsProvider.overrideWith(_NoSavePrefs.new)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(
+            body: SingleChildScrollView(child: RenderSection()),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final sliderFinder = find.byType(Slider);
+    expect(sliderFinder, findsOneWidget);
+    final slider = tester.widget<Slider>(sliderFinder);
+    expect(slider.min, 30);
+    expect(slider.max, 165);
+    expect(slider.value, 60);
+    expect(slider.divisions, 135);
+
+    Color? accent() =>
+        SliderTheme.of(tester.element(sliderFinder)).activeTrackColor;
+
+    final scheme = Theme.of(tester.element(sliderFinder)).colorScheme;
+    // ≤60：主题色（与其它设置滑条一致）。
+    expect(accent(), scheme.primary);
+
+    container.read(appPrefsProvider.notifier).setRenderFps(90);
+    await tester.pump();
+    expect(tester.widget<Slider>(sliderFinder).value, 90);
+    expect(accent(), kRenderFpsWarnColor);
+
+    container.read(appPrefsProvider.notifier).setRenderFps(144);
+    await tester.pump();
+    expect(accent(), scheme.error);
     expect(tester.takeException(), isNull);
   });
 

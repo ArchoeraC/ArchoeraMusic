@@ -60,7 +60,7 @@ class LyricMatchResult {
   /// 来源平台（'netease' / 'qqmusic' / 'kugou'）
   final String platform;
 
-  /// 主歌词格式（'yrc' / 'qrc' / 'krc' / 'lrc'）
+  /// 主歌词格式（`yrc` / `qrc` / `krc` / `lrc`，或平台扩展如 `neko-v1`）。
   final String format;
 
   /// 主歌词原始文本

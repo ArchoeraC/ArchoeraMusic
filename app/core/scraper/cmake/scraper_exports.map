@@ -1,0 +1,18 @@
+# ArchoeraMusic
+# Copyright (C) 2026 Archoera && BetaStudio2
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# archoera_scraper 的导出清单（Linux ELF，version-script）。
+#
+# Rust 静态库（std / hyper / rustls / aes…）链接进来后有上万个全局符号；
+# 不加白名单会全部出现在 .dynsym（体积 + 符号插入风险）。用 version-script
+# 只导出本项目自己的 C ABI，其余一律 local——比 `--exclude-libs,ALL` 更适合
+# 保留 staticlib 里的 era_crypto_* / era_http_*（后者无法配合 --export-dynamic-symbol）。
+{
+  global:
+    archoera_scraper_*;
+    era_crypto_*;
+    era_http_*;
+  local:
+    *;
+};

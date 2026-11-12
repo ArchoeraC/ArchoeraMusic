@@ -2,7 +2,7 @@
 
 > 状态：**规划中（2026-09-16 立项，未实施）**
 > 主线：**GPU / 渲染开销**（当前与上游 SPlayer-Next 差距最大，优先处理）；
-> 副线：**页面与模块的按需加载 / 卸载**（内存与启动）。
+> 副线：**模块按需加载**（页面不卸载；2026-11-09 决策）。
 > 定位：在 [player-render-optimization.md](player-render-optimization.md)（播放页三引擎）
 > 之上，补两块此前没有系统化的工作：① **跨框架渲染机制调研**（Qt / Chromium / WebRender /
 > Impeller），② **运行时生命周期**（页面 / 模块 / 缓存）。播放页细节仍以专项文档为准。
@@ -19,8 +19,9 @@
   ④ 不可见即停（occlusion + 生命周期）**。本方案全部对齐这四点。
 - 背景（最大头）的目标形态：**静态层缓存一次（模糊封面 + 压暗）+ 动态层只在「水纹损伤区」
   以低分辨率绘制**；回退阶梯保证软渲染/老 iGPU 可用。
-- 生命周期：`go_router` 已做「懒建分支 + `Offstage` + `TickerMode`」，缺的是**卸载**（分支状态永驻）
-  与**模块按需**（重模块加载时机，见 [module-on-demand-load-plan.md](module-on-demand-load-plan.md)）。
+- 生命周期：`go_router` 已做「懒建分支 + `Offstage` + `TickerMode`」；**2026-11-09
+  起不再卸载已访问分支 / 壳内容**（卸载重建的 churn 大于收益），只保留**模块按需**
+  （重模块加载时机，见 [module-on-demand-load-plan.md](module-on-demand-load-plan.md)）。
 - **范围不限于播放页**（用户 2026-09-16）：列表 / 首页 / 搜索 / 侧边栏 / 顶栏 / 播放条 /
   毛玻璃弹窗 / 路由转场 / 图片外观背景同样按四杠杆治理（见 §2.1、§4.6）。
 - **实现边界硬约束**：只落 **Dart + 既有 FFI 桥接**、**集显优先且不依赖独显**、**不改引擎**
@@ -52,7 +53,7 @@
 | 维度 | 上游 SPlayer-Next（Electron） | 我们（Flutter） | 差距性质 |
 |---|---|---|---|
 | 水纹背景 | `BackgroundRipple.vue`：**0.55 渲染尺度** WebGL/WebGPU canvas + CSS `blur(10px)` | `ripple_background.dart`：**全分辨率 CPU 顶点场**（≤160×90 顶点 × 48 涟漪，UI 线程） | 像素量 ×3.3、线程、算法 |
-| 背景生命周期 | 展开后**延迟 500ms 挂载**、收起 **500ms 卸载**（`PlayerBackground.vue:15-43`） | 路由 push 即建、pop 才销毁 | 常驻/首帧成本 |
+| 背景生命周期 | 展开后**延迟 500ms 挂载**、收起 **500ms 卸载**（`PlayerBackground.vue:15-43`）；流体就绪前用模糊缩略图铺底 | 轻量样式（渐变/纯色/模糊/主色）路由 push 即建；水纹/流体等重效果等进入动画结束再挂载，采样完成前由模糊封面预览铺底（`PlayerBackground.active`） | 常驻/首帧成本、黑屏 |
 | 图层结构 | blur/ripple **共用** `.bg-blur-wrap` + 单个 `::after` 压暗 | 多遍全屏叠层（gradient + 模糊 + 折射 + 压暗） | overdraw |
 | 文本 | Chromium 字形栅格缓存 + 合成层 | v7 每帧 `TextPainter.layout()`（P1 已部分解决） | UI 线程 |
 | 列表/分支 | Chromium tile + occlusion culling，标签可丢弃 | `go_router` 懒建分支 + `Offstage` + `TickerMode`；**访问过即永驻** | 缺「卸载」 |
@@ -581,7 +582,7 @@
 | 不透明快路径 | Impeller `canvas.cc:1450-1475`；`cc` `layer.cc:894-900`；Qt `qsgbatchrenderer.cpp:1545-1549` | 避免无谓半透明/模糊叠层 |
 | 字形缓存很小会抖 | Skia `SkStrikeCache.h:31-37`（2 MiB）、`TextBlobRedrawCoordinator.h:34-40`（4 MiB）；Qt SDF 图集 LRU | 我们的 Paragraph 缓存用有界 LRU，避免无界增长 |
 | 图片按显示尺寸解码 + 解码缓存上限 | `cc` `image_decode_cache_utils.cc:20-38`；Skia `SkResourceCache.cpp:50-51` | 沿用 `CoverImage` `cacheWidth/Height` + `ImageCache` 上限 |
-| 生命周期 / Loader | Qt `Loader`+`destroy()`；WR `picture_textures.rs:254-274` | 页面分支卸载、模块注册表、图片缓存上限 |
+| 生命周期 / Loader | Qt `Loader`+`destroy()`；WR `picture_textures.rs:254-274` | 页面分支停绘、模块注册表、图片缓存上限 |
 | 后台节流（连 ticker 一起停） | `cc` `scheduler_state_machine.cc:1481-1503`；Qt `qsgthreadedrenderloop.cpp:993-998` | `power_saver.dart` + `FrameGovernor` |
 | Impeller GLES 下 raster cache 关闭 → 缓存必须显式栅格化 | 参考合成器项目 `docs/MOBILE_RENDERING_OPTIMIZATION.md` §Shared SVG app icons（`EnableRasterCache` 返回 false，矢量层每帧重放） | 封面/背景已走预烘焙（对齐）；排查其它「包 `RepaintBoundary` 当缓存」的假设 |
 | 动画收敛到 render object（连续运动与结构状态分离） | 参考合成器项目 SDK 包 retained 三件套（ValueListenable→RenderTransform，每帧 0 build/0 layout，物理像素 snap） | 歌词墙滚动、封面切换、页面转场（见 `rendering-reference-research.md` D2） |
@@ -652,7 +653,8 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
   （现 `ripple_background.dart` 单文件 687 行，应拆）。
 - `app/lib/services/render/`：`layer_budget.dart`（图片/层缓存上限）、
   `quality_governor.dart`（帧时间→档位）、`damage_region.dart`（纯 Dart 脏区聚合）。
-- `app/lib/services/lifecycle/`：`branch_lifecycle.dart`（分支卸载/重建）。
+- `app/lib/services/lifecycle/`：历史规划（`branch_lifecycle.dart` 分支卸载/重建）；
+  2026-11-09 起**不再卸载分支**，该文件不需要落地。
 - `app/lib/services/native_module_registry.dart`：沿用 `module-on-demand-load-plan.md`。
 - **共享 vs 平台**：跨平台逻辑放 Dart 共享层；平台特有逻辑放桥接各后端文件；
   桥接仍按官方工具链原生编译（不引入 Zig 承载）。
@@ -745,9 +747,11 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
   - 现状：`router.dart` 的 `StatefulShellRoute.indexedStack` 已「**首次访问才创建分支**」，
     go_router 用 `Offstage + TickerMode` 包裹非活动分支（`_IndexedStackedRouteBranchContainer`），
     即**已不绘制、已停 ticker**。
-  - 缺口：**访问过的分支子树与状态永驻**。补：长时间未用 / 内存压力时**卸载重建**
-    （可选保留状态：轻量状态经 `PageStorage` / provider，重对象直接释放）。
-  - 非活动分支额外释放：大 `ui.Image`（封面）、长列表缓存、订阅。
+  - **2026-11-09 决策：不卸载已访问分支**。实测卸载/重建会 churn 渲染资源，
+    恢复到前台还要重新解码封面、重新拉取页面数据；保持 `Offstage + TickerMode`
+    停绘/停 ticker 即可，state 与滚动位置零成本保留。
+  - 真正需要释放的是**非活动分支的临时缓存**（大图解码、订阅），由各自
+    provider 的 `autoDispose` / 有界 LRU 管理，而不是整棵子树卸载。
 - **模块**：落地 [module-on-demand-load-plan.md](module-on-demand-load-plan.md)：
   先解除 `bootstrap.dart:46` 的重模块启动常驻，再上注册表引用计数 + 用后释放。
 - **播放页**：收起/退出即释放（现状 `dispose` 已释放 shader/纹理）；可学上游**展开延迟挂载**，
@@ -755,42 +759,28 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
 - **暂停/后台**：`power_saver.dart` 已按最小化/失焦/熄屏压帧率；需确保**连 ticker 一起停**
   （`TickerMode`/`Visibility(maintainAnimation:false)`），而非仅降帧。
 
-> **已落地（2026-10-01）**：
-> 1. **后台清缓存（默认开）**：最小化/托盘隐藏/熄屏时，`power_saver.dart` 释放
->    `ImageCache`（`clear` + `clearLiveImages`）、歌词三件套、封面色缓存、Netease 接口
->    LRU——返回前台按需重载，不影响播放。
-> 2. **根级后台卸载门（`app/background_unload_gate.dart`）**：开启强迫症
->    `preset.unloadAllMemory`（预设 · 强迫症，默认关）且应用进入不可见后台时，把**整棵路由子树**
->    （`MaterialApp.router` 的 Navigator：全部页面 / 弹窗 / 播放页）卸为纯色，
->    恢复后重建。`MaterialApp`/Splash/Vault 门保持挂载（恢复不重放 Splash）。
->    强迫症档额外 `appRouter.go('/')` 复位导航，丢弃分支/Tab/嵌套路由。
-> 3. **强迫症「最小化时卸载全部内存状态」（`preset.unloadAllMemory`，默认关）**：在 1+2
->    基础上 `invalidate` 页面数据 provider（音乐库窗口 / 首页聚光 / 每日推荐 /
->    流媒体库 / 当前歌词），恢复前台后从零重建；播放/认证/偏好/平台能力不在其列。
+> **已落地（2026-10-01；2026-11-09 修订）**：
+> 1. **后台只停帧/降频**：最小化 / 托盘隐藏直接 0 帧，失焦 / 熄屏 1 FPS；
+>    `power_saver.dart` 不再清缓存、不再 invalidate 页面数据。
+> 2. **壳内容不卸载**：播放页展开后 `ShellExpandTransition` 只 `Offstage` +
+>    `TickerMode(false)` 停绘/停布局，element/state 全保留；`OffstageWhenComplete`
+>    同理。返回时零重建。
+> 3. **拆掉 `preset.unloadAllMemory` / `BackgroundUnloadGate`**：实测卸载/重建
+>    整棵路由子树会 churn 渲染资源（表面/图层/驱动缓存只涨不缩），
+>    `ImageCache.clear()` 还会让恢复时全量重新解码封面；净效果是水位抬高、
+>    不回退。用户也反馈「没看到任何用处，只增加开销」。
+> 4. **仍然有效**：最小化/失焦/熄屏的帧率策略、引擎位置事件降频、平台窗口
+>    状态流 minimized「只置位不清除」。
 >
-> **关键时序（修复「最小化后内存不释放」）**：隐藏/最小化时引擎**可能不出帧**
-> （GTK 隐藏窗口不派发 drawFrame），故**释放绝不能挂在 `addPostFrameCallback` 上**
-> ——实测 timer 已触发却无任何释放。现改为：进入后台 **同步释放**缓存/页面数据
-> （不需要帧，立刻生效）。另加 **30s 去抖**：只有「持续后台」达阈值才释放一次，
-> 快速 hide/show 完全不触发（避免反复卸载/重建的 churn）。
->
-> **UI 卸载默认关闭，收进强迫症可选（`preset.unloadAllMemory`）**：默认档只做
-> **同步数据/缓存释放**，**不卸载 UI 子树**。原因（实测）：卸载/重建整棵路由子树会
-> **涨内存且不释放**——① 引擎/驱动在重建时重新分配表面/图层/纹理，旧资源归还到
-> 驱动池但**不还给 OS**（glibc arena 高水位 + Mesa/D3D 资源缓存）；② 卸载期
-> `ImageCache.clear()`，恢复时全量**重新解码**封面；③ 隐藏期不出帧时“卸载”要到
-> 恢复首帧才发生，收益滞后。净效果是**水位抬高、不回退**。故仅在强迫症档由用户
-> 自行承担这一代价。
->
-> **minimize/show 本身的内存增长（非本应用代码）**：实测在**关闭节能与全部卸载
-> 开关**后，仅反复 `hide()/show()` 6 次，进程 RSS 也从 631MB 涨到 729MB 后平台期
+> **minimize/show 本身的内存增长（非本应用代码）**：实测在**关闭节能**后，
+> 仅反复 `hide()/show()` 6 次，进程 RSS 也从 631MB 涨到 729MB 后平台期
 > ——这是窗口隐藏/显示时渲染表面（GTK/Mesa；Windows 上为 D3D/DXGI swapchain）被
-> 销毁重建、驱动内存只涨不缩的平台行为，**不是应用的 Dart/FFI 泄漏**。故「后台释放」
-> 只在**持续后台**做一次（去抖），避免把这种平台 churn 放大。
+> 销毁重建、驱动内存只涨不缩的平台行为，**不是应用的 Dart/FFI 泄漏**。故后台
+> **不做任何释放**，避免把这种平台 churn 放大。
 >
 > 另：平台桥接的窗口状态流对 minimized 改为**只置位、不清除**（部分合成器把
-> GTK hide 报告为 minimized=false，会闪回前台并取消后台释放）；清除交给显式
-> show/restore 事件。这样后台判定不再被系统误报打断（对齐“自己判定后台”）。
+> GTK hide 报告为 minimized=false，会闪回前台）；清除交给显式 show/restore
+> 事件。这样后台判定不再被系统误报打断（对齐“自己判定后台”）。
 > 4. 实测后台常驻基线（release，Linux）：重模块（mediaengine/kernel/scraper/
 >    scanner/ffmpeg）**均已按需未加载**；~290MB 主要由 GPU 驱动（~67MB）、Flutter 引擎
 >    （~27MB）、字体（Noto CJK + MiSans ~22MB）、原生 heap（~58MB）、Dart heap（~29MB）
@@ -865,7 +855,7 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
 |---|---|---|---|
 | **R0** | profile 基线：**全应用**（列表/首页/搜索/播放页）2K/4K，记录 UI/raster 帧时间 + GPU 占用（iGPU 与 llvmpipe） | Dart（`addTimingsCallback`）｜`services/render/quality_governor.dart` | 基线与瓶颈归属报告（分页面） |
 | **R1** | 背景**静态层缓存** + **动态层损伤区** + 降分辨率（§4.1） | Dart｜`widgets/player/background/*`、`services/render/damage_region.dart` | iGPU 全屏达帧预算；视觉与上游一致；软渲染可回退 |
-| **R2** | 图层纪律 + 生命周期（§4.2/§4.4）：稳定层隔离、去无谓裁剪、分支卸载、重模块解除常驻 | Dart + FFI（模块注册表）｜`services/lifecycle/branch_lifecycle.dart`、`services/native_module_registry.dart` | RSS 可控、启动时间不退化；切页/切歌后可回收 |
+| **R2** | 图层纪律 + 生命周期（§4.2/§4.4）：稳定层隔离、去无谓裁剪、分支停绘 + 有界缓存、重模块解除常驻 | Dart + FFI（模块注册表）｜`services/native_module_registry.dart` | RSS 可控、启动时间不退化；切页/切歌后可回收 |
 | **R2b** | **全应用 UI 面**（§4.6）：列表/网格纪律、图片解码与缓存上限、毛玻璃范围、转场、常驻部件隔离 | Dart｜`widgets/list/*`、`widgets/common/glass_surface.dart`、`services/render/layer_budget.dart` | 列表滚动帧时间达标；图片常驻内存有界；无全屏模糊弹窗 |
 | **R3** | 文本/几何批处理（§4.3，按 R1/R2 后剩余瓶颈定） | Dart｜`widgets/player/lyrics_v7/*`、`widgets/player/spectrum_view/*` | 歌词区 UI 帧时间≈常数；频谱无离屏 |
 | **R4** | 自适应画质（§4.5） | Dart｜`services/render/quality_governor.dart` | 目标机稳定在帧预算内，无独显依赖 |
@@ -908,13 +898,14 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
 
 1. **动态层选型**：§4.1 的 A/B/C 哪种在 iGPU 上最优？（怕选错，需先做小实验测填充率/分配开销）
 2. **静态层载体**：`RepaintBoundary` 层缓存 vs 显式预烘焙 `ui.Image`（内存 vs 重绘/分配）。
-3. **页面卸载策略**：保留状态（`PageStorage`/provider）还是直接丢弃重建？卸载触发条件（时长/内存/可见性）。
+3. **页面生命周期策略**：**已决定不卸载**（2026-11-09）——`Offstage + TickerMode`
+   停绘/停 ticker，状态与滚动位置保留；只对临时缓存做有界 LRU / `autoDispose`。
 4. **画质开关**：新增统一 `effectQuality` 档位，还是继续复用 `performanceMode` 二档？
 5. **测量基建**：是否能接入脚本化帧时间/GPU 采集，进 CI 或本地基准（对照 `archive/benchmark-2026-09-10.md`）。
 6. **损伤区粒度**：按「每个活动涟漪的波带包围盒」逐个 dirty rect，还是整个动态层半分辨率刷新？
    （参考：`cc` 的 partial raster **默认关闭**，`layer_tree_settings.h:112`；需小实验权衡。）
 7. **缓存回收策略**：是否照 `cc` 引入「字节上限 + 优先级 + 空闲回收」（`tile_manager.cc:912-1092,495-517`），
-   还是保持 Flutter `ImageCache` + 分支卸载的轻量组合即可？
+   还是保持 Flutter `ImageCache` + 分支停绘的轻量组合即可？
 8. **Impeller 下 `RepaintBoundary` 还有多少缓存收益？**（§3.6 指出 `flow` RasterCache 是 Skia 专用、
    Impeller 编译掉）——需实测：同页面开关边界对 raster 帧时间的影响，再决定列表行是否保留边界。
 9. **列表行边界与 `KeepAlive` 取舍**：默认 `addRepaintBoundaries=true` + `AutomaticKeepAlive`

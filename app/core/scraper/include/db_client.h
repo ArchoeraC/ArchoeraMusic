@@ -14,7 +14,7 @@
 /// 刮削结果写入音频文件标签后由 C# Scanner 接管入库，也无需 HTTP。
 
 #include "scraper.h"
-#include <curl/curl.h>
+#include "scraper_http.h"
 #include <nlohmann/json.hpp>
 #include <functional>
 #include <stdexcept>
@@ -22,12 +22,6 @@
 namespace archoera::scraper {
 
 using json = nlohmann::json;
-
-inline size_t dbWriteCb(char* ptr, size_t size, size_t nmemb, void* userdata) {
-    auto* buf = static_cast<std::string*>(userdata);
-    buf->append(ptr, size * nmemb);
-    return size * nmemb;
-}
 
 class DbClient {
 public:
@@ -38,17 +32,14 @@ public:
     DbClient(const std::string& apiUrl, const std::string& proxyKey)
         : apiUrl_(apiUrl), proxyKey_(proxyKey)
     {
-        if (apiUrl_.empty()) return;  // 纯 provider 模式不初始化 HTTP
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
-        headers_ = curl_slist_append(headers_, ("x-proxy-key: " + proxyKey_).c_str());
-        headers_ = curl_slist_append(headers_, "Content-Type: application/json");
+        if (apiUrl_.empty()) return;  // 纯 provider 模式不使用 HTTP
+        headers_ = {
+            {"x-proxy-key", proxyKey_},
+            {"Content-Type", "application/json"},
+        };
     }
 
-    ~DbClient() {
-        if (headers_) curl_slist_free_all(headers_);
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    ~DbClient() = default;
 
     DbClient(const DbClient&) = delete;
     DbClient& operator=(const DbClient&) = delete;
@@ -107,22 +98,18 @@ private:
 
     bool httpGet(const std::string& url, std::string& body) {
         body.clear();
-        curl_easy_reset(curl_);
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, dbWriteCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, headers_);
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, 10000L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (res != CURLE_OK) {
-            lastError_ = std::string("GET 失败: ") + curl_easy_strerror(res);
+        std::string err;
+        long code = 0;
+        if (!http_.perform("GET", url, std::string(), 10000L, headers_, nullptr,
+                           body, &code, err)) {
+            lastError_ = "GET 失败: " + err;
             return false;
         }
         return true;
     }
 
-    CURL* curl_ = nullptr;
-    curl_slist* headers_ = nullptr;
+    HttpClient http_;
+    HeaderList headers_;
     std::string apiUrl_;
     std::string proxyKey_;
     std::string lastError_;

@@ -22,5 +22,5 @@ extension NekoPrefs on AppPrefs {
 /// 音源是否可用：仅取决于用户开关。
 ///
 /// NekoMusic 已取消第三方客户端 `client_id` / 实例签名要求，不再需要构建期
-/// 注入身份；登录统一走 NekoAuth。
+/// 注入身份；登录统一走扫码（OAuth / 账号密码已于 2026-11-09 移除）。
 bool nekoSourceUsable(AppPrefs prefs) => prefs.nekoEnabled;

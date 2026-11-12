@@ -237,6 +237,7 @@ fn seekMsImpl(opaque_ctx: *anyopaque, ms: i64) Error!void {
         ctx.reader.seek(0, .start) catch {};
         ctx.pending.clearRetainingCapacity();
         ctx.input_eof = false;
+        ctx.aac.resetHistory(); // 回到曲首：历史与整曲解码起始状态一致
         ctx.aac.pos_samples = 0;
         ctx.aac.out_pos = 0;
         ctx.aac.out_buf.clearRetainingCapacity();
@@ -252,25 +253,55 @@ fn seekMsImpl(opaque_ctx: *anyopaque, ms: i64) Error!void {
         ctx.pending.clearRetainingCapacity();
         ctx.input_eof = false;
         ctx.aac.pos_samples = 0;
-        ctx.aac.out_pos = 0;
-        ctx.aac.out_buf.clearRetainingCapacity();
     }
 
-    // 逐帧头推进到「包含目标的帧」起点（≤ 目标）：若再跳过一帧就会越过目标则
-    // 停在当前帧，由上层按 position_samples 裁剪前导样本实现样本级对齐。
+    // seek 预热帧数：SBR/PS 的 QMF 与包络平滑是跨帧状态，直接跳到目标帧
+    // 会得到「零历史」首帧（可闻音色跳变）。实测顺序解码 16 帧即与连续
+    // 解码收敛（HF 噪声相位另有确定性播种，见 sbr.hfNoiseSeed），这里取
+    // 32 帧留余量（约 1.5s 音频，解码开销可忽略）；目标在曲首附近时自然
+    // 从 0 开始，与整曲参考完全一致。
+    const pre_roll_frames: u128 = 32;
+    const out_fs: u128 = ctx.aac.outFrameSamples();
+
+    // 逐帧头快速推进，直到距目标只剩 pre_roll_frames 个输出帧（不解码）。
     var guard: u32 = 0;
-    while (@as(u128, ctx.aac.pos_samples) + @as(u128, ctx.aac.frame_samples) <= target_sample) {
+    var skipped_frames: u32 = 0;
+    while (@as(u128, ctx.aac.pos_samples) + out_fs <= target_sample and
+        target_sample - (@as(u128, ctx.aac.pos_samples) + out_fs) > pre_roll_frames * out_fs)
+    {
         guard += 1;
         if (guard > 10_000_000) return error.SeekFailed;
         const fi = (try fillNextFrame(ctx)) orelse break;
-        // 跳过该帧（不解码）
         const consumed = fi.payload_off + fi.payload_len;
         std.mem.copyForwards(u8, ctx.pending.items[0 .. ctx.pending.items.len - consumed], ctx.pending.items[consumed..]);
         ctx.pending.shrinkRetainingCapacity(ctx.pending.items.len - consumed);
-        ctx.aac.pos_samples += ctx.aac.frame_samples;
+        ctx.aac.pos_samples += ctx.aac.outFrameSamples();
+        skipped_frames += 1;
     }
 
-    // 清空输出游标状态（seek 后从新位置重新解码输出）
+    // 从锚点重建历史，再顺序解码预热帧（输出丢弃）：核心 overlap 与 SBR
+    // 全部跨帧状态由此与连续解码收敛。落点 = 包含目标的帧起点（≤ 目标），
+    // 上层按 position_samples 裁剪前导样本实现样本级对齐。
+    ctx.aac.resetHistory();
+    // HF 噪声相位按「绝对帧序号」播种：跳过多少帧就接着从该序号开始，
+    // 预热帧自然推进，目标帧的噪声相位与连续解码一致（见 sbr.hfNoiseSeed）。
+    ctx.aac.frame_seq = skipped_frames;
+    guard = 0;
+    while (@as(u128, ctx.aac.pos_samples) + out_fs <= target_sample) {
+        guard += 1;
+        if (guard > 10_000_000) return error.SeekFailed;
+        const before = ctx.aac.pos_samples;
+        const ok = decodeOneFrame(ctx) catch |e| switch (e) {
+            error.Aborted, error.OutOfMemory => return e,
+            error.Corrupt => false,
+            else => return e,
+        };
+        if (!ok) break;
+        // 坏帧/无输出帧不推进位置：按帧长补进，避免死循环（与跳过语义一致）
+        if (ctx.aac.pos_samples == before) ctx.aac.pos_samples += ctx.aac.outFrameSamples();
+        ctx.aac.out_pos = 0;
+        ctx.aac.out_buf.clearRetainingCapacity();
+    }
     ctx.aac.out_pos = 0;
     ctx.aac.out_buf.clearRetainingCapacity();
 }
@@ -364,16 +395,35 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     });
 
     // chan_config=0（PCE）：布局/声道数由首帧的 program_config_element 决定。
-    // 预解码首帧以确定声道数（PCE 帧本身不产音频输出，结果留在 out_buf 供首读）。
-    if (ctx.aac.channels == 0) {
-        _ = decodeOneFrame(ctx) catch |e| {
-            if (e != error.Corrupt) return e;
-        };
+    // 预解码前几帧：确定 PCE 声道数 + HE-AAC 的 SBR/PS（输出采样率/声道可能
+    // 变化）。SBR 扩展不保证出现在第 0 帧（常见于第 0/1 帧切换），只解一帧
+    // 会把 HE-AAC 误判成 LC（半速播放、seek 整体错位）。
+    // 探测后回到第一个音频帧并清空历史，让 readImpl 从样本 0 重新解码（与
+    // 整曲参考一致）。
+    if (ctx.file_size > 0) {
+        var probe: u32 = 0;
+        while (probe < 4) : (probe += 1) {
+            const ok = decodeOneFrame(ctx) catch |e| switch (e) {
+                error.Corrupt => false,
+                else => return e,
+            };
+            if (!ok or ctx.aac.sbr_enabled) break;
+        }
+        ctx.reader.seek(@intCast(data_start), .start) catch {};
+        ctx.pending.clearRetainingCapacity();
+        ctx.input_eof = false;
+        ctx.aac.resetHistory();
+        ctx.aac.pos_samples = 0;
+        ctx.aac.out_pos = 0;
+        ctx.aac.out_buf.clearRetainingCapacity();
     }
 
     // 首帧必须可解析（校验真实数据完整性由后续读取处理）
     info.* = .{
-        .sample_rate = if (ctx.aac.sbr_enabled) ctx.aac.sample_rate * 2 else ctx.aac.sample_rate,
+        .sample_rate = if (ctx.aac.sbr_enabled)
+            @max(ctx.aac.sample_rate, ctx.aac.cfg.sample_rate * 2)
+        else
+            ctx.aac.sample_rate,
         .channels = ctx.aac.channels,
         .bits_per_sample = 16,
         .is_float = false,

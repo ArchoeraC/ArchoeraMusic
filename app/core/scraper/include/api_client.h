@@ -15,12 +15,10 @@
 ///   中文音乐源（多源并发 + 评分匹配），对中文音乐匹配率更高
 
 #include "scraper.h"
+#include "scraper_crypto.h"
 #include "scraper_log.h"
-#include <curl/curl.h>
+#include "scraper_http.h"
 #include <nlohmann/json.hpp>
-#include <openssl/evp.h>
-#include <openssl/bn.h>
-#include <openssl/rand.h>
 #include <stdexcept>
 #include <thread>
 #include <cstdio>
@@ -121,30 +119,15 @@ inline static double similarity(const std::string& a, const std::string& b) {
     return maxLen > 0 ? 1.0 - static_cast<double>(dist) / maxLen : 0.0;
 }
 
-/// URL 编码（curl_easy_escape 包装）
-inline static std::string urlEncode(const std::string& raw) {
-    CURL* curl = curl_easy_init();
-    if (!curl) return raw;
-    char* escaped = curl_easy_escape(curl, raw.c_str(), raw.size());
-    std::string result(escaped ? escaped : raw);
-    curl_free(escaped);
-    curl_easy_cleanup(curl);
-    return result;
-}
-
 /// MusicBrainz API 客户端
 class MusicBrainzClient {
 public:
     explicit MusicBrainzClient(const ScraperConfig& cfg)
         : cfg_(cfg), lastReq_(std::chrono::steady_clock::now() - std::chrono::hours(1))
     {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
 
-    ~MusicBrainzClient() {
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    ~MusicBrainzClient() = default;
 
     MusicBrainzClient(const MusicBrainzClient&) = delete;
     MusicBrainzClient& operator=(const MusicBrainzClient&) = delete;
@@ -338,16 +321,11 @@ public:
 
     bool httpGet(const std::string& url, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, body, code, err);
+        if (!ok) lastError_ = "GET 失败: " + err;
+        return ok;
     }
 
  private:
@@ -357,7 +335,7 @@ public:
         return similarity(a, b) >= 0.65;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::chrono::steady_clock::time_point lastReq_;
     std::string lastError_;
@@ -369,13 +347,9 @@ public:
     explicit CoverArtArchiveClient(const ScraperConfig& cfg)
         : cfg_(cfg)
     {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
 
-    ~CoverArtArchiveClient() {
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    ~CoverArtArchiveClient() = default;
 
     CoverArtArchiveClient(const CoverArtArchiveClient&) = delete;
     CoverArtArchiveClient& operator=(const CoverArtArchiveClient&) = delete;
@@ -403,19 +377,19 @@ public:
 private:
     bool httpGetBinary(const std::string& url, std::vector<uint8_t>& data, long* code) {
         data.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string text;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, text, code, err);
+        if (!ok) {
+            lastError_ = "GET 失败: " + err;
+            return false;
+        }
+        data.assign(text.begin(), text.end());
+        return true;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -426,13 +400,9 @@ public:
     explicit LrclibClient(const ScraperConfig& cfg)
         : cfg_(cfg)
     {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
 
-    ~LrclibClient() {
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    ~LrclibClient() = default;
 
     LrclibClient(const LrclibClient&) = delete;
     LrclibClient& operator=(const LrclibClient&) = delete;
@@ -478,19 +448,15 @@ public:
 private:
     bool httpGet(const std::string& url, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
 
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, body, code, err);
+        if (!ok) lastError_ = "GET 失败: " + err;
+        return ok;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -500,10 +466,8 @@ private:
 class DeezerClient {
 public:
     explicit DeezerClient(const ScraperConfig& cfg) : cfg_(cfg) {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
-    ~DeezerClient() { if (curl_) curl_easy_cleanup(curl_); }
+    ~DeezerClient() = default;
 
     DeezerClient(const DeezerClient&) = delete;
     DeezerClient& operator=(const DeezerClient&) = delete;
@@ -605,31 +569,28 @@ public:
 private:
     bool httpGet(const std::string& url, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, body, code, err);
+        if (!ok) lastError_ = "GET 失败: " + err;
+        return ok;
     }
 
     bool httpGetBinary(const std::string& url, std::vector<uint8_t>& data, long* code) {
         data.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string text;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, text, code, err);
+        if (!ok) {
+            lastError_ = "GET 失败: " + err;
+            return false;
+        }
+        data.assign(text.begin(), text.end());
+        return true;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -639,10 +600,8 @@ private:
 class ItunesClient {
 public:
     explicit ItunesClient(const ScraperConfig& cfg) : cfg_(cfg) {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
-    ~ItunesClient() { if (curl_) curl_easy_cleanup(curl_); }
+    ~ItunesClient() = default;
 
     ItunesClient(const ItunesClient&) = delete;
     ItunesClient& operator=(const ItunesClient&) = delete;
@@ -727,31 +686,28 @@ public:
 private:
     bool httpGet(const std::string& url, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, body, code, err);
+        if (!ok) lastError_ = "GET 失败: " + err;
+        return ok;
     }
 
     bool httpGetBinary(const std::string& url, std::vector<uint8_t>& data, long* code) {
         data.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string text;
+        std::string err;
+        const bool ok = http_.perform("GET", url, cfg_.userAgent,
+                                      cfg_.requestTimeoutMs, {}, nullptr, text, code, err);
+        if (!ok) {
+            lastError_ = "GET 失败: " + err;
+            return false;
+        }
+        data.assign(text.begin(), text.end());
+        return true;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -775,12 +731,8 @@ struct ChineseSong {
 class ChineseMusicClientBase {
 public:
     explicit ChineseMusicClientBase(const ScraperConfig& cfg) : cfg_(cfg) {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
-    virtual ~ChineseMusicClientBase() {
-        if (curl_) curl_easy_cleanup(curl_);
-    }
+    virtual ~ChineseMusicClientBase() = default;
 
     ChineseMusicClientBase(const ChineseMusicClientBase&) = delete;
     ChineseMusicClientBase& operator=(const ChineseMusicClientBase&) = delete;
@@ -879,62 +831,23 @@ protected:
     bool httpGet(const std::string& url, std::string& body, long* code,
                  const std::vector<std::pair<std::string, std::string>>& headers = {}) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        struct curl_slist* hdrList = nullptr;
-        for (const auto& h : headers) {
-            hdrList = curl_slist_append(hdrList, (h.first + ": " + h.second).c_str());
-        }
-        if (hdrList) curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, hdrList);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, nullptr);
-        if (hdrList) curl_slist_free_all(hdrList);
-        return res == CURLE_OK;
+        return request("GET", url, headers, nullptr, body, code);
     }
 
     bool httpGetBinary(const std::string& url, std::vector<uint8_t>& data, long* code) {
-        data.clear();
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, nullptr);  // 清除上次请求残留的请求头
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        return res == CURLE_OK;
+        std::string text;
+        const bool ok = request("GET", url, {}, nullptr, text, code);
+        data.assign(text.begin(), text.end());
+        return ok;
     }
 
     /// HTTP GET 二进制数据（支持自定义请求头，用于封面防盗链 Referer）
     bool httpGetBinaryWithHeaders(const std::string& url, std::vector<uint8_t>& data, long* code,
                                   const std::vector<std::pair<std::string, std::string>>& headers = {}) {
-        data.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeBinaryCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &data);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        struct curl_slist* hdrList = nullptr;
-        for (const auto& h : headers) {
-            hdrList = curl_slist_append(hdrList, (h.first + ": " + h.second).c_str());
-        }
-        if (hdrList) curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, hdrList);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, nullptr);
-        if (hdrList) curl_slist_free_all(hdrList);
-        return res == CURLE_OK;
+        std::string text;
+        const bool ok = request("GET", url, headers, nullptr, text, code);
+        data.assign(text.begin(), text.end());
+        return ok;
     }
 
     /// HTTP POST 请求
@@ -943,34 +856,25 @@ protected:
                   std::string& body, long* code,
                   const std::vector<std::pair<std::string, std::string>>& headers = {}) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl_, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, postData.c_str());
-        curl_easy_setopt(curl_, CURLOPT_POSTFIELDSIZE, static_cast<long>(postData.size()));
-
-        struct curl_slist* hdrList = nullptr;
-        for (const auto& h : headers) {
-            hdrList = curl_slist_append(hdrList, (h.first + ": " + h.second).c_str());
-        }
-        if (hdrList) curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, hdrList);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-
-        // 重置为 GET 模式并清除自定义请求头
-        curl_easy_setopt(curl_, CURLOPT_HTTPGET, 1L);
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, nullptr);
-        if (hdrList) curl_slist_free_all(hdrList);
-
-        return res == CURLE_OK;
+        return request("POST", url, headers, &postData, body, code);
     }
 
-    CURL* curl_ = nullptr;
+    /// 统一请求入口（替代原 curl 的"复用句柄 + setopt 覆盖"模型）。
+    bool request(const std::string& method, const std::string& url,
+                 const std::vector<std::pair<std::string, std::string>>& headers,
+                 const std::string* postBody, std::string& body, long* code) {
+        std::string err;
+        const bool ok = http_.perform(method, url, cfg_.userAgent, cfg_.requestTimeoutMs,
+                                      headers, postBody, body, code, err);
+        if (!ok) {
+            lastError_ = method + " 失败: " + err;
+            SCRAPER_LOGW(NULL, "[scraper] %s 失败: %s (%s)", method.c_str(),
+                         err.c_str(), url.c_str());
+        }
+        return ok;
+    }
+
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::string lastError_;
 };
@@ -1070,39 +974,21 @@ private:
     static std::string aes128ecbHex(const std::string& input, const std::string& key) {
         if (key.size() != 16) return "";
 
-        std::string padded = input;
-        unsigned char padVal = static_cast<unsigned char>(16 - input.size() % 16);
-        padded.append(padVal, static_cast<char>(padVal));
-
-        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-        if (!ctx) return "";
-        if (EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), nullptr,
-                               (const unsigned char*)key.data(), nullptr) != 1) {
-            EVP_CIPHER_CTX_free(ctx);
+        // PKCS7 填充由 Rust 后端完成；上限 = 输入 + 一个填充块。
+        std::vector<unsigned char> cipher(input.size() + 16);
+        std::size_t outLen = 0;
+        if (era_crypto_aes128_ecb_pkcs7(
+                reinterpret_cast<const unsigned char*>(key.data()),
+                reinterpret_cast<const unsigned char*>(input.data()),
+                input.size(), cipher.data(), cipher.size(), &outLen) != ERA_CRYPTO_OK) {
             return "";
         }
-        EVP_CIPHER_CTX_set_padding(ctx, 0);
-
-        unsigned char cipherBuf[8192];
-        int outLen = 0;
-        if (EVP_EncryptUpdate(ctx, cipherBuf, &outLen,
-                              (unsigned char*)padded.data(), padded.size()) != 1) {
-            EVP_CIPHER_CTX_free(ctx);
-            return "";
-        }
-        int finalLen = 0;
-        if (EVP_EncryptFinal_ex(ctx, cipherBuf + outLen, &finalLen) != 1) {
-            EVP_CIPHER_CTX_free(ctx);
-            return "";
-        }
-        outLen += finalLen;
-        EVP_CIPHER_CTX_free(ctx);
 
         std::string hex;
         hex.reserve(outLen * 2);
-        for (int i = 0; i < outLen; i++) {
+        for (std::size_t i = 0; i < outLen; i++) {
             char buf[4];
-            std::snprintf(buf, sizeof(buf), "%02X", cipherBuf[i]);
+            std::snprintf(buf, sizeof(buf), "%02X", cipher[i]);
             hex += buf;
         }
         return hex;
@@ -1255,45 +1141,40 @@ private:
     static std::string aes128cbc(const std::string& input, const std::string& key) {
         if (key.size() != 16) return "";
 
-        // PKCS7 padding
+        // 历史行为：旧实现先手动 PKCS7 补块，再交给 EVP（默认填充）补第二块，
+        // 即实际输出是**双填充**。为与已发布版本逐字节一致（单填充是否需要
+        // 改动需与网易云接口联调验证），这里保留手动补块，由 Rust 再补一次。
         std::string padded = input;
         unsigned char padVal = static_cast<unsigned char>(16 - input.size() % 16);
         padded.append(padVal, static_cast<char>(padVal));
 
         // IV = "0102030405060708"
-        unsigned char iv[16] = {0x30,0x31,0x30,0x32,0x30,0x33,0x30,0x34,
-                                0x30,0x35,0x30,0x36,0x30,0x37,0x30,0x38};
+        static const unsigned char iv[16] = {0x30,0x31,0x30,0x32,0x30,0x33,0x30,0x34,
+                                             0x30,0x35,0x30,0x36,0x30,0x37,0x30,0x38};
 
-        unsigned char cipherBuf[4096];
-        int outLen = 0, finalLen = 0;
-        EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-        if (!ctx) return "";
-
-        int ok = 1;
-        ok = ok && EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), nullptr,
-                                      reinterpret_cast<const unsigned char*>(key.data()), iv);
-        ok = ok && EVP_EncryptUpdate(ctx, cipherBuf, &outLen,
-                                     reinterpret_cast<const unsigned char*>(padded.data()),
-                                     static_cast<int>(padded.size()));
-        ok = ok && EVP_EncryptFinal_ex(ctx, cipherBuf + outLen, &finalLen);
-        EVP_CIPHER_CTX_free(ctx);
-        if (!ok) return "";
-
-        outLen += finalLen;
+        std::vector<unsigned char> cipher(padded.size() + 16);
+        std::size_t outLen = 0;
+        if (era_crypto_aes128_cbc_pkcs7(
+                reinterpret_cast<const unsigned char*>(key.data()), iv,
+                reinterpret_cast<const unsigned char*>(padded.data()), padded.size(),
+                cipher.data(), cipher.size(), &outLen) != ERA_CRYPTO_OK) {
+            return "";
+        }
 
         // Base64 encode
         static const char b64[] =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const int total = static_cast<int>(outLen);
         std::string result;
         result.reserve((outLen + 2) / 3 * 4);
-        for (int i = 0; i < outLen; i += 3) {
-            unsigned int n = static_cast<unsigned char>(cipherBuf[i]) << 16;
-            if (i + 1 < outLen) n |= static_cast<unsigned char>(cipherBuf[i + 1]) << 8;
-            if (i + 2 < outLen) n |= static_cast<unsigned char>(cipherBuf[i + 2]);
+        for (int i = 0; i < total; i += 3) {
+            unsigned int n = cipher[i] << 16;
+            if (i + 1 < total) n |= cipher[i + 1] << 8;
+            if (i + 2 < total) n |= cipher[i + 2];
             result.push_back(b64[(n >> 18) & 0x3F]);
             result.push_back(b64[(n >> 12) & 0x3F]);
-            result.push_back((i + 1 < outLen) ? b64[(n >> 6) & 0x3F] : '=');
-            result.push_back((i + 2 < outLen) ? b64[n & 0x3F] : '=');
+            result.push_back((i + 1 < total) ? b64[(n >> 6) & 0x3F] : '=');
+            result.push_back((i + 2 < total) ? b64[n & 0x3F] : '=');
         }
         return result;
     }
@@ -1310,24 +1191,19 @@ private:
             hexIn += buf;
         }
 
-        BN_CTX* ctx = BN_CTX_new();
-        BIGNUM* base = BN_new();
-        BIGNUM* exp = BN_new();
-        BIGNUM* mod = BN_new();
-        BIGNUM* res = BN_new();
-
-        BN_hex2bn(&base, hexIn.c_str());
-        BN_hex2bn(&exp, NETESE_PUB_EXPONENT);
-        BN_hex2bn(&mod, NETESE_MODULUS);
-
-        BN_mod_exp(res, base, exp, mod, ctx);
-
-        char* hexOut = BN_bn2hex(res);
-        std::string result(hexOut);
-        OPENSSL_free(hexOut);
-
-        BN_free(base); BN_free(exp); BN_free(mod); BN_free(res);
-        BN_CTX_free(ctx);
+        // RSA 裸模幂由 Rust 后端完成；输出为小写、无前导零的 hex。
+        char hexOut[512] = {0};
+        std::size_t hexLen = 0;
+        if (era_crypto_rsa_modpow_hex(hexIn.c_str(), NETESE_PUB_EXPONENT,
+                                      NETESE_MODULUS, hexOut, sizeof(hexOut),
+                                      &hexLen) != ERA_CRYPTO_OK) {
+            return "";
+        }
+        std::string result(hexOut, hexLen);
+        // 旧实现走 BN_bn2hex（大写）；保持 encSecKey 逐字节一致。
+        for (char& ch : result) {
+            if (ch >= 'a' && ch <= 'f') ch = static_cast<char>(ch - 'a' + 'A');
+        }
 
         // 补齐 256 位十六进制
         if (result.size() < 256) {
@@ -1339,7 +1215,7 @@ private:
     /// 生成 16 字节 hex 随机密钥
     static std::string generateRandomKey() {
         unsigned char buf[16];
-        RAND_bytes(buf, sizeof(buf));
+        if (era_crypto_random(buf, sizeof(buf)) != ERA_CRYPTO_OK) return "";
         std::string hex;
         for (int i = 0; i < 16; ++i) {
             char h[4];
@@ -1600,7 +1476,7 @@ private:
     /// 生成 UUID 格式的 searchid（QQ 音乐搜索请求需要）
     static std::string generateUUID() {
         unsigned char buf[16];
-        RAND_bytes(buf, sizeof(buf));
+        if (era_crypto_random(buf, sizeof(buf)) != ERA_CRYPTO_OK) return "";
         // 格式: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
         char hex[37];
         std::snprintf(hex, sizeof(hex),
@@ -1678,13 +1554,16 @@ private:
 
         std::string sig;
         {
-            unsigned char digest[EVP_MAX_MD_SIZE];
-            unsigned int len = 0;
-            EVP_Digest(raw.c_str(), raw.size(), digest, &len, EVP_md5(), nullptr);
+            unsigned char digest[16];
+            if (era_crypto_md5(reinterpret_cast<const unsigned char*>(raw.data()),
+                               raw.size(), digest) != ERA_CRYPTO_OK) {
+                return false;
+            }
             std::string hex;
-            for (unsigned int i = 0; i < len; ++i) {
+            hex.reserve(32);
+            for (unsigned char byte : digest) {
                 char buf[3];
-                std::snprintf(buf, sizeof(buf), "%02x", digest[i]);
+                std::snprintf(buf, sizeof(buf), "%02x", byte);
                 hex += buf;
             }
             sig = hex;
@@ -2091,10 +1970,8 @@ struct AcoustIDResult {
 class AcoustIDClient {
 public:
     explicit AcoustIDClient(const ScraperConfig& cfg) : cfg_(cfg) {
-        curl_ = curl_easy_init();
-        if (!curl_) throw std::runtime_error("curl_easy_init 失败");
     }
-    ~AcoustIDClient() { if (curl_) curl_easy_cleanup(curl_); }
+    ~AcoustIDClient() = default;
 
     AcoustIDClient(const AcoustIDClient&) = delete;
     AcoustIDClient& operator=(const AcoustIDClient&) = delete;
@@ -2262,27 +2139,14 @@ private:
     bool httpPost(const std::string& url, const std::string& data,
                   const std::string& contentType, std::string& body, long* code) {
         body.clear();
-        curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl_, CURLOPT_POSTFIELDS, data.c_str());
-        curl_easy_setopt(curl_, CURLOPT_POSTFIELDSIZE, static_cast<long>(data.size()));
-        curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, ::archoera::scraper::writeCb);
-        curl_easy_setopt(curl_, CURLOPT_WRITEDATA, &body);
-        curl_easy_setopt(curl_, CURLOPT_USERAGENT, cfg_.userAgent.c_str());
-        curl_easy_setopt(curl_, CURLOPT_TIMEOUT_MS, cfg_.requestTimeoutMs);
-        curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-
-        struct curl_slist* headers = nullptr;
-        std::string ctHeader = "Content-Type: " + contentType;
-        headers = curl_slist_append(headers, ctHeader.c_str());
-        curl_easy_setopt(curl_, CURLOPT_HTTPHEADER, headers);
-
-        CURLcode res = curl_easy_perform(curl_);
-        if (code) curl_easy_getinfo(curl_, CURLINFO_RESPONSE_CODE, code);
-        if (headers) curl_slist_free_all(headers);
-        return res == CURLE_OK;
+        std::string err;
+        const bool ok = http_.perform("POST", url, cfg_.userAgent, cfg_.requestTimeoutMs,
+                                      {{"Content-Type", contentType}}, &data, body, code, err);
+        if (!ok) lastError_ = "POST 失败: " + err;
+        return ok;
     }
 
-    CURL* curl_ = nullptr;
+    HttpClient http_;
     const ScraperConfig& cfg_;
     std::chrono::steady_clock::time_point lastReq_ = std::chrono::steady_clock::now();
     std::string lastError_;
@@ -2831,27 +2695,33 @@ inline std::string KuwoClient::computeCross(const std::string& token) {
     // 酷我 Cross 头算法：
     //   1. SHA1(token) → 40 字符 hex 串
     //   2. MD5(hex串) → 32 字符 hex 串（即 Cross 值）
-    unsigned char sha1Digest[EVP_MAX_MD_SIZE];
-    unsigned int sha1Len = 0;
-    EVP_Digest(token.c_str(), token.size(), sha1Digest, &sha1Len, EVP_sha1(), nullptr);
+    unsigned char sha1Digest[20];
+    if (era_crypto_sha1(reinterpret_cast<const unsigned char*>(token.data()),
+                        token.size(), sha1Digest) != ERA_CRYPTO_OK) {
+        return "";
+    }
 
     // SHA1 结果转 hex
     std::string sha1Hex;
-    for (unsigned int i = 0; i < sha1Len; ++i) {
+    sha1Hex.reserve(40);
+    for (unsigned char byte : sha1Digest) {
         char buf[3];
-        snprintf(buf, sizeof(buf), "%02x", sha1Digest[i]);
+        snprintf(buf, sizeof(buf), "%02x", byte);
         sha1Hex += buf;
     }
 
     // MD5(sha1Hex)
-    unsigned char md5Digest[EVP_MAX_MD_SIZE];
-    unsigned int md5Len = 0;
-    EVP_Digest(sha1Hex.c_str(), sha1Hex.size(), md5Digest, &md5Len, EVP_md5(), nullptr);
+    unsigned char md5Digest[16];
+    if (era_crypto_md5(reinterpret_cast<const unsigned char*>(sha1Hex.data()),
+                       sha1Hex.size(), md5Digest) != ERA_CRYPTO_OK) {
+        return "";
+    }
 
     std::string cross;
-    for (unsigned int i = 0; i < md5Len; ++i) {
+    cross.reserve(32);
+    for (unsigned char byte : md5Digest) {
         char buf[3];
-        snprintf(buf, sizeof(buf), "%02x", md5Digest[i]);
+        snprintf(buf, sizeof(buf), "%02x", byte);
         cross += buf;
     }
     return cross;

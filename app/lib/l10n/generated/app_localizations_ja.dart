@@ -13,6 +13,17 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsCatRender => 'パフォーマンス / レンダリング';
 
   @override
+  String get settingsRenderFps => '描画フレームレート';
+
+  @override
+  String settingsRenderFpsDesc({required Object fps}) {
+    return '1 秒あたりの描画上限（$fps FPS）。実際はディスプレイのリフレッシュレートに制限されます';
+  }
+
+  @override
+  String get settingsRenderFpsWarn => '高いフレームレートは GPU 負荷と消費電力を増やします';
+
+  @override
   String get settingsRenderSubtitle => 'GPU アクセラレーションとレンダリング負荷（実験的）';
 
   @override
@@ -869,6 +880,37 @@ class AppLocalizationsJa extends AppLocalizations {
   String get loginRiskTitle => 'ログインのリスクについて';
 
   @override
+  String get kugouRiskVerifyTitle => 'KuGou セキュリティ確認';
+
+  @override
+  String get kugouRiskVerifySmsDescription =>
+      'KuGou は SMS 認証を要求しています。アカウントに紐づく電話番号へ認証コードを送信しました。';
+
+  @override
+  String get kugouRiskVerifySmsHint => 'SMS 認証コード';
+
+  @override
+  String get kugouRiskVerifyCodeRequired => 'SMS 認証コードを入力';
+
+  @override
+  String get kugouRiskVerifySubmit => '認証する';
+
+  @override
+  String get kugouRiskVerifyFailed => '認証に失敗しました。コードを確認して再試行してください。';
+
+  @override
+  String get kugouRiskVerifyTcaptchaTitle => 'KuGou 公式アプリで認証を完了してください';
+
+  @override
+  String get kugouRiskVerifyTcaptchaBody =>
+      'KuGou は Tencent CAPTCHA（TCaptcha）を要求していますが、このバージョンではアプリ内に埋め込めません。KuGou 公式アプリでセキュリティ認証を完了してから、このアプリに戻って再試行してください。';
+
+  @override
+  String kugouRiskVerifyUnsupported({required int type}) {
+    return 'KuGou はセキュリティ認証（種類 $type）を要求しています。KuGou 公式アプリで完了してから再試行してください。';
+  }
+
+  @override
   String get loginRiskBody =>
       'サードパーティクライアントへのログインには以下のリスクがあります。確認のうえ続行してください：\n\n· プラットフォームはサードパーティクライアントのログインに対してリスク管理・制限・凍結を行う場合があり、アカウント異常や機能制限を引き起こす可能性があります；\n· QR / 認証情報によるログインは、お客様のアカウントで本ソフトウェアがプラットフォームへアクセスすることを許可することを意味し、お気に入り・再生・コメント等の操作は実際にお客様のアカウントに反映されます；\n· ログイン資格情報（Cookie / トークン等）は本機にのみ暗号化して保存され、開発者やプラットフォーム以外のサーバーへアップロードされることはありません；\n· 各プラットフォームの利用規約を遵守してください。本ソフトウェアの使用による一切の結果はお客様が負担します。\n\nログインを続行すると、上記のリスクを読み理解し同意したものとみなされます。';
 
@@ -1099,67 +1141,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get nekoLoginTitle => 'NekoMusic にログイン';
-
-  @override
-  String get nekoLoginTabOauth => 'OAuth ログイン';
-
-  @override
-  String get nekoOauthTitle => 'NekoAuth でログイン';
-
-  @override
-  String get nekoOauthDesc =>
-      '下記のワンタイムリンクを任意のブラウザで開いて認証してください。既定のブラウザでログインできない場合は、他のブラウザにコピーしてください。';
-
-  @override
-  String get nekoOauthOpen => 'ブラウザでログイン';
-
-  @override
-  String get nekoOauthWaiting => '認証を待っています…';
-
-  @override
-  String get nekoOauthUrlLabel => 'ワンタイムログイン URL';
-
-  @override
-  String get nekoOauthCopy => 'リンクをコピー';
-
-  @override
-  String get nekoOauthCopied => 'リンクをコピーしました';
-
-  @override
-  String get nekoOauthRefresh => '再取得';
-
-  @override
-  String get nekoOauthFailed => 'ログインに失敗しました';
-
-  @override
-  String get nekoLoginTabQr => '二次元コード';
-
-  @override
-  String get nekoLoginTabPassword => 'メールとパスワード';
-
-  @override
-  String get nekoLoginEmail => 'メール';
-
-  @override
-  String get nekoLoginPassword => 'パスワード';
-
-  @override
-  String get nekoLoginPasswordHint => 'パスワードを入力';
-
-  @override
-  String get nekoLoginSubmit => 'ログイン';
-
-  @override
-  String get nekoLoginForgotPassword => 'パスワードをお忘れですか？';
-
-  @override
-  String get nekoForgotCopyHint => 'リセットリンクをコピーしました。ブラウザで開いて再設定してください';
-
-  @override
-  String get nekoForgotFailed => 'リセットリンクの取得に失敗しました';
-
-  @override
-  String get nekoForgotOpened => 'ブラウザで再設定ページを開きました';
 
   @override
   String get nekoLoginQrHint => 'NekoMusic アプリでスキャンしてログイン';
@@ -2521,7 +2502,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsShowSubtitleOff => 'リストに別名を表示しない';
 
   @override
-  String get settingsEnergySaving => '省エネモード';
+  String get settingsEnergySaving => 'スペクトラム省電力';
 
   @override
   String get settingsEnergySavingNote =>
@@ -2532,13 +2513,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsEnergySavingOff => '現在標準モード';
-
-  @override
-  String get settingsUnloadAllMemory => '最小化時に全メモリ状態を解放';
-
-  @override
-  String get settingsUnloadAllMemorySubtitle =>
-      'バックグラウンド（最小化/トレイ/画面オフ）でページデータとキャッシュを破棄し、復帰時に再構築（ホームに戻る/スクロール位置が失われる場合あり）。再生には影響なし';
 
   @override
   String get settingsSearchEnergySavingSubtitle => 'スペクトル取得頻度を下げて CPU を節約';
@@ -3704,6 +3678,9 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
+  String get settingsBackgroundDimAuto => '画像が明るいため、下限を明るさに合わせて自動で上げています';
+
+  @override
   String get settingsBackgroundScale => 'ズームサイズ';
 
   @override
@@ -4749,12 +4726,6 @@ class AppLocalizationsJa extends AppLocalizations {
   String get shortcutActionPlayPause => '再生 / 一時停止';
 
   @override
-  String get shortcutActionPlay => '再生';
-
-  @override
-  String get shortcutActionPause => '一時停止';
-
-  @override
   String get shortcutActionStop => '停止';
 
   @override
@@ -4830,7 +4801,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get shortcutActionGoStreaming => 'ストリーミングへ';
 
   @override
-  String get shortcutActionOpenPlayer => 'プレイヤーを開く';
+  String get shortcutActionOpenPlayer => 'プレイヤーを開く / 閉じる';
 
   @override
   String get shortcutActionOpenSettings => '設定を開く';

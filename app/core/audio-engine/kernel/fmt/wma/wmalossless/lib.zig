@@ -55,8 +55,14 @@ const vtable = decoder.Decoder.VTable{
     .read = read,
     .seek_ms = seekMs,
     .position_ms = positionMs,
+    .position_samples = positionSamples,
     .deinit = deinit,
 };
+
+fn positionSamples(ctx: *anyopaque) i64 {
+    const self: *WmaLosslessCtx = @ptrCast(@alignCast(ctx));
+    return @intCast(self.cursor);
+}
 
 fn read(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const self: *WmaLosslessCtx = @ptrCast(@alignCast(ctx));

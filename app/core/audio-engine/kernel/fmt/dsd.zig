@@ -563,8 +563,19 @@ const vtable = VTable{
     .read = readImpl,
     .seek_ms = seekMsImpl,
     .position_ms = positionMsImpl,
+    .position_samples = positionSamplesImpl,
     .deinit = deinitImpl,
 };
+
+/// 输出 PCM 样本位置：DSD 每 64 bit 抽取 1 个 PCM 样本（out_rate=dsd_rate/64）。
+fn positionSamplesImpl(ctx: *anyopaque) i64 {
+    const f: *Ctx = @ptrCast(@alignCast(ctx));
+    if (f.compressed) {
+        return @intCast((@as(u64, f.frame_index) * f.dst_frame_bytes) / 8);
+    }
+    if (f.channels == 0) return 0;
+    return @intCast(f.ch_read[0] / 8);
+}
 
 fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) Error!usize {
     const f: *Ctx = @ptrCast(@alignCast(ctx));

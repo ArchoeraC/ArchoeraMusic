@@ -13,8 +13,6 @@
       ]
     },
     "taglib",
-    "curl",
-    "openssl",
     "sqlite3",
     "nlohmann-json",
     {

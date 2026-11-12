@@ -520,15 +520,31 @@ int decoder_read_frame(Decoder *d, AVFrame **out_frame)
 
 int decoder_seek_ms(Decoder *d, int64_t offset_ms)
 {
+    int64_t start_us = 0;
+    int64_t ts;
+    int ret;
     if (!d || !d->fmt_ctx) return -1;
 
-    /* 跳到目标偏移（毫秒 → AV_TIME_BASE） */
-    int64_t ts = offset_ms * 1000; /* AV_TIME_BASE 微秒 */
-    /* 用 AVSEEK_FLAG_BACKWARD 保证跳到 offset_ms 之前的关键帧 */
-    int ret = av_seek_frame(d->fmt_ctx, -1, ts, AVSEEK_FLAG_BACKWARD);
+    /* 时间线锚点：offset_ms 是**媒体相对**时间，而 FFmpeg 的 PTS/seek 时间戳
+       是**文件绝对**时间线（TS/HLS/带 edit-list 的 MP4 可能从数秒开始）。
+       av_seek_frame(-1, ts) 的 ts 必须加音频流的 start_time；否则落点整体
+       早 start_time（例如 TS 的 3.4s），随后 seek_trim 又按绝对 PTS 比较，
+       内容会一直停播在曲首/提前 start_time，音质切换的 stage 也会错位。 */
+    {
+        AVStream *st = d->fmt_ctx->streams[d->stream_index];
+        if (st && st->start_time != AV_NOPTS_VALUE) {
+            start_us = av_rescale_q(st->start_time, st->time_base,
+                                    (AVRational){1, AV_TIME_BASE});
+        } else if (d->fmt_ctx->start_time != AV_NOPTS_VALUE) {
+            start_us = d->fmt_ctx->start_time;
+        }
+    }
+    ts = start_us + offset_ms * 1000; /* AV_TIME_BASE 微秒 */
+    /* 用 AVSEEK_FLAG_BACKWARD 保证跳到目标之前的关键帧 */
+    ret = av_seek_frame(d->fmt_ctx, -1, ts, AVSEEK_FLAG_BACKWARD);
     if (ret < 0) {
-        ERA_LOGE(NULL, "%s av_seek_frame 失败 (offset=%ldms): %s\n",
-                LOG_TAG, (long)offset_ms, av_err2str(ret));
+        ERA_LOGE(NULL, "%s av_seek_frame 失败 (offset=%ldms, ts=%lldus): %s\n",
+                LOG_TAG, (long)offset_ms, (long long)ts, av_err2str(ret));
         return ret;
     }
 
@@ -536,12 +552,14 @@ int decoder_seek_ms(Decoder *d, int64_t offset_ms)
     avcodec_flush_buffers(d->dec_ctx);
     d->packet_sent = false;
 
-    /* 记录样本级对齐目标：av_seek_frame 只回退到关键帧，解码输出可能早于
-       offset_ms；decoder_read_frame 会丢弃/裁剪到该目标，保证严格从 offset
-       起（跨容器帧长差异时拼接不出现内容回退）。 */
-    d->seek_trim_us = offset_ms * 1000;
+    /* 记录样本级对齐目标：av_seek_frame 只回退到关键帧，解码输出可能早于目标；
+       decoder_read_frame 会丢弃/裁剪到该目标。目标必须是**绝对 PTS**，与
+       frame->pts 的比较口径一致。 */
+    d->seek_trim_us = ts;
 
-    ERA_LOGW(NULL, "%s 跳过 %ldms\n", LOG_TAG, (long)offset_ms);
+    ERA_LOGW(NULL, "%s 跳过 %ldms（绝对 %.3fs，start=%.3fs）\n", LOG_TAG,
+             (long)offset_ms, (double)ts / 1000000.0,
+             (double)start_us / 1000000.0);
     return 0;
 }
 

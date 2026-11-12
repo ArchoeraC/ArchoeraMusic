@@ -6,6 +6,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io' show pid;
 
 import '../log/log.dart';
 import 'platform_bindings.dart';
@@ -15,12 +16,16 @@ import 'system_deep_link.dart';
 class FfiSystemDeepLink implements SystemDeepLink {
   FfiSystemDeepLink(this._b) {
     _sub = _b.deepLinkEvents.listen((_) => _drain());
+    // 原生事件槽是单槽：deep link 信号可能被紧随其后的窗口焦点等事件覆盖。
+    // 任意平台事件都顺手补取一次 pending URI（取空后是极廉价的空检查）。
+    _anySub = _b.anyEvents.listen((_) => _drain());
     // 冷启动：apl_init 已把命令行 URI 存入桥接缓冲，这里立即取。
     _drain();
   }
 
   final PlatformBindings _b;
   StreamSubscription<AplDeepLinkEvent>? _sub;
+  StreamSubscription<void>? _anySub;
 
   /// 启动早期（`DeepLinkRouter` 尚未订阅）取回的 URI 先缓存，等首个监听者
   /// 出现再补发——否则冷启动 / 次实例早到的登录回调会被直接丢掉。
@@ -31,9 +36,13 @@ class FfiSystemDeepLink implements SystemDeepLink {
       if (_pending.isEmpty) return;
       final pending = List<Uri>.of(_pending);
       _pending.clear();
-      for (final uri in pending) {
-        _ctrl.add(uri);
-      }
+      // onListen 期间监听者可能尚未完全就绪，延到微任务再补发。
+      scheduleMicrotask(() {
+        if (_ctrl.isClosed) return;
+        for (final uri in pending) {
+          _ctrl.add(uri);
+        }
+      });
     },
   );
   final _failCtrl = StreamController<PlatformCapabilityFailure>.broadcast();
@@ -49,7 +58,8 @@ class FfiSystemDeepLink implements SystemDeepLink {
       if (uri == null) continue;
       Log.i(
         'deeplink',
-        '桥接取到 URI scheme=${uri.scheme} host=${uri.host} path=${uri.path}',
+        '桥接取到 URI pid=$pid scheme=${uri.scheme} host=${uri.host} '
+            'path=${uri.path} handoff=${uri.queryParameters.containsKey('handoff')}',
       );
       if (_ctrl.hasListener) {
         _ctrl.add(uri);
@@ -87,6 +97,7 @@ class FfiSystemDeepLink implements SystemDeepLink {
     if (_disposed) return;
     _disposed = true;
     await _sub?.cancel();
+    await _anySub?.cancel();
     await _ctrl.close();
     await _failCtrl.close();
   }

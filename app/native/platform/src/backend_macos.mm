@@ -379,7 +379,7 @@ uint32_t caps() {
     return CAP_POWER_INHIBIT | CAP_POWER_SCREEN_STATE | CAP_WINDOW_STATE |
            CAP_MEDIA_SESSION | CAP_APP_INSTANCE | CAP_SYSTEM_ACCENT |
            CAP_SYSTEM_THEME | CAP_DEEP_LINK | CAP_REVEAL_PATH | CAP_TRAY |
-           CAP_SECURE_FILE | CAP_OPEN_URL | CAP_ELEVATION;
+           CAP_SECURE_FILE | CAP_ELEVATION;
 }
 
 
@@ -402,7 +402,7 @@ int32_t init() {
              object:nil];
     // 冷启动：LaunchServices 把 URL 作为启动参数传入。
     for (NSString* arg in [[NSProcessInfo processInfo] arguments]) {
-        if ([arg hasPrefix:@"archoera://"] || [arg hasPrefix:@"nekomusic://"]) {
+        if ([arg hasPrefix:@"archoera://"]) {
             setPendingDeepLink([arg UTF8String]);
             break;
         }
@@ -574,8 +574,7 @@ int32_t deepLinkForward() {
     @autoreleasepool {
         NSString* url = nil;
         for (NSString* arg in [[NSProcessInfo processInfo] arguments]) {
-            if ([arg hasPrefix:@"archoera://"] ||
-                [arg hasPrefix:@"nekomusic://"]) {
+            if ([arg hasPrefix:@"archoera://"]) {
                 url = arg;
                 break;
             }
@@ -724,18 +723,6 @@ int32_t revealPath(const char* path) {
         }
     }
     return OK;
-}
-
-int32_t openUrl(const char* url) {
-    if (url == nullptr || *url == '\0') return ERR_STATE;
-    @autoreleasepool {
-        NSString* s = [NSString stringWithUTF8String:url];
-        if (s == nil) return ERR_STATE;
-        NSURL* u = [NSURL URLWithString:s];
-        if (u == nil) return ERR_STATE;
-        const BOOL ok = [[NSWorkspace sharedWorkspace] openURL:u];
-        return ok ? OK : ERR_BACKEND;
-    }
 }
 
 // ── 安全文件原语（POSIX open(2)）───────────────────────────────────

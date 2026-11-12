@@ -164,6 +164,8 @@ const Parsed = struct {
     elst_seg_dur: u64 = 0,
     /// elst media_time（需跳过的 priming 样本；0 = 无）
     elst_media_time: i64 = 0,
+    /// mdhd 媒体时间标度（帧偏移/时长单位；HE-AAC 为 SBR 输出率）
+    media_timescale: u32 = 0,
 };
 
 /// ALAC 逐帧解码状态（decoded/scratch 缓冲）
@@ -203,6 +205,11 @@ const M4aCtx = struct {
     skip_first: bool = false,
     /// 还需跳过的 priming 样本（elst media_time）
     skip_samples: u64 = 0,
+    /// 曲首 priming 定额（AAC；seek 回 0 时复原 skip_first/skip_samples）
+    aac_priming: u64 = 0,
+    /// AAC 实际输出采样率（HE-AAC SBR 后 = core×2；与解码器瞬时
+    /// sample_rate 解耦，seek/position 换算始终用它）
+    out_rate: u32 = 0,
     /// 输出样本上限（elst segment_duration；0 = 不限制）
     output_limit: u64 = 0,
     /// 已输出样本总数（position_ms 依据，seek 时按 frame_offsets 回填）
@@ -770,6 +777,24 @@ fn parseTrak(r: *io.Reader, trak: Box, allocator: Allocator, has_audio: *bool) E
 
     const track_id = try parseTrackId(r, trak);
 
+    // mdhd 媒体时间标度：帧偏移/时长以它为单位。隐式 SBR（HE-AAC）的 ASC
+    // 只声明核心采样率，这里的时间标度才是实际输出率（等于 2× 核心率），
+    // 元数据快路径据此校正采样率与时长，否则 HE-AAC 会报半速/双倍时长。
+    var media_timescale: u32 = 0;
+    if (try findChild(r, mdia, "mdhd")) |mdhd| {
+        var h: [24]u8 = undefined;
+        const m = try readAt(r, mdhd.data, &h);
+        if (m >= 4) {
+            media_timescale = if (h[0] == 1) blk: {
+                if (m < 24) break :blk 0;
+                break :blk std.mem.readInt(u32, h[20..24], .big);
+            } else if (m >= 16)
+                std.mem.readInt(u32, h[12..16], .big)
+            else
+                0;
+        }
+    }
+
     // 样本表可能缺失或为空：fMP4（B 站 DASH `.m4s`）的 moov 只有初始化信息，
     // 媒体样本全在 moof 分片里（open 内再扫描分片建表）。此处缺表不报 Corrupt，
     // 由 open 统一判定「无样本表且无分片」→ UnsupportedFormat（交引擎回退）。
@@ -847,6 +872,7 @@ fn parseTrak(r: *io.Reader, trak: Box, allocator: Allocator, has_audio: *bool) E
         .track_id = track_id,
         .elst_seg_dur = elst_seg_dur,
         .elst_media_time = elst_media_time,
+        .media_timescale = media_timescale,
     };
 }
 
@@ -1298,8 +1324,17 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
             ctx.st = .{ .aac = .{} }; // 定义基线：重型状态指针为 null（deinit 安全）
             try ctx.st.aac.initCommon(allocator, cfg);
             ctx.skip_first = true; // M4A AAC encoder delay：跳首帧
-            // HE-AAC（SBR）：输出为 2× 采样率，priming 也加倍
-            if (ctx.skip_samples > 0 and cfg.sbr == 1) ctx.skip_samples *= 2;
+            // 实际曲首丢弃量：SBR 首帧直接输出（0）；否则 elst priming，
+            // 缺失时 readImpl 仍会整帧丢弃首帧（= frame_samples）。seek 的
+            // 媒体↔解码时间换算必须用这个有效值，否则无 elst 的文件会偏一帧。
+            // （探测到 SBR 后下方会重新计算为 0，这里的 cfg.sbr 只是未探测
+            // 的空样本表场景基线。）
+            ctx.aac_priming = if (cfg.sbr == 1)
+                0
+            else if (ctx.skip_samples > 0)
+                ctx.skip_samples
+            else
+                ctx.st.aac.frame_samples;
         },
         else => unreachable, // 委托 codec 已在上方分支返回
     }
@@ -1308,29 +1343,63 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     // 接管 reader（按值拷贝解析后状态）
     ctx.reader = reader.*;
 
-    // chan_config=0（PCE）：布局/声道数由首帧 program_config_element 或默认布局回退决定。
-    // 预解码若干样本以确定声道数（修正元数据）；随后重置读取状态，让 readImpl
-    // 从样本 0 重新处理（含 skip_first priming 语义）。
-    if (p.codec == .aac and ctx.st.aac.channels == 0 and ctx.samples.len > 0) {
+    // AAC：预解码首帧以确定**实际输出格式**（PCE 声道、HE-AAC 的 SBR/PS 会让
+    // 采样率×2、声道 1→2）。info 必须在探测后重建：否则 HE-AAC 会按 core
+    // 采样率播放（半速），seek 的媒体↔样本换算也整体错位。探测后清空历史，
+    // 让 readImpl 从样本 0 重新解码（与整曲参考完全一致）。
+    if (p.codec == .aac and ctx.samples.len > 0) {
         var guard: usize = 0;
-        while (ctx.st.aac.channels == 0 and ctx.next_sample < ctx.samples.len and guard < 32) : (guard += 1) {
-            _ = decodeOneFrame(ctx) catch |e| {
+        var sbr_any = false;
+        // HE-AAC 的 SBR 扩展可能从第 0 或第 1 帧才出现：多解几帧探测，不能
+        // 只解首帧就判定（否则 info 仍报 core 采样率 → 半速播放/seek 错位）。
+        while (guard < 8 and ctx.next_sample < ctx.samples.len) : (guard += 1) {
+            const n = decodeOneFrame(ctx) catch |e| {
                 if (e != error.Corrupt) return e;
+                break;
             };
+            sbr_any = sbr_any or ctx.st.aac.sbr_enabled;
+            if (ctx.st.aac.sbr_enabled) break;
+            if (guard >= 3 and ctx.st.aac.channels != 0 and (n == null or n.? > 0)) break;
         }
-        if (ctx.st.aac.channels != 0) {
-            ctx.channels = ctx.st.aac.channels;
-            info.* = buildInfo(ctx, total_samples, duration_known);
-            // 重置读取状态（丢弃预解码缓冲与游标），readImpl 从头开始
-            ctx.st.aac.out_pos = 0;
-            ctx.st.aac.out_buf.clearRetainingCapacity();
-            ctx.frame_cursor = 0;
-            ctx.cur_samples = 0;
-            ctx.next_sample = 0;
-            ctx.samples_done = 0;
-            ctx.skip_first = true;
+        if (ctx.st.aac.channels != 0) ctx.channels = ctx.st.aac.channels;
+        const base_rate = ctx.st.aac.cfg.sample_rate;
+        const sbr_out = sbr_any or
+            (base_rate > 0 and ctx.st.aac.sample_rate != base_rate);
+        if (sbr_out) {
+            // 让 buildInfo 返回 SBR 输出率（2× core）：buildInfo 读的是容器
+            // CodecCfg 里的 ext_sample_rate，解码器 cfg 只是同一信息的副本，
+            // 两边都要更新，否则 info/时长/seek 换算仍停留在 core 采样率。
+            // 显式信令（AOT 5/29）的 ext_sample_rate 是权威值；隐式 SBR 只有
+            // 解码首帧（SBR 头）后才能得到实际输出率，取两者较大值即可覆盖。
+            const out_rate = @max(ctx.st.aac.sample_rate, ctx.st.aac.cfg.ext_sample_rate);
+            ctx.st.aac.cfg.ext_sample_rate = out_rate;
+            switch (ctx.codec) {
+                .aac => |*cfg| cfg.ext_sample_rate = out_rate,
+                else => {},
+            }
         }
+        // 有效 priming：SBR 解码路径**从不丢弃首帧**（readImpl 的 skip_first
+        // 分支对 sbr_enabled 直接放行），媒体时序 = 解码样本 0 起，故为 0。
+        // 只有 LC 才按 elst priming（缺失时整帧）丢弃。seek 的媒体↔样本换算
+        // 必须与 readImpl 实际丢弃量一致，否则每次定位都早/晚一帧。
+        ctx.aac_priming = if (sbr_out)
+            0
+        else if (ctx.skip_samples > 0)
+            ctx.skip_samples
+        else
+            ctx.st.aac.frame_samples;
+        ctx.st.aac.resetHistory();
+        ctx.st.aac.pos_samples = 0;
+        ctx.st.aac.out_pos = 0;
+        ctx.st.aac.out_buf.clearRetainingCapacity();
+        ctx.frame_cursor = 0;
+        ctx.cur_samples = 0;
+        ctx.next_sample = 0;
+        ctx.samples_done = 0;
+        ctx.skip_first = true;
+        info.* = buildInfo(ctx, total_samples, duration_known);
     }
+    if (p.codec == .aac) ctx.out_rate = info.sample_rate;
     return .{ .vtable = &vtable, .ctx = @ptrCast(ctx) };
 }
 
@@ -1398,7 +1467,13 @@ pub fn openMeta(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) E
     // 委托 codec / 声道待定：回退完整 open（正确性优先；仍由本会话持有释放）
     const fallback = switch (p.codec) {
         .alac => false,
-        .aac => |cfg| cfg.channels == 0,
+        // AAC 的隐式 SBR/PS 无法从 ASC 看出（只声明核心采样率）：媒体时间
+        // 标度与核心率不一致即说明输出率不同（HE-AAC 标度为 2×核心率），
+        // 此时回退完整 open 才能拿到真实输出采样率/声道与精确时长；
+        // 普通 AAC-LC（标度 == 核心率）仍走轻量快路径。
+        .aac => |cfg| cfg.channels == 0 or
+            (cfg.ext_sample_rate == 0 and p.media_timescale != 0 and
+                p.media_timescale != cfg.sample_rate),
         else => true,
     };
     if (fallback) {
@@ -2142,7 +2217,12 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     if (sampleRateOf(f) == 0) return;
     var target: u64 = 0;
     if (ms > 0) {
-        target = @min((@as(u128, @intCast(ms)) * sampleRateOf(f)) / 1000, samplesTotal(f));
+        // 媒体时间 → 解码帧时间：AAC 的 elst priming 样本在媒体 0 之前，
+        // frame_offsets 是**解码样本**偏移。seek 目标须加 priming，否则每次
+        // 定位都早 priming 个样本（切档后整体错位/顿挫）。
+        target = @min((@as(u128, @intCast(ms)) * sampleRateOf(f)) / 1000 +
+                      @as(u128, if (f.codec == .aac) f.aac_priming else 0),
+                      samplesTotal(f));
     }
     // 二分定位最大 k：frame_offsets[k] <= target（整帧对齐，精确到帧边界）
     var lo: usize = 0;
@@ -2153,7 +2233,53 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     }
     f.frame_cursor = f.cur_samples; // 丢弃未输出帧
     f.next_sample = lo;
-    f.samples_done = f.frame_offsets[lo];
+    f.samples_done = if (f.codec == .aac)
+        f.frame_offsets[lo] -| f.aac_priming
+    else
+        f.frame_offsets[lo];
+    if (f.codec == .aac) {
+        // AAC：seek 后必须重建跨帧状态。先清空历史，再解码目标的前一帧
+        // （丢弃输出）→ 目标帧的 IMDCT overlap 与整曲连续解码一致。
+        // 否则新开解码器直接跳到目标帧会得到「零 overlap 首帧」，跨档拼接
+        // 处（尤其无损 ↔ 有损）出现可闻顿挫。
+        f.st.aac.resetHistory();
+        f.frame_cursor = 0;
+        f.cur_samples = 0;
+        if (lo > 0) {
+            // 预热帧数：AAC-LC 只需上一帧重建 IMDCT overlap；HE-AAC 的 SBR/PS
+            // 有跨帧的 QMF/包络平滑状态，顺序解码 16 帧即收敛（实测），这里
+            // 取 32 帧留余量（否则切档后高频包络会跳变）。
+            const pre: usize = if (f.st.aac.sbr_enabled) 32 else 1;
+            const p0 = if (lo > pre) lo - pre else 0;
+            // HF 噪声相位按绝对帧序号播种（sbr.hfNoiseSeed）：锚点序号 = p0，
+            // 预热帧自然推进到目标帧，与从曲首连续解码的相位一致。
+            f.st.aac.frame_seq = @intCast(p0);
+            var pi = p0;
+            while (pi < lo) : (pi += 1) {
+                f.next_sample = pi;
+                _ = decodeOneFrame(f) catch |e| switch (e) {
+                    error.Aborted, error.OutOfMemory => return e,
+                    else => {},
+                };
+            }
+            f.frame_cursor = 0;
+            f.cur_samples = 0;
+            f.next_sample = lo;
+            // 目标帧仍可能落在 priming 区内（priming 跨帧）：只扣剩余部分。
+            if (f.frame_offsets[lo] < f.aac_priming) {
+                f.skip_first = true;
+                f.skip_samples = f.aac_priming - f.frame_offsets[lo];
+            } else {
+                f.skip_first = false;
+                f.skip_samples = 0;
+            }
+        } else {
+            // 回到曲首：复原 priming 语义（与首次从 0 播放一致）。
+            f.skip_first = true;
+            f.skip_samples = f.aac_priming;
+        }
+        f.samples_done = f.frame_offsets[lo] -| f.aac_priming;
+    }
 }
 
 /// positionMs 目标上限（总样本数）
@@ -2161,7 +2287,7 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
 fn sampleRateOf(f: *const M4aCtx) u32 {
     return switch (f.codec) {
         .alac => |c| c.sample_rate,
-        .aac => f.st.aac.sample_rate,
+        .aac => if (f.out_rate > 0) f.out_rate else f.st.aac.sample_rate,
         else => f.sample_rate,
     };
 }

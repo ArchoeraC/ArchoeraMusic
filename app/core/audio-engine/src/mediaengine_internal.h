@@ -48,6 +48,14 @@ int era_mediaengine_mem_window(ArchoeraMediaEngine *e, int end_pos_ms,
 /** 内存会话重建计数（seek 重建 +1）；NULL 返回 -1。 */
 int era_mediaengine_mem_epoch(ArchoeraMediaEngine *e);
 
+/**
+ * stage[0] 的媒体时间：PCM 回调的 `position_ms` 是**本块起始**（见
+ * `pipeline.c::process_dsp_chain`），stage 缓冲也从本块首样本开始，故直接
+ * 返回块起点。白盒回归：旧实现再减一个块时长，commit 时多丢一块暂存数据，
+ * 切档后声音相对进度条前跳约一个解码块（MP3/AAC ≈ 20~26ms，FLAC 更大）。
+ */
+double era_mediaengine_stage_block_origin_ms(double block_start_ms);
+
 #ifdef __cplusplus
 }
 #endif

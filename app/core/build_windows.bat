@@ -36,6 +36,17 @@ set "VCPKG_PREFIX=%ROOT%..\vcpkg_installed\%TRIPLET%"
 if "%VCPKG_ROOT%"=="" set "VCPKG_ROOT=C:\vcpkg"
 set "VCPKG_TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
 
+rem ── 设置搜索索引：由设置源码生成（声明式，无需手工登记）─────────────
+rem 必须在 flutter build / dart analyze 之前生成，否则索引会落后于设置页。
+where dart >nul 2>nul
+if %ERRORLEVEL%==0 (
+    echo [build_windows] ===== 生成设置搜索索引 =====
+    pushd "%ROOT%.."
+    call dart run tool\gen_settings_search_index.dart
+    if errorlevel 1 ( popd & echo ::error::设置搜索索引生成失败 & exit /b 1 )
+    popd
+)
+
 echo [build_windows] vcpkg prefix: %VCPKG_PREFIX%
 echo [build_windows] vcpkg toolchain: %VCPKG_TOOLCHAIN%
 
