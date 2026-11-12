@@ -2890,6 +2890,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLogToFileNote => '单文件，上限 4 MiB（原地截断，不产生额外文件）。';
 
   @override
+  String get settingsSearchQueryLog => '搜索查询日志';
+
+  @override
+  String get settingsSearchQueryLogOn => '记录本机查询关键词，用于改进搜索质量（可随时清除）';
+
+  @override
+  String get settingsSearchQueryLogOff => '日志写入磁盘已关闭，不记录查询';
+
+  @override
+  String get settingsSearchQueryLogCleared => '已清除搜索查询日志';
+
+  @override
   String get settingsSecuritySection => '安全销毁';
 
   @override
@@ -9118,6 +9130,18 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsLogToFileNote => '单文件，上限 4 MiB（原地截断，不产生额外文件）。';
 
   @override
+  String get settingsSearchQueryLog => '搜索查询日志';
+
+  @override
+  String get settingsSearchQueryLogOn => '记录本机查询关键词，用于改进搜索质量（可随时清除）';
+
+  @override
+  String get settingsSearchQueryLogOff => '日志写入磁盘已关闭，不记录查询';
+
+  @override
+  String get settingsSearchQueryLogCleared => '已清除搜索查询日志';
+
+  @override
   String get settingsSecuritySection => '安全销毁';
 
   @override
@@ -15344,6 +15368,18 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsLogToFileNote => '單一檔案，上限 4 MiB（原地截斷，不產生額外檔案）。';
+
+  @override
+  String get settingsSearchQueryLog => '搜尋查詢日誌';
+
+  @override
+  String get settingsSearchQueryLogOn => '記錄本機查詢關鍵字，用於改進搜尋品質（可隨時清除）';
+
+  @override
+  String get settingsSearchQueryLogOff => '日誌寫入磁碟已關閉，不記錄查詢';
+
+  @override
+  String get settingsSearchQueryLogCleared => '已清除搜尋查詢日誌';
 
   @override
   String get settingsSecuritySection => '安全銷毀';

@@ -19,6 +19,7 @@ import 'services/platform/platform_capabilities.dart';
 import 'services/deeplink/deep_link_router.dart';
 import 'services/power/frame_governor.dart';
 import 'services/scanner/sqlite_preload.dart';
+import 'services/search/query_log_file.dart';
 import 'services/streaming/streaming_store.dart';
 import 'stores/app_prefs.dart';
 import 'stores/data_dir.dart';
@@ -58,6 +59,9 @@ Future<void> main(List<String> args) async {
     level: _logLevelFromEnv(),
     fileEnabled: prefs.logToFile,
   );
+  // 查询日志（本机 JSONL，供 T2-7 助词容错矩阵分析）：与「日志落盘」同一开关，
+  // 关闭时不装配 sink（记录调用变成零成本 no-op）。
+  QueryLogger.configure(dataDir: resolveDataDir(), prefs: prefs);
   // 未捕获异常纳入 ERROR（含 isolate/Flutter 框架错误）。不再调 presentError：
   // 完整异常+栈已由统一日志输出，presentError 会经 debugPrint 再打一遍造成重复。
   FlutterError.onError = (details) {

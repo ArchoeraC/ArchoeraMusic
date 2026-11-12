@@ -245,9 +245,12 @@ public sealed class FtsStore : IIndexStoreAdmin
     }
 
     /// <summary>
-    /// **候选集上限**（宽命中查询的工作量上界；0 = 不限）。与 Dart 侧
-    /// `SearchIndex.defaultCandidateCap` 是同一个策略：先按 rowid 顺序取有界候选（无排序、
-    /// 可提前退出），再只给这批候选做 bm25 排序——`ORDER BY bm25` 否则要给**全部命中**打分。
+    /// **候选集上限**（历史参数，已不再裁剪候选；0 = 不限）。
+    ///
+    /// ⚠ 2026-11-12 撤销：原实现「子查询取有界候选 + 外层排序」会让 FTS5 的
+    /// <c>bm25()</c> 在无 <c>MATCH</c> 的外层查询里静默返回 0，相关性排序整体失效。
+    /// 该常量与 <c>Search</c> 的 <c>candidateCap</c> 参数仅为 ABI / 请求 JSON 兼容保留，
+    /// 排序一律走「含 MATCH 的全命中 bm25 排序」（现实现更快且正确）。
     /// </summary>
     public const int DefaultCandidateCap = 5000;
 
@@ -261,26 +264,23 @@ public sealed class FtsStore : IIndexStoreAdmin
         var weights = string.Join(", ", Bm25Weights.Select(
             w => w.ToString(CultureInfo.InvariantCulture)));
         using var cmd = conn.CreateCommand();
-        // candidateCap > 0：先取有界候选再排序；= 0：原路径（全部命中打分），供对照。
-        cmd.CommandText = candidateCap > 0
-            ? $"""
-                SELECT rowid, bm25(search_fts, {weights}) AS score
-                FROM search_fts
-                WHERE rowid IN (
-                    SELECT rowid FROM search_fts WHERE search_fts MATCH @q LIMIT @cap
-                )
-                ORDER BY score
-                LIMIT @limit OFFSET @offset
-                """
-            : $"""
-                SELECT rowid, bm25(search_fts, {weights}) AS score
-                FROM search_fts
-                WHERE search_fts MATCH @q
-                ORDER BY score
-                LIMIT @limit OFFSET @offset
-                """;
+        // bm25 排序必须在**含 `MATCH` 的查询块内**求值——FTS5 的 `bm25()` 在
+        // `rowid IN (SELECT ... MATCH ...)` 这种外层不匹配的写法里**静默返回 0**，
+        // 结果退化为 rowid 顺序而**不报错**（相关性排序整体失效）。
+        //
+        // 历史教训：candidateCap 最初是为了「先取有界候选再排序」省成本，但它用
+        // `WHERE rowid IN (子查询)` 实现，正好踩中上述语义 → 排序失效，且实测并不更快
+        // （宽命中时子查询要跑满一遍才 LIMIT，反而更慢）。故该机制已移除，
+        // 排序交给 FTS5 全命中打分 —— 实测比错误写法更快且结果正确。
+        // candidateCap 参数保留在 ABI 上以兼容旧调用方，但语义上不再裁剪候选。
+        cmd.CommandText = $"""
+            SELECT rowid, bm25(search_fts, {weights}) AS score
+            FROM search_fts
+            WHERE search_fts MATCH @q
+            ORDER BY score
+            LIMIT @limit OFFSET @offset
+            """;
         cmd.Parameters.AddWithValue("@q", matchExpr);
-        if (candidateCap > 0) cmd.Parameters.AddWithValue("@cap", candidateCap);
         cmd.Parameters.AddWithValue("@limit", limit <= 0 ? -1 : limit);
         cmd.Parameters.AddWithValue("@offset", offset < 0 ? 0 : offset);
 
@@ -293,8 +293,7 @@ public sealed class FtsStore : IIndexStoreAdmin
 
     /// <summary>批量把 <c>doc_id</c> 映射回 <c>track_id</c>（查询结果组装用）。</summary>
     public Dictionary<long, string> ResolveTrackIds(IReadOnlyCollection<long> docIds)
-    {
-        var map = new Dictionary<long, string>(docIds.Count);
+    {        var map = new Dictionary<long, string>(docIds.Count);
         if (docIds.Count == 0) return map;
 
         var conn = EnsureOpen();

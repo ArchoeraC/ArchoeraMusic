@@ -55,7 +55,8 @@
 **本地曲库搜索索引（indexer）依赖与设计参考**（许可逐项见 `app/core/indexer/THIRD-PARTY-LICENSES.md`）：
 
 - **[ToolGood.Words](https://github.com/toolgood/ToolGood.Words)（Apache-2.0）** —— 汉字转拼音（含**词级多音字消歧**）、繁简互换、全角半角互换；索引器**直接依赖**
-- **Unicode [Unihan](https://www.unicode.org/reports/tr38/) 数据库 `kDefinition`（Unicode License）** —— 跨语言检索「汉字 ↔ 英文释义」查询扩展的数据来源
+- **Unicode [Unihan](https://www.unicode.org/reports/tr38/) 数据库 `kDefinition` / `kJapanese` / `kSimplifiedVariant` + `kJapaneseOldVariant`（Unicode License）** —— 跨语言检索「汉字 ↔ 英文释义」查询扩展、日文音训读、异体字折叠的数据来源
+- **Unicode NFD 规范分解（Unicode License）** —— 拉丁去音符号折叠表 `data/accent_fold.tsv`
 - **[SQLite FTS5](https://www.sqlite.org/fts5.html)（公有领域）** —— 全文索引 / `bm25()` 排序的存储引擎
 - 分析器 / 分词 / 排序的**设计对照参考**：[KDE Baloo](https://invent.kde.org/frameworks/baloo) + [KFileMetaData](https://invent.kde.org/frameworks/kfilemetadata)（LGPL-2.1+）、[Groonga](https://groonga.org)（LGPL-2.1）`TokenBigram`、[Apache Lucene](https://lucene.apache.org)（Apache-2.0）`CJKBigramFilter`、[Xapian](https://xapian.org)（GPL-2.0+）`CJK_NGRAM`、以及 [SPlayer-Next](https://github.com/SPlayer-Dev/SPlayer-Next) 的 KDE Searcher 用法 —— **仅对照其思路**，本项目分析器为**自研实现，未复制其代码**（标注 GPL/LGPL 者只作理念参考，不引入其源码）
 

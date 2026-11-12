@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/log/log.dart';
 import '../services/mcp/mcp_key_store.dart';
 import '../services/playback/playback_session.dart';
+import '../services/search/query_log_file.dart';
 import 'data_dir.dart';
 import 'prefs_mcp.dart';
 import 'prefs_app.dart';
@@ -140,6 +141,8 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state = state.copyWithLogToFile(value);
     state.save();
     Log.setFileEnabled(value);
+    // 查询日志与「日志落盘」同一开关：关闭即停止记录（不装配 sink）。
+    QueryLogger.setEnabled(value, dataDir: resolveDataDir());
   }
 
   /// 设置解码引擎（'stable' = FFmpeg 稳定默认 / 'eraudio' = 自研实验性）。

@@ -381,7 +381,9 @@ internal static class SearchQuery
         if (terms.Count == 0) return null;
         var body = QuotedAnd(terms, terms[^1].Length >= MinInitialsPrefixLength);
         // 整体加括号：列过滤与 OR 混排时边界更明确（列过滤只作用于本支）。
-        return $"({InitialsColumns} : {body})";
+        // 注意多列过滤必须用**花括号**：FTS5 的 `a b : expr` 是「列 a 后接词元 b」，
+        // 不是列集合，会静默返回空集（本分支因此从不命中）。
+        return $"({{{InitialsColumns}}} : {body})";
     }
 
     private static string? CrossLingualBranch(IReadOnlyList<string> terms)

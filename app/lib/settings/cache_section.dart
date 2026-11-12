@@ -12,6 +12,7 @@ import '../../apis/runtime.dart';
 import '../../l10n/l10n.dart';
 import '../../services/cache/song_cache.dart';
 import '../../services/liked/liked_cache.dart';
+import '../../services/search/query_log_file.dart';
 import '../../stores/app_prefs.dart';
 import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/s_dialog.dart';
@@ -462,6 +463,28 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
                   : l10n.settingsLogToFileOff,
               value: prefs.logToFile,
               onChanged: (v) => notifier.setLogToFile(v),
+            ),
+            // 查询日志（本机 JSONL）：为搜索质量调优采集，可随时清除。
+            SettingTile(
+              icon: EtaIcons.search3,
+              title: l10n.settingsSearchQueryLog,
+              subtitle: prefs.logToFile
+                  ? l10n.settingsSearchQueryLogOn
+                  : l10n.settingsSearchQueryLogOff,
+              enabled: prefs.logToFile,
+              trailing: SizedBox(
+                height: 28,
+                child: TextButton(
+                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  onPressed: prefs.logToFile
+                      ? () {
+                          QueryLogger.clear();
+                          toast(l10n.settingsSearchQueryLogCleared);
+                        }
+                      : null,
+                  child: Text(l10n.commonClear, style: const TextStyle(fontSize: 12)),
+                ),
+              ),
             ),
           ],
         ),

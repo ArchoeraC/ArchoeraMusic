@@ -2919,6 +2919,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsLogToFileNote => '단일 파일, 최대 4 MiB (제자리에서 잘라냄, 추가 파일 없음).';
 
   @override
+  String get settingsSearchQueryLog => '검색 쿼리 로그';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      '검색 품질 개선을 위해 이 기기에 쿼리 키워드를 기록합니다(언제든지 지울 수 있음)';
+
+  @override
+  String get settingsSearchQueryLogOff => '로그 파일 저장이 꺼져 있어 쿼리를 기록하지 않습니다';
+
+  @override
+  String get settingsSearchQueryLogCleared => '검색 쿼리 로그를 지웠습니다';
+
+  @override
   String get settingsSecuritySection => '안전 파기';
 
   @override

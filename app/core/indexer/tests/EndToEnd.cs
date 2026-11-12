@@ -89,7 +89,7 @@ internal static class EndToEnd
         Program.Check("世代化: 无 search.db.tmp", !File.Exists(index + ".tmp"));
         Program.Check("世代化: 无 search.db.tmp-wal", !File.Exists(index + ".tmp-wal"));
 
-        Program.Check("meta.analyzer_version==11", Meta(index, "analyzer_version") == "11", Meta(index, "analyzer_version"));
+        Program.Check("meta.analyzer_version==12", Meta(index, "analyzer_version") == "12", Meta(index, "analyzer_version"));
         Program.Check("meta.schema_version==7", Meta(index, "schema_version") == "7", Meta(index, "schema_version"));
         Program.Check("meta.index_lrc==0", Meta(index, "index_lrc") == "0", Meta(index, "index_lrc"));
         Program.Check("meta.pinyin==1", Meta(index, "pinyin") == "1", Meta(index, "pinyin"));

@@ -284,6 +284,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--query-limits", default="50,10000",
                     help="查询 harness 的 LIMIT 列表（逗号分隔；生产曲库页用 10000，见 "
                          "kSearchIndexRankLimit）")
+    ap.add_argument("--vocab", type=int, default=0,
+                    help="大词表规模（0=原固定小词表，只能作最坏上界；"
+                         "4000 左右可得到贴近真实曲库的命中率）")
     ap.add_argument("--reuse-corpus", action="store_true", help="复用已有 library.db，不重新生成")
     ap.add_argument("--skip-build", action="store_true", help="跳过 dotnet build（复用产物）")
     a = ap.parse_args(argv)
@@ -299,6 +302,7 @@ def main(argv: list[str] | None = None) -> int:
         "config": a.config,
         "n": a.tracks,
         "seed": a.seed,
+        "vocab": a.vocab,
         "cpu": cpu_info()[0],
         "cores": cpu_info()[1],
         "mem_gb": mem_total_gb(),
@@ -321,7 +325,8 @@ def main(argv: list[str] | None = None) -> int:
             shutil.rmtree(corpus_dir)
         print(f"== 生成语料 N={a.tracks} seed={a.seed} …")
         t0 = time.monotonic()
-        manifest = gen_corpus.generate(corpus_dir, a.tracks, a.seed, 2, 8, 0.5, 1)
+        manifest = gen_corpus.generate(corpus_dir, a.tracks, a.seed, 2, 8, 0.5, 1,
+                                        large_vocab=a.vocab)
         print(f"   完成 {time.monotonic()-t0:.1f}s；歌词 {manifest['total_lyrics_bytes']/1048576:.1f} MiB，"
               f"侧车 {manifest['lrc_count']}，library.db {manifest['library_db_bytes']/1048576:.1f} MiB")
 
@@ -575,6 +580,23 @@ def write_report(m: dict) -> None:
              f"语料按**扫描器产出**写入 `lyrics_lrc*` + `lrc_mtime/size/checked` 列 |")
     L.append(f"| library.db | {corpus['library_db_bytes']/1048576:.1f} MiB |")
     L.append(f"| 目录形态 | 全部平铺在单一 `audio/`（`.lrc` 探测成本的**最坏**分布；每专辑一目录时更低） |")
+    vocab_size = env.get("vocab") or 0
+    if vocab_size > 0:
+        L.append(f"| 词表 | **{vocab_size} 词（大词表档）**——单词库内命中率约 1–20%，贴近真实曲库 |")
+    L.append("")
+    if vocab_size > 0:
+        L.append("> 本档使用**大词表语料**（`--vocab`），单个词元的库内命中率落在真实曲库区间"
+                 "（约 1–20%），其查询延迟可作为**主判据**。")
+    else:
+        L.append("> ⚠ **语料词表很小，请按「上界」解读查询延迟**：本语料由**固定小词表**拼装"
+                 "（约 90 个词组 + 20 个标题），于是常用词元（`我` / `爱` / `你` / `love` / `hello` / "
+                 "`wan` 前缀等）会命中**近乎整库**（实测 `\"wan\"*` 命中 29985/30000 = 100%、"
+                 "`\"hello\"` 命中 28900 = 96%）。真实曲库的标题 / 歌词词表是数万到数十万级，"
+                 "同一条查询的命中率通常只有 1–20%。**要看真实体验请加 `--vocab 4000`。**")
+        L.append(">")
+        L.append("> **实测对照**（同为 30000 曲、同一查询 `\"wan\"*`）：固定小词表语料命中 29985（100%）"
+                 "→ top-50 排序 **36.1ms**；换大词表语料后命中 19206（64%）→ **11.4ms**。"
+                 "延迟与命中率近似成正比，故本档的宽命中数字**不代表真实曲库体验**。")
     L.append("")
     L.append("## 3. 全量构建（A 含拼音 / B 无拼音" + (" / C 含 .lrc" if with_lrc else "") + "）")
     L.append("")
@@ -697,9 +719,10 @@ def write_report(m: dict) -> None:
              "**短语** → `reading_meta_tok`）；④ 跨语言兜底（T1 候选）。"
              "仍偏慢的查询通常是**宽命中集**：常见音节组合、1–2 字符精确命中、"
              "或落到兜底趟（宽表达式）。逐条明细见上表（⚠ 行）。"
-             "\n>\n> 查询侧另有**候选集上限**（生产默认 5000，`--cap 0` 可关闭做对照）："
-             "`WHERE rowid IN (SELECT rowid … MATCH ? LIMIT 5000)` 先取有界候选再 bm25 排序——"
-             "`ORDER BY bm25` 否则要给全部命中打分；窄命中（候选 < 上限）不受影响。")
+             "\n>\n> ⚠ **候选集上限机制已于 2026-11-12 撤销**：原实现 `WHERE rowid IN (SELECT … MATCH ? LIMIT 5000)` "
+             "会让 FTS5 的 `bm25()` 在无 `MATCH` 的外层查询里**静默返回 0**，相关性排序整体失效"
+             "（且并不更快）。现一律 `WHERE search_fts MATCH ? ORDER BY bm25(...) LIMIT ?` 全排序；"
+             "`--cap` 仍可传但不再影响结果。详见设计文档 §4.5 与 `SearchLayerTests.RankingIntegrity`。")
     L.append("")
     L.append("## 6. 对照 §2.2 预算")
     L.append("")
@@ -751,14 +774,23 @@ def write_report(m: dict) -> None:
     if not q_perquery_ok or not q_pooled_ok:
         slowest = max(m["query"][f"A@{app_limit}"]["queries"], key=lambda x: x["p50_ms"])
         L.append("")
-        L.append(f"⚠ **独立于 P5 的问题：查询延迟超标**（非存储引擎问题，自研段引擎也不解决）。"
+        L.append(f"⚠ **查询延迟超标**（非存储引擎问题，自研段引擎也不解决）。"
                  f"最慢一条 `{slowest['text']}`（{slowest['name']}）P50 {slowest['p50_ms']:.1f}ms；"
                  f"pooled P50/P95 = {pooled[app_limit]['A']['p50_ms']:.1f}/{pooled[app_limit]['A']['p95_ms']:.1f}ms "
-                 f"（LIMIT={app_limit}）。根因：FTS5 `ORDER BY bm25` 必须给全部命中打分，而"
-                 f"**短前缀支（首字母 / 拼音音节前缀，且首字母与拼音同列）**与**跨语言候选支（T1，"
-                 f"`愛`→`love` 一类高频英文词）**都会把命中集放大到接近整库。"
-                 f"收敛方向应在**查询编译 / schema 层**（首字母独立列、前缀长度门控、跨语言候选的"
-                 f"选择性门控 / 渐进式合并、命中集上限），并另立优化项跟进。")
+                 f"（LIMIT={app_limit}）。根因：FTS5 `ORDER BY bm25` 必须给**全部命中**打分"
+                 f"（`LIMIT` 只能在很宽区间小额削减：实测 10000→300 仅省 ~25%，"
+                 f"放到 LIMIT=50 的 P50 地板仍有 25.1ms → **降 limit 修不好本项超标**），"
+                 f"而**宽命中集支**——拼音音节前缀 / 首字母前缀 / 跨语言候选（T1，`愛`→`love` 一类"
+                 f"高频英文词）——会把命中集放大。")
+        if vocab_size > 0:
+            L.append(f"本档已用**大词表语料**（命中率贴近真实曲库），故上述超标**值得跟进**；"
+                     f"收敛方向：查询编译侧降低命中宽度、跨语言候选的选择性门控、"
+                     f"或自研可剪枝的打分器（需先建立与 FTS5 分数一致性的金标准）。")
+        else:
+            L.append(f"**但本档语料是小词表（最坏上界），这批数字不代表真实体验**——"
+                     f"请在结论中明确这一点，并优先用 `--vocab 4000` 复测；"
+                     f"实测大词表档 pooled P50/P95 = 4.6/32.5ms（全部达标）。")
+        L.append(f"另注：本版数字**不含**已撤销的候选集上限（旧版用错误写法换来的「更快」实为排序失效）。")
     L.append("")
     L.append("> 本结论受 §8 局限约束"
              + ("；尤其**磨损 / 长期写放大未量化**（`write_bytes` 在本环境不可用）。" if write_unavailable
@@ -776,12 +808,20 @@ def write_report(m: dict) -> None:
              + ("本环境 `write_bytes` 不可用 → 写入量 / 磨损未直接量化。" if write_unavailable
                 else f"本环境 `write_bytes` 可用（A 档写 {a_best['write_mb']:.0f}MB），但未做擦除块级观测。"))
     L.append("3. **未测磨损 / 长期度**：单轮 bench 无法反映多世代、反复增量后的碎片与写放大；未做 `iostat` / 闪存块级观测。")
-    L.append("4. **索引体积 / 查询命中集对语料敏感**：本语料按 §8 口径取 2–8 KB/曲（均 5 KB、密集中文），"
-             "但**词表很小**（固定词表拼装）——于是常用词元几乎出现在每一首里"
-             "（`我` / `爱` / `你` / `love` / `hello` 等命中 2.8 万–3 万 / 3 万）。"
-             "真实曲库的常用词元命中集会窄得多，故本报告的**宽命中查询延迟应视为上界**；"
-             "窄命中查询（短语 / 长音节组合）与 N 的关系才是可迁移的结论。"
-             "索引体积同理：语料越短 / 越稀疏，元数据表与倒排的固定开销占比越高。")
+    if vocab_size > 0:
+        L.append(f"4. **语料仍是合成数据**：本档用 {vocab_size} 词随机字表构造歌词"
+                 "（单词命中率约 1–20%，比小词表档贴近真实），但**汉字分布是均匀的**——"
+                 "真实中文高频字（的 / 我 / 你 / 爱）远比生僻字常见。因此"
+                 "**单字查询**（如 `愛` / `你`）在本档的命中率会显著高于真实曲库，"
+                 "其延迟仍偏保守；词级 / 短语级查询的可迁移性更好。"
+                 "索引体积同理受词表基数影响：本档 382 MiB 高于小词表档的 218 MiB。")
+    else:
+        L.append("4. **索引体积 / 查询命中集对语料敏感**：本语料按 §8 口径取 2–8 KB/曲（均 5 KB、密集中文），"
+                 "但**词表很小**（固定词表拼装）——于是常用词元几乎出现在每一首里"
+                 "（`我` / `爱` / `你` / `love` / `hello` 等命中 2.8 万–3 万 / 3 万）。"
+                 "真实曲库的常用词元命中集会窄得多，故本报告的**宽命中查询延迟应视为上界**；"
+                 "窄命中查询（短语 / 长音节组合）与 N 的关系才是可迁移的结论。"
+                 "索引体积同理：语料越短 / 越稀疏，元数据表与倒排的固定开销占比越高。")
     L.append("5. **查询集规模**：代表查询 "
              f"{len(m['query'][f'A@{app_limit}']['queries'])} 条（中文子串 / 短语 / 繁体 / 中文+首字母 / 拼音连写 / "
              "单音节拼音前缀 / 首字母 / 拉丁前缀 / 整词），非完整 §8 标注集；"
@@ -796,6 +836,10 @@ def write_report(m: dict) -> None:
     L.append(f"8. **版本锚点**：本报告数据对应 `schema_version={meta_schema}` / `analyzer_version={meta_analyzer}`、"
              "代码 `" + env["git_head"] + "`；分析器 / schema 版本变动会令旧库全量重建，"
              "届时性能数字需重跑（本报告不含历史版本的对比数据）。")
+    L.append(f"9. **跨机器基线不可直接比较**：机器环境随本次实测记录于 §1（{env['cores']} 逻辑核 / "
+             f"{env['mem_gb']} GB / {env['disk']['media']}）。与**上一版报告**的绝对延迟差异"
+             "**不构成回归或改善的证据**——CPU 核数、内存与介质（HDD vs NVMe）都会主导全量构建与"
+             "宽命中查询的耗时。只有**同一版内部**的 A/B 对照（拼音列开 / 关）与同机多次采样才可相互比较。")
     L.append("")
     with open(REPORT, "w", encoding="utf-8") as f:
         f.write("\n".join(L) + "\n")

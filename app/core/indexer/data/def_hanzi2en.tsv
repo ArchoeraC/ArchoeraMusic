@@ -1,7 +1,7 @@
 # Archoera indexer Unihan 释义查询扩展：汉字码点 → 英文词列表（T1，查询侧用）
 # 来源: Unicode Unihan kDefinition（Unicode License，https://www.unicode.org/license.txt）
 # 字段: HEXCODE<TAB>WORD1 WORD2 ...；WORD 去重、字典序
-# 生成: tools/gen_hanzi_data.py gen_hanzi_defs()（去括注/小写/停用词过滤，确定可重跑）
+# 生成: tools/gen_tables（去括注/小写/停用词过滤，确定可重跑）
 3400	hillock mound
 3401	bamboo bark lick mat taste
 3402	enjoy joyful like love thing

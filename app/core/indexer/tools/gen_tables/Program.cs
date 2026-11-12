@@ -31,13 +31,24 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using ToolGood.Words;
+using Archoera.Indexer.Tools;
 
 const string accentOutput = "data/accent_fold.tsv";
 const string variantOutput = "data/variant_fold.tsv";
+const string nfkcOutput = "data/nfkc.tsv";
+const string jaReadingsOutput = "data/ja_readings.tsv";
+const string defEn2HanziOutput = "data/def_en2hanzi.tsv";
+const string defHanzi2EnOutput = "data/def_hanzi2en.tsv";
 const string unihanZip = "../../../reference/unihan/Unihan.zip";
 
+UnihanTables.WriteNfkcTable(nfkcOutput, UnihanTables.BuildNfkcRows());
 WriteAccentTable(accentOutput, BuildAccentRows());
 WriteVariantTable(variantOutput, BuildVariantRows(unihanZip));
+UnihanTables.WriteJapaneseReadingsTable(jaReadingsOutput, UnihanTables.BuildJapaneseReadingRows(unihanZip));
+
+var (en2hanzi, hanzi2en) = UnihanTables.BuildGlossTables(unihanZip);
+UnihanTables.WriteEn2HanziTable(defEn2HanziOutput, en2hanzi);
+UnihanTables.WriteHanzi2EnTable(defHanzi2EnOutput, hanzi2en);
 
 static List<(int CodePoint, char Base)> BuildAccentRows()
 {

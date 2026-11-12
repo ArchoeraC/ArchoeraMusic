@@ -12,7 +12,7 @@ namespace Archoera.Indexer;
 /// 日文读音映射（索引期）：**假名 → 罗马字**（<c>data/kana_romaji.tsv</c>）+
 /// **汉字 → 音读 / 训读罗马字**（<c>data/ja_readings.tsv</c>，派生自 Unihan
 /// <c>kJapaneseOn</c> / <c>kJapaneseKun</c>，Unicode License，见
-/// <c>tools/gen_hanzi_data.py</c> 与同目录 THIRD-PARTY-LICENSES.md）。
+/// <c>tools/gen_tables</c> 与同目录 THIRD-PARTY-LICENSES.md）。
 ///
 /// 产出写进独立的 <c>reading_meta_tok</c> / <c>reading_lyrics_tok</c> 列，内容为**字母 bigram**
 /// （与 CJK 的 bigram 索引同构）：查询侧把罗马字查询串也 bigram 成 `AND` 组即可命中去重后的

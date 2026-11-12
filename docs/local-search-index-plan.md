@@ -1,6 +1,7 @@
 # 本地曲库搜索索引：歌词模糊搜索设计（Local Library Search Index）
 
-> 状态：**设计草案（未实施）** 2026-10-13
+> 状态：**已实施（P0–P5 落地）** 设计稿 2026-10-13，实现随分支演进持续更新
+> （schema v7 / `AnalyzerVersion` 11；查询层已整体下沉 C# 索引器，见 §9.3）。
 > 范围：为本地曲库增加索引能力，支持**歌词 / 元数据的模糊搜索**（中文优先），
 > 重点是 **拼音搜索**与**多语言歌词层（原文 / 译文 / 音译）搜索**；
 > `.lrc` 侧车歌词**可选索引（子开关，默认关闭）**。
@@ -24,7 +25,9 @@
 - **算力归属**：拼音 / 繁简 / 译文 的生成是**建索引时的一次性（增量）成本**，**不在查询路径上**；
   查询只分析用户输入的那几个字。因此**不拖慢搜索**——真正影响查询的是**索引体积**，用列过滤 + 分级权重 + 增量缓存控制（§4.5、§7.4）。
 - **架构**：`scanner`（既有，写 `library.db`，源真值）→ **`indexer`（新，独立组件，C#，读 `library.db`，写 `search.db`）** → Dart 查询。indexer 仅在总开关开启时经模块注册表按需加载（[module-on-demand-load-plan.md](module-on-demand-load-plan.md)）。
-- **查询侧不需要原生模块**：Dart `sqlite3` 直接跑 FTS5 查询；只有**构建 / 分析**在原生侧。
+- **查询侧同样是原生模块**：表达式编译 / 多趟兜底 / `bm25` 排序 / `docId → trackId` 映射全在 C# 内
+  （`indexer_query` 一次 FFI 调用返回结果）；Dart 只组装请求 JSON 并映射结果，不再用 `package:sqlite3`
+  执行 `MATCH`（只留 schema 探针）。
 - **非目标**：在线曲库 / 在线歌词（本地数据不依赖）；**离线机器翻译**（只索引已有译文）；设备级 wear leveling。
 
 ---
@@ -122,7 +125,8 @@
   - 不读 `.lrc` 侧车。
 - **开启时**：
   - 经模块注册表按需加载 indexer → 首次**全量构建** `search.db`（后台，§3、§7），完成后增量维护；
-  - 搜索切换到 FTS5 `MATCH + bm25()`（§5、§9.3）；`.lrc` 子开关此时才生效。
+  - 搜索切换到 FTS5 `MATCH + bm25()`（§5、§9.3；表达式与排序在 C# 索引器内，Dart 经
+    `indexer_query` 取回结果）；`.lrc` 子开关此时才生效。
 - **开关切换语义**：
   - 关 → 开：若 `search.db` 不存在，触发全量构建；已存在则按世代增量收敛（不阻塞 UI）。
   - 开 → 关：立即停止调度与查询接管，回退 `LIKE`；**取消在途构建**（透传 `indexer_cancel`，
@@ -148,10 +152,10 @@
       └────────────────────────────────────┘                     │ search.db（FTS5；世代化）│
                                                                  └───────▲────────────────┘
                                                                          │ 查询（MATCH + bm25）
-                                        ┌──────────────┐   只读+SQL     │
-                                        │  Dart UI     │ ───────────────┘
-                                        │ (sqlite3 FFI)│   ← 分析器词元经 indexer_analyze FFI 取得
-                                        └──────────────┘
+                                        ┌──────────────┐   indexer_query │
+                                        │  Dart UI     │ ───────────────▶│
+                                        │ (薄 FFI 客户端)│ ◀───────────────┘
+                                        └──────────────┘   结果 JSON
 ```
 
 要点：
@@ -160,8 +164,10 @@
    **`.lrc` 侧车由 scanner 解析入库**（§4.4）：索引器因此**零文件系统访问**，且侧车与曲目按
    `tracks.id` 强绑定（旧实现在索引器里逐曲枚举目录，成本 `O(曲目数 × 目录条目数)`）。
 2. **索引不是源真值**：`library.db` 是唯一真值；`search.db` 可随时删除重建（`search.db` 落后是可接受的短暂状态）。
-3. **查询侧零原生依赖**：Dart `sqlite3` 直接对 `search.db` 跑 FTS5 `MATCH` + `bm25()`；
-   唯一共享的是**分析器**——通过 `indexer_analyze` FFI 取词元串，保证测试向量一致（避免 Dart / C# 双实现漂移）。
+3. **查询侧零 SQL**：Dart 把查询参数编成请求 JSON，经 `indexer_query` 交给 C#；查询编译、六段渐进
+   兜底、`bm25` 排序与 `docId → trackId` 映射都在原生侧完成，结果以 JSON 返回。
+   Dart 侧只保留 `search_meta.schema_version` 探针（决定索引是否可用 / 需重建），不再对 `search.db`
+   跑 `MATCH`——避免查询语义在 Dart / C# 两处漂移。
 4. **生命周期**：indexer 为独立 NativeAOT 模块，与 scanner 同级；仅在**总开关开启**时经模块注册表按需
    `acquire`，**常驻、不卸载**（NativeAOT 后台线程无法安全 `dlclose`，见 `docs/module-on-demand-load-plan.md`）；
    总开关关闭时不加载（§2.4）。
@@ -183,7 +189,8 @@ indexer 现在是纯 `library.db → search.db` 变换器（除自身产物外**
 3. **派生数据可丢弃**：`search.db` 随时可删 / 可换（`IndexStore` 抽象正是 P5 判定的落点），
    不该与源真值写入路径绑死。
 4. **单写者**：scanner 独占写 `library.db`、indexer 独占写 `search.db`（WAL，无写锁竞争）。
-5. **查询侧仍需它**：Dart 的 `MATCH` 编译与高亮拼音走 `indexer_analyze`（查询侧分析必须与索引期分词同源）。
+5. **查询侧仍需它**：查询编译与多趟兜底虽已下沉 C#，但**高亮拼音**仍走 `indexer_analyze`
+   （展示侧分析必须与索引期分词同源）；`indexer_query` 也只在 indexer 模块已加载时可用。
 
 **契约（两模块之间只有这几条）**：
 
@@ -268,7 +275,7 @@ indexer 现在是纯 `library.db → search.db` 变换器（除自身产物外**
 
 - **数据（同一 Unihan 来源 / 同一 Unicode License / 同一定稿生成脚本）**：
   - 汉字 → 假名读音（音读 + 训读）：`data/ja_readings.tsv` 由
-    `tools/gen_hanzi_data.py gen_ja_readings()` 从 Unihan **`kJapanese`**
+    `tools/gen_tables`（纯 .NET）从 Unihan **`kJapanese`**
     （假名；不用 `kJapaneseOn/Kun`——那两个是**大写罗马字**，口径不同会漂移）生成；
   - 假名 → 罗马字：`data/kana_romaji.tsv`（自研表，Hepburn 主拼 + 常见 Kunrei 变体；
     促音「っ」重复后辅音、长音「ー」延长前元音、长元音用重复元音不用 macron）。
@@ -316,7 +323,9 @@ indexer 现在是纯 `library.db → search.db` 变换器（除自身产物外**
   分别写入 `lyrics_tok` / `lyrics_tr_tok` / `lyrics_rom_tok`；纯文本整体归原文，
   无译文 / 音译则对应列空。原文层**不回退**（不把译文 / 音译混入）。`AnalyzerVersion` 4→5 触发全量重建。
 - **不现场翻译**：只索引**已有**译文（§1.3）。**跨语言检索**已**部分实现**（T1，见 §11.9）：
-  查询侧用 Unihan 释义扩展把英文词 → 候选汉字、汉字 → 英文词作为**第 4 条 `OR` 分支**
+  查询侧用 Unihan 释义扩展把英文词 → 候选汉字、汉字 → 英文词，作为**独立兜底趟**
+  （`SearchQuery.CompileCrossLingual`，只在主趟 / 拼音宽松 / 读音趟均不足时才付；
+  早期版本曾并入主趟作为第 4 条 `OR` 分支，因高频候选把命中集放大到近乎整库而移出）
   （仅查询侧，不改索引内容 / 不递增 `AnalyzerVersion`）；更高覆盖率的**向量检索 / MT**
   仍不在本期（T2 另立）。
 
@@ -370,15 +379,29 @@ indexer 现在是纯 `library.db → search.db` 变换器（除自身产物外**
   2. **分级权重**：`bm25()` 权重集中；
   3. **可选物理分离**：把最重的歌词（含拼音 / 译文）索引放**单独 FTS 表 / 文件**，元数据查询完全不触达；
   4. **缓存**：每曲分析结果持久化在 `search_docs`，重索引只重算脏曲；
-  5. 铁律：**绝不把拼音 / 翻译放在查询路径上做**——那才是"拖慢搜索"的根源。
+  5. **查询结果 LRU**（`SearchSession.CacheCapacity = 128`）：同一会话内按「查询串 + scope +
+     limit / offset / fuzzy / minExact / candidateCap + AnalyzerVersion」复用上次 top-k 与 `passes`，
+     输入去抖 + 退格重放不再重复走 FTS；单条结果 > 500 条不入缓存，防止大 `limit` 放大内存。
+     会话随 `indexer_query_close` 一起丢弃（重建 / 删除索引 / 关闭总开关都会调用），无需额外失效逻辑；
+  6. 铁律：**绝不把拼音 / 翻译放在查询路径上做**——那才是"拖慢搜索"的根源。
 
 - **宽命中查询的工作量上界（P5 实测新增）**：FTS5 的 `ORDER BY bm25` 必须给**全部命中**打分，
   于是常见词元（拼音音节 / 首字母 / 高频英文词）把单条延迟推到 O(命中集)——30k 语料实测最坏 **131ms**。
-  对策：**候选集上限**（`SearchIndex.defaultCandidateCap = 5000`，C# 侧 `FtsStore.DefaultCandidateCap` 同值）——
-  先用**无排序**子查询按 rowid 取有界候选（可提前退出，成本有界），再只给这批候选做 bm25 排序：
-  `WHERE rowid IN (SELECT rowid FROM search_fts WHERE search_fts MATCH ? LIMIT 5000) ORDER BY score ...`。
-  **窄命中查询完全不受影响**（候选数 < 上限时等价原路径）；命中集远超上限时（近乎整库命中，
-  排序本就无意义）结果取自候选批——这是**有意**的降级，值取 5000 是「成本几乎不变（探针主导）而质量尽量高」的折中。
+- ⚠ **候选集上限机制已撤销（2026-11-12，修正一个静默失效的生产 bug）**：
+  原实现是「先用无排序子查询按 rowid 取有界候选，再只给这批候选排序」：
+  `WHERE rowid IN (SELECT rowid FROM search_fts WHERE search_fts MATCH ? LIMIT 5000) ORDER BY bm25(...)`。
+  **该写法是错误的**：FTS5 的 `bm25()` 只在**含 `MATCH` 的查询块内**求值，外层用 `IN (子查询)`
+  时每行分数恒为 `0`，`ORDER BY score` 于是退化为 rowid 顺序——**相关性排序整体失效且不报错**。
+  默认 `candidateCap = 5000`，即所有查询都受影响（实测：`晴` / `hello` / `爱你` / `love`
+  的 top200 全部零分；与理想的「全排序 top200」只重合 2–32 条）。
+  更讽刺的是它**并不更快**：候选子查询要先跑满一遍才能 `LIMIT`，宽命中时反而比直接全排序慢
+  （`wan`：错误写法 26ms vs 正确全排序 59ms，但前者结果是错的；中等查询错误写法 9ms vs 正确 16ms）。
+  **现实现**：`WHERE search_fts MATCH ? ORDER BY bm25(...) LIMIT ? OFFSET ?`，一次全排序。
+  `candidateCap` 参数保留在 ABI / 请求 JSON 上以兼容旧调用方，但**不再裁剪候选**。
+  回归用例：`SearchLayerTests.RankingIntegrity`（断言分数有区分度 + 标题命中排在仅歌词命中之前；
+  把旧写法放回去会立刻失败）。
+  > 代价：宽命中查询延迟上升（LIMIT=50 的 pooled P50 15.8→34.9ms）。这是**把正确性买回来**的
+  > 必要成本——之前那个「15.8ms」是在没有排序的情况下测出来的。详见 `bench/REPORT.md` §7。
 - **元数据 / 歌词分列**：拼音与首字母各分两列（`pinyin_meta_tok` / `pinyin_lyrics_tok`、
   `initials_meta_tok` / `initials_lyrics_tok`），于是 `scope=metadata` 的列过滤**真正**只扫元数据
   （旧版混列时拼音查询收不住）；查询侧相应把这两支列过滤到对应列集合（也顺带减少与其它列拉丁词元的误匹配）。
@@ -403,7 +426,7 @@ indexer 现在是纯 `library.db → search.db` 变换器（除自身产物外**
 Dart 侧 `search_index.dart` 只是薄 FFI 客户端（组装请求 JSON、映射结果、累加诊断计数）。
 不引入索引侧词典 / 触发器，在**查询编译**侧做**分级（渐进六趟）**——逐趟递进、命中足够即短路：
 
-1. **主趟** `SearchQuery.CompileMatch`：四条支 `OR`（词法 / 拼音 / 首字母 / ——跨语言支默认**不并入**）；
+1. **主趟** `SearchQuery.CompileMatch`：三条支 `OR`（词法 / 拼音 / 首字母；跨语言支**不并入**主趟）；
    相邻短语拼音 + **独立首字母列** + **前缀长度门控**（见 §4.2）；
 2. **拼音宽松兜底** `SearchQuery.CompilePinyinLoose`（主趟 0 命中时）：音节**位置无关 `AND`**——
    纯 CJK 的**漏字（音节子集）/ 换位（音节集合不变）**靠这一趟召回（`周伦` → `周杰伦`、
@@ -433,7 +456,7 @@ Dart 侧 `search_index.dart` 只是薄 FFI 客户端（组装请求 JSON、映�
    再合并为**单条** OR `MATCH` 一次查询。各趟结果合并去重、**前面的趟次优先**。
    **替换型非同音错字（周杰伦→周杰轮）** 仍需相似字表，**不在本期**。
 
-**跨语言查询扩展（T1，`Analyzer.AnalyzeQuery` + `SearchQuery.cs`）**：第 4 条查询分支——
+**跨语言查询扩展（T1，`Analyzer.AnalyzeQuery` + `SearchQuery.cs`）**：独立兜底趟——
 原生分析器用 Unihan 释义扩展（`data/def_en2hanzi.tsv` / `data/def_hanzi2en.tsv`，`EmbeddedResource` 内嵌）
 把拉丁 / 数字词映射为候选汉字、CJK 字映射为英文释义词，逐候选 `quoteToken` 以 `OR` 组合（总预算 ≤ 32、
 去重、并剔除与查询拼音音节同形的噪声候选）；空则不加此支。**仅改查询侧**（`AnalyzeQuery`），
@@ -500,10 +523,13 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
   title 4.0 / artist 3.0 / album 2.0 / lyrics 1.5 / lyrics_tr 1.0 / lyrics_rom 0.5 /
   **pinyin_meta 2.0 / pinyin_lyrics 1.5** / **reading_meta 2.0** / filename 1.0 /
   **initials_meta 2.0 / initials_lyrics 1.5**。
-- **列序 = bm25 权重序，冻结**（每次 schema 变更只允许「改名 + 追加」，并在 Dart 侧同步
-  `expectedSchemaVersion` / `_bm25Weights` / `metadataColumns`）。
-- **元数据列白名单**：`title_tok artist_tok album_tok filename_tok pinyin_meta_tok initials_meta_tok`
-  ——v4 分列后 `scope=metadata` 才真正「只搜元数据」（旧版拼音 / 首字母混列，白名单收不住）。
+- **列序 = bm25 权重序，冻结**（每次 schema 变更只允许「改名 + 追加」，C# 侧同步
+  `FtsStore.FtsColumns` / `FtsStore.Bm25Weights` / `SearchQuery.MetadataColumns`，
+  Dart 侧同步 `SearchIndex.expectedSchemaVersion`）。
+- **元数据列白名单**（`SearchQuery.MetadataColumns`）：`title_tok artist_tok album_tok filename_tok
+  pinyin_meta_tok initials_meta_tok reading_meta_tok`
+  ——v4 分列后 `scope=metadata` 才真正「只搜元数据」（旧版拼音 / 首字母混列，白名单收不住）；
+  v5 起读音列也在白名单内（读音趟天然是元数据检索，见 §4.2.1）。
 - **schema 版本**（`search_meta.schema_version`）：v1 external-content → **v2 contentless** →
   **v3 首字母独立列** → **v6 `search_docs.reading_tok`**（读音副本，T1-4 分档）→
   **v7 语言画像**（`search_meta` 新增 `has_japanese` / `has_korean` / `has_han` / `has_latin`，
@@ -518,8 +544,13 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
 - **首字母独立列的理由**（P5 实测）：v2 把首字母串与全拼音节混在 `pinyin_tok`，首字母查询
   （`"wan"*`）会命中拼音音节（完 / 万 / 晚…）——30k 语料命中 29985/30000、单条 56ms；拆列后
   查询用 `{initials_tok} : "wan"*` 列过滤，命中集回归「真正以该首字母串开头的短语」。
+  > ⚠ **多列过滤必须用花括号**：FTS5 里 `a b : expr` 是「列 `a` 后面紧跟词元 `b`」，不是列集合，
+  > 会**静默返回空集**（不报错）。查询层从 Dart 下沉 C# 时 `InitialsBranch` 曾漏掉这对花括号，
+  > 导致首字母分支从不命中、分列优化的收益归零；黄金向量当时按错误输出抄写，等于把 bug 固化进
+  > 测试。现已在 `SearchLayerTests.EscapingSafety` 用「首字母串含引号仍闭合列过滤」守住该语法。
 - `.lrc` 开关开启时，侧车文本行并入 `lyrics_tok`（保留来源标记以便排歧）。
-- **列过滤**：元数据查询用 `MATCH '{title_tok artist_tok album_tok} : ...'`，不触歌词 / 拼音列（§4.5）。
+- **列过滤**：元数据查询用 `MATCH '{title_tok artist_tok album_tok filename_tok pinyin_meta_tok
+  initials_meta_tok reading_meta_tok} : ...'`，不触歌词 / 译文 / 音译列（§4.5）。
 - **侧车列不在本库**：`.lrc` 原始文本与锚点 (`lyrics_lrc*` / `lrc_mtime` / `lrc_size` / `lrc_checked`)
   存在 **`library.db` 的 `tracks` 表**，由 scanner 写入（§4.4）；索引器只读它们，不读文件系统。
 - 查询：查询串经**同一分析器** → 词元 → 拼 `MATCH` 表达式（含 `prefix` / 引号短语）。
@@ -631,6 +662,36 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
 
 建议以脚本 + 小样本先行（可复用 `app/core/scanner/bench` 的形式）。
 
+### 8.0 语料真实度（**判读延迟数字前必看**）
+
+性能基准用的确定性语料由**固定小词表**拼装（约 90 个词组 + 20 个标题）。这让常用词元
+在库内命中**近乎整库**：
+
+| 查询 | 命中 / 30000 | 命中率 |
+|---|---|---|
+| `"wan"*`（首字母前缀） | 29985 | 100.0% |
+| `"hello"` | 28900 | 96.3% |
+| `"爱你"` | 29035 | 96.8% |
+
+而 FTS5 的 `ORDER BY bm25` 必须给**全部命中**打分，延迟与命中率近似成正比。
+同一查询在小词表 / 大词表两份语料上的实测：
+
+| 语料 | `"wan"*` 命中 | top-50 排序耗时 |
+|---|---|---|
+| 固定小词表（90 词） | 29985（100%） | **36.1ms** |
+| 大词表（4000 词，`--vocab 4000`） | 19206（64%） | **11.4ms** |
+
+真实曲库的标题 / 歌词词表是数万到数十万级，同一条查询的命中率通常只有 1–20%。
+因此：
+
+- **`--vocab 0`（默认）的小词表语料只能当「最坏上界」**，其中标红的宽命中查询延迟
+  **不代表真实体验**；
+- **`--vocab 4000` 的大词表档是主判据**（单词命中率 1–20%，贴近真实曲库）。
+
+> 2026-11-12 实测：30000 曲、大词表语料、LIMIT=10000 下 pooled P50/P95 =
+> **4.6 / 32.5ms**，14 条代表查询全部落在 §2.2 预算（20 / 80ms）内。
+> 此前「延迟超标」的结论来自小词表语料，属**测量失真**而非真实性能问题。
+
 ### 8.1 真实曲库实测（P5，本机 `/home/betastudio2/音乐`）
 
 | 项 | 值 |
@@ -680,6 +741,7 @@ app/core/
     FtsStore.cs              # IndexStore 的 FTS5 实现（构建 + 只读查询共用一份 bm25 / 候选上限 SQL）
     SearchQuery.cs           # 查询表达式编译（词法 / 拼音 / 首字母 / 读音 / 跨语言 / 模糊）+ CJK 变体
     SearchSession.cs         # 只读查询会话缓存：六段渐进兜底 + bm25 排序 + docId→trackId 映射
+                             #   + 实例内 128 条查询结果 LRU（`CacheCapacity`）
     indexer-ffi/Ffi.cs       # C ABI 导出
     build.sh
     THIRD-PARTY-LICENSES.md
@@ -712,6 +774,19 @@ void indexer_query_close(void);
 void indexer_set_log_sink(void (*sink)(int, const char*, const char*), int min_level);
 ```
 
+`indexer_query` 的 JSON 契约（`SearchSession.SearchRequest.Parse`，缺字段走默认值）：
+
+```jsonc
+// 请求
+{"query": "woaini", "scope": "all" | "metadata", "limit": 200, "offset": 0,
+ "fuzzy": false, "minExact": 1, "candidateCap": 5000}
+// 响应（分数为 bm25，升序 = 越相关越前）
+{"items": [{"trackId": "…", "score": 1.23}],
+ "passes": {"pinyinLoose": 0, "reading": 0, "crossLingual": 0, "fuzzy": 0, "cjkFuzzy": 0}}
+```
+
+`passes` 只用于诊断 / 回归计数（Dart 侧累加成 `SearchIndex.fuzzyQueries` 等接缝）。
+
 ### 9.3 Dart 侧
 
 - `lib/services/search/`：`search_index.dart`（**薄 FFI 客户端**：组装请求 JSON → `indexer_query` → 映射命中 / 兜底计数；只做 schema 探针，不再用 `package:sqlite3` 执行 `MATCH`）、`indexer_ffi.dart`（FFI：run/cancel/analyze/query/query_close）、`search_models.dart`。
@@ -725,9 +800,22 @@ void indexer_set_log_sink(void (*sink)(int, const char*, const char*), int min_l
   另在**扫描完成且索引已就绪**时由曲库层调用（`library_store_scan.dart`）——否则扫描新增的曲目
   在索引就绪态下搜索不到（索引就绪时查询不再回退 `LIKE`）。总开关关闭 / 未构建时不触发
   （`SearchService.indexReady` 为 false，关闭态零成本）。
-- **设置入口**：总开关 `启用本地曲库搜索索引`（默认关）+ 子项 `索引 .lrc 侧车歌词`（默认关，仅在总开关开启时可用）
-  + 动作「重建索引 / 删除索引」。关闭时 Dart 侧不打开 `search.db`、不调 `indexer_*` FFI。
+- **设置入口**：总开关 `启用本地曲库搜索索引`（默认关）+ 两个子项 `索引 .lrc 侧车歌词`（默认关）、
+  `生成歌词罗马音索引`（`search.index.romaji_lyrics`，默认关，T2-9；切换触发全量重建）
+  + 动作「重建索引 / 删除索引」。子项仅在总开关开启时可用；关闭时 Dart 侧不打开 `search.db`、
+  不调 `indexer_*` FFI。
 - UI：音乐库搜索框 / 全局搜索接入（排序替换现有 `LIKE`）；沿用 250ms 去抖；总开关关闭时保持现状 `LIKE`。
+- **排行上限 `kSearchIndexRankLimit = 10000`（2026-11-12 量化后保持不动）**：该值只决定
+  `resolveRankedSearch` 取多少条有序 id，进而决定 `totalCount` 与可翻页数（`pageSize = 300`）。
+  实测（30000 曲 / 大词表语料 / 生产同构 SQL）：
+  - **降 limit 精度无损**——`ORDER BY score LIMIT N` 是全排序前缀，`limit=300/900` 与
+    `limit=10000` 的 top-300/top-900 **逐条位置相同且可复现**（8 条查询全一致）；
+  - **但只省 20–30%**：pooled P50/P95 = 35.9/74.3ms（10000）→ 28.9/58.4（900）→
+    26.3/56.3（300）→ **25.1/52.1（50）**。成本在「给全部命中打分」，**降 limit 修不好
+    20ms 预算**；
+  - 功能代价真实：`totalCount` = 命中 id 数，降 limit 会让宽查询只显示 900 首 / 最多 3 页；
+    补精确计数也不划算（`wan` 的 `count(*)` 13.3ms，`rank(300)+count` ≈ 现状 55.7ms）。
+  ⇒ 保持 10000；真正的杠杆是降低命中宽度（见 `cross-lingual-search-upgrade-plan.md` §4.8）。
 - **歌词命中行内片段**（`search_lyric_snippet.dart`）：结果因歌词命中（标题 / 歌手 / 专辑无字面高亮）
   时，行内显示命中歌词窗口（次要样式、单行省略，`SongRow.lyricSnippet`）。片段在**页加载异步路径**
   批量取歌词（`TracksDb.lyricsByIds`）算好缓存到 `LibraryState.lyricSnippets`，行渲染只同步查表；
@@ -779,8 +867,8 @@ void indexer_set_log_sink(void (*sink)(int, const char*, const char*), int min_l
 7. **模块常驻**：NativeAOT 无法安全卸载（scanner 已验证），indexer 同样常驻，内存需可控。
 8. **与在线搜索 UI 的边界**：本地索引与既有在线 `search_page` 的整合与结果分区。
 9. **跨语言检索**（如英文查询命中中文歌词）：**T0 + T1 已部分实现**——T0 多语言层入库
-   （译文 / 音译作为独立列，§4.3）+ T1 Unihan 释义查询扩展（英文 ↔ 汉字候选第 4 分支，单向**词级**，
-   依赖 Unihan `kDefinition` 的覆盖与精度）。**T2**（向量检索 / MT，句级 / 语义召回、双向高覆盖）
+   （译文 / 音译作为独立列，§4.3）+ T1 Unihan 释义查询扩展（英文 ↔ 汉字候选**独立兜底趟**，
+   单向**词级**，见 §4.6；依赖 Unihan `kDefinition` 的覆盖与精度）。**T2**（向量检索 / MT，句级 / 语义召回、双向高覆盖）
    **另立设计**；已知风险：`.lrc` 分层歧义、释义精度、同形噪声（候选与拼音 / 多义字同形）、
    短语级未覆盖。
 10. **总开关默认关的语义**：关闭时 `search.db` 冻结（可保留），重新开启后须先按世代增量收敛，

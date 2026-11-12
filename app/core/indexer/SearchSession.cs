@@ -26,6 +26,12 @@ internal sealed class SearchRequest
     /// <summary>命中数达到该值即停止继续兜底（默认 1：主趟有命中就不再兜底）。</summary>
     public int MinExact { get; init; } = 1;
 
+    /// <summary>
+    /// 候选集上限（**历史参数，已不再裁剪候选**）。
+    ///
+    /// 保留字段仅为请求 JSON 兼容；<see cref="FtsStore.Search"/> 已忽略它——
+    /// 原实现会让 FTS5 的 bm25 静默返回 0、排序整体失效（见设计文档 §4.5）。
+    /// </summary>
     public int CandidateCap { get; init; } = FtsStore.DefaultCandidateCap;
 
     public static SearchRequest Parse(string json)

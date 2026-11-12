@@ -174,7 +174,7 @@ public static class QueryBench
         return 0;
     }
 
-    /// <summary>生产候选上限（与 Dart `SearchIndex.defaultCandidateCap` 一致；`--cap 0` 关闭）。</summary>
+    /// <summary>候选上限（**历史参数，已不再生效**；`--cap` 仍可传但结果不受影响）。</summary>
     private static int _candidateCap = FtsStore.DefaultCandidateCap;
 
     private static int RunOnce(FtsStore store, string matchExpr, int limit)

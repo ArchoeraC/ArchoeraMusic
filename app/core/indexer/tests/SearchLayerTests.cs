@@ -20,11 +20,13 @@ internal static class SearchLayerTests
     public static void Run()
     {
         CompilerGolden();
+        EscapingSafety();
         CjkVariants();
         ReadingTiers();
         ProgressiveQuery();
         LanguageProfile();
         QueryResultCache();
+        RankingIntegrity();
     }
 
     /* ------------------------------------------------------------------ */
@@ -36,7 +38,7 @@ internal static class SearchLayerTests
         var tokens = Analyzer.AnalyzeQuery("我爱你");
         const string expected = "(\"我爱 爱你\" AND \"我\" AND \"爱\" AND \"你\""
             + " OR {pinyin_meta_tok pinyin_lyrics_tok} : \"wo ai ni\""
-            + " OR (initials_meta_tok initials_lyrics_tok : \"wan\"*))";
+            + " OR ({initials_meta_tok initials_lyrics_tok} : \"wan\"*))";
         var match = SearchQuery.CompileMatch(tokens, metadata: false);
         Program.Check("查询编译器: 我爱你 主趟", match == expected, match ?? "<null>");
 
@@ -121,6 +123,68 @@ internal static class SearchLayerTests
             !SearchQuery.HasFuzzyEligible(Analyzer.AnalyzeQuery("晴天")));
         Program.Check("查询编译器: 拉丁可模糊",
             SearchQuery.HasFuzzyEligible(Analyzer.AnalyzeQuery("hello")));
+    }
+
+    /// <summary>
+    /// 转义安全：查询串里的 FTS5 语法字符（<c>"</c> / <c>*</c> / <c>(</c> / <c>:</c> /
+    /// <c>OR</c>）必须被当作**字面量**，不得闭合引号、不得改变表达式结构。
+    ///
+    /// 这是 <c>SearchQuery.Quote</c> 的安全契约（原 Dart 侧同名用例在查询层下沉后
+    /// 未同步，此组补齐）：注入尝试要么整体被引号包裹，要么内部 <c>"</c> 翻倍。
+    /// </summary>
+    private static void EscapingSafety()
+    {
+        Program.Check("转义: 双引号翻倍",
+            SearchQuery.Quote("a\"b") == "\"a\"\"b\"", SearchQuery.Quote("a\"b"));
+        Program.Check("转义: 仅引号 → 四引号",
+            SearchQuery.Quote("\"") == "\"\"\"\"", SearchQuery.Quote("\""));
+
+        // 语法字符按字面量加引号（不构成 FTS5 语法）。
+        Program.Check("转义: * ( : 按字面量加引号",
+            SearchQuery.CompileMatch(Tokens(lexical: new[] { "a*b", "(", ":" }), metadata: false)
+                == "\"a*b\" AND \"(\" AND \":\"",
+            SearchQuery.CompileMatch(Tokens(lexical: new[] { "a*b", "(", ":" }), metadata: false) ?? "<null>");
+
+        // 注入尝试：闭合引号后插 OR —— 整体加引号后 `""` 翻倍，结构不破。
+        // 末词元 ≥3 字符照常加前缀 `*`（合法行为），关键是**没有**产生真实 OR 运算符。
+        var injected = SearchQuery.CompileMatch(Tokens(lexical: new[] { "x\" OR \"y" }), metadata: false);
+        Program.Check("转义: 注入 OR 被当字面量",
+            injected == "\"x\"\" OR \"\"y\"*", injected ?? "<null>");
+        Program.Check("转义: 注入不产生额外 OR 分支",
+            injected is not null
+                && injected.Count(c => c == '"') == 6
+                && !injected.StartsWith('('),
+            injected ?? "<null>");
+
+        // 含引号的「类 bigram」不入短语（仅 1 个 CJK 字符），仍逐字转义。
+        var quoted = SearchQuery.CompileMatch(Tokens(lexical: new[] { "我\"", "\"爱" }), metadata: false);
+        Program.Check("转义: 含引号类 bigram 不合并成短语",
+            quoted == "\"我\"\"\" AND \"\"\"爱\"", quoted ?? "<null>");
+
+        // 首字母串含引号 / 空格：列过滤仍闭合（列过滤前缀不被词元内容带偏）。
+        var initials = SearchQuery.CompileMatch(Tokens(initials: "a\"b"), metadata: false);
+        Program.Check("转义: 首字母含引号仍闭合列过滤",
+            initials == "({initials_meta_tok initials_lyrics_tok} : \"a\"\"b\"*)",
+            initials ?? "<null>");
+
+        // 跨语言候选含引号：同样按字面量转义。
+        var cross = SearchQuery.CompileCrossLingual(
+            Tokens(crossLingual: new[] { "l\"ove" }), metadata: false);
+        Program.Check("转义: 跨语言候选含引号",
+            cross == "\"l\"\"ove\"", cross ?? "<null>");
+    }
+
+    /// <summary>构造指定列最小查询词元（其余列留空），供转义用例精确控制输入。</summary>
+    private static QueryTokens Tokens(
+        IEnumerable<string>? lexical = null,
+        IEnumerable<string>? crossLingual = null,
+        string? initials = null)
+    {
+        var tokens = new QueryTokens();
+        if (lexical is not null) tokens.Lexical.AddRange(lexical);
+        if (crossLingual is not null) tokens.CrossLingual.AddRange(crossLingual);
+        tokens.PinyinInitials = initials;
+        return tokens;
     }
 
     private static void CjkVariants()
@@ -356,9 +420,11 @@ internal static class SearchLayerTests
             EndToEnd.CreateLibrary(db, generation: 1);
             using (var conn = EndToEnd.Open(db))
             {
-                EndToEnd.InsertTrack(conn, "p1", Path.Combine(media, "a.mp3"), "Love Me",
+                // 文件名给多字母名：单字母 `a.mp3` 会进首字母列，令 `爱`（首字母 a）
+                // 在主趟就命中，掩盖「反向跨语言兜底」这条断言的真实路径。
+                EndToEnd.InsertTrack(conn, "p1", Path.Combine(media, "love-me.mp3"), "Love Me",
                     """[{"name":"ADELE"}]""", null, "love me love me", 1000);
-                EndToEnd.InsertTrack(conn, "p2", Path.Combine(media, "b.mp3"), "Hello World",
+                EndToEnd.InsertTrack(conn, "p2", Path.Combine(media, "hello-world.mp3"), "Hello World",
                     """[{"name":"ADELE"}]""", null, null, 2000);
             }
             EndToEnd.RunEngine(db, index, full: true, lrc: false);
@@ -514,6 +580,86 @@ internal static class SearchLayerTests
     }
 
     private static string Join(IReadOnlyList<string> values) => string.Join(',', values);
+
+    /// <summary>
+    /// **排序完整性回归**（守一个曾经静默失效的生产 bug）。
+    ///
+    /// 历史：`FtsStore.Search` 早期用
+    /// <c>WHERE rowid IN (SELECT rowid ... MATCH ? LIMIT @cap) ORDER BY bm25(...)</c>
+    /// 实现「候选集上限」。FTS5 的 <c>bm25()</c> **只在含 MATCH 的查询块内求值**，
+    /// 该写法的外层查询不匹配 → 每行分数恒为 <c>0</c>，排序退化成 rowid 顺序，
+    /// **不报错也不抛异常**，等于相关性排序整体失效（默认 cap=5000 时对所有查询生效）。
+    ///
+    /// 本用例用「文档相关度差异明显」的语料断言**顺序**（而非仅命中集合），
+    /// 一旦有人重新引入同类写法，分数会退化为相同值、顺序断言立刻失败。
+    /// </summary>
+    private static void RankingIntegrity()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(), "archoera-ranking-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var db = Path.Combine(root, "library.db");
+            var index = Path.Combine(root, "search.db");
+            var media = Path.Combine(root, "media");
+            Directory.CreateDirectory(media);
+
+            EndToEnd.CreateLibrary(db, generation: 1);
+            using (var conn = EndToEnd.Open(db))
+            {
+                // 三首歌的区别只在「标题命中」vs「仅歌词命中」的次数，便于用 bm25 列权重
+                // 拉开差距：标题命中（权重 4.0）应稳定排在仅歌词命中（1.5）之前。
+                EndToEnd.InsertTrack(conn, "title", Path.Combine(media, "t.mp3"), "晴天",
+                    """[{"name":"A"}]""", null, null, 1000);
+                EndToEnd.InsertTrack(conn, "lyrics", Path.Combine(media, "l.mp3"), "别的名字",
+                    """[{"name":"B"}]""", null, "晴天", 2000);
+                EndToEnd.InsertTrack(conn, "both", Path.Combine(media, "b.mp3"), "晴天",
+                    """[{"name":"C"}]""", null, "晴天 晴天 晴天", 3000);
+            }
+            EndToEnd.RunEngine(db, index, full: true, lrc: false);
+            SearchSession.CloseCached();
+
+            using var store = new FtsStore();
+            store.OpenReadOnly(index);
+
+            // 直查 FtsStore：分数的**区分度**是排序有效性的直接证据。
+            var expression = SearchQuery.CompileMatch(Analyzer.AnalyzeQuery("晴天"), metadata: false);
+            Program.Check("排序完整性: 表达式可编译", expression is not null, expression ?? "<null>");
+            var rows = store.Search(expression!, limit: 100, offset: 0,
+                candidateCap: FtsStore.DefaultCandidateCap);
+            Program.Check("排序完整性: 命中 3 首", rows.Count == 3, rows.Count.ToString());
+
+            var distinct = rows.Select(r => Math.Round(r.Score, 6)).Distinct().Count();
+            Program.Check(
+                "排序完整性: bm25 分数有区分度（退化时全为 0）",
+                distinct > 1,
+                $"不同分值 {distinct} 个：" + string.Join(',', rows.Select(r => r.Score.ToString("F4"))));
+
+            // 顺序：标题命中（权重更高）必须排在仅歌词命中之前。
+            var trackIds = store.ResolveTrackIds(rows.Select(r => r.DocId).ToList());
+            var order = rows.Select(r => trackIds[r.DocId]).ToList();
+            var titleRank = order.IndexOf("title");
+            var lyricsRank = order.IndexOf("lyrics");
+            Program.Check(
+                "排序完整性: 标题命中排在仅歌词命中之前",
+                titleRank >= 0 && lyricsRank >= 0 && titleRank < lyricsRank,
+                "顺序=" + string.Join(',', order));
+
+            // candidateCap 不应改变结果（该参数保留仅为 ABI 兼容）。
+            var capped = store.Search(expression!, limit: 100, offset: 0, candidateCap: 500);
+            var cappedIds = store.ResolveTrackIds(capped.Select(r => r.DocId).ToList());
+            Program.Check(
+                "排序完整性: candidateCap 不再裁剪候选（结果一致）",
+                capped.Select(r => cappedIds[r.DocId]).SequenceEqual(order),
+                string.Join(',', capped.Select(r => cappedIds[r.DocId])));
+        }
+        finally
+        {
+            SearchSession.CloseCached();
+            EndToEnd.TryDelete(root);
+        }
+    }
 
     private static string Dump(SearchResult result)
         => "[" + string.Join(',', result.Items.Select(hit => hit.TrackId))

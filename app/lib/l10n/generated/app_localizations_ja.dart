@@ -2918,6 +2918,19 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLogToFileNote => '単一ファイル、上限 4 MiB（その場で切り詰め。追加ファイルは作りません）。';
 
   @override
+  String get settingsSearchQueryLog => '検索クエリログ';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      '検索品質の改善のため、この端末でクエリ語句を記録します（いつでも消去可能）';
+
+  @override
+  String get settingsSearchQueryLogOff => 'ログのファイル出力が無効なため、クエリは記録されません';
+
+  @override
+  String get settingsSearchQueryLogCleared => '検索クエリログを消去しました';
+
+  @override
   String get settingsSecuritySection => '安全な破棄';
 
   @override

@@ -9,6 +9,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:sqlite3/sqlite3.dart';
 
 import 'indexer_ffi.dart';
+import 'query_log.dart';
 import 'search_models.dart';
 
 /// `search.db` 只读查询视图（**薄 FFI 客户端**）。
@@ -30,10 +31,12 @@ class SearchIndex {
   /// 不符则视为不可用，触发重建）。
   static const int expectedSchemaVersion = 7;
 
-  /// **候选集上限**（宽命中查询的工作量上界；0 = 不限）。
+  /// **候选集上限**（历史参数，已不再裁剪候选；0 = 不限）。
   ///
-  /// 语义与 C# `FtsStore.DefaultCandidateCap` 一致：先用无排序子查询按 rowid 顺序
-  /// 取前 N 个候选（成本有界），再只对这批候选做 bm25 排序。
+  /// ⚠ 该机制在 2026-11-12 被撤销：原实现用 `rowid IN (子查询)` 限制候选，导致
+  /// FTS5 的 `bm25()` 静默返回 0、相关性排序整体失效（详见
+  /// `docs/local-search-index-plan.md` §4.5）。参数保留仅为 ABI / 请求 JSON 兼容，
+  /// C# 侧 `FtsStore.Search` 已忽略它并直接全排序。
   static const int defaultCandidateCap = 5000;
 
   final String _dbPath;
@@ -59,6 +62,18 @@ class SearchIndex {
   /// 本连接已执行的**日文读音兜底**查询次数（诊断 / 测试接缝）。
   @visibleForTesting
   int readingQueries = 0;
+
+  /// 当前**累加**的兜底趟计数器快照。
+  ///
+  /// 各字段是累加值（每查一次 `+=`），调用方若只想要「本次查询实际执行了哪些趟」，
+  /// 需在查询前后各取一次并相减（见 `SearchService.search`）。
+  PassCounts get passCounts => PassCounts(
+    pinyinLoose: pinyinLooseQueries,
+    reading: readingQueries,
+    crossLingual: crossLingualQueries,
+    fuzzy: fuzzyQueries,
+    cjkFuzzy: cjkFuzzyQueries,
+  );
 
   /// 打开 `search.db`（只读）。文件缺失 / schema 版本不符返回 null。
   ///
