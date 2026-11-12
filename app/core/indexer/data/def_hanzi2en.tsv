@@ -1,7 +1,7 @@
 # Archoera indexer Unihan 释义查询扩展：汉字码点 → 英文词列表（T1，查询侧用）
 # 来源: Unicode Unihan kDefinition（Unicode License，https://www.unicode.org/license.txt）
 # 字段: HEXCODE<TAB>WORD1 WORD2 ...；WORD 去重、字典序
-# 生成: tools/gen_hanzi_data.py gen_hanzi_defs()（去括注/小写/停用词过滤，确定可重跑）
+# 生成: tools/gen_tables（去括注/小写/停用词过滤，确定可重跑）
 3400	hillock mound
 3401	bamboo bark lick mat taste
 3402	enjoy joyful like love thing
@@ -677,7 +677,7 @@
 373A	color good imprudent interesting no respect white
 373B	admire bind binding comply exquisite fine girl's obedient obey remember
 373C	brother children nephews nieces one's
-373D	branch child seed st terrestrial
+373D	branch child seed terrestrial
 373E	child infant small young
 373F	fish legendary roe spawn
 3740	fond like love
@@ -1018,7 +1018,7 @@
 38AE	bow neglect relax unstring
 38AF	bamboo banners bows emperor flag-staff flags heaven made son streamers
 38B0	bent bow colorful curved decorated leather silk stretch
-38B2	bland diagrams insinuating mild peaceful south-east th words
+38B2	bland diagrams insinuating mild peaceful south-east words
 38B3	black bow color general
 38B4	european west western
 38B5	archer's bow leather powerful ring strong thumb
@@ -1533,7 +1533,7 @@
 3ADE	look sun weather
 3ADF	after daily day moving sun time
 3AE0	kind water
-3AE1	moon period th winter
+3AE1	moon period winter
 3AE4	bright clear day extended long
 3AE5	dark dim obscure
 3AE6	look sun weather
@@ -3810,7 +3810,7 @@
 449F	grass variety
 44A0	exuberant grass luxuriant rapa rape-turnip--brassica shoots trees young
 44A1	grass variety
-44A2	avert calamus door evil flag hung influences leaves lintels lunar month sweet th
+44A2	avert calamus door evil flag hung influences leaves lintels lunar month sweet
 44A3	delicate lush
 44A4	grass variety
 44A5	appropriate considerable corresponding equivalent extent great
@@ -6014,7 +6014,7 @@
 4DB4	blow
 4DB5	bamboo flute holes
 4E00	alone
-4E01	adult heavenly male robust stem th vigorous
+4E01	adult heavenly male robust stem vigorous
 4E02	breath characters obstruction other release seeks
 4E04	above
 4E05	below bring down inferior latin letter transliterate under underneath
@@ -6029,14 +6029,14 @@
 4E0F	invisible parapet
 4E10	beg beggar give
 4E11	branch clown comedian earthly second
-4E12	branches character nd period
+4E12	branches character period
 4E13	monopolize possession sole take
 4E14	about moreover soon will
 4E15	distinguished glorious grand great
 4E16	era generation world
 4E17	thirtieth thirty
 4E18	elder empty hill
-4E19	heavenly rd stem third
+4E19	heavenly stem third
 4E1A	business gb profession radical
 4E1B	bush collection shrub thicket
 4E1C	east eastern eastward
@@ -6099,7 +6099,7 @@
 4E56	crafty rebel shrewd
 4E57	adjunct ascend avail numerary oneself ride vehicles
 4E58	adjunct ascend avail numerary oneself ride vehicles
-4E59	heavenly nd second stem
+4E59	heavenly second stem
 4E5A	conceal hidden minute mysterious secret small
 4E5B	kwukyel
 4E5C	huh squint what
@@ -6146,7 +6146,7 @@
 4E8F	damage deficient fail lose
 4E91	clouds say speak
 4E92	mutually reciprocally
-4E95	determinative geminorum hexagram lunar mansion nd pit shaft star well
+4E95	determinative geminorum hexagram lunar mansion pit shaft star well
 4E97	age harvest year
 4E98	across extend through
 4E99	across extend through
@@ -6158,7 +6158,7 @@
 4E9F	extremely immediately urgently
 4EA0	head kangxi radical
 4EA1	death destroyed lose perish
-4EA2	determinative excessive high lunar mansion nd proud skilled star violent virginis
+4EA2	determinative excessive high lunar mansion proud skilled star violent virginis
 4EA4	communicate deliver exchange intersect mix
 4EA5	branch earthly twelfth
 4EA6	likewise too
@@ -6732,7 +6732,7 @@
 51A9	compose draw sketch write
 51AA	cloth cover cover-cloth
 51AB	ice kangxi radical
-51AC	lunar month th winter
+51AC	lunar month winter
 51AF	dint gallop
 51B0	ice ice-cold
 51B1	closed freezing off stopped up
@@ -7093,7 +7093,7 @@
 536E	container cup measuring wine
 536F	branch earthly fourth
 5370	chop mark print seal stamp
-5371	aquarii dangerous determinative high lunar mansion precarious star th
+5371	aquarii dangerous determinative high lunar mansion precarious star
 5372	beautiful eminent lofty
 5373	immediately promptly quickly
 5374	decline retreat still
@@ -7152,7 +7152,7 @@
 53BE	away drop final lightly particle sentence tap through
 53BF	county district subdivision
 53C1	bank numeral
-53C2	determinative ginseng intervene lunar mansion orionis part st star take
+53C2	determinative ginseng intervene lunar mansion orionis part star take
 53C3	ginseng intervene part take
 53C4	ginseng intervene part take
 53C5	consult counsel intervene part take together
@@ -8127,7 +8127,7 @@
 58BB	wall
 58BC	brick unfired
 58BE	cultivate farm land reclaim
-58C1	determinative house lunar mansion partition pegasi star th wall walls
+58C1	determinative house lunar mansion partition pegasi star wall walls
 58C4	country field open wilderness
 58C5	obstruct
 58C6	clay crack hard jar rocky stiff strata
@@ -8231,7 +8231,7 @@
 5949	offer receive respect serve
 594B	arouse effort exert strive
 594C	degree dot point speck spot
-594E	andromedae determinative lunar man mansion star stride th
+594E	andromedae determinative lunar man mansion star stride
 594F	emperor memorialize report
 5950	brilliant numerous
 5951	bond contract deed engrave
@@ -8259,7 +8259,7 @@
 596D	anger ire red
 596E	arouse effort exert strive
 5970	anger
-5973	aquarii determinative feminine girl kangxi lunar mansion radical star th woman
+5973	aquarii determinative feminine girl kangxi lunar mansion radical star woman
 5974	servant slave
 5976	breasts milk nurse woman's
 5978	crafty false villainous
@@ -8374,7 +8374,7 @@
 5A3C	harlot prostitute
 5A3F	beautiful graceful
 5A40	beautiful graceful
-5A41	arietis determinative lunar mansion star th wear
+5A41	arietis determinative lunar mansion star wear
 5A44	soak soft unreliable weak
 5A46	grandmother woman
 5A49	amiable congenial restrained
@@ -8566,7 +8566,7 @@
 5BA1	examine investigate judge
 5BA2	customer guest traveller
 5BA3	announce declare proclaim
-5BA4	chamber determinative home house lunar mansion pegasi room star th
+5BA4	chamber determinative home house lunar mansion pegasi room star
 5BA5	forgive indulge pardon
 5BA6	government official officialdom
 5BA7	corner
@@ -8688,7 +8688,7 @@
 5C3B	buttocks end sacrum spine
 5C3C	buddhist nun transliteration
 5C3D	deplete exhaust up
-5C3E	determinative end extremity lunar mansion scorpii star stern tail th
+5C3E	determinative end extremity lunar mansion scorpii star stern tail
 5C3F	urinate urine
 5C40	bureau circumstance office
 5C41	break buttocks fart wind
@@ -8916,7 +8916,7 @@
 5DB7	hunan mountains province range
 5DB8	high lofty steep towering
 5DBA	mountain peak ridge
-5DBC	daai island jyu lantau saan
+5DBC	daai island lantau
 5DBD	mountain peak summit
 5DC2	place
 5DC3	lofty
@@ -8953,13 +8953,13 @@
 5DEE	almost differ different nearly officer wrong
 5DEF	atom group
 5DF0	atom group
-5DF1	heavenly oneself personal private self stem th
+5DF1	heavenly oneself personal private self stem
 5DF2	already finished stop
 5DF3	branch earthly sixth
 5DF4	anxiously desire greatly hope
 5DF5	container cup measuring wine
 5DF7	alley lane
-5DFA	mild modest obedient south-east th trigrams
+5DFA	mild modest obedient south-east trigrams
 5DFB	comeback curl make scroll
 5DFC	place
 5DFD	hexagram mild modest obedient south-east trigram
@@ -9085,7 +9085,7 @@
 5E96	cooking cuisine kitchen
 5E97	hotel inn shop store
 5E99	court imperial shrine temple
-5E9A	heavenly stem th
+5E9A	heavenly stem
 5E9C	government prefect prefecture
 5E9E	big disorderly huge messy
 5E9F	abrogate discard terminate
@@ -9202,7 +9202,7 @@
 5F31	delicate fragile weak
 5F33	circular measure
 5F34	bow lacquer red
-5F35	determinative expand extend hydrae lunar mansion sheet star stretch th
+5F35	determinative expand extend hydrae lunar mansion sheet star stretch
 5F36	snare
 5F37	energetic powerful strong
 5F38	bow drawn full stretched tensely
@@ -9304,7 +9304,7 @@
 5FBC	border frontier inspect patrol
 5FBD	badge insignia
 5FC0	ramble stroll
-5FC3	determinative heart intelligence lunar mansion mind scorpii soul star th
+5FC3	determinative heart intelligence lunar mansion mind scorpii soul star
 5FC4	heart number radical
 5FC5	certainly must surely
 5FC6	memory reflect remember upon
@@ -9710,7 +9710,7 @@
 6207	simple simple-minded stupid
 6208	halberd lance rad spear
 6209	battle-axe halberd
-620A	heavenly stem th
+620A	heavenly stem
 620B	little narrow small tiny
 620C	branch earthly eleventh
 620D	borders defend frontiers guard
@@ -9759,7 +9759,7 @@
 623C	branch earthly fourth
 623D	bale out water
 623E	perverse rebellious recalcitrant
-623F	building determinative house lunar mansion room scorpii star th
+623F	building determinative house lunar mansion room scorpii star
 6240	adjunct location numerary place
 6241	flat signboard tablet
 6243	bar door outside placed
@@ -10410,7 +10410,7 @@
 6592	marbled striped variegated
 6593	multicolored
 6595	multicolored
-6597	determinative dipper kangxi lunar mansion radical sagittarii star th unit volume
+6597	determinative dipper kangxi lunar mansion radical sagittarii star unit volume
 6599	conjecture consider ingredients materials
 659A	cup ears libations small stone times
 659B	dou dry equal measure some
@@ -10516,7 +10516,7 @@
 661C	bright expand glorious open out
 661D	dual pronoun
 661E	bright glorious luminous
-661F	any determinative hydrae light lunar mansion planet point star th
+661F	any determinative hydrae light lunar mansion planet point star
 6620	light project reflect
 6621	day extended long relaxed
 6624	sunshine
@@ -10532,7 +10532,7 @@
 6631	bright dazzling light sunlight
 6632	sun-dried
 6633	declining sun west
-6634	determinative lunar mansion star tauri th
+6634	determinative lunar mansion star tauri
 6635	approach close intimate
 6636	bright clear day extended long
 6637	feed prisoner
@@ -10834,7 +10834,7 @@
 67F0	bear crab-apple endure tree
 67F1	lean pillar post support
 67F2	handle
-67F3	determinative hydrae lunar mansion pleasure star th tree willow
+67F3	determinative hydrae lunar mansion pleasure star tree willow
 67F4	faggots firewood fuel
 67F5	fence grid palisade
 67F6	ladle
@@ -11508,7 +11508,7 @@
 6C0D	cloth emperor fine god mat woollen worshipping
 6C0E	cloth cotton fine
 6C0F	family mister
-6C10	determinative librae lunar mansion rd root star tribe
+6C10	determinative librae lunar mansion root star tribe
 6C11	citizens people subjects
 6C13	people subjects vassals
 6C14	kangxi radical steam vapor
@@ -12518,7 +12518,7 @@
 7256	enlightenment lead window
 7258	books documents tablet writing
 7259	molars serrated teeth tooth
-725B	bull capricorni cow determinative kangxi lunar mansion ox radical star th
+725B	bull capricorni cow determinative kangxi lunar mansion ox radical star
 725C	cow ox radical
 725D	deep female gorge species
 725F	barley get low make seek
@@ -12978,7 +12978,7 @@
 752F	peaceful
 7530	arable cultivated field land
 7531	cause reason
-7532	armor fingernails heavenly shell st stem
+7532	armor fingernails heavenly shell stem
 7533	branch earthly extend ninth report state superior
 7534	cockroach
 7535	electric electricity lightning
@@ -13014,7 +13014,7 @@
 755D	fields land measure
 755F	plough
 7560	farm field garden plantation
-7562	completed conclude determinative end finish lunar mansion star tauri th
+7562	completed conclude determinative end finish lunar mansion star tauri
 7564	heaven place worshipping
 7565	approximately outline roughly
 7566	farm sections vegetable
@@ -13233,7 +13233,7 @@
 7671	numbness palsy paralysis
 7672	crazy insanity mad madness mania
 7676	kangxi legs radical
-7678	heavenly stem th
+7678	heavenly stem
 767A	dispatch emit issue out send
 767B	board climb mount rise
 767C	dispatch emit issue out send
@@ -13637,7 +13637,7 @@
 78EA	high mountain precipitous
 78EC	instrument musical stone
 78EF	eddy jetty rock submerged
-78F2	button rank th white
+78F2	button rank white
 78F4	cliff hill ledge steps
 78F5	brook mountain stream
 78F7	phosphorus
@@ -13736,7 +13736,7 @@
 799B	blessings receive sincere spirit
 799C	sacrifice
 79A0	happy
-79A1	beginning campaign day lunar military month nd sacrifice th
+79A1	beginning campaign day lunar military month sacrifice
 79A4	xuan
 79A6	against defend hold out resist
 79A7	congratulations happiness
@@ -14065,7 +14065,7 @@
 7B92	broom
 7B93	book
 7B94	frame growing reed screen silkworms
-7B95	bag determinative dust garbage lunar mansion pan sagittarii sieve star th
+7B95	bag determinative dust garbage lunar mansion pan sagittarii sieve star
 7B96	basket large
 7B97	calculate count figure plan
 7B98	bamboo fine
@@ -14891,7 +14891,7 @@
 7FF9	elevate lift raise turn up
 7FFA	roam soar
 7FFB	capsize flip over upset
-7FFC	crateris determinative fins fish lunar mansion shelter star th wings
+7FFC	crateris determinative fins fish lunar mansion shelter star wings
 7FFD	whir
 7FFE	flit fly
 7FFF	adorned feathers streamer
@@ -15042,7 +15042,7 @@
 80C0	expand inflate swell
 80C1	armpits flank ribs threaten
 80C2	arsine chiropractic
-80C3	arietis determinative fowl gizzard lunar mansion star stomach th
+80C3	arietis determinative fowl gizzard lunar mansion star stomach
 80C4	descendant headpiece helmet
 80C6	bladder bravery courage gall
 80C8	hair thigh
@@ -15986,7 +15986,7 @@
 8655	department locale place
 8656	cry howl shout
 865A	false
-865B	aquarii determinative empty false hollow lunar mansion star th worthless
+865B	aquarii determinative empty false hollow lunar mansion star worthless
 865C	capture imprison prison seize
 865E	about anxious concerned worried
 865F	mark number sign symbol
@@ -16550,12 +16550,12 @@
 89CF	meet see unexpectedly
 89D0	audience have imperial
 89D1	peep spy watch
-89D2	angle corner determinative horn kangxi lunar mansion point radical spica st star
+89D2	angle corner determinative horn kangxi lunar mansion point radical spica star
 89D4	catty
 89D5	coarse rough rude
 89D6	criticize dissatisfied long
 89DA	goblet jug square winecup
-89DC	beak determinative lunar mansion orionis star th turtle
+89DC	beak determinative lunar mansion orionis star turtle
 89DD	butt gore push resist
 89DE	feast propose toast vessel wine
 89E1	antlers
@@ -17491,7 +17491,7 @@
 8EE3	blast explosion rumble
 8EE5	yoke
 8EE8	box carriage cross-piece front inside wooden
-8EEB	carriage corvi cross-board determinative lunar mansion rear star th
+8EEB	carriage corvi cross-board determinative lunar mansion rear star
 8EED	ruin spoil
 8EF0	carriages class denotes generation kind plural row series
 8EF1	bone large
@@ -17631,7 +17631,7 @@
 8F98	capstan pulley wheel windlass
 8F99	ruts tracks wagon wheel
 8F9A	rumbling threshold vehicles
-8F9B	bitter heavenly kangxi laborious radical stem th toilsome
+8F9B	bitter heavenly kangxi laborious radical stem toilsome
 8F9C	crime criminal offense
 8F9E	expression phrase speech words
 8F9F	develop law open rule up
@@ -19784,7 +19784,7 @@
 9B35	big caldron iron pot
 9B37	pot
 9B3B	child childish nourish sell
-9B3C	cancri dead determinative devil ghost kangxi lunar mansion radical rd spirit star
+9B3C	cancri dead determinative devil ghost kangxi lunar mansion radical spirit star
 9B3D	demon elf forest kind
 9B41	best chief leader monstrous
 9B42	soul spirit
@@ -20202,7 +20202,7 @@
 9DF0	swallow
 9DF2	condor vulture
 9DF3	lophura nycthemera pheasant silver
-9DF4	badge civil grade lophura officials pheasant silver species th worn
+9DF4	badge civil grade lophura officials pheasant silver species worn
 9DF8	kingfisher snipe species tringa
 9DF9	accipiter eagle falcon species
 9DFA	ardea egret heron species

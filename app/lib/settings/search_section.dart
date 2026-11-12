@@ -23,6 +23,8 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 ///   搜索切换到按相关度（BM25）排序的排行；关闭即回退现有 `LIKE`，索引默认保留。
 /// - 子开关 `索引 .lrc 侧车歌词`（默认关；总开关关闭时禁用）；切换后**增量重建**
 ///   索引（仅重算受影响曲目，异步、失败降级），无需手动「重建索引」。
+/// - 子开关 `生成歌词罗马音索引`（默认关；T2-9 可选增强）：无音译层的日语歌词
+///   自动生成罗马音（索引体积约增加一倍），切换后触发全量重建。
 /// - 动作：重建索引 / 删除索引（二次确认）；展示构建进度、状态与上次结果。
 ///
 /// 索引是**派生数据**：默认关闭零成本；构建失败不阻断搜索（自动回退 `LIKE`）。
@@ -61,6 +63,12 @@ class _SearchSectionState extends ConsumerState<SearchSection> {
     unawaited(_reindexThenRefresh());
   }
 
+  /// 歌词罗马音子开关切换：写偏好后触发重建（选项变化 → 索引器自动升级为全量）。
+  void _onToggleRomajiLyrics(bool value) {
+    ref.read(appPrefsProvider.notifier).setSearchIndex(romajiLyrics: value);
+    unawaited(_reindexThenRefresh());
+  }
+
   Future<void> _reindexThenRefresh() async {
     await SearchService.instance.reindex();
     if (mounted) setState(() {});
@@ -95,6 +103,14 @@ class _SearchSectionState extends ConsumerState<SearchSection> {
               value: prefs.indexLrc,
               enabled: enabled,
               onChanged: enabled ? _onToggleLrc : null,
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.translateOutline,
+              title: l10n.settingsSearchIndexRomaji,
+              subtitle: l10n.settingsSearchIndexRomajiDesc,
+              value: prefs.romajiLyrics,
+              enabled: enabled,
+              onChanged: enabled ? _onToggleRomajiLyrics : null,
             ),
           ],
         ),

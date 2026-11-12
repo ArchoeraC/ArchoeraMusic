@@ -8,12 +8,20 @@
 | 表 | 来源 | 许可证 | 说明 |
 |---|---|---|---|
 | `data/nfkc.tsv` | Python 标准库 `unicodedata`（NFKC） | **Unicode License** | 逐字符兼容折叠 |
+| `data/accent_fold.tsv` | Unicode **NFD 规范分解**（派生） | **Unicode License** | 拉丁去音符号折叠（T1-5，488 条） |
+| `data/variant_fold.tsv` | Unihan **`kSimplifiedVariant`** + **`kJapaneseOldVariant`** | **Unicode License** | 异体字 → 简体补齐（T1-7，3170 条；主要补日文新字体，只填 ToolGood 未覆盖的字符） |
 | `data/def_en2hanzi.tsv` / `data/def_hanzi2en.tsv` | Unihan **`kDefinition`** | **Unicode License** | 跨语言释义候选（T1，查询侧） |
 | `data/ja_readings.tsv` | Unihan **`kJapanese`** | **Unicode License** | 日文音读 + 训读（假名；索引期转罗马字写入 `reading_meta_tok`） |
-| `data/kana_romaji.tsv` | **自研**（标准罗马字事实） | 同本项目（AGPL-3.0-or-later） | 假名 → 罗马字（Hepburn 主拼 + Kunrei 变体） |
+| `data/kana_romaji.tsv` | **自研**（标准罗马字事实） | 同本项目（AGPL-3.0-or-later） | 假名 → 罗马字（Hepburn 主拼 + Kunrei 变体，含助词 は/へ 双写） |
 
-> 三张 Unihan 派生表由 `tools/gen_hanzi_data.py` **确定、可重跑**生成（`reference/unihan/Unihan.zip`，
-> 经宿主机代理下载，仅生成期需要；产物随仓库提交以便审计）。
+> **生成方式**：**全部 6 张表**由纯 .NET 的 `tools/gen_tables` 生成
+> （`cd app/core/indexer && dotnet run --project tools/gen_tables`），不依赖 Python；
+> Unihan 派生表需 `reference/unihan/Unihan.zip`（仓库级 `.gitignore` 忽略，
+> 缺失时经宿主机代理下载，仅生成期需要）。表缺失时 `build.sh` 自动补齐。
+>
+> 跨语言计划 §4.3 的「构建期工具链收敛到 .NET 一套」由此达成：原 Python 脚本
+> `tools/gen_hanzi_data.py` 已删除。迁移时逐字节校对过 5 张既有表——4 张数据完全相同，
+> `nfkc.tsv` 因 Unicode 16→17 新增 `U+A7F1` 而多一条（`AnalyzerVersion` 11→12）。
 
 ## NuGet 依赖
 
@@ -85,7 +93,7 @@ Copyright 2017-2025 ToolGood
 > `dwyl/english-words`（Unlicense）及其生成的 `pinyin.tsv` / `simp_trad.tsv` /
 > `gb18030.tsv` / `en_blocklist.tsv`——相应能力改由 ToolGood.Words 与框架 CodePages 提供。
 
-数据表由 `tools/gen_hanzi_data.py` 离线、确定性地生成（脚本仅缺表时下载 Unihan，
+数据表由 `tools/gen_tables`（纯 .NET）离线、确定性地生成（仅缺表时下载 Unihan，
 生成结果按码点 / 词序排序，可重现且字节稳定）。
 
 ## Unicode License（Unicode 数据）

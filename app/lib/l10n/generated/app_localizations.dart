@@ -5350,6 +5350,30 @@ abstract class AppLocalizations {
   /// **'单文件，上限 4 MiB（原地截断，不产生额外文件）。'**
   String get settingsLogToFileNote;
 
+  /// No description provided for @settingsSearchQueryLog.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'搜索查询日志'**
+  String get settingsSearchQueryLog;
+
+  /// No description provided for @settingsSearchQueryLogOn.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'记录本机查询关键词，用于改进搜索质量（可随时清除）'**
+  String get settingsSearchQueryLogOn;
+
+  /// No description provided for @settingsSearchQueryLogOff.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'日志写入磁盘已关闭，不记录查询'**
+  String get settingsSearchQueryLogOff;
+
+  /// No description provided for @settingsSearchQueryLogCleared.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'已清除搜索查询日志'**
+  String get settingsSearchQueryLogCleared;
+
   /// No description provided for @settingsSecuritySection.
   ///
   /// In zh_CN, this message translates to:
@@ -8287,6 +8311,18 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'同时索引与音频同名的 .lrc 歌词（需先启用总开关）'**
   String get settingsSearchIndexLrcDesc;
+
+  /// No description provided for @settingsSearchIndexRomaji.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'生成歌词罗马音索引'**
+  String get settingsSearchIndexRomaji;
+
+  /// No description provided for @settingsSearchIndexRomajiDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'日语歌词没有音译时自动生成罗马音，可用罗马字搜索（索引体积约增加一倍）'**
+  String get settingsSearchIndexRomajiDesc;
 
   /// No description provided for @settingsSearchIndexNote.
   ///

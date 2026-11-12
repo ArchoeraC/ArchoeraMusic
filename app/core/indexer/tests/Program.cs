@@ -32,6 +32,7 @@ public static class Program
 
         RunDirectAssertions();
         EndToEnd.Run();
+        SearchLayerTests.Run();
 
         var vectorFiles = Directory.GetFiles(vectorsDir, "*.tsv");
         Array.Sort(vectorFiles, StringComparer.Ordinal);
@@ -51,7 +52,7 @@ public static class Program
 
     private static void RunDirectAssertions()
     {
-        Assert("AnalyzerVersion == 6", Analyzer.AnalyzerVersion == 6,
+        Assert("AnalyzerVersion == 12", Analyzer.AnalyzerVersion == 12,
             Analyzer.AnalyzerVersion.ToString());
 
         // 假名 / 谚文：子串分词（bigram+unigram），**不进拼音 / 首字母列**。
@@ -73,6 +74,40 @@ public static class Program
             Assert($"读音 bigram 含 '{bg}'", ja.Readings.Contains(bg), ja.Readings);
         Assert("纯中文无读音列", Analyzer.Analyze("晴天").Readings.Length == 0,
             Analyzer.Analyze("晴天").Readings);
+
+        // T1-1 罗马音规范形：Hepburn / Kunrei 折叠为同一串（しつけ = shitsuke = situke）。
+        var shitsuke = Analyzer.Analyze("しつけ").Readings;
+        foreach (var bg in new[] { "si", "it", "tu", "uk", "ke" })
+            Assert($"规范形读音含 '{bg}'", shitsuke.Contains(bg), shitsuke);
+        Assert("规范形不含 Hepburn 'sh'", !shitsuke.Contains("sh"), shitsuke);
+
+        // 促音 / 长音折叠：がっこう → gakkou → gakou → gako。
+        var gakkou = Analyzer.Analyze("がっこう").Readings;
+        Assert("促音折叠（がっこう 无 'kk'）", !gakkou.Contains("kk"), gakkou);
+        Assert("长音折叠（がっこう → ga/ko）",
+            gakkou.Contains("ga") && gakkou.Contains("ko"), gakkou);
+
+        // ん + 元音 → nn：きんえん → kinnen（保留 n 边界，避免与「きねん」混淆）。
+        var kinnen = Analyzer.Analyze("きんえん").Readings;
+        Assert("ん+元音 产出 'nn'", kinnen.Contains("nn"), kinnen);
+
+        // T1-2 助词双写：は → ha/wa、へ → he/e、を → wo/o（索引期同假名段内双写）。
+        var kimiHa = Analyzer.Analyze("きみは").Readings;
+        Assert("助词双写: きみは 含 'ha'", kimiHa.Contains("ha"), kimiHa);
+        Assert("助词双写: きみは 含 'wa'", kimiHa.Contains("wa"), kimiHa);
+        Assert("助词双写: へ 含 'e'", Analyzer.Analyze("へ").Readings.Contains("e"),
+            Analyzer.Analyze("へ").Readings);
+        var wo = Analyzer.Analyze("を").Readings;
+        Assert("助词双写: を 含 'wo'/'o'", wo.Contains("wo") && wo.Contains("o"), wo);
+
+        // T1-3 韩文读音：谚文按 Unicode 公式分解 → 国语罗马字（RR），同路写入读音列。
+        Assert("韩文转写: 사랑해 == saranghae", Korean.Romanize("사랑해") == "saranghae",
+            Korean.Romanize("사랑해"));
+        Assert("韩文转写: 한국 == hanguk", Korean.Romanize("한국") == "hanguk",
+            Korean.Romanize("한국"));
+        var korean = Analyzer.Analyze("사랑해").Readings;
+        foreach (var bg in new[] { "sa", "ar", "ra", "an", "ng", "gh", "ha", "ae" })
+            Assert($"韩文读音含 '{bg}'", korean.Contains(bg), korean);
         // 整首标记为日文时，纯汉字段也查 Unihan 音训读（米津玄師 这类歌手名）
         var kanjiWithJa = Analyzer.Analyze("愛", includeReadings: true);
         Assert("汉字读音（愛 → ai）", kanjiWithJa.Readings.Contains('a'.ToString() + 'i'),
@@ -192,6 +227,40 @@ public static class Program
         Assert("NFKC 孤立代理不崩溃", Analyzer.Analyze("\uD83D").Tokens.Length == 0,
             Analyzer.Analyze("\uD83D").Tokens);
 
+        // ---- 去音符号折叠（T1-5，v10）----
+        Assert("accent: Beyoncé → beyonce", Analyzer.Analyze("Beyonc\u00E9").Tokens == "beyonce",
+            Analyzer.Analyze("Beyonc\u00E9").Tokens);
+        Assert("accent: 分解形 e+U+0301 → beyonce",
+            Analyzer.Analyze("Beyonce\u0301").Tokens == "beyonce",
+            Analyzer.Analyze("Beyonce\u0301").Tokens);
+        Assert("accent: 查询侧同构 Beyoncé == Beyonce",
+            string.Join(' ', Analyzer.AnalyzeQuery("Beyonc\u00E9").Lexical)
+                == string.Join(' ', Analyzer.AnalyzeQuery("Beyonce").Lexical),
+            string.Join(' ', Analyzer.AnalyzeQuery("Beyonc\u00E9").Lexical));
+        Assert("accent: ñ / ü / ā", Analyzer.Analyze("Se\u00F1or \u00FCber \u0101").Tokens == "senor uber a",
+            Analyzer.Analyze("Se\u00F1or \u00FCber \u0101").Tokens);
+        // 无规范分解的字母保持原样（已知限制：不额外维护手写映射）。
+        Assert("accent: ł / ø 保持原样", Analyzer.Analyze("\u0141\u00F3d\u017A").Tokens == "\u0142odz",
+            Analyzer.Analyze("\u0141\u00F3d\u017A").Tokens);
+        Assert("accent 表非空", HanziData.AccentEntryCount > 400,
+            HanziData.AccentEntryCount.ToString());
+
+        // ---- 异体字补齐（T1-7，v11）：日文新字体 → 简体，索引 / 查询双端同表 ----
+        Assert("variant: 鉄道 → 铁道", Analyzer.Analyze("鉄道").Tokens == "铁道 铁 道",
+            Analyzer.Analyze("鉄道").Tokens);
+        Assert("variant: 絵 → 绘", Analyzer.Analyze("絵").Tokens == "绘",
+            Analyzer.Analyze("絵").Tokens);
+        Assert("variant: 広島 → 广岛", Analyzer.Analyze("広島").Tokens == "广岛 广 岛",
+            Analyzer.Analyze("広島").Tokens);
+        Assert("variant: 楽園 → 乐园", Analyzer.Analyze("楽園").Tokens == "乐园 乐 园",
+            Analyzer.Analyze("楽園").Tokens);
+        Assert("variant: 銀河鉄道 与 银河铁道 同词元",
+            string.Join(' ', Analyzer.AnalyzeQuery("銀河鉄道").Lexical)
+                == string.Join(' ', Analyzer.AnalyzeQuery("银河铁道").Lexical),
+            string.Join(' ', Analyzer.AnalyzeQuery("銀河鉄道").Lexical));
+        Assert("variant 表非空", HanziData.VariantEntryCount > 1000,
+            HanziData.VariantEntryCount.ToString());
+
         // ---- 英文过度切分门控（v4：已删除 data/en_blocklist.tsv 英文残留阻断表）----
         // 短同形词按取舍不拦截（长度 <6，与 mama(妈妈)/women(我们) 无法区分）。
         Assert("短同形: panda → pan da（不拦截）", Pinyin(Analyzer.AnalyzeQuery("panda")) == "pan da",
@@ -241,6 +310,20 @@ public static class Program
         var many = Analyzer.AnalyzeQuery("love like hate big small new old good bad");
         Assert("CrossLingual 预算 ≤ 32", many.CrossLingual.Count <= Analyzer.CrossLingualBudget,
             many.CrossLingual.Count.ToString());
+        // T2-8 固化参数（2026-11-11 实测）：单词候选 ≤ 8（生成表侧 EN2HANZI_MAX），
+        // 典型 3 词查询不触及总预算 32；只有 ≥4 个英文词的长查询才截断。
+        Assert("CrossLingual 单词候选 ≤ 8", loveQuery.CrossLingual.Count <= 8,
+            loveQuery.CrossLingual.Count.ToString());
+        var threeWords = Analyzer.AnalyzeQuery("love dream moon");
+        Assert("CrossLingual 3 词不触及预算",
+            threeWords.CrossLingual.Count < Analyzer.CrossLingualBudget,
+            threeWords.CrossLingual.Count.ToString());
+        // T2-8 噪音修复：kDefinition 解析不得再产出序数后缀碎片（13th → th）。
+        var xin = Analyzer.AnalyzeQuery("心");
+        Assert("CJK 释义候选不含序数碎片",
+            !xin.CrossLingual.Contains("th") && !xin.CrossLingual.Contains("nd")
+                && !xin.CrossLingual.Contains("st") && !xin.CrossLingual.Contains("rd"),
+            string.Join('|', xin.CrossLingual));
     }
 
     private static void RunVectorFile(string path)

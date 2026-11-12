@@ -2892,6 +2892,19 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsLogToFileNote => '単一ファイル、上限 4 MiB（その場で切り詰め。追加ファイルは作りません）。';
 
   @override
+  String get settingsSearchQueryLog => '検索クエリログ';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      '検索品質の改善のため、この端末でクエリ語句を記録します（いつでも消去可能）';
+
+  @override
+  String get settingsSearchQueryLogOff => 'ログのファイル出力が無効なため、クエリは記録されません';
+
+  @override
+  String get settingsSearchQueryLogCleared => '検索クエリログを消去しました';
+
+  @override
   String get settingsSecuritySection => '安全な破棄';
 
   @override
@@ -4526,6 +4539,13 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get settingsSearchIndexLrcDesc =>
       '音声ファイルと同名の .lrc 歌詞も索引します（マスタースイッチが必要）';
+
+  @override
+  String get settingsSearchIndexRomaji => '歌詞のローマ字索引を生成';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      '音訳のない日本語歌詞からローマ字を自動生成し、ローマ字で検索できるようにします（索引サイズは約2倍）';
 
   @override
   String get settingsSearchIndexNote =>

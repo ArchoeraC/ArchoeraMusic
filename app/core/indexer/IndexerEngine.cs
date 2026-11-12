@@ -5,6 +5,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Archoera.Lyrics;
+using Archoera.Text;
 using Microsoft.Data.Sqlite;
 
 namespace Archoera.Indexer;
@@ -127,7 +128,8 @@ public sealed class IndexerEngine
             || prev is null
             || prev.SchemaVersion != _store.SchemaVersion
             || prev.AnalyzerVersion != Analyzer.AnalyzerVersion
-            || prev.Pinyin != options.Pinyin;
+            || prev.Pinyin != options.Pinyin
+            || prev.RomajiLyrics != options.RomajiLyrics;
 
         _store.Open(indexPath, needFull);
         if (_store is not IIndexStoreAdmin admin)
@@ -136,6 +138,10 @@ public sealed class IndexerEngine
 
         var state = needFull ? new Dictionary<string, DocState>(StringComparer.Ordinal) : admin.LoadState();
         var nextDocId = needFull ? 1L : admin.NextDocId;
+
+        // 距上次全段合并累计的改写曲数（全量构建从 0 起算）。合并只在过阈值时做，
+        // 见 IndexerOptions.MergeEveryUpdates 的注释与实测数据。
+        var updatesSinceMerge = needFull ? 0 : (prev?.UpdatesSinceMerge ?? 0);
 
         long generation = ReadScannerGeneration(libraryPath);
 
@@ -159,6 +165,8 @@ public sealed class IndexerEngine
         // 旧实现逐曲整目录枚举，单目录 30k 曲实测全量 +lrc 393s / 零脏曲增量 161s。
         var dirty = new List<DirtyTrack>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        // 语言画像（v7）：全量从零统计；增量承接旧画像再做 OR（保守，见 ScriptProfile 注释）。
+        var profile = needFull ? new ScriptProfile() : ScriptProfile.FromMeta(prev);
         foreach (var probe in ReadTrackProbes(libraryPath, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -212,7 +220,9 @@ public sealed class IndexerEngine
                     }
 
                     var docId = state.TryGetValue(item.Id, out var st) ? st.DocId : nextDocId++;
-                    _store.Put(docId, BuildTokens(track, options, generation));
+                    var tokens = BuildTokens(track, options, generation);
+                    profile.Add(tokens);
+                    _store.Put(docId, tokens);
                     indexed++;
 
                     if (indexed % ProgressEvery == 0) Fire("index", item.Path);
@@ -236,16 +246,37 @@ public sealed class IndexerEngine
 
         Fire("commit", "");
 
+        updatesSinceMerge += indexed + deleted;
+        var shouldMerge = needFull
+            || (indexed + deleted > 0
+                && options.MergeEveryUpdates > 0
+                && updatesSinceMerge >= options.MergeEveryUpdates);
+        if (shouldMerge) updatesSinceMerge = 0;
+
         admin.WriteMeta(new StoreMeta
         {
             IndexLrc = options.IndexLrc,
             Pinyin = options.Pinyin,
+            RomajiLyrics = options.RomajiLyrics,
             AppliedGeneration = generation,
             BuiltAt = builtAt,
             FullBuildAt = needFull ? builtAt : (prev?.FullBuildAt ?? builtAt),
+            HasJapanese = profile.Japanese,
+            HasKorean = profile.Korean,
+            HasHan = profile.Han,
+            HasLatin = profile.Latin,
+            UpdatesSinceMerge = updatesSinceMerge,
         });
 
-        _store.Optimize();
+        // FTS5 的 `optimize` 是**全段合并**：402MB 级索引实测 4.5–13s，且不随脏曲数缩小
+        // （只改 1 首也要付全额）。但它**不能永远不做**：跳过合并会让 contentless_delete 的
+        // 墓碑累积，宽命中查询随之退化（实测 `爱你` 20 曲 +34% / 60 曲 +73% / 120 曲 +103%）。
+        // 故按「累计改写曲数」过阈值才合并（全量构建收尾总是合并）。
+        //
+        // 注意：脏曲的**筛选与应用始终是同步、完整**的（阶段一/二），合并只是物理整理，
+        // 不改内容、失败也无损（索引仍然正确，下次增量再尝试）——两者不能混为一谈。
+        if (shouldMerge)
+            _store.Optimize();
         _store.Commit();
         admin.Seal();
 
@@ -261,6 +292,8 @@ public sealed class IndexerEngine
             Full = needFull,
             Generation = generation,
             DurationMs = stopwatch.ElapsedMilliseconds,
+            Merged = shouldMerge,
+            UpdatesSinceMerge = updatesSinceMerge,
         };
     }
 
@@ -279,11 +312,10 @@ public sealed class IndexerEngine
     {
         // 「整首是否日文」由任一源含假名判定：真实日文曲库里歌手 / 专辑常是**纯汉字**
         // （米津玄師 / ヨルシカ），需借书目标题里的假名把整首标记为日文，才给这些纯汉字段查读音表。
-        var japanese = options.Pinyin &&
-            (Japanese.ContainsKana(track.Title) || Japanese.ContainsKana(track.ArtistText)
-             || Japanese.ContainsKana(track.AlbumText) || Japanese.ContainsKana(track.Lyrics)
-             || Japanese.ContainsKana(Path.GetFileNameWithoutExtension(track.Path)))
-            ;
+        var hasKana = Japanese.ContainsKana(track.Title) || Japanese.ContainsKana(track.ArtistText)
+            || Japanese.ContainsKana(track.AlbumText) || Japanese.ContainsKana(track.Lyrics)
+            || Japanese.ContainsKana(Path.GetFileNameWithoutExtension(track.Path));
+        var japanese = options.Pinyin && hasKana;
 
         var title = Analyzer.Analyze(track.Title, japanese);
         var artist = Analyzer.Analyze(track.ArtistText, japanese);
@@ -303,7 +335,15 @@ public sealed class IndexerEngine
         var lyrics = Analyzer.Analyze(JoinLayers(embedded.Original, sidecar.Original), japanese);
         var translation = Analyzer.Analyze(JoinLayers(embedded.Translation, sidecar.Translation));
         var romaji = Analyzer.Analyze(JoinLayers(embedded.Romaji, sidecar.Romaji));
+        // 歌词罗马音（T2-9 可选增强）：无 LRC 音译层时，用已算好的歌词读音 bigram 填充；
+        // 有用户提供的音译整词时**不覆盖**。
+        var lyricsRom = romaji.Tokens;
+        if (lyricsRom.Length == 0 && options.RomajiLyrics && hasKana && lyrics.Readings.Length > 0)
+            lyricsRom = lyrics.Readings;
         var filename = Analyzer.Analyze(Path.GetFileNameWithoutExtension(track.Path), japanese);
+        // 日文读音只索引元数据段（歌词读音不索引，见 DocTokens.ReadingMetaTok 说明）；
+        // 同一串另存一份原文副本供兜底趟分档（T1-4，contentless FTS 回读不到 token 文本）。
+        var reading = options.Pinyin ? CombineReadings(title, artist, album, filename) : "";
 
         return new DocTokens
         {
@@ -313,7 +353,7 @@ public sealed class IndexerEngine
             AlbumTok = album.Tokens,
             LyricsTok = lyrics.Tokens,
             LyricsTrTok = translation.Tokens,
-            LyricsRomTok = romaji.Tokens,
+            LyricsRomTok = lyricsRom,
             // 拼音 / 首字母**按元数据段与歌词段分列**（v4）：元数据查询（列过滤）才收得住。
             PinyinMetaTok = options.Pinyin
                 ? CombinePinyin(title, artist, album, filename)
@@ -323,10 +363,8 @@ public sealed class IndexerEngine
                 ? CombineInitials(title, artist, album, filename)
                 : "",
             InitialsLyricsTok = options.Pinyin ? CombineInitials(lyrics) : "",
-            // 日文读音只索引元数据段（歌词读音不索引，见 DocTokens.ReadingMetaTok 说明）。
-            ReadingMetaTok = options.Pinyin
-                ? CombineReadings(title, artist, album, filename)
-                : "",
+            ReadingMetaTok = reading,
+            ReadingText = reading,
             FilenameTok = filename.Tokens,
             IndexedMtime = track.Mtime,
             // 侧车锚点取 **DB 里的聚合值**（与阶段一脏集判定同源，避免索引侧与扫描侧各算一套）。
@@ -619,6 +657,55 @@ public sealed class IndexerEngine
         {
             Log.LogWarn("indexer", $"读取 _scanner_meta 失败（按世代 0 处理）: {ex.Message}");
             return 0;
+        }
+    }
+
+    /// <summary>
+    /// 曲库语言画像累加器（v7）。
+    ///
+    /// 只扫**索引内容列**（标题 / 歌手 / 专辑 / 文件名 / 歌词 / 译文 / 音译），
+    /// **不扫**由它们派生的拼音 / 首字母 / 读音列——否则纯中文库会因拼音字母被误判为「含拉丁」，
+    /// 中文歌的罗马字读音也会把纯英文库误判为「含日文」。
+    ///
+    /// 增量构建从旧画像起步（OR 语义）：删掉最后一首日文歌后位仍可能为 true，
+    /// 但那只意味着「不裁剪兜底趟」，结果依旧正确，不需要为此做全库重算。
+    /// </summary>
+    private struct ScriptProfile
+    {
+        public bool Japanese;
+        public bool Korean;
+        public bool Han;
+        public bool Latin;
+
+        public static ScriptProfile FromMeta(StoreMeta? meta) => new()
+        {
+            Japanese = meta?.HasJapanese ?? true,
+            Korean = meta?.HasKorean ?? true,
+            Han = meta?.HasHan ?? true,
+            Latin = meta?.HasLatin ?? true,
+        };
+
+        public void Add(DocTokens doc)
+        {
+            if (Japanese && Korean && Han && Latin) return;
+            Scan(doc.TitleTok);
+            Scan(doc.ArtistTok);
+            Scan(doc.AlbumTok);
+            Scan(doc.FilenameTok);
+            Scan(doc.LyricsTok);
+            Scan(doc.LyricsTrTok);
+            Scan(doc.LyricsRomTok);
+        }
+
+        private void Scan(string text)
+        {
+            foreach (var ch in text)
+            {
+                if (!Han && ScriptRanges.IsCjk(ch)) Han = true;
+                else if (!Japanese && ScriptRanges.IsKana(ch)) Japanese = true;
+                else if (!Korean && ScriptRanges.IsHangul(ch)) Korean = true;
+                else if (!Latin && ScriptRanges.IsLatinLetter(ch)) Latin = true;
+            }
         }
     }
 }
