@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/downloader/download_controller.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../../l10n/l10n.dart';
+import '../widgets/common/smooth_wheel_scroll_controller.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/download/delete_dialog.dart';
 import '../widgets/download/download_task_tile.dart';
@@ -35,6 +36,15 @@ class _DownloadPageState extends ConsumerState<DownloadPage> {
 
   /// 批量模式下选中的任务 id。
   final Set<String> _selected = {};
+
+  /// 下载任务列表控制器：滚轮/触控板滚动带短时缓动（触摸拖拽/键盘不受影响）。
+  final ScrollController _scroll = SmoothWheelScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   /// 页面可见性（非活动分支被 go_router 包在 TickerMode(enabled:false) 内）。
   bool? _visible;
