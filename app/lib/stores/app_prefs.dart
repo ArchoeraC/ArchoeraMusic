@@ -883,13 +883,17 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
-  /// 设置本地曲库搜索索引开关（总开关 / `.lrc` 子开关）。
+  /// 设置本地曲库搜索索引开关（总开关 / `.lrc` / 歌词罗马音子开关）。
   ///
   /// 同步刷新 [appPrefsSnapshot]：`SearchService` 经该快照判定启用态，
   /// 设置页切换后立即调用 `ensureIndex` / `deactivate` 才能读到新值，
   /// 无需等待应用根组件下一帧重建刷新快照。
-  void setSearchIndex({bool? enabled, bool? indexLrc}) {
-    state = state.copyWithSearchIndex(enabled: enabled, indexLrc: indexLrc);
+  void setSearchIndex({bool? enabled, bool? indexLrc, bool? romajiLyrics}) {
+    state = state.copyWithSearchIndex(
+      enabled: enabled,
+      indexLrc: indexLrc,
+      romajiLyrics: romajiLyrics,
+    );
     state.save();
     appPrefsSnapshot = state;
   }

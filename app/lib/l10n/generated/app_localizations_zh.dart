@@ -4495,6 +4495,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsSearchIndexLrcDesc => '同时索引与音频同名的 .lrc 歌词（需先启用总开关）';
 
   @override
+  String get settingsSearchIndexRomaji => '生成歌词罗马音索引';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      '日语歌词没有音译时自动生成罗马音，可用罗马字搜索（索引体积约增加一倍）';
+
+  @override
   String get settingsSearchIndexNote =>
       '索引是派生数据：默认关闭零成本；开启后首次构建占用时间与磁盘（随曲库增长，约数百 MB @ 万首），构建失败会自动回退基础搜索。';
 
@@ -10714,6 +10721,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsSearchIndexLrcDesc => '同时索引与音频同名的 .lrc 歌词（需先启用总开关）';
+
+  @override
+  String get settingsSearchIndexRomaji => '生成歌词罗马音索引';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      '日语歌词没有音译时自动生成罗马音，可用罗马字搜索（索引体积约增加一倍）';
 
   @override
   String get settingsSearchIndexNote =>
@@ -16936,6 +16950,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsSearchIndexLrcDesc => '同時索引與音訊同名的 .lrc 歌詞（需先啟用總開關）';
+
+  @override
+  String get settingsSearchIndexRomaji => '產生歌詞羅馬音索引';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      '日語歌詞沒有音譯時自動產生羅馬音，可用羅馬字搜尋（索引體積約增加一倍）';
 
   @override
   String get settingsSearchIndexNote =>

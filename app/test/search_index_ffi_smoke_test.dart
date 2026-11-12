@@ -96,7 +96,7 @@ void main() {
     expect(File(searchDb).existsSync(), isTrue);
 
     // 只读打开 search.db，经原生分析器查询。
-    final index = SearchIndex.open(searchDb, analyzer: lib.analyze);
+    final index = SearchIndex.open(searchDb, lib: lib);
     expect(index, isNotNull);
     addTearDown(index!.close);
 
@@ -316,7 +316,7 @@ void main() {
     );
     expect(code, 0, reason: 'indexer_run 应返回 0，实际: $text');
 
-    final index = SearchIndex.open(searchDb, analyzer: lib.analyze);
+    final index = SearchIndex.open(searchDb, lib: lib);
     expect(index, isNotNull);
     addTearDown(index!.close);
 
@@ -367,7 +367,7 @@ Future<SearchIndex> _buildIndex(
   );
   expect(code, 0, reason: 'indexer_run 应返回 0，实际: $text');
 
-  final index = SearchIndex.open(searchDb, analyzer: lib.analyze);
+  final index = SearchIndex.open(searchDb, lib: lib);
   expect(index, isNotNull);
   addTearDown(index!.close);
   return index;

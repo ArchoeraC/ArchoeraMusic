@@ -4802,6 +4802,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Indexer aussi les paroles .lrc du même nom que l\'audio (nécessite l\'interrupteur principal)';
 
   @override
+  String get settingsSearchIndexRomaji => 'Générer la romanisation des paroles';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      'Générer automatiquement le romaji des paroles japonaises sans translittération pour les retrouver en romaji (taille de l\'index environ doublée)';
+
+  @override
   String get settingsSearchIndexNote =>
       'L\'index est une donnée dérivée : désactivé par défaut et gratuit ; son activation consomme du temps et du disque en arrière-plan (quelques centaines de Mo pour 10 000 titres) ; en cas d\'échec, retour automatique à la recherche de base.';
 

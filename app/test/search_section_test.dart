@@ -22,16 +22,22 @@ class _Prefs extends AppPrefsNotifier {
 
   /// 记录 setSearchIndex 调用（不影响全局 appPrefsSnapshot / 不落盘）。
   bool? lastIndexLrc;
+  bool? lastRomajiLyrics;
   int setSearchIndexCalls = 0;
 
   @override
   AppPrefs build() => _initial;
 
   @override
-  void setSearchIndex({bool? enabled, bool? indexLrc}) {
+  void setSearchIndex({bool? enabled, bool? indexLrc, bool? romajiLyrics}) {
     setSearchIndexCalls++;
     lastIndexLrc = indexLrc ?? lastIndexLrc;
-    state = state.copyWithSearchIndex(enabled: enabled, indexLrc: indexLrc);
+    lastRomajiLyrics = romajiLyrics ?? lastRomajiLyrics;
+    state = state.copyWithSearchIndex(
+      enabled: enabled,
+      indexLrc: indexLrc,
+      romajiLyrics: romajiLyrics,
+    );
   }
 }
 
@@ -58,7 +64,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final switches = tester.widgetList<Switch>(find.byType(Switch)).toList();
-    expect(switches, hasLength(2), reason: '总开关 + .lrc 子开关');
+    expect(switches, hasLength(3), reason: '总开关 + .lrc 子开关 + 歌词罗马音子开关');
     expect(switches[0].value, isFalse, reason: '总开关默认关');
     expect(switches[0].onChanged, isNotNull);
     expect(switches[1].value, isFalse, reason: '.lrc 子开关默认关');
@@ -66,6 +72,12 @@ void main() {
       switches[1].onChanged,
       isNull,
       reason: '总开关关闭时 .lrc 子开关不可用（onChanged == null）',
+    );
+    expect(switches[2].value, isFalse, reason: '歌词罗马音子开关默认关');
+    expect(
+      switches[2].onChanged,
+      isNull,
+      reason: '总开关关闭时歌词罗马音子开关不可用（onChanged == null）',
     );
     // 关闭态：动作按钮禁用（不构造 SearchService / 不触碰 search.db）。
     expect(find.text('Rebuild index'), findsOneWidget);
@@ -81,6 +93,7 @@ void main() {
     final switches = tester.widgetList<Switch>(find.byType(Switch)).toList();
     expect(switches[0].value, isTrue);
     expect(switches[1].onChanged, isNotNull);
+    expect(switches[2].onChanged, isNotNull);
   });
 
   testWidgets('总开关开启：切换 .lrc 子开关 → 写偏好 + 触发增量重建', (tester) async {
@@ -109,5 +122,33 @@ void main() {
 
     expect(prefs.lastIndexLrc, isTrue, reason: '切换后写入 .lrc 偏好');
     expect(reindexCalls, 1, reason: '切换 .lrc 子开关触发一次增量重建（reindex）');
+  });
+
+  testWidgets('总开关开启：切换歌词罗马音子开关 → 写偏好 + 触发重建', (tester) async {
+    final prefs = _Prefs(AppPrefs().copyWithSearchIndex(enabled: true));
+    var reindexCalls = 0;
+    SearchService.instance.debugReindexOverride = () async {
+      reindexCalls++;
+    };
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appPrefsProvider.overrideWith(() => prefs)],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(
+            body: SingleChildScrollView(child: SearchSection()),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(Switch).at(2));
+    await tester.pumpAndSettle();
+
+    expect(prefs.lastRomajiLyrics, isTrue, reason: '切换后写入歌词罗马音偏好');
+    expect(reindexCalls, 1, reason: '切换歌词罗马音子开关触发一次重建（reindex）');
   });
 }

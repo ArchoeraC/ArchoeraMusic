@@ -21,7 +21,7 @@
 /// [SearchHighlighter] 记忆化；查询词元只解析一次。
 library;
 
-import 'search_cjk_fuzzy.dart';
+import 'script_ranges.dart';
 import 'search_highlight.dart';
 import 'search_models.dart';
 
@@ -74,12 +74,12 @@ List<_CjkSegment> _cjkSegments(String text) {
   final out = <_CjkSegment>[];
   var i = 0;
   while (i < text.length) {
-    if (!isCjkCodeUnit(text.codeUnitAt(i))) {
+    if (!isCjk(text.codeUnitAt(i))) {
       i++;
       continue;
     }
     final start = i;
-    while (i < text.length && isCjkCodeUnit(text.codeUnitAt(i))) {
+    while (i < text.length && isCjk(text.codeUnitAt(i))) {
       i++;
     }
     out.add(_CjkSegment(text.substring(start, i), start));

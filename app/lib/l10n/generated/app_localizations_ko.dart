@@ -4557,6 +4557,13 @@ class AppLocalizationsKo extends AppLocalizations {
       '오디오와 같은 이름의 .lrc 가사도 함께 인덱싱합니다(마스터 스위치 필요)';
 
   @override
+  String get settingsSearchIndexRomaji => '가사 로마자 색인 생성';
+
+  @override
+  String get settingsSearchIndexRomajiDesc =>
+      '음역이 없는 일본어 가사에 로마자를 자동 생성해 로마자로 검색할 수 있습니다(색인 크기 약 2배)';
+
+  @override
   String get settingsSearchIndexNote =>
       '인덱스는 파생 데이터입니다: 기본값은 꺼짐이며 비용이 없습니다. 켜면 최초 구축에 시간과 디스크(1만 곡 기준 수백 MB)를 사용하며, 실패하면 자동으로 기본 검색으로 폴백합니다.';
 

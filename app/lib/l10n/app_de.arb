@@ -1432,6 +1432,8 @@
   "settingsSearchIndexEnableOff": "Aus: nur einfache Suche (Titel / Künstler / Album), kein Index, kein Speicherverbrauch",
   "settingsSearchIndexLrc": ".lrc-Sidecar-Lyrics indexieren",
   "settingsSearchIndexLrcDesc": "Auch gleichnamige .lrc-Lyrics indexieren (Hauptschalter erforderlich)",
+  "settingsSearchIndexRomaji": "Romanisierung der Liedtexte indexieren",
+  "settingsSearchIndexRomajiDesc": "Romanisierung für japanische Liedtexte ohne Umschrift automatisch erzeugen, damit sie per Romaji gefunden werden (etwa doppelte Indexgröße)",
   "settingsSearchIndexNote": "Der Index ist abgeleitet: standardmäßig aus und kostenlos; beim Aktivieren werden im Hintergrund Zeit und Speicher belegt (bei 10.000 Titeln einige hundert MB); bei Fehlern wird automatisch auf die einfache Suche zurückgefallen.",
   "settingsSectionSearchIndexStatus": "Status & Wartung",
   "settingsSearchIndexStatusDisabled": "Deaktiviert",
