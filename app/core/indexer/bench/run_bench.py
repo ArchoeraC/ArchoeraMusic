@@ -414,6 +414,31 @@ def main(argv: list[str] | None = None) -> int:
         query[f"A@{limit}"] = query_run(index_a, f"A", True, limit)
         query[f"B@{limit}"] = query_run(index_b, "B", False, limit)
 
+    # P0 召回 / 排序质量：必须在**增量改写 index_a 之前**跑。
+    # 延迟达标不等于搜索可用——§4.5 那次排序整体失效在 qbench 里只表现为「更快」，
+    # 本项用字面标注做金标准，专门盯「快而错」。
+    def quality_run(index: str, label: str):
+        out = os.path.join(work, f"qeval_{label}.json")
+        if os.path.exists(out):
+            os.remove(out)
+        cmd = ["dotnet", qb, "eval", "--library", library, "--index", index,
+               "--limit", "50", "--out", out]
+        print(f"-- 召回 / 排序质量 {label} …")
+        r = run_measured(cmd, f"qeval_{label}", work)
+        if r["rc"] != 0 or not os.path.exists(out):
+            raise SystemExit(
+                f"qbench eval 失败（rc={r['rc']}，无输出 JSON）：见 {work}/qeval_{label}.stderr")
+        with open(out, encoding="utf-8") as f:
+            data = json.load(f)
+        agg = data["aggregate"]["all"]
+        if agg.get("count"):
+            print(f"   P@1={agg['p1']:.3f} P@10={agg['p10']:.3f} "
+                  f"NDCG@10={agg['ndcg10']:.3f} MRR@10={agg['mrr10']:.3f} "
+                  f"(n={agg['count']})")
+        return data
+
+    quality = {"A": quality_run(index_a, "A")}
+
     # 增量：先量**零脏曲**（固定开销 = 阶段一探测 + 收尾写路径），再量 K 首。
     def incremental(label: str, index: str, extra: list[str], k: int = 0):
         cmd = ["dotnet", cli, "build", "--db", library, "--index", index] + extra
@@ -443,6 +468,7 @@ def main(argv: list[str] | None = None) -> int:
         "incremental": incremental_runs,
         "noop_inc_lrc": noop_inc_lrc,
         "query": query,
+        "quality": quality,
         "query_limits": limits,
         "breakdown": breakdown,
         "budget": BUDGET,
@@ -733,6 +759,51 @@ def write_report(m: dict) -> None:
              "会让 FTS5 的 `bm25()` 在无 `MATCH` 的外层查询里**静默返回 0**，相关性排序整体失效"
              "（且并不更快）。现一律 `WHERE search_fts MATCH ? ORDER BY bm25(...) LIMIT ?` 全排序；"
              "`--cap` 仍可传但不再影响结果。详见设计文档 §4.5 与 `SearchLayerTests.RankingIntegrity`。")
+    L.append("")
+    L.append("### 5.5 召回 / 排序质量（P0 验收基线）")
+    L.append("")
+    q = m.get("quality", {}).get("A")
+    if not q:
+        L.append("> 本次未采集（`--skip-quality` 或采集失败）。")
+    else:
+        agg = q["aggregate"]
+        L.append("**金标准口径**：曲库文本（标题 / 艺人 / 专辑 / 歌词 / `.lrc`）**字面包含**查询目标字串。"
+                 "这是「子串搜索」的诚实定义，**不依赖被测分析器**（避免循环论证）；"
+                 "拼音 / 繁体查询由评测集给出目标字串（`woaini` → `我爱你`、`愛` → `愛`/`爱`）。")
+        L.append("")
+        L.append("查询集：**窄 / 中档从曲库自动派生**（同名曲目 2–10 首、15–200 首）"
+                 "+ 高频艺人 + 固定短语（中文子串 / 短语 / 繁体 / 拉丁 / 拼音 / 首字母）。"
+                 "按相关项数量分档——`recall@k` 在 k≪|R| 时数学上不可能高，宽查询只看 precision / NDCG。")
+        L.append("")
+        L.append("| 分档 | 条数 | P@1 | P@10 | R@10 | R@50 | MRR@10 | NDCG@10 |")
+        L.append("|---|---|---|---|---|---|---|---|")
+        for key, label in (("narrow", "窄（≤10 首）"), ("medium", "中（11–500 首）"),
+                           ("broad", "宽（>500 首）"), ("all", "**全部**")):
+            g = agg.get(key) or {}
+            if not g.get("count"):
+                continue
+            L.append(f"| {label} | {g['count']} | {g['p1']:.3f} | {g['p10']:.3f} | "
+                     f"{g['r10']:.3f} | {g['r50']:.3f} | {g['mrr10']:.3f} | {g['ndcg10']:.3f} |")
+        L.append("")
+        L.append("逐条（`n_rel` = 标注相关项数；`found@50` = 前 50 条里命中几首）：")
+        L.append("")
+        L.append("| 查询 | 文本 | 分档 | n_rel | found@50 | P@10 | R@10 | MRR@10 | NDCG@10 |")
+        L.append("|---|---|---|---|---|---|---|---|---|")
+        for r in q["queries"]:
+            L.append(f"| `{r['name']}` | `{r['text']}` | {r['bucket']} | {r['n_rel']} | "
+                     f"{r['found_at_50']} | {r['p10']:.3f} | {r['r10']:.3f} | "
+                     f"{r['mrr10']:.3f} | {r['ndcg10']:.3f} |")
+        L.append("")
+        empty = agg.get("empty_ground_truth") or []
+        if empty:
+            L.append(f"> 无标注相关项（本语料不含这些目标，已排除出汇总）：{', '.join('`'+e+'`' for e in empty)}")
+        missing = agg.get("total_missing_from_index") or 0
+        if missing:
+            L.append(f"> ⚠ 标注项中有 {missing} 首不在索引里（索引落后于曲库）——召回被**结构性**压低，"
+                     "先查增量是否收敛，再评价分析器。")
+        L.append("")
+        L.append("> 局限：合成语料的「相关性」是字面包含，没有人工分级标注，"
+                 "故只报二元 NDCG；真实曲库可用 `qbench eval --spec <queries.json>` 提供人工标注集。")
     L.append("")
     L.append("## 6. 对照 §2.2 预算")
     L.append("")

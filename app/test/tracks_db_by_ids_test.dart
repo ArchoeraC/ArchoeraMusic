@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -89,5 +90,14 @@ void main() {
     writer.close();
     final reversed = all.reversed.toList();
     expect(db.listTracksByIds(reversed).map((r) => r.id).toList(), reversed);
+  });
+
+  test('fetchByIdsTask（后台 isolate 入口）保持顺序并独立持有连接', () async {
+    // 「播放全部」在宽查询下（命中上万）经 Isolate.run 走本入口，
+    // 目的是别把 130ms 的行构造压在 UI isolate 上。
+    final rows = await Isolate.run(
+      () => TracksDb.fetchByIdsTask((dbPath: dbPath, ids: const ['c', 'a'])),
+    );
+    expect(rows.map((r) => r.id).toList(), ['c', 'a']);
   });
 }
