@@ -173,41 +173,66 @@ bool _playerRouteInFlight = false;
 /// 播放页收起动画是否在途（防止快捷键连按重复 pop 掉下层页面）。
 bool _playerRouteClosing = false;
 
-/// 当前顶层路由是否已是全屏播放页。
-bool get isPlayerPageOpen =>
-    appRouter.routerDelegate.currentConfiguration.uri.path == '/player';
+/// 播放页是否已展开（`push` 成功到 `pop` 完成之间为 true）。
+///
+/// **不能**用 `routerDelegate.currentConfiguration.uri.path` 判断：go_router 的
+/// `RouteMatchList.uri` 只反映非 [ImperativeRouteMatch] 的匹配，而 `push('/player')`
+/// 产生的正是 imperative match —— 因此 `uri` 仍停留在壳层地址（如 `/library`）。
+/// 用 uri 判断会恒为 false，`closePlayerPage()` 直接 return，表现为「播放页打开后
+/// 关闭按钮没反应 / 快捷键也关不掉」。
+///
+/// 状态只由本文件的开关入口维护，并在 push 的 future 完成（任何原因导致路由
+/// 出栈，含系统返回 / 深链跳走）时统一复位。
+bool _playerPageOpen = false;
+
+/// 当前是否已展开全屏播放页。
+bool get isPlayerPageOpen => _playerPageOpen;
 
 /// 展开全屏播放页（幂等）。
 ///
 /// 双重防护，避免重复入栈：
-/// 1. 当前顶层路由已是 `/player` → 直接返回；
+/// 1. 播放页已展开 → 直接返回；
 /// 2. 已有一次 push 在途（尚未 pop）→ 直接返回。
 ///
 /// 快捷键（`ShortcutAction.openPlayer`）与播放条封面统一走此入口。
-void openPlayerPage() {
-  if (_playerRouteInFlight) return;
-  if (isPlayerPageOpen) {
-    return;
-  }
+///
+/// [router] 仅供测试注入；业务代码一律省略（使用全局 [appRouter]）。
+void openPlayerPage({GoRouter? router}) {
+  final r = router ?? appRouter;
+  if (_playerRouteInFlight || _playerPageOpen) return;
   _playerRouteInFlight = true;
-  appRouter.push('/player').whenComplete(() {
+  _playerPageOpen = true;
+  r.push('/player').whenComplete(() {
     _playerRouteInFlight = false;
     _playerRouteClosing = false;
+    _playerPageOpen = false;
   });
 }
 
 /// 收起全屏播放页（幂等；收起动画期间重复调用忽略）。
-void closePlayerPage() {
-  if (_playerRouteClosing || !isPlayerPageOpen) return;
+///
+/// `canPop()` 守住「push 还没被路由处理」的窗口：同一帧内连按快捷键会先 open
+/// 再 close，此时页栈里还没有播放页，`pop()` 会抛 `GoError: There is nothing to pop`。
+void closePlayerPage({GoRouter? router}) {
+  final r = router ?? appRouter;
+  if (_playerRouteClosing || !_playerPageOpen || !r.canPop()) return;
   _playerRouteClosing = true;
-  appRouter.pop();
+  r.pop();
 }
 
 /// 打开 / 关闭全屏播放页（快捷键 `ShortcutAction.openPlayer` 的切换入口）。
-void togglePlayerPage() {
-  if (isPlayerPageOpen) {
-    closePlayerPage();
+void togglePlayerPage({GoRouter? router}) {
+  if (_playerPageOpen) {
+    closePlayerPage(router: router);
   } else {
-    openPlayerPage();
+    openPlayerPage(router: router);
   }
+}
+
+/// 测试用：复位开关状态（模块级状态会跨用例泄漏；用例结束时常有页面未关闭）。
+@visibleForTesting
+void resetPlayerPageRouteStateForTest() {
+  _playerRouteInFlight = false;
+  _playerRouteClosing = false;
+  _playerPageOpen = false;
 }
