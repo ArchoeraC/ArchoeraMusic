@@ -24,7 +24,7 @@ import 'providers.dart';
 Future<void> refreshAfterVaultUnlock(dynamic ref) async {
   // ① 先丢弃「库锁定期间」可能固化的各平台内存缓存（否则解锁后仍读到空）。
   invalidateNeteaseSessionCache();
-  qmReloadQQMusicCookies(); // QQ cookies 为进程级缓存，须显式失效
+  qmReloadQQMusicCookies(); // QQ cookies / 设备身份为进程级缓存，须显式失效
 
   // ② 逐平台重读登录态。四个平台的"登录态来源"各不相同：
   //    NetEase：Notifier（显式 init）

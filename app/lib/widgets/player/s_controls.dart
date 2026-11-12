@@ -11,6 +11,7 @@ import '../../easter_egg/mouse_dodge.dart';
 import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../common/anim.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 /// 按钮样式。
@@ -50,22 +51,22 @@ class SButton extends StatelessWidget {
   final VoidCallback? onPressed;
 
   double get _height => switch (size) {
-        SButtonSize.small => 28,
-        SButtonSize.medium => 36,
-        SButtonSize.large => 42,
-      };
+    SButtonSize.small => 28,
+    SButtonSize.medium => 36,
+    SButtonSize.large => 42,
+  };
 
   double get _fontSize => switch (size) {
-        SButtonSize.small => 12.5,
-        SButtonSize.medium => 14,
-        SButtonSize.large => 15,
-      };
+    SButtonSize.small => 12.5,
+    SButtonSize.medium => 14,
+    SButtonSize.large => 15,
+  };
 
   double get _iconSize => switch (size) {
-        SButtonSize.small => 15,
-        SButtonSize.medium => 18,
-        SButtonSize.large => 20,
-      };
+    SButtonSize.small => 15,
+    SButtonSize.medium => 18,
+    SButtonSize.large => 20,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -74,25 +75,25 @@ class SButton extends StatelessWidget {
 
     final (Color bg, Color fg, Color hoverBg) = switch (variant) {
       SButtonVariant.primary => (
-          scheme.primary,
-          scheme.onPrimary,
-          scheme.primary.withValues(alpha: 0.85),
-        ),
+        scheme.primary,
+        scheme.onPrimary,
+        scheme.primary.withValues(alpha: 0.85),
+      ),
       SButtonVariant.secondary => (
-          scheme.surfaceContainerHighest,
-          scheme.onSurface,
-          scheme.onSurface.withValues(alpha: 0.1),
-        ),
+        scheme.surfaceContainerHighest,
+        scheme.onSurface,
+        scheme.onSurface.withValues(alpha: 0.1),
+      ),
       SButtonVariant.ghost => (
-          Colors.transparent,
-          scheme.onSurfaceVariant,
-          scheme.onSurface.withValues(alpha: 0.07),
-        ),
+        Colors.transparent,
+        scheme.onSurfaceVariant,
+        scheme.onSurface.withValues(alpha: 0.07),
+      ),
       SButtonVariant.error => (
-          scheme.error,
-          scheme.onError,
-          scheme.error.withValues(alpha: 0.85),
-        ),
+        scheme.error,
+        scheme.onError,
+        scheme.error.withValues(alpha: 0.85),
+      ),
     };
 
     final Widget button = MouseRegion(
@@ -104,23 +105,34 @@ class SButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(circle || round ? AppRadius.pill : AppRadius.control),
+            borderRadius: BorderRadius.circular(
+              circle || round ? AppRadius.pill : AppRadius.control,
+            ),
             hoverColor: enabled ? hoverBg : Colors.transparent,
             onTap: enabled ? onPressed : null,
             child: AnimatedContainer(
               duration: animDuration(
-                  context, const Duration(milliseconds: 150)),
+                context,
+                const Duration(milliseconds: 150),
+              ),
               width: block ? double.infinity : (circle ? _height : null),
               height: _height,
-              padding: circle ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 14),
+              padding: circle
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
                 color: bg.withValues(alpha: enabled ? 1 : 0.45),
-                borderRadius:
-                    BorderRadius.circular(circle || round ? AppRadius.pill : AppRadius.control),
+                borderRadius: BorderRadius.circular(
+                  circle || round ? AppRadius.pill : AppRadius.control,
+                ),
               ),
               child: Row(
-                mainAxisSize: circle || block ? MainAxisSize.max : MainAxisSize.min,
-                mainAxisAlignment: circle ? MainAxisAlignment.center : MainAxisAlignment.center,
+                mainAxisSize: circle || block
+                    ? MainAxisSize.max
+                    : MainAxisSize.min,
+                mainAxisAlignment: circle
+                    ? MainAxisAlignment.center
+                    : MainAxisAlignment.center,
                 children: [
                   if (loading) ...[
                     SizedBox(
@@ -136,8 +148,9 @@ class SButton extends StatelessWidget {
                     Icon(
                       icon,
                       size: _iconSize,
-                      color:
-                          (iconColor ?? fg).withValues(alpha: enabled ? 1 : 0.7),
+                      color: (iconColor ?? fg).withValues(
+                        alpha: enabled ? 1 : 0.7,
+                      ),
                     ),
                     if (!circle) const SizedBox(width: 6),
                   ],
@@ -150,7 +163,9 @@ class SButton extends StatelessWidget {
                         style: TextStyle(
                           color: fg.withValues(alpha: enabled ? 1 : 0.7),
                           fontSize: _fontSize,
-                          fontWeight: variant == SButtonVariant.primary ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: variant == SButtonVariant.primary
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                         ),
                       ),
                     ),
@@ -241,14 +256,20 @@ class _SInputState extends State<SInput> {
           hintText: widget.hintText,
           prefixIcon: widget.prefixIcon == null
               ? null
-              : Icon(widget.prefixIcon, size: 17, color: scheme.onSurfaceVariant.withValues(alpha: 0.7)),
+              : Icon(
+                  widget.prefixIcon,
+                  size: 17,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                ),
           prefixIconConstraints: const BoxConstraints(minWidth: 36),
           suffixIcon: widget.clearable
               ? ValueListenableBuilder<TextEditingValue>(
                   valueListenable: _controller,
                   builder: (context, value, _) => AnimatedOpacity(
                     duration: animDuration(
-                        context, const Duration(milliseconds: 120)),
+                      context,
+                      const Duration(milliseconds: 120),
+                    ),
                     opacity: value.text.isEmpty ? 0 : 1,
                     child: IconButton(
                       tooltip: context.l10n.commonClear,
@@ -259,7 +280,10 @@ class _SInputState extends State<SInput> {
                               _controller.clear();
                               widget.onChanged?.call('');
                             },
-                      icon: Icon(EtaIcons.close, color: scheme.onSurfaceVariant),
+                      icon: Icon(
+                        EtaIcons.close,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 )
@@ -307,14 +331,16 @@ class SSegmented<T> extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final o in options) _buildItem(context, scheme, o),
-        ],
+        children: [for (final o in options) _buildItem(context, scheme, o)],
       ),
     );
   }
 
-  Widget _buildItem(BuildContext context, ColorScheme scheme, SSegmentedOption<T> o) {
+  Widget _buildItem(
+    BuildContext context,
+    ColorScheme scheme,
+    SSegmentedOption<T> o,
+  ) {
     final isSelected = selected == o.value;
     final fg = isSelected ? scheme.primary : scheme.onSurfaceVariant;
     final Widget item = MouseRegion(
@@ -441,4 +467,3 @@ class SDropdown<T> extends StatelessWidget {
     return MouseDodge(child: bar);
   }
 }
-

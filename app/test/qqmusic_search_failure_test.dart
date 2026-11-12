@@ -16,6 +16,7 @@ library;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/apis/qqmusic/api.dart';
+import 'package:archoera_music/apis/qqmusic/core/pacing.dart';
 import 'package:archoera_music/apis/qqmusic/core/request.dart';
 import 'package:archoera_music/apis/qqmusic/core/sign.dart';
 import 'package:archoera_music/services/qqmusic/qqmusic_api.dart';
@@ -98,9 +99,15 @@ void main() {
   setUp(() {
     original = qmHttpTransport;
     qmClearCache();
+    // 风控冷却/连击是跨用例的进程级状态：用例之间必须复位，否则前面命中
+    // risk 的用例会让后续用例直接短路（不联网）。
+    qmResetPacing();
   });
 
-  tearDown(() => qmHttpTransport = original);
+  tearDown(() {
+    qmHttpTransport = original;
+    qmResetPacing();
+  });
 
   group('qmZzcSign（独立实现向量对照）', () {
     test('与 baka qq.js:315 算法逐位一致', () {
@@ -318,7 +325,7 @@ void main() {
       );
     });
 
-    test('传输级错误 → transient，退避重试 3 次', () async {
+    test('传输级错误 → transient，退避重试 1 次（旧实现 3 次，易触发风控）', () async {
       var calls = 0;
       qmHttpTransport = (body, {extraHeaders, url}) async {
         calls++;
@@ -332,7 +339,7 @@ void main() {
               .having((e) => e.kind, 'kind', QmErrorKind.transient),
         ),
       );
-      expect(calls, 3, reason: '初次 + 2 次退避重试');
+      expect(calls, 2, reason: '初次 + 1 次退避重试');
     });
 
     test('空关键词 → 空结果且不发起请求', () async {

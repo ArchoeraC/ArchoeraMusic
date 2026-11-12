@@ -41,9 +41,12 @@ void main() {
     expect(names, contains('minimp3'));
     expect(names, contains('stb_vorbis'));
     expect(names, contains('miniaudio'));
-    // scraper
+    // scraper（加密后端为内嵌 Rust staticlib，不再声明系统 OpenSSL）
     expect(names, contains('libcurl'));
-    expect(names, contains('OpenSSL'));
+    expect(
+      names,
+      contains('scraper — Rust crates（aes/md-5/sha1/num-bigint/getrandom）'),
+    );
     expect(names, contains('SQLite3'));
     expect(names, contains('nlohmann_json'));
     // subsonic / transcoder
@@ -85,12 +88,12 @@ void main() {
     expect(sections, isNotEmpty);
 
     final titles = sections.map((s) => s.$1).toList();
-    // Apache-2.0 组应合并 ToolGood.Words 与 SQLitePCLRaw（及 mbedTLS / OpenSSL …）。
+    // Apache-2.0 组应合并 ToolGood.Words、SQLitePCLRaw（及 mbedTLS / Rust 加密 crates …）。
     final apache = titles.firstWhere((t) => t.startsWith('Apache-2.0'));
     expect(apache, contains('ToolGood.Words'));
     expect(apache, contains('SQLitePCLRaw.lib.e_sqlite3'));
     expect(apache, contains('mbedTLS'));
-    expect(apache, contains('OpenSSL'));
+    expect(apache, contains('scraper — Rust crates'));
     // BSD-3-Clause 组应合并 libopus / WavPack / kissfft 等。
     final bsd = titles.firstWhere((t) => t.startsWith('BSD-3-Clause'));
     expect(bsd, contains('libopus'));
@@ -157,11 +160,7 @@ void main() {
       }
     }
     // ISC 当前未被任何随包原生组件直接引用 → 走兜底分支。
-    expect(
-      titles,
-      contains('其他随包许可正文 — ISC'),
-      reason: 'ISC 正文应被兜底列出',
-    );
+    expect(titles, contains('其他随包许可正文 — ISC'), reason: 'ISC 正文应被兜底列出');
   });
 
   test('Dart/Flutter 包分组：可解析（测试环境可能为空）', () async {

@@ -15,18 +15,23 @@ import 'system_window.dart';
 class FfiSystemWindow implements SystemWindow {
   FfiSystemWindow(this._b) {
     _winSub = _b.windowEvents.listen((e) {
-      final snap = SystemWindowState(minimized: e.minimized, focused: e.focused);
+      final snap = SystemWindowState(
+        minimized: e.minimized,
+        focused: e.focused,
+      );
       _state = snap;
       _stateCtrl.add(snap);
     });
     _backendSub = _b.backendEvents.listen((e) {
       if (e.lost) {
-        _failures.add(PlatformCapabilityFailure(
-          capability: 'window',
-          code: aplErrBackend,
-          message: aplErrorMessage(aplErrBackend),
-          lost: true,
-        ));
+        _failures.add(
+          PlatformCapabilityFailure(
+            capability: 'window',
+            code: aplErrBackend,
+            message: aplErrorMessage(aplErrBackend),
+            lost: true,
+          ),
+        );
       }
     });
   }
@@ -39,8 +44,10 @@ class FfiSystemWindow implements SystemWindow {
   final _stateCtrl = StreamController<SystemWindowState>.broadcast();
   final _failures = StreamController<PlatformCapabilityFailure>.broadcast();
 
-  SystemWindowState _state =
-      const SystemWindowState(minimized: false, focused: true);
+  SystemWindowState _state = const SystemWindowState(
+    minimized: false,
+    focused: true,
+  );
 
   @override
   Future<bool> setEvents(bool on) async => _b.setWindowEvents(on) == aplOk;
@@ -49,6 +56,7 @@ class FfiSystemWindow implements SystemWindow {
   Stream<SystemWindowState> get state => _stateCtrl.stream;
 
   /// 最近一次已知状态（新订阅者可用作初值；桥接事件到达前为前台默认值）。
+  @override
   SystemWindowState get current => _state;
 
   @override

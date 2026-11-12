@@ -42,7 +42,7 @@ import 'lyrics_word_anim.dart';
 import 'spring.dart';
 import 'spring_policy.dart';
 
-import 'package:archoera_music/eta/icon/eta_icons.dart';
+import '../../../l10n/l10n.dart';
 
 part 'lyrics_physics_wall/lyrics_physics_wall_state.dart';
 part 'lyrics_physics_wall/lyrics_physics_wall_painter.dart';
@@ -376,12 +376,6 @@ class _PaintCtx {
 
   /// 上下渐隐由墙体自身按行透明度实现（见 [AmllPhysicsWall.edgeFade]）。
   bool edgeFade = false;
-
-  /// 间奏三点动画的当帧状态。
-  InterludeDotsState dots = InterludeDotsState.hidden;
-
-  /// 间奏三点在自然坐标系中的中心 y。
-  double dotsNaturalY = 0;
 
   /// 已排版段落缓存（可见窗口，P1）。见 [LyricsParagraphCache]。
   final LyricsParagraphCache cache = LyricsParagraphCache();

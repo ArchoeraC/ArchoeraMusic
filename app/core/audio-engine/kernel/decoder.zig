@@ -141,9 +141,11 @@ pub const Decoder = struct {
         position_ms: *const fn (ctx: *anyopaque) i64,
         /// 当前解码位置（**样本**，自文件开头计）。seek 后 = read 将输出的
         /// 首个样本的绝对样本号（可能 < seek 目标样本，表示目标落在该帧内，
-        /// 由上层裁剪掉前导样本实现样本级对齐）。返回 -1 = 未提供（上层
-        /// 不应裁剪，避免毫秒换算引入的舍入误差）。
-        position_samples: ?*const fn (ctx: *anyopaque) i64 = null,
+        /// 由上层裁剪掉前导样本实现样本级对齐）。
+        ///
+        /// **必填**：所有格式工厂都必须实现。上层不做毫秒估算兜底——毫秒
+        /// 换算会多裁/少裁，切档后反而引入新的错位；缺实现应在编译期暴露。
+        position_samples: *const fn (ctx: *anyopaque) i64,
         /// 释放全部资源
         deinit: *const fn (ctx: *anyopaque) void,
     };
@@ -160,12 +162,11 @@ pub const Decoder = struct {
         return self.vtable.position_ms(self.ctx);
     }
 
-    /// 当前解码位置（样本，自文件开头计）。vtable 未提供 → -1（未知）。
+    /// 当前解码位置（样本，自文件开头计）。
     /// 与 [positionMs] 的毫秒精度不同，本值**精确到样本**，供 seek 后裁掉
     /// 前导样本、实现样本级对齐（跨档无缝切换拼接）。
     pub inline fn positionSamples(self: *Decoder) i64 {
-        if (self.vtable.position_samples) |f| return f(self.ctx);
-        return -1;
+        return self.vtable.position_samples(self.ctx);
     }
 
     pub inline fn deinit(self: *Decoder) void {

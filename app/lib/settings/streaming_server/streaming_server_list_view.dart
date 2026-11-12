@@ -89,43 +89,47 @@ extension _StreamingServerListView on _StreamingServerListState {
     final selected = options.any((o) => o.value == prefs.defaultSource)
         ? prefs.defaultSource
         : autoDefaultSource;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: cardDecoration(scheme),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.settingsDefaultSource,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: scheme.onSurface,
+    // 搜索「默认音源」跳转锚点（本行是自定义卡片，不走 SettingTile）。
+    return SettingsAnchor(
+      label: l10n.settingsDefaultSource,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: cardDecoration(scheme),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.settingsDefaultSource,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurface,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  l10n.settingsDefaultSourceDesc,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.4,
-                    color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  const SizedBox(height: 3),
+                  Text(
+                    l10n.settingsDefaultSourceDesc,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      height: 1.4,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          SDropdown<String>(
-            options: options,
-            selected: selected,
-            onChanged: (value) =>
-                ref.read(appPrefsProvider.notifier).setDefaultSource(value),
-          ),
-        ],
+            const SizedBox(width: 12),
+            SDropdown<String>(
+              options: options,
+              selected: selected,
+              onChanged: (value) =>
+                  ref.read(appPrefsProvider.notifier).setDefaultSource(value),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -175,8 +179,9 @@ extension _StreamingServerListView on _StreamingServerListState {
                 ChoiceChip(
                   label: Text(label),
                   selected: current == key,
-                  onSelected: (_) =>
-                      ref.read(appPrefsProvider.notifier).setStreamingQuality(key),
+                  onSelected: (_) => ref
+                      .read(appPrefsProvider.notifier)
+                      .setStreamingQuality(key),
                 ),
             ],
           ),

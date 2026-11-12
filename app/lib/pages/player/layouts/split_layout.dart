@@ -15,6 +15,7 @@ import '../../../widgets/player/cover_switcher.dart';
 import '../../../widgets/player/player_cover.dart';
 import '../../../widgets/player/player_lyrics_block.dart';
 import '../../../widgets/player/player_lyrics_slot.dart';
+import '../../../widgets/player/player_shared_elements.dart';
 import 'player_layout.dart';
 
 class SplitPlayerLayout extends PlayerLayout {
@@ -54,6 +55,8 @@ class SplitPlayerLayout extends PlayerLayout {
           pulse: c.coverPulse,
           beatStrength: c.beatStrength,
           l10n: c.l10n,
+          coverBoundaryKey: c.sharedKeys[PlayerSharedElement.cover],
+          infoBoundaryKey: c.sharedKeys[PlayerSharedElement.info],
         );
         // 歌词块由 PlayerLyricsSlot 管理显隐/滑入滑出（进入动画结束后才挂载，
         // 对齐原版 lyricMounted；关闭时向下滑出并在动画结束后卸载）。
@@ -61,28 +64,32 @@ class SplitPlayerLayout extends PlayerLayout {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Positioned(
-                top: 0,
-                bottom: 0,
-                left: 0,
-                width: box.maxWidth * c.coverLyricRatio,
-                child: AnimatedSlide(
-                  offset: coverCentered
-                      ? const Offset(11 / 18, 0)
-                      : Offset.zero,
+              // 封面列：有歌词时占左侧 `coverLyricRatio`；无歌词且自动居中时
+              // 整列平移到页面中心。用 [AnimatedAlign] 声明对齐方式，不写死
+              // 位移比例——`coverLyricRatio` 改变或窗口尺寸变化都能正确居中
+              // （对齐 SPlayer `translateX(calc(50vw - 50%))` 的语义）。
+              Positioned.fill(
+                child: AnimatedAlign(
+                  alignment: coverCentered
+                      ? Alignment.center
+                      : Alignment.centerLeft,
                   duration: animDuration(
                     context,
                     const Duration(milliseconds: 600),
                   ),
-                  curve: Curves.easeOutCubic,
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: RepaintBoundary(
-                      child: CoverSwitcher(
-                        coverKey: c.coverKey,
-                        style: c.transitionStyle,
-                        next: c.slideNext,
-                        child: coverBlock,
+                  curve: kPlayerLayoutTransitionCurve,
+                  child: SizedBox(
+                    width: box.maxWidth * c.coverLyricRatio,
+                    height: box.maxHeight,
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: RepaintBoundary(
+                        child: CoverSwitcher(
+                          coverKey: c.coverKey,
+                          style: c.transitionStyle,
+                          next: c.slideNext,
+                          child: coverBlock,
+                        ),
                       ),
                     ),
                   ),
@@ -98,7 +105,9 @@ class SplitPlayerLayout extends PlayerLayout {
                   enabled: c.contentMounted && c.hasLyrics,
                   builder: (context) => Padding(
                     padding: const EdgeInsets.only(right: 64),
-                    child: RepaintBoundary(
+                    child: PlayerSharedElementBoundary(
+                      kind: PlayerSharedElement.lyrics,
+                      boundaryKey: c.sharedKeys[PlayerSharedElement.lyrics],
                       child: PlayerLyricsBlock(
                         hasLyrics: c.hasLyrics,
                         lyricScale: lyricScale,

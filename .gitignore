@@ -93,6 +93,8 @@ app/core/shell/target/
 app/core/subsonic/transcoder/target/
 app/core/vault-rs/target/
 app/core/vault-rs/build/
+# scraper 加密后端（Rust staticlib，链入 archoera_scraper）
+app/core/scraper-crypto/target/
 app/core/audio-engine/tempo-rs/target/
 
 # ============================================================================

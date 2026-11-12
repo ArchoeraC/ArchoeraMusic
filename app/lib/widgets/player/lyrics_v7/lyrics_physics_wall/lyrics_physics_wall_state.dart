@@ -19,9 +19,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   List<double> _blur = const [];
   bool _metricsDirty = true;
 
-  /// 间奏预留（三点）与每行自然中心等布局数据。
+  /// 间奏区间（只影响锚点/高亮，不再预留三点空间）。
   List<LyricInterlude> _interludes = const [];
-  List<double> _interludeDotY = const [];
 
   /// 需要参与弹簧/过渡动画的行窗口 `[_winStart, _winEnd)`。
   ///
@@ -429,10 +428,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _metricsDirty = false;
   }
 
-  /// 由当前 [_heights] 重建自然中心与间奏预留。
+  /// 由当前 [_heights] 重建自然中心。
   ///
   /// O(N) 纯算术（几百次加法），比逐行排版便宜几个数量级，可随按需测量
-  /// 随时重算。
+  /// 随时重算。间奏只影响锚点/高亮，不再为三点动画预留额外垂直空间。
   void _recomputeCenters() {
     final heights = _heights;
     final centers = computeCenters(
@@ -440,34 +439,6 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       gapPx: widget.fontSize * kLyricLineGapEm,
       isBg: [for (final g in widget.groups) g.isBG],
     ); // 行间 0.8×（AMLL wrapper 上下 .4em 内边距）
-    // 间奏预留：空隙之后的行整体下移「三点 + 上下留白」的高度，空隙本身
-    // 成为三点的位置（对齐 AMLL 给 anchor 之后的行加 interludeTotalHeight）。
-    final dotSize = widget.fontSize * 0.3;
-    final dotMargin = widget.fontSize * 0.4;
-    final interludeExtra = dotSize + dotMargin * 2;
-    if (_interludes.isEmpty) {
-      _interludeDotY = const [];
-    } else {
-      for (final it in _interludes) {
-        for (var i = it.anchorIndex + 1; i < centers.length; i++) {
-          centers[i] += interludeExtra;
-        }
-      }
-      _interludeDotY = [
-        for (final it in _interludes)
-          it.anchorIndex < 0
-              ? (centers.isEmpty
-                    ? 0.0
-                    : centers.first -
-                          heights.first / 2 -
-                          dotMargin -
-                          dotSize / 2)
-              : centers[it.anchorIndex] +
-                    heights[it.anchorIndex] / 2 +
-                    dotMargin +
-                    dotSize / 2,
-      ];
-    }
     _c.heights = heights;
     _c.centers = centers;
   }
@@ -695,7 +666,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   }) {
     final pos = _clock.valueMs;
     var interludeIdx = _interludeIndexAt(pos);
-    // 间奏期间不点亮任何行（对齐 AMLL：间奏会清空高亮集合），改为三点动画。
+    // 间奏期间不点亮任何行（对齐 AMLL：间奏会清空高亮集合），但不再绘制
+    // 三点等待动画；布局锚点仍停在间奏前一行。
     var active = interludeIdx >= 0 ? -1 : _highlightIdxAt(pos);
     // 逐字提前换行同样作用于间奏末尾：间奏的下一行是逐字行且已到提前换行
     // 点时，间奏提前结束——换行的一次性成本在行开始前完成，不与扫亮同帧。
@@ -707,18 +679,10 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
       }
     }
     _c.active = active; // 高亮：严格覆盖播放位置 + 逐字提前换行（预滚只影响滚动锚点）
-    _c.dots = interludeIdx < 0
-        ? InterludeDotsState.hidden
-        : resolveInterludeDots(
-            startMs: _interludes[interludeIdx].startMs,
-            endMs: _interludes[interludeIdx].endMs,
-            nowMs: pos,
-          );
-    _c.dotsNaturalY = interludeIdx < 0 ? 0 : _interludeDotY[interludeIdx];
     _c.userScrolling = _dragging;
     if (_dragging) {
-      // 用户浏览期间只冻结**自动滚动**（布局锚点），高亮/间奏点仍按播放位置
-      // 推进——对齐 AMLL：`isUserScrolling` 不改变 `isActive`。
+      // 用户浏览期间只冻结**自动滚动**（布局锚点），高亮/间奏锚点仍按播放
+      // 位置推进——对齐 AMLL：`isUserScrolling` 不改变 `isActive`。
       _repaint.notify();
       return;
     }
@@ -932,7 +896,7 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
         _c.active < _c.groups.length &&
         _c.wordSweep &&
         _sweepActiveFor(_c.groups[_c.active]);
-    if (moving || sweeping || _c.dots.visible) _repaint.notify();
+    if (moving || sweeping) _repaint.notify();
   }
 
   /// 该行是否有会随播放推进的扫亮（主行逐字，或显示中的翻译 / 音译扫亮）。
@@ -1022,11 +986,13 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     final groups = widget.groups;
     if (groups.isEmpty) {
       return Center(
-        child: Icon(
-          EtaIcons.fileMusicOutline,
-          size: 64,
-          color: Theme.of(context).colorScheme.onSurfaceVariant
-              .withValues(alpha: 0.3),
+        child: Text(
+          context.l10n.commonNoLyrics,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.35),
+            fontSize: 16,
+          ),
         ),
       );
     }
@@ -1203,10 +1169,6 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   int debugSubFragCacheEntries() =>
       _c.transFragCache.entryCount + _c.romaFragCache.entryCount;
 
-  /// 间奏三点是否可见。
-  @visibleForTesting
-  bool debugDotsVisible() => _c.dots.visible;
-
   /// 上一帧是否走了整层档稳态烘焙贴图路径（D2a）。
   @visibleForTesting
   bool debugBakeActive() => _c.lastFrameBaked;
@@ -1225,10 +1187,6 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _c.bakeEnabled = value;
     _repaint.notify();
   }
-
-  /// 间奏三点的当帧亮度（3 个）。
-  @visibleForTesting
-  List<double> debugDots() => List.of(_c.dots.dots);
 
   void _seekAt(double y) {
     final n = _c.y.length;
