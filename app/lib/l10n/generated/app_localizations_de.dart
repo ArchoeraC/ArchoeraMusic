@@ -3044,6 +3044,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'Einzelne Datei, begrenzt auf 4 MiB (an Ort und Stelle gekürzt; keine zusätzlichen Dateien).';
 
   @override
+  String get settingsSearchQueryLog => 'Suchabfragen-Protokoll';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      'Protokolliert Suchbegriffe auf diesem Gerät, um die Suchqualität zu verbessern (jederzeit löschbar)';
+
+  @override
+  String get settingsSearchQueryLogOff =>
+      'Protokollierung in Datei ist deaktiviert, Abfragen werden nicht aufgezeichnet';
+
+  @override
+  String get settingsSearchQueryLogCleared => 'Suchabfragen-Protokoll gelöscht';
+
+  @override
   String get settingsSecuritySection => 'Sicheres Vernichten';
 
   @override

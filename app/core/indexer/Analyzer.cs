@@ -106,8 +106,12 @@ public static class Analyzer
     /// 输出变化，故递增触发全量重建。
     /// v11：**异体字补齐**（T1-7）——Unihan <c>kSimplifiedVariant</c> 补齐 ToolGood 未覆盖的
     /// 日文新字体（鉄→铁、絵→绘、円→圆…）；含新字体的曲目词元变化，故递增触发全量重建。
+    /// v12：**NFKC 表生成器迁移**——<c>data/nfkc.tsv</c> 的生成从 Python <c>unicodedata</c>
+    /// （Unicode 16.0.0）改为纯 .NET <c>string.Normalize(FormKC)</c>（ICU / Unicode 17.0），
+    /// 唯一内容差异是新增 <c>U+A7F1 → S</c>（Unicode 17 新增字符）。表内容变了，
+    /// 按「表变即重建」的既定规则递增版本，避免新旧表混用产生难以复现的词元差异。
     /// </summary>
-    public const int AnalyzerVersion = 11;
+    public const int AnalyzerVersion = 12;
 
     /// <summary>查询侧跨语言候选（<see cref="QueryTokens.CrossLingual"/>）合并去重后的总预算。</summary>
     public const int CrossLingualBudget = 32;
@@ -348,7 +352,7 @@ public static class Analyzer
     /// 索引 / 查询同表，搜「银河铁道」可命中「銀河鉄道の夜」。
     ///
     /// 近似：NFKC 表**仅逐字符应用**——跨字符规范化组合（如 base + combining 合成）不做，
-    /// 这与 NFKC 完整语义存在已知偏差（见 <c>tools/gen_hanzi_data.py</c> 与报告）。
+    /// 这与 NFKC 完整语义存在已知偏差（见 <c>tools/gen_tables</c> 与报告）。
     /// </summary>
     private static string Normalize(string text)
     {

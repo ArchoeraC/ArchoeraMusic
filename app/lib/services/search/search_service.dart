@@ -14,6 +14,8 @@ import '../../stores/app_prefs.dart';
 import '../log/log.dart';
 import '../scanner/library_scanner.dart';
 import 'indexer_ffi.dart';
+import 'query_log.dart';
+import 'query_log_file.dart';
 import 'search_index.dart';
 import 'search_models.dart';
 
@@ -174,7 +176,10 @@ class SearchService {
     try {
       final index = await _resolveIndexForSearch();
       if (index == null) return null;
-      return index.search(
+      final started = QueryLogger.enabled ? DateTime.now() : null;
+      // 计数器是累加值：记录前先取快照，查询后再求差，才能得到**本次**实际趟次。
+      final before = index.passCounts;
+      final hits = index.search(
         keyword,
         scope: scope,
         limit: limit,
@@ -182,10 +187,46 @@ class SearchService {
         fuzzy: fuzzy,
         minExact: fuzzyMinExact,
       );
+      if (started != null) {
+        _recordQuery(
+          keyword,
+          hits,
+          index.passCounts - before,
+          started,
+          scope == LocalSearchScope.metadata,
+        );
+      }
+      return hits;
     } catch (err) {
       Log.w('search', '本地索引搜索失败，回退 LIKE: $err');
       _status = LocalSearchStatus.error('$err');
       return null;
+    }
+  }
+
+  /// 记录一次查询（**只在本机、仅日志落盘开启时**；T2-7 助词容错矩阵的数据来源）。
+  ///
+  /// 失败一律吞掉：查询日志是诊断增强，绝不阻断搜索主路径。
+  void _recordQuery(
+    String keyword,
+    List<LocalSearchHit>? hits,
+    PassCounts passes,
+    DateTime started,
+    bool metadataOnly,
+  ) {
+    try {
+      if (!shouldLogQuery(keyword)) return;
+      QueryLogger.record(
+        QueryLogEntry(
+          query: keyword,
+          hitCount: hits?.length ?? 0,
+          passes: passesOf(passes),
+          elapsedMs: DateTime.now().difference(started).inMilliseconds,
+          metadataOnly: metadataOnly,
+        ),
+      );
+    } catch (err) {
+      Log.d('search', '查询日志写入失败（已忽略）: $err');
     }
   }
 

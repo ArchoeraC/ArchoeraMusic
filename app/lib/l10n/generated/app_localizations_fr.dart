@@ -3067,6 +3067,21 @@ class AppLocalizationsFr extends AppLocalizations {
       'Fichier unique, plafonné à 4 Mio (tronqué sur place ; aucun fichier supplémentaire).';
 
   @override
+  String get settingsSearchQueryLog => 'Journal des requêtes de recherche';
+
+  @override
+  String get settingsSearchQueryLogOn =>
+      'Enregistre les termes de recherche sur cet appareil pour améliorer la qualité de la recherche (effaçable à tout moment)';
+
+  @override
+  String get settingsSearchQueryLogOff =>
+      'L\'écriture du journal sur disque est désactivée, les requêtes ne sont pas enregistrées';
+
+  @override
+  String get settingsSearchQueryLogCleared =>
+      'Journal des requêtes de recherche effacé';
+
+  @override
   String get settingsSecuritySection => 'Destruction sécurisée';
 
   @override
