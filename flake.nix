@@ -493,6 +493,9 @@ NUGETCFG
         src = src;
 
         nativeBuildInputs = with pkgs; [
+          # nixpkgs 的 Flutter 仍是 3.47（Dart 3.13），而本地/CI 已升 3.50（Dart 3.14）。
+          # `window_manager` 因此用区间约束 `>=0.6.0 <0.8.0`：这里是 Dart 3.13 →
+          # pub 解析到 0.6.x；本地/CI（3.50）解析到 0.7.x。见 app/pubspec.yaml 注释。
           flutter
           clang
           cmake
