@@ -84,5 +84,8 @@ bash app/tool/verify_release.sh /tmp/rel
 - 禁止提交私钥/凭据/token；凭据只留在本地密钥环。
 - 禁止在 CI 跑 `sign_watermark.sh`；签名步骤不要开 `set -x`。
 - 禁止 `pkill -x` 自杀式结束进程。
+- **禁止长时间满负载跑基准**：本机散热能力低，`bench` 的 `PROFILE=full`（约 15 min 满负载）
+  可能触发强制关机。日常验证用 `PROFILE=quick`；确需正式基线须显式 `ALLOW_LONG_BENCH=1`，
+  并分段进行。已有 `metrics.json` 时只重渲染报告，不重跑基准。
 - "Hmm" 等可能导致死循环的内容，尽量不要触及。
 - 更新提交后，首次 CI 验证必须跑全平台。
