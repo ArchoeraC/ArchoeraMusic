@@ -55,6 +55,15 @@ mixin _LibraryStoreScan on Notifier<LibraryState>, _LibraryStoreCore {
         scanErrors: result.errors,
       );
       await _reloadTracks();
+      // 扫描结果与刷新后的曲库规模都记一笔：出现「扫描了但列表/数量不变」时，
+      // 能直接区分是扫描没入库，还是入库了没刷新（见下方 catch 与 pager 的日志）。
+      Log.i(
+        'library',
+        '扫描完成（${incremental ? '增量' : '全量'}）: '
+        'total=${result.total} upsert=${result.upserted} delete=${result.deleted} '
+        'errors=${result.errors} canceled=${result.canceled}'
+        ' → 曲库 ${state.totalCount} 首',
+      );
       // 扫描 → 索引收敛（与 scanner 曲库的键联动）：曲库变了而 `search.db` 还是旧的，
       // 新曲目就搜不到——索引就绪时查询**不再回退 `LIKE`**，旧的父键（`tracks.id` =
       // md5(path)）集合会直接漏掉新增曲目、并可能残留已删除的 id（查询侧虽会剔除
@@ -66,7 +75,8 @@ mixin _LibraryStoreScan on Notifier<LibraryState>, _LibraryStoreCore {
       if (SearchService.instance.indexReady) {
         unawaited(SearchService.instance.reindex());
       }
-    } catch (e) {
+    } catch (e, st) {
+      Log.w('library', '扫描失败: $e\n$st');
       state = state.copyWith(scanning: false, error: e.toString());
     } finally {
       await sub.cancel();
