@@ -74,9 +74,9 @@ FFmpeg 带来的工程问题：
 
 | 优先级 | 格式 | 来源 | 说明 |
 |---|---|---|---|
-| **P0 必做** | MP3 / FLAC / WAV | 本地 + 网易云 + 酷狗 | 网易云默认 `encodeType=flac`，酷狗默认 mp3/flac |
+| **P0 必做** | MP3 / FLAC / WAV | 本地 + NT + 酷狗 | NT 默认 `encodeType=flac`，酷狗默认 mp3/flac |
 | **P0 必做** | OGG / Opus | 本地 + Web 兼容转码输出 | Opus 亦为编码器目标格式 |
-| **P1 必做** | AAC / M4A | QQ 音乐 + 本地 | QQ 音乐默认 m4a；AAC 是唯一"硬骨头"（§6.4） |
+| **P1 必做** | AAC / M4A | QM 音乐 + 本地 | QM 音乐默认 m4a；AAC 是唯一"硬骨头"（§6.4） |
 | **P2 可选** | Vorbis / AIFF | 本地 | `dr_wav` 已含 AIFF 容器；`stb_vorbis` 已内嵌 |
 | **P3 按需** | APE / WavPack / DSD | 本地小众 | 依赖第三方库选型；DSD 建议先砍（见 §15 风险） |
 
@@ -254,7 +254,7 @@ int64_t      audio_input_size(AudioInput *in);
 理由：
 
 1. **行为对齐**：引擎本就是"全速转码 → 落盘完整 → 再播放"，预下载无额外等待成本；
-2. **鉴权归位**：网易云/酷狗/QQ 音源 URL 需要平台 cookie / 签名头，Dart 平台层（`app/lib/apis/*`）
+2. **鉴权归位**：NT/酷狗/QQ 音源 URL 需要平台 cookie / 签名头，Dart 平台层（`app/lib/apis/*`）
    已完整具备；引擎拿本地文件完全不需要网络与 TLS；
 3. **内核瘦身**：去掉 HTTP / 重定向 / TLS（openssl/mbedtls）/ 网络中断回调，内核零网络依赖；
 4. **探测与 seek 最稳**：本地文件可随机访问，时长/seek 精确。
@@ -417,7 +417,7 @@ AAC 解码复杂度高，必须引入成熟实现，候选评估：
 - 解码：OpenCORE AAC `aacDecoder_DecodeFrame`（AAC-LC 为主；SBR 组件按需编译）；
 - 时长：`mvhd` 提供（M4A）；ADTS 需全扫或估算（§9.3）；
 - **降级策略（若 AAC 集成受阻）**：不阻塞发布——
-  - 网易云/酷狗/QQ 平台可配置优先请求 mp3/flac 音源（QQ 音乐 m4a → 请求 mp3）；
+  - NT/酷狗/QQ 平台可配置优先请求 mp3/flac 音源（QM 音乐 m4a → 请求 mp3）；
   - 本地 m4a/aac 未支持时返回明确错误 + 设置项提示；
   - 保留一个**构建开关** `ARCHOERA_AAC=OFF`，默认尝试构建，失败则静默降级（见 §15）。
 
@@ -679,7 +679,7 @@ static int process_frame(AudioPipeline *p)
 ### 13.4 集成冒烟
 
 - 桌面：本地 flac/mp3/wav/ogg 播放 + seek + FFT 拉模式 + EQ/tempo 实时调整（AUTOPLAY 回归）；
-- 在线：网易云（mp3/flac）、酷狗（mp3/flac）、QQ 音乐（P1，mp3 或 m4a）播放；
+- 在线：NT（mp3/flac）、酷狗（mp3/flac）、QM 音乐（P1，mp3 或 m4a）播放；
 - Web 兼容：CLI 批量 OGG/Opus 输出 + `opusinfo` 校验；
 - 中断：SIGTERM / stop 时解码器正确退出，无孤儿资源、无泄漏（ASan 构建回归）。
 
@@ -691,7 +691,7 @@ static int process_frame(AudioPipeline *p)
 |---|---|---|
 | **Phase A** 内核骨架 + P0 解码 | `kernel/`（audio_io/probe/decoder_factory/pcm 三件套）；`fmt/wav.c` `flac.c` `mp3.c`（dr_* 复用）；`player.c`/`ma_decoders.c` 单实现单元收敛；`pipeline.c` 类型脱敏；CMake 移除 FFmpeg 的 decoder/resampler 依赖（**编码器暂保留 FFmpeg 或暂时禁用 Web 兼容路径**） | 本地 mp3/flac/wav 播放 + seek + FFT + DSP 全回归；一致性对比通过；ASan 无泄漏 |
 | **Phase B** Opus 链路 | `fmt/ogg_opus.c`（自写 OGG + libopus）；`encode/opus_encoder.c` + `ogg_muxer.c`；vcpkg/CI 引入 opus | 在线 mp3/flac 播放；CLI 批量 OGG/Opus 输出；Web 兼容路径恢复 |
-| **Phase C** AAC/M4A | `fmt/aac_adts.c` + `fmt/m4a.c` + OpenCORE AAC（`ARCHOERA_AAC` 开关）；QQ 音乐 m4a + 本地 m4a/aac；受阻则降级策略生效 | 本地/在线 m4a/aac 播放；未支持源给出明确错误 |
+| **Phase C** AAC/M4A | `fmt/aac_adts.c` + `fmt/m4a.c` + OpenCORE AAC（`ARCHOERA_AAC` 开关）；QM 音乐 m4a + 本地 m4a/aac；受阻则降级策略生效 | 本地/在线 m4a/aac 播放；未支持源给出明确错误 |
 | **Phase D** 收尾 | 移除全部 FFmpeg 残留（CMake/vcpkg/CI/bat/rebuild 脚本/文档）；可选格式（Vorbis/AIFF 接入，APE/WavPack/DSD 按需）；`THIRD-PARTY-LICENSES.md` 更新；清缓存设置页显示内核版本 | 三平台无任何 `libav*`/`libsw*` 引用；`ldd`/`dumpbin` 验证 |
 
 ---
