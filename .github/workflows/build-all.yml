@@ -43,8 +43,9 @@
 #  └──────────────────────────────────────────────────────────────────
 #
 #  ┌─ nightly job ─────────────────────────────────────────────────────
-#  │  schedule（UTC 18:00）或手动勾选 nightly 时，全平台构建后把产物滚动
-#  │  覆盖到固定 `nightly` prerelease；通道自动为 Nightly(3)，不产生 v* 标签。
+#  │  schedule（UTC 18:00）或手动勾选 nightly 时，先要求该提交已有一轮
+#  │  独立的 build-all 全绿记录；本轮全平台构建成功后再把产物滚动覆盖到固定
+#  │  `nightly` prerelease；通道自动为 Nightly(3)，不产生 v* 标签。
 #  └──────────────────────────────────────────────────────────────────
 #
 #  ┌─ preflight（点菜）────────────────────────────────────────────────
@@ -131,6 +132,10 @@ jobs:
   preflight:
     name: Preflight (platform selection)
     runs-on: ubuntu-latest
+    # 需要读取 Actions 运行记录：Nightly 要求该提交已有一轮独立的 build-all 成功。
+    permissions:
+      contents: read
+      actions: read
     outputs:
       macos: ${{ steps.sel.outputs.macos }}
       windows: ${{ steps.sel.outputs.windows }}
@@ -151,17 +156,61 @@ jobs:
           fetch-depth: 1
       - id: nc
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EV: ${{ github.event_name }}
+          IN_NIGHTLY: ${{ inputs.nightly }}
         run: |
           set -euo pipefail
           skip=false
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            prev=$(git ls-remote origin refs/tags/nightly | awk '{print $1}')
-            echo "nightly tag: ${prev:-<none>} / HEAD: ${GITHUB_SHA}"
-            if [ -n "$prev" ] && [ "$prev" = "$GITHUB_SHA" ]; then
-              echo "自上次 Nightly 以来无新提交，跳过本轮夜间构建"
-              skip=true
+          nightly=false
+          if [ "$EV" = "schedule" ] || { [ "$EV" = "workflow_dispatch" ] && [ "$IN_NIGHTLY" = "true" ]; }; then
+            nightly=true
+          fi
+
+          if [ "$nightly" = "true" ]; then
+            # 1) 无新提交：nightly 标签已指向当前提交（仅 schedule 去重；
+            #    手动 nightly 允许强制重建同一提交）。
+            if [ "$EV" = "schedule" ]; then
+              prev=$(git ls-remote origin refs/tags/nightly | awk '{print $1}')
+              echo "nightly tag: ${prev:-<none>} / HEAD: ${GITHUB_SHA}"
+              if [ -n "$prev" ] && [ "$prev" = "$GITHUB_SHA" ]; then
+                echo "自上次 Nightly 以来无新提交，跳过本轮夜间构建"
+                skip=true
+              fi
+            fi
+
+            # 2) 独立全平台 CI 前置：该提交必须已有一轮非 schedule 的
+            #    build-all 成功运行，且该轮的 9 类平台作业全部成功（全绿），
+            #    否则不触发 nightly。
+            if [ "$skip" = "false" ]; then
+              prior=""
+              for id in $(gh run list --repo "$GITHUB_REPOSITORY" \
+                  --workflow build-all.yml --commit "$GITHUB_SHA" \
+                  --status success --limit 30 --json databaseId,event \
+                  --jq '.[] | select(.event != "schedule") | .databaseId' \
+                  || true); do
+                if [ "$id" = "$GITHUB_RUN_ID" ]; then continue; fi
+                names=$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json jobs \
+                  --jq '.jobs[] | select(.conclusion == "success") | .name' || true)
+                ok=1
+                for pat in "macos (arm64)" "macos (x86_64)" "windows (x64)" \
+                           "Ubuntu 24.04" "Deepin 25" "Fedora" \
+                           "pkg.tar.zst (Arch)" "AppImage" "Flatpak" "NixOS"; do
+                  if ! printf '%s\n' "$names" | grep -Fq "$pat"; then ok=0; break; fi
+                done
+                if [ "$ok" = "1" ]; then prior="$id"; break; fi
+              done
+
+              if [ -z "${prior:-}" ]; then
+                echo "该提交尚无独立的全平台 CI 全绿记录，跳过 Nightly（先跑 tag 发版或全选平台的手动 build-all）"
+                skip=true
+              else
+                echo "前置全平台 CI 全绿运行: $prior"
+              fi
             fi
           fi
+
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
       - id: sel
