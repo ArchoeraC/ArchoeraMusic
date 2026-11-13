@@ -16,6 +16,7 @@ import 'theme/app_theme.dart';
 import 'services/log/log.dart';
 import 'services/mcp/mcp_key_store.dart';
 import 'services/platform/platform_capabilities.dart';
+import 'services/platform/window_decor.dart';
 import 'services/deeplink/deep_link_router.dart';
 import 'services/power/frame_governor.dart';
 import 'services/scanner/sqlite_preload.dart';
@@ -130,13 +131,13 @@ Future<void> main(List<String> args) async {
     );
     return;
   }
-  // 窗口装饰隐藏（桌面端，仅首实例路径；第二实例的提示对话框保留原生
-  // 标题栏）：原生标题栏切为 hidden，外观改由自绘标题栏（app.dart 的
-  // WindowCaption）+ 边缘缩放/边框（VirtualWindowFrame）接管。关闭/最小化/
-  // 最大化经 nativeapi Window API 走与原生按钮相同的系统路径，关闭请求仍由
-  // TrayIntegration 的可取消监听接管（后台常驻语义不变）。尽早调用以减少
-  // 原生标题栏闪现；失败时降级为原生标题栏，绝不阻断启动。
-  _hideNativeWindowDecorations();
+  // 按偏好应用窗口装饰方案（桌面端，仅首实例路径；第二实例的提示对话框
+  // 保留原生标题栏）：system 用系统标题栏；caption 隐藏标题栏、由自绘标题条
+  // （app.dart）+ 边缘缩放接管；borderless 去掉原生边框与系统窗口按钮，内容
+  // 铺满、窗口按钮并入顶栏（等价 SPlayer-Next 的 frame: false）。关闭请求仍由
+  // TrayIntegration 的可取消监听接管（后台常驻语义不变）。尽早调用以减少原生
+  // 装饰闪现；失败时降级为当前原生外观，绝不阻断启动。
+  applyWindowDecor(prefs.windowDecor);
   // 预加载内置 SQLite（libe_sqlite3）：dart sqlite3 包经 hooks 配置
   // source: system 按名 dlopen("libe_sqlite3.so")，这里先按绝对路径加载，
   // 使 dart sqlite3 与 scanner-ffi 共享同一 SQLite 实例（同版本），避免
@@ -208,20 +209,6 @@ Future<void> main(List<String> args) async {
 /// OAuth 拆除，见 CHANGELOG「破坏性变更」）。
 bool _isDeepLinkArg(String arg) {
   return arg.toLowerCase().startsWith('archoera://');
-}
-
-/// 桌面端隐藏原生窗口装饰（Linux GTK 走 CSD，Windows 保留 thickframe
-/// 边缘缩放，macOS 走 fullSizeContentView + 红绿灯按钮）。
-///
-/// 无窗口环境（托盘常驻分支之前窗口可能未创建）/ nativeapi 缺失时静默
-/// 降级为原生标题栏，绝不阻断启动。
-void _hideNativeWindowDecorations() {
-  if (!(Platform.isLinux || Platform.isWindows || Platform.isMacOS)) return;
-  try {
-    WindowManager.instance.getCurrent()?.titleBarStyle = TitleBarStyle.hidden;
-  } catch (e) {
-    Log.w('window', '隐藏原生窗口装饰失败（沿用原生标题栏）: $e');
-  }
 }
 
 /// 启动门（提权 / 已有实例）可用的 locale：设置优先，否则跟随系统。

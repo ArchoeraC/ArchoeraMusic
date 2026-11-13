@@ -16,6 +16,7 @@ import '../../l10n/l10n.dart';
 import '../../services/netease/track.dart';
 import '../../services/source/media_request_headers.dart';
 import '../../stores/user_playlists.dart';
+import '../common/smooth_wheel_scroll_controller.dart';
 import '../common/toast.dart';
 import '../player/s_controls.dart';
 import 'collection_platform.dart';
@@ -65,6 +66,9 @@ class _PlaylistPickerDialog extends ConsumerStatefulWidget {
 class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
   bool _busy = false;
 
+  /// 歌单列表滚轮 / 触控板滚动带与主列表一致的弹簧跟随。
+  final ScrollController _scroll = SmoothWheelScrollController();
+
   List<String> get _trackIds => [
     for (final t in widget.tracks)
       if (t.source == widget.source && t.id.isNotEmpty) t.id,
@@ -83,6 +87,12 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
         ref.read(userPlaylistsProvider).ensureLoaded(widget.source);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   Future<void> _addTo(String playlistId) async {
@@ -223,6 +233,7 @@ class _PlaylistPickerDialogState extends ConsumerState<_PlaylistPickerDialog> {
         else
           Flexible(
             child: ListView.builder(
+              controller: _scroll,
               shrinkWrap: true,
               itemCount: items.length,
               itemBuilder: (context, i) => _PlaylistPickRow(

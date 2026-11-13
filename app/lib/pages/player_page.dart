@@ -16,6 +16,7 @@ import '../services/lyrics/lyric_line.dart';
 import '../services/playback/sleep_timer.dart';
 import '../utils/format.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/platform/window_decor.dart';
 import '../stores/app_prefs.dart';
 import '../stores/lyrics_provider.dart';
 import '../stores/player_route_animation.dart';
@@ -34,6 +35,7 @@ import '../widgets/player/quality_menu.dart';
 import '../widgets/player/spectrum_view.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/common/anim.dart';
+import '../widgets/layout/window_controls.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 

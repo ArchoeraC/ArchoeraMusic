@@ -212,6 +212,41 @@ class _AppearanceSectionState extends ConsumerState<AppearanceSection> {
         ],
         const SizedBox(height: 20),
         SettingSection(
+          title: l10n.settingsSectionWindow,
+          note: l10n.settingsWindowDecorNote,
+          children: [
+            SettingTile(
+              icon: EtaIcons.square,
+              title: l10n.settingsWindowDecor,
+              subtitle: l10n.settingsWindowDecorDesc,
+              trailing: SSegmented<String>(
+                options: [
+                  SSegmentedOption('system', l10n.settingsWindowDecorSystem),
+                  SSegmentedOption('caption', l10n.settingsWindowDecorCaption),
+                  SSegmentedOption(
+                    'borderless',
+                    l10n.settingsWindowDecorBorderless,
+                  ),
+                ],
+                selected: prefs.windowDecor,
+                onChanged: (v) {
+                  notifier.setWindowDecor(v);
+                  applyWindowDecor(v);
+                },
+              ),
+            ),
+            SettingSwitchTile(
+              icon: EtaIcons.eyeCloseOutline,
+              title: l10n.settingsWindowControlsAutoHide,
+              subtitle: l10n.settingsWindowControlsAutoHideDesc,
+              value: prefs.autoHideWindowControls,
+              enabled: prefs.windowDecor == 'borderless',
+              onChanged: notifier.setAutoHideWindowControls,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SettingSection(
           title: l10n.settingsSectionLayout,
           children: [
             SettingSwitchTile(

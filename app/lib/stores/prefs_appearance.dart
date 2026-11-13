@@ -27,6 +27,8 @@ const sidebarOrderKey = 'appearance.sidebarOrder';
 const sidebarHiddenKeysKey = 'appearance.sidebarHiddenKeys';
 const localeKey = 'appearance.locale';
 const floatingBarKey = 'appearance.floatingPlayerBar';
+const windowDecorKey = 'appearance.windowDecor';
+const autoHideWindowControlsKey = 'appearance.autoHideWindowControls';
 const coverRadiusKey = 'appearance.coverRadius';
 const weatherEnabledKey = 'appearance.weatherEnabled';
 const weatherAutoLocateKey = 'appearance.weatherAutoLocate';
@@ -48,6 +50,12 @@ const Set<String> routeTransitionIds = {'none', 'fade', 'slide', 'zoom'};
 /// 侧边栏导航高亮样式合法 id（与 `side_bar/nav_styles/` 的注册表一致；
 /// 默认 `default`）。
 const Set<String> sidebarNavStyleIds = {'default', 'animated'};
+
+/// 窗口装饰方案合法 id（默认 `borderless`）：
+/// - `system`：系统原生标题栏；
+/// - `caption`：自绘 32px 标题条 + 边缘缩放；
+/// - `borderless`：无边框，内容铺满，窗口按钮并入顶栏。
+const Set<String> windowDecorIds = {'system', 'caption', 'borderless'};
 
 /// 侧边栏导航项稳定 key（与 `SideBar` 的 `_NavItem` 一一对应）与默认顺序。
 ///
@@ -115,6 +123,19 @@ extension AppearancePrefs on AppPrefs {
     if (v is String && appearanceStyleIds.contains(v)) return v;
     return 'solid';
   }
+
+  /// 窗口装饰方案（见 [windowDecorIds]），默认无边框。
+  String get windowDecor {
+    final v = data[windowDecorKey];
+    if (v is String && windowDecorIds.contains(v)) return v;
+    return 'borderless';
+  }
+
+  /// 无边框方案下自动隐藏窗口按钮（仅在指针移到右上角时显示）。
+  ///
+  /// **默认关闭**：触摸屏 / 无鼠标设备无法通过悬停唤出按钮。
+  bool get autoHideWindowControls =>
+      data[autoHideWindowControlsKey] == true;
 
   /// 背景图片路径（磁盘绝对路径；null = 未选择，对齐 imageBackground.src）。
   String? get backgroundImage => data[backgroundImageKey] as String?;
@@ -341,6 +362,18 @@ extension AppearancePrefs on AppPrefs {
 
   AppPrefs copyWithFloatingBar(bool value) =>
       AppPrefs(initialData: {...data, floatingBarKey: value});
+
+  /// 设置窗口装饰方案（非法值忽略，保留原值）。
+  AppPrefs copyWithWindowDecor(String value) => AppPrefs(
+    initialData: {
+      ...data,
+      if (windowDecorIds.contains(value)) windowDecorKey: value,
+    },
+  );
+
+  /// 无边框方案下自动隐藏窗口按钮（默认关）。
+  AppPrefs copyWithAutoHideWindowControls(bool value) =>
+      AppPrefs(initialData: {...data, autoHideWindowControlsKey: value});
 
   /// 设置侧边栏自定义（导航项显示顺序 / 隐藏项集合）。
   AppPrefs copyWithSidebarCustomize({

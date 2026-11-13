@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme_provider.dart';
 import '../../services/netease/netease_api.dart';
+import '../../services/platform/window_decor.dart';
 import '../../services/source/media_request_headers.dart';
 import '../../services/source/source_platform.dart';
 import '../../services/playback/playback_notifier.dart';
@@ -22,6 +23,7 @@ import '../../stores/providers.dart';
 import '../../stores/shell_page_state.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../common/smooth_wheel_scroll_controller.dart';
 import '../dialogs/kugou_login_button.dart';
 import '../dialogs/bilibili_login_dialog.dart';
 import '../dialogs/neko_login_dialog.dart';
@@ -32,6 +34,7 @@ import '../player/s_controls.dart';
 import '../common/anim.dart';
 import '../common/glass_blur.dart';
 import '../common/toast.dart';
+import 'window_controls.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
@@ -44,8 +47,9 @@ part 'nav_header/nav_header_weather.dart';
 ///
 /// 布局：返回 / 全局搜索框（SInput，回车跳搜索页）/（弹性留白）/ 用户 /
 /// 齿轮下拉（主题循环 light→dark→system + 全局设置占位）。
-/// 窗口控制（最小化/关闭）由 Linux 系统窗口管理，桌面壳不绘制
-/// （原项目 WindowControls 仅在无边框窗口启用）。
+/// 窗口装饰设为 `borderless` 时，右端并入窗口按钮（最小化/最大化/关闭），
+/// 整行空白处可拖动窗口（对齐 SPlayer-Next 的 WindowControls）；其余方案
+/// 由系统标题栏或自绘标题条接管。
 class NavHeader extends ConsumerStatefulWidget {
   const NavHeader({super.key});
 
@@ -74,7 +78,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
 
   /// 当前全屏播放页的路由动画（0 = 折叠，1 = 完全展开；由 `PlayerPage`
   /// 经 [playerRouteAnimationProvider] 写入）。展开开始即收起搜索下拉：浮层挂在
-  /// 根 Overlay 上，**不会**随壳内容一起缩放淡出。
+  /// 根 Overlay 上，**不会**随壳内容一起停绘。
   Animation<double>? _playerRouteAnim;
 
   /// 输入文本 + 宽度动画合并监听（浮层面板内容实时刷新）。
@@ -98,6 +102,37 @@ class _NavHeaderState extends ConsumerState<NavHeader>
 
   /// 搜索框宽度伸展动效时长（保持原节奏，不随面板加长）。
   static const Duration _widthExpandMs = Duration(milliseconds: 180);
+
+  // ── 无边框窗口按钮：右上角自动隐藏（可选，默认关）──────────────
+  /// 按钮组（含分隔线与间距）占位宽度，菜单右移时按此值平移。
+  /// = 6 + 1(分隔线) + 6 + 3×36(圆按钮) + 2×2(按钮间距)。
+  static const double _windowControlsSlotWidth = 125;
+
+  /// 右上角唤出热区宽度 / 高度：覆盖顶栏顶部一条窄边（含手势条）。
+  /// 高度略高于头像顶边（约 15px），悬停时即可唤出；下滑手势的判定范围
+  /// 与热区一致，因此不依赖光标精确定位。
+  static const double _windowControlsTriggerWidth = 180;
+  static const double _windowControlsTriggerHeight = 20;
+
+  /// 手势唤醒条（类似手机底部 Home 指示条）：尺寸与距顶距离。
+  static const double _windowControlsLineWidth = 42;
+  static const double _windowControlsLineHeight = 4;
+  static const double _windowControlsLineTop = 6;
+
+  /// 下滑多少像素视为「唤出」手势。
+  static const double _windowControlsDragReveal = 10;
+
+  /// 手势唤出后的停留时长：留出移向按钮并点击的时间。
+  static const Duration _windowControlsGestureHold = Duration(milliseconds: 2400);
+
+  /// 指针在右上角时是否显示（仅自动隐藏开启时生效）。
+  bool _windowControlsShown = false;
+
+  /// 下滑手势累计距离（达到阈值后唤出并清零）。
+  double _windowControlsDragAccum = 0;
+
+  /// 指针离开按钮 / 热区后的延迟隐藏计时器（留出从热区移到按钮的时间）。
+  Timer? _windowControlsHideTimer;
 
   // ── 热搜 / 建议（NT + KG，对齐原版 getHotSearches / getSearchSuggest）──
   Timer? _suggestDebounce;
@@ -129,8 +164,43 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     _widthCtrl = AnimationController(vsync: this, duration: _widthExpandMs);
   }
 
+  /// 指针进入右上角热区 / 按钮组：立即显示窗口按钮。
+  ///
+  /// [hold] 非空时（下滑手势唤出）显示后额外保留该时长，给用户移向按钮
+  /// 并点击的时间；悬停唤出不传（指针离开后再按常规延迟收回）。
+  void _showWindowControls({Duration? hold}) {
+    _windowControlsHideTimer?.cancel();
+    if (!_windowControlsShown) {
+      setState(() => _windowControlsShown = true);
+    }
+    if (hold != null) _scheduleHideWindowControls(delay: hold);
+  }
+
+  /// 指针离开后延迟隐藏：留出从顶部热区移到按钮上的时间，
+  /// 避免刚显示就因指针离开热区而收回。
+  void _scheduleHideWindowControls({
+    Duration delay = const Duration(milliseconds: 280),
+  }) {
+    _windowControlsHideTimer?.cancel();
+    _windowControlsHideTimer = Timer(delay, () {
+      if (!mounted || !_windowControlsShown) return;
+      setState(() => _windowControlsShown = false);
+    });
+  }
+
+  /// 热区内下滑：累计到阈值即唤出（并保留 [_windowControlsGestureHold]）。
+  void _onWindowControlsDragUpdate(DragUpdateDetails details) {
+    _windowControlsDragAccum += details.delta.dy;
+    if (_windowControlsDragAccum < _windowControlsDragReveal) return;
+    _windowControlsDragAccum = 0;
+    _showWindowControls(hold: _windowControlsGestureHold);
+  }
+
+  void _onWindowControlsDragEnd() => _windowControlsDragAccum = 0;
+
   @override
   void dispose() {
+    _windowControlsHideTimer?.cancel();
     _searchFocus.removeListener(_onSearchFocusChanged);
     _suggestDebounce?.cancel();
     // 浮层必须**同步**摘除，不能等收起动画：顶栏被停绘/收起时 controller
@@ -217,10 +287,10 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     _onPlayerRouteExpand();
   }
 
-  /// 播放页开始展开（壳内容随后整体缩放淡出、最终停绘）→ 收起搜索下拉。
+  /// 播放页开始展开（壳内容随后整体停绘）→ 收起搜索下拉。
   ///
   /// 下拉浮层在**根 Overlay** 里（见 [_buildSearchOverlay]），不在壳子树内，
-  /// 因此不会随壳内容淡出。这里必须**同步**摘除：壳内容停绘时 `TickerMode`
+  /// 因此不会随壳内容停绘。这里必须**同步**摘除：壳内容停绘时 `TickerMode`
   /// 会暂停本 State 的动画，面板的收起反转可能永远走不到 `dismissed`，
   /// 浮层会永久悬在播放页左上角。
   void _onPlayerRouteExpand() {
@@ -475,53 +545,176 @@ class _NavHeaderState extends ConsumerState<NavHeader>
         selection: TextSelection.collapsed(offset: value.length),
       );
     });
-    // 播放页展开（壳内容即将缩放淡出并停绘）→ 收起搜索下拉（浮层不在壳内，
-    // 不随淡出；见 [_onPlayerRouteExpand]）。
+    // 播放页展开（壳内容即将停绘）→ 收起搜索下拉（浮层不在壳内，
+    // 不随停绘；见 [_onPlayerRouteExpand]）。
     ref.listen(
       playerRouteAnimationProvider,
       (_, next) => _bindPlayerRouteAnim(next),
     );
-    return SizedBox(
-      height: 64,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            // 返回（pop 栈内页面优先，否则回主页；恒可点，不随
-            // go_router 分支历史禁用）
-            IconButton(
-              tooltip: l10n.commonBack,
-              onPressed: () => _handleBack(context),
-              icon: const Icon(EtaIcons.leftSmall, size: 22),
-            ),
-            const SizedBox(width: 8),
-            TapRegion(
-              groupId: _searchTapGroup,
-              onTapOutside: (_) => _searchFocus.unfocus(),
-              child: _NavHeaderSearchField(
-                layerLink: _searchLayerLink,
-                widthAnimation: _widthCtrl,
-                collapsedWidth: _searchCollapsedWidth,
-                expandedWidth: _searchExpandedWidth,
-                searchFocus: _searchFocus,
-                searchCtrl: _searchCtrl,
-                hintText: l10n.navHeaderSearchHint,
-                onChanged: _onSearchChanged,
-                onSubmitted: _submitSearch,
-                onTapOutside: (_) {},
+    // 无边框方案：窗口按钮并入顶栏，整行作为拖动区域（交互控件优先命中，
+    // 等价 SPlayer-Next 的 drag / no-drag 分区）。
+    final borderless =
+        ref.watch(appPrefsProvider.select((p) => p.windowDecor)) ==
+        WindowDecor.borderless;
+    // 自动隐藏窗口按钮（可选项，默认关）：隐藏时头像/菜单右移填满空位。
+    final autoHideControls =
+        borderless &&
+        ref.watch(appPrefsProvider.select((p) => p.autoHideWindowControls));
+    final controlsHidden = autoHideControls && !_windowControlsShown;
+    final row = Row(
+      children: [
+        // 返回（pop 栈内页面优先，否则回主页；恒可点，不随
+        // go_router 分支历史禁用）
+        IconButton(
+          tooltip: l10n.commonBack,
+          onPressed: () => _handleBack(context),
+          icon: const Icon(EtaIcons.leftSmall, size: 22),
+        ),
+        const SizedBox(width: 8),
+        TapRegion(
+          groupId: _searchTapGroup,
+          onTapOutside: (_) => _searchFocus.unfocus(),
+          child: _NavHeaderSearchField(
+            layerLink: _searchLayerLink,
+            widthAnimation: _widthCtrl,
+            collapsedWidth: _searchCollapsedWidth,
+            expandedWidth: _searchExpandedWidth,
+            searchFocus: _searchFocus,
+            searchCtrl: _searchCtrl,
+            hintText: l10n.navHeaderSearchHint,
+            onChanged: _onSearchChanged,
+            onSubmitted: _submitSearch,
+            onTapOutside: (_) {},
+          ),
+        ),
+        const Spacer(),
+        // 天气 + 账号头像 + 菜单：自动隐藏窗口按钮时**整组**右移，填补按钮
+        // 让出的空间（按钮仍保留占位，只做透明度/平移，不触发重新布局）。
+        // 天气必须留在这组里，否则右侧会露出它和被移走的头像之间的空洞。
+        AnimatedContainer(
+          duration: animDuration(context, const Duration(milliseconds: 200)),
+          curve: Curves.easeOutCubic,
+          transform: Matrix4.translationValues(
+            controlsHidden ? _windowControlsSlotWidth : 0,
+            0,
+            0,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）
+              const _WeatherMini(),
+              // 与账号菜单保持间距（避免组件过小且贴太近）
+              const SizedBox(width: 12),
+              // 账号（多平台：NT / KG / QM占位）
+              const _AccountsMenu(),
+              const SizedBox(width: 4),
+              const _NavHeaderActionsMenu(),
+            ],
+          ),
+        ),
+        if (borderless)
+          AnimatedOpacity(
+            opacity: controlsHidden ? 0 : 1,
+            duration: animDuration(context, const Duration(milliseconds: 180)),
+            curve: Curves.easeOut,
+            child: ExcludeFocus(
+              excluding: controlsHidden,
+              child: IgnorePointer(
+                ignoring: controlsHidden,
+                // 指针停在按钮上时保持显示（在热区外也能续命）。
+                child: MouseRegion(
+                  onEnter: autoHideControls
+                      ? (_) => _showWindowControls()
+                      : null,
+                  onExit: autoHideControls
+                      ? (_) => _scheduleHideWindowControls()
+                      : null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 1,
+                        height: 20,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 6),
+                      const WindowControls(),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const Spacer(),
-            // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）
-            const _WeatherMini(),
-            // 与账号菜单保持间距（避免组件过小且贴太近）
-            const SizedBox(width: 12),
-            // 账号（多平台：NT / KG / QM占位）
-            const _AccountsMenu(),
-            const SizedBox(width: 4),
-            const _NavHeaderActionsMenu(),
-          ],
-        ),
+          ),
+      ],
+    );
+    return SizedBox(
+      height: 64,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: borderless ? WindowDragArea(child: row) : row,
+            ),
+          ),
+          // 右上角热区：覆盖顶栏顶部窄边（含手势条）。悬停或向下拖动
+          // 都可唤出按钮；手势唤出后会额外保留一段时间供点击。
+          if (autoHideControls)
+            Positioned(
+              top: 0,
+              right: 0,
+              width: _windowControlsTriggerWidth,
+              height: _windowControlsTriggerHeight,
+              child: MouseRegion(
+                onEnter: (_) => _showWindowControls(),
+                onExit: (_) => _scheduleHideWindowControls(),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onVerticalDragUpdate: _onWindowControlsDragUpdate,
+                  onVerticalDragEnd: (_) => _onWindowControlsDragEnd(),
+                  onVerticalDragCancel: _onWindowControlsDragEnd,
+                  child: Stack(
+                    children: [
+                      // 类似手机 Home 指示条：按钮隐藏时显示，提示可从这里
+                      // 悬停 / 下滑唤出窗口按钮。
+                      Positioned(
+                        top: _windowControlsLineTop,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          child: Center(
+                            child: AnimatedOpacity(
+                              opacity: controlsHidden ? 0.45 : 0,
+                              duration: animDuration(
+                                context,
+                                const Duration(milliseconds: 180),
+                              ),
+                              child: Container(
+                                width: _windowControlsLineWidth,
+                                height: _windowControlsLineHeight,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                  borderRadius: BorderRadius.circular(
+                                    _windowControlsLineHeight / 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

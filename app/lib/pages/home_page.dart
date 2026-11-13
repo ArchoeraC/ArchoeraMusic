@@ -14,11 +14,13 @@ import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
 import '../widgets/dialogs/netease_login_dialog.dart';
 import '../widgets/player/s_controls.dart';
+import '../widgets/common/smooth_wheel_scroll_controller.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/dialogs/track_list_dialog.dart';
 import '../widgets/home/action_card.dart';
 import '../widgets/home/spotlight_card.dart';
 import '../widgets/home/section_title.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'home/home_page_actions.dart';
@@ -51,10 +53,20 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _loading = false;
   String _error = '';
 
+  /// 页面纵向滚动控制器：滚轮 / 触控板带与列表一致的弹簧跟随；
+  /// 触摸拖拽与键盘滚动不经过 `pointerScroll`，行为与原生一致。
+  final ScrollController _scroll = SmoothWheelScrollController();
+
   @override
   void initState() {
     super.initState();
     _fetchAll();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   @override
