@@ -108,13 +108,28 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   /// = 6 + 1(分隔线) + 6 + 3×36(圆按钮) + 2×2(按钮间距)。
   static const double _windowControlsSlotWidth = 125;
 
-  /// 右上角唤出热区宽度 / 高度：只覆盖顶栏顶部一条窄边，
-  /// 不压到下方的头像与菜单，避免悬停冲突。
-  static const double _windowControlsTriggerWidth = 150;
-  static const double _windowControlsTriggerHeight = 12;
+  /// 右上角唤出热区宽度 / 高度：覆盖顶栏顶部一条窄边（含手势条）。
+  /// 高度略高于头像顶边（约 15px），悬停时即可唤出；下滑手势的判定范围
+  /// 与热区一致，因此不依赖光标精确定位。
+  static const double _windowControlsTriggerWidth = 180;
+  static const double _windowControlsTriggerHeight = 20;
+
+  /// 手势唤醒条（类似手机底部 Home 指示条）：尺寸与距顶距离。
+  static const double _windowControlsLineWidth = 42;
+  static const double _windowControlsLineHeight = 4;
+  static const double _windowControlsLineTop = 6;
+
+  /// 下滑多少像素视为「唤出」手势。
+  static const double _windowControlsDragReveal = 10;
+
+  /// 手势唤出后的停留时长：留出移向按钮并点击的时间。
+  static const Duration _windowControlsGestureHold = Duration(milliseconds: 2400);
 
   /// 指针在右上角时是否显示（仅自动隐藏开启时生效）。
   bool _windowControlsShown = false;
+
+  /// 下滑手势累计距离（达到阈值后唤出并清零）。
+  double _windowControlsDragAccum = 0;
 
   /// 指针离开按钮 / 热区后的延迟隐藏计时器（留出从热区移到按钮的时间）。
   Timer? _windowControlsHideTimer;
@@ -150,22 +165,38 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   }
 
   /// 指针进入右上角热区 / 按钮组：立即显示窗口按钮。
-  void _showWindowControls() {
+  ///
+  /// [hold] 非空时（下滑手势唤出）显示后额外保留该时长，给用户移向按钮
+  /// 并点击的时间；悬停唤出不传（指针离开后再按常规延迟收回）。
+  void _showWindowControls({Duration? hold}) {
     _windowControlsHideTimer?.cancel();
     if (!_windowControlsShown) {
       setState(() => _windowControlsShown = true);
     }
+    if (hold != null) _scheduleHideWindowControls(delay: hold);
   }
 
   /// 指针离开后延迟隐藏：留出从顶部热区移到按钮上的时间，
   /// 避免刚显示就因指针离开热区而收回。
-  void _scheduleHideWindowControls() {
+  void _scheduleHideWindowControls({
+    Duration delay = const Duration(milliseconds: 280),
+  }) {
     _windowControlsHideTimer?.cancel();
-    _windowControlsHideTimer = Timer(const Duration(milliseconds: 280), () {
+    _windowControlsHideTimer = Timer(delay, () {
       if (!mounted || !_windowControlsShown) return;
       setState(() => _windowControlsShown = false);
     });
   }
+
+  /// 热区内下滑：累计到阈值即唤出（并保留 [_windowControlsGestureHold]）。
+  void _onWindowControlsDragUpdate(DragUpdateDetails details) {
+    _windowControlsDragAccum += details.delta.dy;
+    if (_windowControlsDragAccum < _windowControlsDragReveal) return;
+    _windowControlsDragAccum = 0;
+    _showWindowControls(hold: _windowControlsGestureHold);
+  }
+
+  void _onWindowControlsDragEnd() => _windowControlsDragAccum = 0;
 
   @override
   void dispose() {
@@ -629,8 +660,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
               child: borderless ? WindowDragArea(child: row) : row,
             ),
           ),
-          // 右上角热区：只占顶栏顶部一条窄边（按钮隐藏时头像/菜单在下方，
-          // 不会被误触）；移入即唤出按钮，移出由延迟计时器收回。
+          // 右上角热区：覆盖顶栏顶部窄边（含手势条）。悬停或向下拖动
+          // 都可唤出按钮；手势唤出后会额外保留一段时间供点击。
           if (autoHideControls)
             Positioned(
               top: 0,
@@ -640,7 +671,46 @@ class _NavHeaderState extends ConsumerState<NavHeader>
               child: MouseRegion(
                 onEnter: (_) => _showWindowControls(),
                 onExit: (_) => _scheduleHideWindowControls(),
-                child: const SizedBox.expand(),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onVerticalDragUpdate: _onWindowControlsDragUpdate,
+                  onVerticalDragEnd: (_) => _onWindowControlsDragEnd(),
+                  onVerticalDragCancel: _onWindowControlsDragEnd,
+                  child: Stack(
+                    children: [
+                      // 类似手机 Home 指示条：按钮隐藏时显示，提示可从这里
+                      // 悬停 / 下滑唤出窗口按钮。
+                      Positioned(
+                        top: _windowControlsLineTop,
+                        left: 0,
+                        right: 0,
+                        child: IgnorePointer(
+                          child: Center(
+                            child: AnimatedOpacity(
+                              opacity: controlsHidden ? 0.45 : 0,
+                              duration: animDuration(
+                                context,
+                                const Duration(milliseconds: 180),
+                              ),
+                              child: Container(
+                                width: _windowControlsLineWidth,
+                                height: _windowControlsLineHeight,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                  borderRadius: BorderRadius.circular(
+                                    _windowControlsLineHeight / 2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
         ],

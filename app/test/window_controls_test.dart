@@ -116,6 +116,53 @@ void main() {
     expect(controlsHitTest().ignoring, isTrue);
   });
 
+  testWidgets('右上角下滑手势也能唤出按钮，并保留操作时间', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPrefsProvider.overrideWith(
+            () => _PrefsNotifier({
+              windowDecorKey: 'borderless',
+              autoHideWindowControlsKey: true,
+            }),
+          ),
+        ],
+        child: _app(const NavHeader()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final header = tester.getRect(find.byType(NavHeader));
+    final gesture = await tester.startGesture(
+      Offset(header.right - 60, header.top + 4),
+      kind: PointerDeviceKind.touch,
+    );
+    await gesture.moveBy(const Offset(0, 40));
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    AnimatedOpacity controlsOpacity() => tester.widget<AnimatedOpacity>(
+      find
+          .ancestor(
+            of: find.byType(WindowControls),
+            matching: find.byType(AnimatedOpacity),
+          )
+          .first,
+    );
+
+    // 下滑唤出后立即显示。
+    expect(controlsOpacity().opacity, 1);
+
+    // 手势唤出有约 2.4s 的停留时间：1s 后仍在，足够移向按钮点击。
+    await tester.pump(const Duration(seconds: 1));
+    expect(controlsOpacity().opacity, 1);
+
+    // 超时后自动收回。
+    await tester.pump(const Duration(milliseconds: 1600));
+    await tester.pumpAndSettle();
+    expect(controlsOpacity().opacity, 0);
+  });
+
   testWidgets('未开启自动隐藏时按钮始终可见、可点击', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
