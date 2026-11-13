@@ -7,21 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! CELT 浮点 FFT + 逆 MDCT（docs/audio-kernel-zig.md §9.2，P2）
-//!
-//! 自研混合基 FFT（N = 2^a·3^b·5^c，覆盖 CELT 尺寸 60/120/240/480），
-//! 结构参考重构对照 FFmpeg `libavutil/tx_template.c` 的 AV_TX_FLOAT_MDCT 逆变换
-//! （ff_tx_mdct_inv / ff_tx_mdct_gen_exp）（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 逆 MDCT（对齐 av_tx 结构，sub_map 取恒等）：
-//!   1. 预旋转：z[i] = {src[n-1-k], src[k]} × exp[i]（k = 恒等索引）；
-//!   2. 逆 FFT（长度 n/2）；
-//!   3. 后旋转（exp 表第二半），输出 n/2 个复数 = n 个时域样本。
-//! 尺度：exp 表含 sqrt(|scale|)，整体再乘 -1/32768（对齐 av_tx scale）。
-//!
-//! 说明：av_tx 与 libopus kiss_fft 求和顺序不同但均通过 RFC 6716 testvector 的
-//! s16 逐位验收；本实现自然序混合基 FFT 数学等价，以 testvector s16 为准绳。
-
 const std = @import("std");
 const testing = std.testing;
 

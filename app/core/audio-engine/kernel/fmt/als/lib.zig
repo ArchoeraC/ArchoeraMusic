@@ -3,17 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! MPEG-4 ALS 解码器封装（fmt/m4a 委托 inner 解码器；VTable）
-//!
-//! m4a 合成「原始 ALS 帧流」（mp4 sample 数据直拼，可为每包多帧）后经本模块打开：
-//!   - 配置由 fmt/m4a 解析 stsd esds 得到（SpecificConfig，见 core.parseConfig）；
-//!   - open 将整条流读入内存（含 64B 尾填充，对齐 ffmpeg 的
-//!     AV_INPUT_BUFFER_PADDING_SIZE 语义），core.Decoder 逐帧解码；
-//!   - 帧样本可能大于单次 read 请求量（如 frame_length 20480）：已解码帧保留，
-//!     按游标分批输出，与 flac/ac3 委托 inner 同型。
-//!
-//! 输出：位深 ≤16 → 交错 s16（左移对齐满幅）；>16 → s32。与 ffmpeg 输出一致。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

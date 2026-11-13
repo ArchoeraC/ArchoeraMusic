@@ -7,19 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! APE 预测解码器 + 长滤波器 + 终级滤波器（docs/audio-kernel-zig.md §9.10）
-//!
-//! 参考重构对照 FFmpeg libavcodec/apedec.c：filter_fast_3320 / filter_3800 /
-//! long_filter_high_3800 / long_filter_ehigh_3830 / predictor_update_3930 /
-//! predictor_update_filter（64-bit）/ do_apply_filter / do_init_filter，
-//! 逐位复刻（含所有 (unsigned)/uint32/uint64 回绕与算术右移语义）保证逐样本一致；
-//! 许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
-//!
-//! 版本分派（对齐 ape_decode_init）：
-//!   < 3930 → 3800 系列（FAST=1000 走 filter_fast_3320；HIGH/EXTRA_HIGH 先做长滤波）
-//!   3930-3949 → predictor_update_3930（先终级滤波）
-//!   >= 3950 → predictor_update_filter（64-bit，先终级滤波；24-bit 走 interim 双趟）
-
 const std = @import("std");
 
 const HISTORY_SIZE = 512;

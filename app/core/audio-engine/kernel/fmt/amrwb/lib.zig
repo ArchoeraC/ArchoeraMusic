@@ -7,21 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AMR-WB（G.722.2，16kHz ACELP）解码接入（.awb / `#!AMR-WB` 裸流 + 3gp 单轨抽取）
-//!
-//! 解码核心：codec.zig（FFmpeg amrwbdec 浮点路径逐句移植）+ tables.zig + dsp.zig。
-//! 本模块负责：格式识别入口、帧迭代（读 mode → 帧长）、整读 → 逐帧解码 → 交错 s16，
-//! 以 decoder.Decoder VTable 暴露（对齐 fmt/dts/ 接入模式）。
-//!
-//! 容器：
-//!   - raw：9 字节 `#!AMR-WB\n` 头 + MIME/storage 帧（1 字节 mode 头 + 载荷），
-//!     或直接逐帧（probe 已按头识别）；帧长表 = cf_sizes_wb[mode] 位 → ((b+7)/8)+1；
-//!   - 3gp/mp4 单轨（.awb 样本常见形态，如 验收基准 fate-suite amrwb）：走 mdat
-//!     载荷逐帧扫描（AMR 帧含 mode 头字节，stsz 逐样本大小一致）。解码时每帧
-//!     20ms → 320 样本 @16kHz，输出单声道 s16le。
-//!
-//! 参考：验收基准 libavcodec/amrwbdec.c、amr.h、amrwbdata.h（LGPL-2.1+）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

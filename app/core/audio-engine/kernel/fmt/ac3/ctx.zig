@@ -3,11 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AC-3 / E-AC-3 解码共享状态（对照 FFmpeg ac3dec.h AC3DecodeContext）
-//!
-//! 各模块（exponents/mantissa/coupling/rematrix/downmix）以本结构为契约，
-//! 用 fmt/aac/bitreader.zig 的 BitReader 读取位流。
-
 const std = @import("std");
 const t = @import("tables.zig");
 const ba = @import("bitalloc.zig");

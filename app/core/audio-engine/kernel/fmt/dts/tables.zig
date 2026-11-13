@@ -7,12 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS（DCA Coherent Acoustics）core 解码常量与表（阶段一：解析层）
-//!
-//! 对照 FFmpeg：dca_syncwords.h / dca_sample_rate_tab.h / dcadata.c
-//! / dca.c / dca_core.h / dca_core.c（audio_mode_ch_mask 等）。
-//! 许可登记见 audio-engine/THIRD-PARTY-LICENSES.md：表值按规范与 FFmpeg 表核对。
-
 // ---- dca_syncwords.h ----
 
 /// 核心子流 sync（32 位）文件字节按 16-bit 字大端：7F FE 80 01

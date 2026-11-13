@@ -7,31 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! FLAC 解码器封装（open + VTable + 帧循环 + 去相关 + seek + 输出打包）
-//!
-//! 参考重构对照 flacdec.c flac_decode_frame / decode_frame / decorrelate_33bps /
-//! flac_set_bps 与 flacdsp_template.c flac_decorrelate_*_c。
-//!
-//! 输出契约（对齐 FFmpeg 默认 S16/S32 输出，保证 f6 逐样本一致 对照可逐字节比对）：
-//!   - 流位深 ≤ 16 → 输出 16-bit（左移 16-bps 位对齐满幅）；
-//!   - 流位深 > 16 → 输出 32-bit（左移 32-bps 位对齐满幅）；
-//!   - 交错小端 PCM，`Info.bits_per_sample` = 16 / 32。
-//!
-//! 帧循环：
-//!   - 每帧开新建 BitReader（帧边界恒为字节对齐，见 bitreader.zig 文件头）；
-//!   - EOF 判定：剩余位 < 最小合法帧 80 位（验收基准 FLAC_MIN_FRAME_SIZE=10B）→ 0；
-//!   - STREAMINFO 一致性：声道数相等、blocksize ≤ max_blocksize、bps 一致；
-//!     frame 采样率可覆写（验收基准 语义，不报错）；
-//!   - 32 位流 + 立体声耦合 → 侧声道走 33 位宽式路径（decodeSubframeWide）；
-//!   - 整帧 CRC-16 校验失败 → Corrupt（坏帧重同步：向后扫描合法帧起点跳过继续，
-//!     §13.3 容错；无法恢复且无产出 → Corrupt 透出）。
-//!
-//! seek 语义：
-//!   - 有 SEEKTABLE → 定位最近点后解码丢弃至目标样本（帧对齐）；
-//!   - 无 SEEKTABLE → 按总样本比例估算字节偏移 + sync 扫描（CRC-8 校验防误判）
-//!     定位真实帧边界，再解码丢弃至目标；落点样本号由帧头 UTF-8 编号推算
-//!     （fixed-blocksize 流：编号×blocksize；variable-blocksize 流：编号即样本号）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

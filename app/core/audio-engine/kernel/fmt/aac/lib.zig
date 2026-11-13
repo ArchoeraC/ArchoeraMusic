@@ -3,20 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AAC-LC 解码器（自研 Zig，ISO/IEC 14496-3；语义与 FFmpeg n9.0.1
-//! libavcodec/aac/aacdec*.c 浮点路径逐位对照（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 范围（Phase C）：
-//!   - AOT 2 (AAC-LC)，无 SBR/PS（HE-AAC → UnsupportedFormat 回退 FFmpeg 主后端 §8.3）；
-//!   - raw_data_block 元素：SCE / CPE / LFE / DSE(skip) / FIL(skip；含隐式 SBR 载荷跳过，
-//!     对齐 FFmpeg 对 LC 的行为) / PCE（chan_config=0 定义布局）/ CCE（耦合声道）；
-//!   - 工具：MS 立体声 / intensity 立体声 / TNS / PNS / pulse / 声道耦合（CCE）；
-//!     Main/LTP 预测、LD/ELD/USAC 不支持；
-//!   - 容器：ADTS 裸流（本文件 Decoder VTable）。M4A 分包模式待 m4a.zig esds 接线。
-//!
-//! 输出契约：s16 交错小端（float ×32768 四舍五入 + 饱和），与
-//! `ffmpeg -i x.aac -f s16le` 对照验收（§17.2：float 域 <1e-4 + s16 逐位统计）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

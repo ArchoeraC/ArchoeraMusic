@@ -7,15 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AAC PS（参数立体声）解码器（移植 FFmpeg n9.0.1 浮点路径）。
-//!
-//! 复刻对象：libavcodec/{aacps.c,aacps_common.c,aacpsdsp_template.c} +
-//! aacpsdata.c 表 + aacps_tablegen.h 生成。HE-AAC v2 的立体声恢复：
-//! 单声道 core + 参数化 IID/ICC/IPD/OPD → 左右声道。
-//!
-//! 数据流（ff_ps_apply）：混合分析(L→Lbuf 子子带) → 去相关(Lbuf→Rbuf)
-//! → 立体声处理(H 矩阵混合) → 混合合成(Lbuf/Rbuf→L/R QMF 域)。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const BitReader = @import("bitreader.zig").BitReader;

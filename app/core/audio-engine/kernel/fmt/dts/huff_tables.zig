@@ -7,20 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS core Huffman 码表分段（阶段二）
-//!
-//! 对应 FFmpeg dcahuff.c ff_dca_vlc_src_tables，并按 DCA_INIT_VLC 的
-//! 消费顺序切成小段：
-//!   quant_i_j   —— abits=i+1 码书第 j 个子书（j < ff_dca_quant_index_group_size[i]）
-//!   bitalloc_i  —— 位分配 VLC（12 条目，5 张）
-//!   scalef_i    —— 缩放因子差 VLC（129 条目，偏移 -64）
-//!   tmode_i     —— 瞬态模式 VLC（4 条目）
-//! 每段给出符号列（sym，含偏移前的原始码值）与码长列（len）。
-//! 码字本身由 验收基准 的"按表序累加"规范分配（见 huff.zig），与 ff_vlc_init_from_lengths
-//! 一致，保证位级消费与 验收基准 相同。
-//!
-//! 数据由 tools/gen_dca_huff.py 自动抽取自 验收基准 n9.0.1。
-//! Generated: quant/bitalloc/scalef/tmode huffman code sections (symbol,len).
 pub const quant_0_0_sym = [_]i16{ 1, 2, 0 };
 pub const quant_0_0_len = [_]u8{ 1, 2, 2 };
 pub const quant_1_0_sym = [_]i16{ 2, 3, 1, 4, 0 };

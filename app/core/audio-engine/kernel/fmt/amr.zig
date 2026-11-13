@@ -3,23 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AMR 解码器（.amr 容器 + OpenCORE AMR-NB 解码）
-//!
-//! 文档（docs/audio-kernel-zig.md §9.13）：`#!AMR\n` 头 + 帧重同步自研（~100 行），
-//! 解码走 vendored OpenCORE AMR-NB（Apache-2.0，`kernel/c/amr/`，按 `-x c` 编译）。
-//!
-//! AMR 帧结构（octet-aligned）：
-//!   - 每帧 20ms；AMR-NB = 160 样本 @ 8kHz；
-//!   - 首字节：P(1) + FT(4) + Q(1) + 保留(2)；FT = (byte0 >> 3) & 0xF；
-//!   - 帧类型 → 载荷字节数表（12,13,15,17,19,20,26,31,5,6,5,5,0,0,0,0）；
-//!   - SID/NO_DATA 帧（type 8-15）载荷 0 或小，解码器输出静音/舒适噪声。
-//!
-//! 接口（`interf_dec.h`）：`Decoder_Interface_init` / `Decoder_Interface_Decode`
-//! （输入含 1 字节头，输出 160 s16 @ 8kHz）/ `Decoder_Interface_exit`。
-//!
-//! 时长：open 时 ToC 跳帧计数（每帧 20ms 固定，帧数 × 20ms = exact；
-//! 扫描区上限 64 MiB，超出按首帧模式 CBR 外推 estimate）。
-
 const std = @import("std");
 const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");

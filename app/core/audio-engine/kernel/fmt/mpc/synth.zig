@@ -7,20 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Musepack 合成核心 —— FFmpeg n9.0.1 定点路径逐句复刻（mpc.c + mpegaudiodsp 固定点）。
-//!
-//! 覆盖：
-//!   - dct32 定点（dct32_template.c，DCT32_FLOAT=0）
-//!   - apply_window 定点（mpegaudiodsp_template.c，USE_FLOATS=0）+ round_sample
-//!   - ff_mpa_synth_filter_fixed 调度（offset 回绕 512）
-//!   - ff_mpc_dequantize_and_synth（mpc.c：CC×SCF 浮点乘→int32 截断、M/S 折回）
-//!   - 合成窗 ff_mpa_synth_window_fixed 生成（mpa_synth_init）
-//!   - AVLFG（av_lfg_init(0xDEADBEEF)+av_lfg_get，libavutil/lfg.{h,c}）
-//!
-//! 位型/运算顺序与 C 完全一致：32-bit 用 i32 回绕乘法与算术右移；乘加以 i64 保持；
-//! dct 中间量按 unsigned 32-bit 模算术（验收基准 SUINT），复刻其回绕行为。
-//! 验证目标：与 `ffmpeg -i x.mpc -f s16le` 逐样本位一致。
-
 const std = @import("std");
 const once = @import("../../once.zig");
 const tables = @import("tables.zig");

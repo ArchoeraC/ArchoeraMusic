@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AC-3 / E-AC-3 解码器表（对照 FFmpeg ac3tab.c / ac3.c / ac3dec_data.c / ac3defs.h）
-//!
-//! 许可登记见 audio-engine/THIRD-PARTY-LICENSES.md：表值直接取自 ATSC A/52 / A/52:2012 规范与 FFmpeg 表。
-
 // ---- ac3defs.h ----
 
 pub const EAC3_MAX_CHANNELS: usize = 16;

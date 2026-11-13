@@ -3,24 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Matroska/EBML 最小解析（内存切片，零分配）
-//!
-//! Matroska 是 EBML 树。本模块只提供解析所需原语：
-//!   - vint 长度判定（首字节前导零计数 +1，上限 8；§EBML spec）；
-//!   - 元素遍历（id vint + size vint + payload）。
-//!
-//! 已知元素 id（MATROSKA_ID_*，libavformat/matroskadec.c matroska_ebml_elements）：
-//!   0x1A45DFA3 EBML 头 / 0x18538067 Segment / 0x114D9B74 SeekHead /
-//!   0x1549A966 Info / 0x1654AE6B Tracks / 0x1254C367 Tags / 0x1C53BB6B Cues /
-//!   0x1F43B675 Cluster / 0xA3 SimpleBlock / 0xA0 BlockGroup / 0xA1 Block /
-//!   0xEC Void / 0xBF CRC-32。
-//!
-//! 语义（参考重构，对照 matroskadec.c matroska_ebmlnum 系列）：
-//!   - vint 值 = 整段按 BE 大整数去掉 marker 位后剩余位；
-//!     首字节 b0 前导零 z → 总长 L=z+1，值有效位 = L*8-(z+1)（恒 ≤ 56，u64 安全）；
-//!   - id 同样按前导零定长（1..4 字节），保留 marker 位为 id 的一部分；
-//!   - 所有越界读返回 null，由调用方按 Corrupt 处理（§13.3 有界）。
-
 const std = @import("std");
 
 /// vint 长度 = 首字节前导零计数 + 1（1..8；0x00 非法但按 1 处理由调用方判定）

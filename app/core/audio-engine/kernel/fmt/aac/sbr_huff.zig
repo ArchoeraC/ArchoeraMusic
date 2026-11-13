@@ -7,10 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! SBR Huffman 表（aac/aacdec_tab.c sbr_huffman_tab，10 张平铺）。
-//! 表序：t_env_1_5dB, f_env_1_5dB, t_env_bal_1_5dB, f_env_bal_1_5dB, t_env_3_0dB,
-//! f_env_3_0dB, t_env_bal_3_0dB, f_env_bal_3_0dB, t_noise_3_0dB, t_noise_bal_3_0dB
-
 pub const sbr_huff_symbols = [604]u8{
     60, 59, 61, 58, 62, 57, 63, 56, 64, 55, 65, 54, 66, 53, 67, 52,
     51, 68, 50, 69, 49, 70, 48, 47, 71, 46, 72, 45, 44, 73, 41, 42,

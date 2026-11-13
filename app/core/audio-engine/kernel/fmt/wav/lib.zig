@@ -3,28 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 自研 WAV 解码器（docs/audio-kernel-zig.md §9.1）
-//!
-//! 容器（全部接管，probe 归并为 Format.wav 家族）：
-//!   - RIFF / RIFX（big-endian）/ RF64（ds64 扩展）—— `fmt `/`data`/`fact` chunk；
-//!   - W64（Sony Wave64，GUID 容器，支持多 `data` 段拼接）；
-//!   - AIFF / AIFF-C（`COMM`/`SSND`/`FVER`，80-bit extended 采样率）；
-//!   - CAF（Apple Core Audio，`caff` + `desc` 头，PCM `lpcm` 分支）；
-//!   - AU / Sun（`.snd` 固定头，encoding 2..7 = 未压缩 PCM）。
-//!
-//! 编码：
-//!   - PCM 整数（8/16/24/32/64 位；WAV 8-bit 为无符号 pcm_u8，AIFF 为有符号 pcm_s8，
-//!     AIFC-"raw " 无符号，CAF/AU 8-bit 有符号 pcm_s8）、IEEE float（32/64 位，
-//!     RIFX/AIFF/CAF/AU 大端，AIFC-"sowt" 小端，CAF 由 desc flags 决定 LE/BE）；
-//!   - A-LAW / mu-LAW（G.711，解码为 16-bit 线性 s16 输出，小端）；
-//!   - ADPCM（4-bit，输出 s16）：IMA WAV（tag 0x11）+ MS ADPCM（tag 2），块解码见 adpcm.zig；
-//!   - WAVEFORMATEXTENSIBLE（0xFFFE，SubFormat GUID 判定子格式）；
-//!   - 其余编码（GSM、CAF 内嵌 alac/aac/lpcm 可变包、AU mulaw/alaw 等）→
-//!     error.UnsupportedFormat → 引擎回退 验收基准（§8.3）。
-//!
-//! 输出：原生位深交错 PCM（alaw/mulaw/adpcm 为 s16），由上层 pcm/* 统一转换。
-//! 健壮性（§13.3）：chunk 循环有界、长度 clamp、字段范围校验、多 data 段越界保护。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");
