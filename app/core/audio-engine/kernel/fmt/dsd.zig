@@ -21,13 +21,13 @@
 //!
 //! 输出契约：原生 16-bit、交错 PCM，采样率 = DSD 位率/64（DSD64→44.1k、
 //! DSD128→88.2k、DSD256→176.4k）。DSD 为 1-bit 有损转换（"软 DSD"路径），
-//! 对照 ffmpeg dsddec 以波形相关/频谱验证（非 bit-exact）。
+//! 对照 验收基准 dsddec 以波形相关/频谱验证（非 逐样本一致）。
 //!
 //! DFF-DST（SACD 镜像常用 DST 压缩 DSD）：'FRM8' form 'DSD '/'DST ' + PROP
 //! （FS/CHNL/CMPR='DST '）→ 'DST ' chunk 内含 FRTE 帧表与一串 'DSTF' 帧；
-//! 每 DSTF 帧为独立 DST 压缩单元，经 dst/dst.zig（FFmpeg dstdec.c 逐句移植）
-//! 重建每声道 DSD 位流（fate dst-64fs44-2ch 与 ffmpeg f32 输出逐位一致），
-//! 再复用本文件的 dsd2pcm + 8× 抽取路径输出 PCM。dst2pcm 状态按 ffmpeg
+//! 每 DSTF 帧为独立 DST 压缩单元，经 dst/dst.zig（验收基准 dstdec.c 逐句移植）
+//! 重建每声道 DSD 位流（fate dst-64fs44-2ch 与 验收基准 f32 输出逐样本一致），
+//! 再复用本文件的 dsd2pcm + 8× 抽取路径输出 PCM。dst2pcm 状态按 验收基准
 //! decode_init 以 0x69 初始化 fifo。
 
 const std = @import("std");
@@ -37,7 +37,7 @@ const decoder = @import("../decoder.zig");
 const dstcodec = @import("dst/dst.zig");
 const id3 = @import("mp3/id3.zig");
 
-// ---- dsd2pcm 常量（FFmpeg dsd.c / Gesemann BSD dsd2pcm） ----
+// ---- dsd2pcm 常量（验收基准 dsd.c / Gesemann BSD dsd2pcm） ----
 
 const HTAPS: usize = 48;
 const CTABLES: usize = (HTAPS + 7) / 8; // 6
@@ -416,7 +416,7 @@ fn parseDsf(f: *Ctx) Error!void {
 
 fn parseDff(f: *Ctx) Error!void {
     f.is_dff = true;
-    // FRM8 大小端为 BE。容器结构（对齐 FFmpeg libavformat/iff.c）：
+    // FRM8 大小端为 BE。容器结构（对齐 验收基准 libavformat/iff.c）：
     //   'FRM8' + size(8BE) + form_type('DSD '/'DST ') + chunks
     //   PROP chunk data = 'SND '(无 size) + 属性表（每项 tag+size(8BE)+data）
     //     —— FS  = DSD 位率、CHNL = 通道数 + 通道代码、CMPR = 压缩码（'DSD '/'DST '）
@@ -462,7 +462,7 @@ fn parseDff(f: *Ctx) Error!void {
         const dec = try f.allocator.create(dstcodec.Decoder);
         dec.* = .{};
         f.dst_dec = dec;
-        // ffmpeg dst decode_init：dsd2pcm FIFO 以 0x69 填充
+        // 验收基准 dst decode_init：dsd2pcm FIFO 以 0x69 填充
         for (0..f.channels) |ch| f.fifo[ch] = @splat(0x69);
     } else {
         if (!found_data or f.channels == 0) return error.Corrupt;
@@ -850,8 +850,8 @@ test "dsd: DSF 集成解码（open + 读取 + 时长）" {
 
 /// FATE `dst/dst-64fs44-2ch.dff`：DSD64 立体声，10 DSTF 帧，压缩载荷 DST。
 const dst_sample = @embedFile("dst/samples/dst-64fs44-2ch.dff");
-/// 参考：系统 ffmpeg `dst` 解码器直接输出（f32le 交错 352800Hz），
-/// 即 ffmpeg dstdec + dsd.c（fifo 0x69 初值）逐帧译码的 float 结果。
+/// 参考：系统 验收基准 `dst` 解码器直接输出（f32le 交错 352800Hz），
+/// 即 验收基准 dstdec + dsd.c（fifo 0x69 初值）逐帧译码的 float 结果。
 const dst_golden_f32 = @embedFile("dst/samples/dst-64fs44-2ch.f32");
 
 test "dsd: DFF-DST（FATE dst-64fs44-2ch）open + 全量读取" {
@@ -880,7 +880,7 @@ test "dsd: DFF-DST（FATE dst-64fs44-2ch）open + 全量读取" {
     try std.testing.expectEqual(@as(u8, 2), ch);
 }
 
-test "dsd: DFF-DST → DSD 重建 + dsd2pcm f32 与 ffmpeg 逐位一致（全 10 帧）" {
+test "dsd: DFF-DST → DSD 重建 + dsd2pcm f32 与 验收基准 逐样本一致（全 10 帧）" {
     const reader = io.Reader.openMem(dst_sample);
     var f: Ctx = .{ .allocator = std.testing.allocator, .reader = reader };
     defer f.pcm.deinit(std.testing.allocator);
@@ -894,7 +894,7 @@ test "dsd: DFF-DST → DSD 重建 + dsd2pcm f32 与 ffmpeg 逐位一致（全 10
     try std.testing.expectEqual(@as(usize, 10), f.frame_count);
     const dec = f.dst_dec.?;
 
-    // dsd2pcm 状态：ffmpeg dst decode_init 以 0x69 填 FIFO
+    // dsd2pcm 状态：验收基准 dst decode_init 以 0x69 填 FIFO
     var g_fifo: [16][FIFOSIZE]u8 = @splat(@splat(0x69));
     var g_pos: [16]u8 = @splat(0);
 

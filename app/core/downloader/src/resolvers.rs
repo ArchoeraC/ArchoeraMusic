@@ -40,7 +40,7 @@ use crate::models::*;
 /// 音源 URL 解析器：把 enqueue 请求解析为可下载 URL。
 ///
 /// 只有**具备 Rust 自研解析**的音源才实现本 trait；直传/预解析音源
-/// （QQ、Neko、Streaming、未来未知音源）不在注册表中，调用方据此走
+/// （QM、Neko、Streaming、未来未知音源）不在注册表中，调用方据此走
 /// Dart 播放管线预解析 URL 回退（§12.1），行为与历史一致。
 pub trait SourceResolver: Send + Sync {
     /// 解析可下载 URL；[cancel] 为任务取消标志（解析阶段也响应取消）。
@@ -82,7 +82,7 @@ pub fn resolver_for_platform(source: SourcePlatform) -> Option<&'static dyn Sour
         SourcePlatform::Kugou => Some(&KUGOU_RESOLVER),
         SourcePlatform::Netease => Some(&NETEASE_RESOLVER),
         SourcePlatform::Bilibili => Some(&BILIBILI_RESOLVER),
-        // QQ / Neko / Streaming / 未知：Rust 无自研解析 → Dart 预解析直链。
+        // QM / Neko / Streaming / 未知：Rust 无自研解析 → Dart 预解析直链。
         SourcePlatform::Qqmusic
         | SourcePlatform::Neko
         | SourcePlatform::Streaming
@@ -409,7 +409,7 @@ async fn kg_song_url(
             })
         }
         2 => {
-            // status=2 语义需区分（实测 2026-08：酷狗对无权限档位返回
+            // status=2 语义需区分（实测 2026-08：KG 对无权限档位返回
             // trans_param.pay_block_tpl=1 付费墙模板，换 dfid 无法解锁）：
             // 付费墙 → 立即降级下一档；否则保持旧行为（SSA「需要验证」→
             // 换新 dfid 重试一次）。
@@ -739,7 +739,7 @@ fn level_to_key(level: &str) -> String {
 
 /// 单档播放 URL 请求（下载接口的回落，对齐原版 fetchNeteasePlaySource）。
 ///
-/// 网易云 `download/url`（客户端下载接口）对未登录 / 无下载权限的歌曲经常
+/// NT `download/url`（客户端下载接口）对未登录 / 无下载权限的歌曲经常
 /// 返回 url=null（尤其无损档），而 `player/url`（播放接口）对免费曲仍能返回
 /// 完整无损 URL。顺序为 download → 失败回落 player，
 /// 本函数即该回落：data 为数组取首项，**freeTrialInfo（试听片段）视为不可用**。

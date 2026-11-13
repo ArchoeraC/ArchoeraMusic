@@ -31,25 +31,29 @@
 ### 1. 音频内核：衍生文件被标成纯 AGPL（高）
 
 `kernel/` 下 223 个 `.zig` 文件此前统一标注
-`SPDX-License-Identifier: AGPL-3.0-or-later`，但其中约 50 个文件在注释中明确写着
+`SPDX-License-Identifier: AGPL-3.0-or-later`，但其中 90 个文件在注释中明确写着
 「逐位移植 / 逐句对齐 FFmpeg」「libopus 移植」「WavPack 对照」「minimp3 表转录」。
 把 LGPL 衍生作品标成纯 AGPL 不符合 LGPL 的 copyleft 要求，也不满足 BSD-3
 「保留版权声明」的义务。
 
 修复：
 
-- 按 `THIRD-PARTY-LICENSES.md` 的分类，给 48 个衍生文件改为对应 SPDX：
+- 按 `THIRD-PARTY-LICENSES.md` 的分类 + 文件头自述，给 90 个衍生文件改为对应 SPDX：
   - FFmpeg 移植 → `LGPL-2.1-or-later`
   - libopus / WavPack → `BSD-3-Clause`（文件头补上游版权行）
   - minimp3 表 → `CC0-1.0`
 - 文件头增加「衍生作品」说明，指向模块 `THIRD-PARTY-LICENSES.md`；
 - 模块文档新增「文件级许可标注（SPDX）」一节，明确**以文件头为准**；
-- 仍属独立实现的文件保持 `AGPL-3.0-or-later`（对照参考类模块按文档登记）。
+- 第二轮复核把文档原归入「对照参考」、但文件头明确写「移植 / 逐位复刻 / 位级一致 /
+  表值来自 FFmpeg」的模块一并补标：FLAC、DTS、MLP、APE、ALAC、AAC PS/SBR 表、
+  Opus CELT/PVQ/RC/FFT、WMA ASF 容器与 MDCT；
+- 仍属独立实现的文件保持 `AGPL-3.0-or-later`（MP3 码流层、WAV/AIFF、Ogg/M4A/mka
+  容器、probe/takeover、DSP 等）。
 
 > LGPL-2.1-or-later 本身允许按更高版本行使权利，与 AGPL-3.0 聚合分发兼容；
 > 静态合并部分继续按模块文档提供完整源码与构建链以满足「可重链」要求。
 
-### 2. 酷狗模块：引用了 GPL-2.0-only 项目的实现路径（高）
+### 2. KG 模块：引用了 GPL-2.0-only 项目的实现路径（高）
 
 `app/lib/services/kugou/*` 多处注释写着「对齐 MoeKoeMusic `deviceUtil.js` /
 `Library.vue` / `formatPlaylistTracks`」。MoeKoeMusic 的 `package.json` 声明

@@ -26,7 +26,7 @@ pub const Codec = enum {
     pcm_int,
     pcm_float,
     /// F16LE（tag 1 + bits 32 + block_align ch*4 + extradata 2B [01 00]）：
-    /// 4 字节槽位 le32（float32 位模式）× 2⁻¹⁵，输出 f32（镜像 FFmpeg pcm_f16le）
+    /// 4 字节槽位 le32（float32 位模式）× 2⁻¹⁵，输出 f32（镜像 验收基准 pcm_f16le）
     pcm_f16,
     /// F24LE（tag 1 + bits 24 + block_align ch*4）：4 字节槽位 le32 × 2⁻²³，输出 f32
     pcm_f24,
@@ -97,7 +97,7 @@ pub const AiffComm = struct {
 };
 
 /// WAVEFORMATEXTENSIBLE 的 SubFormat GUID 尾段（12 字节，匹配即取 GUID 头 4 字节为 tag）。
-/// 取值镜像 FFmpeg riff.h 的 FF_MEDIASUBTYPE_BASE_GUID / FF_AMBISONIC_BASE_GUID /
+/// 取值镜像 验收基准 riff.h 的 FF_MEDIASUBTYPE_BASE_GUID / FF_AMBISONIC_BASE_GUID /
 /// FF_BROKEN_BASE_GUID（重构参考，非直接使用）。
 const mediasubtype_base_guid: [12]u8 = .{ 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 };
 const ambisonic_base_guid: [12]u8 = .{ 0x21, 0x07, 0xD3, 0x11, 0x86, 0x44, 0xC8, 0xC1, 0xCA, 0x00, 0x00, 0x00 };
@@ -143,7 +143,7 @@ pub fn parseWavFmt(reader: *io.Reader, csize: u64, endian: std.builtin.Endian) E
         if (!try readExact(reader, &cb)) return error.Corrupt;
         const cb_size = readU16(&cb, .little);
         rest -= 2;
-        // cbSize 封顶到剩余字节（镜像 FFmpeg cbSize = FFMIN(size, cbSize)）
+        // cbSize 封顶到剩余字节（镜像 验收基准 cbSize = FFMIN(size, cbSize)）
         const n = @min(@as(u64, cb_size), rest);
         extradata_len = try readExtradata(reader, n, &extradata);
         rest -= n;
@@ -323,9 +323,9 @@ fn buildFmt(
     const ext_n = @min(extradata.len, 64);
     fmt.extradata_len = @intCast(ext_n);
     @memcpy(fmt.extradata[0..ext_n], extradata[0..ext_n]);
-    // fmt chunk 里的 block_align 可能损坏（FFmpeg 修复逻辑）：取二者较大
+    // fmt chunk 里的 block_align 可能损坏（验收基准 修复逻辑）：取二者较大
     fmt.block_align = @max(fmt.block_align, block_align);
-    // F16/F24 判定（镜像 FFmpeg wavdec.c 664-675，仅 little-endian）：
+    // F16/F24 判定（镜像 验收基准 wavdec.c 664-675，仅 little-endian）：
     // 4 字节槽位（block_align == ch*4）的 PCM 实为缩放 float：
     //   - F24LE：tag 1 + bits 24；
     //   - F16LE：tag 1 + bits 32 + extradata 2B == LE16(1)。
@@ -337,7 +337,7 @@ fn buildFmt(
             std.mem.readInt(u16, extradata[0..2], .little) == 1)
         {
             fmt.codec = .pcm_f16;
-            // 文件 bits 字段为 32（槽位宽度）；归一为编码位深 16（镜像 FFmpeg wavdec 670）
+            // 文件 bits 字段为 32（槽位宽度）；归一为编码位深 16（镜像 验收基准 wavdec 670）
             fmt.bits = 16;
         }
     }
@@ -356,8 +356,8 @@ pub fn validate(fmt: WavFmt) Error!void {
             else => false,
         }) return error.UnsupportedFormat,
         .pcm_float => if (!switch (fmt.bits) {
-            // 16 = IEEE half（2 字节）；24 拒绝 → FFmpeg 兜底：tag 3 + bits 24 无
-            // 映射（FFmpeg 亦 NONE）；float24 的正确形态是 F24LE（tag 1 + 4B 槽位），
+            // 16 = IEEE half（2 字节）；24 拒绝 → 验收基准 兜底：tag 3 + bits 24 无
+            // 映射（验收基准 亦 NONE）；float24 的正确形态是 F24LE（tag 1 + 4B 槽位），
             // 已在 buildFmt 判定为 .pcm_f24，见下
             16, 32, 64 => true,
             else => false,
@@ -375,15 +375,15 @@ pub fn validate(fmt: WavFmt) Error!void {
         // DK4 块式：解码循环仅用 status[0]/status[st]，只支持 1-2 声道
         .adpcm_dk4 => if (fmt.channels > 2 or fmt.block_align < 4 * fmt.channels)
             return error.Corrupt, // 块头 4B/通道
-        // DK3 块式：sum/diff 立体声编解码（镜像 FFmpeg 1748-1798 用 status[0]/status[1]），
+        // DK3 块式：sum/diff 立体声编解码（镜像 验收基准 1748-1798 用 status[0]/status[1]），
         // 仅 2 声道；块头 16B（10B 跳过 + 2×pred + 2×idx）
         .adpcm_dk3 => if (fmt.channels != 2 or fmt.block_align < 16)
             return error.Corrupt,
-        // XBOX 块式：4-bit（镜像 FFmpeg 327-330 bits_per_coded_sample == 4），
+        // XBOX 块式：4-bit（镜像 验收基准 327-330 bits_per_coded_sample == 4），
         // 块头 4B/通道；通道 ≤8
         .adpcm_xbox => if (fmt.channels > 8 or fmt.bits != 4 or fmt.block_align < 4 * fmt.channels)
             return error.Corrupt,
-        // SANYO 块式：≤2 声道（镜像 FFmpeg 267-269）；位深 3/4/5（324-326）；
+        // SANYO 块式：≤2 声道（镜像 验收基准 267-269）；位深 3/4/5（324-326）；
         // 每块样本数须在 fmt 扩展区（2B LE，1428-1432）；块头 4B/通道
         .adpcm_sanyo => if (fmt.channels > 2 or fmt.bits < 3 or fmt.bits > 5 or
             fmt.extradata_len != 2 or fmt.block_align < 4 * fmt.channels)
@@ -391,10 +391,10 @@ pub fn validate(fmt: WavFmt) Error!void {
         // XAN 块式：解码器 predictor/shift 为 [2]，只支持 1-2 声道；块头 2B/通道
         .xan => if (fmt.channels > 2 or fmt.block_align < 2 * fmt.channels)
             return error.Corrupt,
-        // 连续流 ADPCM：仅支持 ≤2 声道（镜像 FFmpeg 仅解 status[0]/status[st]）
+        // 连续流 ADPCM：仅支持 ≤2 声道（镜像 验收基准 仅解 status[0]/status[st]）
         .adpcm_oki, .adpcm_yamaha, .adpcm_ct => if (fmt.channels > 2)
             return error.Corrupt,
-        // GSM 06.10：仅单声道（FFmpeg gsmdec 同）；块长须合法：
+        // GSM 06.10：仅单声道（验收基准 gsmdec 同）；块长须合法：
         //   WAV GSM_MS = 41..65 步进 3；AIFF 纯 GSM = 33（解码时再按容器选择）
         .gsm => {
             if (fmt.channels != 1) return error.UnsupportedFormat;
@@ -405,13 +405,13 @@ pub fn validate(fmt: WavFmt) Error!void {
                 return error.Corrupt;
             }
         },
-        // MACE：仅 ≤2 声道（FFmpeg mace_decode_init 限制 1-2）；块长须为 2B/声道（MAC3）
+        // MACE：仅 ≤2 声道（验收基准 mace_decode_init 限制 1-2）；块长须为 2B/声道（MAC3）
         // 或 1B/声道（MAC6）
         .mace3 => if (fmt.channels > 2 or fmt.block_align != 2 * fmt.channels)
             return error.Corrupt,
         .mace6 => if (fmt.channels > 2 or fmt.block_align != 1 * fmt.channels)
             return error.Corrupt,
-        // ZORK 连续流：8-bit 控制量（镜像 FFmpeg init 331-334 bits==8）；≤2 声道
+        // ZORK 连续流：8-bit 控制量（镜像 验收基准 init 331-334 bits==8）；≤2 声道
         .adpcm_zork => if (fmt.channels > 2 or fmt.bits != 8)
             return error.Corrupt,
         // SWF 位流：4-bit（av_get_bits_per_sample 返回 4，utils.c 555-574）；≤2 声道
@@ -429,7 +429,7 @@ pub fn validate(fmt: WavFmt) Error!void {
 }
 
 /// 80-bit extended float（IEEE 754 extended，2 字节符号+指数 + 8 字节尾数）→ u32
-/// 采样率（AIFF COMM，大端）。算法镜像 FFmpeg aiffdec.c（exp 偏移 16383，双移）
+/// 采样率（AIFF COMM，大端）。算法镜像 验收基准 aiffdec.c（exp 偏移 16383，双移）
 fn parseExtended80(b: []const u8) Error!u32 {
     const exp_field = readU16(b[0..2], .big);
     if (exp_field & 0x8000 != 0) return error.Corrupt; // 负采样率非法
@@ -518,7 +518,7 @@ test "decl: WAVEFORMATEXTENSIBLE 子格式 PCM" {
 
     var reader = io.Reader.openMem(&buf);
     const fmt = try parseWavFmt(&reader, 40, .little);
-    // 该布局（bits 24 + block_align 8 == ch*4）镜像 FFmpeg wavdec 判定 → F24LE
+    // 该布局（bits 24 + block_align 8 == ch*4）镜像 验收基准 wavdec 判定 → F24LE
     try testing.expectEqual(Codec.pcm_f24, fmt.codec);
     try testing.expectEqual(@as(u16, 24), fmt.bits);
     // block_align 取 max(计算值 6, 文件值 8) = 8（破损修复逻辑）
@@ -592,7 +592,7 @@ test "decl: WAV float16（tag 3 + bits 16）放行" {
 }
 
 test "decl: WAV float24（tag 3 + bits 24）→ Unsupported" {
-    // tag 3 + bits 24 无映射（FFmpeg 亦 NONE）；float24 的正确形态 F24LE
+    // tag 3 + bits 24 无映射（验收基准 亦 NONE）；float24 的正确形态 F24LE
     // 走 tag 1 + 4B 槽位路径（见下）
     var f = fmtBytes(3, 1, 48000, 144000, 3, 24, .little);
     var reader = io.Reader.openMem(&f);
@@ -600,7 +600,7 @@ test "decl: WAV float24（tag 3 + bits 24）→ Unsupported" {
 }
 
 test "decl: WAV float24 F24LE（tag 1 + bits 24 + block_align ch*4）" {
-    // F24LE：PCM tag 1 + bits 24 + 4 字节槽位（镜像 FFmpeg wavdec 671-674）
+    // F24LE：PCM tag 1 + bits 24 + 4 字节槽位（镜像 验收基准 wavdec 671-674）
     var f = fmtBytes(1, 2, 48000, 384000, 8, 24, .little);
     var reader = io.Reader.openMem(&f);
     const fmt = try parseWavFmt(&reader, 16, .little);
@@ -636,7 +636,7 @@ test "decl: F16 判定负例（extradata != [01 00]）→ 保持 pcm_int s32" {
 }
 
 test "decl: RIFX 大端不触发 F16/F24 判定" {
-    // 大端（RIFX）4B 槽位保持普通 PCM（FFmpeg 无 RIFX F16/F24 变体）
+    // 大端（RIFX）4B 槽位保持普通 PCM（验收基准 无 RIFX F16/F24 变体）
     var f = fmtBytes(1, 2, 48000, 384000, 8, 24, .big);
     var reader = io.Reader.openMem(&f);
     const fmt = try parseWavFmt(&reader, 16, .big);
@@ -659,7 +659,7 @@ test "decl: WAV XAN DPCM（tag 0x594A）解析" {
     try testing.expectEqual(Codec.xan, fmt2.codec);
     try testing.expectEqual(@as(usize, 8), fmt2.block_align);
 
-    // 三声道 XAN → Corrupt（解码器 predictor/shift 仅 [2]，镜像 FFmpeg）
+    // 三声道 XAN → Corrupt（解码器 predictor/shift 仅 [2]，镜像 验收基准）
     var f3 = fmtBytes(0x594A, 3, 8000, 24000, 12, 16, .little);
     var reader3 = io.Reader.openMem(&f3);
     try testing.expectError(error.Corrupt, parseWavFmt(&reader3, 16, .little));
@@ -692,7 +692,7 @@ test "decl: ADPCM XBOX（tag 0x69）解析与位深限制" {
     try testing.expectEqual(@as(usize, 32), fmt.block_align);
     try testing.expectEqual(@as(u16, 4), fmt.bits);
 
-    // 位深 != 4 → Corrupt（镜像 FFmpeg init 327-330）
+    // 位深 != 4 → Corrupt（镜像 验收基准 init 327-330）
     var f2 = fmtBytes(0x69, 2, 48000, 1536000, 32, 8, .little);
     var reader2 = io.Reader.openMem(&f2);
     try testing.expectError(error.Corrupt, parseWavFmt(&reader2, 16, .little));
@@ -712,7 +712,7 @@ test "decl: ADPCM SANYO（tag 0x125）解析与扩展区校验" {
     try testing.expectEqual(@as(usize, 79), fmt.block_align);
     try testing.expectEqual(@as(u8, 2), fmt.extradata_len);
 
-    // 缺扩展区（csize 16）→ Corrupt（镜像 FFmpeg 1429）
+    // 缺扩展区（csize 16）→ Corrupt（镜像 验收基准 1429）
     var f2 = fmtBytes(0x125, 1, 8000, 8000, 79, 3, .little);
     var reader2 = io.Reader.openMem(&f2);
     try testing.expectError(error.Corrupt, parseWavFmt(&reader2, 16, .little));
@@ -805,7 +805,7 @@ test "decl: AIFF-C MACE 压缩类型（'MAC3'/'MAC6'）解析" {
     try testing.expectEqual(Codec.mace6, c6s.fmt.codec);
     try testing.expectEqual(@as(usize, 2), c6s.fmt.block_align);
 
-    // 非法：MAC3 三声道 → Corrupt（FFmpeg mace 仅 1-2 声道）
+    // 非法：MAC3 三声道 → Corrupt（验收基准 mace 仅 1-2 声道）
     std.mem.writeInt(u16, buf[0..2], 3, .big);
     @memcpy(buf[18..22], "MAC3");
     var r3x = io.Reader.openMem(&buf);

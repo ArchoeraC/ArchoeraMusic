@@ -30,7 +30,7 @@ Future<void> refreshAfterVaultUnlock(dynamic ref) async {
   //    NetEase：Notifier（显式 init）
   //    Kugou  ：API 实例在**构造期**从库内会话恢复 → 重建实例
   //    Neko   ：显式 `restore()`（bootstrap 入口）
-  //    QQ     ：进程级 cookie 缓存 → 已在 ① 失效，此后按需重取
+  //    QM     ：进程级 cookie 缓存 → 已在 ① 失效，此后按需重取
   try {
     await ref.read(neteaseAuthProvider.notifier).init();
   } catch (e) {

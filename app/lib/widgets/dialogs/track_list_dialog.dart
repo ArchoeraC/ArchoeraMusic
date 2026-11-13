@@ -30,7 +30,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 part 'track_list_dialog/track_list_dialog_actions.dart';
 part 'track_list_dialog/track_list_dialog_view.dart';
 
-/// 通用KG曲目列表弹窗（歌单 / 专辑 / 歌手单曲 / 榜单复用）。
+/// 通用KG 曲目列表弹窗（歌单 / 专辑 / 歌手单曲 / 榜单复用）。
 Future<void> showKugouTracksDialog(
   BuildContext context, {
   required String title,
@@ -57,7 +57,7 @@ Future<void> showKugouTracksDialog(
   );
 }
 
-/// QM曲目列表弹窗（歌单 / 专辑 / 歌手单曲复用）。
+/// QM 曲目列表弹窗（歌单 / 专辑 / 歌手单曲复用）。
 Future<void> showQqTracksDialog(
   BuildContext context, {
   required String title,
@@ -72,7 +72,7 @@ Future<void> showQqTracksDialog(
   loadTracks: loadTracks,
 );
 
-/// QM歌单详情弹窗（song_list 全量曲目）。
+/// QM 歌单详情弹窗（song_list 全量曲目）。
 Future<void> showQqPlaylistDetailDialog(
   BuildContext context,
   CoverItem playlist,
@@ -91,7 +91,7 @@ Future<void> showQqPlaylistDetailDialog(
   );
 }
 
-/// QM专辑详情弹窗（专辑曲目）。
+/// QM 专辑详情弹窗（专辑曲目）。
 Future<void> showQqAlbumDetailDialog(BuildContext context, CoverItem album) {
   return showQqTracksDialog(
     context,
@@ -106,7 +106,7 @@ Future<void> showQqAlbumDetailDialog(BuildContext context, CoverItem album) {
   );
 }
 
-/// QM歌手详情弹窗（歌手热门曲目）。
+/// QM 歌手详情弹窗（歌手热门曲目）。
 Future<void> showQqArtistDetailDialog(BuildContext context, CoverItem artist) {
   return showQqTracksDialog(
     context,
@@ -117,7 +117,7 @@ Future<void> showQqArtistDetailDialog(BuildContext context, CoverItem artist) {
   );
 }
 
-/// KG歌单详情弹窗（公开歌单全量曲目）。
+/// KG 歌单详情弹窗（公开歌单全量曲目）。
 Future<void> showKugouPlaylistDetailDialog(
   BuildContext context,
   CoverItem playlist,
@@ -132,7 +132,7 @@ Future<void> showKugouPlaylistDetailDialog(
   );
 }
 
-/// KG专辑详情弹窗（专辑歌曲）。
+/// KG 专辑详情弹窗（专辑歌曲）。
 Future<void> showKugouAlbumDialog(BuildContext context, CoverItem album) {
   return showKugouTracksDialog(
     context,
@@ -143,7 +143,7 @@ Future<void> showKugouAlbumDialog(BuildContext context, CoverItem album) {
   );
 }
 
-/// KG歌手详情弹窗（歌手单曲）。
+/// KG 歌手详情弹窗（歌手单曲）。
 Future<void> showKugouArtistDialog(BuildContext context, CoverItem artist) {
   return showKugouTracksDialog(
     context,
@@ -154,7 +154,7 @@ Future<void> showKugouArtistDialog(BuildContext context, CoverItem artist) {
   );
 }
 
-/// KG榜单详情弹窗（榜单歌曲）。
+/// KG 榜单详情弹窗（榜单歌曲）。
 Future<void> showKugouRankDialog(BuildContext context, CoverItem rank) {
   return showKugouTracksDialog(
     context,
@@ -186,7 +186,7 @@ Future<void> showPlaylistDetailDialog(
   );
 }
 
-/// NT专辑详情弹窗（专辑曲目；收藏页专辑 tab 用）。
+/// NT 专辑详情弹窗（专辑曲目；收藏页专辑 tab 用）。
 Future<void> showNeteaseAlbumDialog(BuildContext context, CoverItem album) {
   return showKugouTracksDialog(
     context,
@@ -197,7 +197,7 @@ Future<void> showNeteaseAlbumDialog(BuildContext context, CoverItem album) {
   );
 }
 
-/// NT歌手详情弹窗（歌手热门歌曲；收藏页歌手 tab 用）。
+/// NT 歌手详情弹窗（歌手热门歌曲；收藏页歌手 tab 用）。
 Future<void> showNeteaseArtistDialog(BuildContext context, CoverItem artist) {
   return showKugouTracksDialog(
     context,
@@ -359,7 +359,7 @@ class _TrackListDialogState extends ConsumerState<TrackListDialog> {
   Widget build(BuildContext context) => _buildTrackListDialog(context);
 }
 
-/// KG浏览弹窗（排行榜 / 歌单广场等封面网格浏览；点击项进入详情）。
+/// KG 浏览弹窗（排行榜 / 歌单广场等封面网格浏览；点击项进入详情）。
 ///
 /// 点击某项时先关闭弹窗，再通过 [onItemTap] 打开对应详情（避免弹窗叠层）。
 Future<void> showKugouBrowseDialog(

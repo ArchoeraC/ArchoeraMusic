@@ -13,7 +13,7 @@
 //! `libavformat/oggparsespeex.c`（容器映射）。核心解码见 `decode.zig`，码本见
 //! `data.zig`（自 speexdata.h 逐值转录）。
 //!
-//! 正确性基准为 **ffmpeg 内嵌 libspeex**：NB(mode0) 保持 native 逐位一致，WB/UWB
+//! 正确性基准为 **ffmpeg 内嵌 libspeex**：NB(mode0) 保持 native 逐样本一致，WB/UWB
 //! 按 libspeex 语义修正（低带 wideband 高通等，详见 decode.zig 头注释）。
 //!
 //! 语义要点：
@@ -24,7 +24,7 @@
 //!   - 每 Ogg packet 含 frames_per_packet 个 20ms 帧（位连续无字节对齐），
 //!     包尾 terminator（m=15）；VBR 逐帧自描述 submode；
 //!   - 输出 s16：f32 × (1/32768) → RINT 偶舍入 → 饱和（对齐 swresample 的
-//!     cvtps2dq + packssdw SIMD 路径，即系统 ffmpeg `-f s16le` 实际走的路径）。
+//!     cvtps2dq + packssdw SIMD 路径，即系统 验收基准 `-f s16le` 实际走的路径）。
 //!
 //! probe/接线建议（供集成者）：
 //!   - probe.zig `Format.spx`：`identifyOgg` 中首包 payload 以 `"Speex   "`
@@ -235,7 +235,7 @@ fn decodeStereo(data: []f32, frame_size: usize, stereo: *spx.StereoState) void {
 }
 
 /// 解码单个 Ogg packet（frames_per_packet × 20ms 帧 → 交错 s16 缓冲）。
-/// 返回产出样本帧数。错误帧对齐 ffmpeg CLI：跳过整包剩余（状态保留）。
+/// 返回产出样本帧数。错误帧对齐 参考 CLI：跳过整包剩余（状态保留）。
 fn decodePacket(f: *SpeexCtx, data: []const u8) Error!usize {
     const channels: usize = @intCast(f.hdr.nb_channels);
     const fs: usize = @intCast(f.hdr.frame_size);
@@ -378,7 +378,7 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
         f.fc.st[m].init(&spx.speex_modes[m]);
     }
     // libspeex sb_decoder_init 对低层 NB 解码器 SPEEX_SET_WIDEBAND=1：WB/UWB 流的
-    // mode0 低带输出走 wideband 高通（对齐 libspeex；FFmpeg native 用 narrowband）。
+    // mode0 低带输出走 wideband 高通（对齐 libspeex；验收基准 native 用 narrowband）。
     if (f.hdr.mode > 0) f.fc.st[0].is_wideband = true;
 
     // 缓冲：帧解码域 + s16 输出（frames_per_packet × frame_size × ch × 2B）
@@ -396,7 +396,7 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
 
     // 首音频包信息（对照 oggparsespeex.c speex_packet：first_pts = 首音频页
     // granule − packet_size × 该页包数。speexenc 的 granule 相对帧数有非对齐
-    // 偏移，FFmpeg 以该修正对齐 pts；读一包后 reset，readImpl 经 header_pkts 跳头）
+    // 偏移，验收基准 以该修正对齐 pts；读一包后 reset，readImpl 经 header_pkts 跳头）
     var first_pts: ?i64 = null;
     if (try f.demux.nextPacket()) |pkt| {
         if (!pkt.continued) {
@@ -695,7 +695,7 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     const target: i64 = @divTrunc(ms * f.hdr.rate, 1000);
     if (target < 0) return error.SeekFailed;
     // granule 定位页 + 解码器状态重建 + 起始样本丢弃（CELP 状态冷启，前几帧
-    // 音质过渡，与 FFmpeg Ogg seek 重启解码一致）。位置按目标样本计（丢弃段不推进）。
+    // 音质过渡，与 验收基准 Ogg seek 重启解码一致）。位置按目标样本计（丢弃段不推进）。
     // 定位页起点 granule = prev；页起点到目标之间须丢弃 target - prev 个样本。
     const prev = try f.demux.seekToGranule(target);
     var m: u32 = 0;
@@ -761,7 +761,7 @@ pub const CompareResult = struct {
     corr: f64,
 };
 
-/// mine vs 参考 PCM 对拍（corr / max_abs / bit-exact；ref 为 s16le 字节流）
+/// mine vs 参考 PCM 对拍（corr / max_abs / 逐样本一致；ref 为 s16le 字节流）
 pub fn compare(mine: []const i16, ref: []const u8) CompareResult {
     const n = @min(mine.len, ref.len / 2);
     var equal: usize = 0;
@@ -803,8 +803,8 @@ fn decodeAll(allocator: Allocator, data: []const u8, out: *std.ArrayList(i16)) !
     return info;
 }
 
-/// `bit_exact`：NB(mode0) 仍与 FFmpeg native 逐位一致（保持既有锚点）；
-/// WB/UWB 参考改为 ffmpeg 内嵌 libspeex（浮点路径），只要求 corr 达标。
+/// `bit_exact`：NB(mode0) 仍与 验收基准 native 逐样本一致（保持既有锚点）；
+/// WB/UWB 参考改为 验收基准 内嵌 libspeex（浮点路径），只要求 corr 达标。
 fn goldenCase(allocator: Allocator, name: []const u8, data: []const u8, ref: []const u8, want_rate: u32, want_samples: usize, bit_exact: bool) !void {
     var out = std.ArrayList(i16).empty;
     defer out.deinit(allocator);
@@ -823,23 +823,23 @@ fn goldenCase(allocator: Allocator, name: []const u8, data: []const u8, ref: []c
     if (bit_exact) try testing.expectEqual(r.n, r.equal);
 }
 
-test "spx golden: NB q6 8k（ffmpeg native speex 对拍）" {
+test "spx golden: NB q6 8k（验收基准 native speex 对拍）" {
     try goldenCase(testing.allocator, "q6_8k", q6_spx, q6_ref, 8000, 24160, true);
 }
 
-test "spx golden: WB q8 16k（ffmpeg libspeex 参考）" {
+test "spx golden: WB q8 16k（验收基准 libspeex 参考）" {
     try goldenCase(testing.allocator, "q8_16k", q8_spx, q8_ref, 16000, 48320, false);
 }
 
-test "spx golden: UWB q10 32k（三层；ffmpeg libspeex 参考）" {
+test "spx golden: UWB q10 32k（三层；验收基准 libspeex 参考）" {
     try goldenCase(testing.allocator, "q10_32k", q10_spx, q10_ref, 32000, 64640, false);
 }
 
-test "spx golden: VBR vbr3 16k（ffmpeg libspeex 参考）" {
+test "spx golden: VBR vbr3 16k（验收基准 libspeex 参考）" {
     try goldenCase(testing.allocator, "vbr3_16k", vbr_spx, vbr_ref, 16000, 48320, false);
 }
 
-test "spx golden: WB 立体声（inband 强度立体声；ffmpeg libspeex 参考）" {
+test "spx golden: WB 立体声（inband 强度立体声；验收基准 libspeex 参考）" {
     var out = std.ArrayList(i16).empty;
     defer out.deinit(testing.allocator);
     const info = try decodeAll(testing.allocator, st_spx, &out);

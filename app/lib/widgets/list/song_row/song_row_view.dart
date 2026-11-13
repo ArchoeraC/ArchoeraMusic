@@ -533,7 +533,7 @@ class _SourceBadge extends StatelessWidget {
 }
 
 /// 可用最高音质标签（label + 是否无损档）：由「音源注册表」适配器按来源给出
-/// （KG hash 链 / QQ 文件大小 / Neko 服务端 `maxQuality` / 其余按
+/// （KG hash 链 / QM 文件大小 / Neko 服务端 `maxQuality` / 其余按
 /// [Track.quality] 反推）。返回 null 表示无可用信息（列表不显示音质标签）。
 ({String label, bool lossless})? _bestQuality(
   Track t,

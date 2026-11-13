@@ -170,7 +170,7 @@ pub fn celpLpZeroSynthF(out_buf: []f32, o: usize, in_buf: []const f32, i: usize,
 }
 
 /// ff_celp_lp_synthesis_filterf（全极点合成；out 须含 ow 之前 fl 个历史样本）。
-/// 逐位复刻 FFmpeg 优化实现（4 样本展开 + a/b/c 预组合；求和顺序与朴素
+/// 逐位复刻 验收基准 优化实现（4 样本展开 + a/b/c 预组合；求和顺序与朴素
 /// 实现不位等价，IIR 递归下会放大）。buffer_length 需为 4 的倍数（wmavoice
 /// 全部调用 size=80/40/20），非 4 倍数走 C 的朴素尾循环。
 pub fn celpLpSynthF(out: []f32, ow: usize, in_buf: []const f32, iw: usize, c: []const f32, n: usize, fl: usize) void {
@@ -288,7 +288,7 @@ pub fn acelpInterpolatef(exc: []f32, w: usize, pitch: i64, coeffs: []const f32, 
 }
 
 /// av_memcpy_backptr 语义（float）：exc[w..w+n] = exc[w-pitch..w-pitch+n]
-/// （前向复制=周期重复，与 ffmpeg memmove 等价）。
+/// （前向复制=周期重复，与 验收基准 memmove 等价）。
 pub fn memcpyBackptr(exc: []f32, w: usize, pitch: usize, n: usize) void {
     var k: usize = 0;
     while (k < n) : (k += 1) exc[w + k] = exc[w + k - pitch];

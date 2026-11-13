@@ -699,7 +699,7 @@ fn doImdct(f: *DecoderCtx, s: *c.Ctx, channels: usize, offset: i32) void {
     }
 }
 
-/// 窗函数重叠相加（对照 FFmpeg float_dsp vector_fmul_window，len=128 → 256 输出）
+/// 窗函数重叠相加（对照 验收基准 float_dsp vector_fmul_window，len=128 → 256 输出）
 /// 输出为镜像对：dst[k] 与 dst[2len-1-k] 由 src0[k] 与 src1[len-1-k] 合成。
 fn vectorFmulWindow(dst: []f32, src0: []const f32, src1: []const f32, win: *const [256]f32) void {
     const len = src0.len;
@@ -727,7 +727,7 @@ fn seekMsImpl(ctx: *anyopaque, ms_arg: i64) Error!void {
     f.out_pos = 0;
     f.out_len = 0;
     f.frames_done = 0;
-    // 抖动 PRNG 随从头重解一并复位（对照 ffmpeg ac3_decode_flush 的 av_lfg_init）
+    // 抖动 PRNG 随从头重解一并复位（对照 验收基准 ac3_decode_flush 的 av_lfg_init）
     f.s.jitter.init(0);
     try f.reader.seek(0, .start);
     // 逐帧解码跳过（解码出的帧全部丢弃；readImpl 从目标帧重新解码）

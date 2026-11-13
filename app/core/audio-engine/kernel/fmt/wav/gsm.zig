@@ -31,7 +31,7 @@ pub const frame_size: usize = 160;
 pub const ms_frame_size: usize = 320;
 
 // ---------------------------------------------------------------------------
-// 常量表（值对齐 FFmpeg gsmdec_data.c）
+// 常量表（值对齐 验收基准 gsmdec_data.c）
 // ---------------------------------------------------------------------------
 
 /// 长时预测增益表（ff_gsm_long_term_gain_tab[4]）
@@ -45,7 +45,7 @@ const requant = [4][8]u8{
     .{ 0, 1, 2, 3, 4, 5, 6, 7 },
 };
 
-/// 去量化表（ff_gsm_dequant_tab[64][8]；行 48+ 为饱和近似值，保持 FFmpeg 原值）
+/// 去量化表（ff_gsm_dequant_tab[64][8]；行 48+ 为饱和近似值，保持 验收基准 原值）
 const dequant = [64][8]i16{
     .{ -28, -20, -12, -4, 4, 12, 20, 28 },
     .{ -56, -40, -24, -8, 8, 24, 40, 56 },
@@ -145,7 +145,7 @@ const apcm_mode = [9][4]u8{
 // 解码状态
 // ---------------------------------------------------------------------------
 
-/// GSM 解码状态（镜像 FFmpeg GSMContext；流开头 / seek 后须置零）
+/// GSM 解码状态（镜像 验收基准 GSMContext；流开头 / seek 后须置零）
 pub const Context = struct {
     /// 前 120 元素为上一帧尾部（long_term_synth 按 lag 回溯），随后 160 为当前帧
     ref_buf: [280]i16 = @splat(0),
@@ -164,7 +164,7 @@ const BitReader = struct {
     bit_pos: usize,
     lsb_first: bool,
 
-    /// 读取 `n` 位（≤ 31）。位序语义对齐 FFmpeg：
+    /// 读取 `n` 位（≤ 31）。位序语义对齐 验收基准：
     ///   - MSB-first（get_bits）：首个读入 bit 成为结果**最高位**；
     ///   - LSB-first（get_bits_le）：首个读入 bit 成为结果最低位。
     /// 越界 → error.Corrupt。
@@ -194,7 +194,7 @@ const BitReader = struct {
 // 编解码原语（镜像 gsmdec_template.c）
 // ---------------------------------------------------------------------------
 
-/// 定长乘加（镜像 FFmpeg gsm_mult：(int)(a*b + 2^14) >> 15）。
+/// 定长乘加（镜像 验收基准 gsm_mult：(int)(a*b + 2^14) >> 15）。
 /// 中间量按 u32 回绕，最终在**有符号**值上算术右移（符号位扩展），
 /// 与 C 的 `(int)(...) >> 15` 语义一致；逻辑右移会在此处产生分歧。
 fn gsmMult(a: i32, b: i32) i32 {
@@ -342,7 +342,7 @@ fn gsmDecodeBlock(ctx: *Context, samples: []i16, gb: *BitReader, mode: usize) Er
 /// 解码 GSM_MS 块（WAV tag 0x31/0x32/0x1500）。
 /// `in` 为整块（41..65 字节，步进 3）；`out` 容量须 >= ms_frame_size（交错 s16）。
 pub fn decodeGsmMs(ctx: *Context, in: []const u8, out: []i16) Error!void {
-    // 块长校验镜像 FFmpeg gsm_init：41 ≤ align ≤ 65 且 (align-41) % 3 == 0
+    // 块长校验镜像 验收基准 gsm_init：41 ≤ align ≤ 65 且 (align-41) % 3 == 0
     if (in.len < msn_min_block_size or in.len > ms_block_size or
         (in.len - msn_min_block_size) % 3 != 0)
     {
@@ -367,9 +367,9 @@ pub fn decodeGsm(ctx: *Context, in: []const u8, out: []i16) Error!void {
 // 测试
 // ---------------------------------------------------------------------------
 //
-// 黄金样本由 libgsm 生成（/tmp 脚本，已比对 FFmpeg 原生解码器输出一致）：
+// 黄金样本由 libgsm 生成（/tmp 脚本，已比对 验收基准 原生解码器输出一致）：
 //   960 样本 440Hz 正弦 s16 @8kHz → `-c:a libgsm_ms`（GSM_MS 3 块）与
-//   `-c:a libgsm -f gsm`（纯 GSM 6 帧）；期望输出为 ffmpeg 原生解码逐位一致。
+//   `-c:a libgsm -f gsm`（纯 GSM 6 帧）；期望输出为 验收基准 原生解码逐样本一致。
 
 const testing = std.testing;
 
@@ -464,7 +464,7 @@ test "gsm: GSM_MS 单块解码对照黄金" {
 }
 
 test "gsm: GSM_MS 多块连续解码（上下文跨块）" {
-    // 3 块（65B × 3），期望与 libgsm_ms 编码 → FFmpeg 原生解码输出逐字节一致
+    // 3 块（65B × 3），期望与 libgsm_ms 编码 → 验收基准 原生解码输出逐字节一致
     const blocks = [_][65]u8{
         .{
             0x88, 0xDD, 0xE1, 0x1A, 0x85, 0xC2, 0xF3, 0x16, 0x40, 0x9B, 0xD2, 0x8A,
@@ -491,7 +491,7 @@ test "gsm: GSM_MS 多块连续解码（上下文跨块）" {
             0xD8, 0x52, 0x5B, 0x4B, 0x69,
         },
     };
-    // 期望：960 样本 s16le（3 块 × 320 样本），由 FFmpeg 原生解码器逐字节导出
+    // 期望：960 样本 s16le（3 块 × 320 样本），由 验收基准 原生解码器逐字节导出
     const expect = [_]u8{
         0x00, 0x00, 0x00, 0x00, 0x00, 0x1C, 0x90, 0x21, 0x00, 0x19, 0xC8, 0x22,
         0xE0, 0x20, 0x78, 0x18, 0xC0, 0x04, 0x00, 0xFE, 0xA8, 0xFF, 0x48, 0xE7,
@@ -666,7 +666,7 @@ test "gsm: GSM_MS 多块连续解码（上下文跨块）" {
 
 test "gsm: 纯 GSM 逐帧解码与 GSM_MS 输出一致（同源音频两种位序）" {
     // 纯 GSM（198B = 6 帧 × 33B，MSB 位序）与 GSM_MS（195B = 3 块 × 65B，LSB 位序）
-    // 为同一段音频（440Hz 正弦 960 样本）的两种封装；FFmpeg 原生解码两者输出逐字节
+    // 为同一段音频（440Hz 正弦 960 样本）的两种封装；验收基准 原生解码两者输出逐字节
     // 一致（/tmp/gsm_pure_expected.raw == /tmp/gsm_expected.raw，cmp 已验证）。
     // GSM_MS 侧已由上方黄金测试锚定，故纯 GSM 输出一致即证明解码正确。
     const ms = [_]u8{

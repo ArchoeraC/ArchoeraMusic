@@ -5,7 +5,7 @@
 /// 歌词格式选择（跨平台共享）：把「逐字富格式 vs 标准 LRC」的优先级策略
 /// 集中到一处，各平台只负责把自己的候选内容喂进来。
 ///
-/// 背景：netease 的 `yrc`、QQ 的 `qrc`、kugou 的 `krc` 都是逐字富格式，
+/// 背景：netease 的 `yrc`、QM 的 `qrc`、kugou 的 `krc` 都是逐字富格式，
 /// 各平台原先各写一份 `_pickMain` / `_pickFormatted`；本文件统一为
 /// [pickLyricFormat]，用户「格式顺序」（[AppPrefs.preferWordByWord]）
 /// 只需换算成一个布尔传入。

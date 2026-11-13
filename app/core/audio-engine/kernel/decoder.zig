@@ -38,13 +38,13 @@ pub const Metadata = struct {
 };
 
 /// VORBIS 注释通用键值对（未映射标准字段的原始条目：TRACKNUMBER / ALBUMARTIST /
-/// REPLAYGAIN_* 等全部保留，对齐 FFmpeg av_dict 语义；重复键全部保留）
+/// REPLAYGAIN_* 等全部保留，对齐 验收基准 av_dict 语义；重复键全部保留）
 pub const Tag = struct {
     key: []const u8,
     value: []const u8,
 };
 
-/// 音量归一化增益（REPLAYGAIN_* 标签；单位对齐 FFmpeg AVReplayGain：
+/// 音量归一化增益（REPLAYGAIN_* 标签；单位对齐 验收基准 AVReplayGain：
 /// gain 为 0.001 dB、peak 为 0.00001；null = 缺失）
 pub const ReplayGain = struct {
     track_gain: ?i32 = null,
@@ -106,12 +106,12 @@ pub const Info = struct {
     /// 时长（微秒）；精确度见 duration_known
     duration_us: i64,
     duration_known: DurationKnown,
-    /// 编码器名（对齐 FFmpeg 命名，如 "pcm_s16le"；静态字面量，sentinel 终止，
+    /// 编码器名（对齐 验收基准 命名，如 "pcm_s16le"；静态字面量，sentinel 终止，
     /// 供 C ABI（zk_decoder_open 的 ZkInfo.codec_name）直接取指针）
     codec_name: [:0]const u8,
     /// 容器名（如 "wav"）
     format_name: [:0]const u8,
-    /// 编码 profile 名（对齐 FFmpeg 命名，如 DTS 的 "DTS" / "DTS-ES" /
+    /// 编码 profile 名（对齐 验收基准 命名，如 DTS 的 "DTS" / "DTS-ES" /
     /// "DTS 96/24" / "DTS-HD MA"；静态字面量，null = 无/未细分）
     profile: ?[:0]const u8 = null,
     /// 标签元数据（可空字符串；生命周期与 Decoder 一致，见 `Metadata`）
@@ -194,7 +194,7 @@ pub const MetaFn = *const fn (
 ) Error!MetadataSession;
 
 /// 打开解码器：probe 嗅探 → Registry 分派（§8.2；格式工厂登记于 registry.zig）。
-/// 未接管 / 未开启的格式 → error.UnsupportedFormat（引擎回退 FFmpeg，§8.3）。
+/// 未接管 / 未开启的格式 → error.UnsupportedFormat（引擎回退 验收基准，§8.3）。
 ///
 /// `allocator` 供各格式模块分配上下文（当前 wav 为无分配路径，后续
 /// flac/ogg 等经此传入，见 §8.1「allocator：engine.zig 传入」）。
@@ -212,7 +212,7 @@ pub fn openWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []const u
 
 /// 从**内存字节切片**打开解码器（纯内存源；docs/audio-memory-source.md §7）。
 /// 与 [open] 同语义：probe 嗅探 → Registry 分派；未接管格式 → error.UnsupportedFormat
-/// （引擎回退 FFmpeg）。字节所有权归调用方，解码器只读不释放，生命周期须覆盖解码器。
+/// （引擎回退 验收基准）。字节所有权归调用方，解码器只读不释放，生命周期须覆盖解码器。
 pub fn openMem(allocator: std.mem.Allocator, data: []const u8, info: *Info) Error!Decoder {
     var reader = io.Reader.openMem(data);
     return openReader(allocator, &reader, info);
@@ -308,7 +308,7 @@ pub fn openMetaWithIo(io_inst: std.Io, allocator: std.mem.Allocator, path: []con
 
 const testing = std.testing;
 
-/// LOAS/LATM 真实样本 + ffmpeg 参考 PCM（fmt/latm 端到端 golden）
+/// LOAS/LATM 真实样本 + 验收基准 PCM（fmt/latm 端到端 golden）
 const latm_tiny = @embedFile("fmt/latm_tiny_mono.latm");
 const latm_tiny_golden = @embedFile("fmt/latm_tiny_mono.s16");
 
@@ -334,7 +334,7 @@ test "open: .latm 经 probe → 工厂分发（decoder.open 全链路）端到�
     try testing.expectEqualStrings("aac", info.codec_name);
     try testing.expectEqualStrings("latm", info.format_name);
 
-    // 与 golden 样本比对（corr/bit-exact 阈值同 fmt/latm e2e）
+    // 与 golden 样本比对（corr/逐样本一致 阈值同 fmt/latm e2e）
     var out = std.ArrayList(i16).empty;
     defer out.deinit(testing.allocator);
     var buf: [65536]u8 = undefined;
@@ -398,14 +398,14 @@ test "open: .mka 经 probe → 工厂分发（decoder.open 全链路）端到端
     try testing.expectEqual(@as(usize, 110250), total);
 }
 
-/// Musepack SV8 FATE（44.1k 立体声 456 帧）+ ffmpeg 参考 PCM（decoder.open 全链路 e2e）
+/// Musepack SV8 FATE（44.1k 立体声 456 帧）+ 验收基准 PCM（decoder.open 全链路 e2e）
 const mpc_mp8 = @embedFile("fmt/mpc/samples/inside-mp8.mpc");
 const mpc_mp8_s16 = @embedFile("fmt/mpc/samples/inside-mp8.s16");
-/// SV7 FATE（44.1k 立体声 456 帧）：open 全接管，首 1s 与 ffmpeg 逐位一致
+/// SV7 FATE（44.1k 立体声 456 帧）：open 全接管，首 1s 与 验收基准 逐样本一致
 const mpc_mp7 = @embedFile("fmt/mpc/samples/inside-mp7.mpc");
 const mpc_mp7_first1s = @embedFile("fmt/mpc/samples/inside-mp7.first1s.s16");
 
-test "open: .mpc(SV8) 经 probe → 工厂分发端到端（逐位对齐 ffmpeg 参考）" {
+test "open: .mpc(SV8) 经 probe → 工厂分发端到端（逐样本对齐 验收基准）" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
     const ioinst = std.Io.Threaded.global_single_threaded.io();
@@ -469,7 +469,7 @@ fn e2eDecodeFull(comptime name: []const u8, comptime payload: []const u8) ![]u8 
     return out.toOwnedSlice(testing.allocator);
 }
 
-test "open: .spx(Ogg-Speex NB q6) 经 probe → 工厂分发端到端（逐位对齐 ffmpeg 参考）" {
+test "open: .spx(Ogg-Speex NB q6) 经 probe → 工厂分发端到端（逐样本对齐 验收基准）" {
     const out = try e2eDecodeFull("t.spx", spx_q6);
     defer testing.allocator.free(out);
     try testing.expectEqual(spx_q6_ref.len, out.len);
@@ -477,7 +477,7 @@ test "open: .spx(Ogg-Speex NB q6) 经 probe → 工厂分发端到端（逐位�
 }
 
 
-test "open: .tak(FATE luckynight) 经 probe → 工厂分发端到端（逐位对齐 ffmpeg 参考）" {
+test "open: .tak(FATE luckynight) 经 probe → 工厂分发端到端（逐样本对齐 验收基准）" {
     const out = try e2eDecodeFull("t.tak", tak_lucky);
     defer testing.allocator.free(out);
     try testing.expectEqual(tak_lucky_ref.len, out.len);
@@ -485,14 +485,14 @@ test "open: .tak(FATE luckynight) 经 probe → 工厂分发端到端（逐位�
 }
 
 
-test "open: .shn(FATE luckynight) 经 probe → 工厂分发端到端（逐位对齐 ffmpeg 参考）" {
+test "open: .shn(FATE luckynight) 经 probe → 工厂分发端到端（逐样本对齐 验收基准）" {
     const out = try e2eDecodeFull("t.shn", shn_lucky);
     defer testing.allocator.free(out);
     try testing.expectEqual(shn_lucky_ref.len, out.len);
     try testing.expectEqualSlices(u8, shn_lucky_ref, out);
 }
 
-test "open: .mpc(SV7) 经 probe → 工厂分发端到端（首 1s 逐位对齐 ffmpeg 参考）" {
+test "open: .mpc(SV7) 经 probe → 工厂分发端到端（首 1s 逐样本对齐 验收基准）" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
     const ioinst = std.Io.Threaded.global_single_threaded.io();
@@ -523,13 +523,13 @@ test "open: .mpc(SV7) 经 probe → 工厂分发端到端（首 1s 逐位对齐 
     try testing.expectEqualSlices(u8, mpc_mp7_first1s, out.items[0..mpc_mp7_first1s.len]);
 }
 
-/// TTA 真实样本（FATE inside.tta / ffmpeg 编码 mono.tta）+ ffmpeg 参考 PCM
+/// TTA 真实样本（FATE inside.tta / 验收基准 编码 mono.tta）+ 验收基准 PCM
 const tta_inside = @embedFile("fmt/tta/samples/inside.tta");
 const tta_inside_s16 = @embedFile("fmt/tta/samples/inside.s16");
 const tta_mono = @embedFile("fmt/tta/samples/mono.tta");
 const tta_mono_s16 = @embedFile("fmt/tta/samples/mono.s16");
 
-test "open: .tta(FATE inside) 经 probe → 工厂分发端到端（逐位对齐 ffmpeg s16le）" {
+test "open: .tta(FATE inside) 经 probe → 工厂分发端到端（逐样本对齐 验收基准 s16le）" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
     const ioinst = std.Io.Threaded.global_single_threaded.io();
@@ -561,7 +561,7 @@ test "open: .tta(FATE inside) 经 probe → 工厂分发端到端（逐位对齐
     try testing.expectEqualSlices(u8, tta_inside_s16, out.items);
 }
 
-test "open: .tta(mono 44.1k) 经 probe → 工厂分发端到端（逐位对齐 ffmpeg s16le）" {
+test "open: .tta(mono 44.1k) 经 probe → 工厂分发端到端（逐样本对齐 验收基准 s16le）" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
     const ioinst = std.Io.Threaded.global_single_threaded.io();
@@ -593,7 +593,7 @@ test "open: .tta(mono 44.1k) 经 probe → 工厂分发端到端（逐位对齐 
     try testing.expectEqualSlices(u8, tta_mono_s16, out.items);
 }
 
-test "AS4 openHinted: 正确提示免 probe 直分派；错误提示回退 probe；均与 sync 逐位一致" {
+test "AS4 openHinted: 正确提示免 probe 直分派；错误提示回退 probe；均与 sync 逐样本一致" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
     const ioinst = std.Io.Threaded.global_single_threaded.io();
@@ -618,7 +618,7 @@ test "AS4 openHinted: 正确提示免 probe 直分派；错误提示回退 probe
     ref.deinit();
     try testing.expect(ref_out.items.len > 0);
 
-    // 正确提示：直接分派（免 probe），输出逐位一致
+    // 正确提示：直接分派（免 probe），输出逐样本一致
     var hi: Info = undefined;
     var hd = try openHinted(testing.allocator, full, .latm, &hi);
     var hint_out = std.ArrayList(u8).empty;
@@ -633,7 +633,7 @@ test "AS4 openHinted: 正确提示免 probe 直分派；错误提示回退 probe
     try testing.expectEqualSlices(u8, ref_out.items, hint_out.items);
     try testing.expectEqual(ref_info.channels, hi.channels);
 
-    // 错误提示（wav）：分派失败 → rewind → 回退 probe，仍逐位一致
+    // 错误提示（wav）：分派失败 → rewind → 回退 probe，仍逐样本一致
     var wi: Info = undefined;
     var wd = try openHinted(testing.allocator, full, .wav, &wi);
     var wrong_out = std.ArrayList(u8).empty;

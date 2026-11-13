@@ -2,9 +2,9 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// QQ 音乐**安装级设备身份**。
+/// QM**安装级设备身份**。
 ///
-/// 风控要点：QQ 移动端协议（`musicu.fcg` 的 Android comm）会用
+/// 风控要点：QM 移动端协议（`musicu.fcg` 的 Android comm）会用
 /// `udid / OpenUDID / QIMEI36 / aid / phonetype` 组成设备指纹。旧实现把这些
 /// 字段全写成 `'0'`，并且每次取流（`song_url`）都随机生成一个新的 32 位 GUID：
 ///
@@ -24,7 +24,7 @@ import 'dart:math';
 
 import '../../runtime.dart';
 
-/// 宿主会话存储里保存 QQ 设备身份的键。
+/// 宿主会话存储里保存 QM 设备身份的键。
 const String qqDevicePlatform = 'qqmusic_device';
 
 /// 一台「自洽」的 Android 设备档案（机型 / 系统 / 客户端版本必须互相匹配）。
@@ -59,7 +59,7 @@ class QqDeviceProfile {
   /// Android API level（例如 `35`）。
   final int sdk;
 
-  /// QQ 音乐 Android 客户端版本号（同时用于 comm.cv/v 与 UA）。
+  /// QM Android 客户端版本号（同时用于 comm.cv/v 与 UA）。
   final int cv;
 }
 
@@ -130,7 +130,7 @@ String _luhnImei(Random rng) {
   return '${digits.join()}$check';
 }
 
-/// QQ 安装级设备身份。
+/// QM 安装级设备身份。
 class QqDevice {
   const QqDevice({
     required this.profileKey,
@@ -186,7 +186,7 @@ class QqDevice {
   /// 机型（comm.phonetype）。
   String get model => profile.model;
 
-  /// 统一的 QQ 音乐 Android UA。
+  /// 统一的 QM Android UA。
   String get userAgent => 'QQMusic $cv(android $osVer)';
 
   /// QIMEI 是否仍然可用（服务端建议 24h 更新一次）。

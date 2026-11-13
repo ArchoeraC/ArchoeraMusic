@@ -17,7 +17,7 @@
 //!
 //! 解码为浮点（对齐 ffmpeg fltp）；s16 用 round(x*32768)+clamp。IMDCT 为
 //! av_tx 位精确内核（mdct.zig）；scale-factor 量化步进的 exp10 用 f64 数学，
-//! 与系统 ffmpeg 的 f32 近似存在末位差异 → s16 bit-exact 非 100%（实测比例见
+//! 与系统 验收基准 的 f32 近似存在末位差异 → s16 逐样本一致 非 100%（实测比例见
 //! fmt/wma/README），corr ≥ 0.9999。
 
 const std = @import("std");
@@ -272,7 +272,7 @@ test "wmapro 配置: latin 5.1 channel_mask/LFE 推导" {
     try std.testing.expectEqual(@as(i32, 3), d.lfe_channel);
 }
 
-test "wmapro e2e: Beethoven 2ch == ffmpeg" {
+test "wmapro e2e: Beethoven 2ch == 验收基准" {
     const r = try runE2e(sample_beethoven, @embedFile("golden_beethoven.s16"));
     try std.testing.expectEqual(@as(u32, 48000), r.sr);
     try std.testing.expectEqual(@as(u8, 2), r.ch);
@@ -282,7 +282,7 @@ test "wmapro e2e: Beethoven 2ch == ffmpeg" {
 
 const sample_latin51 = @embedFile("sample_latin51.wma");
 
-test "wmapro e2e: latin 5.1 6ch == ffmpeg" {
+test "wmapro e2e: latin 5.1 6ch == 验收基准" {
     const r = try runE2e(sample_latin51, @embedFile("golden_latin51.s16"));
     try std.testing.expectEqual(@as(u32, 48000), r.sr);
     try std.testing.expectEqual(@as(u8, 6), r.ch);

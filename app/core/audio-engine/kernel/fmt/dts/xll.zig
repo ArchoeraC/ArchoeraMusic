@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! DTS-HD MA 无损扩展（XLL）解码
 //!
@@ -33,7 +37,7 @@ pub const SPEAKER_COUNT: usize = 32;
 
 pub const syncword_xll: u32 = 0x41A29547;
 /// DTS:X 对象音频扩展 sync（dca_syncwords.h DCA_SYNCWORD_XLL_X / _X_IMAX）。
-/// ffmpeg 不解码对象数据（仅跳过），只据 sync 置 profile 标志。
+/// 验收基准 不解码对象数据（仅跳过），只据 sync 置 profile 标志。
 pub const syncword_xll_x: u32 = 0x02000850;
 pub const syncword_xll_x_imax: u32 = 0xF14000D0;
 
@@ -681,7 +685,7 @@ pub const XllDecoder = struct {
         try self.parseNaviTable(ba);
         try self.parseBandData(ba);
 
-        // 帧尾扩展数据检测（ffmpeg parse_frame：DTS:X / DTS:X IMAX sync）。
+        // 帧尾扩展数据检测（验收基准 parse_frame：DTS:X / DTS:X IMAX sync）。
         // 对象数据本身不解码，仅置标志（profile 上报用）。
         const aligned = (ba.br.bit_pos + 31) & ~@as(usize, 31);
         if (self.frame_size * 8 > aligned) {
@@ -902,7 +906,7 @@ pub const XllDecoder = struct {
         const cb: *ChSetBuf = &self.bufs[c.slot];
         const msb = cb.msb;
 
-        // ffmpeg：找后续 hier dmix chset —— 有则先撤销 core 预缩放（仅 2 频带无
+        // 验收基准：找后续 hier dmix chset —— 有则先撤销 core 预缩放（仅 2 频带无
         // deci_history 场景；本函数调用方只在单频带 chset 上使用 core 组合）
         const o = self.findNextHierDmix(c);
 
@@ -968,7 +972,7 @@ pub const XllDecoder = struct {
             }
             self.output_mask |= c.ch_mask;
         }
-        // 层次式 downmix 撤销/缩放（ffmpeg "Undo hierarchial downmix and/or
+        // 层次式 downmix 撤销/缩放（验收基准 "Undo hierarchial downmix and/or
         // apply scaling"：位于第 2..nchsets 个 chset 且嵌有 dmix 时）
         {
             var ci: usize = 1;
@@ -992,7 +996,7 @@ pub const XllDecoder = struct {
         }
     }
     // ==================================================================
-    // 层次式 downmix（ffmpeg undo_down_mix / scale_down_mix / dmix 系）
+    // 层次式 downmix（验收基准 undo_down_mix / scale_down_mix / dmix 系）
     // ==================================================================
     /// is_hier_dmix_chset：非主 chset + 嵌 dmix + 层次成员
     fn isHierDmixChset(self: *const XllDecoder, c: *const ChSet) bool {
@@ -1117,7 +1121,7 @@ test "xll: 解析基本（无 sync）" {
 // 构造最小可解析 XLL 帧头所需字段过多；此处直接验证 parseFrame 内嵌逻辑的
 // 等价检测路径：对“已通过带数据解析后的位位置 + frame_size”边界条件的检测
 // 在真实样本（xll51/xll71/xll192）中为负例（无 X sync → flags 保持 false），
-// 由 lib.zig 的既有 bit-exact 回归覆盖。正例合成：构造只有公共头与尾扩展
+// 由 lib.zig 的既有逐样本一致回归覆盖。正例合成：构造只有公共头与尾扩展
 // 数据的帧不可行（子头/NAVI 校验强约束），故正例以完整帧在样本侧覆盖，
 // 负例在此以“frame_size 内无 X sync”的解析结果验证。
 

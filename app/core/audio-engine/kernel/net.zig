@@ -19,7 +19,7 @@
 //! 单一常驻实例**（见 globalIo，避免每路 Threaded 的 SIGIO handler 互相覆盖）；
 //! 被内核解码线程串行调用（同步/run-to-completion），不自持解码线程。`abort` 置位并尽力 `shutdown` 连接以解除阻塞读（best-effort）。
 //!
-//! 断流重连 / 读超时（对齐 FFmpeg AVIO 的 `rw_timeout` / `reconnect*`）：
+//! 断流重连 / 读超时（对齐 验收基准 AVIO 的 `rw_timeout` / `reconnect*`）：
 //!   - 瞬时读错误 / 长度内提前 EOF / 读超时 → 自 `net_pos` 以 `Range` 重连续传；
 //!     重试上限 + 指数退避，见 `configureFromEnv` / `backoffSleep`；
 //!   - 读超时：`std.Io.net` 不暴露 socket 读超时（且 std 阻塞读不允许 EAGAIN，
@@ -55,7 +55,7 @@ const max_redirects = 6;
 /// seek 前向「同一连接内丢弃」而非重连的距离上限（字节）
 const forward_discard_limit = 1 << 20;
 
-/// 读超时默认值（ms；对齐 FFmpeg AVIO 的 rw_timeout=15s）；0 = 关闭 watchdog。
+/// 读超时默认值（ms；对齐 验收基准 AVIO 的 rw_timeout=15s）；0 = 关闭 watchdog。
 const default_timeout_ms: u32 = 15000;
 /// 断流重连默认：最多 3 次，首次退避 500ms，指数增长、上限 5s。
 const default_reconnect_max: u32 = 3;

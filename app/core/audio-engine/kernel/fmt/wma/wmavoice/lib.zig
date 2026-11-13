@@ -17,7 +17,7 @@
 //! superframe 输出。
 //!
 //! 输出：解码器内部 float 样本经 clip(round(x*32768)) 转交错 s16（mono），
-//! 对齐 ffmpeg `-f s16le`（s16 语义 = round+clip，见上层验证）。
+//! 对齐 验收基准 `-f s16le`（s16 语义 = round+clip，见上层验证）。
 
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
@@ -89,7 +89,7 @@ fn deinit(ctx: *anyopaque) void {
     a.destroy(self);
 }
 
-/// toS16：ffmpeg FLT→s16（`-f s16le`）语义 = round(clip(x*32768))。
+/// toS16：验收基准 FLT→s16（`-f s16le`）语义 = round(clip(x*32768))。
 fn toS16(x: f32) i16 {
     var v: f64 = @round(@as(f64, x) * 32768.0);
     if (v > 32767.0) v = 32767.0;
@@ -139,7 +139,7 @@ pub fn decodeF32(a: std.mem.Allocator, file_data: []const u8, hdr: *const asf.He
     var guard: usize = 0;
     const max_guard = (n + 2) * 2048 + 64;
 
-    // 正常对象循环（对齐 ffmpeg decode_simple_internal：每次消费后继续剩余，
+    // 正常对象循环（对齐 验收基准 decode_simple_internal：每次消费后继续剩余，
     // 对象耗尽才取下一个；最后一个对象同样须循环到 cur 空为止）
     while (true) : (guard += 1) {
         if (guard > max_guard) return error.Corrupt;
@@ -150,7 +150,7 @@ pub fn decodeF32(a: std.mem.Allocator, file_data: []const u8, hdr: *const asf.He
         }
         const consumed = dec.decodePacket(cur);
         if (consumed < 0) {
-            // ffmpeg：解码错误 → 丢弃本对象剩余
+            // 验收基准：解码错误 → 丢弃本对象剩余
             cur = &.{};
             continue;
         }
@@ -166,7 +166,7 @@ pub fn decodeF32(a: std.mem.Allocator, file_data: []const u8, hdr: *const asf.He
         }
     }
 
-    // drain：补空包直到不再产生帧（对齐 ffmpeg flush）
+    // drain：补空包直到不再产生帧（对齐 验收基准 flush）
     while (true) : (guard += 1) {
         if (guard > max_guard) return error.Corrupt;
         const consumed = dec.decodePacket(&.{});
@@ -191,7 +191,7 @@ pub fn openFromAsf(allocator: std.mem.Allocator, file_data: []u8, hdr: *const as
     const audio = hdr.audio.?;
     if (audio.codec_tag != 0x000A) return error.UnsupportedFormat;
     if (audio.extradata.len != 46) return error.UnsupportedFormat;
-    // ffmpeg 支持 322–22097 Hz（pitch/history 范围约束）；其余回退主后端
+    // 验收基准 支持 322–22097 Hz（pitch/history 范围约束）；其余回退主后端
     if (audio.sample_rate < 322 or audio.sample_rate > 22097) return error.UnsupportedFormat;
     if (audio.block_align == 0 or audio.block_align > (1 << 22)) return error.UnsupportedFormat;
 
@@ -229,7 +229,7 @@ pub fn openFromAsf(allocator: std.mem.Allocator, file_data: []u8, hdr: *const as
 }
 
 // ---------------------------------------------------------------------------
-// golden 回归（vs ffmpeg n9.0.1 内部 float 输出；.f32 = `-f f32le`）
+// golden 回归（vs 验收基准 n9.0.1 内部 float 输出；.f32 = `-f f32le`）
 // ---------------------------------------------------------------------------
 
 fn corrF(a: []const f32, b: []const f32) f64 {
@@ -352,13 +352,13 @@ test "wmavoice dump f32 (env-gated)" {
     }
 }
 
-test "wmavoice golden: 8kHz 7kbps（lsp10，ds=9）float 逐位 vs ffmpeg no-asm" {
+test "wmavoice golden: 8kHz 7kbps（lsp10，ds=9）float 逐位 vs 验收基准 no-asm" {
     try runGolden(s7, g7, 8000);
 }
-test "wmavoice golden: 8kHz 11kbps（lsp10，ds=3，tilt_corr）float 逐位 vs ffmpeg no-asm" {
+test "wmavoice golden: 8kHz 11kbps（lsp10，ds=3，tilt_corr）float 逐位 vs 验收基准 no-asm" {
     try runGolden(s11, g11, 8000);
 }
-test "wmavoice golden: 16kHz 19kbps（lsp16，ds=3）float 逐位 vs ffmpeg no-asm" {
+test "wmavoice golden: 16kHz 19kbps（lsp16，ds=3）float 逐位 vs 验收基准 no-asm" {
     try runGolden(s19, g19, 16000);
 }
 

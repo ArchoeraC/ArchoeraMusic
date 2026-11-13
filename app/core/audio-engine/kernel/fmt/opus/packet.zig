@@ -9,7 +9,7 @@
 //! 分割。参考重构对照 FFmpeg `libavcodec/opus/parse.c`（ff_opus_parse_packet，
 //! 非自定界形态）与 RFC 6716 Table 2（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
-//! 语义要点（对齐参考实现，保证 bit-exact）：
+//! 语义要点（对齐参考实现，保证逐样本一致）：
 //!   - Table 2：config 0-11 SILK-only（NB/MB/WB，10/20/40/60ms）、
 //!     12-15 Hybrid（SWB/FB，10/20ms）、16-31 CELT-only（NB/WB/SWB/FB，
 //!     2.5/5/10/20ms）；每档内 (config&3) / (config&1) 决定帧时长；
@@ -127,7 +127,7 @@ fn lacingFull(data: []const u8, ptr: *usize) ?usize {
     return val;
 }
 
-/// 解析 packet：TOC + 帧分割（FFmpeg ff_opus_parse_packet 语义，非自定界）。
+/// 解析 packet：TOC + 帧分割（验收基准 ff_opus_parse_packet 语义，非自定界）。
 /// 非法 packet → error.Corrupt。
 pub fn parse(data: []const u8) Error!Packet {
     if (data.len == 0) return error.Corrupt;

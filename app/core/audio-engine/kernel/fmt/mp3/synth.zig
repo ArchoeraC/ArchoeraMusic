@@ -14,7 +14,7 @@ const g_sec = [24]f32{
 
 /// 8 点 DCT 核（对标 minimp3 mp3d_DCT_II 内层蝶形）。
 /// 输入的 4 个「行」相互独立 → 用 V4 逐 lane 并行；每 lane 的运算顺序与标量完全一致，
-/// 不重组浮点、不引入 FMA → 位级一致（B 档手法但无精度风险）。
+/// 不重组浮点、不引入 FMA → 逐样本一致（B 档手法但无精度风险）。
 inline fn dctRows8(in: [8]V4) [8]V4 {
     var v0 = in[0];
     var v1 = in[1];
@@ -142,7 +142,7 @@ fn synthPair(pcm: [*]f32, nch: usize, z: [*]const f32) void {
 }
 
 /// 单条多相抽头的 4 路并行向量（vz/vy 各 4 个连续 f32）。
-/// 4 个「相位样本」相互独立，逐 lane 运算顺序与标量完全一致 → 位级一致（B 档但无精度风险）。
+/// 4 个「相位样本」相互独立，逐 lane 运算顺序与标量完全一致 → 逐样本一致（B 档但无精度风险）。
 const V4 = vec.V4;
 
 fn synth(xl: [*]const f32, dstl: [*]f32, nch: usize, lins: [*]f32) void {

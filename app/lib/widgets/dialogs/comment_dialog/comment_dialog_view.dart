@@ -26,7 +26,7 @@ extension _CommentDialogView on _CommentDialogState {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _CommentDialogHeader(trackTitle: widget.track.title, l10n: l10n),
-              // 「热门 / 最新」两 Tab 仅对有该能力的平台显示（NT、QQ）。
+              // 「热门 / 最新」两 Tab 仅对有该能力的平台显示（NT、QM）。
               if (_platform.supportsHot)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),

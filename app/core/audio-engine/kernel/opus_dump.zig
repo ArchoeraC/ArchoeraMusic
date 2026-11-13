@@ -12,7 +12,7 @@
 //!   ./opus_dump <file.opus>            # P1：仅解复用/解析统计
 //!   ./opus_dump <file.opus> --decode   # P2：CELT-only 全解码，f32 交错 PCM 到 stdout
 //!   ./opus_dump <file.opus> --s16      # P3：CELT-only 全解码，s16 交错 PCM 到 stdout
-//! 与 `opus_demo -d` 的输出（-f32 / 默认 s16）逐字节比对即完成 CELT bit-exact 验收。
+//! 与 `opus_demo -d` 的输出（-f32 / 默认 s16）逐字节比对即完成 CELT 逐样本一致 验收。
 
 const std = @import("std");
 const io = @import("io.zig");

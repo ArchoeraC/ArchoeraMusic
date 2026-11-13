@@ -6,7 +6,7 @@
 //! Speex CELP 核心解码（对照移植 FFmpeg `libavcodec/speexdec.c`，n9.0.1 native
 //! speex 解码器，浮点路径）。
 //!
-//! 移植约定（保证与 C 实现位级一致）：
+//! 移植约定（保证与 C 实现逐样本一致）：
 //!   - 所有浮点运算保持 C 源的求值顺序（Zig 严格浮点，无 FMA 收缩/重结合）；
 //!   - `@exp`/`@cos`/`@sqrt` 链接 libc 时解析到与 ffmpeg 相同的 glibc libm；
 //!   - 表数据自 reference/FFmpeg/libavcodec/speexdata.h 逐值转录（data.zig）；
@@ -51,7 +51,7 @@ pub const EXC_OFF: isize = 2 * NB_PITCH_END + NB_SUBFRAME_SIZE + 6; // 334
 const SHIFT_LEN = 2 * NB_PITCH_END + NB_SUBFRAME_SIZE + 12; // 340
 
 // ---------------------------------------------------------------------------
-// 位读取器（FFmpeg get_bits 语义：MSB 先行；EOF 后读 0）
+// 位读取器（验收基准 get_bits 语义：MSB 先行；EOF 后读 0）
 // ---------------------------------------------------------------------------
 
 pub const BitReader = struct {
@@ -62,7 +62,7 @@ pub const BitReader = struct {
         return .{ .data = data };
     }
 
-    /// 剩余位数（FFmpeg get_bits_left 可为负；本实现钳到下界防溢出）
+    /// 剩余位数（验收基准 get_bits_left 可为负；本实现钳到下界防溢出）
     pub fn left(self: *const BitReader) i32 {
         const total: i64 = @as(i64, @intCast(self.data.len)) * 8;
         const r = total - @as(i64, @intCast(self.pos));
@@ -88,7 +88,7 @@ pub const BitReader = struct {
         return @intCast(self.getBits(1));
     }
 
-    /// 查看 n 位（不消耗；FFmpeg show_bits）
+    /// 查看 n 位（不消耗；验收基准 show_bits）
     pub fn showBits(self: *const BitReader, n: u5) u32 {
         var v: u32 = 0;
         var i: u5 = 0;
@@ -126,14 +126,14 @@ inline fn gain3tap1tap(g: *const [3]f32) f32 {
         (if (g[2] > 0.0) g[2] else -0.5 * g[2]);
 }
 
-/// speex_rand（libspeex bits.c 同款 LCG，位级一致）
+/// speex_rand（libspeex bits.c 同款 LCG，逐样本一致）
 pub fn speexRand(std_dev: f32, seed: *u32) f32 {
     seed.* = 1664525 *% seed.* +% 1013904223;
     const ran: u32 = 0x3f800000 | (0x007fffff & seed.*);
     var fran: f32 = @bitCast(ran);
     fran -= 1.5;
     // libspeex math_approx.h：频谱折叠/舒适噪声用单位方差归一（sqrt(12)≈3.4642）。
-    // FFmpeg native 漏乘该因子；对齐 libspeex 保留（NB submode1/DTX 路径）。
+    // 验收基准 native 漏乘该因子；对齐 libspeex 保留（NB submode1/DTX 路径）。
     const out = @as(f64, 3.4642) * @as(f64, std_dev) * @as(f64, fran);
     return @floatCast(out);
 }
@@ -257,7 +257,7 @@ fn lspInterpolate(
 
 /// lsp_to_lpc（C 原样：P/Q 级联二阶多项式重构）
 /// `order` 显式传入（NB=10 / SB=8；数组实参可能大于 order）。
-/// cosf 须与 ffmpeg 所链 libm 位级一致：Zig compiler_rt 自带 cosf 在个别输入上
+/// cosf 须与 验收基准 所链 libm 逐样本一致：Zig compiler_rt 自带 cosf 在个别输入上
 /// 与 glibc 差 1 ulp，故经 dlsym(RTLD_NEXT) 取系统 cosf（dlsym 失败时回退 @cos）。
 var cosf_ptr: ?*const fn (f32) callconv(.c) f32 = null;
 var cosf_inited: bool = false;
@@ -269,7 +269,7 @@ fn cosfGlibc(x: f32) f32 {
     if (builtin.os.tag != .linux) return @cos(x); // 非 Linux（win/mac）直接用内置
     if (!cosf_inited) {
         cosf_inited = true;
-        // 经 dlopen("libm.so.6"/"libm.so.0") 取系统 libm 的 cosf（与 ffmpeg 所链
+        // 经 dlopen("libm.so.6"/"libm.so.0") 取系统 libm 的 cosf（与 验收基准 所链
         // libm 同一 ifunc 实现）；失败时回退 Zig @cos（个别输入可能差 1 ulp）。
         const RTLD_NOW: c_int = 2;
         const libm_names = [_][*:0]const u8{ "libm.so.6", "libm.so.0" };
@@ -1348,7 +1348,7 @@ fn sbDecode(
             var gc: f32 = 0.87360 * t.gc_quant_bound[gb.getBits(4)];
             if (st.subframe_size == 80) {
                 // libspeex: MULT16_16_P14(QCONST16(1.4142f,14), gc) —— 浮点版即 gc*1.4142f
-                // （FFmpeg native 此处用 double M_SQRT2；对齐 libspeex 改用 1.4142f）
+                // （验收基准 native 此处用 double M_SQRT2；对齐 libspeex 改用 1.4142f）
                 gc = gc * 1.4142;
             }
             const scale = (gc * el) / filter_ratio;

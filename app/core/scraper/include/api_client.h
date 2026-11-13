@@ -879,7 +879,7 @@ protected:
     std::string lastError_;
 };
 
-/// 网易云音乐客户端
+/// NT 客户端
 /// 使用 weapi 加密接口搜索（更完整的结果），回退到公开 API
 class NeteaseClient : public ChineseMusicClientBase {
 public:
@@ -959,7 +959,7 @@ public:
 
 private:
     // ====================================================================
-    // 网易云 weapi 加密算法
+    // NT weapi 加密算法
     //
     // 算法流程（基于对 NetEase Music 网页版客户端 JS 的逆向分析）：
     //   1. 用固定 nonce 做 AES-128-CBC 加密 → enc1
@@ -1143,7 +1143,7 @@ private:
 
         // 历史行为：旧实现先手动 PKCS7 补块，再交给 EVP（默认填充）补第二块，
         // 即实际输出是**双填充**。为与已发布版本逐字节一致（单填充是否需要
-        // 改动需与网易云接口联调验证），这里保留手动补块，由 Rust 再补一次。
+        // 改动需与NT 接口联调验证），这里保留手动补块，由 Rust 再补一次。
         std::string padded = input;
         unsigned char padVal = static_cast<unsigned char>(16 - input.size() % 16);
         padded.append(padVal, static_cast<char>(padVal));
@@ -1334,7 +1334,7 @@ private:
         } catch (const json::exception&) {}
     }
 
-    // 网易云 weapi 加密常量
+    // NT weapi 加密常量
     // 来源：对 NetEase Music 网页版客户端 JavaScript 的逆向分析
     // 这些常量是公开的 API 规范，多個开源项目独立分析得到相同值
     static constexpr const char* WEB_NETESE_NONCE_KEY = "0CoJUm6Qyw8W8jud";
@@ -1347,7 +1347,7 @@ private:
         "3ece0462db0a22b8e7";
 };
 
-/// QQ 音乐客户端
+/// QM 客户端
 /// 使用 musicu.fcg 搜索接口
 class QQMusicClient : public ChineseMusicClientBase {
 public:
@@ -1473,7 +1473,7 @@ public:
     }
 
 private:
-    /// 生成 UUID 格式的 searchid（QQ 音乐搜索请求需要）
+    /// 生成 UUID 格式的 searchid（QM 搜索请求需要）
     static std::string generateUUID() {
         unsigned char buf[16];
         if (era_crypto_random(buf, sizeof(buf)) != ERA_CRYPTO_OK) return "";
@@ -1488,7 +1488,7 @@ private:
         return hex;
     }
 
-    /// Base64 解码（QQ 音乐歌词为 Base64 编码）
+    /// Base64 解码（QM 歌词为 Base64 编码）
     static std::string decodeBase64(const std::string& encoded) {
         static const std::string table =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -1509,7 +1509,7 @@ private:
     }
 };
 
-/// 酷狗音乐客户端
+/// KG 音乐客户端
 /// 使用带 MD5 签名的搜索接口
 class KugouClient : public ChineseMusicClientBase {
 public:
@@ -1931,7 +1931,7 @@ private:
 
 /// 多源元数据解析器
 /// 整合 MusicBrainz + Deezer + iTunes + Cover Art Archive + LRCLIB
-/// 以及中文音乐源（网易云/QQ/酷狗/酷我/咪咕），多源并发查询
+/// 以及中文音乐源（NT/QQ/KG/酷我/咪咕），多源并发查询
 /// 支持 AcoustID 音频指纹回退（无标签文件识别）
 
 // ============================================================================
@@ -2166,7 +2166,7 @@ public:
     /// 解析单个曲目的完整元数据
     ///
     /// 多源并发策略：
-    ///   1. 启动所有启用的数据源（MusicBrainz/Deezer/iTunes/网易云/QQ/酷狗/酷我/咪咕）
+    ///   1. 启动所有启用的数据源（MusicBrainz/Deezer/iTunes/NT/QQ/KG/酷我/咪咕）
     ///      并发查询，使用 std::async + std::future
     ///   2. 等待所有 future 完成（带超时保护），收集每个源的结果
     ///   3. 按优先级合并：MusicBrainz（最权威）→ 西方源 → 中文源
@@ -2360,7 +2360,7 @@ public:
         }
 
         // 2.4-2.8 中文源：收集所有通过评分的候选，统一排序后合并
-        // 源优先级仅用于同分 tie-break：网易云 > QQ > 酷狗 > 酷我 > 咪咕
+        // 源优先级仅用于同分 tie-break：NT > QM > KG > 酷我 > 咪咕
         struct ChineseResult {
             std::vector<ChineseSong> songs;
             std::string name;

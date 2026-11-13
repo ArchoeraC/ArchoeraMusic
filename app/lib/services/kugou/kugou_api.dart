@@ -587,7 +587,7 @@ class KugouApi extends ChangeNotifier {
 
   // ─── 热搜 / 搜索建议（补全） ─────────────────────────────────────
 
-  /// KG热搜（mobilecdn /api/v3/search/hot，公网无鉴权）。
+  /// KG 热搜（mobilecdn /api/v3/search/hot，公网无鉴权）。
   ///
   /// 返回 [HotSearchItem]（keyword 为热词，score 可能缺失）；接口失败抛
   /// [KgApiException] 由调用方兜底静默。
@@ -611,7 +611,7 @@ class KugouApi extends ChangeNotifier {
         .toList();
   }
 
-  /// KG搜索建议（gateway /v2/getSearchTip，对齐 KuGouMusicApi
+  /// KG 搜索建议（gateway /v2/getSearchTip，对齐 KuGouMusicApi
   /// search_suggest.js：Android 签名 + `x-router: searchtip.kugou.com`）。
   ///
   /// 解析 `data.music_tip`（歌曲）与 `data.album_tip`（专辑）；建议条目
@@ -1267,7 +1267,7 @@ class KugouApi extends ChangeNotifier {
     }).toList();
   }
 
-  /// 拉取KG用户曲库并按归属分类（创建的歌单 / 收藏的歌单 / 收藏的专辑）。
+  /// 拉取KG 用户曲库并按归属分类（创建的歌单 / 收藏的歌单 / 收藏的专辑）。
   ///
   /// 对齐 `/v7/get_all_list` 的实际返回结构：
   /// - `list_create_userid == 登录 userid` 或 `name == '我喜欢'` → 创建的歌单；
@@ -1392,7 +1392,7 @@ class KugouApi extends ChangeNotifier {
     return (await playlistTracksAllNew(gid, gid: gid)).reversed.toList();
   }
 
-  /// KG红心 hash 集合（轻量：分页只取 hash，不构造/保存 Track、不写库）。
+  /// KG 红心 hash 集合（轻量：分页只取 hash，不构造/保存 Track、不写库）。
   ///
   /// 对齐NT [likedIds]（likelist）语义——红心状态与「我喜欢」列表
   /// 解耦：启动/登录态变化时由 LikeController 做轻量 id 同步（避免启动

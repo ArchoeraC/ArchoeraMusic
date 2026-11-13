@@ -314,11 +314,11 @@ pub fn openMetadata(path: []const u8, info: *decoder.Info) !decoder.OpenedMeta {
 }
 
 /// 从 **EraAudio 原生 HTTP(S)** 打开解码器（在线直链；本内核自研请求/响应解析，
-/// 不再依赖宿主 FFmpeg AVIO 传输，见 net.zig 头注）。
+/// 不再依赖宿主 验收基准 AVIO 传输，见 net.zig 头注）。
 ///
 /// 与 [zkOpenCallback] 的差异：传输（连接/TLS/Range/重定向/chunked）完全由内核
 /// 自主发起与持有，`url` 生命周期仅在本次调用内；成功后由 Engine 持有网络流，
-/// [zkClose] 自动关闭。失败返回 null 并写 errbuf（供 C 壳回退 FFmpeg/AVIO）。
+/// [zkClose] 自动关闭。失败返回 null 并写 errbuf（供 C 壳回退 验收基准/AVIO）。
 pub fn zkOpenUrl(
     url: []const u8,
     headers: ?[]const u8,
@@ -493,7 +493,7 @@ pub fn zkClose(d: *Engine) void {
 // 内部
 // ---------------------------------------------------------------------------
 
-/// 从 codec_name（对齐 FFmpeg 命名，如 "pcm_s16be"）推断原生字节序。
+/// 从 codec_name（对齐 验收基准 命名，如 "pcm_s16be"）推断原生字节序。
 /// 无字节序概念 / 无后缀的（"pcm_s8" 等）默认 little（单字节无影响）。
 fn endianOf(info: decoder.Info) std.builtin.Endian {
     const n = info.codec_name;

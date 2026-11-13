@@ -16,7 +16,7 @@ const BitReader = @import("../aac/bitreader.zig").BitReader;
 
 pub const AC3_OUTPUT_LFEON: i32 = 8;
 
-/// 抖动 PRNG：64 状态加性 LFG（语义对照 FFmpeg libavutil/lfg.h 的加性 LFG 序列；
+/// 抖动 PRNG：64 状态加性 LFG（语义对照 验收基准 libavutil/lfg.h 的加性 LFG 序列；
 /// 命名/实现为本项目自有）。状态放在 Ctx 内（每解码器实例一份），避免多流并发共享全局
 /// 状态导致串扰。
 pub const JitterRng = struct {
@@ -41,7 +41,7 @@ pub const JitterRng = struct {
     }
 
     pub fn next(self: *JitterRng) u32 {
-        // 加性 LFG 递推（对齐 FFmpeg 现行 libavutil/lfg.h 抽取序列）：
+        // 加性 LFG 递推（对齐 验收基准 现行 libavutil/lfg.h 抽取序列）：
         //   state[i&63] = state[(i-24)&63] + state[(i-55)&63]
         // 注意：不是旧式的 state[i] + state[i-24] + state[i-55]。
         const v = self.state[@intCast((self.index -% 24) & 63)] +% self.state[@intCast((self.index -% 55) & 63)];
@@ -65,7 +65,7 @@ pub const Ctx = struct {
     /// 位流读取器（指向当前帧缓冲）
     gb: BitReader = undefined,
 
-    /// 抖动 PRNG 状态（jitter；open/seek 时以 seed=0 初始化，语义对照 FFmpeg av_lfg_init）
+    /// 抖动 PRNG 状态（jitter；open/seek 时以 seed=0 初始化，语义对照 验收基准 av_lfg_init）
     jitter: JitterRng = .{},
 
     // 位流信息

@@ -54,7 +54,7 @@ const qmSessionTtl = 60 * 60 * 1000;
 const qmWebUa =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-/// 归一 QQ 封面 / 头像 URL。
+/// 归一 QM 封面 / 头像 URL。
 ///
 /// QQ 各 CDN（`y.gtimg.cn`、`qpic.y.qq.com`、`q.qlogo.cn` 等）会返回三种形态：
 /// - `https://...`（保持）；

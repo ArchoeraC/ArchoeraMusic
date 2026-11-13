@@ -41,7 +41,7 @@ pub const Params = struct {
     flags2: u16,
 };
 
-/// MSB-first 位读取（对齐 ffmpeg get_bits）
+/// MSB-first 位读取（对齐 验收基准 get_bits）
 const GetBits = struct {
     buf: []const u8,
     index: usize = 0,
@@ -116,7 +116,7 @@ fn totalGainToBits(total_gain: i32) u5 {
 }
 
 /// ff_wma_get_frame_len_bits：由采样率与版本决定帧长（wma_common.c）。
-/// ffmpeg 编码器不置 var_block 等 decode_flags，故不传 flags。
+/// 验收基准 编码器不置 var_block 等 decode_flags，故不传 flags。
 fn frameLenBits(sr: u32, version: u8) u8 {
     if (sr <= 16000)
         return 9;
@@ -369,9 +369,9 @@ pub const WmaDec = struct {
         for (tab.pow_tab_bits, 0..) |bitsv, i| self.pow_tab[i] = @bitCast(bitsv);
     }
 
-    // 注意：ff_wma_hgain_hufftab 只含 {symbol,length} 无码字；ffmpeg 编码器从不置
+    // 注意：ff_wma_hgain_hufftab 只含 {symbol,length} 无码字；验收基准 编码器从不置
     // 高带噪声编码位（encode_block 恒写 high_band_coded=0），因此本实现遇到高带被
-    // 噪声编码即 UnsupportedFormat（不实现 hgain VLC 也能对 ffmpeg 产物保持同步）。
+    // 噪声编码即 UnsupportedFormat（不实现 hgain VLC 也能对 验收基准 产物保持同步）。
 
     /// 谱系数 Huffman VLC 与 run/level 表统一按 coef_vlc_table 选择（wma.c）：
     /// ms=false → coef[2T]，ms=true → coef[2T+1]（VLC 码字与 run/level 同源）。
@@ -637,7 +637,7 @@ pub const WmaDec = struct {
             for (0..channels) |ch| nb_coefs[ch] = self.coefs_end - self.coefs_start;
 
             // 噪声编码：高带标志 + 增益（wma.c use_noise_coding 分支）。
-            // ffmpeg 编码器恒写 high_band_coded=0（噪声只加在解码侧低位）；若文件
+            // 验收基准 编码器恒写 high_band_coded=0（噪声只加在解码侧低位）；若文件
             // 确有高带被噪声编码（需 hgain VLC），本实现不支持 → UnsupportedFormat。
             if (self.use_noise_coding) {
                 var any_hb_coded = false;
@@ -723,7 +723,7 @@ pub const WmaDec = struct {
     }
 
     /// 由 coefs1 + exponents 归一化出频谱系数（含 use_noise_coding 路径）。
-    /// ffmpeg 编码文件的高带恒未噪声编码，故此处只走“噪声加在编码值上”分支
+    /// 验收基准 编码文件的高带恒未噪声编码，故此处只走“噪声加在编码值上”分支
     /// （与 wmadec.c 全部 uncoded 等价：极低频噪声、主频/高带 coded+noise、
     /// 极高频纯噪声）。
     fn computeCoefs(self: *WmaDec, ch: usize, total_gain: i32, mdct_norm: f32, nb_coefs: usize) void {

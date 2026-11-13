@@ -30,19 +30,19 @@
 //!
 //! 流式 callback Reader 说明：
 //!   - flac 内层解码器逐帧以 reader.size() 估 EOF → open 时先 count 一遍逻辑流
-//!     长（逐块、内存恒定）作 size_hint；逐块直喂，输出与整拼逐位一致；
+//!     长（逐块、内存恒定）作 size_hint；逐块直喂，输出与整拼逐样本一致；
 //!   - opus 内层按 Ogg 页顺序解码，不依赖 size()；EOS 页 granule=累计样本，
 //!     仅在流尾出现 → 页生成延迟一拍（pending 一包），与整拼 buildOpusOgg 一致；
 //!   - on_seek 仅支持相对前跳（丢弃已产字节）；内层在逻辑流真尽头的
 //!     Corrupt/SeekFailed 在 feed.eof 时按正常流尾吞掉（对齐 fmt/oggflac）。
 //!
-//! 修整语义（对齐 FFmpeg matroska demux + `-f s16le` 逐样本输出）：
+//! 修整语义（对齐 验收基准 matroska demux + `-f s16le` 逐样本输出）：
 //!   - 起始丢弃 CodecDelay（0x56AA，ns → round(ns·rate/1e9) 样本）；
 //!   - 结尾丢弃末 BlockGroup DiscardPadding（0x75A2，ns → 样本）；
 //!     FLAC 由 STREAMINFO total_samples、Opus 由 pre-skip（OpusHead，解码器内部
 //!     丢弃）天然处理；其余 codec 的起/止丢弃在 wrapper（read 环保留区）实现。
 //!     流式 codec 的 DiscardPadding 在流尾才知 → 用延迟窗（tail_guard_frames 样本）
-//!     兜底：解码保留尾窗，EOF 收紧到精确丢弃量再排出（输出与整拼逐位一致；
+//!     兜底：解码保留尾窗，EOF 收紧到精确丢弃量再排出（输出与整拼逐样本一致；
 //!     病理 discard > 尾窗按窗丢弃，诚实兜底）。
 //!
 //! Info：sample_rate/channels/位深取自 codec 内核解码结果（与其容器声明一致），
@@ -51,24 +51,24 @@
 //!
 //! 已知限制（诚实汇报）：
 //!   - mka 内 WavPack / TrueHD / MLP / ALAC / AC-4 等轨道 → 本内核不支持
-//!     （probe 返回受支持音轨不存在 → UnsupportedFormat → 引擎回退 FFmpeg）；
+//!     （probe 返回受支持音轨不存在 → UnsupportedFormat → 引擎回退 验收基准）；
 //!   - 多轨 mka 只取首个 type=2 且 codec 受支持的音轨（无语言/旗标择优）；
 //!   - Vorbis：granule=-1 合成 → 内层 fmt/vorbis 的按 granule seek 不可用
 //!     （mka wrapper 的 seek 为完整重解+丢弃，不调内层 seek，不受影响）；
-//!     解码差异 = stb_vorbis vs ffmpeg libavcodec/vorbisdec 的既有 codec 层
-//!     差异（与 fmt/ogg 直解 .ogg 同水平，容器层长度/修整与 ffmpeg 对齐）；
+//!     解码差异 = stb_vorbis vs 验收基准 libavcodec/vorbisdec 的既有 codec 层
+//!     差异（与 fmt/ogg 直解 .ogg 同水平，容器层长度/修整与 验收基准 对齐）；
 //!   - DTS-HD：XLL 的 AUPR 语义（initial_padding 单元在 mka 中表现为普通块
 //!     + CodecDelay 修整，与 .dtshd 容器的 skip_units 语义不同）由 wrapper
 //!     样本修整承担；192k XLL（CodecDelay 按容器声明 48k 换算、解码输出
-//!     192k）时 priming 换算率会失配（本内核按解码输出率换算，ffmpeg 同样
+//!     192k）时 priming 换算率会失配（本内核按解码输出率换算，验收基准 同样
 //!     以 codecpar 率换算，真实文件罕见，暂不支持该形态的精确修整）。
-//!   - mp3：容器接入正确（帧直拼 + 起止修整按 ffmpeg 语义）；既有自研 mp3
-//!     内核对该 mono LAME 全流样本本身与 ffmpeg 存在 codec 层样本数/舍入差异
+//!   - mp3：容器接入正确（帧直拼 + 起止修整按 验收基准 语义）；既有自研 mp3
+//!     内核对该 mono LAME 全流样本本身与 验收基准 存在 codec 层样本数/舍入差异
 //!     （同帧流不经 mka 直接喂 fmt/mp3 亦复现），非容器层问题。
 //!   - 输入形态：流式需随机 seek（file / memory 均支持）。callback 源（网络等）
 //!     无底层随机 seek，本模块按 IoError 拒绝——现状引擎均走文件路径，不受影响。
 //!   - 兜底阈值：单 Cluster payload > 32MB 或整拼合成流 > 256MB → 拒解
-//!     （UnsupportedFormat → 回退 FFmpeg）；单路径内存恒 ~ 数十 MB 级。
+//!     （UnsupportedFormat → 回退 验收基准）；单路径内存恒 ~ 数十 MB 级。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
@@ -433,7 +433,7 @@ fn parseBlockGroup(payload: []const u8, track_no: u64, discard: *u64) ?Lace {
 
 /// 目标音轨 codec 逻辑字节流的惰性合成器（callback Reader 的 on_read 源）。
 /// FLAC/AAC 直接逐块输出合成流；Opus 逐包合成 Ogg 页（granule 由 TOC 累计，
-/// EOS 页在流尾补发，保证与整拼输出逐位一致）。
+/// EOS 页在流尾补发，保证与整拼输出逐样本一致）。
 const Feed = struct {
     codec: Codec,
     allocator: Allocator,
@@ -1520,7 +1520,7 @@ fn emitOpusPage(f: *Feed, header_type: u8, payload: []const u8, granule: u64) Er
 }
 
 /// opus 音频页：一次一页。为在流尾精确补发 EOS（granule=累计总样本），
-/// 页生成延迟一拍（pending 持有上一音频包），与整拼 buildOpusOgg 输出逐位一致。
+/// 页生成延迟一拍（pending 持有上一音频包），与整拼 buildOpusOgg 输出逐样本一致。
 fn opusNextPage(f: *Feed) Error!bool {
     while (true) {
         const m = f.nav.next() catch {
@@ -1618,7 +1618,7 @@ fn feedSeek(ctx: *anyopaque, off: i64, whence: i32, buffered: usize) bool {
 // 兜底整拼（A_AC3/A_EAC3/A_MP1-3/A_DTS/A_VORBIS）：有界预算内合成 codec 流
 // ---------------------------------------------------------------------------
 
-/// 预算检查（合成流超上限 → UnsupportedFormat，引擎回退 FFmpeg，避免 OOM）
+/// 预算检查（合成流超上限 → UnsupportedFormat，引擎回退 验收基准，避免 OOM）
 fn checkBudget(len: usize) Error!void {
     if (len > spool_budget) return error.UnsupportedFormat;
 }
@@ -1731,7 +1731,7 @@ fn buildDtshdContainerPayload(allocator: Allocator, raw: []const u8, out: *std.A
 const exss_sync = [4]u8{ 0x64, 0x58, 0x20, 0x25 };
 
 /// A_VORBIS codec-private → 3 头包（ident/comment/setup）。
-/// Matroska 封装：[头包数-1][len1][len2(255 续段)] + 三包（对齐 ffmpeg
+/// Matroska 封装：[头包数-1][len1][len2(255 续段)] + 三包（对齐 验收基准
 /// avpriv_split_xiph_headers 的 matroska 分支；len1/len2 用 xiph 续段编码）。
 fn parseVorbisHeaderPackets(priv: []const u8) Error![3][]const u8 {
     if (priv.len < 3) return error.UnsupportedFormat;
@@ -1810,20 +1810,20 @@ fn writeOggPage(
 }
 
 // ---------------------------------------------------------------------------
-// 集成测试（内嵌 ffmpeg 生成的 .mka 样本；golden 采用「全文件解码 md5 + 长度」）
+// 集成测试（内嵌 验收基准 生成的 .mka 样本；golden 采用「全文件解码 md5 + 长度」）
 // 对齐说明：
-//   - flac / pcm：内核解码 md5 == ffmpeg `-f s16le` 输出 md5（bit-exact）；
-//   - aac：除 6 个孤立样本 ±1 外逐位一致（md5 锁内核确定性 + 长度==ffmpeg）；
-//   - ac3/eac3/opus：corr≈1.0（float 路径非 bit-exact），md5 锁内核；
+//   - flac / pcm：内核解码 md5 == 验收基准 `-f s16le` 输出 md5（逐样本一致）；
+//   - aac：除 6 个孤立样本 ±1 外逐样本一致（md5 锁内核确定性 + 长度==验收基准）；
+//   - ac3/eac3/opus：corr≈1.0（float 路径非 逐样本一致），md5 锁内核；
 //   - dts/dtshd：合成 .dtshd 容器复用 fmt/dts 全管线；XLL 5.1 上混输出与
-//     ffmpeg `-f s16le`（解 mka 本体）逐位一致（bit-exact，见 ref_dtshd_xll）；
-//   - mp3：帧流接入正确（与 ffmpeg 解码同一帧流一致）；自研 mp3 内核曾因
+//     验收基准 `-f s16le`（解 mka 本体）逐样本一致（逐样本一致，见 ref_dtshd_xll）；
+//   - mp3：帧流接入正确（与 验收基准 解码同一帧流一致）；自研 mp3 内核曾因
 //     read() 分块边界丢弃解码帧尾 → 样本数偏少 ~11%（2026-09-05 已修：残余
-//     帧跨调用保留，样本数 == ffmpeg 全流解码）。逐样本仍存在 ±1/漂移
-//     codec 层差异（不经 mka 亦复现，minimp3 vs ffmpeg 实现差异），
+//     帧跨调用保留，样本数 == 验收基准 全流解码）。逐样本仍存在 ±1/漂移
+//     codec 层差异（不经 mka 亦复现，minimp3 vs 验收基准 实现差异），
 //     md5 锁 mka 接入确定性；
-//   - vorbis：容器层与 ffmpeg 对齐（输出长度 == ffmpeg 解 mka 本体，逐样本
-//     corr 见各用例打印）；残余逐样本差异 = stb_vorbis vs ffmpeg vorbisdec
+//   - vorbis：容器层与 验收基准 对齐（输出长度 == 验收基准 解 mka 本体，逐样本
+//     corr 见各用例打印）；残余逐样本差异 = stb_vorbis vs 验收基准 vorbisdec
 //     的既有 codec 层差异（与 fmt/ogg 直解 .ogg 同水平，非容器层问题）。
 // ---------------------------------------------------------------------------
 
@@ -1843,7 +1843,7 @@ const s_vorbis_q6 = @embedFile("samples/vorbis_q6_stereo.mka");
 const s_vorbis_q8 = @embedFile("samples/vorbis_q8_mono.mka");
 const s_xbr_xxch_mka = @embedFile("samples/xbr_xxch.mka");
 
-// ffmpeg 参考（解 mka 本体 `-f s16le`；与 /tmp/mka 提供的 ref_*.s16 逐位一致）
+// 验收基准（解 mka 本体 `-f s16le`；与 /tmp/mka 提供的 ref_*.s16 逐样本一致）
 const ref_dtshd_xll = @embedFile("samples/ref_dtshd_xll.s16");
 const ref_xbr_xxch = @embedFile("samples/ref_xbr_xxch.s16");
 const ref_vorbis_out = @embedFile("samples/ref_vorbis_out.s16");
@@ -1860,7 +1860,7 @@ const Golden = struct {
     rate: u32,
     ch: u8,
     bits: u8,
-    /// 期望解码字节数（对齐 ffmpeg 输出长度）
+    /// 期望解码字节数（对齐 验收基准 输出长度）
     bytes: usize,
     /// 期望解码 md5（hex，小写）
     md5: []const u8,
@@ -1906,7 +1906,7 @@ const Compare = struct {
     bitexact_pct: f64,
 };
 
-/// 交错 s16 字节流 vs 参考的逐样本对照（corr / max_abs / bit-exact；只比重叠段）。
+/// 交错 s16 字节流 vs 参考的逐样本对照（corr / max_abs / 逐样本一致；只比重叠段）。
 fn compareS16(mine: []const u8, ref: []const u8) Compare {
     const n = @min(mine.len, ref.len) / 2;
     var neq: usize = 0;
@@ -1948,7 +1948,7 @@ fn compareS16(mine: []const u8, ref: []const u8) Compare {
     };
 }
 
-test "mka: flac 接入（合成 fLaC 头）bit-exact 对齐 ffmpeg" {
+test "mka: flac 接入（合成 fLaC 头）逐样本对齐 验收基准" {
     try checkGolden(.{
         .file = s_flac_mka,
         .codec = "flac",
@@ -1960,7 +1960,7 @@ test "mka: flac 接入（合成 fLaC 头）bit-exact 对齐 ffmpeg" {
     });
 }
 
-test "mka: pcm_s16le 接入（PCM 直出）bit-exact 对齐 ffmpeg" {
+test "mka: pcm_s16le 接入（PCM 直出）逐样本对齐 验收基准" {
     try checkGolden(.{
         .file = s_pcm_mka,
         .codec = "pcm_s16le",
@@ -1972,7 +1972,7 @@ test "mka: pcm_s16le 接入（PCM 直出）bit-exact 对齐 ffmpeg" {
     });
 }
 
-test "mka: aac 接入（合成 ADTS + 1024 起始丢弃）长度对齐 ffmpeg" {
+test "mka: aac 接入（合成 ADTS + 1024 起始丢弃）长度对齐 验收基准" {
     try checkGolden(.{
         .file = s_aac_mka,
         .codec = "aac",
@@ -1984,7 +1984,7 @@ test "mka: aac 接入（合成 ADTS + 1024 起始丢弃）长度对齐 ffmpeg" {
     });
 }
 
-test "mka: ac3 接入（帧直拼）长度对齐 ffmpeg" {
+test "mka: ac3 接入（帧直拼）长度对齐 验收基准" {
     try checkGolden(.{
         .file = s_ac3_mka,
         .codec = "ac3",
@@ -1996,7 +1996,7 @@ test "mka: ac3 接入（帧直拼）长度对齐 ffmpeg" {
     });
 }
 
-test "mka: eac3 接入（帧直拼）长度对齐 ffmpeg" {
+test "mka: eac3 接入（帧直拼）长度对齐 验收基准" {
     try checkGolden(.{
         .file = s_eac3_mka,
         .codec = "eac3",
@@ -2032,7 +2032,7 @@ test "mka: dts core 接入（帧直拼 + 1024 起始丢弃）" {
     });
 }
 
-test "mka: dtshd 接入（合成 .dtshd 容器 → fmt/dts XLL 上混）bit-exact 对齐 ffmpeg" {
+test "mka: dtshd 接入（合成 .dtshd 容器 → fmt/dts XLL 上混）逐样本对齐 验收基准" {
     var buf = std.ArrayList(u8).empty;
     defer buf.deinit(testing.allocator);
     const info = try decodeAll(s_dtshd_mka, &buf);
@@ -2040,12 +2040,12 @@ test "mka: dtshd 接入（合成 .dtshd 容器 → fmt/dts XLL 上混）bit-exac
     try testing.expectEqual(@as(u8, 6), info.channels);
     try testing.expectEqualStrings("dts", info.codec_name);
     try testing.expectEqualStrings("DTS-HD MA", info.profile.?);
-    // 与 ffmpeg 解 mka 本体（XLL 输出，CodecDelay 1024 样本由 wrapper 丢弃）逐位一致
+    // 与 验收基准 解 mka 本体（XLL 输出，CodecDelay 1024 样本由 wrapper 丢弃）逐样本一致
     try testing.expectEqual(ref_dtshd_xll.len, buf.items.len);
     try testing.expectEqualSlices(u8, ref_dtshd_xll, buf.items);
 }
 
-test "mka: dtshd_xll 接入（同源另封装样本，XLL 5.1 上混）bit-exact 对齐 ffmpeg" {
+test "mka: dtshd_xll 接入（同源另封装样本，XLL 5.1 上混）逐样本对齐 验收基准" {
     var buf = std.ArrayList(u8).empty;
     defer buf.deinit(testing.allocator);
     const info = try decodeAll(s_dtshd_xll_mka, &buf);
@@ -2055,23 +2055,23 @@ test "mka: dtshd_xll 接入（同源另封装样本，XLL 5.1 上混）bit-exact
     try testing.expectEqualSlices(u8, ref_dtshd_xll, buf.items);
 }
 
-test "mka: xbr_xxch 接入（DTS-HD HRA 7.1，XBR+XXCH 全声道，逐位对齐 ffmpeg 定点）" {
+test "mka: xbr_xxch 接入（DTS-HD HRA 7.1，XBR+XXCH 全声道，逐样本对齐 验收基准 定点）" {
     var buf = std.ArrayList(u8).empty;
     defer buf.deinit(testing.allocator);
     const info = try decodeAll(s_xbr_xxch_mka, &buf);
     try testing.expectEqual(@as(u32, 48000), info.sample_rate);
     try testing.expectEqual(@as(u8, 8), info.channels);
     try testing.expectEqualStrings("DTS-HD HRA", info.profile.?);
-    // 容器层：输出长度 == ffmpeg（CodecDelay 1024 样本修整 + XXCH 8 声道）
+    // 容器层：输出长度 == 验收基准（CodecDelay 1024 样本修整 + XXCH 8 声道）
     try testing.expectEqual(ref_xbr_xxch.len, buf.items.len);
     // 参考 = ffmpeg `-flags2 skip_manual -bitexact -f s16le`（定点）解码 mka 本体
-    // 再按本链路同语义裁去 CodecDelay 前 1024 帧（ffmpeg 默认浮点路径的裁剪量；
+    // 再按本链路同语义裁去 CodecDelay 前 1024 帧（验收基准 默认浮点路径的裁剪量；
     // -bitexact 固定点 dump 本身不裁）。fmt/dts 已实现 XBR（逐位对齐 .dtshd 直解），
     // 故此处应为 100% 逐位。
     try testing.expectEqualSlices(u8, ref_xbr_xxch, buf.items);
 }
 
-test "mka: mp3 接入（帧直拼 + CodecDelay/DiscardPadding 修整；长度==ffmpeg 全流）" {
+test "mka: mp3 接入（帧直拼 + CodecDelay/DiscardPadding 修整；长度==验收基准 全流）" {
     try checkGolden(.{
         .file = s_mp3_mka,
         .codec = "mp3",
@@ -2083,7 +2083,7 @@ test "mka: mp3 接入（帧直拼 + CodecDelay/DiscardPadding 修整；长度==f
     });
 }
 
-/// Vorbis-in-mka 对照：容器层（长度==ffmpeg）+ codec 层（corr 打印，阈值锁定）。
+/// Vorbis-in-mka 对照：容器层（长度==验收基准）+ codec 层（corr 打印，阈值锁定）。
 fn checkVorbis(mka: []const u8, ref: []const u8, rate: u32, ch: u8, min_corr: f64) !void {
     var buf = std.ArrayList(u8).empty;
     defer buf.deinit(testing.allocator);
@@ -2092,17 +2092,17 @@ fn checkVorbis(mka: []const u8, ref: []const u8, rate: u32, ch: u8, min_corr: f6
     try testing.expectEqual(ch, info.channels);
     try testing.expectEqualStrings("vorbis", info.codec_name);
     try testing.expectEqualStrings("matroska", info.format_name);
-    // 容器层对齐：输出长度与 ffmpeg 解 mka 本体一致（DiscardPadding 修整）；
-    // CodecDelay 不丢（ffmpeg vorbis 解码端不消费 initial_padding，实测对拍）。
+    // 容器层对齐：输出长度与 验收基准 解 mka 本体一致（DiscardPadding 修整）；
+    // CodecDelay 不丢（验收基准 vorbis 解码端不消费 initial_padding，实测对拍）。
     try testing.expectEqual(ref.len, buf.items.len);
     const c = compareS16(buf.items, ref);
     std.debug.print("  mka vorbis vs ffmpeg: n={d} corr={d:.8} max_abs={d} bit-exact {d}/{d} = {d:.4}%\n", .{ c.n, c.corr, c.max_abs, c.n - c.neq, c.n, c.bitexact_pct });
-    // codec 层：stb_vorbis vs ffmpeg vorbisdec 的既有差异（与 fmt/ogg 直解
+    // codec 层：stb_vorbis vs 验收基准 vorbisdec 的既有差异（与 fmt/ogg 直解
     // .ogg 同水平），非容器层问题 → 以 corr 锁定容器接入确定性。
     try testing.expect(c.corr > min_corr);
 }
 
-test "mka: vorbis 接入（合成 Ogg 页 granule=-1 → fmt/vorbis）容器层对齐 ffmpeg" {
+test "mka: vorbis 接入（合成 Ogg 页 granule=-1 → fmt/vorbis）容器层对齐 验收基准" {
     try checkVorbis(s_vorbis_mka, ref_vorbis_out, 44100, 1, 0.999);
 }
 
@@ -2155,7 +2155,7 @@ fn appendVint(allocator: Allocator, out: *std.ArrayList(u8), value: u64) !void {
 }
 
 /// 把嵌入的 flac mka 拆成多 cluster 变体（把原 cluster 的子元素均分到 N 个 cluster），
-/// 验证跨 cluster 流式导航的解码输出与单 cluster 逐位一致（bounded、按需读）。
+/// 验证跨 cluster 流式导航的解码输出与单 cluster 逐样本一致（bounded、按需读）。
 fn splitMkaClusters(data: []const u8, n_clusters: usize) ![]u8 {
     const allocator = testing.allocator;
     var out = std.ArrayList(u8).empty;
@@ -2214,7 +2214,7 @@ fn splitMkaClusters(data: []const u8, n_clusters: usize) ![]u8 {
     return out.toOwnedSlice(allocator);
 }
 
-test "mka: 多 cluster 流式（flac 拆 5 cluster）解码逐位一致" {
+test "mka: 多 cluster 流式（flac 拆 5 cluster）解码逐样本一致" {
     const split = try splitMkaClusters(s_flac_mka, 5);
     defer testing.allocator.free(split);
     var buf = std.ArrayList(u8).empty;

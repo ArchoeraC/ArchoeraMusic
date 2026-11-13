@@ -20,7 +20,7 @@
 //!   - `resampler.zig` / `tempo.zig`  移植计划占位（未导出）
 //!
 //! 已移植块经 `kernel/kernel.zig` 的 `zk_dsp_*` C ABI 暴露给 C 壳；
-//! 命名自有（`era_` 前缀），不照搬 FFmpeg / SoX / 上游标识符。
+//! 命名自有（`era_` 前缀），不照搬 验收基准 / SoX / 上游标识符。
 
 const std = @import("std");
 

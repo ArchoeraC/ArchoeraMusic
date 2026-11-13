@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! 位级读取（FLAC 音频帧 MSB-first 位流）
 //!
@@ -161,7 +165,7 @@ pub const BitReader = struct {
     }
 
     /// unary 编码：逐位读取直到出现 stop 位，返回 stop 之前的位数。
-    /// 与 FFmpeg `get_unary` 语义一致：max 位内未遇 stop 时返回 max，
+    /// 与 验收基准 `get_unary` 语义一致：max 位内未遇 stop 时返回 max，
     /// 是否非法由调用方按上下文校验（wasted bits ≤ 30 等）。
     pub fn readUnary(self: *BitReader, stop: u1, max: u8) Error!u8 {
         var count: u8 = 0;

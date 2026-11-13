@@ -4,7 +4,7 @@
 
 /// 新建歌单弹窗（对齐原项目 PlaylistCreateDialog.vue）。
 ///
-/// 名称 + （仅网易云）「设为私密」；提交经 [UserPlaylistsOps] 写入，成功后刷新
+/// 名称 + （仅NT）「设为私密」；提交经 [UserPlaylistsOps] 写入，成功后刷新
 /// 用户歌单并联动收藏页。
 library;
 
@@ -108,7 +108,7 @@ class _PlaylistCreateDialogState extends ConsumerState<_PlaylistCreateDialog> {
             autofocus: true,
             onSubmitted: (_) => _submit(),
           ),
-          // 「私密」由适配器声明（仅网易云支持；Neko 无该概念）。
+          // 「私密」由适配器声明（仅NT 支持；Neko 无该概念）。
           if (collectionPlatform(widget.source)
               .playlistPrivacySupported(ref)) ...[
             const SizedBox(height: 14),

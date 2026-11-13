@@ -218,7 +218,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
             for (0..frame.nsamples) |n| {
                 for (0..frame.nch) |ch| {
                     const raw = frame.planes[ch][n];
-                    // 与 ffmpeg filter_frame_fixed 一致：clip23 后再缩放
+                    // 与 验收基准 filter_frame_fixed 一致：clip23 后再缩放
                     const v = std.math.clamp(raw, -(1 << 23), (1 << 23) - 1);
                     if (out_s16) {
                         std.mem.writeInt(i16, out_buf[pos..][0..2], @intCast(v >> 8), .little);

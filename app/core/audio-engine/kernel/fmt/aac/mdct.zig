@@ -7,7 +7,7 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! 逆 MDCT（bit-exact 复刻 FFmpeg av_tx 浮点路径，支持 f32/f64）。
+//! 逆 MDCT（复刻 FFmpeg av_tx 浮点路径，支持 f32/f64）。
 //!
 //! 复刻对象：libavutil/tx_template.c `ff_tx_mdct_inv` + 单块 split-radix
 //! FFT codelet（fft512_ns…fft8_ns）+ `ff_tx_fft_sr_combine`，运算顺序、
@@ -19,14 +19,14 @@
 //!   - FFT：n2 点单块 split-radix（递归至手写 fft16/8/4 基例）；
 //!   - post-twiddle 与交错输出。
 //!
-//! scale = 1/N/32768 已折入 exp 表；f32 表输出与 ffmpeg CLI 逐位一致
-//! （mdct_golden_* 黄金向量校验）；f64 表由 f32 源值精确提升。
+//! scale = 1/N/32768 已折入 exp 表；f32 表输出与 参考 CLI 逐样本一致
+//! （mdct_golden_* 验收基准向量校验）；f64 表由 f32 源值精确提升。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const vec = @import("../../simd/vec.zig");
 
-/// 泛型 MDCT（T = f32 / f64）。f32 用 f32 表（黄金向量位模式），
+/// 泛型 MDCT（T = f32 / f64）。f32 用 f32 表（验收基准向量位模式），
 /// f64 用提升表；蝶形/FFT 全程 T 精度。
 pub fn Mdct(comptime T: type) type {
     const mt = if (T == f32) @import("mdct_tables.zig") else @import("mdct_tables_f64.zig");
@@ -216,7 +216,7 @@ pub fn Mdct(comptime T: type) type {
             const o3 = 6 * len;
 
             // f32 向量路径：每轮 j 的 8 个 k 相互独立，打包成 V8 lane（逐 lane 运算顺序
-            // 与标量 transformW 完全一致 → 逐位一致）。f64 仍走标量（无 f64 实例化）。
+            // 与标量 transformW 完全一致 → 逐样本一致）。f64 仍走标量（无 f64 实例化）。
             if (T == f32) {
                 const zf: [*]f32 = @ptrCast(z.ptr);
                 const cf: [*]const f32 = @ptrCast(cos.ptr);
@@ -376,7 +376,7 @@ pub fn Mdct(comptime T: type) type {
         }
 
         /// 前向 MDCT：in = 2N（2048）个时域样本，out = N（1024）个频谱系数（交错）。
-        /// 复刻 ff_tx_mdct_fwd：scatter 折叠 + split-radix FFT + post-twiddle（bit-exact）。
+        /// 复刻 ff_tx_mdct_fwd：scatter 折叠 + split-radix FFT + post-twiddle（逐样本一致）。
         pub fn transformFwd(
             self: *const Self,
             out: []T,
@@ -468,7 +468,7 @@ pub fn Mdct(comptime T: type) type {
             // ---- fold（ff_tx_mdct_inv 折叠循环，map 翻倍）----
             if (T == f32) {
                 // 每个 i 独立；输出 z[i] 连续、输入按 map 聚集。8 lane 打包，
-                // lane 内运算顺序与标量一致（逐位一致）。
+                // lane 内运算顺序与标量一致（逐样本一致）。
                 const zf: [*]f32 = @ptrCast(z.ptr);
                 const ef: [*]const f32 = @ptrCast(self.exp.ptr);
                 var i: usize = 0;
@@ -593,7 +593,7 @@ fn lcgInput(comptime T: type, len: usize, out: []T) void {
     }
 }
 
-test "MDCT 1024 前向（LTP）与 ffmpeg 黄金向量逐位一致" {
+test "MDCT 1024 前向（LTP）与验收基准向量逐样本一致" {
     const M = Mdct(f32);
     const m = M.initLtp();
     var in: [2048]f32 = undefined;
@@ -611,7 +611,7 @@ test "MDCT 1024 前向（LTP）与 ffmpeg 黄金向量逐位一致" {
     }
 }
 
-test "MDCT 1024 与 ffmpeg 黄金向量逐位一致" {
+test "MDCT 1024 与验收基准向量逐样本一致" {
     const M = Mdct(f32);
     const m = M.init(1024);
     var in: [1024]f32 = undefined;
@@ -629,7 +629,7 @@ test "MDCT 1024 与 ffmpeg 黄金向量逐位一致" {
     }
 }
 
-test "MDCT 128 与 ffmpeg 黄金向量逐位一致" {
+test "MDCT 128 与验收基准向量逐样本一致" {
     const M = Mdct(f32);
     const m = M.init(128);
     var in: [128]f32 = undefined;

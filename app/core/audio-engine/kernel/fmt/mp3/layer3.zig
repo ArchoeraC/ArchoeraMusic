@@ -607,7 +607,7 @@ const g_aa = [2][8]f32{
 };
 
 fn antialias(grbuf_in: []f32, nbands: i32) void {
-    // 8 个抽头相互独立 → V8；先取 u/d 再落两处，逐 lane 与标量同序（位级一致）。
+    // 8 个抽头相互独立 → V8；先取 u/d 再落两处，逐 lane 与标量同序（逐样本一致）。
     const aa0: vec.V8 = @bitCast(g_aa[0]);
     const aa1: vec.V8 = @bitCast(g_aa[1]);
     var grbuf = grbuf_in;

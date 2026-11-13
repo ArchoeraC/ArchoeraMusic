@@ -132,6 +132,13 @@
 
 ### 3.2 依赖账本
 
+> **许可证列的含义**：下表的 `AGPL` 指该项目在对应模块中**独立编写的部分**；
+> 逐文件许可以 `kernel/**` 文件头 `SPDX-License-Identifier` 为**权威**。
+> 其中由 FFmpeg 移植 / 逐位复刻的解码器（FLAC、DTS、MLP、APE、ALAC、AAC SBR/PS、
+> WMA 及 ASF/MDCT、Opus CELT/PVQ/RC/FFT 等）按 **LGPL-2.1-or-later** 标注；
+> libopus / WavPack 移植按 **BSD-3-Clause**、minimp3 表按 **CC0-1.0** 标注。
+> 完整清单见 `app/core/audio-engine/THIRD-PARTY-LICENSES.md`。
+
 | 模块 | 形态 | 许可证 | 引入理由 / 自研成本 |
 |---|---|---|---|
 | WAV / AIFF / W64 / RF64 解复用 | **自研 Zig**（~250 行） | AGPL | RIFF 家族纯表结构，无数学复杂度 |
@@ -2239,7 +2246,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
 
 - 桌面：本地 flac/mp3/wav/ogg + **T1 全格式（alac/wv/ape/dsd/aiff/vorbis）**播放 + seek + VQT 频谱事件
   + EQ/tempo 实时调整（AUTOPLAY 回归）；
-- 在线：网易云（mp3/flac）、酷狗（mp3/flac）、QQ 音乐（P1：mp3 或 m4a）；
+- 在线：NT（mp3/flac）、KG（mp3/flac）、QM（P1：mp3 或 m4a）；
 - 中断：SIGTERM / stop 正确退出，ASan/LeakSanitizer（`-fsanitize` 或 Zig Debug 模式）回归；
 - 畸形输入：截断文件 / 随机字节 / 超大长度字段 → 无崩溃（fuzz 用 `std.testing` 随机种子）。
 

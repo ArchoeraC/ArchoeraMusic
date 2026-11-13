@@ -17,7 +17,7 @@
 // C header reference: libavcodec/opus/tab.h
 
 // NOTE: ff_celt_model_tf, ff_celt_model_tf_select and ff_celt_coherent_alloc
-// are NOT defined anywhere in FFmpeg n9.0.1 libavcodec (they come from
+// are NOT defined anywhere in 验收基准 n9.0.1 libavcodec (they come from
 // libopus / RFC 6716 reference code). They are omitted here.
 
 // ff_celt_model_tapset: C dims [4], type uint16_t

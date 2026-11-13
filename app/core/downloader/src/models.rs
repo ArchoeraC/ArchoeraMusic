@@ -182,7 +182,7 @@ pub struct EnqueueRequest {
     pub pre_resolved_ext: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pre_resolved_size: Option<u64>,
-    /// 下载请求附加头（网易 CDN 需 Referer/Cookie/UA；酷狗通常为空）。
+    /// 下载请求附加头（NT CDN 需 Referer/Cookie/UA；KG 通常为空）。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub pre_resolved_headers: Vec<(String, String)>,
 }

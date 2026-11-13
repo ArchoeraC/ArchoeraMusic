@@ -1,23 +1,27 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! FLAC 解码器封装（open + VTable + 帧循环 + 去相关 + seek + 输出打包）
 //!
 //! 参考重构对照 flacdec.c flac_decode_frame / decode_frame / decorrelate_33bps /
 //! flac_set_bps 与 flacdsp_template.c flac_decorrelate_*_c。
 //!
-//! 输出契约（对齐 FFmpeg 默认 S16/S32 输出，保证 f6 bit-exact 对照可逐字节比对）：
+//! 输出契约（对齐 FFmpeg 默认 S16/S32 输出，保证 f6 逐样本一致 对照可逐字节比对）：
 //!   - 流位深 ≤ 16 → 输出 16-bit（左移 16-bps 位对齐满幅）；
 //!   - 流位深 > 16 → 输出 32-bit（左移 32-bps 位对齐满幅）；
 //!   - 交错小端 PCM，`Info.bits_per_sample` = 16 / 32。
 //!
 //! 帧循环：
 //!   - 每帧开新建 BitReader（帧边界恒为字节对齐，见 bitreader.zig 文件头）；
-//!   - EOF 判定：剩余位 < 最小合法帧 80 位（FFmpeg FLAC_MIN_FRAME_SIZE=10B）→ 0；
+//!   - EOF 判定：剩余位 < 最小合法帧 80 位（验收基准 FLAC_MIN_FRAME_SIZE=10B）→ 0；
 //!   - STREAMINFO 一致性：声道数相等、blocksize ≤ max_blocksize、bps 一致；
-//!     frame 采样率可覆写（FFmpeg 语义，不报错）；
+//!     frame 采样率可覆写（验收基准 语义，不报错）；
 //!   - 32 位流 + 立体声耦合 → 侧声道走 33 位宽式路径（decodeSubframeWide）；
 //!   - 整帧 CRC-16 校验失败 → Corrupt（坏帧重同步：向后扫描合法帧起点跳过继续，
 //!     §13.3 容错；无法恢复且无产出 → Corrupt 透出）。
@@ -40,7 +44,7 @@ const subframe = @import("subframe.zig");
 const BitReader = bitreader.BitReader;
 const VTable = decoder.Decoder.VTable;
 
-/// 最小合法帧位长（FFmpeg FLAC_MIN_FRAME_SIZE = 10 字节）；剩余不足视为 EOF
+/// 最小合法帧位长（验收基准 FLAC_MIN_FRAME_SIZE = 10 字节）；剩余不足视为 EOF
 const min_frame_bits: u64 = 80;
 
 /// FLAC 解码上下文
@@ -65,7 +69,7 @@ const FlacCtx = struct {
     sample_rate: u32,
     /// 输出位深（16 / 32）
     out_bps: u8,
-    /// 输出左移位数（16-bps 或 32-bps，对齐 FFmpeg flac_set_bps）
+    /// 输出左移位数（16-bps 或 32-bps，对齐 验收基准 flac_set_bps）
     out_shift: u5,
     /// 每帧解码缓冲（单一连续块，按 max_blocksize×channels 分配）
     decoded_buf: []i32,
@@ -276,7 +280,7 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
             produced += take;
         } else {
             // 解码下一帧；坏帧（Corrupt）→ 重同步跳过，继续后续帧
-            // （§13.3 容错；对齐 FFmpeg flacdec 对损坏帧跳过继续）
+            // （§13.3 容错；对齐 验收基准 flacdec 对损坏帧跳过继续）
             const r = decodeOneFrame(f) catch |err| switch (err) {
                 error.Corrupt => {
                     if (!try resyncToNextFrame(f)) {
@@ -347,7 +351,7 @@ fn decodeOneFrame(f: *FlacCtx) Error!?FrameResult {
     if (hdr.blocksize > f.stream_info.max_blocksize) return error.Corrupt;
     const eff_bps: u8 = if (hdr.bps == 0) f.stream_info.bits_per_sample else hdr.bps;
     if (eff_bps != f.stream_info.bits_per_sample) return error.Corrupt;
-    // 采样率：帧头可覆写（FFmpeg 语义）；流未知时采纳帧头值供 position 计算
+    // 采样率：帧头可覆写（验收基准 语义）；流未知时采纳帧头值供 position 计算
     if (hdr.sample_rate != 0) {
         if (f.sample_rate == 0) f.sample_rate = hdr.sample_rate;
     }
@@ -480,7 +484,7 @@ fn emitSamples(f: *FlacCtx, out: []u8, start: usize, count: usize) void {
 
 /// 坏帧重同步：从当前位置向后扫描合法帧起点（0xFFF8 同步码 + 帧头 CRC-8/一致性校验，
 /// 复用 scanForFrame）；找到 → reader 定位到该帧起点并返回 true。文件剩余不足以构成
-/// 帧 → false（调用方按不可恢复处理）。FFmpeg flacdec 对损坏帧同样跳过继续（§13.3）。
+/// 帧 → false（调用方按不可恢复处理）。验收基准 flacdec 对损坏帧同样跳过继续（§13.3）。
 fn resyncToNextFrame(f: *FlacCtx) Error!bool {
     f.frame_cursor = f.cur_blocksize; // 丢弃当前帧未输出残余
     const start = f.reader.pos;

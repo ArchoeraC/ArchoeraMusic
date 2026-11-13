@@ -71,7 +71,7 @@ pub const CeltBlock = struct {
         self.pf_tapset = 0;
         self.pf_tapset_old = 0;
         self.pf_tapset_new = 0;
-        // FFmpeg flush 语义：emph_coeff = 0 / deemph_weights[0]
+        // 验收基准 flush 语义：emph_coeff = 0 / deemph_weights[0]
         self.emph_coeff = 0.0 / tables.era_opus_deemph_weights[0];
     }
 };

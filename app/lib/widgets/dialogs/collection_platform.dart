@@ -11,7 +11,7 @@
 /// 每个适配器负责该源的全部差异：
 /// - 平台元信息：标签、是否启用（实验源开关）、登录态、登录动作；
 /// - 我喜欢（红心）：红心键归一、id 集合、全量列表、收藏/取消、对账、
-///   本机库（QQ）等；
+///   本机库（QM）等；
 /// - 收藏页：分类 Tab、拉取、点击打开、副标题/空态/登录文案。
 library;
 
@@ -104,24 +104,24 @@ abstract class CollectionPlatform {
   /// 红心操作失败时的提示文案。
   String likeFailedText(AppLocalizations l10n);
 
-  /// 「我喜欢」是否可用（QQ 本机红心无需登录 → true；默认同 [loggedIn]）。
+  /// 「我喜欢」是否可用（QM 本机红心无需登录 → true；默认同 [loggedIn]）。
   bool likedAvailable(dynamic ref) => loggedIn(ref);
 
   // ── 我喜欢（红心） ────────────────────────────────────────────────
 
-  /// 本机红心库（QQ）：列表/状态不经服务端，离线可用。
+  /// 本机红心库（QM）：列表/状态不经服务端，离线可用。
   bool get localLikedStore => false;
 
-  /// 红心键（跨端稳定标识；NT=id，KG=hash，QQ=songmid）。
+  /// 红心键（跨端稳定标识；NT=id，KG=hash，QM=songmid）。
   String likeKey(Track t);
 
-  /// 是否参与权威列表对账（QQ 本机列表不走对账）。
+  /// 是否参与权威列表对账（QM 本机列表不走对账）。
   bool get reconcileLiked => !localLikedStore;
 
   /// 收藏成功 / 取消后是否维护共享「我喜欢」列表增量（NT / KG 覆写为 true）。
   bool get likedLocalDelta => false;
 
-  /// 缓存 user key（NT uid / KG userid / QQ 'local'）。
+  /// 缓存 user key（NT uid / KG userid / QM 'local'）。
   String? likedUserKey(dynamic ref);
 
   /// 轻量红心 id 集合（启动同步用）。
@@ -136,13 +136,13 @@ abstract class CollectionPlatform {
   /// 我喜欢页展示视图（服务端 store / 本机库）。
   LikedView likedView(dynamic ref);
 
-  /// 登录态变化时的处理（重置；QQ 本机库无需处理）。
+  /// 登录态变化时的处理（重置；QM 本机库无需处理）。
   void resetLiked(dynamic ref) {}
 
-  /// 进入页面时的加载（QQ 会顺带并入在线收藏）。
+  /// 进入页面时的加载（QM 会顺带并入在线收藏）。
   void ensureLikedLoaded(dynamic ref);
 
-  /// 刷新按钮文案（QQ 为「同步在线收藏」）。
+  /// 刷新按钮文案（QM 为「同步在线收藏」）。
   String likedRefreshLabel(AppLocalizations l10n) => l10n.commonRefresh;
 
   /// 刷新按钮是否显示。
@@ -152,7 +152,7 @@ abstract class CollectionPlatform {
   /// 刷新动作。
   Future<void> likedRefresh(BuildContext context, dynamic ref);
 
-  /// 空态额外动作（QQ 登录/同步）；无 → null。
+  /// 空态额外动作（QM 登录/同步）；无 → null。
   ({String label, Future<void> Function(BuildContext, dynamic) run})?
   likedEmptyAction(AppLocalizations l10n, dynamic ref) => null;
 
@@ -269,7 +269,7 @@ CollectionPlatform collectionPlatform(String source) =>
 /// 该源是否注册了自己的收藏适配器。
 ///
 /// [collectionPlatform] 对未注册源会回退 NT，因此**所有写操作（红心 / 歌单）
-/// 必须先判断本函数**：否则 B 站等无收藏能力的曲目会被写进网易云红心或歌单。
+/// 必须先判断本函数**：否则 B 站等无收藏能力的曲目会被写进NT 红心或歌单。
 bool hasCollectionAdapter(String source) => _registry.containsKey(source);
 
 /// 已启用平台的适配器（顺序即下拉顺序）。
@@ -290,7 +290,7 @@ String preferredCollectionSource(dynamic ref, {String fallback = 'netease'}) {
 }
 
 /// 默认「我喜欢」平台：用户设置了默认音源则优先使用；否则按登录态
-/// 优先 NT → KG → QQ，均未登录时回 NT（与历史一致；QQ 虽「本机可用」，
+/// 优先 NT → KG → QM，均未登录时回 NT（与历史一致；QM 虽「本机可用」，
 /// 但未登录时默认仍回 NT 引导登录）。
 String defaultLikedPlatform(dynamic ref) {
   final preferred = preferredCollectionSource(ref, fallback: '');
@@ -798,7 +798,7 @@ class _KugouCollection extends CollectionPlatform {
   String favEmptyHint(AppLocalizations l10n) => l10n.pageFavKugouEmptyHint;
 }
 
-// ── QQ ─────────────────────────────────────────────────────────────────
+// ── QM ─────────────────────────────────────────────────────────────────
 
 class _QqCollection extends CollectionPlatform {
   @override

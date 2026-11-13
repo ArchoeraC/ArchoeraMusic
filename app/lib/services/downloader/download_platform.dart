@@ -173,7 +173,7 @@ class _NeteaseDownloadPlatform extends DownloadPlatform {
 
   @override
   List<List<String>> requestHeaders(Track track, String quality) {
-    // 网易 CDN 通常需 Referer/UA；带登录态时补 Cookie（对齐 Rust resolver）。
+    // NT CDN 通常需 Referer/UA；带登录态时补 Cookie（对齐 Rust resolver）。
     final headers = <List<String>>[
       const ['Referer', 'https://music.163.com/'],
       const [
@@ -212,7 +212,7 @@ class _KugouDownloadPlatform extends DownloadPlatform {
   // KG 回退请求不带额外 headers（沿用改动前行为；CDN 鉴权由 Rust/直链承担）。
 }
 
-// ── QQ ─────────────────────────────────────────────────────────────────
+// ── QM ─────────────────────────────────────────────────────────────────
 
 class _QqMusicDownloadPlatform extends DownloadPlatform {
   @override
@@ -223,7 +223,7 @@ class _QqMusicDownloadPlatform extends DownloadPlatform {
 
   @override
   List<List<String>> requestHeaders(Track track, String quality) {
-    // QQ CDN 需 UA/Referer；带登录态时补 Cookie（GetVkey 直链鉴权）。
+    // QM CDN 需 UA/Referer；带登录态时补 Cookie（GetVkey 直链鉴权）。
     // UA 取安装级设备身份，与取流请求（apis/qqmusic/modules/song_url.dart）
     // 保持同一套指纹——UA 前后不一致本身是可聚类信号。
     final headers = <List<String>>[

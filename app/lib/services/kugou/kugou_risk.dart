@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 酷狗 SSA 安全验证的协议模型与行为指纹生成。
+/// KG SSA 安全验证的协议模型与行为指纹生成。
 ///
 /// 对齐 KuGouMusicApi `util/generate_simulate.js` 的协议模型：
 ///
@@ -22,7 +22,7 @@ import 'dart:math';
 
 import 'kugou_crypto.dart';
 
-/// SSA 行为指纹固定 IV（ASCII 16 字节，与酷狗 WASM 客户端一致）。
+/// SSA 行为指纹固定 IV（ASCII 16 字节，与KG WASM 客户端一致）。
 const _ssaEdtIv = 'kugousecurity123';
 
 /// 一次 SSA 验证所需的 `sid` / `edt`。

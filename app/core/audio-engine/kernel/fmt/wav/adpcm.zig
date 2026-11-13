@@ -19,14 +19,14 @@
 //!     Yamaha ADPCM（tag 0x0020，codec "adpcm_yamaha"）、Creative CT
 //!     （tag 0x0200，codec "adpcm_ct"）：无块头连续流，每字节 2 交错样本。
 //!
-//! 算法与常量表重构自 FFmpeg `libavcodec/adpcm.c` / `adpcm_data.c`
-//! （reference/FFmpeg，参考实现非直接复制）。
+//! 算法与常量表重构自 验收基准 `libavcodec/adpcm.c` / `adpcm_data.c`
+//! （reference/验收基准，参考实现非直接复制）。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 
 // ---------------------------------------------------------------------------
-// 常量表（值对齐 FFmpeg adpcm_data.c）
+// 常量表（值对齐 验收基准 adpcm_data.c）
 // ---------------------------------------------------------------------------
 
 /// IMA index 增量表
@@ -86,15 +86,15 @@ const yamaha_difflookup = [16]i8{
     -1, -3, -5, -7, -9, -11, -13, -15,
 };
 
-/// MS ADPCM 预测系数（按 FFmpeg 约定除以 4 存储，预测公式分母为 64）
+/// MS ADPCM 预测系数（按 验收基准 约定除以 4 存储，预测公式分母为 64）
 const coeff1 = [7]u8{ 64, 128, 0, 48, 60, 115, 98 };
 const coeff2 = [7]i8{ 0, -64, 0, 16, 0, -52, -58 };
 
-/// MS ADPCM idelta 上限（镜像 FFmpeg INT_MAX/768，防溢出）
+/// MS ADPCM idelta 上限（镜像 验收基准 INT_MAX/768，防溢出）
 const idelta_max: i32 = 2796202;
 
 // ---------------------------------------------------------------------------
-// 样本数（WAV 标准公式，与 FFmpeg 解码循环一致）
+// 样本数（WAV 标准公式，与 验收基准 解码循环一致）
 // ---------------------------------------------------------------------------
 
 /// MS ADPCM 每块样本数（每通道）
@@ -133,7 +133,7 @@ fn clip16(v: i32) i16 {
     return @intCast(std.math.clamp(v, -32768, 32767));
 }
 
-/// IMA 4-bit nibble 展开（分段移位变体，算法对齐 FFmpeg
+/// IMA 4-bit nibble 展开（分段移位变体，算法对齐 验收基准
 /// ff_adpcm_ima_qt_expand_nibble 557-581：diff = step>>3 + (n&4?step) +
 /// (n&2?step>>1) + (n&1?step>>2)。IMA WAV 4-bit 与 IMA QT 使用；
 /// DK3/DK4/XBOX 用 imaExpandNibbleMul（直接乘法），二者因整数截断不同，
@@ -151,10 +151,10 @@ fn imaExpandNibble(s: *ImaState, nibble: u8) i16 {
     return v;
 }
 
-/// IMA nibble 展开（直接乘法变体，镜像 FFmpeg adpcm_ima_expand_nibble
+/// IMA nibble 展开（直接乘法变体，镜像 验收基准 adpcm_ima_expand_nibble
 /// 446-470：diff = ((2*delta + 1) * step) >> shift，delta = nibble & 7）。
 /// DK3 / DK4 / XBOX（shift 恒 3）使用；与 imaExpandNibble 分段移位版本因
-/// 整数截断不同，不能互换（bit-exact 对照见 docs/audio-kernel-zig.md §17.2）。
+/// 整数截断不同，不能互换（逐样本一致 对照见 docs/audio-kernel-zig.md §17.2）。
 fn imaExpandNibbleMul(s: *ImaState, nibble: u8, shift: u4) i16 {
     const step: i32 = step_table[@intCast(s.step_index)];
     s.step_index = std.math.clamp(s.step_index + index_table[nibble], 0, 88);
@@ -166,7 +166,7 @@ fn imaExpandNibbleMul(s: *ImaState, nibble: u8, shift: u4) i16 {
     return v;
 }
 
-/// MS ADPCM 4-bit nibble 展开（算法对齐 FFmpeg adpcm_ms_expand_nibble）
+/// MS ADPCM 4-bit nibble 展开（算法对齐 验收基准 adpcm_ms_expand_nibble）
 fn msExpandNibble(s: *MsState, nibble: u8) i16 {
     var predictor: i32 = @divTrunc(s.sample1 * s.coeff1 + s.sample2 * s.coeff2, 64);
     const signed_nibble: i32 = if (nibble & 8 != 0) @as(i32, nibble) - 0x10 else nibble;
@@ -227,7 +227,7 @@ pub fn decodeImaWav(in: []const u8, channels: usize, samples_per_ch: usize, out:
 
 /// 解码一个 IMA DK4 块。`samples_per_ch` 为每通道样本数（含头部 predictor）。
 /// `out` 容量须 >= samples_per_ch * channels（交错 s16）。仅支持 1-2 声道
-/// （镜像 FFmpeg adpcm.c 1720-1736：数据循环仅用 status[0]/status[st]）。
+/// （镜像 验收基准 adpcm.c 1720-1736：数据循环仅用 status[0]/status[st]）。
 pub fn decodeDk4(in: []const u8, channels: usize, samples_per_ch: usize, out: []i16) Error!void {
     if (channels < 1 or channels > 2) return error.UnsupportedFormat;
     if (in.len < 4 * channels) return error.Corrupt;
@@ -247,7 +247,7 @@ pub fn decodeDk4(in: []const u8, channels: usize, samples_per_ch: usize, out: []
     if (samples_per_ch == 0) return error.Corrupt;
 
     // 数据区：每字节 → ch0 高 4 位 + ch{st} 低 4 位。
-    // 字节数按 FFmpeg 公式 `(nb_samples - 1) >> (1 - st)`（st = 立体声 ? 1 : 0）。
+    // 字节数按 验收基准 公式 `(nb_samples - 1) >> (1 - st)`（st = 立体声 ? 1 : 0）。
     const st: usize = if (channels == 2) 1 else 0;
     const n_bytes = (samples_per_ch - 1) >> @intCast(1 - st);
     var s: usize = channels; // 已写头样本（线性游标，随块内交错输出推进）
@@ -255,7 +255,7 @@ pub fn decodeDk4(in: []const u8, channels: usize, samples_per_ch: usize, out: []
         if (pos >= in.len) return error.Corrupt;
         const v = in[pos];
         pos += 1;
-        // 直接乘法变体（镜像 FFmpeg adpcm_ima_expand_nibble shift=3）
+        // 直接乘法变体（镜像 验收基准 adpcm_ima_expand_nibble shift=3）
         out[s] = imaExpandNibbleMul(&state[0], v >> 4, 3);
         s += 1;
         out[s] = imaExpandNibbleMul(&state[st], v & 0x0F, 3);
@@ -263,19 +263,19 @@ pub fn decodeDk4(in: []const u8, channels: usize, samples_per_ch: usize, out: []
     }
 }
 
-/// IMA DK3（tag 0x0062）每块每通道样本数（镜像 FFmpeg adpcm.c 1296-1299）：
+/// IMA DK3（tag 0x0062）每块每通道样本数（镜像 验收基准 adpcm.c 1296-1299）：
 /// `((block_align - 16) * 2 / 3 * 4) / channels`（C 整数左结合；16 = 10B 跳过 +
-/// 2×predictor(2B) + 2×step_index(1B) 的块头）。数据不足时 FFmpeg 用 bytestream
+/// 2×predictor(2B) + 2×step_index(1B) 的块头）。数据不足时 验收基准 用 bytestream
 /// 越界零填充继续展开（见 decodeDk3 注释），故输出数大于数据字节可容纳数。
 pub fn dk3SamplesPerBlock(block_align: usize, channels: usize) usize {
     return ((block_align -| 16) * 2 / 3 * 4) / channels;
 }
 
-/// 解码一个 IMA DK3 块（tag 0x0062）。仅支持 2 声道（sum/diff 编解码，镜像 FFmpeg
+/// 解码一个 IMA DK3 块（tag 0x0062）。仅支持 2 声道（sum/diff 编解码，镜像 验收基准
 /// 1748-1798：状态 [0] = sum 通道、[1] = diff 通道，每迭代 4 nibble = 2 字节 → 4 交错
 /// 样本）。`samples_per_ch` 为每通道样本数（dk3SamplesPerBlock）。
-/// 数据耗尽后镜像 FFmpeg bytestream2_get_byteu 越界语义：padding（零字节）继续
-/// 展开，保证与 FFmpeg 输出逐样本一致。
+/// 数据耗尽后镜像 验收基准 bytestream2_get_byteu 越界语义：padding（零字节）继续
+/// 展开，保证与 验收基准 输出逐样本一致。
 pub fn decodeDk3(src: []const u8, channels: usize, samples_per_ch: usize, out: []i16) Error!void {
     if (channels != 2) return error.UnsupportedFormat;
     if (src.len < 16) return error.Corrupt;
@@ -293,7 +293,7 @@ pub fn decodeDk3(src: []const u8, channels: usize, samples_per_ch: usize, out: [
     var o: usize = 0;
     while (o < total) {
         // sum 通道与 diff 通道各展开 1 nibble → 输出第 1 对样本
-        // （直接乘法变体，镜像 FFmpeg adpcm_ima_expand_nibble shift=3）
+        // （直接乘法变体，镜像 验收基准 adpcm_ima_expand_nibble shift=3）
         _ = imaExpandNibbleMul(&state[0], dk3GetNibble(src, &pos, &last_byte, &decode_top), 3);
         _ = imaExpandNibbleMul(&state[1], dk3GetNibble(src, &pos, &last_byte, &decode_top), 3);
         diff_channel = @divTrunc(diff_channel + state[1].predictor, 2);
@@ -310,7 +310,7 @@ pub fn decodeDk3(src: []const u8, channels: usize, samples_per_ch: usize, out: [
     }
 }
 
-/// DK3 nibble 交替读取（镜像 FFmpeg DK3_GET_NEXT_NIBBLE 宏：低 4 位先、高 4 位后，
+/// DK3 nibble 交替读取（镜像 验收基准 DK3_GET_NEXT_NIBBLE 宏：低 4 位先、高 4 位后，
 /// 跨字节保持 last_byte）。数据耗尽后返回零 nibble（镜像 AV_INPUT_BUFFER_PADDING_SIZE
 /// 零填充下的 bytestream2_get_byteu 越界行为）。
 fn dk3GetNibble(src: []const u8, pos: *usize, last_byte: *u8, decode_top: *bool) u8 {
@@ -324,7 +324,7 @@ fn dk3GetNibble(src: []const u8, pos: *usize, last_byte: *u8, decode_top: *bool)
     return last_byte.* & 0x0F;
 }
 
-/// XBOX ADPCM（tag 0x0069）每块每通道输出样本数（镜像 FFmpeg adpcm.c 1336-1343 +
+/// XBOX ADPCM（tag 0x0069）每块每通道输出样本数（镜像 验收基准 adpcm.c 1336-1343 +
 /// 1597 `frame->nb_samples--`）：解码数 = (block_align - 4ch)/(4ch)*8 + 1，输出减 1
 /// （丢弃每块最后 1 样本，XBOX 格式固有怪癖）。
 pub fn xboxSamplesPerBlock(block_align: usize, channels: usize) usize {
@@ -360,7 +360,7 @@ pub fn decodeXbox(src: []const u8, channels: usize, samples_per_ch: usize, out: 
             for (0..4) |j| {
                 const v = b[j];
                 // 始终展开两个 nibble 保持状态同步；末尾被 frame->nb_samples--
-                // 丢弃的样本不写入输出（镜像 FFmpeg 1573-1598 越界语义）
+                // 丢弃的样本不写入输出（镜像 验收基准 1573-1598 越界语义）
                 const v0 = imaExpandNibbleMul(&state[c], v & 0x0F, 3);
                 const v1 = imaExpandNibbleMul(&state[c], v >> 4, 3);
                 const j0 = base + 2 * j * channels;
@@ -371,7 +371,7 @@ pub fn decodeXbox(src: []const u8, channels: usize, samples_per_ch: usize, out: 
     }
 }
 
-/// SANYO LD-ADPCM（tag 0x0125）每块每通道样本数 = fmt 扩展区 LE16（镜像 FFmpeg
+/// SANYO LD-ADPCM（tag 0x0125）每块每通道样本数 = fmt 扩展区 LE16（镜像 验收基准
 /// adpcm.c 1428-1432：`nb_samples = AV_RL16(extradata)`）。
 pub fn sanyoSamplesPerBlock(extradata: []const u8) Error!usize {
     if (extradata.len != 2) return error.Corrupt;
@@ -380,8 +380,8 @@ pub fn sanyoSamplesPerBlock(extradata: []const u8) Error!usize {
 
 /// 解码一个 SANYO LD-ADPCM 块（tag 0x0125）。块头每通道 predictor(le16) + step(le16)；
 /// 数据为 LSB 优先位流（get_bits_le），每样本 bits 位，按 `sample×channel` 序读取
-/// （镜像 FFmpeg 2820-2823）。`bits` ∈ {3,4,5} 决定 expand 变体。状态跨块保持
-/// （镜像 FFmpeg ADPCMChannelStatus 跨帧保持；seek 时重置）。
+/// （镜像 验收基准 2820-2823）。`bits` ∈ {3,4,5} 决定 expand 变体。状态跨块保持
+/// （镜像 验收基准 ADPCMChannelStatus 跨帧保持；seek 时重置）。
 pub fn decodeSanyo(st: *ContState, src: []const u8, channels: usize, bits: u8, samples_per_ch: usize, out: []i16) Error!void {
     if (channels < 1 or channels > 2) return error.UnsupportedFormat;
     if (bits < 3 or bits > 5) return error.UnsupportedFormat;
@@ -406,7 +406,7 @@ pub fn decodeSanyo(st: *ContState, src: []const u8, channels: usize, bits: u8, s
     }
 }
 
-/// LSB 优先位读取器（镜像 FFmpeg get_bits_le 语义：每字节从 bit0 起，先读低位移位）
+/// LSB 优先位读取器（镜像 验收基准 get_bits_le 语义：每字节从 bit0 起，先读低位移位）
 const BitReader = struct {
     buf: []const u8,
     byte_pos: usize = 0,
@@ -432,7 +432,7 @@ fn readBitsLe(br: *BitReader, n: u8) u32 {
     return out;
 }
 
-/// SANYO 3-bit 展开（镜像 FFmpeg adpcm_sanyo_expand3，step 上限 7281）
+/// SANYO 3-bit 展开（镜像 验收基准 adpcm_sanyo_expand3，step 上限 7281）
 fn sanyoExpand3(st: *ContState, c: usize, bits: u32) i16 {
     const sign = bits & 4;
     const delta: i32 = if (sign != 0) 4 - @as(i32, @intCast(bits & 3)) else @as(i32, @intCast(bits));
@@ -466,7 +466,7 @@ fn sanyoExpand3(st: *ContState, c: usize, bits: u32) i16 {
     return @intCast(st.predictor[c]);
 }
 
-/// SANYO 4-bit 展开（镜像 FFmpeg adpcm_sanyo_expand4，step 上限 2621）
+/// SANYO 4-bit 展开（镜像 验收基准 adpcm_sanyo_expand4，step 上限 2621）
 fn sanyoExpand4(st: *ContState, c: usize, bits: u32) i16 {
     const sign = bits & 8;
     const delta: i32 = if (sign != 0) 8 - @as(i32, @intCast(bits & 7)) else @as(i32, @intCast(bits));
@@ -507,7 +507,7 @@ fn sanyoExpand4(st: *ContState, c: usize, bits: u32) i16 {
     return @intCast(st.predictor[c]);
 }
 
-/// SANYO 5-bit 展开（镜像 FFmpeg adpcm_sanyo_expand5，step 上限 1024；add 用旧 step）
+/// SANYO 5-bit 展开（镜像 验收基准 adpcm_sanyo_expand5，step 上限 1024；add 用旧 step）
 fn sanyoExpand5(st: *ContState, c: usize, bits: u32) i16 {
     const sign = bits & 0x10;
     const delta: i32 = if (sign != 0) 16 - @as(i32, @intCast(bits & 0xF)) else @as(i32, @intCast(bits));
@@ -541,7 +541,7 @@ pub fn decodeMs(in: []const u8, channels: usize, samples_per_ch: usize, out: []i
     if (in.len < 7 * channels) return error.Corrupt;
 
     if (channels > 2) {
-        // >2 声道（镜像 FFmpeg 1637-1658）：每通道为独立连续段
+        // >2 声道（镜像 验收基准 1637-1658）：每通道为独立连续段
         //   [pred(1) idelta(2) s1(2) s2(2) + nibble 数据((samples-2)/2 字节)]
         var st: [8]MsState = undefined;
         var pos: usize = 0;
@@ -580,7 +580,7 @@ pub fn decodeMs(in: []const u8, channels: usize, samples_per_ch: usize, out: []i
     var st: [2]MsState = undefined;
     var preds: [2]u8 = undefined;
     var pos: usize = 0;
-    // 块头 ≤2 通道按**通道交错**排列（镜像 FFmpeg 1660-1686）：
+    // 块头 ≤2 通道按**通道交错**排列（镜像 验收基准 1660-1686）：
     //   pred(1B)×ch → idelta(2B LE)×ch → sample1(2B LE)×ch → sample2(2B LE)×ch
     for (0..channels) |c| {
         preds[c] = in[pos];
@@ -613,7 +613,7 @@ pub fn decodeMs(in: []const u8, channels: usize, samples_per_ch: usize, out: []i
             .idelta = idelta[c],
             .sample1 = sample1[c],
             .sample2 = sample2[c],
-            // 表值已按 FFmpeg 约定除以 4 存储（预测公式分母 64 对齐）
+            // 表值已按 验收基准 约定除以 4 存储（预测公式分母 64 对齐）
             .coeff1 = coeff1[preds[c]],
             .coeff2 = coeff2[preds[c]],
         };
@@ -644,7 +644,7 @@ pub fn decodeMs(in: []const u8, channels: usize, samples_per_ch: usize, out: []i
 // ---------------------------------------------------------------------------
 
 /// 解码一个 IMA QT 块。块大小固定 34*channels 字节 → 每通道 64 样本。
-/// `st` 为块间保持状态（FFmpeg 启发式依赖上一块展开后的状态）；流开头须 resetCont(.., false)。
+/// `st` 为块间保持状态（验收基准 启发式依赖上一块展开后的状态）；流开头须 resetCont(.., false)。
 /// `out` 容量须 >= 64 * channels（交错 s16）。支持 1..8 声道。
 pub fn decodeImaQt(st: *ContState, in: []const u8, channels: usize, out: []i16) Error!void {
     if (channels < 1 or channels > 8) return error.UnsupportedFormat;
@@ -657,7 +657,7 @@ pub fn decodeImaQt(st: *ContState, in: []const u8, channels: usize, out: []i16) 
         pos += 2;
         const step_index: i32 = raw & 0x7F;
         const predictor: i32 = @as(i32, raw) & ~@as(i32, 0x7F);
-        // FFmpeg 启发式（镜像 adpcm.c 1494-1504）：step 相同且 predictor 差 ≤0x7f
+        // 验收基准 启发式（镜像 adpcm.c 1494-1504）：step 相同且 predictor 差 ≤0x7f
         // 时沿用上一块展开后的状态（QuickTime 块拼接约定）
         var diff = predictor - st.predictor[c];
         if (diff < 0) diff = -diff;
@@ -673,7 +673,7 @@ pub fn decodeImaQt(st: *ContState, in: []const u8, channels: usize, out: []i16) 
             out[(2 * j) * channels + c] = imaExpandNibble(&state, byte & 0x0F);
             out[(2 * j + 1) * channels + c] = imaExpandNibble(&state, byte >> 4);
         }
-        // 写回展开后状态（镜像 FFmpeg：cs 被 nibble 展开原地更新，跨块保持）
+        // 写回展开后状态（镜像 验收基准：cs 被 nibble 展开原地更新，跨块保持）
         st.predictor[c] = state.predictor;
         st.step_index[c] = state.step_index;
     }
@@ -691,13 +691,13 @@ pub const ContState = struct {
     step: [8]i32 = .{ 0, 0, 0, 0, 0, 0, 0, 0 }, // Yamaha / CT
 };
 
-/// 重置解码状态。`ct_init` 为 true（Creative CT）时步长按 FFmpeg 初始化为 511。
+/// 重置解码状态。`ct_init` 为 true（Creative CT）时步长按 验收基准 初始化为 511。
 pub fn resetCont(st: *ContState, ct_init: bool) void {
     st.* = .{};
     if (ct_init) st.step = .{ 511, 511, 511, 511, 511, 511, 511, 511 };
 }
 
-/// OKI 4-bit nibble 展开（对齐 FFmpeg adpcm_ima_oki_expand_nibble）
+/// OKI 4-bit nibble 展开（对齐 验收基准 adpcm_ima_oki_expand_nibble）
 fn okiExpandNibble(st: *ContState, c: usize, nibble: u8) i16 {
     const step: i32 = oki_step_table[@intCast(st.step_index[c])];
     st.step_index[c] = std.math.clamp(st.step_index[c] + index_table[nibble], 0, 48);
@@ -723,7 +723,7 @@ pub fn decodeOki(st: *ContState, in: []const u8, channels: usize, out: []i16) vo
     }
 }
 
-/// Yamaha 4-bit nibble 展开（对齐 FFmpeg adpcm_yamaha_expand_nibble）
+/// Yamaha 4-bit nibble 展开（对齐 验收基准 adpcm_yamaha_expand_nibble）
 fn yamahaExpandNibble(st: *ContState, c: usize, nibble: u8) i16 {
     if (st.step[c] == 0) {
         st.predictor[c] = 0;
@@ -751,7 +751,7 @@ pub fn decodeYamaha(st: *ContState, in: []const u8, channels: usize, out: []i16)
     }
 }
 
-/// Creative CT 4-bit nibble 展开（对齐 FFmpeg adpcm_ct_expand_nibble）
+/// Creative CT 4-bit nibble 展开（对齐 验收基准 adpcm_ct_expand_nibble）
 fn ctExpandNibble(st: *ContState, c: usize, nibble: u8) i16 {
     const delta: i32 = nibble & 7;
     const diff: i32 = ((2 * delta + 1) * st.step[c]) >> 3;
@@ -780,7 +780,7 @@ pub fn decodeCt(st: *ContState, in: []const u8, channels: usize, out: []i16) voi
 // ZORK DPCM（连续流，每字节 1 交错样本）与 SWF ADPCM（MSB-first 位流）
 // ---------------------------------------------------------------------------
 
-/// ZORK DPCM 展开（镜像 FFmpeg adpcm_zork_expand_nibble，adpcm.c 788-821）：
+/// ZORK DPCM 展开（镜像 验收基准 adpcm_zork_expand_nibble，adpcm.c 788-821）：
 /// 每字节直接作为 8-bit 控制量：位 0x40..0x01 依次累加 step_table[index] 的
 /// 1..1/64，位 0x80 取负；index += zork_index_table[(v>>4)&7]，clip 0..88。
 fn zorkExpand(st: *ContState, c: usize, v: u8) i16 {
@@ -843,7 +843,7 @@ pub fn swfExpandSample(st: *ContState, c: usize, delta: u32, nb_bits: u8) i16 {
     return v;
 }
 
-/// SWF ADPCM 每通道样本数（镜像 FFmpeg get_nb_samples，adpcm.c 1374-1385）：
+/// SWF ADPCM 每通道样本数（镜像 验收基准 get_nb_samples，adpcm.c 1374-1385）：
 /// buf_bits = size*8 - 2（首 2 bit 为 nbits 字段）；块头 22*ch bits；
 /// 块 = 块头 + nbits*ch*4095；nblocks = buf_bits / block_size；
 /// nb = nblocks*4096 + (bits_left >= 块头 ? 1 + (bits_left-块头)/(nbits*ch) : 0)。
@@ -1692,7 +1692,7 @@ test "adpcm: SANYO 非法输入" {
 }
 
 // ---------------------------------------------------------------------------
-// 黄金样本（bit-exact 对照数据，源自 FFmpeg 解码 /tmp/wav_samples 参考样本，
+// 黄金样本（逐样本一致 对照数据，源自 验收基准 解码 /tmp/wav_samples 参考样本，
 // 见 docs/audio-kernel-zig.md §17.2 验收范式）：fmt 块 + data 块 + 期望 PCM 字节
 // ---------------------------------------------------------------------------
 

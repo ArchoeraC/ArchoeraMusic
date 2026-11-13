@@ -7,7 +7,7 @@
 //!
 //! 与 /tmp/ac3downmix_ref.c 的 C 参考实现（FFmpeg ac3dec.c 三个函数逐字移植 +
 //! 合成输入）交叉校验：同一输入 → 完全相同的 f32 位模式（dump 行以 u32 十六进制
-//! 输出，C/Zig 逐位一致）。同时内嵌断言覆盖各分支。
+//! 输出，C/Zig 逐样本一致）。同时内嵌断言覆盖各分支。
 
 const std = @import("std");
 const t = @import("fmt/ac3/tables.zig");

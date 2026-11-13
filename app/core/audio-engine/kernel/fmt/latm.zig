@@ -24,12 +24,12 @@
 //!     AAC 载荷 = 原始 raw AAC 帧（raw_data_block，通常字节对齐，但 LATM 内
 //!     起始位可不按字节对齐 → 位拷贝回对齐缓冲后喂内核）。
 //!
-//! 支持范围（对齐 ffmpeg aac_latm）：audio_mux_version 0/1（非 A）；
+//! 支持范围（对齐 验收基准 aac_latm）：audio_mux_version 0/1（非 A）；
 //! numProgram==0 / numLayer==0（单节目单层；多节目/多流 → UnsupportedFormat）；
-//! 每元素仅解码第一个子帧（numSubFrames 后续子帧丢弃，与 ffmpeg 逐包
+//! 每元素仅解码第一个子帧（numSubFrames 后续子帧丢弃，与 验收基准 逐包
 //! aac_decode_frame 语义一致）；frameLengthType 0（变长）/1（定长）。
 //! AAC-LC/Main/LTP（AOT 1/2/4）帧复用内核；ASC 内 PCE（chan_config=0）布局、
-//! ER/ELD、AudioMuxVersionA → UnsupportedFormat（回退 FFmpeg 主后端 §8.3）。
+//! ER/ELD、AudioMuxVersionA → UnsupportedFormat（回退 验收基准 主后端 §8.3）。
 //! 采样率/声道来自 StreamMuxConfig 内 AudioSpecificConfig（与 ffprobe 一致）。
 //!
 //! Seek：按 LOAS 帧头顺序跳过（每元素固定 1 音频帧，1024/960 样本），无需
@@ -109,7 +109,7 @@ fn loasFrameTotal(buf: []const u8) ?usize {
     const w: u24 = @intCast((@as(u32, buf[0]) << 16) | (@as(u32, buf[1]) << 8) | buf[2]);
     if ((w & 0xFFE000) != 0x56E000) return null; // 0x2B7 << 13
     const len: usize = w & 0x1FFF;
-    // ffmpeg loas_probe：帧长 = len + 3 ≥ 7（len ≥ 4）才判合法
+    // 验收基准 loas_probe：帧长 = len + 3 ≥ 7（len ≥ 4）才判合法
     if (len < 4) return null;
     return len + 3;
 }
@@ -196,12 +196,12 @@ fn supportedObjectType(ot: u8) bool {
 fn validateCfg(cfg: asc.M4ACfg) Error!void {
     if (!supportedObjectType(cfg.object_type)) return error.UnsupportedFormat;
     // chan_config==0：布局由 ASC 内 PCE 定义（LATM 的 GA 特定配置含 PCE）。
-    // 内核仅支持 chan_config 非 0 的 ASC 配置 → 回退 FFmpeg。
+    // 内核仅支持 chan_config 非 0 的 ASC 配置 → 回退 验收基准。
     if (cfg.chan_config == 0) return error.UnsupportedFormat;
 }
 
 /// 读取 audio_mux_version==1 时带长度前缀的 ASC：位拷贝 asclen 字节到对齐
-/// 缓冲后用 asc.parseAsc（sync_extension=1，对齐 ffmpeg asclen>0 分支）。
+/// 缓冲后用 asc.parseAsc（sync_extension=1，对齐 验收基准 asclen>0 分支）。
 fn parseAscBounded(ctx: *LatmCtx, br: *BitReader, asclen: u32) Error!void {
     var tmp: [512]u8 = undefined;
     if (asclen == 0 or asclen > tmp.len) return error.UnsupportedFormat;
@@ -213,7 +213,7 @@ fn parseAscBounded(ctx: *LatmCtx, br: *BitReader, asclen: u32) Error!void {
 }
 
 /// 解析 StreamMuxConfig（br 位于 audio_mux_version 位）。语义对照
-/// ffmpeg read_stream_mux_config：audio_mux_version / version_A、
+/// 验收基准 read_stream_mux_config：audio_mux_version / version_A、
 /// taraFullness（v1）、allStreamsSameTimeFraming、numSubFrames、numProgram
 /// （≠0 → 不支持）、numLayer（≠0 → 不支持）、AudioSpecificConfig、
 /// frameLengthType、latmBufferFullness / 定长、otherData、config_crc。
@@ -221,7 +221,7 @@ fn parseStreamMuxConfig(ctx: *LatmCtx, br: *BitReader) Error!void {
     const ver = (try br.readBits(1)) != 0;
     var ver_a = false;
     if (ver) ver_a = (try br.readBits(1)) != 0;
-    // AudioMuxVersionA（MuxConfigPresent 变体）不在此解码（对齐 ffmpeg）
+    // AudioMuxVersionA（MuxConfigPresent 变体）不在此解码（对齐 验收基准）
     if (ver_a) return error.UnsupportedFormat;
     if (ver) _ = try latmGetValue(br); // taraFullness
 
@@ -234,7 +234,7 @@ fn parseStreamMuxConfig(ctx: *LatmCtx, br: *BitReader) Error!void {
 
     if (!ver) {
         // audio_mux_version==0：ASC 无长度前缀、无 sync_extension 扫描
-        // （对齐 ffmpeg asclen==0 → sync_extension=0），按 GA 特配置结束即止
+        // （对齐 验收基准 asclen==0 → sync_extension=0），按 GA 特配置结束即止
         const r = try asc.parseAscBr(br, false);
         ctx.cfg = r.cfg;
     } else {
@@ -270,7 +270,7 @@ fn parseStreamMuxConfig(ctx: *LatmCtx, br: *BitReader) Error!void {
 
 /// PayloadLengthInfo → mux_slot_length_bytes（本元素首子帧 AAC 载荷字节数）。
 /// frameLengthType 0：逐 8 位字节求和直到字节 ≠ 255（255 续传）。
-/// frameLengthType 1：定长。语义对照 ffmpeg read_payload_length_info。
+/// frameLengthType 1：定长。语义对照 验收基准 read_payload_length_info。
 fn readPayloadLengthInfo(ctx: *LatmCtx, br: *BitReader) Error!u32 {
     if (ctx.frame_length_type == 0) {
         var mux_slot_length: u32 = 0;
@@ -559,7 +559,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
         _ = try br.readBits(24);
         const use_same_mux = (try br.readBits(1)) != 0;
         if (!use_same_mux) {
-            // 不支持/损坏的首个配置 → 明确回退（open 即失败，FFmpeg 主后端）
+            // 不支持/损坏的首个配置 → 明确回退（open 即失败，验收基准 主后端）
             try parseStreamMuxConfig(ctx, &br);
             found = true;
             break;
@@ -599,7 +599,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     ctx.aac.out_buf.clearRetainingCapacity();
 
     // 时长：LOAS 跳帧计数（每元素解码输出 1 个 AAC 帧 = frame_samples 样本
-    // —— numSubFrames>1 的后续子帧按 ffmpeg 语义丢弃）。扫描不可靠时回落
+    // —— numSubFrames>1 的后续子帧按 验收基准 语义丢弃）。扫描不可靠时回落
     // 平均帧长估算。SBR 下输出样本数与采样率同时 ×2，时长不变。
     var duration_us: i64 = -1;
     var known: decoder.DurationKnown = .unknown;
@@ -797,7 +797,7 @@ test "SMC 解析: 多节目/多层/变体 → UnsupportedFormat" {
     try testing.expectError(error.UnsupportedFormat, parseStreamMuxConfig(&ctx, &br));
 }
 
-// ---------------- 端到端（真实样本，golden 来自系统 ffmpeg n9.0.1） ----------------
+// ---------------- 端到端（真实样本，golden 来自系统 验收基准 n9.0.1） ----------------
 
 const e2e_mono = @embedFile("latm_tiny_mono.latm");
 const e2e_mono_golden = @embedFile("latm_tiny_mono.s16");
@@ -850,7 +850,7 @@ fn runE2e(input: []const u8, golden: []const u8) !E2e {
     };
 }
 
-test "latm e2e: mono 44.1kHz == ffmpeg（含重复 StreamMuxConfig）" {
+test "latm e2e: mono 44.1kHz == 验收基准（含重复 StreamMuxConfig）" {
     const r = try runE2e(e2e_mono, e2e_mono_golden);
     try std.testing.expectEqual(@as(u32, 44100), r.sr);
     try std.testing.expectEqual(@as(u8, 1), r.ch);
@@ -858,7 +858,7 @@ test "latm e2e: mono 44.1kHz == ffmpeg（含重复 StreamMuxConfig）" {
     try testing.expect(r.bit_exact > 99.9);
 }
 
-test "latm e2e: stereo 48kHz == ffmpeg" {
+test "latm e2e: stereo 48kHz == 验收基准" {
     const r = try runE2e(e2e_stereo, e2e_stereo_golden);
     try std.testing.expectEqual(@as(u32, 48000), r.sr);
     try std.testing.expectEqual(@as(u8, 2), r.ch);

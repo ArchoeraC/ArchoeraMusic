@@ -10,7 +10,7 @@
 //!   - 一阶高通（双线性变换，K = tan(w0/2)）。
 //!
 //! 精度纪律：`w0` 以 f64 计算后落回 f32，与既有 `kernel/dsp/eq.zig` 的
-//! `calcPeaking` 完全一致（逐位对齐 C 壳 `equalizer.c`）；三角函数/幂函数
+//! `calcPeaking` 完全一致（逐样本对齐 C 壳 `equalizer.c`）；三角函数/幂函数
 //! 直接调用宿主 libm（`dspmath.zig`），避免 Zig compiler_rt 自带实现的 ulp 差异。
 //!
 //! 命名自有（`era_` 前缀），biquad/peaking/shelf 等为通用 DSP 术语，

@@ -12,7 +12,7 @@
 //! subframe / 声道组 / DPCM+runlevel scale factors / 矢量+runlevel 谱系数 /
 //! IMDCT（av_tx 位精确内核，见 mdct.zig）/ 窗重叠结构一致；解码为浮点（对齐
 //! ffmpeg fltp）。量化步进用 ff_exp10(exp/20)（f64→f32 舍入），与系统 ffmpeg
-//! f32 exp10 有末位差异，s16 输出非 100% bit-exact（报告见 wmapro/lib.zig）。
+//! f32 exp10 有末位差异，s16 输出非 100% 逐样本一致（报告见 wmapro/lib.zig）。
 //!
 //! 本文件不含容器解析。`Dec.decodePacket` 一次处理一个 WMA packet（通常
 //! block_align 字节），由 lib.zig 按 ffmpeg decode core 喂包循环驱动：同一
@@ -133,7 +133,7 @@ fn copyBits(dst: *BitWriter, src: []const u8, length: usize) void {
     }
 }
 
-/// BE16 读取，越过源尾按 0（对齐 ffmpeg AV_INPUT_BUFFER_PADDING 语义）
+/// BE16 读取，越过源尾按 0（对齐 验收基准 AV_INPUT_BUFFER_PADDING 语义）
 fn readBe16Pad(src: []const u8, off: usize) u32 {
     var b: [2]u8 = .{ 0, 0 };
     for (0..2) |k| {
@@ -570,7 +570,7 @@ pub const Dec = struct {
         return self.gb.get(n_bits);
     }
 
-    /// ff_exp10(x) = exp2(M_LOG2_10·x)（对齐 ffmpeg ffmath.h，f64 转 f32）
+    /// ff_exp10(x) = exp2(M_LOG2_10·x)（对齐 验收基准 ffmath.h，f64 转 f32）
     fn ffExp10(self: *Dec, x: f64) f32 {
         _ = self;
         const m_log2_10 = 3.321928094887362347870319429489390175864831393024580612054756395; // log2(10)
@@ -978,7 +978,7 @@ pub const Dec = struct {
         const sstart: i64 = start;
         const slen: i64 = @intCast(len);
         for (0..len) |u| {
-            // FFmpeg：for (i=-len, j=len-1; i<0; i++, j--)
+            // 验收基准：for (i=-len, j=len-1; i<0; i++, j--)
             const i: i64 = @as(i64, @intCast(u)) - slen;
             const j: i64 = slen - 1 - @as(i64, @intCast(u)); // len-1..0
             const aA: usize = @intCast(sstart + slen + i);

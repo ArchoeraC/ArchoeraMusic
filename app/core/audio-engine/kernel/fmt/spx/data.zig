@@ -8,7 +8,7 @@
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! Speex 解码码本/系数表（自 reference/FFmpeg/libavcodec/speexdata.h 逐值转录，
-//! 溯源 libspeex 1.2.x 同名表；f32 以 IEEE-754 位模式 @bitCast 给出，保证逐位一致）。
+//! 溯源 libspeex 1.2.x 同名表；f32 以 IEEE-754 位模式 @bitCast 给出，保证逐样本一致）。
 //! 原表许可：BSD（Xiph.org / J.-M. Valin 等，见 speexdata.h 顶部版权声明）。
 
 const std = @import("std");
@@ -428,8 +428,8 @@ pub const exc_gain_quant_scal1 = [2]f32{
 pub const wb_skip_table = [8]u16{ 0, 36, 112, 192, 352, 0, 0, 0 };
 
 // expf 查找表：解码路径的 expf 实参全部量化（ol_gain 5bit / SB 折叠 5bit /
-// 立体声 6bit）。表值以系统 glibc expf（与 ffmpeg n9.0.1 链接的 libm 相同）
-// 逐一生成，规避 Zig compiler_rt 自带 expf 的 1-ulp 差异，保证与 ffmpeg 位级一致。
+// 立体声 6bit）。表值以系统 glibc expf（与 验收基准 n9.0.1 链接的 libm 相同）
+// 逐一生成，规避 Zig compiler_rt 自带 expf 的 1-ulp 差异，保证与 验收基准 逐样本一致。
 pub const exp_gain_tab = [32]f32{ @as(f32, @bitCast(@as(u32, 0x3f800000))), @as(f32, @bitCast(@as(u32, 0x3faa54c7))), @as(f32, @bitCast(@as(u32, 0x3fe2a969))), @as(f32, @bitCast(@as(u32, 0x4016cf8f))), @as(f32, @bitCast(@as(u32, 0x4048af8e))), @as(f32, @bitCast(@as(u32, 0x4085870a))), @as(f32, @bitCast(@as(u32, 0x40b1afc9))), @as(f32, @bitCast(@as(u32, 0x40ec7326))), @as(f32, @bitCast(@as(u32, 0x411d52c6))), @as(f32, @bitCast(@as(u32, 0x41515a20))), @as(f32, @bitCast(@as(u32, 0x418b4b2e))), @as(f32, @bitCast(@as(u32, 0x41b95c1a))), @as(f32, @bitCast(@as(u32, 0x41f6a918))), @as(f32, @bitCast(@as(u32, 0x42241df8))), @as(f32, @bitCast(@as(u32, 0x425a6481))), @as(f32, @bitCast(@as(u32, 0x42914f0f))), @as(f32, @bitCast(@as(u32, 0x42c15d43))), @as(f32, @bitCast(@as(u32, 0x4300a7f6))), @as(f32, @bitCast(@as(u32, 0x432b3447))), @as(f32, @bitCast(@as(u32, 0x4363d2d1))), @as(f32, @bitCast(@as(u32, 0x43979575))), @as(f32, @bitCast(@as(u32, 0x43c9b6e3))), @as(f32, @bitCast(@as(u32, 0x4406363e))), @as(f32, @bitCast(@as(u32, 0x443298f3))), @as(f32, @bitCast(@as(u32, 0x446da96a))), @as(f32, @bitCast(@as(u32, 0x449e2134))), @as(f32, @bitCast(@as(u32, 0x44d26cd2))), @as(f32, @bitCast(@as(u32, 0x450c01f6))), @as(f32, @bitCast(@as(u32, 0x453a4f54))), @as(f32, @bitCast(@as(u32, 0x4577ecbf))), @as(f32, @bitCast(@as(u32, 0x45a4f550))), @as(f32, @bitCast(@as(u32, 0x45db830d))) };
 
 pub const exp_fold_tab = [32]f32{ @as(f32, @bitCast(@as(u32, 0x3e92b0c2))), @as(f32, @bitCast(@as(u32, 0x3ea638d9))), @as(f32, @bitCast(@as(u32, 0x3ebc5ab2))), @as(f32, @bitCast(@as(u32, 0x3ed56ef0))), @as(f32, @bitCast(@as(u32, 0x3ef1da07))), @as(f32, @bitCast(@as(u32, 0x3f0906e5))), @as(f32, @bitCast(@as(u32, 0x3f1b4598))), @as(f32, @bitCast(@as(u32, 0x3f2ff231))), @as(f32, @bitCast(@as(u32, 0x3f475f7d))), @as(f32, @bitCast(@as(u32, 0x3f61eb51))), @as(f32, @bitCast(@as(u32, 0x3f800000))), @as(f32, @bitCast(@as(u32, 0x3f910b02))), @as(f32, @bitCast(@as(u32, 0x3fa45af2))), @as(f32, @bitCast(@as(u32, 0x3fba3d29))), @as(f32, @bitCast(@as(u32, 0x3fd3094c))), @as(f32, @bitCast(@as(u32, 0x3fef22af))), @as(f32, @bitCast(@as(u32, 0x40077cee))), @as(f32, @bitCast(@as(u32, 0x4019872c))), @as(f32, @bitCast(@as(u32, 0x402df854))), @as(f32, @bitCast(@as(u32, 0x40452246))), @as(f32, @bitCast(@as(u32, 0x405f61c7))), @as(f32, @bitCast(@as(u32, 0x407d1ffa))), @as(f32, @bitCast(@as(u32, 0x408f69ff))), @as(f32, @bitCast(@as(u32, 0x40a28269))), @as(f32, @bitCast(@as(u32, 0x40b825b5))), @as(f32, @bitCast(@as(u32, 0x40d0aa8d))), @as(f32, @bitCast(@as(u32, 0x40ec7326))), @as(f32, @bitCast(@as(u32, 0x4105f763))), @as(f32, @bitCast(@as(u32, 0x4117cdc4))), @as(f32, @bitCast(@as(u32, 0x412c0426))), @as(f32, @bitCast(@as(u32, 0x4142eb7f))), @as(f32, @bitCast(@as(u32, 0x415cdf89))) };
