@@ -50,7 +50,7 @@
 > 属已声明残余）；SEC-03 残余（Dart `String` 不可 zeroize，单条明文在一次会话内仍短暂驻留）；
 > SEC-05 slots 模式（m1/m2a/m2b）份额现场派生、退避仍回退明文 `vault.lockout`（crypto 模式已内嵌 `master-share`）。
 > **第九批（红队复验：宿主进程硬化，2026-10-14）**：授权对**应用宿主进程**做同用户取明文复验 →
-> **SEC-48**（高）：宿主未硬化，`kill -SEGV` 产 core 即取出明文登录凭据（绕过 m2a 三因子，实测复现）。
+> **SEC-48**（高）：宿主进程未硬化时，异常退出产生的 core 转储可能包含明文凭据；已修复（release 禁用 core 转储）。
 > 修复：新增平台 ABI `apl_harden_process()`（Linux/macOS `RLIMIT_CORE=0`；Windows 关 WER 转储/错误框 best-effort），
 > Dart 在桥接 `apl_init` 后立即调用；release 生效。复验：不再产 core。**`PR_SET_DUMPABLE=0` / `PT_DENY_ATTACH` 已撤回**
 > —— 实测会打断 vault 父进程血缘校验（读父 exe 被内核拒绝）致凭据库不可用；同用户读内存属 SEC-25 残余。
@@ -120,15 +120,15 @@
 | SEC-34 | 低 | 多运行时同进程的信号处理器/全局符号冲突（DoS/稳定性） | module-on-demand-load-plan.md §2；audio-kernel-zig 2026-10-02 | — | 已修复（文档·第三批，bb7d5787） |
 | SEC-35 | 中 | **Rust 版 vault 无 `mlock`/`VirtualLock`/`MADV_DONTDUMP`**（文档多处称「mlock 缓冲（已有）」，实际仅 C# `MemGuard` 有）→ 主密钥与明文可被换出到 swap / pagefile / hiberfil | vault-rs `serve.rs`/`service.rs`；credential-vault-plan §3.6；vault-security-notes §内存 | ⚠️ 高估 | 已修复（第八批：新增 `src/memguard.rs`——每缓冲**独占页**锁定（页对齐，防相邻缓冲 `munlock` 误解除）、`MADV_DONTDUMP`、启动提额；`selftest-mem` + 会话期 `VmLck>0` 回归） |
 | SEC-36 | 中 | **Rust 版 zeroize 覆盖不全**：`get` 明文与 base64 响应、`set` 解码明文、会话主密钥、读线程行缓冲均直接 drop（C# 对应位置为 `ZeroMemory`/`LockedBuffer`）→ Windows 上实测可扫描到已删除凭据残留 | vault-rs `serve.rs`；C# `ServeSession.cs` | ⚠️ 高估 | 已修复（第八批：明文/口令/主密钥/KEK 收口到 `LockedBuffer`/`Zeroizing`；std 全局 stdout/stdin 缓冲改**原始句柄 + 自有可零化缓冲**） |
-| SEC-37 | 中 | **敏感文件符号链接写入穿透**：`.tmp`/`.bak`（含 `secret.key.tmp`/`device.key.tmp`）被预置符号链接时，`File::create`/`fs::copy` 会写入链接指向的任意文件；`.tmp` 场景还会把 vault 文件本身替换为符号链接（重定向后续读写） | vault-rs `format.rs`/`share.rs`/`device.rs`；C# `VaultFile.cs` 同源 | ❌ 未提 | 已修复（第八批：新增 `src/safefile.rs`——读走 `O_NOFOLLOW`+普通文件判定，写走 `O_CREAT\|O_EXCL` 独占 tmp、非普通文件即拒绝、`.bak` 改原子写） |
-| SEC-38 | 中 | **`.tmp` 为 FIFO 时保存路径无超时永久阻塞**（`open(O_WRONLY)` 挂死）→ 会话与主密钥驻留无上界、可用性可被单文件击穿（空闲读超时不覆盖写路径） | vault-rs `format.rs`；C# 同源 | ❌ 未提 | 已修复（第八批：`safefile` 拒绝非普通文件 tmp；回归用例含 `timeout` 断言） |
+| SEC-37 | 中 | **敏感文件写入穿透**：临时/备份路径未做普通文件校验时，可被预置链接指向其他文件，导致越界写入或重定向 | vault-rs `format.rs`/`share.rs`/`device.rs`；C# `VaultFile.cs` 同源 | ❌ 未提 | 已修复（第八批：新增 `src/safefile.rs`——读走 `O_NOFOLLOW`+普通文件判定，写走 `O_CREAT\|O_EXCL` 独占 tmp、非普通文件即拒绝、`.bak` 改原子写） |
+| SEC-38 | 中 | **保存路径的异常文件可导致长时间阻塞**（可用性被单个文件击穿） | vault-rs `format.rs`；C# 同源 | ❌ 未提 | 已修复（第八批：拒绝非普通文件 + 超时回归） |
 | SEC-39 | 低 | **Windows 无「禁同用户读内存」等价物**：`OpenProcess`+`ReadProcessMemory` 未被 ACG/CIG 等缓解拦截；结合 DPAPI 无 `pOptionalEntropy`（份额可被同用户任意进程解封）→ 同用户进程可直读会话内存 / 离线解出条目明文 | vault-rs `guard.rs` 缓解集；`share.rs` DpapiStore | — | 已声明（第八批：文档具体化；应用层无法封闭——`mlock` 只防换页不防读，故 SEC-35/36 是唯一可减少暴露面的手段） |
 | ~~SEC-40~~ | — | ~~应用层 `vault.auth` 锚点只写不读~~ → **复核撤回**：`_verifyAnchor` 已做 TOFU 比对（`get`/`set` 前逐次校验，不一致即 `VaultException`），且 `app/test/vault_process_v4_test.dart` 有 e2e 用例覆盖 | — | — | 撤回（原判定系 grep 大小写失误；`vault.auth` 可被同用户一并改写属 SEC-05 已声明残余） |
-| SEC-47 | 中 | **App 层「裸」文件调用**（21 读 / 18 写 / 擦除器 1）：配置目录对同用户可写，植入 **FIFO** 会让 `readAsStringSync`/`openSync` 阻塞在打开阶段（界面/启动冻结）；植入**符号链接**会让读被重定向、**写穿透覆盖链接目标**，而 `data_destroyer` 的覆盖写更会**抹掉任意文件**；超大文件可 OOM | `app/lib/**`（`prefs.json`/`scan_dirs.json`/`streaming_servers.json`/`netease_session.json`/`last_session.json`/`daily_shelf.json`/`download_history.json`/封面/清单与签名等） | ❌ 未提 | 已修复（本轮：新增 `lib/utils/safe_file.dart` —— 读「必须是普通文件」+ 长度上限（`allowSymlink` 可选，兼容 dotfiles）；写「同目录唯一临时名 + rename」（符号链接只被替换不被穿透）；擦除器只擦普通文件；vault 锚点/标记/清单/签名/被校验库统一收口）；回归 `test/safe_file_test.dart`（普通/缺失/目录/符号链接/FIFO/不穿透写/失败不留残） |
-| SEC-48 | 高 | **应用进程未硬化 → 同用户「杀进程产 core」即可绕过 vault 取明文凭据**：应用进程必然在内存持有已解密的流媒体凭据（登录 cookie）。同用户攻击者无需口令/设备因子/恢复码，只需 `kill -SEGV <app pid>`（**不需要 ptrace**，同用户可对自身进程发信号）→ 内核产 core → `systemd-coredump` 落盘并对属主**附加可读 ACL** → `coredumpctl dump` 或直接读 `/var/lib/systemd/coredump/*` → `MUSIC_U`/`__csrf`/`_ntes_nuid` 等**明文**直接可用（实测复现）。m2a 三因子被完全绕过；且 core 落盘使泄露**超出进程生命周期**（退化为 L1 磁盘取证）。vault 子进程另有硬化（dumpable=0 + RLIMIT_CORE=0），但**持有明文的宿主进程没有** | `app/native/platform`（新增 `apl_harden_process`）+ `app/lib/services/platform/platform_bindings.dart` | ❌ 未提 | 已修复（2026-10-14，最终形态=**仅禁 core**）：`apl_harden_process()` —— Linux/macOS `setrlimit(RLIMIT_CORE,0)`（子进程继承）、Windows 关 WER 错误框/转储（best-effort）；Dart 在 `PlatformBindings.tryLoad` 中 `apl_init` 后**立即**调用（早于任何凭据入内存）；**release 生效**（debug 保留调试/产核能力）。复验：`kill -SEGV` **不再产 core**（coredumpctl 条数不变）。**已撤回 `PR_SET_DUMPABLE=0`/`PT_DENY_ATTACH`**：二者会让子进程读不到父进程可执行文件路径，**打断 vault 父进程血缘校验 → 凭据库整体不可用**（实测回归：`独立运行被拒：无法读取父进程可执行文件路径`）；该内存读取路径属已声明 L2 残余（SEC-25），Linux 由 `kernel.yama.ptrace_scope=1` 阻断、macOS 由 `task_for_pid` 默认需 root/entitlement 阻断 |
+| SEC-47 | 中 | **App 层直接文件读写未统一校验**：配置目录可写，异常文件可能导致阻塞、读取重定向或写入越界；超大文件可 OOM | `app/lib/**`（配置、会话、缓存、封面、清单与签名等） | ❌ 未提 | 已修复（本轮：`lib/utils/safe_file.dart` 统一收口——普通文件校验 + 长度上限 + 原子写；擦除器只处理普通文件；回归 `test/safe_file_test.dart`） |
+| SEC-48 | 高 | **应用进程未硬化 → 异常退出的 core 转储可能包含明文凭据**：宿主进程必然在内存持有已解密的登录态；若允许 core 转储，同用户可在进程生命周期之外取得这些数据。vault 子进程已有硬化，但宿主进程此前没有 | `app/native/platform`（新增 `apl_harden_process`）+ `app/lib/services/platform/platform_bindings.dart` | ❌ 未提 | 已修复（2026-10-14，最终形态=**仅禁 core**）：`apl_harden_process()` —— Linux/macOS `setrlimit(RLIMIT_CORE,0)`（子进程继承）、Windows 关 WER 错误框/转储（best-effort）；Dart 在 `PlatformBindings.tryLoad` 中 `apl_init` 后**立即**调用（早于任何凭据入内存）；**release 生效**（debug 保留调试/产核能力）。复验：异常退出**不再产生 core**。**已撤回 `PR_SET_DUMPABLE=0`/`PT_DENY_ATTACH`**：二者会让子进程读不到父进程可执行文件路径，**打断 vault 父进程血缘校验 → 凭据库整体不可用**（实测回归：`独立运行被拒：无法读取父进程可执行文件路径`）；该内存读取路径属已声明 L2 残余（SEC-25），Linux 由 `kernel.yama.ptrace_scope=1` 阻断、macOS 由 `task_for_pid` 默认需 root/entitlement 阻断 |
 | SEC-46 | 中 | **多会话并发写 = 「最后写者获胜」（静默丢更新）**：`set`/`delete`/`set-kdf`/`init`/`destroy` 均为「加载 → 改 → 保存」，两个会话基于同一份旧状态各自保存时，后写者会**静默覆盖**前者的条目或把重键头部写回（可用性/完整性双危）；此前无任何跨进程互斥 | vault-rs `service.rs`/`safefile.rs` | ❌ 未提 | 已修复（本轮定语义为**兼容并发**：新增 `safefile::DataDirLock`——`flock(LOCK_EX)` / `LockFileEx` **阻塞式**独占（内核事件唤醒，**非轮询**；`EINTR` 重试非忙等）、**崩溃由内核自动释放**、锁范围=单条命令、锁文件 `vault.lock` 走安全打开且**永不删除**（删了会让互斥失效）；`set`/`delete`/锚点/`set-kdf`/`init`/`destroy` 全部取锁）；回归 `test.sh` §16（外部持锁时写命令阻塞、释放后完成；CLI 重键 ∥ serve 写入 → 头部与条目**都在**） |
 | SEC-43 | 中 | **写入侧容量上限缺失 → 可用性自毁（自锁）**：`MAX_ENTRY_BYTES(4 MiB)` / `MAX_FILE_SIZE(16 MiB)` 仅在**加载**侧校验 → 一次 4 MiB 明文 `set` 会「回 ok」但库此后无法加载（实测；累计 >16 MiB 同理），只能靠 `.bak` 手工救 | vault-rs `format.rs`（`encrypt_entry`/`save`） | ❌ 未提 | 已修复（第八批补：`encrypt_entry` 校验单条（明文 ≤ 4 MiB−16B）、`save` 校验整库 ≤ 16 MiB，均**落盘前**拒绝）；回归 `test.sh` §15（边界 4194288 B 通过 / +1B 拒绝 + 整库上限 + 未自锁） |
-| SEC-44 | 中 | **退避状态文件读取未防护 → 植入即挂死/OOM**：`vault.lockout` 用 `fs::read_to_string` → 植入 **FIFO** 会让 `open` 阻塞在握手路径（无超时覆盖，实测挂死）；符号链接可重定向读取，超大文件可 OOM。vault 文件/`device.key`/`secret.key` 亦存在「读进内存后才判长度」的同类隐患 | vault-rs `lockout.rs`/`format.rs`/`device.rs`/`share.rs` | ❌ 未提 | 已修复（第八批补：新增 `safefile::read_regular_limited`——**读前**按元数据判长度 + 拒绝非普通文件；全部敏感读取改走它，退避状态异常一律视为「无锁定」）；回归 `test.sh` §13.5（FIFO / 符号链接→/dev/zero / 超大文件均正常解锁、不挂死） |
+| SEC-44 | 中 | **退避状态等敏感读取未防护**：异常文件可导致阻塞、读取重定向或 OOM | vault-rs `lockout.rs`/`format.rs`/`device.rs`/`share.rs` | ❌ 未提 | 已修复（第八批补：`safefile::read_regular_limited`——读前判长度 + 拒绝非普通文件；异常状态视为「无锁定」） |
 | SEC-45 | 中 | **并发保存的 tmp 互删竞争**（第八批自身引入）：`write_atomic` 的「清理陈旧 tmp」在 4 路真并发保存下会删掉别人正在用的 `<file>.tmp` → 实测 40 次写 2 次失败（`ENOENT`/`EEXIST`） | vault-rs `safefile.rs` | ❌ 未提 | 已修复（第八批补：临时名改为**进程唯一** `<file>.tmp.<pid>` + 兼容清理旧的可预测名；真并发 10 轮 40 次**全部成功、无残留**） |
 | SEC-42 | 低 | **「沙箱被攻破」语义未闭环**：主程序侧只有「vault **异常退出** → crash 标记 → `exit(86)`」；而**可观测的蓄意破坏**（加载器注入变量）此前只 `err`+退出码 1 → 被应用判为「主动报错，不联动」，不触发 fail-closed；文档亦未区分「可观测破坏 / 不可观测攻破 / 数据完整性失败」三类 | vault-rs `guard.rs`/`main.rs`；[vault_process.dart](../app/lib/services/security/vault_process.dart) | ⚠️ 未明确 | 已修复（第八批：新增 `SANDBOX_BREACH_EXIT = 87`——注入面被破坏时打印 `err` 后以 87 终止；应用侧 `markerForExit` 把 87 与信号终止同等判为 crash → `exit(86)` **连带主程序退出**；**明示不做**猜测式检测、**明示不删数据**；回归：`test.sh` 注入用例断言 87、`vault_process_v4_test` 断言 87→crash） |
 | SEC-41 | 中 | **沙箱只武装 `serve`**：`verify_and_arm()` 仅在 serve（与 seccomp 自检）调用 → `init-*`/`set-kdf`/`destroy`/`status` 等一次性命令**未硬化**（`PR_SET_DUMPABLE=1`、`RLIMIT_CORE` 默认（可产含口令的 core）、无 seccomp / Windows 无缓解）；`init-m2a` 还会在内存中持有恢复码，KDF 期间窗口可达秒级 | vault-rs `main.rs`/`guard.rs`；C# 同源 | ❌ 未提 | 已修复（第八批：拆出 `guard::harden_process()`，`main` **所有命令**入口先硬化；血缘校验仍仅 `serve`（保证打包布局下用户仍可手工 `destroy <dir>`）；新增 `selftest-seccomp list` 逐条验证 denylist；回归 13.1/13.2） |
@@ -440,194 +440,22 @@ OS 份额覆盖、vault 文件 DoS（`VaultLimits`）、uid 路径遍历（锚�
 
 ---
 
-## 8.5 第八批 · 红队复验证据（2026-10-12）
+## 8.5 红队复验结论（摘要）
 
-方法与边界：本地 Linux 原生 + `msvc-wine`/Wine（真实 Windows 产物）+ macOS SDK 交叉编译；
-仅在本机用户自有数据上做**非破坏性**验证（临时目录、探针二进制不入库）。
+> 细节与复现步骤不在公开文档展开；安全报告请按 [SECURITY.md](../SECURITY.md) 走私密渠道。
 
-**撬开的路径（修补前实测）**：
+复验范围：本机同用户、非破坏性，覆盖**内存驻留、文件系统落盘、沙箱完整性、宿主进程**四类路径。
+结论按处置结果记录，不列具体攻击步骤：
 
-| # | 手段 | 结果 |
+| 类别 | 结论 | 状态 |
 |---|---|---|
-| W1 | 非 vault 二进制直接 `CryptUnprotectData(<dataDir>/sshare.bin)` → 取 `ShareBundle` 偏移 6 起的 32B 主密钥 → Node `aes-256-gcm` 直解 `credentials.vault` | **成功**读出条目明文（不碰官方 vault、不碰口令、不走血缘/握手） |
-| W2 | `OpenProcess(PROCESS_VM_READ)` + `ReadProcessMemory` 遍历活动会话内存 | 命中主密钥 4 处、凭据明文 1 处、base64 3 处、`get` 响应串 2 处、**已删除条目 base64**（一次运行命中） |
-| X1 | `.tmp`/`.bak` 预置为符号链接 | 覆盖任意用户文件（canary 被写）；`.tmp` 场景 vault 文件被替换为符号链接（后续读写被重定向） |
-| X2 | `.tmp` 预置为 FIFO | `set` 后 12s 无响应且进程存活——保存路径**永久阻塞**（写路径无超时） |
-| L4 | 每次猜测前删除 `vault.lockout` | 12 次错误口令 0.93s（≈13 次/秒）无锁定（对照：有退避时 5 min/次，约 2 个数量级差距；属**已声明**残余） |
+| 内存 / core 泄露 | 宿主进程未硬化时可能带出已解密凭据（SEC-48） | 已修复：core 限制 + 父进程退出策略；同用户内存读取属已声明边界 |
+| 文件系统落盘 | 符号链接 / FIFO 预置攻击（SEC-37/38/44/45） | 已修复：普通文件校验 + 独占临时名 + 读侧长度上限 |
+| 沙箱完整性 | seccomp 名单逐条自检、一次性命令同样硬化（SEC-41/42） | 已修复并有回归 |
+| 同用户边界 | 同账号可读进程内存 / 删除退避状态 | **已声明残余**，非应用层可封闭 |
+| 方案切换 | 新库初始化后未验证“新口令可解锁”（SEC-48 随访） | 已修复：`verifyUnlock` 自验证 + 顺序调整 + 回归 |
 
-**修补后复验**：W1 仍成立（属 SEC-39 同用户边界，应用层不可封闭）；W2 的**已删除凭据残留降为 0 命中**、
-凭据明文 0 命中、`get` 响应串 0 命中（仅主密钥仍在会话内存中——`mlock` 防换页不防读）；X1/X2 **全部被拒**
-（`err 拒绝写入：…非普通文件`，canary 未被覆盖、vault 保持普通文件、FIFO 不再挂死）；L4 不变（已声明残余）。
-
-**反向发现（文档可收紧）**：Linux 侧 `PR_SET_DUMPABLE=0` 实测**强于**`vault-security-notes` 的表述——
-`ptrace`/`process_vm_readv` 返回 `EPERM`、`/proc/<pid>/{mem,maps,smaps,environ}` 返回 `EACCES`（该表述原是
-针对 Dart 主进程的）。
-
-**沙箱完整性（第八批复验）**：
-
-- **逐条生效性**：不只「过滤器是否装载」，而是对 denylist **每一条**被拒系统调用各 fork 一个子进程实际调用，
-  内核以 `SIGSYS` 终止才算生效 —— `archoera-vault selftest-seccomp list` 实测 `killed=33/33 failed=-`
-  （名单漂移 / 内核 ABI 差异会在该项暴露）；回归在 `test.sh` §13.2。
-- **覆盖所有命令**：SEC-41 修复后，`main` 入口即 `harden_process()`（mlock 配额 / `RLIMIT_CORE=0` /
-  `PR_SET_DUMPABLE=0` / seccomp / Windows 缓解）。实测一次性命令（`set-kdf`）采样：
-  `Seccomp: 2`、`/proc/<pid>/mem` `EACCES`、`Max core file size 0`；回归 §13.1。
-
-**「打爆沙箱是否会让 vault 自毁」——实测结论：不会**（回归 §13.3/§13.4）：
-
-| 打击方式 | 结果 |
-|---|---|
-| 活动会话 SIGKILL / SIGTERM / SIGSEGV | 凭据仍在、仍可解锁；**不产 core**（`RLIMIT_CORE=0` + `dumpable=0`） |
-| seccomp 违例（AF_INET socket → SIGSYS 自杀） | 数据未动 |
-| 篡改 / 截断 / 垃圾化 vault 文件 | `serve` 被拒，**文件未被删除**；复原后凭据完好 |
-| 篡改 / 删除 `device.key`（m2a/m2b） | 被拒或引导恢复码，**文件未被删除**；复原后可解锁 |
-| 篡改 `secret.key`（file 后端） | 被拒，文件未删除 |
-| `LD_PRELOAD` 注入 | 拒绝运行，数据未动 |
-| 重复 `init-*`（回滚路径） | 被拒，既有 vault 未被误删 |
-| **显式 `destroy`**（对照组） | 目录清空 —— **唯一**的数据销毁入口 |
-
-配套（应用层，[vault_process.dart](../app/lib/services/security/vault_process.dart)）：非预期退出只写 `crash`
-标记并 `exit(86)` 终止**主进程**（fail-closed），版本异常只删除**二进制副本**，二者都不触碰凭据数据；
-`data_destroyer.dart` 仅由安全设置面板按钮调用（用户显式动作）。
-
-**沙箱被破坏的语义（SEC-42，第八批定稿）**：
-
-| 类别 | 例子 | 行为 |
-|---|---|---|
-| **可观测的蓄意破坏** | 加载器注入变量（`LD_PRELOAD`/`LD_AUDIT`/`DYLD_INSERT_LIBRARIES`）；seccomp 违例（内核 `SIGSYS`） | vault **自毁**（退出码 87 / 信号）→ 应用 crash 标记 → `exit(86)` **连带主程序退出**，默认路径二进制副本一并删除 |
-| **不可观测的攻破** | 同用户 `ptrace` / 读 `/proc/<pid>/mem` | **不做检测**（内核层已拒绝、vault 无从感知；猜测式检测只会误报且拦不住真攻击）——防线是 `PR_SET_DUMPABLE=0`/`mlock`/静态链接 |
-| **数据完整性失败** | vault/`device.key` 被篡改、截断、垃圾化 | **只拒绝本次操作**（不联动、不删除）：可能是磁盘损坏，升级则会成为「丢个坏文件就让应用自杀」的 DoS 原语 |
-| **任何情况** | — | **绝不删除用户凭据**；销毁只有显式 `destroy`（或设置面板）一条路径 |
-
-**App 层文件访问（SEC-47，本轮收口）**：新增 `app/lib/utils/safe_file.dart` ——
-**读**要求「必须是普通文件」（`allowSymlink` 默认 true 以兼容把配置软链到 dotfiles 的用户，
-可显式关闭）+ 长度上限（拒绝超大文件 OOM）；**写**走「同目录随机唯一临时名 → `rename`」，
-使符号链接**只被替换、不被穿透**（此前 `writeAsStringSync` 会顺着链接覆盖目标，
-`data_destroyer` 的覆盖写更会把目标文件抹掉）；擦除器增加「仅普通文件」前置判定，
-`openSync` 型流式写先删同名路径再创建并不跟随校验。
-残余（如实）：纯 Dart 回退路径下 `dart:io` 无 `O_NONBLOCK`/`O_NOFOLLOW`，判定与读写之间有极窄 TOCTOU 窗口
-（需精确抢时）。**已落地**：平台桥接新增原生 `open(2)` 安全文件能力（`APL_CAP_SECURE_FILE`，ABI v4：
-`apl_file_read`/`apl_file_write_atomic`，`O_NOFOLLOW`/`O_NONBLOCK` + 打开后按句柄 `fstat` 判普通文件；写走独占
-临时名 + rename），能力可用时 `SafeFile` 自动切到原生后端，彻底关闭该窗口（见 docs/platform-native-bridge.md §3.2.1）。
-
-**并发语义（SEC-46，定稿「兼容并发」）**：不使用「最后写者获胜」（会静默丢更新）。写命令以
-**阻塞式跨进程独占锁**（`flock`/`LockFileEx`，内核唤醒、非轮询）保护「加载 → 改 → 保存」：
-多会话仍可交错执行（锁范围=单条命令），拿不到锁时在内核等待，**崩溃自动释放**，无陈旧锁；
-锁文件 `vault.lock` 永不删除（内容为空、非敏感面）。注意：握手路径的「取/建锚点」也取一次锁，
-故外部长期持锁会连带阻塞握手（受调用方超时约束）。
-
-**读写两侧的对称防护（收尾复查）**：写入侧统一 `O_CREAT|O_EXCL` 独占 + 进程唯一 tmp + 拒绝非普通文件
-（SEC-37/38/45）；读取侧统一 `read_regular_limited`（拒绝符号链接/FIFO/目录 + **读前**按元数据判长度，
-SEC-44）；容量上限在**写入前**校验（SEC-43）。三者共同消除「植入一个文件即可挂死/自锁/vOOM」这一类。
-
-**字节兼容锚点变更**：C# 版删除后，活体 oracle（互解互读）替换为**冻结黄金夹具**
-（`app/core/vault-rs/testdata/`；`test.sh` §14 + `test-windows.sh` §11 读回固定值）——比活体实现更稳、不需 .NET。
-
-**环境限制（如实标注）**：Wine 的 `CryptProtectData` 为固定密钥实现——换 `WINEPREFIX` 仍能解封同一
-`sshare.bin`，故 Wine 上的 DPAPI **不能**用于验证「用户绑定」；真机需复验（SEC-39 中「同用户任意进程可解封」
-的结论不依赖 Wine，来自「无 `pOptionalEntropy` → 仅绑定 OS 用户」的 API 语义）。
-
----
-
-## 8.6 第九批 · 红队复验（2026-10-14）：宿主进程未硬化 → core 泄露明文凭据（SEC-48）
-
-**授权背景**：维护者在自备机器上、以自己的账号登录流媒体后，授权对 vault 做同用户「撬锁」复验
-（目标：从 **m2a**（口令 + `device.key` + 恢复码）容器里取出明文凭据）。**全程本机、只读式尝试、不外传、真实密钥不外泄**。
-
-**结论**：vault 本体（容器格式 / Argon2id / 沙箱 / 血缘校验 / 退避）**没有被绕过**；
-最短路径落在**宿主进程**——它必须持有已解密的凭据，却没有做进程硬化。
-
-**复现（同用户，无需口令 / 设备因子 / 恢复码；也无需 ptrace）**
-
-```bash
-pid=$(pgrep -x archoera_music)          # 应用宿主进程
-kill -SEGV "$pid"                       # 同用户可对自身进程发信号；内核据 core_pattern 产 core
-coredumpctl dump "$pid" -o /tmp/core    # systemd-coredump 落盘并对属主附加可读 ACL
-# 或直接读 /var/lib/systemd/coredump/core.<name>.1000.*.zst（ACL: user:<uid>:r--）
-grep -a -oE 'MUSIC_U=[^;]{6,}' /tmp/core
-```
-
-**实测结果（脱敏）**：core 内命中 **`MUSIC_U=00C…`、`__csrf=b07…`、`_ntes_nuid=afc…`** 等明文
-（应用进程 RSS 仅 ~307 MiB，core 16 MiB 即够）。即：**m2a 的三因子被整体绕过**；
-且 core **落盘**使泄露超出进程生命周期（退化为 L1 磁盘取证 / 备份泄露）。
-对照：vault 子进程本就硬化（`PR_SET_DUMPABLE=0` + `RLIMIT_CORE=0`）——缺的是**持有明文的宿主**。
-
-**修复（同批落地）**：平台桥接新增 ABI `apl_harden_process()`，三端后端实现：
-
-| 平台 | 措施 |
-|---|---|
-| Linux | `setrlimit(RLIMIT_CORE, 0)`（本进程 + 子进程继承）→ 禁 core |
-| macOS | `setrlimit(RLIMIT_CORE, 0)` → 禁 core |
-| Windows | 关闭 WER 崩溃转储/错误框（`SetErrorMode` + `WerSetFlags(NO_UI)`，best-effort） |
-
-Dart 侧在 `PlatformBindings.tryLoad()` 里 `apl_init` 成功**后立即**调用（早于任何凭据进入内存）；
-**release 构建生效**（debug 保留调试/产核能力，避免阻碍开发）。
-
-**复验（A/B 对照，决定性）**：`bash -c 'ulimit -c 0; kill -SEGV $$'` → `coredumpctl` 状态 **`none`**
-（"terminated abnormally **without generating a coredump**"）；对照组 `ulimit -c unlimited` → **`present` 56K**
-（"dumped core"）。即 `RLIMIT_CORE=0` 对**管道式** `core_pattern`（systemd-coredump）同样生效，应用进程同样观测到
-`without generating a coredump`。注意 `coredumpctl list` 的**条目数会 +1**（那是一条**无内容**的日志记录，
-status 列为 `none`），不能只看条数——须看 `info` 的 size/message。
-
-**首版矫枉过正与撤回（同日回归 → 修正）**：首版同时设了 `PR_SET_DUMPABLE=0`（macOS 为 `PT_DENY_ATTACH`），
-实测**打断 vault 的父进程血缘校验**——vault 在打包布局下要读 `/proc/<ppid>/exe` 与预期主程序比对，而
-`dumpable=0` 让**子进程**也读不到父进程的 `/proc/pid/exe`（内核 `ptrace_may_access` 语义；最小复现：
-父进程 `PR_SET_DUMPABLE=0` 后 `fork()`，子进程 `readlink("/proc/<父pid>/exe")` → `EACCES`），
-于是握手报 `独立运行被拒：无法读取父进程可执行文件路径`，**凭据库整体不可用**（登录态无法持久化）。
-故最终形态**只保留禁 core**：core 落盘是本次实测**唯一**能真正绕过 vault 的持久化路径，且与血缘校验无冲突；
-同用户直接读内存（`ptrace`/`process_vm_readv`/`/proc/pid/mem`）属 **SEC-25 已声明残余**（Linux 侧由
-`kernel.yama.ptrace_scope=1` 阻断、macOS 侧由 `task_for_pid` 默认需 root/entitlement 阻断，无法在普通用户
-权限内强制，尤其 `ptrace_scope=0` 的发行版）。**结论：安全机制之间不能互相拆台**——加固不得使既有防线失效。
-
-**第二轮复验（2026-10-14，登录态下重新撬锁）**：加固后按同一路径重打 ——
-`kill -SEGV` 后 `systemd-coredump` 明确记 **"terminated abnormally without generating a coredump"**，
-`/var/lib/systemd/coredump` **无文件**、`coredumpctl dump` 仅回 994B **元数据记录**（已扫描：无凭据特征）✓；
-`/proc/<pid>/mem` 与 `process_vm_readv` 被内核拒（`kernel.yama.ptrace_scope=1`）✓；
-`/proc/<pid>/environ`/磁盘/日志/prefs 均无明文 ✓；MCP（keyless）工具面无凭据通道
-（`get_preferences` 对含 `key/secret/token/password/cookie/credential` 的键一律剔除）✓。
-**意外发现（非漏洞、但文档定性偏高）**：vault 的**进程血缘校验可被绕过** —— 把 `archoera-vault`
-复制到非 `native/` 目录即按 "dev/测试布局" 跳过校验（实测）；但**因子仍挡住**（无口令/恢复码
-报 `m2a 需要 handshake <口令>`）。故已在 credential-vault-plan §3.5 把「双因子：进程血缘 + 主密钥持有」
-更正为「纵深两层，真正的门＝主密钥持有」，与代码注释一致。
-
-**残余（如实声明）**：
-
-1. **同用户运行期注入仍是硬上限**（SEC-25 已声明）：能 `LD_PRELOAD`/替换二进制/在加固前取得执行权的攻击者，
-   仍可在硬化的进程内读内存——加固消除的是「**已退出进程的磁盘快照**」与「**非父进程 ptrace**」两条**可避免的放大器**。
-2. **同用户读内存（Linux `ptrace_scope=0` / 无 Yama 的发行版）**：未设 `PR_SET_DUMPABLE=0`（见上「撤回」），
-   该路径依赖内核 `kernel.yama.ptrace_scope=1`；建议发行版/文档引导用户保持默认 1（我们无权修改系统 sysctl）。
-3. **Windows 无 Linux `PR_SET_DUMPABLE` 等价物**：转储是否落盘取决于系统 WER 策略（best-effort 抑制，非强制）。
-4. **debug 构建不硬化**：生产（release）路径生效；对 debug 产物的取证不在威胁模型内。
-5. **辅助进程**：子进程 fork 继承 `RLIMIT_CORE=0`；vault 另行自硬化。Dart `String` 不可 zeroize（SEC-03 残余）仍在。
-
-**同批附带复验（低危，纵深）**：MCP 控制服务 `mcp.allowKeyless=true` → 本机任意进程可无密钥读库/控制播放
-（Playback/库统计实测可读）。浏览器侧已由 **Origin allowlist** 挡住（伪造 `Origin: https://evil.example` → 403），
-但 **Host 未校验**（`Host: evil.example.com` 仍 `200`）——DNS rebinding 的前置条件。建议：默认关闭 keyless，
-并校验 `Host` 属于本机白名单（纵深防御，非阻塞项）。
-
----
-
-## 8.7 第九批随访（2026-10-14）：方案切换的「新库口令对不上」丢库风险
-
-**现场（维护者本机实测）**：m2a 方案一次切换后，用户输入口令解锁持续报
-`SHARE_MISMATCH AES-256-GCM 认证失败`，最终触发退避锁定。取证：容器在切换时刻被**重新初始化**
-（2535B→322B、新 `vault_id`/`device.key`/锚点/标记，槽=口令+设备 / 恢复码，条目=1），
-`prefs.security.scheme=m2a`、`m2aRecoveryAcked=true` —— 即**切换成功执行完**（旧库按设计被销毁，
-切换对话已明示），但**新库的口令与用户以为的不一致**（或用户未改用新口令）。
-
-**机理**：切换流程是「快照 → `destroy`（旧库/份额一并销毁）→ `init` 新方案 → `discard` 快照」。
-初始化成功后**没有任何验证**证明「新库能被刚输入的口令解开」；一旦不一致，旧库已销毁 →
-只能靠 m2a **恢复码**（`HKDF(恢复码, salt, RECOVERY_INFO)`，**不依赖口令与 `device.key`**，
-见 `vault-rs/src/service.rs` m2a `rec` 分支 + 单测「device.key 丢失后恢复码解锁」）或重建。
-
-**修复**（同批落地）：
-1. `VaultProcess.verifyUnlock(dataDir, password:)`：`init` 成功后**立即用刚输入的口令做一次真实解锁往返**；
-   失败 → 抛错 → 现有 `catch` 回滚快照（**旧库原封不动**，并提示「已回滚，旧库未动」）。
-2. 顺序改为 **`setCredentialScheme` → `discard`**：即使中断/崩溃也不会留下「容器是新的、pref 是旧的」。
-3. 回归：`vault_process_v4_test.dart`「verifyUnlock 自验证：正确口令通过 / 错误口令抛错」。
-4. 恢复码仍是最后兜底（界面已有「用恢复码解锁」入口，`VaultUnlockGate`）。
-
-**残余**：`destroy` 删除的**系统钥匙串份额**（crypto 模式）仍在进程外、无法随快照回滚——故 crypto
-切换前置 `canInitCrypto()` 预检（临时目录探测，不触碰真实库）；其余方案的 `destroy` 均在快照内可回滚。
+**原则**：任何异常路径都只拒绝本次操作，**绝不删除用户凭据**；销毁仅保留显式 `destroy` / 设置面板一条路径。
 
 ---
 
