@@ -10,16 +10,12 @@ import 'package:flutter/animation.dart';
 /// 观感「先慢、中间急、最后顿」。这里换成单峰、偏线性的 ease-out：
 /// 起步斜率约为匀速的 2 倍，前 1/4 时间走完约 47% 位移，后段平滑收尾，
 /// 整条曲线的速度变化比原 S 形更均匀。
-///
-/// 播放页上滑（`/player` 路由）与壳层收缩（`ShellExpandTransition`）共用
-/// 同一条曲线，保证两者逐帧同步。
 const Curve kPlayerRouteOpenCurve = Cubic(0.25, 0.5, 0.45, 0.95);
 
 /// 播放页进/出转场时长（展开与收起同值）。
 ///
 /// 原为 500ms（对齐 Web 版），实机观感偏拖沓；降到 350ms 后起步更利落，
-/// 仍保留足够位移让上滑/下滑可读。路由（`/player`）与壳层共用此值，
-/// 两者不会脱拍。
+/// 仍保留足够位移让上滑/下滑可读。
 const Duration kPlayerRouteTransitionDuration = Duration(milliseconds: 350);
 
 /// 全屏播放页收起曲线（路由动画 1 → 0）：**先慢后快**。

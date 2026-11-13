@@ -239,6 +239,9 @@ extension _PlayerPageView on _PlayerPageState {
                                             : null,
                                         onSelectQuality: notifier.setQuality,
                                         onToggleFullscreen: _toggleFullscreen,
+                                        borderless:
+                                            prefs.windowDecor ==
+                                            WindowDecor.borderless,
                                       ),
                                     ),
                                   ),
@@ -311,6 +314,7 @@ class _PlayerTopBar extends StatelessWidget {
     required this.onToggleLyrics,
     required this.onSelectQuality,
     required this.onToggleFullscreen,
+    required this.borderless,
   });
 
   final AppLocalizations l10n;
@@ -331,72 +335,76 @@ class _PlayerTopBar extends StatelessWidget {
   final ValueChanged<String> onSelectQuality;
   final Future<void> Function() onToggleFullscreen;
 
+  /// 无边框窗口：顶栏空白处整行可拖动窗口（窗口按钮不放播放页）。
+  final bool borderless;
+
   @override
   Widget build(BuildContext context) {
+    final row = Row(
+      children: [
+        IconButton(
+          tooltip: l10n.playerBarCollapsePlayer,
+          onPressed: onClose,
+          icon: const Icon(EtaIcons.downSmall),
+          iconSize: 32,
+        ),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: showLyrics
+              ? l10n.playerBarHideLyrics
+              : l10n.playerBarShowLyrics,
+          child: InkResponse(
+            radius: 24,
+            onTap: onToggleLyrics,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                EtaIcons.fileMusicOutline,
+                size: 26,
+                color:
+                    (showLyrics
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant)
+                        .withValues(
+                          alpha: onToggleLyrics == null
+                              ? 0.35
+                              : (hasLyrics ? 1 : 0.35),
+                        ),
+              ),
+            ),
+          ),
+        ),
+        const Spacer(),
+        const _SleepTimerButton(),
+        // 当前曲目可切音质档位（Neko 自可选音质流起同样支持）。
+        if (current != null)
+          QualityMenu(
+            levels: qualityLevels,
+            current: quality,
+            onSelected: onSelectQuality,
+          ),
+        // 播放页内快速切换布局（与设置里的「封面布局」同一份偏好）。
+        _LayoutMenuButton(
+          l10n: l10n,
+          currentId: layoutId,
+          onSelected: onSelectLayout,
+        ),
+        Tooltip(
+          message: isFullScreen
+              ? l10n.playerBarExitFullscreen
+              : l10n.playerBarFullscreen,
+          child: IconButton(
+            onPressed: onToggleFullscreen,
+            icon: Icon(
+              isFullScreen ? EtaIcons.fullscreenExit : EtaIcons.fullscreen,
+            ),
+          ),
+        ),
+      ],
+    );
     return SizedBox(
       height: 56,
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: l10n.playerBarCollapsePlayer,
-            onPressed: onClose,
-            icon: const Icon(EtaIcons.downSmall),
-            iconSize: 32,
-          ),
-          const SizedBox(width: 4),
-          Tooltip(
-            message: showLyrics
-                ? l10n.playerBarHideLyrics
-                : l10n.playerBarShowLyrics,
-            child: InkResponse(
-              radius: 24,
-              onTap: onToggleLyrics,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Icon(
-                  EtaIcons.fileMusicOutline,
-                  size: 26,
-                  color:
-                      (showLyrics
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant)
-                          .withValues(
-                            alpha: onToggleLyrics == null
-                                ? 0.35
-                                : (hasLyrics ? 1 : 0.35),
-                          ),
-                ),
-              ),
-            ),
-          ),
-          const Spacer(),
-          const _SleepTimerButton(),
-          // 当前曲目可切音质档位（Neko 自可选音质流起同样支持）。
-          if (current != null)
-            QualityMenu(
-              levels: qualityLevels,
-              current: quality,
-              onSelected: onSelectQuality,
-            ),
-          // 播放页内快速切换布局（与设置里的「封面布局」同一份偏好）。
-          _LayoutMenuButton(
-            l10n: l10n,
-            currentId: layoutId,
-            onSelected: onSelectLayout,
-          ),
-          Tooltip(
-            message: isFullScreen
-                ? l10n.playerBarExitFullscreen
-                : l10n.playerBarFullscreen,
-            child: IconButton(
-              onPressed: onToggleFullscreen,
-              icon: Icon(
-                isFullScreen ? EtaIcons.fullscreenExit : EtaIcons.fullscreen,
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: borderless ? WindowDragArea(child: row) : row,
     );
   }
 }

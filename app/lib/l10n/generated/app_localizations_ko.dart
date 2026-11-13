@@ -1893,6 +1893,47 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsFloatingBarOff => '전체 너비 도킹（기본）';
 
   @override
+  String get settingsSectionWindow => '창';
+
+  @override
+  String get settingsWindowDecor => '창 장식';
+
+  @override
+  String get settingsWindowDecorDesc =>
+      '테두리 없음: 콘텐츠가 창 전체를 채우고 창 버튼이 상단 표시줄에 통합됩니다.';
+
+  @override
+  String get settingsWindowDecorSystem => '시스템 기본';
+
+  @override
+  String get settingsWindowDecorCaption => '사용자 지정 제목 표시줄';
+
+  @override
+  String get settingsWindowDecorBorderless => '테두리 없음';
+
+  @override
+  String get settingsWindowDecorNote => '즉시 적용됩니다. 제목 표시줄이 이상하면 앱을 다시 시작하세요.';
+
+  @override
+  String get settingsWindowControlsAutoHide => '창 버튼 자동 숨기기';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      '「테두리 없음」에만 적용됩니다. 커서를 오른쪽 위 모서리로 이동할 때만 표시됩니다. 터치 사용자는 클릭할 수 없습니다. 기본값은 꺼짐입니다.';
+
+  @override
+  String get windowMinimize => '최소화';
+
+  @override
+  String get windowMaximize => '최대화';
+
+  @override
+  String get windowRestore => '이전 크기로';
+
+  @override
+  String get windowClose => '닫기';
+
+  @override
   String get settingsSectionFont => '인터페이스 글꼴';
 
   @override

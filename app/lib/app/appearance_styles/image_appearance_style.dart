@@ -32,20 +32,25 @@ class ImageAppearanceStyle extends AppearanceStyle {
     final path = prefs.backgroundImage;
     if (path == null) return null;
     if (path.isEmpty) return const SizedBox.shrink();
-    // 背景铺满全屏又带模糊/遮罩，无需原图全分辨率：按屏幕物理尺寸解码，
+    // 背景铺满全屏又带模糊/遮罩，无需原图全分辨率：按屏幕长边解码，
     // 大壁纸（4K+）可省数 MB 解码位图内存。
+    //
+    // 必须用 `ResizeImagePolicy.fit`：同时指定宽高 + exact（默认）会像
+    // `BoxFit.fill` 一样**拉伸**源图，窗口比例变化后背景会变形；fit 在
+    // 保持原图宽高比的前提下缩到长边上限，后续由烘焙层按 cover 裁切。
     final screen = MediaQuery.sizeOf(context);
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    final decodeW = (screen.width * dpr).round().clamp(1, 2560);
-    final decodeH = (screen.height * dpr).round().clamp(1, 2560);
+    final decodeMax = (screen.longestSide * dpr).round().clamp(1, 2560);
     return ClipRect(
       // 一次性烘焙成静态纹理：避免实时 `ImageFiltered` 在每帧重算全屏模糊
       // （Impeller 无图层光栅缓存，见 [BakedImageBackground]）。
       child: BakedImageBackground(
-        provider: ResizeImage.resizeIfNeeded(
-          decodeW,
-          decodeH,
+        provider: ResizeImage(
           FileImage(File(path)),
+          width: decodeMax,
+          height: decodeMax,
+          policy: ResizeImagePolicy.fit,
+          allowUpscaling: false,
         ),
         blurSigma: prefs.backgroundBlur.toDouble(),
         scale: prefs.backgroundScale,

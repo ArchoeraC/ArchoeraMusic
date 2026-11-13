@@ -16,6 +16,7 @@ import '../../l10n/l10n.dart';
 import '../../widgets/dialogs/track_context_menu.dart';
 import '../../widgets/list/cover_grid.dart';
 import '../../widgets/list/song_list.dart';
+import '../../widgets/common/smooth_wheel_scroll_controller.dart';
 import 'detail_scaffold.dart';
 
 part 'artist_detail/artist_detail_page_actions.dart';
@@ -39,10 +40,19 @@ class _StreamingArtistDetailPageState
   String? _error;
   bool _loading = true;
 
+  /// 页面纵向滚动控制器：滚轮 / 触控板带与列表一致的弹簧跟随。
+  final ScrollController _scroll = SmoothWheelScrollController();
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   void _startLoading() {

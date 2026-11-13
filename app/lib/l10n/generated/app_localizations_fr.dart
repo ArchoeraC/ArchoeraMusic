@@ -1968,6 +1968,49 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsFloatingBarOff => 'Ancré pleine largeur（par défaut）';
 
   @override
+  String get settingsSectionWindow => 'Fenêtre';
+
+  @override
+  String get settingsWindowDecor => 'Décoration de fenêtre';
+
+  @override
+  String get settingsWindowDecorDesc =>
+      'Sans bordure : le contenu remplit la fenêtre et les boutons sont intégrés à la barre supérieure.';
+
+  @override
+  String get settingsWindowDecorSystem => 'Système';
+
+  @override
+  String get settingsWindowDecorCaption => 'Barre de titre personnalisée';
+
+  @override
+  String get settingsWindowDecorBorderless => 'Sans bordure';
+
+  @override
+  String get settingsWindowDecorNote =>
+      'Prise en compte immédiate ; redémarrez lapplication si la barre de titre saffiche mal.';
+
+  @override
+  String get settingsWindowControlsAutoHide =>
+      'Masquer automatiquement les boutons de fenêtre';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      'S’applique uniquement à « Sans bordure » ; affiché seulement lorsque le curseur se déplace dans le coin supérieur droit. Les utilisateurs tactiles ne peuvent pas cliquer. Désactivé par défaut.';
+
+  @override
+  String get windowMinimize => 'Réduire';
+
+  @override
+  String get windowMaximize => 'Agrandir';
+
+  @override
+  String get windowRestore => 'Restaurer';
+
+  @override
+  String get windowClose => 'Fermer';
+
+  @override
   String get settingsSectionFont => 'Police d\'interface';
 
   @override
