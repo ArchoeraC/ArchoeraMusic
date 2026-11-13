@@ -144,10 +144,31 @@ jobs:
       build_matrix: ${{ steps.sel.outputs.build_matrix }}
       all_selected: ${{ steps.sel.outputs.all_selected }}
     steps:
+      # 夜间构建去重：当前提交与 `nightly` 标签相同 → 直接跳过（不构建、不发布）。
+      # 手动派发不跳过（可强制重建同一提交）。
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 1
+      - id: nc
+        shell: bash
+        run: |
+          set -euo pipefail
+          skip=false
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            prev=$(git ls-remote origin refs/tags/nightly | awk '{print $1}')
+            echo "nightly tag: ${prev:-<none>} / HEAD: ${GITHUB_SHA}"
+            if [ -n "$prev" ] && [ "$prev" = "$GITHUB_SHA" ]; then
+              echo "自上次 Nightly 以来无新提交，跳过本轮夜间构建"
+              skip=true
+            fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
       - id: sel
         shell: bash
         env:
           EV: ${{ github.event_name }}
+          NIGHTLY_SKIP: ${{ steps.nc.outputs.skip }}
           IN_MACOS: ${{ inputs.macos }}
           IN_WINDOWS: ${{ inputs.windows }}
           IN_LINUX_DEB: ${{ inputs.linux_deb }}
@@ -160,6 +181,19 @@ jobs:
         run: |
           set -euo pipefail
           truthy() { case "${1:-}" in true|TRUE|True|1|yes|YES) echo true ;; *) echo false ;; esac; }
+          if [ "${NIGHTLY_SKIP:-false}" = "true" ]; then
+            # 夜间去重命中：输出全 false（所有构建作业跳过，nightly 也不会发布）。
+            {
+              echo "macos=false"; echo "windows=false"
+              echo "linux_deb=false"; echo "linux_deepin=false"
+              echo "linux_rpm=false"; echo "linux_arch=false"
+              echo "linux_appimage=false"; echo "linux_flatpak=false"
+              echo "linux_nix=false"; echo "all_selected=false"
+              echo 'build_matrix=[{"os":"none","runner":"ubuntu-latest","zig_archive":"","arch":"","rid":"","artifact":""}]'
+            } >> "$GITHUB_OUTPUT"
+            echo "── Nightly 去重：跳过全部平台 ──"
+            exit 0
+          fi
           if [ "$EV" = "push" ] || [ "$EV" = "schedule" ]; then
             # tag 发版 / 夜间构建：忽略点菜、强制全选（必须全平台）。
             MACOS=true; WINDOWS=true; DEB=true; DEEPIN=true; RPM=true
@@ -1243,6 +1277,8 @@ jobs:
   # =====================================================================
   #  nightly：定时构建三端产物，滚动覆盖到固定 `nightly` prerelease。
   #  - 仅 schedule（或手动勾选 nightly）触发；tag 发版走 release 作业。
+  #  - 前置：`needs` 中全部平台作业成功（全平台 CI 全绿）才会执行发布；
+  #    任一平台失败/跳过 → 本作业自动跳过，不移动 nightly 标签。
   #  - 通道由 workflow 级 ARCHOERA_CHANNEL 统一设为 3（Nightly）。
   #  - 每次覆盖同名 prerelease，不产生版本 tag，不参与 v* 发版。
   # =====================================================================
