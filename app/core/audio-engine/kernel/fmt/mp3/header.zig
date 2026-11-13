@@ -3,13 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! MPEG Audio 帧头解析（对齐 minimp3 hdr_* 宏语义）。
-//!
-//! 4 字节帧头：[sync 11][version 2][layer 2][protection 1][bitrate 4]
-//!            [samplerate 2][padding 1][private 1][channel_mode 2][mode_ext 2][copyright 1][original 1][emphasis 2]
-//!
-//! 注意：layer 编号遵循 minimp3/libmad：Layer III=1, Layer II=2, Layer I=3。
-
 const std = @import("std");
 
 pub const LAYER_III: u8 = 1;

@@ -3,17 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Ogg 容器内 FLAC 流（Ogg-FLAC mapping，RFC 5334）
-//!
-//! 文档（docs/audio-kernel-zig.md §9.3）：Ogg-FLAC 首个 packet =
-//! `0x7F "FLAC"` + version(1) + header_packet_type(1=0 fLaC) + `"fLaC"` + metadata
-//! blocks（STREAMINFO 必须居首）；后续每个 packet = 一个完整 FLAC 音频帧。
-//!
-//! 接入方式：用 `fmt/ogg.zig` Demux 逐包取帧，通过 **callback Reader**
-//! （`io.Reader` on_read/on_seek 回调）把剥离映射头后的 packet1（"fLaC"+blocks）
-//! 与后续帧拼接成连续字节流，喂给现有 `fmt/flac/lib.zig` 解码器 —— 元数据
-//! （VORBIS_COMMENT/PICTURE/时长）与帧解码全部复用，零代码重复。
-
 const std = @import("std");
 const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");

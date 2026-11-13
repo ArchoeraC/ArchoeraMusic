@@ -3,52 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! M4A（ISO-BMFF / MP4）容器解复用 —— 自研 Zig
-//!
-//! 定位（docs/audio-kernel-zig.md §9.8）：MP4 容器内音频解复用，覆盖
-//! ALAC / AAC-LC（原生路径）+ FLAC('fLaC') / Opus('Opus') / AC-3('ac-3') /
-//! E-AC-3('ec-3') / MP3('.mp3') / ALS('mp4a'+esds AOT_ALS，codec mp4als，
-//! 委托路径)。**每个 m4a sample = 一个压缩帧**（ALS 允许一包多帧，委托
-//! 解码器按帧长自切）。
-//!
-//! 两路解码语义：
-//!   - 原生：ALAC（alac.decodeFrame）与 AAC-LC（raw_data_block）逐 sample 解码；
-//!   - 委托（照 fmt/mka 成功模式）：stsd codec-private（dfLa STREAMINFO / dOps
-//!     OpusHead / esds DecoderSpecificInfo→ALSSpecificConfig）→ 内存合成 inner
-//!     解码器可消费的流（flac 头+帧 / opus Ogg / ac3-eac3-mp3 帧直拼 / ALS 帧流
-//!     直拼），帧解码复用 fmt/flac、fmt/opus、fmt/ac3、fmt/mp3、fmt/als。
-//!   elst 容器语义对齐 验收基准 mov demuxer：media_time = 起始 priming（opus 由
-//!   OpusHead pre-skip 承担），segment_duration = 输出上限（opus mp4 无 granule，
-//!   验收基准 解码至 EOF，不截断）。
-//!
-//! 容器结构（ISO/IEC 14496-12 / QuickTime）：
-//!   - 顶层 box：ftyp / moov / mdat / free…（box = size(4 BE) + type(4)，可嵌套；
-//!     size==1 → 后接 8 字节 largesize；size==0 → 延伸至父 box 末尾）；
-//!   - moov → trak → mdia → minf → stbl：
-//!       stsd —— sample description（'alac' 子 box = 36 字节 magic cookie；
-//!               'mp4a'+esds(ASC)；'fLaC'+dfLa(FLAC metadata block)；
-//!               'Opus'+dOps(OpusSpecificBox)；ac-3/ec-3/.mp3 自同步无需私有）；
-//!       stts —— time-to-sample（样本→时长映射，提供总样本数与逐帧样本数）；
-//!       stsc —— sample-to-chunk（样本↔chunk 映射 run 表）；
-//!       stco/co64 —— chunk 文件偏移（32/64 位）；
-//!       stsz —— 样本大小（等长或逐样本）。
-//!
-//! 解析策略：
-//!   - moov 未必在 mdat 之前（验收基准 兼容），顶层按 box size 精确跳转扫描；
-//!   - 遍历全部 trak，取首个受支持 codec 条目的音频轨（跳过视频轨）；
-//!   - stsc/stco/stsz 三表结合生成线性 sample 表（offset, size）；
-//!   - stts run 展开为逐帧累计样本偏移（frame_offsets），支撑精确整帧 seek
-//!     与时长计算（总样本数 = frame_offsets[末位]）。
-//!
-//! 分片 MP4（fMP4，B 站 DASH `.m4s` 音轨）：moov 样本表为空，媒体样本全在
-//! moof 分片里。顶层扫描 moof → traf → tfhd/trun（trex 兜底默认时长/大小），
-//! 按 track_ID 匹配音频轨，生成与 stbl 路径同构的线性样本表（含逐帧时长 →
-//! frame_offsets），解码/seek 逻辑完全复用。无分片可解析 → UnsupportedFormat。
-//!
-//! 读取（VTable.read）：原生路径逐 sample 解码（坏帧 Corrupt → 跳过继续，
-//! 对齐 FLAC 重同步语义，§13.3；整段无产出时 Corrupt 透出）；委托路径从
-//! inner 拉帧并应用 elst priming/上限。EOF = sample 索引耗尽 / inner EOF。
-
 const std = @import("std");
 const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");

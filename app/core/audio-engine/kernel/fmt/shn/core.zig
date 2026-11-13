@@ -7,26 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Shorten (.shn, 无损) 解码核心（逐句对齐 FFmpeg n9.0.1 libavcodec/shorten.c）。
-//!
-//! 语义要点（纯整数、无浮点）：
-//!   - 位流为 **MSB-first**（GetBitContext 默认大端位序，与 TTA 的 LE 相反）；
-//!   - Rice 码用 get_ur_golomb_jpegls(limit=INT_MAX, esc_len=0) 语义：
-//!     unary 前缀（数 0 直到 1，1 被消耗）+ k 位二进制后缀（MSB-first）；
-//!     符号版 get_sr_golomb_shorten 用 k+1 位参数 + zigzag 映射
-//!     （(u>>1) ^ -(u&1)，uint32 回绕域）；
-//!   - 固定预测（FN_DIFF0..3，阶 0-3）与 FN_QLPC（系数 get_sr_golomb_shorten
-//!     (LPCQUANT=5) 定点量化，qshift=5，v2+ 预测加 lpcqoffset=32）；
-//!   - 溢出/符号语义完全复刻 C：int32/uint32 回绕、算术右移、
-//!     coffset/means 的混合 unsigned 加法 + 有符号除法向零取整；
-//!   - 命令流：每命令 get_ur_golomb_shorten(FNSIZE=2) 读函数码；
-//!     is_audio_command = {1,1,1,1,0,0,0,1,1,0}；块 = channels 个音频命令
-//!     （每命令一通道）→ 输出一帧交错 PCM；未知命令 = 本块中止复位重来
-//!     （与 验收基准 分包 decode 调用语义逐位等价，见 nextBlock）。
-//!
-//! EOF 边界：越界读按零填充（GetBitContext 缓冲零填充语义），
-//! bit_pos 可越过 size_in_bits（get_bits_left 可为负，与 C 一致）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

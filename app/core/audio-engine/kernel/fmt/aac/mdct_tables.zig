@@ -7,16 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! MDCT 辅助表——由 FFmpeg n9.0.1 同款公式（tx_template.c ff_tx_mdct_gen_exp /
-//! tx.c split_radix_permutation / twiddle tab）在本机以 double 精度计算后
-//! 按精确位模式嵌入（mdctdump.c 探针，LGPL 参考对照产物）。
-//!
-//! 布局说明：
-//!   - mdct_exp_<N>：[permuted(n2) | raw(n2)] 复数，re/im 交错 f32。
-//!     permuted[i] = raw[map_pre[i]]（gather revtab，inv=1）；
-//!   - mdct_map_<N>：fold 用 gather map（未翻倍；运行时 <<1）；
-//!   - fft_tab_<M>：tab[i]=(float)cos(i*2π/M)，i ∈ [0, M/4]，共 M/4+1 项。
-
 pub const mdct_exp_1024 = [2048]f32{
     @bitCast(@as(u32, 0x393504F2)), @bitCast(@as(u32, 0x338E2C19)), @bitCast(@as(u32, 0x38FFE6DD)), @bitCast(@as(u32, 0x39000C90)),
     @bitCast(@as(u32, 0x388A6AFD)), @bitCast(@as(u32, 0x39274441)), @bitCast(@as(u32, 0x392736A7)), @bitCast(@as(u32, 0x388AACAA)),

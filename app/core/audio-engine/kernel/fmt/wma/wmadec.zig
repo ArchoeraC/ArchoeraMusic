@@ -7,19 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA v1/v2 解码核心——逐位移植 FFmpeg libavcodec wmadec.c + wma.c（n9.0.1）。
-//!
-//! 覆盖：flags2 仅允许固定块长路径（bit_reservoir=0x2 / use_variable_block_len
-//! =0x4 拒绝，ffmpeg 编码器从不置位，见 encode_init flags2=1）；指数可用
-//! LSP（exp_vlc=0，历史文件 t.wma）或 AAC 标度因子 VLC（exp_vlc=1，ffmpeg 编码
-//! 器恒为 1）；`use_noise_coding` 由 sample_rate1/bps 依 wma.c 规则导出（低码率
-//! ffmpeg 可触发，本实现含噪声带/噪声表全路径）；frame_len 依
-//! ff_wma_get_frame_len_bits(sr, version) 取 512/1024/2048。
-//!
-//! 喂入：block_align 字节 superframe；输出：每 superframe 一帧 frame_len 采样
-//! × 声道（f32 交错，由调用方排布）。frame_len 2048 用 av_tx 位精确 IMDCT；
-//! 1024/512 用通用数学路径（f64，误差 <1e-6，见 wma_mdct.mdctInvFullMath）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const tab = @import("wmadata.zig");

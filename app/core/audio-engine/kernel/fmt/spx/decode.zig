@@ -3,26 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Speex CELP 核心解码（对照移植 FFmpeg `libavcodec/speexdec.c`，n9.0.1 native
-//! speex 解码器，浮点路径）。
-//!
-//! 移植约定（保证与 C 实现逐样本一致）：
-//!   - 所有浮点运算保持 C 源的求值顺序（Zig 严格浮点，无 FMA 收缩/重结合）；
-//!   - `@exp`/`@cos`/`@sqrt` 链接 libc 时解析到与 ffmpeg 相同的 glibc libm；
-//!   - 表数据自 reference/FFmpeg/libavcodec/speexdata.h 逐值转录（data.zig）；
-//!   - exc_buf 以「基址 + 有符号偏移」访问，等价 C 的 exc 指针负回看。
-//!
-//! 参考基准（2026-09）：正确性验收以 **ffmpeg 内嵌 libspeex**（`-c:a libspeex`）为准
-//! （scorecard speex 行）。native 与 libspeex 在 WB/UWB 上存在实质差异，本模块在
-//! 保留 NB(mode0) native 逐位锚点的同时，按 libspeex 语义对齐 WB/UWB：
-//!   - WB/UWB 低带 NB 解码器 `is_wideband=1` → 低带输出走 **wideband 高通**
-//!     （libspeex `sb_decoder_init` 对低层 SET_WIDEBAND；native 误用 narrowband）；
-//!   - 高带 `subframe_size==80` 的 gc 增益用 `1.4142f`（libspeex QCONST16，
-//!     native 用 double `M_SQRT2`）；
-//!   - `speex_rand` 保留单位方差因子 `3.4642`（libspeex `math_approx.h`；
-//!     native 漏乘，仅影响 submode1/DTX 舒适噪声）；
-//!   - vocoder / PLC 的 sqrt/exp 按 libspeex 的 double libm 提权。
-
 const std = @import("std");
 const builtin = @import("builtin");
 const t = @import("data.zig");

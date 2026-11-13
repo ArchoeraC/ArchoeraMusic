@@ -7,13 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AMR-WB 解码常量与表（自 FFmpeg reference 提取，见文件头溯源）。
-//!
-//! 数据来源：FFmpeg libavcodec/amrwbdata.h（LGPL-2.1+，作者 Marcelo Galvao Povoa，2010）；
-//! 表值原文出自 3GPP TS 26.190 / TS 26.173 / TS 26.201 V9.0.0。
-//! 表经脚本抽为 Zig 常量，逐位复刻 FFmpeg 使用路径（浮点路径 f32 位图保留）。
-//! 版权声明保留（LGPL-2.1+）：Copyright (c) 2010 Marcelo Galvao Povoa.
-
 const std = @import("std");
 
 pub const LP_ORDER: usize = 16;

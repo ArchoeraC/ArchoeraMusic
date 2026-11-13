@@ -7,12 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS core 定点合成 DSP（阶段二，对照 FFmpeg dcamath.h / dcadct.c / dcadsp.c
-//! / dcaadpcm.c / synth_filter.c 的 fixed（整数）路径）
-//!
-//! 全部为整数运算，运算顺序逐句对齐 FFmpeg C（含每个舍入点），保证
-//! 与 `ffmpeg -flags +bitexact`（定点模式，S32 24bit<<8 输出）逐位一致。
-
 const std = @import("std");
 
 pub const DCA_SUBBANDS: usize = 32;

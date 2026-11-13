@@ -7,34 +7,6 @@
 // 上游版权归 WavPack 作者所有；本文件按 BSD-3-Clause 分发，
 // 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WavPack 解码器（docs/audio-kernel-zig.md §9.9）
-//!
-//! 参考重构对照 wavpack.c / wavpack.h / wavpackdata.c（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 容器：wvpk 32 字节块头 + 块内 metadata 序列。文件为连续块流：
-//!   一个"包"由 INITIAL_BLOCK 起到 FINAL_BLOCK 止的 1..N 个块组成，
-//!   多声道文件每块携带 1（mono）或 2（stereo）个声道，块间共用同一样本区间。
-//!
-//! 解码流程（对齐 FFmpeg wavpack_decode_frame/block 语义）：
-//!   1. 包内逐块读入内存（块总大小 = ckSize + 8）；
-//!   2. 解析 metadata：DECTERMS（去相关项）→ DECWEIGHTS（权重）→ DECSAMPLES（初始样本）
-//!      → ENTROPY（median 初值）→ HYBRID / INT32INFO / FLOATINFO → DATA（主位流）
-//!      → EXTRABITS（低位补全位流，首 32 位为 CRC）；
-//!   3. 熵解码（LSB-first）：零块压缩 → unary 区间 → median 自适应 → 符号位；
-//!   4. 去相关 terms 级联（t>8 二阶预测 / t≤8 环形缓冲 / t=-1 自预测 / t=-3 交叉）；
-//!   5. joint 反变换 → CRC 校验 → 按输出契约打包。
-//!
-//! 输出契约（对齐 验收基准 wavpack 默认输出，保证逐样本一致 对照可逐字节比对）：
-//!   - flags&3 ≤ 1 → 16-bit（post_shift 对齐满幅）；≥ 2 → 32-bit 顶对齐；
-//!   - WV_FLOAT_DATA → 32-bit IEEE float；
-//!   - 交错小端 PCM，`Info.bits_per_sample` = 16 / 32，`is_float` 标记 float。
-//!
-//! 范围与容错（§9.9 / §13.3）：
-//!   - 混合 .wvc 修正、DSD 调制不在本期范围：DSD 在 open 判定 → UnsupportedFormat
-//!     （引擎回退 验收基准 主后端，§8.3）；流中段出现 → Corrupt；
-//!   - 块内位流越界、CRC 不匹配、包内块数失控 → Corrupt；
-//!   - seek 走块头扫描（block_index 定位包），目标超出文件尾 → 置 EOF。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

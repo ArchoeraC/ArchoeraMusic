@@ -9,10 +9,6 @@
 // Erik de Castro Lopo。本文件保留上游版权声明，按 BSD-3-Clause 分发；
 // 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! SILK 解码器（libopus 1.6.1 silk/ 固定点移植）。
-//! 依赖：rc.zig 的 ec_dec（SILK 与 CELT 共用同一 range coder）、silk_tables.zig。
-//! 状态：基础框架 + decode_frame/decode_indices 已完成；decode_pulses/decode_parameters/
-//!       decode_core/dec_API/滤波器组 待移植。
 const std = @import("std");
 const rcmod = @import("rc.zig");
 const st = @import("silk_tables.zig");

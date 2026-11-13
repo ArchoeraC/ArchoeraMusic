@@ -7,12 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Voice 位读写器——复刻 FFmpeg GetBitContext / PutBitContext 语义。
-//!
-//! MSB-first（FFmpeg bitstream 序）。读取越过 `size_in_bits` 时按缓冲末尾零
-//! 填充返回 0（FFmpeg 对每个 packet 缓冲零填充 AV_INPUT_BUFFER_PADDING_SIZE；
-//! 本内核调用方保证传入 64 字节零填充的缓冲，等价）。PutBits 同序写出。
-
 const std = @import("std");
 
 /// 大端（MSB-first）bit reader。

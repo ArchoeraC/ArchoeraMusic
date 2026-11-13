@@ -3,20 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 容器帧层（docs/audio-kernel-zig.md §9.1 的 RIFF 家族统一 framing）
-//!
-//! 三种（+CAF）容器的 chunk 头布局不同，统一抽象为 `Chunk{id, size}`：
-//!   - RIFF / RIFX / RF64：`id(4) + size(4, 容器字节序)`，payload = size，pad 到 2；
-//!   - W64（Sony Wave64）：`GUID(16) + size(8, LE)`，payload = size - 24，pad 到 8，
-//!     id 取 GUID 前 4 字节（四字符码）；
-//!   - AIFF / AIFF-C：`id(4) + size(4, BE)`，payload = size，pad 到 2；
-//!   - CAF（Apple Core Audio）：`id(4) + size(8, BE)`，payload = size，**无对齐 pad**。
-//!
-//! AU（Sun）无 chunk 结构（固定 24 字节头 + annotation），由 lib.zig 单独解析，
-//! 本模块的 nextChunk/skipChunk 不对其开放。
-//!
-//! 对齐（§13.3）：chunk size 均来自文件、可能畸形，`skipChunk` 保守截断到输入边界。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

@@ -7,15 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! LBR（DTS Express / DCA-LBR）解码所需常量表
-//!
-//! 由 reference/FFmpeg/libavcodec 的 dcadata.c（LBR 段）、dca.c、dcahuff.c
-//! （ff_dca_vlc_src_tables LBR 段 / tnl_grp_sizes）经脚本抽取生成，逐值与
-//! FFmpeg n9.0.1 一致；各表以「源文件:行号」注释溯源。
-//! 浮点表为 f32（C 源为 float 字面量，双精度→float 截断与 C 编译一致）。
-//! VLC 码表为 (符号, 码长) 序列，按 ff_vlc_init_from_lengths 增量码字算法
-//! 消费；entry_offset（符号偏移）在 lbr.zig 中应用。
-
 /// dcadata.c:8732
 pub const era_dca_avg_g3_freqs = [3]u16{
     16000, 18000, 24000,

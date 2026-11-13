@@ -7,8 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! MLP/TrueHD 解码上下文（对照 FFmpeg mlpdec.c / mlp.h 结构）
-
 const t = @import("tables.zig");
 
 pub const MAX_CHANNELS = 16;

@@ -7,14 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! SV8 哈夫曼/枚举解码基础 —— 复刻 FFmpeg n9.0.1 的 VLC 与 mpc8 组合码。
-//!
-//! ff_vlc_init_from_lengths 语义：按“符号列表顺序”用增量 code += 1<<(32-len) 分配码字
-//! （对给定 (len, 符号) 列表自动保证前缀合法）。等长符号码字连续，因此可按
-//! len 分组区间查询；逐位读入与 FFmpeg 的 get_vlc2 消耗一致。
-//!
-//! 另含 mpc8_dec_base / mpc8_dec_enum / mpc8_get_mod_golomb / mpc8_get_mask。
-
 const std = @import("std");
 
 // ---------------------------------------------------------------------------

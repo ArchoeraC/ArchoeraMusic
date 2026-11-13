@@ -3,19 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AAC 配置解析：AudioSpecificConfig（ISO 14496-3 §1.6.2.1）+ ADTS 帧头。
-//!
-//! 语义对齐 FFmpeg n9.0.1 mpeg4audio.c ff_mpeg4audio_get_config_gb 与
-//! adts_header.c ff_adts_header_parse（参考对照；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）：
-//!   - get_object_type：5 位；31 (escape) → 32 + 6 位扩展；
-//!   - get_sample_rate：4 位索引（0xF → 24 位显式值）；
-//!   - 隐式 SBR/PS 信令（AOT 5 / 29 前置）与显式信令（sync extension 0x2b7）；
-//!   - GASpecificConfig 的 frameLengthFlag（960/1024）；
-//!   - ADTS：syncword/profile/sf_index/chan_config/frame_length/rdb，
-//!     samples = (rdb+1)*1024；
-//!   - sbr/ps 三态：-1 未声明 / 0 无 / 1 有——内核当前仅支持无 SBR/PS 的
-//!     AAC-LC（其余 UnsupportedFormat 回退 FFmpeg 主后端，§8.3）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const brmod = @import("bitreader.zig");

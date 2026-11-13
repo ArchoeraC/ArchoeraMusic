@@ -7,13 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Auto-generated WMA Pro (wmapro) inverse-MDCT tables.
-//! Source: system FFmpeg n9.0.1 av_tx (libavutil) FLOAT MDCT inverse, plain
-//! (non-FULL), per length 1<<b, scale = 1/(1<<(b-1)) / (1<<(bits_per_sample-1)).
-//! Probed via reference tree probe_mdct (links reference/FFmpeg libavutil.a);
-//! mdct_exp_{L}: ctx->exp float bits (2*(L/2) complex = 2*L floats).
-//! mdct_map_{L}: ctx->map (inv-fold gather, already <<1).
-
 pub const mdct_map_64 = [_]u16{
     0, 32, 48, 16, 56, 24, 8, 40, 60, 28, 44, 12, 4, 36, 52, 20,
     62, 30, 46, 14, 54, 22, 6, 38, 2, 34, 50, 18, 58, 26, 10, 42,

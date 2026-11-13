@@ -7,24 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! FLAC 音频帧头解析（ff_flac_decode_frame_header，参考重构）
-//!
-//! 帧头位排布（32 位后字节对齐）：
-//!   sync(15)=0x7FFC + var_size(1) | bs_code(4) + sr_code(4) + ch_mode(4)
-//!   + bps_code(3) + reserved(1) | UTF-8 帧号/样本号 | blocksize 扩展位
-//!   | samplerate 扩展位 | CRC-8（整帧头含 CRC 字节校验和应为 0）
-//!
-//! 常量表（flacdata.c）：
-//!   - blocksize：code 6/7 为 8/16 位 +1，其余查表（0/192/576/…/32768）；
-//!   - samplerate：code <12 查表，12/13/14 为 8 位*1000 / 16 位 / 16 位*10；
-//!   - bps：code 0 = 0（用 STREAMINFO），3 非法，其余 8/12/16/20/24/32。
-//!
-//! ch_mode（flac.h FLAC_CHMODE_*）：0-7 独立（channels=code+1）；
-//! 8=left_side / 9=right_side / 10=mid_side（channels=2）；≥11 非法。
-//!
-//! 本模块只做帧头**内在**校验（sync/reserved/code/CRC-8）；与 STREAMINFO 的
-//! 一致性校验（blocksize ≤ max_blocksize、bps/samplerate 归属）在 lib.zig。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const bitreader = @import("bitreader.zig");
