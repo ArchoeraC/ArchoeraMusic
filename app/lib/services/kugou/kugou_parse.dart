@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// KG响应解析（KRC 歌词 + 歌单/榜单/搜索通用条目 → [Track]）。
+/// KG 响应解析（KRC 歌词 + 歌单/榜单/搜索通用条目 → [Track]）。
 ///
 /// 从 `kugou_api.dart` 拆出：纯解析函数，与网络请求/会话解耦，便于
 /// 单测与复用。
@@ -311,7 +311,7 @@ bool _kgIsOriginal(Object? raw) {
   return raw.toString() == '1' || raw.toString().toLowerCase() == 'true';
 }
 
-/// KG版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
+/// KG 版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
 int _kgFee(Object? raw) {
   if (raw == null) return 0;
   final v = raw is num ? raw.toInt() : int.tryParse(raw.toString()) ?? 0;

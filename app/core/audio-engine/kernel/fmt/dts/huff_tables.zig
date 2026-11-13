@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! DTS core Huffman 码表分段（阶段二）
 //!
@@ -12,10 +16,10 @@
 //!   scalef_i    —— 缩放因子差 VLC（129 条目，偏移 -64）
 //!   tmode_i     —— 瞬态模式 VLC（4 条目）
 //! 每段给出符号列（sym，含偏移前的原始码值）与码长列（len）。
-//! 码字本身由 ffmpeg 的"按表序累加"规范分配（见 huff.zig），与 ff_vlc_init_from_lengths
-//! 一致，保证位级消费与 FFmpeg 相同。
+//! 码字本身由 验收基准 的"按表序累加"规范分配（见 huff.zig），与 ff_vlc_init_from_lengths
+//! 一致，保证位级消费与 验收基准 相同。
 //!
-//! 数据由 tools/gen_dca_huff.py 自动抽取自 FFmpeg n9.0.1。
+//! 数据由 tools/gen_dca_huff.py 自动抽取自 验收基准 n9.0.1。
 //! Generated: quant/bitalloc/scalef/tmode huffman code sections (symbol,len).
 pub const quant_0_0_sym = [_]i16{ 1, 2, 0 };
 pub const quant_0_0_len = [_]u8{ 1, 2, 2 };

@@ -42,8 +42,8 @@ class SuggestSongItem {
   final String? artist;
   final String? album;
 
-  /// 来源平台（'netease' / 'kugou'；KG建议条目只有 songid，点击播放需
-  /// 按其 source 分发解析——NT用 id 直取，KG先经搜索补 hash）。
+  /// 来源平台（'netease' / 'kugou'；KG 建议条目只有 songid，点击播放需
+  /// 按其 source 分发解析——NT 用 id 直取，KG 先经搜索补 hash）。
   final String source;
 }
 
@@ -60,8 +60,8 @@ class SuggestSimpleItem {
   final String name;
   final String? subtitle;
 
-  /// 来源平台（'netease' / 'kugou'；KG专辑条目点击需按其 source 分发
-  /// 到KG专辑详情弹窗——albumid 不能用于NT专辑接口）。
+  /// 来源平台（'netease' / 'kugou'；KG 专辑条目点击需按其 source 分发
+  /// 到KG 专辑详情弹窗——albumid 不能用于NT 专辑接口）。
   final String source;
 }
 
@@ -234,7 +234,7 @@ mixin NeteaseSearchApi on NeteaseApiBase {
     }).toList();
   }
 
-  /// NT热搜（search_hot_detail；仅NT，对齐原项目 getHotSearches，
+  /// NT 热搜（search_hot_detail；仅NT，对齐原项目 getHotSearches，
   /// 按热度排序，过滤空关键词）。接口失败返回空列表。
   Future<List<HotSearchItem>> searchHot() async {
     final body = await _call('search_hot_detail', const {});
@@ -252,7 +252,7 @@ mixin NeteaseSearchApi on NeteaseApiBase {
         .toList();
   }
 
-  /// NT搜索建议（search_suggest web；对齐原项目 getSearchSuggest，
+  /// NT 搜索建议（search_suggest web；对齐原项目 getSearchSuggest，
   /// 分类歌曲 / 专辑 / 歌手 / 歌单）。关键词空或失败返回空集。
   Future<SuggestData> searchSuggest(String keyword) async {
     final word = keyword.trim();

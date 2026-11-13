@@ -12,7 +12,7 @@ extension _SearchPageView on _SearchPageState {
     final isPlaying = ref.watch(playbackProvider.select((s) => s.playing));
     final coverRadius = ref.watch(appPrefsProvider).coverRadius;
     // 红心集合：聚合/单平台混来源结果按行键合并（NT id + KG hash
-    // + QQ songmid，与 songLikeKey / LikeController 一致）。
+    // + QM songmid，与 songLikeKey / LikeController 一致）。
     final like = ref.watch(likeControllerProvider);
     final rowLikedIds = {
       ...like.idsFor('netease'),

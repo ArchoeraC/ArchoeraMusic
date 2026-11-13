@@ -17,14 +17,14 @@
 //!     算术码）残差；LTP；块切换（block switching）；随机访问（RA）帧；
 //!   - joint-stereo 配对、mc_coding 多声道相关（als_weighting /
 //!     revert_channel_correlation）；跨帧 carryover 样本；
-//!   - 输出交错 16/24/32 位整数（bit-exact 对齐 ffmpeg `-f s16le/s32le`）。
+//!   - 输出交错 16/24/32 位整数（逐样本对齐 验收基准 `-f s16le/s32le`）。
 //!
-//! 不实现（→ error.UnsupportedFormat，由 fmt/m4a 回退系统 ffmpeg）：
+//! 不实现（→ error.UnsupportedFormat，由 fmt/m4a 回退系统 验收基准）：
 //!   浮点 ALS（floating）、RLSLMS、chan_sort 通道重排。
 //!
 //! 位流访问模型：整个 ALS 帧流为内存字节流，帧在字节边界起读、字节边界收尾
-//! （每 block / 每声道数据后 align）。mp4 一包可含多帧（ffmpeg 语义同：帧长仅
-//! 解码可知）。流末尾 64B 零填充模拟 ffmpeg AV_INPUT_BUFFER_PADDING_SIZE，
+//! （每 block / 每声道数据后 align）。mp4 一包可含多帧（验收基准 语义同：帧长仅
+//! 解码可知）。流末尾 64B 零填充模拟 验收基准 AV_INPUT_BUFFER_PADDING_SIZE，
 //! 越界位返回 0（不越界崩溃）。
 
 const std = @import("std");
@@ -1328,8 +1328,8 @@ test "parseConfig 拒绝非 ALS（AOT 非 36）" {
     try testing.expectError(error.UnsupportedFormat, parseConfig(&dsi));
 }
 
-// 512ch conformance（als_09）端到端 core 解码 == ffmpeg（整数无损，整轨 MD5 + 前缀逐字节）。
-test "als core: 512ch（mcc+bgmc+块切换+RA）解码 == ffmpeg（bit-exact MD5+前缀）" {
+// 512ch conformance（als_09）端到端 core 解码 == 验收基准（整数无损，整轨 MD5 + 前缀逐字节）。
+test "als core: 512ch（mcc+bgmc+块切换+RA）解码 == 验收基准（逐样本一致 MD5+前缀）" {
     const dsi = @embedFile("samples/als09.dsi");
     const frames = @embedFile("samples/als09.frames");
     const pre = @embedFile("samples/als09_prefix.s16");
@@ -1355,10 +1355,10 @@ test "als core: 512ch（mcc+bgmc+块切换+RA）解码 == ffmpeg（bit-exact MD5
         try out.appendNTimes(alloc, 0, @as(usize, n) * cfg.channels * 2);
         dec.interleaveOut(out.items[start..], 0, n);
     }
-    // 全轨 s16le 长度（ffmpeg golden）
+    // 全轨 s16le 长度（验收基准 golden）
     try testing.expectEqual(@as(usize, 3154944), out.items.len);
 
-    // 全轨 MD5（ffmpeg golden：ac53ff89954a54d02c3f8d686f70c054）
+    // 全轨 MD5（验收基准 golden：ac53ff89954a54d02c3f8d686f70c054）
     const md5 = @import("../ac3/md5.zig").Md5;
     var got: [16]u8 = undefined;
     md5.hash(out.items, &got, .{});

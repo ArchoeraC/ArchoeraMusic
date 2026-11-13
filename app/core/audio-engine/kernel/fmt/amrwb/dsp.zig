@@ -16,7 +16,7 @@
 //! libavutil/lfg.c（Lagged Fibonacci PRNG）。运算顺序与类型逐句对齐，
 //! 全部标量浮点（f32/f64 同 C），不触发任何融合乘加。
 //!
-//! 参考重构：FFmpeg 目标为准；数值表见 tables.zig。
+//! 参考重构：验收基准 目标为准；数值表见 tables.zig。
 
 const std = @import("std");
 const T = @import("tables.zig");
@@ -24,8 +24,8 @@ const T = @import("tables.zig");
 pub const LP_ORDER = T.LP_ORDER;
 pub const AMRWB_SFR_SIZE = T.AMRWB_SFR_SIZE;
 
-// glibc libm（ffmpeg C 用 glibc cos/exp2/log10f；Zig @cos/@exp2/@log10 走
-// compiler-rt，个别参数末位舍入与 glibc 不同 → 为逐位对齐 ffmpeg 直连 libm。
+// glibc libm（验收基准 C 用 glibc cos/exp2/log10f；Zig @cos/@exp2/@log10 走
+// compiler-rt，个别参数末位舍入与 glibc 不同 → 为逐样本对齐 验收基准 直连 libm。
 // 直接 extern 会被 Zig 链接的 compiler-rt 同名符号截获，故 Linux 下经
 // dlopen/dlsym 取 glibc libm 实现；其他平台回退 extern（系统 libm）。
 const builtin = @import("builtin");

@@ -22,7 +22,7 @@
 
 ## 刮削（元数据补齐）
 
-- **多源并发刮削**：MusicBrainz（权威 + MBID/ISRC）、Deezer、iTunes、网易云、QQ 音乐、酷狗、酷我、咪咕 8 个在线源，外加 **AcoustID 音频指纹**回退；命中相似度评分、多源字段择优合并，并自动补封面（Cover Art Archive → 各源回退）与歌词（LRCLIB → 中文源）。
+- **多源并发刮削**：MusicBrainz（权威 + MBID/ISRC）、Deezer、iTunes、NT、QM、KG、酷我、咪咕 8 个在线源，外加 **AcoustID 音频指纹**回退；命中相似度评分、多源字段择优合并，并自动补封面（Cover Art Archive → 各源回退）与歌词（LRCLIB → 中文源）。
 - **写入选项**：元数据 / 封面 / 歌词嵌入开关；**跳过已刮削**（已有 MusicBrainz ID 或 ISRC 的文件不再重复联网）。
 - **高级参数**：并发查询线程数（0=自动）、批大小、失败重试上限（超出后不再重试）。
 - **仅目录整理（不联网）**：按模板把目录内文件移动到目标目录树——可用变量 `artist / albumArtist / album / genre / year / disc / track / title / ext`，以 `/` 分隔目录层级，**始终保留原文件名**；内置 歌手/专辑、仅歌手、风格/歌手/专辑、年份/歌手/专辑 四套预设模板。

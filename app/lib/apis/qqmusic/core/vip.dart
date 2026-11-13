@@ -7,7 +7,7 @@
 /// 将 vip_login_base 响应归一为播放权限状态（是否具会员 / 会员等级）。
 library;
 
-/// 归一 QQ 会员播放权限状态。
+/// 归一 QM 会员播放权限状态。
 ({bool isVip, int vipLevel}) qmNormalizeQQMusicVip(Map<String, dynamic>? data) {
   final identity = data?['identity'];
   final identityMap = identity is Map ? identity : const <String, dynamic>{};

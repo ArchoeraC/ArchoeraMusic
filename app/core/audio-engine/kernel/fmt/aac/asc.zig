@@ -54,7 +54,7 @@ pub const M4ACfg = struct {
     frame_length_short: bool = false,
     frame_length: u16 = 1024,
 
-    /// HE-AAC v1/v2（SBR 或 PS 存在）——内核暂不支持，回退 FFmpeg
+    /// HE-AAC v1/v2（SBR 或 PS 存在）——内核暂不支持，回退 验收基准
     pub fn isHeAac(self: *const M4ACfg) bool {
         return self.sbr == 1 or self.ps == 1;
     }
@@ -121,7 +121,7 @@ pub fn parseAscBr(br: *brmod.BitReader, sync_extension: bool) Error!AscResult {
 
     const payload_offset = br.bit_pos - start_bit;
 
-    // GASpecificConfig（对照 ffmpeg decode_ga_specific_config）：
+    // GASpecificConfig（对照 验收基准 decode_ga_specific_config）：
     // frameLengthFlag + dependsOnCoreCoder(1) [+ coreCoderDelay(14)] + extensionFlag(1)
     // + [layerNr(3)，SCALABLE]
     switch (c.object_type) {
@@ -255,7 +255,7 @@ test "ASC: AAC-LC 立体声 44.1kHz" {
     try testing.expectEqual(@as(i8, -1), r.cfg.sbr);
     try testing.expectEqual(@as(i8, 0), r.cfg.ps); // 多声道隐式 PS 关闭
     try testing.expectEqual(@as(u16, 1024), r.cfg.frame_length);
-    // payload 起始于 GASpecificConfig 前（frameLengthFlag 不计入，对齐 FFmpeg specific_config_bitindex）
+    // payload 起始于 GASpecificConfig 前（frameLengthFlag 不计入，对齐 验收基准 specific_config_bitindex）
     try testing.expectEqual(@as(usize, 13), r.payload_bit_offset); // 5+4+4
 }
 
@@ -297,7 +297,7 @@ test "ASC: 显式 SBR 信令（sync extension）" {
 }
 
 test "ASC: 隐式 SBR 前置（AOT 5 开头）" {
-    // 字段顺序（FFmpeg mpeg4audio.c 解析序）：
+    // 字段顺序（验收基准 mpeg4audio.c 解析序）：
     // AOT(5)=SBR → sf_index(4) → chan_cfg(4) → ext_sf_index(4) → 真实 AOT(5) → frameLengthFlag
     var w: BitWriter = .{};
     w.put(AOT_SBR, 5);

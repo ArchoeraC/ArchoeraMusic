@@ -27,7 +27,7 @@
 //!     作用于 transform_coeffs 与作用于 coeffs 数值结果一致。
 //!   - 任务描述把 doRematrixing 写成 (n0-n1)/2、(n0+n1)/2，并称 ac3UpmixDelay
 //!     用 downmix_coeffs 做线性组合；这两处与实际 C 不符（C 为 ch1=n0+n1、
-//!     ch2=n0-n1；ac3_upmix_delay 仅 memcpy/memset）。为与 C 数值逐位一致，
+//!     ch2=n0-n1；ac3_upmix_delay 仅 memcpy/memset）。为与 C 数值逐样本一致，
 //!     本实现严格照搬 C。
 //!   - C 的 set_downmix_coeffs 返回 int（仅 malloc 失败），float 路径 FIXR12 为
 //!     恒等映射，故此处为 void 且直接存 f32。

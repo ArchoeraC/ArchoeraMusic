@@ -17,7 +17,7 @@
 //!   - 输出对齐 ffmpeg 内部样本格式：8bit → u8(+0x80)、16bit → s16（=`-f s16le`）、
 //!     24bit → int32<<8（=`-f s32le`）；Info.bits_per_sample 报 8/16/32
 //!     （24bit 以 32bit 承载，与 wmalossless/flac/ALAC 输出语义一致）；
-//!   - format=2（加密）及不支持位深 → UnsupportedFormat（回退 FFmpeg 主后端）。
+//!   - format=2（加密）及不支持位深 → UnsupportedFormat（回退 验收基准 主后端）。
 //!
 //! 内存纪律（RSS 收口）：
 //!   - **不再整读文件**。open 只按需读 22B 头 + seek 表（O(nframes) 偏移索引），
@@ -409,7 +409,7 @@ pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder
 }
 
 // ---------------------------------------------------------------------------
-// 回归测试（golden = ffmpeg n9.0.1 native tta 解码，逐字节）
+// 回归测试（golden = 验收基准 n9.0.1 native tta 解码，逐字节）
 // ---------------------------------------------------------------------------
 
 const testing = std.testing;
@@ -450,7 +450,7 @@ fn runE2e(embedded: []const u8, golden: []const u8) !struct { sr: u32, ch: u8, b
     return .{ .sr = info.sample_rate, .ch = info.channels, .bits = info.bits_per_sample, .bytes = ns, .equal = equal };
 }
 
-test "tta e2e: inside.tta (44.1k/16bit 2ch, 12 帧含 17397 尾帧) == ffmpeg s16le" {
+test "tta e2e: inside.tta (44.1k/16bit 2ch, 12 帧含 17397 尾帧) == 验收基准 s16le" {
     const r = try runE2e(inside_tta, inside_golden);
     try testing.expectEqual(@as(u32, 44100), r.sr);
     try testing.expectEqual(@as(u8, 2), r.ch);
@@ -459,7 +459,7 @@ test "tta e2e: inside.tta (44.1k/16bit 2ch, 12 帧含 17397 尾帧) == ffmpeg s1
     try testing.expectEqual(inside_golden.len, r.equal);
 }
 
-test "tta e2e: mono.tta (44.1k/16bit 1ch, ffmpeg 编码 3 帧) == ffmpeg s16le" {
+test "tta e2e: mono.tta (44.1k/16bit 1ch, 验收基准 编码 3 帧) == 验收基准 s16le" {
     const r = try runE2e(mono_tta, mono_golden);
     try testing.expectEqual(@as(u32, 44100), r.sr);
     try testing.expectEqual(@as(u8, 1), r.ch);
@@ -471,7 +471,7 @@ test "tta e2e: mono.tta (44.1k/16bit 1ch, ffmpeg 编码 3 帧) == ffmpeg s16le" 
 const bit24_tta = @embedFile("samples/bit24.tta"); // ffmpeg 编码 44.1k 立体声 24bit 粉噪
 const bit24_golden = @embedFile("samples/bit24.s32");
 
-test "tta e2e: bit24.tta (44.1k/24bit 2ch) == ffmpeg s32le（24bit<<8）" {
+test "tta e2e: bit24.tta (44.1k/24bit 2ch) == 验收基准 s32le（24bit<<8）" {
     const r = try runE2e(bit24_tta, bit24_golden);
     try testing.expectEqual(@as(u32, 44100), r.sr);
     try testing.expectEqual(@as(u8, 2), r.ch);
@@ -483,7 +483,7 @@ test "tta e2e: bit24.tta (44.1k/24bit 2ch) == ffmpeg s32le（24bit<<8）" {
 const bit8_tta = @embedFile("samples/bit8.tta"); // ffmpeg 编码 48k 单声道 8bit
 const bit8_golden = @embedFile("samples/bit8.u8");
 
-test "tta e2e: bit8.tta (48k/8bit 1ch) == ffmpeg u8（样本+0x80）" {
+test "tta e2e: bit8.tta (48k/8bit 1ch) == 验收基准 u8（样本+0x80）" {
     const r = try runE2e(bit8_tta, bit8_golden);
     try testing.expectEqual(@as(u32, 48000), r.sr);
     try testing.expectEqual(@as(u8, 1), r.ch);
@@ -559,7 +559,7 @@ test "tta 健壮性: 截断/非法头 → Corrupt，format=2/非法位深 → Un
     var r2 = io.Reader.openMem(&enc);
     try testing.expectError(error.UnsupportedFormat, open(testing.allocator, &r2, &info));
 
-    // 非法位深（32bit → bps 4，ffmpeg 不支持）→ UnsupportedFormat
+    // 非法位深（32bit → bps 4，验收基准 不支持）→ UnsupportedFormat
     var b32: [22]u8 = @splat(0);
     @memcpy(b32[0..4], "TTA1");
     std.mem.writeInt(u16, b32[4..6], 1, .little);

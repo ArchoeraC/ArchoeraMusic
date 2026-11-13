@@ -200,7 +200,7 @@ List<({String text, int start, int dur})> _parseQrcWords(String rest) {
   return words;
 }
 
-/// QRC（QQ 音乐逐字）→ 传统 YRC 归一化文本。
+/// QRC（QM 逐字）→ 传统 YRC 归一化文本。
 ///
 /// QRC 与 YRC 的行头都是 `[起始,时长]` 毫秒，但字级为 `字(起始,时长)`
 /// （**文字在前、时间为绝对值**）；归一化为 `[m:ss.xxx]<相对起始,时长>字`，
@@ -238,7 +238,7 @@ bool _isQrcContent(String content, String format) {
 
 /// 解析翻译 / 音译（罗马音）行。
 ///
-/// 子行通常已是标准 LRC，但 QQ 的罗马音同样以 QRC XML 返回（`romajiFormat`
+/// 子行通常已是标准 LRC，但 QM 的罗马音同样以 QRC XML 返回（`romajiFormat`
 /// 标为 qrc）；先按 QRC 归一化再走 [parseLrc]，并剥掉可能残留的字级标签
 /// （`<start,dur>`），保证译文/罗马音行是纯文本。
 List<LyricLine> _parseSubLines(String text, String? format) {
@@ -731,7 +731,7 @@ String? _asText(Object? value) {
 ///   `[mm:ss]字` 都解析为 [LyricFragment]（行内相对偏移）；
 /// - 行内尾随和声「主歌词（和声）」拆为紧随的背景行（对齐 AMLL）；
 /// - 翻译 / 音译（罗马音）按各自 [translationFormat] / [romajiFormat]
-///   解析（QQ 罗马音为 QRC），再按「时间最近」归属到主行（容差 4s）。
+///   解析（QM 罗马音为 QRC），再按「时间最近」归属到主行（容差 4s）。
 List<LyricGroup> parseLyricGroups({
   required String content,
   required String format,
@@ -799,7 +799,7 @@ List<LyricGroup> parseLyricGroups({
   String? transAt(int timeMs) => nearestAt(transLines, transTimes, timeMs);
   String? romaAt(int timeMs) => nearestAt(romaLines, romaTimes, timeMs);
 
-  // 交错翻译合并：本地下载（KG等）的 LRC 常见「主行 + 同时间戳译文」
+  // 交错翻译合并：本地下载（KG 等）的 LRC 常见「主行 + 同时间戳译文」
   // 的交错结构（`[mm:ss.xx]原文` 后紧跟 `[mm:ss.xx]译文`，如
   // `[00:37.472]僕は強くならなきゃいけない` + `[00:37.472]必须要让自己变得强大起来`）。
   // 若两行视为独立主行，译文会占一个时间轴槽位、译文也无法挂到主行

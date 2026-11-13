@@ -6,7 +6,7 @@
 ///
 /// 只验证 C++ 侧调用约定与固定测试向量：AES-128-ECB/CBC + PKCS7、RSA 裸模幂、
 /// MD5/SHA1、随机源。向量来源：NIST SP 800-38A、RFC 1321、FIPS 180-1，以及用
-/// Python `pow()` 对网易云公开 modulus 计算的模幂结果。
+/// Python `pow()` 对NT 公开 modulus 计算的模幂结果。
 
 #include "scraper_crypto.h"
 

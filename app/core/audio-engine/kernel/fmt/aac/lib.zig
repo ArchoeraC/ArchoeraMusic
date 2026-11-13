@@ -143,7 +143,7 @@ pub const Aac = struct {
         self.mdct_short = mdct_mod.Mdct(f32).init(128);
         self.mdct_ltp = mdct_mod.Mdct(f32).initLtp();
         self.sbr_enabled = false;
-        // ASC 显式声明 SBR（HE-AAC）：预置启用（对齐 ffmpeg m4ac.sbr=1，使前导帧
+        // ASC 显式声明 SBR（HE-AAC）：预置启用（对齐 验收基准 m4ac.sbr=1，使前导帧
         // start==0 也执行纯上采样 QMF 暖机，避免 X_low 提前 1 帧）
         if (cfg.sbr == 1) {
             try self.ensureSbr();
@@ -279,7 +279,7 @@ pub const Aac = struct {
             ch.ics.tns_max_bands = t.tns_max_bands_1024[si];
             // predictor_present：Main（AOT 1）→ decode_prediction；LTP（AOT 4）→ decode_ltp；LC → 拒
             ch.ics.predictor_present = (try br.readBits(1)) != 0;
-            // ffmpeg 每帧清零 predictor_reset_group（aacdec.c decode_ics_info），
+            // 验收基准 每帧清零 predictor_reset_group（aacdec.c decode_ics_info），
             // 非 predictor 帧不得沿用旧 reset 组反复重置预测器
             ch.ics.predictor_reset_group = 0;
             if (ch.ics.predictor_present) {
@@ -665,7 +665,7 @@ pub const Aac = struct {
                     var ico: f32 = -@as(f32, @floatFromInt(p.amp[i]));
                     if (co != 0) {
                         co /= sfv;
-                        // ffmpeg 浮点路径除数是 sqrtf(sqrtf(|co|)) = 4 次根（非 cbrt）
+                        // 验收基准 浮点路径除数是 sqrtf(sqrtf(|co|)) = 4 次根（非 cbrt）
                         ico = co / @sqrt(@sqrt(@abs(co))) + (if (co > 0) @as(f32, -ico) else ico);
                     }
                     coef_base[p.pos[i]] = std.math.cbrt(@abs(ico)) * ico * sfv;
@@ -773,7 +773,7 @@ pub const Aac = struct {
                         const base = ch_off + ics.swb_offset[sfb] + group * 128;
                         var i: usize = base;
                         const end = base + len;
-                        // 每样本独立 → 8 路并行；lane 内次序与标量一致（逐位一致）
+                        // 每样本独立 → 8 路并行；lane 内次序与标量一致（逐样本一致）
                         while (i + 8 <= end) : (i += 8) {
                             const a = vec.load8(che.ch[0].coeffs[i..].ptr);
                             const b = vec.load8(che.ch[1].coeffs[i..].ptr);
@@ -840,7 +840,7 @@ pub const Aac = struct {
         //   out[2len-1-k]   = src0[k]*win[k] + src1[len-1-k]*win[2len-1-k]
         //
         // 向量化：一次 8 个 k。每个 k 相互独立，lane 内运算顺序与标量完全相同
-        // （不重结合、不引 FMA）→ 逐位一致；反向访存用 rev8 折算。
+        // （不重结合、不引 FMA）→ 逐样本一致；反向访存用 rev8 折算。
         var k: usize = 0;
         while (k + 8 <= len) : (k += 8) {
             const s0 = vec.load8(src0.ptr + k);
@@ -1294,7 +1294,7 @@ pub const Aac = struct {
                     const before = br.bit_pos;
                     sbr_mod.decodeExtension(sbr, br, sbr_cnt, self.prev_elem_type) catch {
                             // SBR 解析失败：降级跳过（extension_type 的 4bit 已消费，
-                            // 剩余数据 sbr_cnt*8 - 4 bit；对齐 ffmpeg skip_bits_long(cnt*8-4)）
+                            // 剩余数据 sbr_cnt*8 - 4 bit；对齐 验收基准 skip_bits_long(cnt*8-4)）
                         br.bit_pos = before;
                         try br.skipBits(sbr_cnt * 8 - 4);
                         return;
@@ -1306,7 +1306,7 @@ pub const Aac = struct {
                             self.channels = 2;
                         }
                     }
-                    // SBR 启用：只要有 SBR 扩展数据即启用（对齐 ffmpeg m4ac.sbr=1，
+                    // SBR 启用：只要有 SBR 扩展数据即启用（对齐 验收基准 m4ac.sbr=1，
                     // 不依赖头已解析），使前导帧（start==0）也执行纯上采样 QMF 暖机
                     self.sbr_enabled = true;
                     return;
@@ -1319,7 +1319,7 @@ pub const Aac = struct {
 
     // ---------------- PCE（program_config_element，chan_config=0） ----------------
 
-    /// ---- ffmpeg PCE→AV 位置分配移植（aacdec.c assign_channels，layer0）----
+    /// ---- 验收基准 PCE→AV 位置分配移植（aacdec.c assign_channels，layer0）----
     const PceRowSentinel: i16 = -1; // NONE
     const PceRowUnused: i16 = -2;
     // 每行 6 个 AV_CHAN 序号（ff_aac_channel_map[0][pos-1]）：
@@ -1480,8 +1480,8 @@ pub const Aac = struct {
 
 
 
-        // ---- ffmpeg assign_channels/sniff_channel_order 移植：front→side→back→lfe
-        // layer0 分配 av_bits，按 av_bits 稳定排序 → 输出声道序（= ffmpeg native 序）----
+        // ---- 验收基准 assign_channels/sniff_channel_order 移植：front→side→back→lfe
+        // layer0 分配 av_bits，按 av_bits 稳定排序 → 输出声道序（= 验收基准 native 序）----
         const TypeCpeF: u8 = 1;
         var out = PceOut{};
         const Elem = struct { cpe: u1, tag: u4, ty: u8 };
@@ -1680,11 +1680,11 @@ pub const Aac = struct {
             // BEFORE_TNS 耦合（依赖：谱域相加）
             self.applyChannelCoupling(che, le.ty, le.id, CpBeforeTns, true);
             // AAC Main 预测器（predictor 在耦合后、TNS 前应用）
-            // ffmpeg 对 MAIN 每帧都调 apply_prediction（decode_ics/decode_cpe 无条件）；
+            // 验收基准 对 MAIN 每帧都调 apply_prediction（decode_ics/decode_cpe 无条件）；
             // 无 predictor_present 的帧也推进预测器状态，故不能按 present 门控
             if (self.cfg.object_type == asc.AOT_AAC_MAIN) self.applyPrediction(&che.ch[0]);
             if (nch and self.cfg.object_type == asc.AOT_AAC_MAIN) self.applyPrediction(&che.ch[1]);
-            // AAC LTP：apply_ltp（在耦合后、TNS 前；对齐 ffmpeg spectral_to_sample）
+            // AAC LTP：apply_ltp（在耦合后、TNS 前；对齐 验收基准 spectral_to_sample）
             if (self.cfg.object_type == asc.AOT_AAC_LTP) {
                 if (che.ch[0].ics.predictor_present) {
                     if (che.ch[0].ics.ltp.present) self.applyLtp(&che.ch[0]);
@@ -1761,7 +1761,7 @@ pub const Aac = struct {
     }
 };
 
-/// 声道布局元素（chan_config 映射；对齐 FFmpeg ff_aac_channel_layout_map + sniff 排序）
+/// 声道布局元素（chan_config 映射；对齐 验收基准 ff_aac_channel_layout_map + sniff 排序）
 const LayoutElem = struct {
     /// 元素类型（0=SCE 1=CPE 3=LFE）
     ty: u8,
@@ -1833,7 +1833,7 @@ const ChannelState = struct {
     sfo: [MAX_GROUPS * MAX_SFB]i32 = @splat(0),
     sf: [MAX_GROUPS * MAX_SFB]f32 = @splat(0),
     coeffs: [FRAME_LEN]f32 = @splat(0),
-    // output 需 2048：低 1024 为本帧样本，高 1024 供 LTP predTime（对齐 FFmpeg sce->output[2048]）
+    // output 需 2048：低 1024 为本帧样本，高 1024 供 LTP predTime（对齐 验收基准 sce->output[2048]）
     output: [2 * FRAME_LEN]f32 = @splat(0),
     saved: [FRAME_LEN]f32 = @splat(0),
     tns_present: bool = false,
@@ -1969,10 +1969,10 @@ fn lcgRandom(prev: u32) i32 {
 extern "c" fn lrintf(x: f32) c_long;
 
 inline fn floatToS16(v: f32) i16 {
-    // 对齐 FFmpeg swresample：av_clip_int16(lrintf(x*32768))（lrintf = 最近偶数舍入）
+    // 对齐 验收基准 swresample：av_clip_int16(lrintf(x*32768))（lrintf = 最近偶数舍入）
     const x = v * 32768.0;
     // 最近偶数舍入快路径：|x| < 2^22 时 (x + 1.5·2^23) − 1.5·2^23 在 IEEE 默认舍入下
-    // 与 lrintf 逐位一致（2^23 ≤ 和 < 2^24 ⇒ ulp=1，加法即舍入到整数）。
+    // 与 lrintf 逐样本一致（2^23 ≤ 和 < 2^24 ⇒ ulp=1，加法即舍入到整数）。
     // 越界（含 NaN/Inf）回退 libc，语义不变。
     const r: c_long = if (@abs(x) < 4194304.0)
         @intFromFloat((x + 12582912.0) - 12582912.0)

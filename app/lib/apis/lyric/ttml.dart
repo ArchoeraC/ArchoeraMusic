@@ -103,7 +103,7 @@ Future<String?> fetchTTML(
 /// 渲染端后续的 fetchTTMLOverlay 调用会通过 inflight Map 复用同一个 Future。
 ///
 /// [path] 为 AMLL DB 平台目录（由音源注册表给出：NT `ncm-lyrics` /
-/// QQ `qq-lyrics`）。
+/// QM `qq-lyrics`）。
 void prefetchTTML(String platform, List<String> ids, {required String path}) {
   // ignore: unawaited_futures
   fetchTTML(platform, ids, path: path);

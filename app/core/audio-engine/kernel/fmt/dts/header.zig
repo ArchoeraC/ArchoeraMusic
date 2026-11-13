@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! DTS core 帧头解析（阶段一：16-bit core 子流，BE 或 16-bit 字交换 LE）
 //!
@@ -21,7 +25,7 @@ const BitReader = @import("../aac/bitreader.zig").BitReader;
 const t = @import("tables.zig");
 
 /// 解析窗口：core 帧头 104 位（含 CRC 时为 120 位）+ 主声道头 nsubframes(4)+
-/// nchannels(3)，最坏到第 127 位 → 需 16 字节；取 FFmpeg 同款 18 字节余量。
+/// nchannels(3)，最坏到第 127 位 → 需 16 字节；取 验收基准 同款 18 字节余量。
 pub const header_window: usize = 18;
 
 pub const ParseError = error{
@@ -60,12 +64,12 @@ pub const Header = struct {
     order: ByteOrder = .be16,
     /// Frame type（1 = 普通帧；0 = 首帧/低采样率残帧等）
     normal_frame: bool = false,
-    /// samples_deficit（5 位 +1；FFmpeg 仅接受 32）
+    /// samples_deficit（5 位 +1；验收基准 仅接受 32）
     deficit_samples: u8 = 0,
     crc_present: bool = false,
     /// 每帧 PCM 块数（7 位 +1；须为 8 的倍数）
     npcmblocks: u8 = 0,
-    /// 主帧字节大小（14 位 +1；含 sync，FFmpeg 后续按 FFALIGN(x,4) 处理 DTS-HD）
+    /// 主帧字节大小（14 位 +1；含 sync，验收基准 后续按 FFALIGN(x,4) 处理 DTS-HD）
     frame_size: u16 = 0,
     /// 声道布置（audio_mode，6 位）
     audio_mode: u8 = 0,

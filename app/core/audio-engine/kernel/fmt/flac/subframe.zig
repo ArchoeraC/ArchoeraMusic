@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! FLAC 子帧解码（constant / verbatim / fixed 0-4 / LPC + wasted bits）
 //!
@@ -15,14 +19,14 @@
 //!   其余非法 → error.Corrupt。
 //!
 //! 有效位宽 = 帧 bps（含侧声道 +1 调整，调用方算好）- wasted；
-//! 校验 wasted < 有效位宽（FFmpeg 以 show_bits 探测保证样本位数 ≥ 1）。
+//! 校验 wasted < 有效位宽（验收基准 以 show_bits 探测保证样本位数 ≥ 1）。
 //!
 //! 重建语义：
 //!   - fixed：warm-up 读 order 个有符号样本，残差后按 binomial 系数递推
-//!     （DECODER_SUBFRAME_FIXED_WIDE；与窄式 int32 递推对有效流 bit-exact）；
+//!     （DECODER_SUBFRAME_FIXED_WIDE；与窄式 int32 递推对有效流 逐样本一致）；
 //!   - lpc：warm-up + coeff_prec(4)+1（==16 非法）+ qlevel(5 位有符号，负非法)
 //!     + 系数（逆序）→ i64 累加重建（= lpc32 语义）；
-//!     FFmpeg 在走 lpc32 且流位深 ≤ 16 时附加 lpc_analyze_remodulate，
+//!     验收基准 在走 lpc32 且流位深 ≤ 16 时附加 lpc_analyze_remodulate，
 //!     复刻编码器 int32 环绕语义——本实现忠实复现；
 //!   - wasted：解码后整体左移 wasted 位。
 //!
@@ -49,7 +53,7 @@ fn parseHeader(br: *BitReader) Error!Header {
     const type_bits: u6 = @intCast(try br.readBits(6));
     var wasted: u8 = 0;
     if (try br.readBit() == 1) {
-        // FFmpeg get_unary 上限为剩余位数；33 位深下 wasted 实际 ≤ 32
+        // 验收基准 get_unary 上限为剩余位数；33 位深下 wasted 实际 ≤ 32
         wasted = 1 + try br.readUnary(1, 32);
     }
     return .{ .type_bits = type_bits, .wasted = wasted };
@@ -188,7 +192,7 @@ fn decodeLpc(
         out[i] +%= @intCast(sum >> qlevel);
     }
 
-    // FFmpeg：走 lpc32（而非 lpc16）且流位深 ≤ 16 时重调制，
+    // 验收基准：走 lpc32（而非 lpc16）且流位深 ≤ 16 时重调制，
     // 复刻编码器 int32 环绕（lpc_analyze_remodulate）。
     const use_lpc32 = !(bps <= 16 and bps + coeff_prec + floorLog2(order) <= 32);
     if (use_lpc32 and stream_bps <= 16) {

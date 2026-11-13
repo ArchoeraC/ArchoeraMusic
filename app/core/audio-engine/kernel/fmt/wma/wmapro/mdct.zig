@@ -7,7 +7,7 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Pro 逆 MDCT（plain inv-MDCT，bit-exact 复刻 FFmpeg n9.0.1 av_tx
+//! WMA Pro 逆 MDCT（plain inv-MDCT，复刻 FFmpeg n9.0.1 av_tx
 //! AV_TX_FLOAT_MDCT inv，非 FULL）。长度 L ∈ {64…2048} 幂次。
 //!
 //! av_tx mdct_inv(L)：读 L 谱值 → 写 L 时域样，scale 折叠进 exp 表
