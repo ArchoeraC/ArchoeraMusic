@@ -1945,6 +1945,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsFloatingBarOff => 'Full-width docked (default)';
 
   @override
+  String get settingsSectionWindow => 'Window';
+
+  @override
+  String get settingsWindowDecor => 'Window decoration';
+
+  @override
+  String get settingsWindowDecorDesc =>
+      'Borderless: content fills the window and window buttons sit in the top bar.';
+
+  @override
+  String get settingsWindowDecorSystem => 'System';
+
+  @override
+  String get settingsWindowDecorCaption => 'Custom title bar';
+
+  @override
+  String get settingsWindowDecorBorderless => 'Borderless';
+
+  @override
+  String get settingsWindowDecorNote =>
+      'Takes effect immediately; restart the app if the title bar looks wrong.';
+
+  @override
+  String get settingsWindowControlsAutoHide => 'Auto-hide window buttons';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      'Only applies to Borderless; shown only when the cursor moves to the top-right corner. Touch users cannot click them. Off by default.';
+
+  @override
+  String get windowMinimize => 'Minimize';
+
+  @override
+  String get windowMaximize => 'Maximize';
+
+  @override
+  String get windowRestore => 'Restore';
+
+  @override
+  String get windowClose => 'Close';
+
+  @override
   String get settingsSectionFont => 'Interface font';
 
   @override

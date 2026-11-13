@@ -46,8 +46,8 @@ class CoverGrid extends ConsumerWidget {
     if (items.isEmpty && !loading) {
       return const SizedBox.shrink();
     }
-    final double r = radius ??
-        ref.watch(appPrefsProvider.select((p) => p.coverRadius));
+    final double r =
+        radius ?? ref.watch(appPrefsProvider.select((p) => p.coverRadius));
     final grid = InkClip(
       child: GridView.builder(
         shrinkWrap: shrinkWrap,
@@ -94,7 +94,7 @@ class CoverGrid extends ConsumerWidget {
 }
 
 /// 横向封面走带（主页区段：推荐歌单 / 新碟 / 热门歌手）。
-class CoverRail extends ConsumerWidget {
+class CoverRail extends ConsumerStatefulWidget {
   const CoverRail({
     super.key,
     required this.items,
@@ -119,16 +119,35 @@ class CoverRail extends ConsumerWidget {
   final bool artist;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CoverRail> createState() => _CoverRailState();
+}
+
+class _CoverRailState extends ConsumerState<CoverRail> {
+  /// 横向滚轮 / 触控板滚动与纵向列表同一套弹簧跟随；触摸拖拽、键盘滚动
+  /// 不经过 `pointerScroll`，行为与原生一致。
+  final ScrollController _scroll = SmoothWheelScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final items = widget.items;
+    final loading = widget.loading;
     if (items.isEmpty && !loading) {
       return const SizedBox.shrink();
     }
-    final double r = radius ??
+    final double r =
+        widget.radius ??
         ref.watch(appPrefsProvider.select((p) => p.coverRadius));
     return SizedBox(
-      height: height,
+      height: widget.height,
       child: InkClip(
         child: ListView.builder(
+          controller: _scroll,
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: items.length + (loading ? 1 : 0),
@@ -138,8 +157,8 @@ class CoverRail extends ConsumerWidget {
           itemExtentBuilder: (index, _) {
             if (index == items.length) return 40;
             return index == items.length - 1 && !loading
-                ? cardWidth
-                : cardWidth + 14;
+                ? widget.cardWidth
+                : widget.cardWidth + 14;
           },
           itemBuilder: (context, index) {
             if (index == items.length) {
@@ -156,13 +175,15 @@ class CoverRail extends ConsumerWidget {
             }
             final item = items[index];
             final card = SizedBox(
-              width: cardWidth,
+              width: widget.cardWidth,
               child: CoverCard(
                 item: item,
                 radius: r,
-                artist: artist,
-                onTap: () => onTap(item),
-                onPlay: onPlay == null ? null : () => onPlay!(item),
+                artist: widget.artist,
+                onTap: () => widget.onTap(item),
+                onPlay: widget.onPlay == null
+                    ? null
+                    : () => widget.onPlay!(item),
               ),
             );
             if (index == items.length - 1 && !loading) return card;
@@ -301,7 +322,10 @@ class CoverCard extends StatelessWidget {
               // 双边 target 解码必须保比例（见 lib/widgets/list/cover_image.dart）：
               // ResizeImage 默认 policy=exact 会把 16:9 拉成 1:1（解码层变形）。
               image: ResizeImage(
-                NetworkImage(item.cover!, headers: mediaHeadersForUrl(item.cover!)),
+                NetworkImage(
+                  item.cover!,
+                  headers: mediaHeadersForUrl(item.cover!),
+                ),
                 width: 320,
                 height: 320,
                 policy: ResizeImagePolicy.fit,

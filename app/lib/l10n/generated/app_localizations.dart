@@ -3556,6 +3556,84 @@ abstract class AppLocalizations {
   /// **'全宽停靠（默认）'**
   String get settingsFloatingBarOff;
 
+  /// No description provided for @settingsSectionWindow.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'窗口'**
+  String get settingsSectionWindow;
+
+  /// No description provided for @settingsWindowDecor.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'窗口装饰方案'**
+  String get settingsWindowDecor;
+
+  /// No description provided for @settingsWindowDecorDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无边框：内容铺满窗口，窗口按钮并入顶栏。'**
+  String get settingsWindowDecorDesc;
+
+  /// No description provided for @settingsWindowDecorSystem.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'系统原生'**
+  String get settingsWindowDecorSystem;
+
+  /// No description provided for @settingsWindowDecorCaption.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自绘标题栏'**
+  String get settingsWindowDecorCaption;
+
+  /// No description provided for @settingsWindowDecorBorderless.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'无边框'**
+  String get settingsWindowDecorBorderless;
+
+  /// No description provided for @settingsWindowDecorNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'切换立即生效；若标题栏显示异常，重启应用即可。'**
+  String get settingsWindowDecorNote;
+
+  /// No description provided for @settingsWindowControlsAutoHide.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动隐藏窗口按钮'**
+  String get settingsWindowControlsAutoHide;
+
+  /// No description provided for @settingsWindowControlsAutoHideDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅「无边框」方案生效；光标移到右上角时才显示，触摸屏用户将无法点击，默认关闭。'**
+  String get settingsWindowControlsAutoHideDesc;
+
+  /// No description provided for @windowMinimize.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'最小化'**
+  String get windowMinimize;
+
+  /// No description provided for @windowMaximize.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'最大化'**
+  String get windowMaximize;
+
+  /// No description provided for @windowRestore.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'还原'**
+  String get windowRestore;
+
+  /// No description provided for @windowClose.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'关闭'**
+  String get windowClose;
+
   /// No description provided for @settingsSectionFont.
   ///
   /// In zh_CN, this message translates to:

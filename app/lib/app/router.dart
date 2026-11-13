@@ -128,9 +128,9 @@ final appRouter = GoRouter(
       path: '/player',
       pageBuilder: (context, state) => CustomTransitionPage(
         key: state.pageKey,
-        // 非不透明：过渡期间 Overlay 仍绘制下方主页，才能看到主页同步收缩
-        // （不透明路由会立刻把下方路由 offstage）。展开动画结束后壳内容由
-        // ShellExpandTransition 停绘/停布局（State 保留），背后绘制开销为零。
+        // 非不透明：过渡期间 Overlay 仍绘制下方主页（主页保持原位，不做
+        // 缩放/淡出，只被播放页上滑盖住）。展开动画结束后壳内容由
+        // OffstageWhenComplete 停绘/停 ticker（State 保留），背后绘制开销为零。
         opaque: false,
         transitionDuration: kPlayerRouteTransitionDuration,
         reverseTransitionDuration: kPlayerRouteTransitionDuration,
@@ -144,7 +144,6 @@ final appRouter = GoRouter(
           // 曲线改成单峰：展开先快后慢、收起先慢后快（见
           // `player_route_curves.dart`）；收起走 reverseCurve，Flutter 直接把它
           // 作用在 1 → 0 的递减值上，因此两条曲线都用 ease-out 形状。
-          // 壳层由 `ShellExpandTransition` 用同一组曲线驱动，天然同步。
           final curved = CurvedAnimation(
             parent: animation,
             curve: kPlayerRouteOpenCurve,

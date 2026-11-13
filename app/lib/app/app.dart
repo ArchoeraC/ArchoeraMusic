@@ -9,7 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart'
     show
         DragToMoveArea,
-        VirtualWindowFrame,
+        DragToResizeArea,
+        ResizeEdge,
         WindowCaption,
         kWindowCaptionHeight;
 
@@ -19,6 +20,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../l10n/l10n.dart';
 import '../services/mcp/mcp_host.dart';
 import '../services/platform/media_session.dart';
+import '../services/platform/window_decor.dart';
 import '../services/power/power_saver.dart';
 import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
@@ -37,12 +39,14 @@ import 'bootstrap.dart';
 import 'router.dart';
 import 'theme_provider.dart';
 
-/// 桌面端启用自绘窗口框（配合 main.dart 的 TitleBarStyle.hidden）：
-/// WindowCaption 提供标题栏（拖拽 + 双击最大化 + 最小化/最大化/关闭），
-/// VirtualWindowFrame 提供边缘缩放与窗口边框/阴影（Linux 全边缘；
-/// Windows 左右下走原生 thickframe 仅补顶部；macOS 原生缩放直通）。
+/// 桌面端窗口装饰（配合 main.dart 的 applyWindowDecor）：
+/// - `caption`：WindowCaption 提供 32px 标题条（拖拽 + 双击最大化 + 三个窗口
+///   按钮），保留系统边框；Windows 左右下走原生 thickframe，仅补顶部热区；
+/// - `borderless`：去掉原生边框与系统按钮，内容铺满，窗口按钮并入主界面
+///   顶栏 NavHeader（播放页不放窗口按钮），边缘缩放由 `_EdgeResizeArea`
+///   全边缘接管。
 /// 关闭按钮调用 nativeapi 可取消的关闭请求，仍由 TrayIntegration 接管。
-final bool _kCustomWindowFrame =
+final bool _kDesktop =
     Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
 /// ArchoeraMusic 应用根：主题 + 路由 + 启动门。
@@ -177,48 +181,56 @@ class ArchoeraMusicApp extends ConsumerWidget {
                     child: gate,
                   );
                 }
-                // 自绘窗口框包在最外层：标题栏悬浮于一切路由（含播放页）之上，
-                // 启动门/解锁门期间仍可最小化/关闭；无边框窗口的边缘缩放由
-                // VirtualWindowFrame 提供（最大化/全屏时自动收边）。
-                if (_kCustomWindowFrame) {
+                // 窗口装饰包在最外层：caption 模式下标题条悬浮于一切路由
+                // （含播放页）之上，启动门/解锁门期间仍可最小化/关闭；
+                // borderless 模式不占布局，内容直通窗口边缘。
+                final decor = _kDesktop
+                    ? prefs.windowDecor
+                    : WindowDecor.system;
+                if (decor != WindowDecor.system) {
                   // 先把当前内容快照到局部变量再包装：Builder 的闭包捕获的是
                   // 变量而非值，若闭包里直接引用 gate，而 gate 紧接着被重新赋
                   // 值为这个 Builder 本身 → 挂载时无限自嵌套（栈溢出）。
                   final content = gate;
+                  final frameless = decor == WindowDecor.borderless;
                   gate = Builder(
-                    builder: (frameContext) => VirtualWindowFrame(
-                      child: Column(
-                        children: [
-                          if (Platform.isMacOS)
-                            // macOS：TitleBarStyle.hidden 保留原生红绿灯按钮
-                            // （悬浮于内容左上），这里只补一条拖拽/双击最大化区，
-                            // 避免与原生按钮重复。
-                            DragToMoveArea(
-                              child: SizedBox(
-                                height: 28,
-                                child: ColoredBox(
-                                  color: Theme.of(frameContext)
-                                      .colorScheme
-                                      .surface,
-                                ),
-                              ),
-                            )
-                          else
-                            // WindowCaption 内部用 SizedBox(height: double.infinity)
-                            // 撑满，必须由父级给出确定高度（官方示例放在 AppBar 下）；
-                            // 直接塞进 Column 会拿到无限高度约束而断言失败。
-                            SizedBox(
-                              height: kWindowCaptionHeight,
-                              child: WindowCaption(
-                                brightness: Theme.of(frameContext).brightness,
-                                backgroundColor: Theme.of(frameContext)
-                                    .colorScheme
-                                    .surface,
-                              ),
+                    builder: (frameContext) => _EdgeResizeArea(
+                      frameless: frameless,
+                      child: frameless
+                          ? content
+                          : Column(
+                              children: [
+                                if (Platform.isMacOS)
+                                  // macOS：TitleBarStyle.hidden 保留原生红绿灯按钮
+                                  // （悬浮于内容左上），这里只补一条拖拽/双击最大化区，
+                                  // 避免与原生按钮重复。
+                                  DragToMoveArea(
+                                    child: SizedBox(
+                                      height: 28,
+                                      child: ColoredBox(
+                                        color: Theme.of(frameContext)
+                                            .colorScheme
+                                            .surface,
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  // WindowCaption 内部用 SizedBox(height: double.infinity)
+                                  // 撑满，必须由父级给出确定高度（官方示例放在 AppBar 下）；
+                                  // 直接塞进 Column 会拿到无限高度约束而断言失败。
+                                  SizedBox(
+                                    height: kWindowCaptionHeight,
+                                    child: WindowCaption(
+                                      brightness: Theme.of(frameContext)
+                                          .brightness,
+                                      backgroundColor: Theme.of(frameContext)
+                                          .colorScheme
+                                          .surface,
+                                    ),
+                                  ),
+                                Expanded(child: content),
+                              ],
                             ),
-                          Expanded(child: content),
-                        ],
-                      ),
                     ),
                   );
                 }
@@ -229,5 +241,41 @@ class ArchoeraMusicApp extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// 无边框窗口的边缘缩放热区（仅在自绘窗口框下使用）。
+///
+/// 不用 `VirtualWindowFrame`：它会为整窗叠加 `BoxShadow`（每帧一次全屏模糊，
+/// 且完全被不透明内容盖住）与圆角 `ClipRRect`，并额外注册窗口监听、在
+/// `initState` 与每次焦点/缩放/最大化事件里同步读取 3 个原生窗口属性
+/// （Windows 上属于会阻塞 UI 线程的跨线程调用）。这里只保留真正需要的
+/// 原生拖拽缩放区域，热路径上没有任何原生读取。
+class _EdgeResizeArea extends StatelessWidget {
+  const _EdgeResizeArea({required this.child, this.frameless = false});
+
+  final Widget child;
+
+  /// 无边框（frameless）时 Windows 也失去 thickframe，需要补全四条边。
+  final bool frameless;
+
+  @override
+  Widget build(BuildContext context) {
+    if (Platform.isWindows) {
+      // caption 模式原生 thickframe 仍在，左右与底部可原生缩放，只补顶部三边；
+      // borderless 模式边框被移除，四边都由 Flutter 侧热区接管。
+      return DragToResizeArea(
+        enableResizeEdges: frameless
+            ? null
+            : const [ResizeEdge.topLeft, ResizeEdge.top, ResizeEdge.topRight],
+        child: child,
+      );
+    }
+    if (Platform.isLinux) {
+      // GTK 去掉装饰后由 Flutter 侧接管四条边（Wayland 走 beginResizeDrag）。
+      return DragToResizeArea(child: child);
+    }
+    // macOS：TitleBarStyle.hidden 保留原生窗口边缘缩放能力，无需额外热区。
+    return child;
   }
 }

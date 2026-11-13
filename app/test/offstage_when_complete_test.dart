@@ -36,7 +36,11 @@ void main() {
 
     await tester.pumpWidget(host());
     Offstage offstageOf() => tester.widget<Offstage>(find.byType(Offstage));
+    TickerMode tickerModeOf() => tester.widget<TickerMode>(
+      find.byType(TickerMode, skipOffstage: false),
+    );
     expect(offstageOf().offstage, isFalse);
+    expect(tickerModeOf().enabled, isTrue);
 
     // 动画中途：仍在绘制。
     controller.value = 0.5;
@@ -48,12 +52,14 @@ void main() {
     controller.value = 1.0;
     await tester.pump();
     expect(offstageOf().offstage, isTrue);
+    expect(tickerModeOf().enabled, isFalse, reason: '被遮挡期间子树动画应暂停');
     expect(built, buildsBefore, reason: '停绘不应触发 child 重建（保留状态）');
 
     // 回退：重新显示，仍是同一份子树。
     controller.value = 0.2;
     await tester.pump();
     expect(offstageOf().offstage, isFalse);
+    expect(tickerModeOf().enabled, isTrue);
     expect(built, buildsBefore, reason: '恢复显示不应重建 child');
 
     controller.dispose();

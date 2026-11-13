@@ -5,7 +5,7 @@
 /// 播放页路由动画写入器回归：
 /// - 关闭后迅速重开时新旧 `PlayerPage` 实例会短暂重叠，旧实例 `dispose` 清空
 ///   动画时**只能**清掉自己写入的那个，不能把新实例刚写入的动画抹掉；
-/// - 否则壳层（`AppShell` / `ShellExpandTransition`）会永久停在折叠态。
+/// - 否则壳层（`AppShell` 的停绘判定 / 顶栏下拉收起）会停在错误状态。
 library;
 
 import 'package:flutter/widgets.dart';

@@ -141,6 +141,12 @@ static void my_application_activate(GApplication* application) {
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
+  // 渲染后端诊断开关：ARCHOERA_IMPELLER=0 时退回 Skia（默认仍用 Impeller）。
+  // 用于对比 Flutter 3.50 Impeller 在 Linux 桌面/高刷屏上的性能；release
+  // 构建会忽略从环境传入的 engine switch，故需要项目级 opt-out。
+  if (g_strcmp0(g_getenv("ARCHOERA_IMPELLER"), "0") == 0) {
+    fl_dart_project_set_enable_impeller(project, FALSE);
+  }
 
   FlView* view = fl_view_new(project);
   GdkRGBA background_color;

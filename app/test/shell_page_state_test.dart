@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /// [shell_page_state] 回归测试：平台 / Tab 选择存于应用级 provider，因此在
-/// `ShellExpandTransition` 展开/收起（全屏播放页）后仍保留，不会回到默认值。
+/// 播放页展开/收起（壳内容停绘）后仍保留，不会回到默认值。
 /// 2026-11-09 起壳内容只停绘、不再卸载，本测试同时守住「State 不重建」。
 library;
 
@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:archoera_music/app/shell_expand_transition.dart';
+import 'package:archoera_music/widgets/common/offstage_when_complete.dart';
 import 'package:archoera_music/stores/shell_page_state.dart';
 
 /// 模拟「页面」：把平台与 Tab 选择存在 provider，`State` 重建时从中恢复。
@@ -53,7 +53,7 @@ Widget _host(Animation<double> animation) {
   return ProviderScope(
     child: MaterialApp(
       home: Scaffold(
-        body: ShellExpandTransition(
+        body: OffstageWhenComplete(
           animation: animation,
           child: const _PlatformPicker(),
         ),
