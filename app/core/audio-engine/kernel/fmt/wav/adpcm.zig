@@ -3,25 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! WAV / AIFF 内 ADPCM 解码（docs/audio-kernel-zig.md §9.1）
-//!
-//! 支持多种 4-bit ADPCM（输出 s16）：
-//!   - IMA WAV（WAV tag 0x0011，codec "adpcm_ima_wav"）：块头每通道
-//!     predictor(2B LE) + step_index(1B) + reserved(1B)，随后每字节两个 4-bit
-//!     nibble（低 4 位在前）；每 8 样本 4 字节，通道按块交错存放；
-//!   - MS ADPCM（WAV tag 0x0002，codec "adpcm_ms"）：块头每通道
-//!     predictor(1B) + idelta(2B LE) + sample1(2B LE) + sample2(2B LE)，随后
-//!     nibble 数据；≤2 声道 mono 每字节 2 样本（高/低 4 位）、stereo 高 4 位 = ch0、
-//!     低 4 位 = ch1；>2 声道每通道独立连续段（镜像 FFmpeg 行为）；
-//!   - IMA QT（AIFF-C "ima4"，codec "adpcm_ima_qt"）：块 = 每通道
-//!     predictor/step_index 打包 2B BE + 32B 数据 → 64 样本/通道；
-//!   - OKI ADPCM（WAV tag 0x0010/0x0017，codec "adpcm_ima_oki"）、
-//!     Yamaha ADPCM（tag 0x0020，codec "adpcm_yamaha"）、Creative CT
-//!     （tag 0x0200，codec "adpcm_ct"）：无块头连续流，每字节 2 交错样本。
-//!
-//! 算法与常量表重构自 验收基准 `libavcodec/adpcm.c` / `adpcm_data.c`
-//! （reference/验收基准，参考实现非直接复制）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

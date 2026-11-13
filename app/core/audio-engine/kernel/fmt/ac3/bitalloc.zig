@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AC-3 位分配（对照 FFmpeg ac3.c / ac3dsp.c）
-//!
-//! PSD（功率谱密度）计算、掩蔽曲线、逐 bin 位分配（bap）。
-
 const t = @import("tables.zig");
 
 pub const BitAllocParams = struct {

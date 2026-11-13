@@ -3,16 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! MACE（Macintosh Audio Compression/Expansion）3:1 / 6:1 解码器（docs/audio-kernel-zig.md §9.1）
-//!
-//! 镜像 FFmpeg libavcodec/mace.c。AIFC 压缩类型 "MAC3"（3:1）/ "MAC6"（6:1）。
-//! 特性：
-//!   - 1-2 声道；块式：MAC3 每块 2B/声道、MAC6 每块 1B/声道，每块 6 样本/声道；
-//!   - 流式状态（index/factor/prev2/previous/level）跨块保持，seek 后须重置
-//!     （镜像 FFmpeg flush）；
-//!   - 输出交错 s16。注意：样本输出为 `QT_8S_2_16S`（高字节复制到低位），
-//!     这是 MACE 解码器保持与原版二进制一致的刻意的"怪异"行为（mace.c 注释）。
-
 const std = @import("std");
 const testing = std.testing;
 const Error = @import("../../error.zig").Error;

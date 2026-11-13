@@ -7,21 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! 逆 MDCT（复刻 FFmpeg av_tx 浮点路径，支持 f32/f64）。
-//!
-//! 复刻对象：libavutil/tx_template.c `ff_tx_mdct_inv` + 单块 split-radix
-//! FFT codelet（fft512_ns…fft8_ns）+ `ff_tx_fft_sr_combine`，运算顺序、
-//! 宏展开（CMUL/BF/BUTTERFLIES/TRANSFORM）、表布局逐一对齐：
-//!   - fold：z[i] = CMUL({in[len-1-2m], in[2m]}, exp_permuted[i])，
-//!     m = gather revtab（split_radix_permutation, inv=1）；
-//!   - exp 表布局 [permuted(n2) | raw(n2)]，由 mdct_tables*.zig 以位模式嵌入
-//!     （double 精度 cos/sin → T 截断的舍入顺序敏感，故不在 Zig 内计算）；
-//!   - FFT：n2 点单块 split-radix（递归至手写 fft16/8/4 基例）；
-//!   - post-twiddle 与交错输出。
-//!
-//! scale = 1/N/32768 已折入 exp 表；f32 表输出与 参考 CLI 逐样本一致
-//! （mdct_golden_* 验收基准向量校验）；f64 表由 f32 源值精确提升。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const vec = @import("../../simd/vec.zig");

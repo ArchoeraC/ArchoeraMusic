@@ -3,21 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Opus packet 解析（docs/audio-kernel-zig.md §9.2）
-//!
-//! RFC 6716 §3：TOC 字节（config 7-3 / stereo 2 / code 1-0）+ 帧计数 + 帧尺寸
-//! 分割。参考重构对照 FFmpeg `libavcodec/opus/parse.c`（ff_opus_parse_packet，
-//! 非自定界形态）与 RFC 6716 Table 2（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 语义要点（对齐参考实现，保证逐样本一致）：
-//!   - Table 2：config 0-11 SILK-only（NB/MB/WB，10/20/40/60ms）、
-//!     12-15 Hybrid（SWB/FB，10/20ms）、16-31 CELT-only（NB/WB/SWB/FB，
-//!     2.5/5/10/20ms）；每档内 (config&3) / (config&1) 决定帧时长；
-//!   - code 0 = 单帧；1 = 两帧等长（剩余须为偶数）；2 = 两帧变长（首帧 1-2
-//!     字节长度）；3 = 任意帧数（帧数 6 位 / padding 标志 bit6 / VBR 标志 bit7，
-//!     padding 长度走 xiph lacing，VBR 时 M-1 个 1-2 字节帧长）；
-//!   - 采样率恒 48kHz。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

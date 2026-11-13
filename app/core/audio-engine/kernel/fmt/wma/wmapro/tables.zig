@@ -7,10 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Pro (wmapro) Huffman / band / decorrelation tables.
-//! Source: reference/FFmpeg/libavcodec/wmaprodata.h (n9.0.1). Rows/order and
-//! offsets preserved verbatim; codes derived at comptime exactly as
-//! ff_vlc_init_from_lengths (in-order canonical assignment).
 pub const critical_freq = [_]u16{
     100,  200,  300,  400,  510,  630,  770,   920,   1080,  1270,  1480,  1720,  2000, 2320, 2700, 3150,
     3700, 4400, 5300, 6400, 7700, 9500, 12000, 15500, 20675, 28575, 41375, 63875,

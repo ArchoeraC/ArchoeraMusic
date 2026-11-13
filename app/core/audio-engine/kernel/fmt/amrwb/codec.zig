@@ -7,18 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AMR-WB 解码主路径（浮点，逐句对齐 FFmpeg amrwbdec.c）
-//!
-//! 对照 FFmpeg libavcodec/amrwbdec.c + amr.h（ff_amr_bit_reorder）：
-//! 帧头 MIME 解析 → 位重排（order_MODE_*）→ ISF 量化解码/预测/最小间距 →
-//! ISF→ISP→每子帧内插→LPC → 逐子帧 ACELP 解码（自适应码本分数基音、
-//! 代数码本 4-track、增益 VQ、基音锐化/去稀疏/噪声增强/基音增强）→
-//! LPC 合成 → 去加重 → 31Hz HPF → 5/4 上采样 → 高频带（噪声激励 + 20 阶
-//! LPC + 6-7kHz BPF，23k85 额外 7k LPF）→ 求和 → 浮点样本。
-//!
-//! 帧输入：含 1 字节 MIME 头（mode/quality）的整帧字节。
-//! 帧输出：320 个 f32 样本（16kHz 单声道）。
-
 const std = @import("std");
 const T = @import("tables.zig");
 const dsp = @import("dsp.zig");

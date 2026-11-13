@@ -3,14 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AC-3 / E-AC-3 指数解码（对照 FFmpeg ac3dec.c decode_exponents）
-//!
-//! §7.1.3 Exponent Decoding。三种策略统一以 7 位组编码 3 个基数 5 的增量码字
-//! （各码字 0..4，delta = 码字 - 2），解码后按 group_size 展开为绝对指数：
-//!   D15（策略 1）：每码字 1 个 bin；D25（策略 2）：每码字 2 个 bin；
-//!   D45（策略 3）：每码字 4 个 bin。
-//! 绝对指数范围 0..24；越界（组码 ≥125 / 指数 >24 或 <0 / 位读取越界）→ 返回 true。
-
 const t = @import("tables.zig");
 const Ctx = @import("ctx.zig").Ctx;
 

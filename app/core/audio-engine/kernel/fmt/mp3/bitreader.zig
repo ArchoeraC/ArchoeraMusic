@@ -3,11 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! MP3 bitstream reader（MSB-first，对齐 minimp3 bs_t）。
-//!
-//! 边界语义与 minimp3 get_bits 完全一致：若读取会越过 limit 返回 0，
-//! 但 pos 仍已前进。跨字节缓存合并取 n 位。
-
 pub const BitReader = struct {
     buf: []const u8,
     pos: usize = 0, // 位偏移

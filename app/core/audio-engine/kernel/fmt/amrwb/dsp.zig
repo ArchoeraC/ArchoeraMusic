@@ -7,17 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AMR-WB 解码 DSP（浮点路径复刻 FFmpeg ACELP 族工具函数）
-//!
-//! 对照 FFmpeg libavcodec（LGPL-2.1+）：acelp_filters.c（acelp_interpolatef /
-//! acelp_apply_order_2_transfer_function）、celp_filters.c（lp 合成滤波，
-//! 含 4 路展开路径）、acelp_vectors.c（weighted sum / scale sum-of-squares /
-//! circ_addf）、celp_math.c（float dot product）、libavutil/ffmath.h（ff_exp10）、
-//! libavutil/lfg.c（Lagged Fibonacci PRNG）。运算顺序与类型逐句对齐，
-//! 全部标量浮点（f32/f64 同 C），不触发任何融合乘加。
-//!
-//! 参考重构：验收基准 目标为准；数值表见 tables.zig。
-
 const std = @import("std");
 const T = @import("tables.zig");
 

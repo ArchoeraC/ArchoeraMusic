@@ -3,18 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 格式声明解析（docs/audio-kernel-zig.md §9.1）
-//!
-//! 解析 WAV `fmt ` chunk（含 WAVEFORMATEXTENSIBLE）与 AIFF `COMM` chunk
-//! （含 AIFF-C 压缩类型与 80-bit extended 采样率），统一产出 `WavFmt`：
-//!   - 编码判定：PCM 整数 / IEEE float / A-LAW / mu-LAW / ADPCM
-//!     （IMA WAV tag 0x11、MS tag 2、OKI tag 0x10/0x17、Yamaha tag 0x20、
-//!     Creative CT tag 0x200、AIFF-C "ima4"）；其余 → UnsupportedFormat，
-//!     引擎回退 FFmpeg，§8.3；
-//!   - 字节序：RIFX 与 AIFF 为 big-endian，RIFF/RF64/W64/AIFC-"sowt" 为 little；
-//!     WAV 8-bit PCM 为**无符号**（pcm_u8），AIFF 8-bit 为**有符号**（pcm_s8），
-//!     AIFC-"raw " 才是无符号 —— 由调用方依据容器 + tag 决定 codec_name。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

@@ -3,25 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Opus 解码器封装（open + VTable + Ogg 解复用 + SILK/CELT/HYBRID + 重采样 + 输出）
-//!
-//! 输出契约：48kHz、s16、交错 PCM（opus 原生位深 16），与 FFmpeg `-c:a libopus -f s16le`
-//! 对照（±1 LSB 容差，见 docs/audio-kernel-zig.md §9.2）。
-//!
-//! 帧循环语义（对齐 libopus `opus_decoder.c` / `silk/dec_API.c`）：
-//!   - 每帧新建区间解码器（SILK 帧 / CELT 帧独立 `ec_dec`），hybrid 的 CELT 在同一
-//!     `ec_dec` 上续解；
-//!   - SILK：内部 8/12/16k 解码 → 固定 resampler 升采样到 48k；喂入采用 dec_API
-//!     `&samplesOut1_tmp[n][1]` 语义（首样本 = 上一帧末样本 sMid/sSide[1]，丢弃本帧末样本）；
-//!   - HYBRID：SILK 升采样到 48k 后，同一 `ec_dec` 续解 CELT HP（start_band=17）
-//!     以定点 `ADD_RES(pcm, SIG2RES(celt_sig))` 语义累加（±1 LSB）；
-//!   - CELT：直接 48k f32 输出 → s16。
-//!   - 冗余位（opus_decoder.c:501-528）：`dec_log(12)` + celt_to_silk + `dec_uint(256)`
-//!     + `dec.storage -= redundancy_bytes`（`BitReader.limit` / `RawBits.bytes` 收缩）。
-//!
-//! pre-skip / end-trim：OpusHead.pre_skip 起始丢弃；末页 granule（含 pre_skip）决定
-//! 整轨样本数，超出的尾样本丢弃。输出增益（Q7.8）按 libopus `celt_exp2` 浮点公式应用。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

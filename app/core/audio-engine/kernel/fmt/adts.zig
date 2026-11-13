@@ -3,21 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! ADTS 裸流容器（AAC ADTS，ISO 14496-3 §1.8.2）：帧同步定位 + 头解析，
-//! 载荷逐帧喂给 fmt/aac/lib.zig（AAC-LC 自研解码核心）。
-//!
-//! 帧结构：syncword(12)=0xFFF | id(1) | layer(2)=0 | protection_absent(1)
-//!         | profile(2) | sf_index(4) | private(1) | chan_cfg(3) | ...
-//!         | aac_frame_length(13，含头) | buffer_fullness(11) | rdb(2)
-//! 头长 7 字节；protection_absent==0 时其后跟 2 字节 CRC（载荷前）。
-//!
-//! 范围（Phase C）：profile=LC、rdb=1；chan_config ≤ 7（mono~7.1）已支持；
-//! 其余（HE-AAD/LD/多声道/PCE）→ UnsupportedFormat 回退 FFmpeg 主后端（§8.3）。
-//!
-//! Seek：按帧头顺序跳过累计样本（每帧固定 1024），无需解码即可定位；
-//! 时长：open 时 ADTS 帧头跳帧计数（帧数 × 1024 = exact；扫描区上限
-//! 128 MiB / 重同步失败 → 回落首帧码率估算 estimate）。
-
 const std = @import("std");
 const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");

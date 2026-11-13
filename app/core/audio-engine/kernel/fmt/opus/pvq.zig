@@ -7,20 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! CELT PVQ 解码（docs/audio-kernel-zig.md §9.2，P2）
-//!
-//! 参考重构对照 FFmpeg `libavcodec/opus/pvq.c`（pvq_decode_band 全路径 +
-//! celt_cwrsi / celt_alg_unquant / celt_exp_rotation / celt_haar1 /
-//! celt_stereo_merge / 数学原语）（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 语义要点（保证逐样本一致）：
-//!   - U(N,K) 组合数表（`ff_celt_pvq_u_row`，满足
-//!     U(n,k)=U(n,k-1)+U(n-1,k-1)+U(n-1,k)），V(N,K)=U(N,K)+U(N,K+1)；
-//!   - `celt_cwrsi`：PVQ 索引 → 脉冲向量（带符号），u64 norm → f32 舍入；
-//!   - `celt_exp_rotation`：theta 用 double（M_PI），cosf/sinf；
-//!   - `celt_haar1`：M_SQRT1_2 用 double 乘后再舍入 f32；
-//!   - collapse mask 位运算与 `remaining2` 8ths 位预算精确一致。
-
 const std = @import("std");
 const rcmod = @import("rc.zig");
 const tables = @import("celt_tables.zig");

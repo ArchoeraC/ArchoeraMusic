@@ -7,17 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS core 流帧扫描/统计（阶段一）
-//!
-//! 在整段缓冲上以 sync 定位 + 帧头 frame_size 前进的方式遍历 core 帧：
-//!   - 相邻纯 core 流（裸 .dts / .dca，如 ffmpeg dca 编码器输出）逐帧无缝；
-//!   - DTS-HD（core + EXSS/XLL 交错，如 fate-suite dtshd）core 帧之间存在
-//!     EXSS 子流 → 帧间差额计入 skipped（core 帧本身仍可按 header 前进）；
-//!   - 帧尾不足 / 悬挂 sync 视为尾部残留（residual）。
-//!
-//! 校验口径（供与 ffprobe/ffmpeg 对照）：core 帧数 = 解码 PCM 帧数，
-//! total_samples = Σ npcmblocks×32，纯 core 文件 residual 应为 0。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const hdr = @import("header.zig");

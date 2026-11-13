@@ -7,11 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Voice (wmavoice) 静态解码表——自动自 reference/FFmpeg/libavcodec/wmavoice_data.h 抽取。
-//! 生成：gen_tables_zig.py（十进制 → 精确位模式 hex float；u8 原值）。
-//! 与 FFmpeg n9.0.1 wmavoice_data.h 同源（LGPL v2.1+）。布局全部压平为 1-D；
-//! 访问偏移由解码器显式计算（mean/intercoeff/denoise_power 见 core 注释）。
-
 const std = @import("std");
 
 pub const wmavoice_dq_lsp10i = [3840]u8{

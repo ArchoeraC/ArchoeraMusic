@@ -7,21 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! TTA (True Audio, .tta) 帧解码核心（逐句对齐 FFmpeg n9.0.1 libavcodec/tta.c）。
-//!
-//! 语义要点（纯整数、无浮点）：
-//!   - 位流为 **LSB-first**（BITSTREAM_READER_LE）；帧内通道按时间步交错，
-//!     但滤波器/预测器/Rice 状态在**每帧起始归零**（帧间无耦合，可随机访问）；
-//!   - 每样本：unary(1 前缀，0 终止) → 分段 Rice(k0/k1 双自适应) → 逆 zigzag
-//!     映射 → 8 抽头自适应 LMS（qm/dx/dl，round/shift 定点舍入）→ 一阶定点
-//!     预测 PRED（(1-2^-k) 偏差）→ 多声道差分去相关；
-//!   - 溢出/无符号减法语义完全复刻 C（uint32 回绕 + int32 算术移位），逐样本一致。
-//!
-//! 位深语义（bytes_per_sample 对齐 验收基准 s->bps）：1=8bit、2=16bit、3=24bit；
-//! 滤波 shift = ff_tta_filter_configs[bps-1] = {10,9,10,12}；预测系数 k：
-//! 8bit→4、16/24bit→5。输出布局对齐 验收基准 内部样本格式：
-//!   8bit → u8(样本+0x80)；16bit → s16；24bit → int32<<8（= `-f s32le`）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

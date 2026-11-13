@@ -7,13 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Voice DSP/量化助手——移植 FFmpeg（celp_filters / acelp_filters /
-//! acelp_vectors / lsp 相关函数 + wmavoice.c 内嵌小函数），n9.0.1。
-//!
-//! 全部浮点滤波/变换以「平坦缓冲 + 绝对写入偏移」实现（FFmpeg C 大量使用负
-//! 索引读回 `out[-i]` 历史；Zig slice 无负索引，故传入整块缓冲与写入起点，由
-//! 调用方保证起点 ≥ filter_length，历史样本紧邻起点之前）。
-
 const std = @import("std");
 const tables = @import("tables.zig");
 const builtin = @import("builtin");

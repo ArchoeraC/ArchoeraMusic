@@ -7,27 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS（DCA Coherent Acoustics）core → PCM 解码（阶段二）
-//!
-//! 主线对照 FFmpeg dca_core.c 的 parse_frame_header / parse_coding_header /
-//! parse_subframe_header / parse_subframe_audio / parse_frame_data（逐样本一致）+
-//! filter_frame_fixed / ff_dca_core_filter_fixed（定点合成，整数逐句一致）。
-//!
-//! 位流：MSB-first，输入 frame 须为已还原的 BE16 字节（LE16 字交换在 lib 层完成）。
-//! 输出：与 `ffmpeg -bitexact -f s32le` 对齐的 24-bit<<8 S32 平面
-//! （声道序 = ffmpeg 默认 remap 序）。定点路径全部整数运算 → 逐样本一致。
-//!
-//! 范围：core 主声道（mono/stereo/3.0/2.1/3.1/2.2/5.0/5.1 + LFE 64x）+ CSS X96
-//! （DTS 96/24：core 帧内 X96 扩展 64 子带数据 + 64-band 合成 → 96k 采样率；
-//!   含 LFE 96k 二次插值）；X96 合成亦供 DTS-HD MA 192k XLL 残余上混使用
-//!   （96k core 输入，见 lib.decodePayloadToS16）。
-//! 附加声道：CSS XCH（DTS-ES 6.1：core 帧内 0x5A5A5A5A 扩展 + Cs，含 es_format
-//!   嵌入 XCH 降混撤销）与 CSS/EXSS XXCH（speaker mask 声道组 + 附加声道
-//!   dmix 撤销），以及 EXSS X96（parse_x96_frame_exss 多声道组）——对照
-//!   dca_core.c parse_xch_frame / parse_xxch_frame / parse_x96_frame_exss 与
-//!   ff_dca_core_parse_exss。LBR 未实现；LFE 128x 定点模式 验收基准 亦不支持。
-//! 14-bit 打包与阶段一一致不支持。
-
 const std = @import("std");
 const BitReader = @import("../aac/bitreader.zig").BitReader;
 const huff = @import("huff.zig");

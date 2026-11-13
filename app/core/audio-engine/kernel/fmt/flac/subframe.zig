@@ -7,33 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! FLAC 子帧解码（constant / verbatim / fixed 0-4 / LPC + wasted bits）
-//!
-//! 参考重构对照 flacdec.c decode_subframe / *_fixed* / *_lpc* /
-//! lpc_analyze_remodulate 与 flacdsp.c flac_lpc_*_c / flac_wasted_*_c。
-//!
-//! 位排布（decode_subframe）：
-//!   padding(1)=0 + type(6) + wasted_flag(1)
-//!   （wasted_flag=1 时）unary：wasted = 1 + 前缀 0 个数；
-//!   type 分派：0 constant / 1 verbatim / 8+order fixed / 32+(order-1) lpc，
-//!   其余非法 → error.Corrupt。
-//!
-//! 有效位宽 = 帧 bps（含侧声道 +1 调整，调用方算好）- wasted；
-//! 校验 wasted < 有效位宽（验收基准 以 show_bits 探测保证样本位数 ≥ 1）。
-//!
-//! 重建语义：
-//!   - fixed：warm-up 读 order 个有符号样本，残差后按 binomial 系数递推
-//!     （DECODER_SUBFRAME_FIXED_WIDE；与窄式 int32 递推对有效流 逐样本一致）；
-//!   - lpc：warm-up + coeff_prec(4)+1（==16 非法）+ qlevel(5 位有符号，负非法)
-//!     + 系数（逆序）→ i64 累加重建（= lpc32 语义）；
-//!     验收基准 在走 lpc32 且流位深 ≤ 16 时附加 lpc_analyze_remodulate，
-//!     复刻编码器 int32 环绕语义——本实现忠实复现；
-//!   - wasted：解码后整体左移 wasted 位。
-//!
-//! 33 位路径（32 位流 + mid/side 侧声道，wasted 扣除后仍 33 位）：
-//!   decodeSubframeWide 输出 []i64；wasted>0 时内容按 33-wasted 位解码进
-//!   i32 临时区再左移（对应 flac_wasted_33_c）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const bitreader = @import("bitreader.zig");

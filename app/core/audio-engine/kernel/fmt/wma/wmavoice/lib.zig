@@ -7,18 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Voice (wmavoice, ASF codec_tag 0x000A) 解码接入层。
-//!
-//! 复用 fmt/wma 的 ASF 容器解析与数据包去包（asf.zig / packets.zig）。每个
-//! ASF 音频对象（obj_size 通常为 block_align 的倍数，内含若干 codec packet；
-//! 每个 codec packet 有自己的 4bit+…+spillover 头）逐一 feed 到
-//! `core.Dec.decodePacket`——对象可能跨多次调用消费（decode 一次至多吐一帧
-//! superframe 480 样本）；对象耗尽后按 ffmpeg drain 语义补空包触发剩余缓存
-//! superframe 输出。
-//!
-//! 输出：解码器内部 float 样本经 clip(round(x*32768)) 转交错 s16（mono），
-//! 对齐 验收基准 `-f s16le`（s16 语义 = round+clip，见上层验证）。
-
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
 const io = @import("../../../io.zig");

@@ -3,15 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Musepack 解码器接入层（fmt/mpc）—— SV7/SV8 均已 逐样本一致（对照 ffmpeg n9.0.1）。
-//!
-//! 容器：SV8 = MPCK chunk 流（SH 头 + AP 音频包），SV7 = MP+ 打包帧。
-//! 本层把整个输入读入内存后交给 fmt/mpc/sv8.zig / sv7.zig。输出原生 16-bit
-//! 交错 PCM。
-//!
-//! 支持面：SV7/SV8 44100/48000/37800/32000、立体声（SV7 恒 2 声道）、
-//! 已用 FATE inside-mp7.mpc / inside-mp8.mpc 全流逐样本对齐 ffmpeg `-f s16le`。
-
 const std = @import("std");
 
 const Error = @import("../../error.zig").Error;

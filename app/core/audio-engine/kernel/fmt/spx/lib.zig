@@ -7,31 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Ogg-Speex（.spx）解码入口（Ogg 容器 + Speex CELP，mode 0/1/2 = NB/WB/UWB）。
-//!
-//! 对照移植 FFmpeg `libavcodec/speexdec.c`（n9.0.1 native `speex`，浮点路径）+
-//! `libavformat/oggparsespeex.c`（容器映射）。核心解码见 `decode.zig`，码本见
-//! `data.zig`（自 speexdata.h 逐值转录）。
-//!
-//! 正确性基准为 **ffmpeg 内嵌 libspeex**：NB(mode0) 保持 native 逐样本一致，WB/UWB
-//! 按 libspeex 语义修正（低带 wideband 高通等，详见 decode.zig 头注释）。
-//!
-//! 语义要点：
-//!   - 头两包：packet0 = SpeexHeader（魔数 "Speex   "，80 字节标准布局：
-//!     rate@36 / mode@40 / bitstream_ver@44 / channels@48 / bitrate@52 /
-//!     frame_size@56 / vbr@60 / frames_per_packet@64 / extra_headers@68），
-//!     packet1 = Vorbis comment（标签元数据）；其后 extra_headers 个附加头包；
-//!   - 每 Ogg packet 含 frames_per_packet 个 20ms 帧（位连续无字节对齐），
-//!     包尾 terminator（m=15）；VBR 逐帧自描述 submode；
-//!   - 输出 s16：f32 × (1/32768) → RINT 偶舍入 → 饱和（对齐 swresample 的
-//!     cvtps2dq + packssdw SIMD 路径，即系统 验收基准 `-f s16le` 实际走的路径）。
-//!
-//! probe/接线建议（供集成者）：
-//!   - probe.zig `Format.spx`：`identifyOgg` 中首包 payload 以 `"Speex   "`
-//!     （8 字节，S 大写 + 3 空格）开头 → `.ogg_speex`（OggS 页 + 27+nsegs 偏移，
-//!     同 OpusHead 判定方式）；enabled() 接 formats.ogg 与独立 formats.speex 开关；
-//!   - decoder.zig `open()` 分派：`.ogg_speex => spx.open(allocator, &reader, info)`。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

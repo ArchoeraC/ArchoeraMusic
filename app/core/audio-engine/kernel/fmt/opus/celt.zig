@@ -7,17 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! CELT 解码器编排（docs/audio-kernel-zig.md §9.2，P2）
-//!
-//! 参考重构对照 FFmpeg `libavcodec/opus/celt.c`（ff_celt_bitalloc /
-//! ff_celt_quant_bands）与 `libavcodec/opus/dec_celt.c`（ff_celt_decode_frame /
-//! 能量解码 / tf / 后滤波 / 去加重）+ `dsp.c`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 帧解码流程：静音 → 后滤波参数 → transient → coarse energy → tf_changes →
-//! bitalloc → fine energy → quant_bands（PVQ）→ anticollapse → final energy →
-//! anticollapse/denormalize → 逆 MDCT + 重叠相加 → 后滤波 → 去加重 →
-//! prev_energy 更新。
-
 const std = @import("std");
 const rcmod = @import("rc.zig");
 const pvqmod = @import("pvq.zig");

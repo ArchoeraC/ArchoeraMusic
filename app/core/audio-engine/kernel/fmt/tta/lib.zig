@@ -3,28 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! TTA (True Audio, .tta) 解码器接入层（fmt/tta）。
-//!
-//! 容器（libavformat/tta.c + tta.c 头解析）：
-//!   22 字节 TTA1 头（魔数/format/channels/bits_per_sample/sample_rate/
-//!   data_length(每声道样本总数)/头 CRC32）→ 每帧 4 字节大小的 seek 表 + 表 CRC
-//!   → 帧体。data_length=0 / 头 CRC 不匹配按 ffmpeg 默认（非 CRCCHECK）语义容忍，
-//!   结构损坏仍报 Corrupt。
-//!
-//! 解码语义（对齐 ffmpeg n9.0.1 native tta）：
-//!   - 帧长 frame_len = 256×sample_rate/245；帧间无状态（滤波器/预测器/Rice 每帧
-//!     归零），支持按帧随机访问 seek；
-//!   - 输出对齐 ffmpeg 内部样本格式：8bit → u8(+0x80)、16bit → s16（=`-f s16le`）、
-//!     24bit → int32<<8（=`-f s32le`）；Info.bits_per_sample 报 8/16/32
-//!     （24bit 以 32bit 承载，与 wmalossless/flac/ALAC 输出语义一致）；
-//!   - format=2（加密）及不支持位深 → UnsupportedFormat（回退 验收基准 主后端）。
-//!
-//! 内存纪律（RSS 收口）：
-//!   - **不再整读文件**。open 只按需读 22B 头 + seek 表（O(nframes) 偏移索引），
-//!     音频帧在 read 时用 `reader.seek(帧起点)` 按帧读入**定长复用缓冲**（尺寸 = 最大
-//!     单帧体），解码后立即复用；常驻内存与文件体积无关，仅 ∝ 帧长/声道/位深 + 单帧。
-//!   逐位语义与原先整读路径完全一致（同一 BitReader/FrameDecoder，正文不变）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

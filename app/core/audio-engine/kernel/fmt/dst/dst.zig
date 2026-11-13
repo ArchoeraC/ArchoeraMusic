@@ -7,41 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DST（Direct Stream Transfer，DST 压缩 DSD）帧解码 —— FFmpeg libavcodec/dstdec.c
-//! 逐句移植。
-//!
-//! 背景（ISO/IEC 14496-3 Subpart 10「lossless coding of oversampled audio」）：
-//! SACD 镜像 .dff 常见为 DST 压缩而非未压缩 DSD。每个 DSTF 帧是独立的压缩单元：
-//!   - 帧头标志（压缩 / 未压缩 DSD 数据）、分段（segmentation）头、通道→滤波
-//!     系数集映射（fsets）与通道→概率表映射（probs）、半概率位；
-//!   - fsets / probs 两张表用「未编码系数 + Golomb-Rice 残差 + 前向预测」传输
-//!     （10.12 / 10.13）；fsets 提供每声道 8×16=128 抽头的 DSD 预测滤波器，
-//!     probs 提供按 |预测值| 查表的符号概率；
-//!   - 其后为算术码数据：ac 初始化 12 位，逐 DSD 样本用上述概率做二进制算术
-//!     解码（ac_get），与（滤波器预测 >>15 的最高位）异或还原出 DSD 位 v；
-//!   - 每个通道的 status 是一个 128 位移位寄存器（初始 0xAA），随输出逐位左移，
-//!     作为滤波器 / 概率索引的历史（该过程无损：DST 为有损码流设计，但 验收基准
-//!     按原样重建编码器侧等价的位流，mine 与其 逐样本一致）。
-//!
-//! 移植对齐点（与 dstdec.c 一一对应）：
-//!   - read_map（10.7~10.9）、read_table（10.12/10.13）、get_sr_golomb_dst
-//!     （golomb.h get_ur_golomb_jpegls + 符号位）、ac_init/ac_get（10.11）、
-//!     build_filter、prob_dst_x_bit（ff_reverse 表）；
-//!   - 逐样本主循环中 status 以 16 字节小端 u64 双半移位，filter[felem][j][b]
-//!     查表累加预测；
-//!   - 输出 DSD 字节序与 dstdec 写盘一致：每 8 位一时间槽，位 i 落字节
-//!     (i/8) 的 MSB-first（位 7-(i&7)），字节按 `槽×channels+通道` 交错存储
-//!     （验收基准 在帧缓冲内为每通道预留 4 字节对齐；抽离 4 字节填充后逐字节等价，
-//!     见 dsd2pcm translate 的 src_stride 论证）。
-//!
-//! 约束与 验收基准 一致：通道 ≤ 6（DST_MAX_CHANNELS）、fsets/probs 元素 ≤ 12
-//! （DST_MAX_ELEMENTS）。不在 PATCHWELCOME 集合内的帧结构（非 same segmentation /
-//! 非 same mapping 等，dstdec 仅 request_sample 后报错）返回 UnsupportedFormat。
-//!
-//! 验证：本模块 + dsd.zig 对 fate-suite `dst/dst-64fs44-2ch.dff`（DSD64 立体声
-//! 10 帧）解码，逐 DSTF 帧重建 DSD → 复用 dsd2pcm（与 验收基准 dsd.c 同源算法）
-//! 输出 f32，与系统 验收基准 `dst` 解码器输出（pcm_f32le，352800 Hz）逐样本一致。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

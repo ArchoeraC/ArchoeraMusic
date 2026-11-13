@@ -7,29 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DSD 解码器（DSF/DFF 容器 + DSD→PCM）
-//!
-//! 文档（docs/audio-kernel-zig.md §9.11）：DSF（`DSD ` 头 + chunk 表）/ DFF
-//! （`FRM8`）容器自研，DSD→PCM 走 1-bit 抽取 + 低通（对照 FFmpeg `dsddec.c` /
-//! `dsd.c`，后者基于 Sebastian Gesemann 的 BSD dsd2pcm）。
-//!
-//! 处理链：
-//!   1) 容器解析 → 声道数 / DSD 位率 / 位序（LSBF/MSBF）/ 块布局；
-//!   2) dsd2pcm 转译：每 DSD 字节（8 个 1-bit 样本）经 96 抽头对称低通 FIR
-//!      （查表 ctables）输出 1 个 f64，采样率 = DSD 位率/8；
-//!   3) 8× 抽取：窗函数 sinc 低通（截止 ~20kHz，对齐 44.1k 倍率输出）→ s16。
-//!
-//! 输出契约：原生 16-bit、交错 PCM，采样率 = DSD 位率/64（DSD64→44.1k、
-//! DSD128→88.2k、DSD256→176.4k）。DSD 为 1-bit 有损转换（"软 DSD"路径），
-//! 对照 验收基准 dsddec 以波形相关/频谱验证（非 逐样本一致）。
-//!
-//! DFF-DST（SACD 镜像常用 DST 压缩 DSD）：'FRM8' form 'DSD '/'DST ' + PROP
-//! （FS/CHNL/CMPR='DST '）→ 'DST ' chunk 内含 FRTE 帧表与一串 'DSTF' 帧；
-//! 每 DSTF 帧为独立 DST 压缩单元，经 dst/dst.zig（验收基准 dstdec.c 逐句移植）
-//! 重建每声道 DSD 位流（fate dst-64fs44-2ch 与 验收基准 f32 输出逐样本一致），
-//! 再复用本文件的 dsd2pcm + 8× 抽取路径输出 PCM。dst2pcm 状态按 验收基准
-//! decode_init 以 0x69 初始化 fifo。
-
 const std = @import("std");
 const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");

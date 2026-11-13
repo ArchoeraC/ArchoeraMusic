@@ -3,28 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Vorbis 解码器封装（open + VTable + Ogg 流式 pushdata）
-//!
-//! 文档（docs/audio-kernel-zig.md §9.12）：复用自研 Ogg 容器（fmt/ogg.zig 负责
-//! 页/包重组与 granule 定位），解码走 vendored `stb_vorbis`（public domain 单文件，
-//! 编译进内核见 build.zig addCSourceFile）。
-//!
-//! 接入方式：stb_vorbis pushdata API（`stb_vorbis_open_pushdata` +
-//! `stb_vorbis_decode_frame_pushdata`）——调用方流式喂入 Ogg 字节，stb_vorbis
-//! 内部做 Ogg 页同步与 Vorbis 帧解码；输出 float（每声道独立数组）→ 转 s16
-//! 交错（缩放 2^15，对齐 stb_vorbis 自身 `FAST_SCALED_FLOAT_TO_INT(x,15)`）。
-//!
-//! 帧循环语义（对齐 stb_vorbis pushdata）：
-//!   - `decode_frame_pushdata` 返回 (bytes_used, samples)：
-//!     - 0 字节/0 样本 → 需更多输入（继续喂）；
-//!     - N 字节/0 样本 → 页重同步（继续喂）；
-//!     - N 字节/M 样本 → 解出一帧；
-//!   - 输入缓冲按需增长，`in_pos` 记录已消费字节，空间不足时前移压缩。
-//!
-//! 输出契约：原生 16-bit、交错 PCM，采样率/声道取自 Vorbis ident（stb_vorbis
-//! `get_info`）。Vorbis 为有损格式（无 逐样本一致 参考），对照 验收基准 `libvorbis`
-//! 以 ±1 LSB 容差评估（§3.7 裁决 vendored stb_vorbis）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

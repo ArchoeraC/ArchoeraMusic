@@ -7,18 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Pro (wmapro) 解码核心——逐函数移植 FFmpeg libavcodec/wmaprodec.c
-//! (n9.0.1) 的 WMAPRO 路径（不含 XMA）。bit reservoir / packet / frame /
-//! subframe / 声道组 / DPCM+runlevel scale factors / 矢量+runlevel 谱系数 /
-//! IMDCT（av_tx 位精确内核，见 mdct.zig）/ 窗重叠结构一致；解码为浮点（对齐
-//! ffmpeg fltp）。量化步进用 ff_exp10(exp/20)（f64→f32 舍入），与系统 ffmpeg
-//! f32 exp10 有末位差异，s16 输出非 100% 逐样本一致（报告见 wmapro/lib.zig）。
-//!
-//! 本文件不含容器解析。`Dec.decodePacket` 一次处理一个 WMA packet（通常
-//! block_align 字节），由 lib.zig 按 ffmpeg decode core 喂包循环驱动：同一
-//! avpkt 可能被多次 decodePacket 直到消费完毕；文件尾再喂一次空包触发 eof
-//! flush 输出重叠尾。
-
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
 const T = @import("tables.zig");

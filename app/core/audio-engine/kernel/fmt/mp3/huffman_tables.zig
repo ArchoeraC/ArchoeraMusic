@@ -7,7 +7,6 @@
 // 表值本身为事实数据，本文件按 CC0-1.0 保留来源说明；
 // 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Layer III huffman 表（移植自 minimp3, CC0）。
 pub const tabs = [_]i16{
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
