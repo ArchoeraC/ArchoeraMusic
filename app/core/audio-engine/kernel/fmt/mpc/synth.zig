@@ -18,7 +18,7 @@
 //!   - AVLFG（av_lfg_init(0xDEADBEEF)+av_lfg_get，libavutil/lfg.{h,c}）
 //!
 //! 位型/运算顺序与 C 完全一致：32-bit 用 i32 回绕乘法与算术右移；乘加以 i64 保持；
-//! dct 中间量按 unsigned 32-bit 模算术（FFmpeg SUINT），复刻其回绕行为。
+//! dct 中间量按 unsigned 32-bit 模算术（验收基准 SUINT），复刻其回绕行为。
 //! 验证目标：与 `ffmpeg -i x.mpc -f s16le` 逐样本位一致。
 
 const std = @import("std");
@@ -29,7 +29,7 @@ pub const era_sblimit = 32;
 pub const era_samples_per_band = 36;
 pub const era_mpc_frame_size = era_sblimit * era_samples_per_band;
 pub const era_mpa_max_channels = 2;
-/// FFmpeg 的 FRAC_BITS=23 / WFRAC_BITS=16，合成输出移位 = 16+23-15
+/// 验收基准 的 FRAC_BITS=23 / WFRAC_BITS=16，合成输出移位 = 16+23-15
 const OUT_SHIFT: u6 = 24;
 
 // ---------------------------------------------------------------------------
@@ -69,7 +69,7 @@ pub const Lfg = struct {
 // 32-band 合成窗生成（mpa_synth_init，fixed）
 // ---------------------------------------------------------------------------
 
-/// [512+256]；本实现（C 标量路径）只用前 512。含延伸段以对齐 FFmpeg 布局。
+/// [512+256]；本实现（C 标量路径）只用前 512。含延伸段以对齐 验收基准 布局。
 pub var synth_window: [512 + 256]i32 = undefined;
 var window_once: once.Once = .{};
 
@@ -518,7 +518,7 @@ pub const EraMpcCore = struct {
     }
 };
 
-/// FFmpeg 的 av_clipf(a, INT32_MIN, INT32_MAX) —— float 域裁剪后转 int32。
+/// 验收基准 的 av_clipf(a, INT32_MIN, INT32_MAX) —— float 域裁剪后转 int32。
 /// 注意 C 语义：INT32_MAX 以 float 形参传入时舍入为 2147483648.0f（2^31，
 /// f32 不可精确表示 2147483647），故上界实为 2^31；x86 cvttss2si 对越界值
 /// 产生"整数不定值" 0x80000000 = INT32_MIN（含恰好 2^31 与 NaN 情形），

@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Musepack 解码器接入层（fmt/mpc）—— SV7/SV8 均已 bit-exact（对照 ffmpeg n9.0.1）。
+//! Musepack 解码器接入层（fmt/mpc）—— SV7/SV8 均已 逐样本一致（对照 ffmpeg n9.0.1）。
 //!
 //! 容器：SV8 = MPCK chunk 流（SH 头 + AP 音频包），SV7 = MP+ 打包帧。
 //! 本层把整个输入读入内存后交给 fmt/mpc/sv8.zig / sv7.zig。输出原生 16-bit
 //! 交错 PCM。
 //!
 //! 支持面：SV7/SV8 44100/48000/37800/32000、立体声（SV7 恒 2 声道）、
-//! 已用 FATE inside-mp7.mpc / inside-mp8.mpc 全流逐位对齐 ffmpeg `-f s16le`。
+//! 已用 FATE inside-mp7.mpc / inside-mp8.mpc 全流逐样本对齐 ffmpeg `-f s16le`。
 
 const std = @import("std");
 
@@ -118,7 +118,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
         ctx.channels = 2; // SV7 恒立体声（mpc7.c AV_CHANNEL_LAYOUT_STEREO）
         ctx.sample_rate = cfg.sample_rate;
 
-        // 时长按实际可解出的整帧数（等于 ffmpeg 输出帧数；见 sv7.zig
+        // 时长按实际可解出的整帧数（等于 验收基准 输出帧数；见 sv7.zig
         // 模块注释——末帧截断路径经 demux 不可达，输出恒为整帧）
         const total_frames: u64 = ctx.dec.v7.parsed.frames.len;
         const dur_us: i64 = @intCast((total_frames * SAMPLES_PER_FRAME * 1_000_000) / cfg.sample_rate);
@@ -333,13 +333,13 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
             }
         },
         .v7 => |*d| {
-            // FFmpeg mpc seek 语义（libavformat/mpc.c DELAY_FRAMES + mpc7.c
+            // 验收基准 mpc seek 语义（libavformat/mpc.c DELAY_FRAMES + mpc7.c
             // decode_flush）：oldDSCF 清零、自 max(frame-32, 0) 起解码并丢弃
             // 输出（预热重建状态），自目标帧起输出。已验证与
             // `ffmpeg -ss x -i in.mpc`（in-seek）输出逐位一致（见 sv7.zig）。
-            // 差异：帧号 < 32 时本实现预热 min(32, frame) 帧（FFmpeg 会把目标
+            // 差异：帧号 < 32 时本实现预热 min(32, frame) 帧（验收基准 会把目标
             // 帧一并丢弃，输出从第 32 帧开始——CLI 边缘缺陷，此处不从）。
-            // 另：目标落在帧中间时本实现自该样本精确起播（ffmpeg in-seek 按
+            // 另：目标落在帧中间时本实现自该样本精确起播（验收基准 in-seek 按
             // 整帧对齐，属 CLI 丢弃逻辑，非解码器语义）。
             const frame_idx = target / SAMPLES_PER_FRAME;
             const fresh = try sv7.Decoder7.init(f.allocator, f.data);
@@ -390,19 +390,19 @@ fn deinitImpl(ctx: *anyopaque) void {
 
 const testing = std.testing;
 
-/// FATE SV8（44.1k 双声道，456 帧）+ ffmpeg `-f s16le` 参考 PCM
+/// FATE SV8（44.1k 双声道，456 帧）+ 验收基准 `-f s16le` 参考 PCM
 const inside_mp8 = @embedFile("samples/inside-mp8.mpc");
 const inside_mp8_s16 = @embedFile("samples/inside-mp8.s16");
-/// FATE SV7（44.1k 双声道，456 帧）+ ffmpeg `-f s16le` 参考 PCM（截段）
+/// FATE SV7（44.1k 双声道，456 帧）+ 验收基准 `-f s16le` 参考 PCM（截段）
 const inside_mp7 = @embedFile("samples/inside-mp7.mpc");
-/// ffmpeg 参考前 1 秒（44100 样本 ×2ch×2B；md5 9a0438306ba1ff379e609af17bcee3ef）
+/// 验收基准前 1 秒（44100 样本 ×2ch×2B；md5 9a0438306ba1ff379e609af17bcee3ef）
 const inside_mp7_first1s = @embedFile("samples/inside-mp7.first1s.s16");
-/// ffmpeg `-ss 5.016 -i`（in-seek）参考自样本 221205（帧 192+21）起 1 秒
+/// 验收基准 `-ss 5.016 -i`（in-seek）参考自样本 221205（帧 192+21）起 1 秒
 const inside_mp7_seek5s = @embedFile("samples/inside-mp7.seek5s.s16");
-/// ffmpeg 全流参考 PCM md5（2101248 字节 = 456 帧 × 1152 × 2ch × 2B）
+/// 验收基准 全流参考 PCM md5（2101248 字节 = 456 帧 × 1152 × 2ch × 2B）
 const inside_mp7_full_md5 = "80ff10b054d4ae77aee0461758a6cd6e";
 
-test "sv8: inside-mp8 全流解码 → 与 ffmpeg 参考 PCM 逐位一致" {
+test "sv8: inside-mp8 全流解码 → 与 验收基准 PCM 逐样本一致" {
     const alloc = testing.allocator;
     var r = io.Reader.openMem(inside_mp8);
     var info: decoder.Info = undefined;
@@ -470,7 +470,7 @@ test "sv7: Info 头部解析（44.1k 立体声 / 时长）" {
     try testing.expectEqual(@as(i64, 456 * 1152 * 1_000_000 / 44100), info.duration_us);
 }
 
-test "sv7: inside-mp7 全流解码 → 与 ffmpeg 参考 PCM 逐位一致" {
+test "sv7: inside-mp7 全流解码 → 与 验收基准 PCM 逐样本一致" {
     const alloc = testing.allocator;
     var r = io.Reader.openMem(inside_mp7);
     var info: decoder.Info = undefined;
@@ -489,7 +489,7 @@ test "sv7: inside-mp7 全流解码 → 与 ffmpeg 参考 PCM 逐位一致" {
     // 首段逐字节比对
     try testing.expect(out.items.len >= inside_mp7_first1s.len);
     try testing.expectEqualSlices(u8, inside_mp7_first1s, out.items[0..inside_mp7_first1s.len]);
-    // 全流 md5（对拍 ffmpeg n9.0.1 `-f s16le`）
+    // 全流 md5（对拍 验收基准 n9.0.1 `-f s16le`）
     var md5: [16]u8 = undefined;
     std.crypto.hash.Md5.hash(out.items, &md5, .{});
     var hex: [32]u8 = undefined;
@@ -497,7 +497,7 @@ test "sv7: inside-mp7 全流解码 → 与 ffmpeg 参考 PCM 逐位一致" {
     try testing.expectEqualStrings(inside_mp7_full_md5, &hex);
 }
 
-test "sv7: seek(5016ms) → 与 ffmpeg in-seek 参考（帧 192+21 样本）逐位一致" {
+test "sv7: seek(5016ms) → 与 验收基准 in-seek 参考（帧 192+21 样本）逐样本一致" {
     const alloc = testing.allocator;
     var r = io.Reader.openMem(inside_mp7);
     var info: decoder.Info = undefined;
@@ -515,7 +515,7 @@ test "sv7: seek(5016ms) → 与 ffmpeg in-seek 参考（帧 192+21 样本）逐�
         if (n == 0) break;
         try out.appendSlice(alloc, buf[0 .. n * @as(usize, ch) * 2]);
     }
-    // 参考：ffmpeg `-ss 5.016 -i` 全量输出（帧 192 起）截取自样本 221205 的 1 秒
+    // 参考：验收基准 `-ss 5.016 -i` 全量输出（帧 192 起）截取自样本 221205 的 1 秒
     try testing.expect(out.items.len >= inside_mp7_seek5s.len);
     try testing.expectEqualSlices(u8, inside_mp7_seek5s, out.items[0..inside_mp7_seek5s.len]);
     // 输出长度 = 总样本 - 目标样本（末帧不截断）
@@ -548,15 +548,15 @@ test "sv7: seek 越界 → EOF；seek(0) 回到起点重新解码一致" {
     try testing.expectEqualSlices(u8, inside_mp7_first1s, out.items[0..inside_mp7_first1s.len]);
 }
 
-test "sv7: seek(8000ms) → 与 ffmpeg in-seek 参考逐位一致（md5，第二校验点）" {
+test "sv7: seek(8000ms) → 与 验收基准 in-seek 参考逐样本一致（md5，第二校验点）" {
     const alloc = testing.allocator;
     var r = io.Reader.openMem(inside_mp7);
     var info: decoder.Info = undefined;
     var d = try open(alloc, &r, &info);
     defer d.deinit();
 
-    // 8000 ms → 样本 352800（帧 306 内偏移 288）。ffmpeg `-ss 8 -i` 输出
-    // 自帧 306 起且与连续解码逐位一致，故参考 md5 可由全流参考 PCM 截取计算。
+    // 8000 ms → 样本 352800（帧 306 内偏移 288）。验收基准 `-ss 8 -i` 输出
+    // 自帧 306 起且与连续解码逐样本一致，故参考 md5 可由全流参考 PCM 截取计算。
     try d.seekMs(8000);
     var out = std.ArrayList(u8).empty;
     defer out.deinit(alloc);

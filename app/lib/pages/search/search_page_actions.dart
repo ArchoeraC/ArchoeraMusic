@@ -36,7 +36,7 @@ extension _SearchPageActions on _SearchPageState {
     if (_query.isNotEmpty) unawaited(_fetch(append: false));
   }
 
-  /// 该源失败后是否需要退避（能力位；QQ 为真）。
+  /// 该源失败后是否需要退避（能力位；QM 为真）。
   bool _coolable(String source) => sourcePlatform(source).searchCoolable;
 
   /// 错误态（SearchErrorState / 聚合全败）的重试入口：可退避源失败后先等待，
@@ -54,7 +54,7 @@ extension _SearchPageActions on _SearchPageState {
     unawaited(_fetch(append: false));
   }
 
-  /// 单来源失败的说明文案（由源适配器提供；QQ 为分类文案，其余原始异常）。
+  /// 单来源失败的说明文案（由源适配器提供；QM 为分类文案，其余原始异常）。
   String _failureDetail(String source, Object? err) =>
       sourcePlatform(source).searchErrorDetail(context.l10n, err);
 
@@ -107,7 +107,7 @@ extension _SearchPageActions on _SearchPageState {
   /// 专辑 / 歌手 / 歌单点击（按平台分发详情弹窗）。
   ///
   /// 聚合（'all'）下结果混三方平台，按 **CoverItem.source** 分发到对应
-  /// 平台详情弹窗（NT歌单/专辑/歌手、KG、QQ 均已接通曲目列表）。
+  /// 平台详情弹窗（NT 歌单/专辑/歌手、KG、QM 均已接通曲目列表）。
   void _onCoverTap(CoverItem item) {
     final src = _platform == 'all' ? item.source : _platform;
     sourcePlatform(src).openCover(context, ref, _sourceSearchKind(_tab), item);
@@ -124,7 +124,7 @@ extension _SearchPageActions on _SearchPageState {
     );
   }
 
-  /// 红心失败提示（各平台独立文案；QQ 在线同步失败提示实验接口可读错误）。
+  /// 红心失败提示（各平台独立文案；QM 在线同步失败提示实验接口可读错误）。
   /// 文案统一由「收藏平台」适配器提供（`SourcePlatform.collections` 组合）。
   String _likeFailText(String source) {
     final l10n = context.l10n;
@@ -133,7 +133,7 @@ extension _SearchPageActions on _SearchPageState {
   }
 
   /// 行内红心切换：失败提示登录（对齐「我喜欢」页 _toggleLike 语义；
-  /// 成功由 SongList 红心填充态即时反馈，不再 toast）。QQ 走本地红心
+  /// 成功由 SongList 红心填充态即时反馈，不再 toast）。QM 走本地红心
   /// （未登录也成功）；仅登录后的在线实验收藏失败才回滚并提示。
   Future<void> _toggleLike(Track track) async {
     final controller = ref.read(likeControllerProvider);

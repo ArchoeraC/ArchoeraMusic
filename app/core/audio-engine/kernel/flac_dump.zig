@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! FLAC bit-exact 对照导出工具：解码一个 FLAC 文件，按解码器输出契约
+//! FLAC 逐样本一致 对照导出工具：解码一个 FLAC 文件，按解码器输出契约
 //! （bps≤16 → 16-bit 左移对齐；bps>16 → 32-bit 左移对齐；交错小端）写原始 PCM 到 stdout；
 //! 元数据 / 全部标签条目 / REPLAYGAIN / 提示点 / PICTURE 封面摘要打印到 stderr
 //! （对照 metaflac --list 核对）。
@@ -16,7 +16,7 @@ const std = @import("std");
 const decoder = @import("decoder.zig");
 
 /// 打印元数据摘要到 stderr（对照 metaflac --list / ffprobe 人工核对；
-/// stdout 保持纯 PCM，不破坏 bit-exact 比对）。
+/// stdout 保持纯 PCM，不破坏 逐样本一致 比对）。
 fn dumpMeta(info: *const decoder.Info) void {
     std.debug.print("-- metadata --\n", .{});
     inline for (.{

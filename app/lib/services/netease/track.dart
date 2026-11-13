@@ -5,7 +5,7 @@
 /// 歌曲 / 歌单的轻量元数据模型（对齐 @shared/types/player 的 Track 子集）。
 ///
 /// 仅承载 UI 层展示与播放所需字段；数据来自 apis 包（纯 Dart 直连）
-/// 返回的NT/KG原始对象（字段映射对齐原项目 `src/utils/format/netease.ts`）。
+/// 返回的NT/KG 原始对象（字段映射对齐原项目 `src/utils/format/netease.ts`）。
 library;
 
 /// 封面 URL 拼尺寸（对齐 withPicSize：缺省 300 边长）。
@@ -57,7 +57,7 @@ String? kgFillCover(String? url, int size) {
   return url.replaceAll('{size}', '$size');
 }
 
-/// KG歌曲品质信息（来自搜索结果：各档 hash + 文件大小）。
+/// KG 歌曲品质信息（来自搜索结果：各档 hash + 文件大小）。
 class KugouTrackInfo {
   const KugouTrackInfo({
     required this.hash,
@@ -177,7 +177,7 @@ const qualityLabels = <String, String>{
   'lq': 'LQ',
 };
 
-/// QM歌曲信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
+/// QM 歌曲信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
 class QqMusicTrackInfo {
   const QqMusicTrackInfo({
     required this.mid,
@@ -243,7 +243,7 @@ class BilibiliTrackInfo {
       );
 }
 
-/// QQ 封面 URL（albumMid → y.gtimg.cn 图床）。
+/// QM 封面 URL（albumMid → y.gtimg.cn 图床）。
 String qqCover(String? albumMid, [int size = 300]) {
   final mid = albumMid?.trim() ?? '';
   if (mid.isEmpty) return '';
@@ -370,7 +370,7 @@ class Track {
   final String id;
   final String title;
 
-  /// 副标题（网易 alias 首条）。
+  /// 副标题（NT alias 首条）。
   final String? comment;
   final List<TrackArtist> artists;
   final TrackAlbum? album;
@@ -388,10 +388,10 @@ class Track {
   /// 解析与音质切换路径）。
   final String source;
 
-  /// KG品质信息（source == 'kugou' 时存在）。
+  /// KG 品质信息（source == 'kugou' 时存在）。
   final KugouTrackInfo? kugou;
 
-  /// QM信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
+  /// QM 信息（source == 'qqmusic' 时存在；song_url 直链解析用）。
   final QqMusicTrackInfo? qqmusic;
 
   /// B 站视频信息（source == 'bilibili' 时存在；bvid/cid 解析用）。
@@ -415,7 +415,7 @@ class Track {
   /// 文件大小（字节；仅服务器明确返回时存在）。
   final int? fileSize;
 
-  /// 音频品质信息（NT hr/sq/h/m/l、KG最高档、流媒体服务器返回时存在）。
+  /// 音频品质信息（NT hr/sq/h/m/l、KG 最高档、流媒体服务器返回时存在）。
   final TrackQuality? quality;
 
   /// 是否为原唱（KG `IsOriginal == 1` 时置位；翻唱/伴奏不置位）。
@@ -430,7 +430,7 @@ class Track {
 
   String get artistNames => artists.map((a) => a.name).join(' / ');
 
-  /// 替换KG品质信息，其余字段原样保留（下载前补齐 hash 链时使用）。
+  /// 替换KG 品质信息，其余字段原样保留（下载前补齐 hash 链时使用）。
   Track copyWithKugou(KugouTrackInfo? kugou) => Track(
     id: id,
     title: title,
@@ -653,7 +653,7 @@ class Track {
         : int.tryParse(durationSec.toString()) ?? 0;
 
     // id 以 hash（音频文件级唯一键）优先，audio_id 仅作兜底。
-    // KG把同一作品的不同版本（不同专辑/音源）归并到同一个 audio_id，
+    // KG 把同一作品的不同版本（不同专辑/音源）归并到同一个 audio_id，
     // 若用 audio_id 当 id，列表会同时高亮多个版本、队列会误判为同一首
     // （对齐原版 songToTrack 的 `song.hash || song.id`）。
     return Track(
@@ -669,7 +669,7 @@ class Track {
       kugou: hashes.isEmpty
           ? null
           : KugouTrackInfo(hash: hash, hashes: hashes, sizes: sizes),
-      // 原唱标识（`IsOriginal == 1`）+ KG版权
+      // 原唱标识（`IsOriginal == 1`）+ KG 版权
       // privilege == 10 → VIP（接口约定）
       isOriginal: _kgIsOriginal(song['IsOriginal'] ?? song['isOriginal']),
       fee: _kgFee(song['privilege']),
@@ -683,7 +683,7 @@ class Track {
     return raw.toString() == '1' || raw.toString().toLowerCase() == 'true';
   }
 
-  /// KG版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
+  /// KG 版权 `privilege` → TrackFee（10=VIP 需会员；其余视作免费）。
   static int _kgFee(Object? raw) {
     if (raw == null) return 0;
     final v = raw is num ? raw.toInt() : int.tryParse(raw.toString()) ?? 0;
@@ -699,7 +699,7 @@ class Track {
     return 0;
   }
 
-  /// QQ 归一歌曲对象（qm 模块 song 字段）→ Track。
+  /// QM 归一歌曲对象（qm 模块 song 字段）→ Track。
   ///
   /// 输入来自 apis/qqmusic modules/search|album|artist|song_list 归一后的
   /// 结构（id/mid/name/artist/artists/album/albumMid/duration/mediaMid/pay/

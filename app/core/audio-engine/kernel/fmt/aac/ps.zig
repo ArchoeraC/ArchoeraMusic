@@ -1,9 +1,13 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AAC PS（参数立体声）解码器（bit-exact 移植 FFmpeg n9.0.1 浮点路径）。
+//! AAC PS（参数立体声）解码器（移植 FFmpeg n9.0.1 浮点路径）。
 //!
 //! 复刻对象：libavcodec/{aacps.c,aacps_common.c,aacpsdsp_template.c} +
 //! aacpsdata.c 表 + aacps_tablegen.h 生成。HE-AAC v2 的立体声恢复：
@@ -81,7 +85,7 @@ pub const PSCtx = struct {
     ipd_hist: [PS_MAX_NR_IIDICC]i8 = @splat(0),
 };
 
-/// 清零全部状态（对齐 FFmpeg calloc / 带宽切换复位）
+/// 清零全部状态（对齐 验收基准 calloc / 带宽切换复位）
 fn zeroState(self: *PSCtx) void {
     const bytes: [*]u8 = @ptrCast(self);
     @memset(bytes[0..@sizeOf(PSCtx)], 0);

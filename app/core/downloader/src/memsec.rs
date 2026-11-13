@@ -5,7 +5,7 @@
 // ============================================================
 // 敏感内存保护：mlock（禁 swap）+ zeroize（用后清零）
 //
-// 下载器会话凭据（酷狗 token/userid、网易 cookie）以 [MlockSecret] 存储：
+// 下载器会话凭据（KG token/userid、NT cookie）以 [MlockSecret] 存储：
 // - mlock：页面锁定防被换出到磁盘（Linux/macOS 经 libc::mlock，
 //   Windows 经 VirtualLock）；Linux 另设 MADV_DONTDUMP 防 core dump 拷贝。
 // - zeroize：Drop / 重赋值时整块清零，防残留明文被静态途径读取。

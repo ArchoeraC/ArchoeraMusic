@@ -2,10 +2,10 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// NT直连调用器（新 apis 包完整移植版）
+/// NT 直连调用器（新 apis 包完整移植版）
 ///
 /// 对齐 apis/netease/index.ts 的 callNetease 语义：按 name 路由到对应模块，
-/// 返回NT原始响应体（`{code, result...}` / `{code, data...}`）。
+/// 返回NT 原始响应体（`{code, result...}` / `{code, data...}`）。
 /// 覆盖全部 73 个模块（旧 NeteaseDirectCaller 仅 cloudsearch/song_url），
 /// 且 nmCallNetease 自带 LRU 响应缓存。
 library;

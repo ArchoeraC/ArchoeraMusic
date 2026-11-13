@@ -1,9 +1,13 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA 逆 MDCT（bit-exact 复刻 FFmpeg av_tx FLOAT_MDCT inv 路径）。
+//! WMA 逆 MDCT（复刻 FFmpeg av_tx FLOAT_MDCT inv 路径）。
 //!
 //! wmadec.c 以 `av_tx_init(..., AV_TX_FLOAT_MDCT, 1, 1<<(frame_len_bits-i),
 //! scale=1/32768, AV_TX_FULL_IMDCT)` 建变换：`ff_tx_mdct_inv_full` 包
@@ -352,7 +356,7 @@ fn checkFull(comptime L: usize) !void {
     try testing.expectEqual(@as(usize, 0), mismatches);
 }
 
-test "WMA FULL_IMDCT 2048 与 ffmpeg av_tx 黄金向量逐位一致" {
+test "WMA FULL_IMDCT 2048 与 验收基准 av_tx 验收基准向量逐样本一致" {
     try checkFull(2048);
 }
 

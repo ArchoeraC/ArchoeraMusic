@@ -304,38 +304,38 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
      + Dart 接收 isolate 事件泵；终态后一次性 isDone 复查（非周期）；失败回退开关 ARCHOERA_SCRAPER_POLL_FALLBACK。
      验证：scraper ctest（入队/超时/销毁唤醒/空闲 CPU≈0）全过；scraper_pump_test 双模式过；dart analyze 0。
 - 定性保留（非浪费/合理）：引擎流式 20ms 解码节拍（背压 pacing）；audio 事件泵 50ms 轮询仅作为 isolate
-  握手失败回退；nav_header 天气业务周期刷新；网易云/酷狗登录 1–2s QR 状态查询（外部协议）；subsonic poll 为文档示例无周期调用者。
+  握手失败回退；nav_header 天气业务周期刷新；NT/KG 登录 1–2s QR 状态查询（外部协议）；subsonic poll 为文档示例无周期调用者。
 
 
-## 16. 2026-09-05 QQMusic 完整可播接入
-- 参照新版上游 QQ 实现（/tmp/spx），扩展 lib/apis/qqmusic：core 对齐（cookie/uin
-  经 sessionStore 持久化、UA/comm 伪装、config android 伪装、credential/vip、qrlogin QQ/微信）、模块新增
+## 16. 2026-09-05 QM 完整可播接入
+- 参照新版上游 QM 实现（/tmp/spx），扩展 lib/apis/qqmusic：core 对齐（cookie/uin
+  经 sessionStore 持久化、UA/comm 伪装、config android 伪装、credential/vip、qrlogin QM/微信）、模块新增
   song_url(GetVkey 多音质/访客可播免费曲)、user_detail、login_qr、album/artist/comment；search 四分类等对齐。
 - 新增 lib/services/qqmusic/qqmusic_api.dart（结果映射到 netease Track/Cover 层 + resolvePlayUrl + QR 登录/登出）。
-- UI：搜索页 QQ 段（四分类+点播）、QQ 扫码登录对话框（QQ/微信）、顶栏账号菜单 QQ 登录/登出、歌单/专辑/歌手弹窗、
-  QQ 歌词、playback 源解析/音质；l10n 9 语种。真实链路验证：搜索→免费曲访客直链 HTTP200 可播；VIP 按接口返回
-  “需会员/无版权”语义；QQ 扫码出码。回归测试 qqmusic_direct_test 8 项。
-- 诚实边界：不绕过付费；扫码 check_sig/微信 405 多跳需真机验证；榜单未接 QQ UI（首页榜单为 Kugou 专属）；
-  红心收藏 QQ 无官方 like API 故隐藏；接口风控/限流需随上游单点修。
+- UI：搜索页 QM 段（四分类+点播）、QM 扫码登录对话框（QM/微信）、顶栏账号菜单 QM 登录/登出、歌单/专辑/歌手弹窗、
+  QM 歌词、playback 源解析/音质；l10n 9 语种。真实链路验证：搜索→免费曲访客直链 HTTP200 可播；VIP 按接口返回
+  “需会员/无版权”语义；QM 扫码出码。回归测试 qqmusic_direct_test 8 项。
+- 诚实边界：不绕过付费；扫码 check_sig/微信 405 多跳需真机验证；榜单未接 QM UI（首页榜单为 Kugou 专属）；
+  红心收藏 QM 无官方 like API 故隐藏；接口风控/限流需随上游单点修。
 
 
-## 17. 2026-09-05 QQ 收藏(我喜欢) + 聚合搜索
-- 红心：QQ 键=songmid（like_controller 新增 qqmusic 路由，修复“误走网易云”）；本地持久化 qq_liked.json；
-  toggle 乐观+已登录实验在线收藏失败回滚本地；启动/登录/登出监听同步（在线并入 add-only）。「我喜欢」页新增 QQ 段。
+## 17. 2026-09-05 QM 收藏(我喜欢) + 聚合搜索
+- 红心：QM 键=songmid（like_controller 新增 qqmusic 路由，修复“误走NT”）；本地持久化 qq_liked.json；
+  toggle 乐观+已登录实验在线收藏失败回滚本地；启动/登录/登出监听同步（在线并入 add-only）。「我喜欢」页新增 QM 段。
 - 在线实验收藏（社区逆向调研，标注来源/日期）：dir-201（“我的喜欢”）DissInfo 读取、AddSonglist/DelSonglist 红心，
   常量 kQqFavExperimental=true；未登录/缺 songid 抛可读错；不绕付费。需真机扫码登录验证在线往返。
-- 聚合搜索：all=songs 三方（网易+酷狗+QQ）并行合并；albums/artists/playlists 亦三方聚合；CoverItem.source 角标；
-  详情按 source 分发（QQ/网易云专辑·歌手·歌单均可开）。红心在 QQ 单平台与 all 均启用。
+- 聚合搜索：all=songs 三方（NT+KG+QM）并行合并；albums/artists/playlists 亦三方聚合；CoverItem.source 角标；
+  详情按 source 分发（QM/NT 专辑·歌手·歌单均可开）。红心在 QM 单平台与 all 均启用。
 - 验证：dart analyze 0；qq_like_test 8 项过；bundle 393M。
 
 
-## 18. 2026-09-05 QQ 搜索风控诊断与处理
-- 根因：QQ 搜索失败为 **IP 级配额/风控 inner=2001**（HTTP200、request.code=2001、meta.is_filter=-12、间歇+分钟级配额），
+## 18. 2026-09-05 QM 搜索风控诊断与处理
+- 根因：QM 搜索失败为 **IP 级配额/风控 inner=2001**（HTTP200、request.code=2001、meta.is_filter=-12、间歇+分钟级配额），
   请求形态与上游零差异；旧代码自动重试 2 次→风暴加剧。
 - 修复：风险码(2001)不自动重试；网络瞬时退避(300/600ms)；单发+20s 冷却+手动重试门禁（防连打）；
-  聚合 all 逐源独立 try/catch——QQ 失败只横幅「{平台}暂不可用+详情+重试」，其它源照常；单 QQ 平台给可读内码文案。
-  另修真实参数 bug：QQ 歌手搜索单页硬上限 30（其余 50）静默空结果——模块层夹紧 + 分页除数修正。
-- 上游对照：上游实现对非零码一律退避重试 2 次（不区分风控）、无聚合；MineRadio 一族为本地/可视化播放器无 QQ
+  聚合 all 逐源独立 try/catch——QM 失败只横幅「{平台}暂不可用+详情+重试」，其它源照常；单 QM 平台给可读内码文案。
+  另修真实参数 bug：QM 歌手搜索单页硬上限 30（其余 50）静默空结果——模块层夹紧 + 分页除数修正。
+- 上游对照：上游实现对非零码一律退避重试 2 次（不区分风控）、无聚合；MineRadio 一族为本地/可视化播放器无 QM
   在线源（GitHub 检索 clone 需鉴权，未得代码，按其“分开获取+聚合、单源容错”理念本端实现）。
 - 验证：dart analyze 0；新增 failure/state 测试 11 项（2001→risk 1 次、transient 重试、单源降级、冷却门禁）；bundle 393M。
 - 策略：不硬猜/不绕付费；IP 仍 2001 时应用单发+可读提示；建议住宅/真机 IP 验证（形态与上游一致）。

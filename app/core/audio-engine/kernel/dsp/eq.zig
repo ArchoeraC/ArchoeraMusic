@@ -67,7 +67,7 @@ pub const EraEq = struct {
 ///
 /// 注意：C 的 `w0 = 2.0f * M_PI * freq / sample_rate` 中 `M_PI` 为 **double**
 /// 常量，整式以 double 计算后再落回 float；此处同样以 f64 计算后截断，
-/// 保证与 C 逐位一致。
+/// 保证与 C 逐样本一致。
 fn calcPeaking(f: *EraBiquad, freq: f32, gain_db: f32, q: f32, sample_rate: u32) void {
     const a_gain = math.gainFromDb(gain_db);
     const w0: f32 = @floatCast(

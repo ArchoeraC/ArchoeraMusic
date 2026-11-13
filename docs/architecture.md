@@ -292,7 +292,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
    - 注意 `platform` 完整版 vs `lite` 概念版 token 不通用，自用选定一版并在 modules 内封装隔离
 4. KRC 歌词解析：已有 `core/krc.ts`（KRC → 标准时间轴），直接复用
 
-### 7.3 QQ Music（后期）
+### 7.3 QM Music（后期）
 - 纯 Dart 移植（`app/lib/core/apis/qqmusic/`，已落地）：TripleDES + RC4 + qrc 加密、match/search/lyric/leaderboard/hot_search/song_info/song_list
 
 ### 7.4 登录与会话管理
@@ -301,7 +301,7 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - **登录态检测**：启动/打开播放前调 `login_status`（netease）；失效 → 播放返回 403/401 → `player:sourceError` → UI 提示重新登录
 - **登出**：`logout` 清平台 cookie（Dart 本地层会话记录 + vault 内密文），**不涉及 `sessions` 表**（已废弃，见 §8）
 - **多账号**：自用单账号起步；多平台多账号切换在 Dart 本地层会话记录中预留
-- KuGou / QQ 登录（Phase 2/3）：对齐 netease 模式，各自 modules 内封装
+- KuGou / QM 登录（Phase 2/3）：对齐 netease 模式，各自 modules 内封装
 
 ### 7.5 Subsonic 认证与传输（SEC-32）
 
@@ -599,8 +599,8 @@ ArchoeraMusic/
 |---|---|---|
 | **Phase 0** 骨架 ✅ | Flutter 三端骨架 + C 引擎构建打通（2026-08-05；原「spawn 侧车 + HTTP/WS 打通」路径已废弃，见 §12.0） | App 可启动、引擎可用 |
 | **Phase 1** Netease + 播放 ✅ | **桌面 FFI 直连引擎播放**（完整转码 PCM 落盘 + miniaudio 自播 + seek 即时 + FFT 拉模式，2026-08-07）；平台 API 纯 Dart 直连；Flutter 搜索页、播放页（歌词 + 频谱）、二维码登录、队列 | 可登录、搜索、播放，歌词/频谱同步，任意 seek |
-| **Phase 2** KuGou | 移植 kugou 模块（song_url/榜单/歌单）为纯 Dart（`app/lib/core/apis/kugou/`）；Flutter 接入酷狗搜索播放 | 可搜索播放酷狗歌曲 |
-| **Phase 3** 补全 | QQ 音乐接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）（**桌面歌词独立窗已放弃**）| 核心功能达成规划子集 |
+| **Phase 2** KuGou | 移植 kugou 模块（song_url/榜单/歌单）为纯 Dart（`app/lib/core/apis/kugou/`）；Flutter 接入KG 搜索播放 | 可搜索播放KG 歌曲 |
+| **Phase 3** 补全 | QM 接入；本地曲库（C# scanner + 音乐库页 + watcher）；本地播放走统一管线（PCM 落盘 + miniaudio 自播，§5.4）；媒体键/托盘（media-ctrl napi）；C 引擎进程内 seek（可选）（**桌面歌词独立窗已放弃**）| 核心功能达成规划子集 |
 | **Phase 4** 优化 | C 引擎增强：进程内 seek、预加载/无缝切换；性能/内存基线（沿用原项目 memory discipline）；缓存与并发策略 | 播放体验优化，桌面集成完备 |
 
 ### 12.0 历史落地记录（简记）

@@ -1,11 +1,7 @@
-# QQ 音乐 API 风控优化分析
+# QM API 风控优化分析
 
-> 分析时间：2026-11-11。对照上游参考（只读，不参与本项目构建）：
-> - `SPlayer-Next/baka-plugins`（`plugins/qq.js`，已 `git pull` 到 `88e0ea0`）
-> - `SPlayer-Next/go-music-dl`（已 `git pull` 到 `c445ddd`）→ 其 QQ 实现来自
->   `guohuiyuan/music-lib` `qq/*.go`
-> - `L-1124/QQMusicApi`（Python，QIMEI/设备档案的完整实现）
-> - `Suxiaoqinx/QQMusicapi`（Node，同一套 QIMEI 协议）
+> 分析时间：2026-11-11。对照若干公开的第三方 QM 客户端 / 插件与 API 实现
+> （只读，不参与本项目构建；具体项目名称与提交不在本文展开）。
 >
 > 结论先行：**新版方案的共同点不是新算法，而是「稳定设备身份 + 真实
 > QIMEI + 请求节奏控制」**。我们此前把 `udid/OpenUDID/QIMEI36` 写成 `'0'`，
@@ -41,8 +37,7 @@
 
 ### 2.1 设备档案 + QIMEI（最关键）
 
-`L-1124/QQMusicApi` 的 `utils/device.py` / `utils/qimei.py` 与
-`Suxiaoqinx/QQMusicapi` 的 `src/utils/qimei.js` 是同一套协议：
+公开实现中的 Python 设备/设备档案模块与 Node 侧 QIMEI 模块是同一套协议：
 
 1. 生成一台**自洽**的 Android 设备：机型 / 主板 / 厂商 / 系统版本 / API level
    / IMEI（满足 Luhn）/ androidId / MAC / OpenUDID / boot_id 互相匹配；
@@ -58,8 +53,8 @@
 
 ### 2.2 稳定的 GUID
 
-`baka-plugins/plugins/qq.js` 仍用社区共享的硬编码 GUID
-（`1F70E520B2EAA7D25E11760783C53CA9`）；`go-music-dl` 的 `music-lib`
+部分插件仍用社区共享的硬编码 GUID
+（`1F70E520B2EAA7D25E11760783C53CA9`）；某聚合库
 **每次取流随机生成 GUID**（`fmt.Sprintf("%d", r.Int63n(9000000000)+1000000000)`），
 注释还写着 "Use a random GUID to reduce the chance of rate limiting"。
 
@@ -76,8 +71,8 @@
 
 ### 2.4 音质档位收敛
 
-`baka-plugins` 的 `typeMap` 只保留 5 档（m4a/128/320/ape/flac），高解析
-另走 `size_new`；`go-music-lib` 一次请求也只带「按账号是否 VIP 挑出来的
+某插件的档位表只保留 5 档（m4a/128/320/ape/flac），高解析
+另走 `size_new`；该聚合库一次请求也只带「按账号是否 VIP 挑出来的
 ≤7 个」文件名。我们此前对一次取流固定发 9 个档位（含 RS01/AI00/Q001/Q000），
 既是批量刷取特征，也让「无效档位」把请求体积放大 3 倍。
 
@@ -115,9 +110,9 @@
 2. **失败档位记忆**：某曲目在 `lossless` 档拿到 104009 后，短期记住并直接
    从 `hq` 开始，避免每次都从最高档试起。
 3. **搜索 fallback 到移动协议**：`musics.fcg` 签名协议在风控期会整体失败，
-   而 `musicu.fcg` + `searchBase`（`baka-plugins` 的 `searchBase`）用的是另一条
+   而 `musicu.fcg` + `searchBase`（某插件的搜索入口）用的是另一条
    通道，可作为只读搜索的降级路径（注意它不带 `ct=19`，无完整音质字段）。
-4. **设备重置入口**：设置项里加「重置 QQ 设备身份」，并在重置时同步清空
+4. **设备重置入口**：设置项里加「重置 QM 设备身份」，并在重置时同步清空
    QIMEI 缓存；正常用户不该用到，但排障时需要。
 5. **风控可观测性**：把 `qmPacingSnapshot()`（在途数/连击数/冷却剩余）暴露到
    诊断页，便于用户反馈时判断是「网络问题」还是「被限流」。

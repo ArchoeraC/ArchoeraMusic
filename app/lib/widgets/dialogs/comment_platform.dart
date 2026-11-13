@@ -50,7 +50,7 @@ abstract class CommentPlatform {
   /// 平台展示名（未找到评论 / 需登录提示用；本地化）。
   String label(AppLocalizations l10n);
 
-  /// 是否提供「热门 / 最新」两 Tab（NT、QQ）。
+  /// 是否提供「热门 / 最新」两 Tab（NT、QM）。
   bool get supportsHot => false;
 
   /// 是否支持发表评论（如 NT）。
@@ -172,7 +172,7 @@ class _NeteaseCommentPlatform extends CommentPlatform {
 
 // ── KG ─────────────────────────────────────────────────────────────────
 
-/// KG评论 → 通用展示模型（字段与 [NeteaseComment] 对齐）。
+/// KG 评论 → 通用展示模型（字段与 [NeteaseComment] 对齐）。
 NeteaseComment _kgToTile(KugouComment c) => NeteaseComment(
   id: c.id,
   userName: c.userName,
@@ -221,7 +221,7 @@ class _KugouCommentPlatform extends CommentPlatform {
   }
 }
 
-// ── QQ ─────────────────────────────────────────────────────────────────
+// ── QM ─────────────────────────────────────────────────────────────────
 
 class _QqCommentPlatform extends CommentPlatform {
   @override

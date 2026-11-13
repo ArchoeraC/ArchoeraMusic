@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! FLAC 元数据解析（可选 ID3v2 前置 + fLaC 头 + 元数据块遍历 + STREAMINFO + SEEKTABLE）
 //!
@@ -17,12 +21,12 @@
 //!   4 VORBIS_COMMENT（Vorbis comment：字段长度 LE；TITLE/ARTIST/ALBUM/DATE/GENRE/COMMENT
 //!     （COMMENT 与 DESCRIPTION 同义）→ `decoder.Metadata`，键大小写不敏感、首字段优先、
 //!     单字段限长 §9.1 同款；全部条目（含 TRACKNUMBER/ALBUMARTIST/REPLAYGAIN_* 等非标准
-//!     键）→ `Metadata.tags`，对齐 FFmpeg av_dict；REPLAYGAIN_* 同时解析为增益）
+//!     键）→ `Metadata.tags`，对齐 验收基准 av_dict；REPLAYGAIN_* 同时解析为增益）
 //!   5 CUESHEET（CD 目录：头 396B + 每 track 36B + 每 index 12B；index offset（样本，相对
 //!     音频流起点）→ `decoder.CuePoint`，条目数 clamp 到块实际承载）
 //!   6 PICTURE（FLAC 规范 §5.8 / ID3v2 APIC：type/mime/desc/宽高/色深/数据，字段长度 BE；
 //!     数据限长 64MiB，字段越界放弃该图 → `decoder.Picture`）
-//!   其余类型（7..126 保留）与 127 INVALID —— 跳过（FFmpeg flacdec default 分支 avio_skip
+//!   其余类型（7..126 保留）与 127 INVALID —— 跳过（验收基准 flacdec default 分支 avio_skip
 //!     同款容错，未来新块类型不致拒播）
 //!
 //! 健壮性（§13.3）：magic / STREAMINFO 尺寸 / bps / blocksize / SEEKTABLE 尺寸
@@ -53,7 +57,7 @@ pub const MetadataType = enum(u7) {
     cuesheet,
     picture,
 
-    /// 未定义块类型（7..126 保留 / 127 INVALID）—— 跳过（FFmpeg flacdec default
+    /// 未定义块类型（7..126 保留 / 127 INVALID）—— 跳过（验收基准 flacdec default
     /// 分支 avio_skip 同款容错，见文件头注释）
     unknown,
 
@@ -85,7 +89,7 @@ pub const StreamInfo = struct {
     md5: [16]u8,
 };
 
-/// SEEKTABLE 单个 seek point（解码定位用，§9.3 / ffmpeg av_add_index_entry 语义）
+/// SEEKTABLE 单个 seek point（解码定位用，§9.3 / 验收基准 av_add_index_entry 语义）
 pub const SeekPoint = struct {
     /// 该点对应帧的**首样本编号**；0xFFFFFFFFFFFFFFFF = 占位点（不可用）
     sample_number: u64,
@@ -171,7 +175,7 @@ pub fn freePictures(allocator: std.mem.Allocator, pics: *[]decoder.Picture) void
 /// 解析 fLaC 头与全部元数据块；成功时 reader 定位于**第一个音频帧**。
 /// 调用方保证 reader 位于文件开头（offset 0）。
 pub fn parse(reader: *io.Reader, allocator: std.mem.Allocator) Error!ParseResult {
-    // 可选 ID3v2 前置标签（FLAC 规范允许；FFmpeg flacdec 同款跳过，见文件头注释）
+    // 可选 ID3v2 前置标签（FLAC 规范允许；验收基准 flacdec 同款跳过，见文件头注释）
     try skipId3v2(reader);
 
     // fLaC 魔数（防御性校验：probe 已按魔数路由，此处兜底）
@@ -208,7 +212,7 @@ pub fn parse(reader: *io.Reader, allocator: std.mem.Allocator) Error!ParseResult
                 found_streaminfo = true;
             },
             .seektable => {
-                // 与 FFmpeg 一致：STREAMINFO 之前不允许处理非 STREAMINFO 块
+                // 与 验收基准 一致：STREAMINFO 之前不允许处理非 STREAMINFO 块
                 if (!found_streaminfo) return error.Corrupt;
                 if (size % seekpoint_size != 0) return error.Corrupt;
                 const points = size / seekpoint_size;
@@ -236,7 +240,7 @@ pub fn parse(reader: *io.Reader, allocator: std.mem.Allocator) Error!ParseResult
                 try parsePicture(reader, allocator, size, &result.pictures);
             },
             // PADDING / APPLICATION / 未知类型（含 127 INVALID）—— 跳过
-            // （FFmpeg flacdec default 分支 avio_skip 同款容错）
+            // （验收基准 flacdec default 分支 avio_skip 同款容错）
             else => {
                 try reader.seek(@intCast(size), .current);
             },
@@ -332,7 +336,7 @@ fn readLeU32(reader: *io.Reader, end: u64) Error!?u32 {
 
 /// 解析 FLAC VORBIS_COMMENT 块。Vorbis comment 布局（字段长度 **LE**）：
 ///   vendor_length(4) + vendor_string + list_length(4) + N × {length(4) + "KEY=value"}。
-/// 全部条目（含非标准键）→ `tags`（对齐 FFmpeg av_dict）；REPLAYGAIN_* → `rg`；
+/// 全部条目（含非标准键）→ `tags`（对齐 验收基准 av_dict）；REPLAYGAIN_* → `rg`；
 /// 标准字段 → `meta`（首字段优先）。
 /// 容错：内部字段长度越界/畸形 → 停止该块解析（reader 定位到块尾，不报 Corrupt，
 /// 对齐 WAV LIST-INFO §9.1）。
@@ -397,7 +401,7 @@ fn parseCommentField(
     const value = std.mem.trim(u8, buf[eq + 1 .. got], " \t\r\n\x00");
     if (value.len == 0) return;
 
-    // 通用条目全量保留（对齐 FFmpeg av_dict：含 REPLAYGAIN_* 与标准字段键，
+    // 通用条目全量保留（对齐 验收基准 av_dict：含 REPLAYGAIN_* 与标准字段键，
     // 重复键全部保留；key 原样大小写、value 已 trim）
     {
         const k = allocator.dupe(u8, key) catch return error.OutOfMemory;
@@ -407,7 +411,7 @@ fn parseCommentField(
         try tags.append(allocator, .{ .key = k, .value = v });
     }
 
-    // REPLAYGAIN 增益（单位对齐 FFmpeg AVReplayGain：gain 0.001dB / peak 0.00001）
+    // REPLAYGAIN 增益（单位对齐 验收基准 AVReplayGain：gain 0.001dB / peak 0.00001）
     if (std.ascii.eqlIgnoreCase(key, "REPLAYGAIN_TRACK_GAIN")) {
         rg.track_gain = parseGainDb(value) orelse rg.track_gain;
     } else if (std.ascii.eqlIgnoreCase(key, "REPLAYGAIN_TRACK_PEAK")) {
@@ -424,7 +428,7 @@ fn parseCommentField(
     if (!setMetaField(meta, field, s)) allocator.free(s);
 }
 
-/// 解析 REPLAYGAIN_*_GAIN（"±X.XX dB"）→ 千分之一 dB 整数（对齐 FFmpeg
+/// 解析 REPLAYGAIN_*_GAIN（"±X.XX dB"）→ 千分之一 dB 整数（对齐 验收基准
 /// AVReplayGain.gain 单位）；畸形/越界 → null
 fn parseGainDb(s: []const u8) ?i32 {
     var buf = std.mem.trim(u8, s, " \t");
@@ -439,7 +443,7 @@ fn parseGainDb(s: []const u8) ?i32 {
     return @intFromFloat(@round(scaled));
 }
 
-/// 解析 REPLAYGAIN_*_PEAK（"0.999023"）→ 十万分之一单位整数（对齐 FFmpeg
+/// 解析 REPLAYGAIN_*_PEAK（"0.999023"）→ 十万分之一单位整数（对齐 验收基准
 /// AVReplayGain.peak 单位）；畸形/越界 → null
 fn parsePeak(s: []const u8) ?u32 {
     const v = std.fmt.parseFloat(f32, std.mem.trim(u8, s, " \t")) catch return null;
@@ -747,7 +751,7 @@ test "streaminfo: 未知块类型（保留值 / 127 INVALID）→ 跳过容错" 
     var r = io.Reader.openMem(stream.items);
     try testing.expectError(error.Corrupt, parse(&r, testing.allocator));
 
-    // STREAMINFO + 未知块（type 7、127）+ last → 跳过成功（FFmpeg default 分支同款）
+    // STREAMINFO + 未知块（type 7、127）+ last → 跳过成功（验收基准 default 分支同款）
     const si = makeStreamInfo();
     var stream2 = std.ArrayList(u8).empty;
     defer stream2.deinit(testing.allocator);
@@ -811,7 +815,7 @@ test "streaminfo: SEEKTABLE 尺寸非 18 倍数 → Corrupt" {
     try testing.expectError(error.Corrupt, parse(&r, testing.allocator));
 }
 
-test "streaminfo: STREAMINFO 前的 SEEKTABLE → Corrupt（与 FFmpeg 一致）" {
+test "streaminfo: STREAMINFO 前的 SEEKTABLE → Corrupt（与 验收基准 一致）" {
     var stream = std.ArrayList(u8).empty;
     defer stream.deinit(testing.allocator);
     try stream.appendSlice(testing.allocator, "fLaC");
@@ -927,7 +931,7 @@ test "streaminfo: VORBIS_COMMENT 全量 tags 保留 + REPLAYGAIN 解析" {
     try testing.expectEqualStrings("03", result.meta.tags[1].value);
     try testing.expectEqualStrings("ALBUMARTIST", result.meta.tags[2].key);
     try testing.expectEqualStrings("LYRICS", result.meta.tags[7].key);
-    // REPLAYGAIN 数值（gain 0.001dB / peak 0.00001，对齐 FFmpeg AVReplayGain）
+    // REPLAYGAIN 数值（gain 0.001dB / peak 0.00001，对齐 验收基准 AVReplayGain）
     try testing.expectEqual(@as(?i32, -6350), result.replay_gain.track_gain);
     try testing.expectEqual(@as(?u32, 99902), result.replay_gain.track_peak);
     try testing.expectEqual(@as(?i32, -8000), result.replay_gain.album_gain);

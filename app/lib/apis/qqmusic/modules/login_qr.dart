@@ -4,7 +4,7 @@
 
 /// QM 二维码登录模块（对齐 login_qr.ts + core/credential.ts）。
 ///
-/// 仅支持 QQ 扫码登录：
+/// 仅支持 QM 扫码登录：
 /// - ptlogin2 ptqrshow 出码 → ptqrlogin 轮询 → check_sig 取 p_skey →
 ///   graph.qq.com authorize 换 code → QQConnectLogin 换 musickey
 ///
@@ -143,11 +143,11 @@ void _resetJar() => _cookieJar = <String, String>{};
 
 // ── 出码 ─────────────────────────────────────────────────────────────
 
-/// 获取 QQ 登录二维码 Key 及图片内容（仅 QQ 扫码）。
+/// 获取 QM 登录二维码 Key 及图片内容（仅 QM 扫码）。
 Future<Map<String, dynamic>> _qrKey(String type) async {
   _resetJar();
 
-  // QQ 扫码
+  // QM 扫码
   final url =
       'https://ssl.ptlogin2.qq.com/ptqrshow?appid=716027609&e=2&l=M&s=3&d=72&v=4&t=${DateTime.now().microsecondsSinceEpoch}&daid=383&pt_3rd_aid=100497308';
   final res = await _httpGet(
@@ -171,9 +171,9 @@ Future<Map<String, dynamic>> _qrKey(String type) async {
 
 // ── 轮询 ─────────────────────────────────────────────────────────────
 
-/// 轮询 QQ 扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（已写 cookie）。
+/// 轮询 QM 扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（已写 cookie）。
 Future<Map<String, dynamic>> _qrCheck(String key, String type) async {
-  // QQ 扫码检查
+  // QM 扫码检查
   final ptqrtoken = qmHash33(key, 0);
   final now = DateTime.now().millisecondsSinceEpoch;
   final query = {
@@ -232,9 +232,9 @@ Future<Map<String, dynamic>> _qrCheck(String key, String type) async {
       throw HttpException('获取 p_skey 失败');
     }
 
-    // authorize 换取授权 code。redirect_uri 为 QQ OAuth（client_id
+    // authorize 换取授权 code。redirect_uri 为 QM OAuth（client_id
     // 100497308）在 y.qq.com 注册的回跳页，页面名含 "wx" 属上游命名，
-    // 属于 QQ 登录流程（非微信登录），不可改动。
+    // 属于 QM 登录流程（非微信登录），不可改动。
     final authBody = <String, String>{
       'response_type': 'code',
       'client_id': '100497308',

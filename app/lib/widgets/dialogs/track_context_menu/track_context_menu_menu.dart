@@ -16,7 +16,7 @@ void showTrackContextMenu(
 }) {
   // 菜单项可见性由音源注册表声明（不再硬编码平台列表）：
   // - 「红心 / 评论 / 添加到歌单」：NT / KG；
-  // - 「查看歌手 / 详情 / 下载」：NT / KG / QQ。
+  // - 「查看歌手 / 详情 / 下载」：NT / KG / QM。
   final sp = sourcePlatform(track.source);
   final canLike = sp.trackMenuLikeComment;
   final canComment = sp.trackMenuComment;
@@ -58,7 +58,7 @@ void showTrackContextMenu(
             icon: EtaIcons.chatOutline,
             onTap: () => showCommentDialog(context, track: track),
           ),
-        // 添加到歌单：由注册表适配器声明是否支持（如网易云）。
+        // 添加到歌单：由注册表适配器声明是否支持（如NT）。
         if (canLike &&
             collectionPlatform(track.source).playlistManageSupported(ref))
           SContextMenuItem(
@@ -71,7 +71,7 @@ void showTrackContextMenu(
             ),
           ),
       ],
-      // 查看歌手 / 媒体详情：在线来源通用（含 QQ）。
+      // 查看歌手 / 媒体详情：在线来源通用（含 QM）。
       if (canViewArtist || canViewDetail) ...[
         SContextMenuItem.divider(),
         // 查看歌手：按来源分发到各平台歌手详情（NT/KG/QQ 均已接通）。

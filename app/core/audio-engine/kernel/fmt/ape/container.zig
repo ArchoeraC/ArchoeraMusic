@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! APE 容器解析（docs/audio-kernel-zig.md §9.10）
 //!
@@ -214,7 +218,7 @@ pub fn parse(allocator: std.mem.Allocator, reader: *io.Reader) Error!Header {
         frames[totalframes - 1].size = final_size;
     }
 
-    // 帧定位修正（对齐 FFmpeg：skip 回退 + 4 字节对齐）
+    // 帧定位修正（对齐 验收基准：skip 回退 + 4 字节对齐）
     for (frames) |*f| {
         if (f.skip != 0) {
             f.pos -%= f.skip;

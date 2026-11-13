@@ -20,7 +20,7 @@
 //!   - ADPCM（4-bit，输出 s16）：IMA WAV（tag 0x11）+ MS ADPCM（tag 2），块解码见 adpcm.zig；
 //!   - WAVEFORMATEXTENSIBLE（0xFFFE，SubFormat GUID 判定子格式）；
 //!   - 其余编码（GSM、CAF 内嵌 alac/aac/lpcm 可变包、AU mulaw/alaw 等）→
-//!     error.UnsupportedFormat → 引擎回退 FFmpeg（§8.3）。
+//!     error.UnsupportedFormat → 引擎回退 验收基准（§8.3）。
 //!
 //! 输出：原生位深交错 PCM（alaw/mulaw/adpcm 为 s16），由上层 pcm/* 统一转换。
 //! 健壮性（§13.3）：chunk 循环有界、长度 clamp、字段范围校验、多 data 段越界保护。
@@ -359,7 +359,7 @@ fn parseAlloc(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.I
         ctx.sanyo_samples_per_block = adpcm.sanyoSamplesPerBlock(fmt.extradata[0..fmt.extradata_len]) catch return error.Corrupt;
         ctx.sanyo_bits = @intCast(fmt.bits);
     }
-    // Creative CT 连续流初始步长 511（镜像 FFmpeg adpcm_init，adpcm.c 2916-2918）
+    // Creative CT 连续流初始步长 511（镜像 验收基准 adpcm_init，adpcm.c 2916-2918）
     if (fmt.codec == .adpcm_ct) adpcm.resetCont(&ctx.cont, true);
     // G.726：code_size = fmt.bits（decl 已按 byte_rate/sample_rate 覆盖，
     // riffdec.c 254-256），并初始化解码状态（镜像 g726_decode_init → g726_reset）
@@ -434,7 +434,7 @@ const CafPcm = struct {
 };
 
 /// CAF 魔数后 8 字节：version u16 BE（须 1）+ file flags u16 BE。
-/// 随后 chunk 须为 `desc`（size == 32），逐字段镜像 FFmpeg cafdec.c read_desc_chunk：
+/// 随后 chunk 须为 `desc`（size == 32），逐字段镜像 验收基准 cafdec.c read_desc_chunk：
 ///   mSampleRate    f64（8 字节 IEEE754 大端）
 ///   mFormatID      4 字符码（文件内按大端顺序，"lpcm"）
 ///   mFormatFlags   u32 BE（0x1 = float，0x2 = little-endian，0x4 = signed integer）
@@ -465,7 +465,7 @@ fn parseCafDesc(reader: *io.Reader) Error!CafPcm {
 
     const is_le = (flags & 0x2) != 0;
     const is_float = (flags & 0x1) != 0;
-    // 镜像 ffmpeg：CAF lpcm 整数恒按有符号解码（cafdec.c (flags ^ 0x2) | 0x4）
+    // 镜像 验收基准：CAF lpcm 整数恒按有符号解码（cafdec.c (flags ^ 0x2) | 0x4）
     const codec: decl.Codec = if (is_float)
         switch (bits) {
             32, 64 => .pcm_float,
@@ -481,7 +481,7 @@ fn parseCafDesc(reader: *io.Reader) Error!CafPcm {
         .channels = @intCast(channels),
         .sample_rate = sample_rate,
         .bits = @intCast(bits),
-        // 帧字节 = 样本宽 × 声道（ffmpeg cafenc 写入的 bytes_per_packet 即此值）
+        // 帧字节 = 样本宽 × 声道（验收基准 cafenc 写入的 bytes_per_packet 即此值）
         .block_align = @as(usize, @intCast(channels)) * @as(usize, bits / 8),
     };
     try decl.validate(fmt);
@@ -499,7 +499,7 @@ fn openCaf(
     if (!try readExact(reader, &fh)) return error.Corrupt;
     if (!std.mem.eql(u8, fh[0..4], "caff")) return error.Corrupt;
 
-    // desc 必须紧随文件头（镜像 FFmpeg cafdec read_header）
+    // desc 必须紧随文件头（镜像 验收基准 cafdec read_header）
     var dh: [12]u8 = undefined;
     if (!try readExact(reader, &dh)) return error.Corrupt;
     if (!std.mem.eql(u8, dh[0..4], "desc")) return error.Corrupt;
@@ -535,7 +535,7 @@ fn openCaf(
     return finishPcm(ctx, reader, pcm.fmt, found, info);
 }
 
-/// AU 未压缩 PCM encoding（镜像 FFmpeg au.c codec_au_tags；非 PCM → Unsupported）
+/// AU 未压缩 PCM encoding（镜像 验收基准 au.c codec_au_tags；非 PCM → Unsupported）
 const AuCodec = struct { codec: decl.Codec, bits: u16 };
 
 fn auCodec(encoding: u32) Error!AuCodec {
@@ -546,13 +546,13 @@ fn auCodec(encoding: u32) Error!AuCodec {
         5 => .{ .codec = .pcm_int, .bits = 32 }, // PCM_S32BE
         6 => .{ .codec = .pcm_float, .bits = 32 }, // PCM_F32BE
         7 => .{ .codec = .pcm_float, .bits = 64 }, // PCM_F64BE
-        // 1 = mu-law、27 = A-LAW、23..26 = G.726 等非未压缩 PCM → FFmpeg
+        // 1 = mu-law、27 = A-LAW、23..26 = G.726 等非未压缩 PCM → 验收基准
         else => error.UnsupportedFormat,
     };
 }
 
 /// 打开 Sun AU：`.snd` + 固定头（24B 字段）→ 数据定位于 data_offset。
-/// 镜像 FFmpeg au.c au_read_header：data_size 可为 0xFFFFFFFF（未知，取至文件尾）。
+/// 镜像 验收基准 au.c au_read_header：data_size 可为 0xFFFFFFFF（未知，取至文件尾）。
 fn openAu(
     ctx: *WavCtx,
     reader: *io.Reader,
@@ -709,9 +709,9 @@ pub fn formatName(container: Container) [:0]const u8 {
     };
 }
 
-/// 编码器名（对齐 FFmpeg 命名）。8-bit 语义依容器/tag：
+/// 编码器名（对齐 验收基准 命名）。8-bit 语义依容器/tag：
 ///   WAV/W64 8-bit = unsigned（pcm_u8）；AIFF "NONE"/"in24"… = signed（pcm_s8）；
-///   AIFC "raw " = unsigned；CAF / AU 8-bit = signed（pcm_s8，镜像 FFmpeg cafdec/au）。
+///   AIFC "raw " = unsigned；CAF / AU 8-bit = signed（pcm_s8，镜像 验收基准 cafdec/au）。
 fn codecName(ctx: *WavCtx) [:0]const u8 {
     const be = ctx.endian == .big;
     switch (ctx.codec) {
@@ -741,7 +741,7 @@ fn codecName(ctx: *WavCtx) [:0]const u8 {
             64 => if (be) "pcm_f64be" else "pcm_f64le",
             else => "pcm_float",
         },
-        // F16LE/F24LE（4 字节槽位变体，仅 little-endian；镜像 FFmpeg 命名）
+        // F16LE/F24LE（4 字节槽位变体，仅 little-endian；镜像 验收基准 命名）
         .pcm_f16 => return "pcm_f16le",
         .pcm_f24 => return "pcm_f24le",
         .pcm_int => {
@@ -796,7 +796,7 @@ fn readPcm(w: *WavCtx, out: []u8, max_samples: usize) Error!usize {
     const n = try readData(w, out[0..want]);
     w.position_bytes += n;
     // F16/F24：4 字节槽位 le32（float32 位模式）× 2^-(bits-1)，原地转换
-    // （镜像 FFmpeg pcm.c DECODE(32, le32) + vector_fmul_scalar，613-619 行）
+    // （镜像 验收基准 pcm.c DECODE(32, le32) + vector_fmul_scalar，613-619 行）
     if (w.codec == .pcm_f16 or w.codec == .pcm_f24) {
         const coded_bits: u8 = if (w.codec == .pcm_f16) 16 else 24;
         const scale: f32 = 1.0 / @as(f32, @floatFromInt(@as(i32, 1) << @intCast(coded_bits - 1)));
@@ -951,7 +951,7 @@ fn readMace(w: *WavCtx, out: []u8, max_samples: usize) Error!usize {
 
 /// XAN DPCM 块式解码（仿 readAdpcm 的整块循环）：
 ///   每块 block_align 字节 = 2B/通道 predictor 头 + 每字节 1 交错样本，
-///   解码状态不跨块（shift 每块重置 {4,4}，镜像 FFmpeg dpcm.c）。
+///   解码状态不跨块（shift 每块重置 {4,4}，镜像 验收基准 dpcm.c）。
 fn readXan(w: *WavCtx, out: []u8, max_samples: usize) Error!usize {
     const block_samples = samplesPerBlock(w) * w.channels; // 每块交错样本数
     const block_out_bytes = block_samples * 2;
@@ -1044,7 +1044,7 @@ fn readZork(w: *WavCtx, out: []u8, max_samples: usize) Error!usize {
     return n / w.channels; // 帧数
 }
 
-/// SWF 位流按位读取（MSB-first，镜像 FFmpeg GetBitContext get_bits）：
+/// SWF 位流按位读取（MSB-first，镜像 验收基准 GetBitContext get_bits）：
 /// 按需读取覆盖字节（position_bytes 每次读前定位）；越界补 0 不消费真实数据。
 /// 消耗后推进 w.swf_bitpos（数据区起点起算的绝对位游标）。
 fn readSwfBits(w: *WavCtx, n: u8) Error!u32 {
@@ -1075,7 +1075,7 @@ fn readSwf(w: *WavCtx, out: []u8, max_samples: usize) Error!usize {
     const ch = w.channels;
     const nbits = w.swf_nbits;
     if (nbits < 2 or nbits > 5 or w.data_bytes == 0) return 0;
-    // 位流总位数（含首 2-bit nbits 字段，镜像 FFmpeg size = buf_size*8，adpcm.c 918）
+    // 位流总位数（含首 2-bit nbits 字段，镜像 验收基准 size = buf_size*8，adpcm.c 918）
     const data_bits = w.data_bytes * 8;
 
     const out_cap = (out.len / 2) / ch * ch; // 输出样本数对齐整帧
@@ -1156,7 +1156,7 @@ fn readG722(w: *WavCtx, out: []u8, max_samples: usize) Error!usize {
 
 /// G.726 连续位流读取：每样本 code_size 位 → 1 帧（mono），输出 s16 LE。
 /// 解码状态 w.g726 跨 read 调用保持（seek 时重置）。按字节边界切包，包尾
-/// 剩余不足 code_size 的残位丢弃（镜像 FFmpeg 每包独立 get_bits，g726.c 455-486）。
+/// 剩余不足 code_size 的残位丢弃（镜像 验收基准 每包独立 get_bits，g726.c 455-486）。
 fn readG726(w: *WavCtx, out: []u8, max_samples: usize) Error!usize {
     const cs: u64 = w.g726.code_size; // 2..5（validate 保证）
     const out_cap = (out.len / 2) / w.channels * w.channels; // mono
@@ -1193,13 +1193,13 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
         @min((@as(u128, @intCast(ms)) * w.sample_rate) / 1000, total_frames);
     if (isContinuous(w)) {
         // 连续流：无块头、无法从中间跳入（状态须从头重训练）。
-        // 镜像 FFmpeg flush+seek 语义：跳转到字节位置并重置解码状态。
+        // 镜像 验收基准 flush+seek 语义：跳转到字节位置并重置解码状态。
         adpcm.resetCont(&w.cont, w.codec == .adpcm_ct);
         if (w.codec == .adpcm_g722) w.g722 = .{};
         w.position_bytes = frames * w.channels / 2; // 每字节 channels/2 帧
         return;
     }
-    // G.726 连续位流：状态须从头重训练（镜像 FFmpeg g726_decode_flush）；
+    // G.726 连续位流：状态须从头重训练（镜像 验收基准 g726_decode_flush）；
     // 字节位置按 code_size 位折算（包尾残位丢弃）
     if (w.codec == .adpcm_g726) {
         adpcm.g726Reset(&w.g726);
@@ -1225,11 +1225,11 @@ fn seekMsImpl(ctx: *anyopaque, ms: i64) Error!void {
     // 对齐到块边界（PCM/G.711 每块 1 帧；ADPCM 按块样本数）
     const blocks = frames / samplesPerBlock(w);
     w.position_bytes = blocks * w.block_align;
-    // IMA QT 启发式依赖上一块展开状态：seek 后须重置（镜像 FFmpeg flush）
+    // IMA QT 启发式依赖上一块展开状态：seek 后须重置（镜像 验收基准 flush）
     if (w.codec == .adpcm_ima_qt) adpcm.resetCont(&w.cont, false);
-    // GSM 的 ref_buf/lar/msr 为流式状态：seek 后须清空（镜像 FFmpeg flush）
+    // GSM 的 ref_buf/lar/msr 为流式状态：seek 后须清空（镜像 验收基准 flush）
     if (w.codec == .gsm) w.gsm_ctx = .{};
-    // MACE 的 index/factor/level 为流式状态：seek 后须清空（镜像 FFmpeg flush）
+    // MACE 的 index/factor/level 为流式状态：seek 后须清空（镜像 验收基准 flush）
     if (w.codec == .mace3 or w.codec == .mace6) w.mace_ctx = .{};
     // Reader 位置无需同步：readData 每次读取前自行 seek
 }
@@ -2325,51 +2325,51 @@ fn checkGolden(
     try testing.expectEqualSlices(u8, expect, got);
 }
 
-test "wav 集成: DK3（tag 0x62）黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: DK3（tag 0x62）黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_dk3_fmt, &adpcm.golden_dk3_data, &adpcm.golden_dk3_expect, "adpcm_ima_dk3", 22050, 2, 3537);
 }
 
-test "wav 集成: XBOX（tag 0x69）黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: XBOX（tag 0x69）黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_xbox_fmt, &adpcm.golden_xbox_data, &adpcm.golden_xbox_expect, "adpcm_ima_xbox", 48000, 2, 1000);
 }
 
-test "wav 集成: SANYO 3-bit（tag 0x125）黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: SANYO 3-bit（tag 0x125）黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_sanyo_m3_fmt, &adpcm.golden_sanyo_m3_data, &adpcm.golden_sanyo_m3_expect, "adpcm_sanyo", 8000, 1, 30000);
 }
 
-test "wav 集成: SANYO 5-bit（tag 0x125）黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: SANYO 5-bit（tag 0x125）黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_sanyo_s5_fmt, &adpcm.golden_sanyo_s5_data, &adpcm.golden_sanyo_s5_expect, "adpcm_sanyo", 8000, 2, 16000);
 }
 
-test "wav 集成: ZORK（tag 0x11 + bits 8）黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: ZORK（tag 0x11 + bits 8）黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_zork_fmt, &adpcm.golden_zork_data, &adpcm.golden_zork_expect, "adpcm_zork", 8000, 2, 25000);
 }
 
-test "wav 集成: SWF mono（tag 0x5346）黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: SWF mono（tag 0x5346）黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_swf_mono_fmt, &adpcm.golden_swf_mono_data, &adpcm.golden_swf_mono_expect, "adpcm_swf", 8000, 1, 12625);
 }
 
-test "wav 集成: SWF stereo（tag 0x5346）黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: SWF stereo（tag 0x5346）黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_swf_stereo_fmt, &adpcm.golden_swf_stereo_data, &adpcm.golden_swf_stereo_expect, "adpcm_swf", 8000, 2, 8125);
 }
 
-test "wav 集成: G.722（tag 0x028F）黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: G.722（tag 0x028F）黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_g722_mono_fmt, &adpcm.golden_g722_mono_data, &adpcm.golden_g722_mono_expect, "adpcm_g722", 16000, 1, 1000000);
 }
 
-test "wav 集成: G.726（tag 0x0045）code_size 2 黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: G.726（tag 0x0045）code_size 2 黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_g726_2_fmt, &adpcm.golden_g726_2_data, &adpcm.golden_g726_2_expect, "adpcm_g726", 8000, 1, 1000000);
 }
 
-test "wav 集成: G.726（tag 0x0045）code_size 3 黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: G.726（tag 0x0045）code_size 3 黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_g726_3_fmt, &adpcm.golden_g726_3_data, &adpcm.golden_g726_3_expect, "adpcm_g726", 8000, 1, 1000000);
 }
 
-test "wav 集成: G.726（tag 0x0045）code_size 4 黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: G.726（tag 0x0045）code_size 4 黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_g726_4_fmt, &adpcm.golden_g726_4_data, &adpcm.golden_g726_4_expect, "adpcm_g726", 8000, 1, 1000000);
 }
 
-test "wav 集成: G.726（tag 0x0045）code_size 5 黄金样本 bit-exact（FFmpeg 对照）" {
+test "wav 集成: G.726（tag 0x0045）code_size 5 黄金样本 逐样本一致（验收基准 对照）" {
     try checkGolden(&adpcm.golden_g726_5_fmt, &adpcm.golden_g726_5_data, &adpcm.golden_g726_5_expect, "adpcm_g726", 8000, 1, 1000000);
 }
 
@@ -2632,7 +2632,7 @@ test "wav 畸形: LIST-INFO 声明超长 → 截断不崩溃" {
 
 test "wav 集成: GSM_MS（tag 0x31）端到端黄金 + seek 块对齐" {
     // 真实数据：libgsm_ms 编码 960 样本 440Hz 正弦（/tmp/gsm_ref.wav data 区，3 块 × 65B），
-    // 解码期望与 FFmpeg 原生输出逐字节一致（gsm.zig 已锚定黄金）。
+    // 解码期望与 验收基准 原生输出逐字节一致（gsm.zig 已锚定黄金）。
     const data = [_]u8{
         0x88, 0xDD, 0xE1, 0x1A, 0x85, 0xC2, 0xF3, 0x16, 0x40, 0x9B, 0xD2, 0x8A,
         0x02, 0xEB, 0x1C, 0xDB, 0x69, 0x24, 0x57, 0xA5, 0x64, 0x44, 0xFA, 0x2F,
@@ -2690,7 +2690,7 @@ test "wav 集成: GSM_MS（tag 0x31）端到端黄金 + seek 块对齐" {
     try dec.seekMs(61);
     try testing.expectEqual(@as(i64, 40), dec.positionMs());
     try testing.expectEqual(@as(usize, 640), try dec.read(&out, 640, &ch));
-    // GSM 为流式状态解码：seek 后内部状态被 flush（镜像 FFmpeg），块 1 起以全新
+    // GSM 为流式状态解码：seek 后内部状态被 flush（镜像 验收基准），块 1 起以全新
     // 状态解码，输出与未 seek 的连续解码（expect[320..]，依赖块 0 状态）不同。
     // 因此期望改为 seek 后以全新 ctx 从块 1 起重新解码。
     var ctx_seek = gsm.Context{};
@@ -2762,7 +2762,7 @@ test "wav 集成: AIFC GSM（'GSM '）端到端" {
 }
 
 test "wav 集成: AIFC MAC6（'MAC6'）mono 端到端黄金 + seek 块对齐" {
-    // 黄金数据（mace.zig）由独立 Python 参考实现生成，并已与 FFmpeg 官方 mace6 解码器逐样本一致
+    // 黄金数据（mace.zig）由独立 Python 参考实现生成，并已与 验收基准 官方 mace6 解码器逐样本一致
     const data = mace.golden_m6m;
     var comm: [22]u8 = undefined; // 18 + compressionType "MAC6"
     std.mem.writeInt(u16, comm[0..2], 1, .big); // channels
@@ -2799,7 +2799,7 @@ test "wav 集成: AIFC MAC6（'MAC6'）mono 端到端黄金 + seek 块对齐" {
     try dec.seekMs(2);
     try testing.expectEqual(@as(i64, 1), dec.positionMs());
     try testing.expectEqual(@as(usize, 78), try dec.read(&out, 78, &ch));
-    // MACE 为流式状态：seek 后 ctx 被 flush（镜像 FFmpeg），期望以全新 ctx 从块 7 起解码
+    // MACE 为流式状态：seek 后 ctx 被 flush（镜像 验收基准），期望以全新 ctx 从块 7 起解码
     var ctx = mace.Context{};
     var expect_seek: [78]i16 = undefined;
     _ = try mace.decode(&ctx, data[7..], 1, false, &expect_seek);
@@ -3064,7 +3064,7 @@ fn buildAu(allocator: std.mem.Allocator, encoding: u32, rate: u32, channels: u32
     return buf.toOwnedSlice(allocator);
 }
 
-test "caf 集成: lpcm s16le mono（镜像 ffmpeg 布局：desc + chan + info + data）" {
+test "caf 集成: lpcm s16le mono（镜像 验收基准 布局：desc + chan + info + data）" {
     // data：4 帧 s16 LE
     var pcm: [8]u8 = undefined;
     const vals = [_]i16{ 1000, -1000, 2000, -2000 };

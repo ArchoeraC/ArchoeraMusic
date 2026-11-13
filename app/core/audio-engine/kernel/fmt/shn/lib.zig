@@ -19,15 +19,15 @@
 //!   3. internal_ftype ∈ {2,3,5}（U8/S16HL/S16LH）且 1 ≤ channels ≤ 8 且
 //!      1 ≤ blocksize ≤ 65535 → 识别 Format.shn。
 //!   decoder dispatch：`.shn => shn.open(allocator, &reader, info)`；
-//!   未识别 → 交由 FFmpeg 主后端（错误集内 UnsupportedFormat）。
+//!   未识别 → 交由 验收基准 主后端（错误集内 UnsupportedFormat）。
 //!
-//! 解码语义（对齐 ffmpeg n9.0.1 native shorten，kernel/fmt/shn/core.zig）：
+//! 解码语义（对齐 验收基准 n9.0.1 native shorten，kernel/fmt/shn/core.zig）：
 //!   - MSB-first 位流 + jpegls 变体 Rice（unary + k 位后缀；符号 = zigzag）；
 //!   - internal_ftype 决定输出：TYPE_U8 → u8、TYPE_S16HL/S16LH → s16
-//!     （AIFF-C swap 为值字节交换后按 LE 输出，与 ffmpeg `-f s16le` 逐位一致）；
+//!     （AIFF-C swap 为值字节交换后按 LE 输出，与 验收基准 `-f s16le` 逐样本一致）；
 //!   - seek：Shorten 块间状态耦合（wrap 样本/均值），不支持随机访问；
 //!     seek_ms 重建解码器后从头快进到目标块（正确性优先）；
-//!   - 时长：裸流无总长字段（ffmpeg Duration: N/A）→ duration_known = .unknown。
+//!   - 时长：裸流无总长字段（验收基准 Duration: N/A）→ duration_known = .unknown。
 //!
 //! Info：sample_rate/channels 取自 WAVE-AIFF 头 + shorten 头；
 //! bits_per_sample = 8（U8）/ 16（S16）；codec_name = "shorten"，format_name = "shn"。
@@ -181,7 +181,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
 
     var dec = core.Decoder.init(allocator, data);
     errdefer dec.deinit();
-    // 头部即时解析（Info 需要 sr/ch/bps；与 ffmpeg 首 decode 调用 read_header 等价）
+    // 头部即时解析（Info 需要 sr/ch/bps；与 验收基准 首 decode 调用 read_header 等价）
     try dec.parseHeader();
     if (dec.sample_rate == 0) return error.Corrupt;
 
@@ -225,7 +225,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
 }
 
 // ---------------------------------------------------------------------------
-// 回归测试（golden = ffmpeg n9.0.1 native shorten 解码，逐字节）
+// 回归测试（golden = 验收基准 n9.0.1 native shorten 解码，逐字节）
 // ---------------------------------------------------------------------------
 
 const testing = std.testing;
@@ -251,7 +251,7 @@ fn decodeAll(shn: []const u8) !struct { bytes: std.ArrayList(u8), info: decoder.
     return .{ .bytes = out, .info = info };
 }
 
-test "shn e2e: luckynight-partial.shn (44.1k/16bit 2ch) == ffmpeg s16le（逐位）" {
+test "shn e2e: luckynight-partial.shn (44.1k/16bit 2ch) == 验收基准 s16le（逐位）" {
     var era_res = try decodeAll(luckynight_shn);
     defer era_res.bytes.deinit(testing.allocator);
     const info = era_res.info;
@@ -340,7 +340,7 @@ test "shn 健壮性: 坏魔数/截断头 → Corrupt；非 RIFF/FORM verbatim �
 }
 
 // ---------------------------------------------------------------------------
-// 合成样本（编码器镜像生成的码流，oracle = ffmpeg n9.0.1 native shorten 解码）：
+// 合成样本（编码器镜像生成的码流，oracle = 验收基准 n9.0.1 native shorten 解码）：
 // 覆盖 v0/v1/v2、FN_QLPC/DIFF0..3/ZERO/BITSHIFT/BLOCKSIZE/VERBATIM、
 // U8/S16、AIFF/AIFF-C(swap)、1/2/4 声道。
 // ---------------------------------------------------------------------------
@@ -374,7 +374,7 @@ fn expectGolden(shn: []const u8, golden: []const u8, width: usize) !void {
     try testing.expectEqualSlices(u8, golden, out.items);
 }
 
-test "shn 合成: v2 QLPC+DIFF0..3+ZERO+BITSHIFT2+BLOCKSIZE 缩+VERBATIM (2ch) == ffmpeg s16le" {
+test "shn 合成: v2 QLPC+DIFF0..3+ZERO+BITSHIFT2+BLOCKSIZE 缩+VERBATIM (2ch) == 验收基准 s16le" {
     var r = io.Reader.openMem(synth_v2_qlpc);
     var info: decoder.Info = undefined;
     var d = try open(testing.allocator, &r, &info);
@@ -385,7 +385,7 @@ test "shn 合成: v2 QLPC+DIFF0..3+ZERO+BITSHIFT2+BLOCKSIZE 缩+VERBATIM (2ch) =
     try expectGolden(synth_v2_qlpc, synth_v2_qlpc_golden, 2);
 }
 
-test "shn 合成: v1 DIFF0 (1ch, 无 lpcqoffset/均值无移位) == ffmpeg s16le" {
+test "shn 合成: v1 DIFF0 (1ch, 无 lpcqoffset/均值无移位) == 验收基准 s16le" {
     var r = io.Reader.openMem(synth_v1_diff);
     var info: decoder.Info = undefined;
     var d = try open(testing.allocator, &r, &info);
@@ -395,7 +395,7 @@ test "shn 合成: v1 DIFF0 (1ch, 无 lpcqoffset/均值无移位) == ffmpeg s16le
     try expectGolden(synth_v1_diff, synth_v1_diff_golden, 2);
 }
 
-test "shn 合成: v0 U8 (k=字段-1 hack, coffset=0) == ffmpeg u8" {
+test "shn 合成: v0 U8 (k=字段-1 hack, coffset=0) == 验收基准 u8" {
     var r = io.Reader.openMem(synth_v0_u8);
     var info: decoder.Info = undefined;
     var d = try open(testing.allocator, &r, &info);
@@ -406,7 +406,7 @@ test "shn 合成: v0 U8 (k=字段-1 hack, coffset=0) == ffmpeg u8" {
     try expectGolden(synth_v0_u8, synth_v0_u8_golden, 1);
 }
 
-test "shn 合成: v2 AIFF 头 4ch == ffmpeg s16le（FORM/COMM 80bit 采样率 + 多声道交错）" {
+test "shn 合成: v2 AIFF 头 4ch == 验收基准 s16le（FORM/COMM 80bit 采样率 + 多声道交错）" {
     var r = io.Reader.openMem(synth_v2_aiff4);
     var info: decoder.Info = undefined;
     var d = try open(testing.allocator, &r, &info);
@@ -416,7 +416,7 @@ test "shn 合成: v2 AIFF 头 4ch == ffmpeg s16le（FORM/COMM 80bit 采样率 + 
     try expectGolden(synth_v2_aiff4, synth_v2_aiff4_golden, 2);
 }
 
-test "shn 合成: v2 AIFF-C swap（值字节交换）== ffmpeg s16le" {
+test "shn 合成: v2 AIFF-C swap（值字节交换）== 验收基准 s16le" {
     var r = io.Reader.openMem(synth_v2_aifc);
     var info: decoder.Info = undefined;
     var d = try open(testing.allocator, &r, &info);

@@ -15,7 +15,7 @@ String? qmSessionToCookieHeader(Map<String, String> session) {
   return entries.map((e) => '${e.key}=${e.value}').join('; ');
 }
 
-/// QQ 系哈希算法（ptqrtoken / g_tk 共用）。
+/// QM 系哈希算法（ptqrtoken / g_tk 共用）。
 ///
 /// JS 侧等价实现：每轮 `(h<<5)+h+code` 后 `& 0xffffffff` 保留低 32 位，
 /// 最终 `& 2147483647` 清符号位。Dart 用 64 位 int 运算并显式掩码等价。
@@ -37,7 +37,7 @@ String qmCredentialMusicId(Map<String, dynamic> credential,
 
 /// 将登录凭据转换为可持久化的会话字段。
 ///
-/// [loginType] 1=微信 / 2=QQ；缺省时读凭据里的 `loginType`，再回退 2。
+/// [loginType] 1=微信 / 2=QM；缺省时读凭据里的 `loginType`，再回退 2。
 /// 微信登录需把 openid/refresh_token 映射到 `wx*` 字段（对齐 credential.ts）。
 Map<String, String> qmCredentialToSession(
   Map<String, dynamic> credential, {

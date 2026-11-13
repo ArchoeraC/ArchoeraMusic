@@ -39,7 +39,7 @@ use crate::crypto::netease as nm;
 use crate::models::{EnqueueRequest, SourcePlatform};
 
 /// 封面大小安全阀（仅防异常响应拖慢任务，如 HTML 错误页/异常大文件）。
-/// 正常高清封面远低于此：网易原图为 2048×2048 PNG（约 10MB），不触顶。
+/// 正常高清封面远低于此：NT 原图为 2048×2048 PNG（约 10MB），不触顶。
 const MAX_COVER_BYTES: u64 = 50 * 1024 * 1024;
 
 /// 歌曲元数据（引擎自主寻找的结果；缺失字段为空串 / None）
@@ -282,7 +282,7 @@ static NEKO_META: SourceMetadataCapability = SourceMetadataCapability {
     provider: None,
     trusted_lyrics: false,
 };
-/// QQ / Streaming 及未来未知音源：无平台接口，歌词沿用内嵌/平台默认（可信）。
+/// QM / Streaming 及未来未知音源：无平台接口，歌词沿用内嵌/平台默认（可信）。
 static DEFAULT_META: SourceMetadataCapability = SourceMetadataCapability {
     provider: None,
     trusted_lyrics: true,
@@ -312,7 +312,7 @@ pub async fn fetch_platform_info(
 ) -> TrackMetadata {
     match metadata_capability_for(request.source).provider {
         Some(provider) => provider.fetch_info(client, request).await,
-        // QQ / Neko / Streaming / 未知：无 Rust 侧平台接口，用 enqueue 传入元数据
+        // QM / Neko / Streaming / 未知：无 Rust 侧平台接口，用 enqueue 传入元数据
         // + 兜底源（MusicBrainz / CAA）补全。
         None => TrackMetadata::default(),
     }
@@ -345,7 +345,7 @@ const KG_LYRIC_HEADERS: [(&str, &str); 3] = [
     ("User-Agent", "KuGou2012-9020-ExpandSearchManager"),
 ];
 
-/// 登录态 query 片段（`&token=...&userid=...`）；酷狗搜索/歌词接口本无鉴权，
+/// 登录态 query 片段（`&token=...&userid=...`）；KG 搜索/歌词接口本无鉴权，
 /// 但带 token/userid 可尝试解锁 VIP 歌词等受限内容。best-effort：
 /// 未登录（空 / "0"）不注入，保持匿名请求。
 fn kg_auth_query() -> String {
@@ -753,7 +753,7 @@ async fn netease_lyrics(client: &reqwest::Client, request: &EnqueueRequest) -> O
     if lrc.is_empty() {
         return None;
     }
-    // 翻译（tlyric）合并：网易云翻译行与主歌词行序对应，交错写入
+    // 翻译（tlyric）合并：NT 翻译行与主歌词行序对应，交错写入
     let tlyric = body
         .get("tlyric")
         .and_then(|l| l.get("lyric"))
@@ -790,7 +790,7 @@ pub async fn download_cover(
     if bytes.len() < 8 {
         return None;
     }
-    // 魔数识别的真实类型优先（网易 CDN 会把 PNG 标成 image/jpg，头值不可信）；
+    // 魔数识别的真实类型优先（NT CDN 会把 PNG 标成 image/jpg，头值不可信）；
     // 未知格式（webp 等）回退响应头，再无则兜底 jpeg。
     let mime = guess_image_mime(&bytes)
         .or(mime)
@@ -956,7 +956,7 @@ async fn get_json(
     resp.json().await.ok()
 }
 
-/// 网易 weapi POST（对齐 resolvers.rs nm_download_url 的请求形态）
+/// NT weapi POST（对齐 resolvers.rs nm_download_url 的请求形态）
 async fn nm_weapi_post(
     client: &reqwest::Client,
     path: &str,
@@ -1063,7 +1063,7 @@ mod tests {
     use std::io::Write;
 
     /// 反向构造 KRC 密文（明文 → zlib → 前置 4 字节明文头 → 仅头后内容 XOR → base64），
-    /// 验证 decrypt_krc 与酷狗加密流程互逆。
+    /// 验证 decrypt_krc 与KG 加密流程互逆。
     fn build_krc_base64(plain: &str) -> String {
         let mut enc = ZlibEncoder::new(Vec::new(), Compression::default());
         enc.write_all(plain.as_bytes()).unwrap();
@@ -1162,7 +1162,7 @@ mod tests {
         let neko = metadata_capability_for(SourcePlatform::Neko);
         assert!(neko.provider.is_none());
         assert!(!neko.trusted_lyrics);
-        // QQ / Streaming / Bilibili / 未知：无平台实现，歌词可信（沿用内嵌/平台默认）。
+        // QM / Streaming / Bilibili / 未知：无平台实现，歌词可信（沿用内嵌/平台默认）。
         for src in [
             SourcePlatform::Qqmusic,
             SourcePlatform::Streaming,

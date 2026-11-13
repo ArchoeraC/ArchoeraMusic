@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! DTS（DCA Coherent Acoustics）core 解码数值表（阶段二）
 //!
@@ -2321,7 +2325,7 @@ pub const era_dca_lfe_fir_64_fixed: [256]i32 = .{
     24426, -106412, -437356, 4549871, 4819584, -350658, -139125, 28376,
     25721, -116977, -410365, 4641355, 4731293, -381475, -127884, 27038,
 };
-// ---- DTS-HD XLL（dca.c / dcadata.c / dca_xll 定点）表，FFmpeg n9.0.1 ----
+// ---- DTS-HD XLL（dca.c / dcadata.c / dca_xll 定点）表，验收基准 n9.0.1 ----
 // ff_dca_sampling_freqs（dca.c；XLL chset 采样率索引表，与 core sample_rates 表不同）
 pub const era_dca_sampling_freqs: [16]u32 = .{
     8000, 16000, 32000, 64000, 128000, 22050, 44100, 88200,

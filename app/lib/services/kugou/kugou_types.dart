@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// KG数据模型（歌词 / 评论 / 登录会话 / 用户曲库分类）。
+/// KG 数据模型（歌词 / 评论 / 登录会话 / 用户曲库分类）。
 ///
 /// 从 `kugou_api.dart` 拆出：与网络请求无关的纯类型定义与解析函数，
 /// 供 [KugouApi] 与调用方（评论弹窗等）共享。
@@ -25,7 +25,7 @@ class KugouLyric {
   final String roma;
 }
 
-/// KG歌曲评论（commentsv2/getCommentWithLike 条目）。
+/// KG 歌曲评论（commentsv2/getCommentWithLike 条目）。
 class KugouComment {
   const KugouComment({
     required this.id,
@@ -56,7 +56,7 @@ class KugouComment {
   final List<KugouComment> reply;
 }
 
-/// KG歌曲评论分页。
+/// KG 歌曲评论分页。
 class KugouCommentPage {
   const KugouCommentPage({
     required this.list,
@@ -101,7 +101,7 @@ KugouComment kgCommentFromKg(Map<String, dynamic> c) {
   );
 }
 
-/// KG登录会话（扫码登录成功后的 token/userid，v5/url 请求 VIP 曲目用）。
+/// KG 登录会话（扫码登录成功后的 token/userid，v5/url 请求 VIP 曲目用）。
 class KugouSession {
   const KugouSession({
     required this.token,
@@ -135,7 +135,7 @@ class KugouSession {
   String toString() => 'KugouSession(userid=$userid, nickname=$nickname)';
 }
 
-/// KG用户曲库条目类型（对齐 `/v7/get_all_list` 的分类：
+/// KG 用户曲库条目类型（对齐 `/v7/get_all_list` 的分类：
 /// 创建的歌单 / 收藏的歌单 / 收藏的专辑）。
 enum KugouLibraryType {
   /// 我创建的歌单（含系统「我喜欢」）。
@@ -148,7 +148,7 @@ enum KugouLibraryType {
   collectedAlbum,
 }
 
-/// KG用户曲库条目。
+/// KG 用户曲库条目。
 class KugouLibraryItem {
   const KugouLibraryItem({
     required this.type,
@@ -176,7 +176,7 @@ class KugouLibraryItem {
       CoverItem(id: id, title: title, cover: cover, trackCount: trackCount);
 }
 
-/// KG用户曲库（登录态，按 [KugouLibraryType] 分类）。
+/// KG 用户曲库（登录态，按 [KugouLibraryType] 分类）。
 class KugouLibrary {
   const KugouLibrary({required this.items});
 
