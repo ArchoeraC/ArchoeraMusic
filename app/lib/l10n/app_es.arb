@@ -587,6 +587,8 @@
   "settingsWindowDecorCaption": "Barra de título personalizada",
   "settingsWindowDecorBorderless": "Sin bordes",
   "settingsWindowDecorNote": "Se aplica al instante; si la barra de título se ve mal, reinicia la aplicación.",
+  "settingsWindowControlsAutoHide": "Ocultar automáticamente los botones de la ventana",
+  "settingsWindowControlsAutoHideDesc": "Solo se aplica a «Sin bordes»; se muestra únicamente cuando el cursor se mueve a la esquina superior derecha. Los usuarios táctiles no pueden hacer clic. Desactivado por defecto.",
   "windowMinimize": "Minimizar",
   "windowMaximize": "Maximizar",
   "windowRestore": "Restaurar",

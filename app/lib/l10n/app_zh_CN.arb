@@ -606,6 +606,8 @@
   "settingsWindowDecorCaption": "自绘标题栏",
   "settingsWindowDecorBorderless": "无边框",
   "settingsWindowDecorNote": "切换立即生效；若标题栏显示异常，重启应用即可。",
+  "settingsWindowControlsAutoHide": "自动隐藏窗口按钮",
+  "settingsWindowControlsAutoHideDesc": "仅「无边框」方案生效；光标移到右上角时才显示，触摸屏用户将无法点击，默认关闭。",
   "windowMinimize": "最小化",
   "windowMaximize": "最大化",
   "windowRestore": "还原",

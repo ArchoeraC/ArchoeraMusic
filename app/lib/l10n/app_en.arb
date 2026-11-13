@@ -587,6 +587,8 @@
   "settingsWindowDecorCaption": "Custom title bar",
   "settingsWindowDecorBorderless": "Borderless",
   "settingsWindowDecorNote": "Takes effect immediately; restart the app if the title bar looks wrong.",
+  "settingsWindowControlsAutoHide": "Auto-hide window buttons",
+  "settingsWindowControlsAutoHideDesc": "Only applies to Borderless; shown only when the cursor moves to the top-right corner. Touch users cannot click them. Off by default.",
   "windowMinimize": "Minimize",
   "windowMaximize": "Maximize",
   "windowRestore": "Restore",

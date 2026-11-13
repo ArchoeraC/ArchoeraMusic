@@ -1915,6 +1915,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsWindowDecorNote => '즉시 적용됩니다. 제목 표시줄이 이상하면 앱을 다시 시작하세요.';
 
   @override
+  String get settingsWindowControlsAutoHide => '창 버튼 자동 숨기기';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      '「테두리 없음」에만 적용됩니다. 커서를 오른쪽 위 모서리로 이동할 때만 표시됩니다. 터치 사용자는 클릭할 수 없습니다. 기본값은 꺼짐입니다.';
+
+  @override
   String get windowMinimize => '최소화';
 
   @override

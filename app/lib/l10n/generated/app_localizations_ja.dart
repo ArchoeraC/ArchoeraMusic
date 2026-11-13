@@ -1913,6 +1913,13 @@ class AppLocalizationsJa extends AppLocalizations {
       'すぐに反映されます。タイトルバーの表示がおかしい場合はアプリを再起動してください。';
 
   @override
+  String get settingsWindowControlsAutoHide => 'ウィンドウボタンを自動的に隠す';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      '「ボーダーレス」でのみ有効。カーソルを右上隅に移動したときだけ表示されます。タッチユーザーはクリックできません。既定ではオフです。';
+
+  @override
   String get windowMinimize => '最小化';
 
   @override

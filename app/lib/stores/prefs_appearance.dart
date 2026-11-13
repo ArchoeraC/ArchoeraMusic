@@ -28,6 +28,7 @@ const sidebarHiddenKeysKey = 'appearance.sidebarHiddenKeys';
 const localeKey = 'appearance.locale';
 const floatingBarKey = 'appearance.floatingPlayerBar';
 const windowDecorKey = 'appearance.windowDecor';
+const autoHideWindowControlsKey = 'appearance.autoHideWindowControls';
 const coverRadiusKey = 'appearance.coverRadius';
 const weatherEnabledKey = 'appearance.weatherEnabled';
 const weatherAutoLocateKey = 'appearance.weatherAutoLocate';
@@ -129,6 +130,12 @@ extension AppearancePrefs on AppPrefs {
     if (v is String && windowDecorIds.contains(v)) return v;
     return 'borderless';
   }
+
+  /// 无边框方案下自动隐藏窗口按钮（仅在指针移到右上角时显示）。
+  ///
+  /// **默认关闭**：触摸屏 / 无鼠标设备无法通过悬停唤出按钮。
+  bool get autoHideWindowControls =>
+      data[autoHideWindowControlsKey] == true;
 
   /// 背景图片路径（磁盘绝对路径；null = 未选择，对齐 imageBackground.src）。
   String? get backgroundImage => data[backgroundImageKey] as String?;
@@ -363,6 +370,10 @@ extension AppearancePrefs on AppPrefs {
       if (windowDecorIds.contains(value)) windowDecorKey: value,
     },
   );
+
+  /// 无边框方案下自动隐藏窗口按钮（默认关）。
+  AppPrefs copyWithAutoHideWindowControls(bool value) =>
+      AppPrefs(initialData: {...data, autoHideWindowControlsKey: value});
 
   /// 设置侧边栏自定义（导航项显示顺序 / 隐藏项集合）。
   AppPrefs copyWithSidebarCustomize({

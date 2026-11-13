@@ -1995,6 +1995,14 @@ class AppLocalizationsEs extends AppLocalizations {
       'Se aplica al instante; si la barra de título se ve mal, reinicia la aplicación.';
 
   @override
+  String get settingsWindowControlsAutoHide =>
+      'Ocultar automáticamente los botones de la ventana';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      'Solo se aplica a «Sin bordes»; se muestra únicamente cuando el cursor se mueve a la esquina superior derecha. Los usuarios táctiles no pueden hacer clic. Desactivado por defecto.';
+
+  @override
   String get windowMinimize => 'Minimizar';
 
   @override
