@@ -225,7 +225,7 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     var flac_reader = makeFlacReader(ctx);
     ctx.flac = try flac.open(allocator, &flac_reader, info);
     // 时长补齐：Ogg-FLAC 的 STREAMINFO total_samples 常为 0（流式 muxer，
-    // 如 ffmpeg 写 Ogg 时无法预知总样本数）→ FLAC 层报 unknown。用尾窗扫描
+    // 如 验收基准 写 Ogg 时无法预知总样本数）→ FLAC 层报 unknown。用尾窗扫描
     // 末页 granule 补齐（Ogg-FLAC mapping：granule = 末帧末样本绝对编号，
     // granule/rate 与 ffprobe 容器时长一致）。EOS 页 → exact；EOS 缺失/损坏
     // → 退 .estimate；callback/扫描失败 → 维持 FLAC 层（STREAMINFO）结果。
@@ -416,11 +416,11 @@ fn lastPageStart(data: []const u8) usize {
     return last;
 }
 
-/// ffmpeg 生成（0.5s 440Hz 正弦 44100 mono，`-c:a flac -f ogg`）：STREAMINFO
+/// 验收基准 生成（0.5s 440Hz 正弦 44100 mono，`-c:a flac -f ogg`）：STREAMINFO
 /// total_samples = 0（流式 muxer），末页 EOS granule 22050 = 0.5s
 const sample_oga = @embedFile("samples/oggflac_tiny.oga");
 
-/// ffmpeg 生成（2.013s 44100 mono）：末页 EOS granule 88773（多音频页形态）
+/// 验收基准 生成（2.013s 44100 mono）：末页 EOS granule 88773（多音频页形态）
 const multi_oga = @embedFile("samples/oggflac_multi.oga");
 
 test "oggflac: open Info 时长（末页 granule 补齐 STREAMINFO total_samples=0）" {

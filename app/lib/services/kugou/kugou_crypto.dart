@@ -52,7 +52,7 @@ MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDECi0Np2UR87scwrvTr72L6oO01rBbbBPriSDFPxr3
 
 /// SSA 行为指纹的 RSA-OAEP-SHA256 公钥（2048bit，SPKI PEM）。
 ///
-/// 来源：KuGouMusicApi `util/generate_simulate.js`（从酷狗 WASM 客户端
+/// 来源：KuGouMusicApi `util/generate_simulate.js`（从KG WASM 客户端
 /// 提取）。只用于加密一次性 AES key，服务端用对应私钥解 `sid`。
 const kgSsaPublicKeyPem = '''-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoW2+Ylo8ALePSQTP0xBF

@@ -21,9 +21,9 @@
 //!     每帧样本数 = IS_LAST? last_frame_samples : frame_samples（随 HAS_INFO
 //!     STREAMINFO 逐帧更新）。
 //!
-//! 解码语义（对齐 ffmpeg n9.0.1 native tak，kernel/fmt/tak/core.zig）：
+//! 解码语义（对齐 验收基准 n9.0.1 native tak，kernel/fmt/tak/core.zig）：
 //!   - LSB-first 位流；帧独立可随机访问（帧解码无跨帧状态）；
-//!   - 输出对齐 ffmpeg 内部样本格式：8bit → u8(+0x80)、16bit → s16
+//!   - 输出对齐 验收基准 内部样本格式：8bit → u8(+0x80)、16bit → s16
 //!     （=`-f s16le`）、24bit → int32<<8（=`-f s32le`）；Info.bits_per_sample
 //!     报 8/16/32；codec 非 MONO_STEREO/MULTICHANNEL、data_type≠0 或通道>6 →
 //!     UnsupportedFormat。
@@ -31,7 +31,7 @@
 //! 建议 probe/接线（集成者执行）：
 //!   - probe.zig Format 增 `.tak`；formats 增 `.tak = true`；
 //!     identify 增 `if (eql(head[0..4], "tBaK")) return .tak;`
-//!     （与 ffmpeg libavformat tak_probe 的 AVPROBE_SCORE_EXTENSION 同源）；
+//!     （与 验收基准 libavformat tak_probe 的 AVPROBE_SCORE_EXTENSION 同源）；
 //!   - decoder.zig dispatch 增 `.tak => tak.open(allocator, &reader, info)`；
 //!   - kernel.zig 聚合测试增 `_ = @import("fmt/tak/tables.zig")`、
 //!     `_ = @import("fmt/tak/core.zig")`、`_ = @import("fmt/tak/lib.zig")`；
@@ -473,7 +473,7 @@ pub fn openMeta(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder
 }
 
 // ---------------------------------------------------------------------------
-// 回归测试（golden = ffmpeg n9.0.1 native tak 解码，逐字节）
+// 回归测试（golden = 验收基准 n9.0.1 native tak 解码，逐字节）
 // ---------------------------------------------------------------------------
 
 const testing = std.testing;
@@ -498,7 +498,7 @@ fn decodeAll(tak: []const u8) !struct { bytes: std.ArrayList(u8), info: decoder.
     return .{ .bytes = out, .info = info };
 }
 
-test "tak e2e: luckynight-partial.tak (44.1k/16bit 2ch, 38 帧) == ffmpeg s16le" {
+test "tak e2e: luckynight-partial.tak (44.1k/16bit 2ch, 38 帧) == 验收基准 s16le" {
     var res = try decodeAll(luckynight_tak);
     defer res.bytes.deinit(testing.allocator);
     const info = res.info;

@@ -35,7 +35,7 @@ final neteaseApiProvider = Provider<NeteaseApi>((ref) {
   return NeteaseApi(ApisNeteaseCaller());
 });
 
-/// NT登录态（login_status 账号）。null = 未登录。
+/// NT 登录态（login_status 账号）。null = 未登录。
 ///
 /// [NeteaseAuthNotifier.init] 在应用启动时调用：先匿名注册（让推荐类接口
 /// 可用），再读取持久化会话中的账号；[logout] 清空会话。
@@ -190,7 +190,7 @@ final likeControllerProvider = ChangeNotifierProvider<LikeController>(
   (ref) => LikeController(ref),
 );
 
-/// 全局「我喜欢」列表数据源（KG / NT全量 Track + 缓存秒开；
+/// 全局「我喜欢」列表数据源（KG / NT 全量 Track + 缓存秒开；
 /// 红心状态由 LikeController 独立轻量同步，不由此派生）。
 ///
 /// **非 autoDispose**：跨页共享——[LikeController.toggle] 在任意页面成功后据此
@@ -202,11 +202,11 @@ final likedStoreProvider = ChangeNotifierProvider<LikedStore>(
   (ref) => LikedStore(ref),
 );
 
-/// QM红心收藏本机数据源（见 QqLikedStore：本机主源 + 在线实验并入）。
-/// 构造即异步加载本地 `qq_liked.json`；登录 QQ 后 LikeController 同步会把
+/// QM 红心收藏本机数据源（见 QqLikedStore：本机主源 + 在线实验并入）。
+/// 构造即异步加载本地 `qq_liked.json`；登录 QM 后 LikeController 同步会把
 /// 在线「我喜欢」并入红心集合，「我喜欢」页刷新时把在线 Track 并入本列表。
 ///
-/// **非 autoDispose**：启动流程（bootstrap 登录 QQ 后并入在线收藏）与设置弹窗
+/// **非 autoDispose**：启动流程（bootstrap 登录 QM 后并入在线收藏）与设置弹窗
 /// 均以 `ref.read` + 异步 `await` 使用本 store（`mergeOnline` 内部 await 加载、
 /// 再 notify）；autoDispose 会在页外释放它并导致已释放实例继续被写。
 final qqLikedStoreProvider = ChangeNotifierProvider<QqLikedStore>(

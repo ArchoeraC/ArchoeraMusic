@@ -212,7 +212,7 @@ dynamic nmEapiResDecrypt(String encryptedHex, {bool aeapi = false}) {
 /// URL 表单编码：`k=v` 连接，**保留空值**（`k=`）。
 ///
 /// 与 JS `new URLSearchParams(obj).toString()` 语义一致——Dart 的
-/// `Uri(queryParameters:)` 会把空值退化成裸键（丢 `=`），网易反爬接口会
+/// `Uri(queryParameters:)` 会把空值退化成裸键（丢 `=`），NT 反爬接口会
 /// 因此返回 400（实测）。所有 form body 统一走这里。
 String nmFormUrlEncode(Map<String, dynamic> data) => data.entries
     .map((e) =>

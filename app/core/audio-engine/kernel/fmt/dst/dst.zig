@@ -20,8 +20,8 @@
 //!   - 其后为算术码数据：ac 初始化 12 位，逐 DSD 样本用上述概率做二进制算术
 //!     解码（ac_get），与（滤波器预测 >>15 的最高位）异或还原出 DSD 位 v；
 //!   - 每个通道的 status 是一个 128 位移位寄存器（初始 0xAA），随输出逐位左移，
-//!     作为滤波器 / 概率索引的历史（该过程无损：DST 为有损码流设计，但 ffmpeg
-//!     按原样重建编码器侧等价的位流，mine 与其 bit-exact）。
+//!     作为滤波器 / 概率索引的历史（该过程无损：DST 为有损码流设计，但 验收基准
+//!     按原样重建编码器侧等价的位流，mine 与其 逐样本一致）。
 //!
 //! 移植对齐点（与 dstdec.c 一一对应）：
 //!   - read_map（10.7~10.9）、read_table（10.12/10.13）、get_sr_golomb_dst
@@ -31,16 +31,16 @@
 //!     查表累加预测；
 //!   - 输出 DSD 字节序与 dstdec 写盘一致：每 8 位一时间槽，位 i 落字节
 //!     (i/8) 的 MSB-first（位 7-(i&7)），字节按 `槽×channels+通道` 交错存储
-//!     （ffmpeg 在帧缓冲内为每通道预留 4 字节对齐；抽离 4 字节填充后逐字节等价，
+//!     （验收基准 在帧缓冲内为每通道预留 4 字节对齐；抽离 4 字节填充后逐字节等价，
 //!     见 dsd2pcm translate 的 src_stride 论证）。
 //!
-//! 约束与 FFmpeg 一致：通道 ≤ 6（DST_MAX_CHANNELS）、fsets/probs 元素 ≤ 12
+//! 约束与 验收基准 一致：通道 ≤ 6（DST_MAX_CHANNELS）、fsets/probs 元素 ≤ 12
 //! （DST_MAX_ELEMENTS）。不在 PATCHWELCOME 集合内的帧结构（非 same segmentation /
 //! 非 same mapping 等，dstdec 仅 request_sample 后报错）返回 UnsupportedFormat。
 //!
 //! 验证：本模块 + dsd.zig 对 fate-suite `dst/dst-64fs44-2ch.dff`（DSD64 立体声
-//! 10 帧）解码，逐 DSTF 帧重建 DSD → 复用 dsd2pcm（与 ffmpeg dsd.c 同源算法）
-//! 输出 f32，与系统 ffmpeg `dst` 解码器输出（pcm_f32le，352800 Hz）逐位一致。
+//! 10 帧）解码，逐 DSTF 帧重建 DSD → 复用 dsd2pcm（与 验收基准 dsd.c 同源算法）
+//! 输出 f32，与系统 验收基准 `dst` 解码器输出（pcm_f32le，352800 Hz）逐样本一致。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
@@ -49,7 +49,7 @@ const Error = @import("../../error.zig").Error;
 pub const max_channels = 6;
 pub const max_elements = 12;
 
-/// ffmpeg 的字节位反转表（libavutil/reverse.c）
+/// 验收基准 的字节位反转表（libavutil/reverse.c）
 const era_reverse = blk: {
     @setEvalBranchQuota(100000);
     var t: [256]u8 = undefined;
@@ -77,7 +77,7 @@ const probs_code_pred_coeff = [3][3]i8{
     .{ -24, 24, -8 },
 };
 
-// ---- 位读取（MSB-first，越界按 0 填充，行为对齐 ffmpeg GetBitContext） ----
+// ---- 位读取（MSB-first，越界按 0 填充，行为对齐 验收基准 GetBitContext） ----
 
 pub const BitReader = struct {
     data: []const u8,
@@ -458,7 +458,7 @@ test "dst: readMap 通道独立映射（fate 样本帧 0 真实前导位）" {
     try testing.expect(t.length[0] > 0 and t.length[1] > 0);
 }
 
-test "dst: ff_reverse 与 ffmpeg reverse 表抽样一致" {
+test "dst: ff_reverse 与 验收基准 reverse 表抽样一致" {
     // 抽样：0x01→0x80、0x80→0x01、0xF0→0x0F、0x2C→0x34
     try testing.expectEqual(@as(u8, 0x80), era_reverse[0x01]);
     try testing.expectEqual(@as(u8, 0x01), era_reverse[0x80]);

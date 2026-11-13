@@ -18,7 +18,7 @@
 //!     天然线程安全；`peek`/`read`/`seek` 均为纯偏移运算；
 //!   - file 形态无需内部缓冲；callback 形态因底层无 offset，`peek` 需缓冲；
 //!   - `abort` 置原子标志，所有 read/peek/seek 立即返回 error.Aborted
-//!     （替代 FFmpeg AVIOInterruptCB，§13.1），保证 SIGTERM / stop 即时响应。
+//!     （替代 验收基准 AVIOInterruptCB，§13.1），保证 SIGTERM / stop 即时响应。
 
 const std = @import("std");
 const Error = @import("error.zig").Error;
@@ -338,7 +338,7 @@ pub const Reader = struct {
     }
 
     /// 中断：置位原子标志，所有 read/peek/seek 立即返回 error.Aborted（§13.1）。
-    /// 由引擎 stop / SIGTERM 路径调用，替代 FFmpeg AVIOInterruptCB。
+    /// 由引擎 stop / SIGTERM 路径调用，替代 验收基准 AVIOInterruptCB。
     pub fn abort(self: *Reader) void {
         self.aborted.store(true, .seq_cst);
     }

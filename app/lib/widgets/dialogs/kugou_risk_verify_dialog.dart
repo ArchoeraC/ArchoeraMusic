@@ -2,10 +2,10 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// 酷狗 SSA 安全验证弹窗。
+/// KG SSA 安全验证弹窗。
 ///
 /// 短信（v_type=32）可以在应用内完成；腾讯 TCaptcha（v_type=23）必须运行
-/// 腾讯 JS，当前桌面端没有 WebView，因此明确提示用户去酷狗官方客户端完成，
+/// 腾讯 JS，当前桌面端没有 WebView，因此明确提示用户去KG 官方客户端完成，
 /// 而不是伪造 ticket。验证结果回传给 [KugouApi]，由它在成功后只重试一次。
 library;
 

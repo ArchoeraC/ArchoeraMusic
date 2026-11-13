@@ -19,7 +19,7 @@ import '../widgets/common/splash_screen.dart';
 import '../widgets/dialogs/kugou_risk_verify_dialog.dart';
 import 'router.dart';
 
-/// 启动时初始化NT登录态（匿名注册 + 读取持久化账号）。
+/// 启动时初始化NT 登录态（匿名注册 + 读取持久化账号）。
 class AuthBootstrap extends ConsumerStatefulWidget {
   const AuthBootstrap({super.key, required this.child});
 
@@ -33,12 +33,12 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
   @override
   void initState() {
     super.initState();
-    // 酷狗 SSA 验证需要 UI：把对话框处理器注入 API 层（协议仍留在 API 层）。
+    // KG SSA 验证需要 UI：把对话框处理器注入 API 层（协议仍留在 API 层）。
     _registerKugouRiskVerify(ref.read(kugouApiProvider));
     // 异步初始化：不阻塞首帧渲染
     Future<void>.microtask(() async {
       try {
-        // 并行：恢复播放现场（含位置续播）与NT登录态初始化互不阻塞
+        // 并行：恢复播放现场（含位置续播）与NT 登录态初始化互不阻塞
         await Future.wait([
           ref.read(playbackProvider.notifier).restore(),
           ref.read(neteaseAuthProvider.notifier).init(),
@@ -56,8 +56,8 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       unawaited(ref.read(qqMusicApiProvider).loadProfileSilently());
       unawaited(ref.read(bilibiliApiProvider).loadProfileSilently());
       // 启动同步红心集合：
-      // KG会话在 KugouApi 构造函数同步恢复（userid 首帧已就位），下方
-      // ref.listen 变更监听收不到「恢复」事件 → 不显式同步则KG红心恒为空。
+      // KG 会话在 KugouApi 构造函数同步恢复（userid 首帧已就位），下方
+      // ref.listen 变更监听收不到「恢复」事件 → 不显式同步则KG 红心恒为空。
       // NT init 完成的 state 变更会触发监听器再同步一次，sync 的
       // _pending 合并 + _sameSet 去重保证重复调用幂等（至多重复一次网络请求）。
       // 注：搜索结果红心不亮的主因是KG hash 大小写（mobilecdn 小写 vs
@@ -102,9 +102,9 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
       ref.read(likeControllerProvider).sync();
       ref.read(downloadControllerProvider.notifier).syncSessions();
     });
-    // QM登录态（isLoggedIn bool 变化）：
+    // QM 登录态（isLoggedIn bool 变化）：
     // - 同步红心集合（本机 + 登录后并入在线 songmid）；
-    // - 把在线「我喜欢」Track 并入本机 QQ 红心列表（add-only 实验接口，
+    // - 把在线「我喜欢」Track 并入本机 QM 红心列表（add-only 实验接口，
     //   失败静默——本机红心不受影响）。登出仅清 cookie，不动本机红心。
     ref.listen(qqMusicApiProvider.select((s) => s.isLoggedIn), (prev, next) {
       if (prev == next) return;
@@ -127,8 +127,8 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
     return widget.child;
   }
 
-  /// 登录 QQ 后把在线「我喜欢」（实验 dirid=201）并入本机列表（add-only）。
-  /// 失败/未开启实验开关时静默跳过——绝不覆盖或清空本机 QQ 红心。
+  /// 登录 QM 后把在线「我喜欢」（实验 dirid=201）并入本机列表（add-only）。
+  /// 失败/未开启实验开关时静默跳过——绝不覆盖或清空本机 QM 红心。
   static Future<void> _mergeQqOnlineFavorites(WidgetRef ref) async {
     if (!kQqFavExperimental) return;
     try {

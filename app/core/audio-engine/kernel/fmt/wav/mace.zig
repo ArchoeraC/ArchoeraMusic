@@ -179,7 +179,7 @@ fn chomp6(chd: *ChannelData, val: u8, tab_idx: u8) [2]i16 {
 }
 
 /// 解码一整块（src.len == blockSize(mace3, ch)），输出 out[0..6*ch] 交错 s16。
-/// 块内字节布局（镜像 FFmpeg mace_decode_frame 的 pkt 索引）：
+/// 块内字节布局（镜像 验收基准 mace_decode_frame 的 pkt 索引）：
 ///   MAC6: [ch0][ch1]（每声道 1 字节）；MAC3: [ch0a][ch0b][ch1a][ch1b]（每声道 2 字节连续）
 pub fn decodeBlock(ctx: *Context, src: []const u8, channels: usize, mace3: bool, out: []i16) void {
     const bytes_per_ch: usize = if (mace3) 2 else 1;
@@ -206,7 +206,7 @@ pub fn decodeBlock(ctx: *Context, src: []const u8, channels: usize, mace3: bool,
     }
 }
 
-/// 解码连续块（src.len 应为 blockSize 的整数倍；尾部残缺块按 FFmpeg 截断忽略）。
+/// 解码连续块（src.len 应为 blockSize 的整数倍；尾部残缺块按 验收基准 截断忽略）。
 /// 返回输出样本数（交错）。
 pub fn decode(ctx: *Context, src: []const u8, channels: usize, mace3: bool, out: []i16) Error!usize {
     const bpb = blockSize(mace3, channels);
@@ -226,7 +226,7 @@ pub fn decode(ctx: *Context, src: []const u8, channels: usize, mace3: bool, out:
 // ---- 测试 ----
 //
 // 黄金数据由独立 Python 参考实现生成（mace_ref.py，转写自 mace.c），
-// 并已与 FFmpeg 官方 mace3/mace6 解码器输出逐字节比对一致（4 组 0 mismatch）。
+// 并已与 验收基准 官方 mace3/mace6 解码器输出逐字节比对一致（4 组 0 mismatch）。
 
 pub const golden_m6m = [_]u8{ 0x44, 0x20, 0x82, 0x3C, 0xFD, 0xE6, 0xF1, 0xC2, 0x6B, 0x30, 0xF9, 0x0E, 0xC7, 0xDD, 0x01, 0xE4, 0x88, 0x75, 0x34, 0xA2 };
 pub const golden_m6m_expect = [_]i16{ 0, 0, 0, 0, 0, -1, -1, -1, -1, 0, 0, 0, 0, -1, -1, -1, -1, 0, 257, 257, 257, 0, -1, -258, -515, -515, -515, -258, -258, -515, -515, -515, -258, -1, -1, -1, -1, -258, -258, -515, -258, -258, -1, -1, -1, -1, 0, 257, 771, 1285, 1542, 2056, 2570, 3084, 3598, 3855, 3084, 771, -515, -1286, -1286, -515, -258, -772, -772, -1, 257, 1028, 1542, 2056, 1799, 1028, 0, -1286, -1800, -1029, -515, -1, -1, -772, -1029, -1286, -1543, -1543, -1543, -1286, -772, -1, 257, 771, 771, 514, 514, 257, -1, -515, -1543, -2828, -2828, -1286, 257, 2056, 3598, 4883, 4369, 2056, -1800, -7454, -8996, -6169, -4370, -3856, -7197, -14907, -21075, -25701, -24673, -17991, -8482, 4112 };

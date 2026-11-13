@@ -36,7 +36,7 @@ extension _LikedPageView on _LikedPageState {
       if (target != _platform) _applyDefaultPlatform(target);
     });
 
-    // 两个可能的「我喜欢」后端（服务端 store / QQ 本机库）变化都会触发重建。
+    // 两个可能的「我喜欢」后端（服务端 store / QM 本机库）变化都会触发重建。
     ref.watch(likedStoreProvider);
     ref.watch(qqLikedStoreProvider);
 
@@ -292,7 +292,7 @@ class _LikedEmptyState extends StatelessWidget {
   final String title;
   final String message;
 
-  /// 可选的空态动作（QQ 平台：登录 / 同步在线收藏）。
+  /// 可选的空态动作（QM 平台：登录 / 同步在线收藏）。
   final String? actionLabel;
   final VoidCallback? onAction;
 

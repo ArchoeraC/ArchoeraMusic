@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! CELT PVQ 解码（docs/audio-kernel-zig.md §9.2，P2）
 //!
@@ -9,7 +13,7 @@
 //! celt_cwrsi / celt_alg_unquant / celt_exp_rotation / celt_haar1 /
 //! celt_stereo_merge / 数学原语）（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
-//! 语义要点（保证 bit-exact）：
+//! 语义要点（保证逐样本一致）：
 //!   - U(N,K) 组合数表（`ff_celt_pvq_u_row`，满足
 //!     U(n,k)=U(n,k-1)+U(n-1,k-1)+U(n-1,k)），V(N,K)=U(N,K)+U(N,K+1)；
 //!   - `celt_cwrsi`：PVQ 索引 → 脉冲向量（带符号），u64 norm → f32 舍入；

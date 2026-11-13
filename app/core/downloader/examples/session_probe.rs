@@ -95,7 +95,7 @@ async fn main() -> anyhow::Result<()> {
     ffi_inject(&cookie, &uid, &tok);
     let cancel = Arc::new(AtomicBool::new(false));
 
-    // ── 1. 网易 VIP 歌曲（屋顶 5257138，Dart 侧确认真实 cookie 可解锁；晴天 186016 对照）──
+    // ── 1. NT VIP 歌曲（屋顶 5257138，Dart 侧确认真实 cookie 可解锁；晴天 186016 对照）──
     for (nm_id, nm_title) in [("5257138", "屋顶"), ("186016", "晴天")] {
         let nm_req = EnqueueRequest {
             track_id: format!("probe-nm-{nm_id}"),
@@ -120,7 +120,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    // ── 2. 酷狗 VIP 歌曲（西憂花 - ふわふわhazy 四档 hash）──
+    // ── 2. KG VIP 歌曲（西憂花 - ふわふわhazy 四档 hash）──
     let mut hashes = HashMap::new();
     hashes.insert("128k".to_string(), "973F5079DB5A1F97AE03F28D586C9E40".to_lowercase());
     hashes.insert("320k".to_string(), "BED82B38A85B1FE883834478F585AB04".to_lowercase());

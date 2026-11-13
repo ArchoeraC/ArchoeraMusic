@@ -24,10 +24,10 @@
 //!
 //! last_frame/lastframelen（mpc7.c 的末帧截断）：demux 侧 data[1] =
 //! (curframe > fcount) && fcount 在 fcount>0 时恒为 0（curframe 自增后至多等于
-//! fcount），故 FFmpeg 实际解码路径永远输出整帧 1152 样本 —— 本实现保持一致，
+//! fcount），故 验收基准 实际解码路径永远输出整帧 1152 样本 —— 本实现保持一致，
 //! 仅保留字段以对齐结构。
 //!
-//! 验证目标：与 `ffmpeg n9.0.1 -i x.mpc -f s16le` 逐位一致
+//! 验证目标：与 `验收基准 n9.0.1 -i x.mpc -f s16le` 逐样本一致
 //! （FATE inside-mp7.mpc 全流 456 帧已对齐）。
 
 const std = @import("std");
@@ -42,7 +42,7 @@ const era_samples_per_band = synth.era_samples_per_band;
 const era_mpc_frame_size = synth.era_mpc_frame_size;
 const era_mpc_bands = 32;
 
-/// FFmpeg mpc demuxer：DELAY_FRAMES（seek 预热丢弃帧数）
+/// 验收基准 mpc demuxer：DELAY_FRAMES（seek 预热丢弃帧数）
 pub const era_mpc_delay_frames = 32;
 /// mpc_rate[extradata[2] & 3]（libavformat/mpc.c）
 const era_mpc_rate = [4]u32{ 44100, 48000, 37800, 32000 };
@@ -82,14 +82,14 @@ pub const Parsed = struct {
 };
 
 /// 逐句复刻 mpc_read_header（extradata 位域）+ mpc_read_packet（帧链推导）。
-/// data 生命周期须覆盖解码。fcount==0 时按 FFmpeg 行为读到数据耗尽为止。
+/// data 生命周期须覆盖解码。fcount==0 时按 验收基准 行为读到数据耗尽为止。
 pub fn parse(data: []const u8, allocator: std.mem.Allocator) Error!Parsed {
     if (data.len < 24) return error.Corrupt;
     if (!std.mem.eql(u8, data[0..3], "MP+")) return error.Corrupt;
     const ver = data[3];
     if (ver != 7 and ver != 0x17) return error.Corrupt; // 仅 SV7
     const era_fcount = std.mem.readInt(u32, data[4..8], .little);
-    // FFmpeg：fcount * sizeof(MPCFrame) >= UINT_MAX → AVERROR_INVALIDDATA
+    // 验收基准：fcount * sizeof(MPCFrame) >= UINT_MAX → AVERROR_INVALIDDATA
     if (@as(u64, era_fcount) * @sizeOf(Frame) >= std.math.maxInt(u32)) return error.Corrupt;
 
     // ---- mpc7_decode_init：extradata 16 字节 bswap 后读位域 ----
@@ -138,7 +138,7 @@ pub fn parse(data: []const u8, allocator: std.mem.Allocator) Error!Parsed {
         // avio_read 不足 size 字节（文件截断）→ AVERROR_INVALIDDATA，该包丢弃
         if (pos + size > data.len) break;
         // 退化防护：合法帧至少含 res/scf/量化位流，4 字节装不下；
-        // 防止 size<=4 且 curbits!=0 时 pos 不前进的死循环（FFmpeg 无此防护）
+        // 防止 size<=4 且 curbits!=0 时 pos 不前进的死循环（验收基准 无此防护）
         if (size <= 4) break;
         // pkt->data[0] = curbits（局部变量，+= 20 之后的值）：解码器跳过
         // 20-bit 帧长场，从帧数据起点开始；（curbits-20 只存 seek 表，不进包）
@@ -211,9 +211,9 @@ pub const Decoder7 = struct {
     }
 
     /// 重置到指定帧起点（seek 预热入口）：状态清零并跳过前 frame 帧。
-    /// 等价 FFmpeg 语义：avcodec_flush_buffers（oldDSCF 清零）+ demuxer
+    /// 等价 验收基准 语义：avcodec_flush_buffers（oldDSCF 清零）+ demuxer
     /// 跳转到 frames[frame] 包起点；LFG 重新播种（与"全新解码会话后立即
-    /// seek"的 FFmpeg 路径一致；会话中途 seek 的 rnd 连续性见 lib.zig 说明）。
+    /// seek"的 验收基准 路径一致；会话中途 seek 的 rnd 连续性见 lib.zig 说明）。
     pub fn resetTo(self: *Decoder7, frame: usize) void {
         self.core.init();
         self.era_cur_frame = frame;
@@ -253,7 +253,7 @@ pub const Decoder7 = struct {
     }
 
     /// 解码下一帧到 out_planar（[2][1152]）；返回 false = EOF。
-    /// 帧解码失败时跳过该帧输出继续（FFmpeg 丢包继续解封装语义）。
+    /// 帧解码失败时跳过该帧输出继续（验收基准 丢包继续解封装语义）。
     pub fn next(self: *Decoder7, out_planar: *[2][era_mpc_frame_size]i16) bool {
         while (true) {
             if (self.eof or self.era_cur_frame >= self.parsed.frames.len) {
@@ -265,7 +265,7 @@ pub const Decoder7 = struct {
             if (self.decodeFrame(f, out_planar)) |_| {
                 return true;
             } else |_| {
-                // FFmpeg：decode_frame 出错 → 本包无输出，状态保持，继续下一包
+                // 验收基准：decode_frame 出错 → 本包无输出，状态保持，继续下一包
                 continue;
             }
         }
@@ -286,7 +286,7 @@ pub const Decoder7 = struct {
         var br = vlc.BitReader{ .data = scratch };
         br.pos = f.skip; // skip_bits_long(&gb, skip)
 
-        // 本帧 bands[0..=maxbands] 清零（FFmpeg memset sizeof(*bands)*(maxbands+1)）
+        // 本帧 bands[0..=maxbands] 清零（验收基准 memset sizeof(*bands)*(maxbands+1)）
         for (0..@as(usize, @intCast(cfg.era_maxbands)) + 1) |i| {
             c.era_bands[i] = .{};
         }
@@ -371,7 +371,7 @@ pub const Decoder7 = struct {
         // 去量化 + 合成（mpc.c 共用路径；mb 可为 -1 = 全静音帧）
         synth.dequantizeAndSynth(c, mb, out_planar, 2);
 
-        // 位使用量校验（FFmpeg：超出或剩余 ≥32 位 → 帧错误；last_frame 豁免，
+        // 位使用量校验（验收基准：超出或剩余 ≥32 位 → 帧错误；last_frame 豁免，
         // 见模块注释——data[1] 恒 0，故校验恒生效）
         const bits_used: i64 = @intCast(br.pos);
         const bits_avail: i64 = @intCast(buf_size * 8);
@@ -454,7 +454,7 @@ test "sv7: parse 头部与帧链（FATE inside-mp7）" {
     // ffprobe 实测 456 包，载荷字节数逐帧一致（见 lib.zig 对拍说明）
     try testing.expectEqual(@as(u32, 456), parsed.cfg.era_fcount);
     try testing.expectEqual(@as(usize, 456), parsed.frames.len);
-    // 首帧：pos=24 size=12 skip=28（8 位链偏移 + 20 位帧长场；FFmpeg demux 推导值）
+    // 首帧：pos=24 size=12 skip=28（8 位链偏移 + 20 位帧长场；验收基准 demux 推导值）
     try testing.expectEqual(@as(usize, 24), parsed.frames[0].pos);
     try testing.expectEqual(@as(usize, 12), parsed.frames[0].size);
     try testing.expectEqual(@as(u32, 28), parsed.frames[0].skip);

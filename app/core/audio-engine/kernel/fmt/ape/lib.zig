@@ -1,13 +1,17 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! APE（Monkey's Audio）解码器（docs/audio-kernel-zig.md §9.10）
 //!
 //! 以 Zig 实现（不依赖 Monkey's Audio 官方 SDK），参考重构对照
 //! FFmpeg libavcodec/apedec.c + libavformat/ape.c（reference/FFmpeg，n9.0.1），
-//! 逐位复刻保证 bit-exact 对照验收（§17.2；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
+//! 逐位复刻保证逐样本对照验收（§17.2；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
 //! 解码流程（对齐 ape_decode_frame / ape_unpack_* / init_frame_decoder）：
 //!   1. 帧数据 → 4 字节字级 bswap（大端帧数据 → 主机序）+ buf_size 零填充
@@ -19,13 +23,13 @@
 //!      （3800/3930/3950）→ 立体声去相关 → 输出打包 + CRC 累计；
 //!   4. 帧末 CRC-32/MPEG 比对（>= 3900）定位损坏帧。
 //!
-//! 输出契约（对齐 FFmpeg ape 解码器输出，保证 bit-exact 逐字节比对）：
+//! 输出契约（对齐 验收基准 ape 解码器输出，保证 逐字节一致）：
 //!   - bps 8  → u8（decoded+0x80 & 0xff）；bps 16 → s16；
 //!   - bps 24 → s32（decoded*256，顶对齐）；
 //!   - 交错小端 PCM，`Info.bits_per_sample` = 8 / 16 / 32。
 //!
 //! 范围与容错（§9.10 / §13.3）：
-//!   - 仅 mono / stereo（FFmpeg 同限）；bps ∈ {8,16,24}；
+//!   - 仅 mono / stereo（验收基准 同限）；bps ∈ {8,16,24}；
 //!   - 版本 3800-3990；压缩级别须为 1000 的倍数且 ≤ 5000（< 3930 禁 insane）；
 //!   - 帧数据越界 / 区间越界 / CRC 不匹配 / 位流耗尽 → error.Corrupt；
 //!   - seek 按帧重解（每帧独立状态），目标超出文件尾 → EOF。
@@ -44,7 +48,7 @@ const BitReader = bitreader.BitReader;
 const RangeCtx = rangecoder.Ctx;
 const VTable = decoder.Decoder.VTable;
 
-/// 每块最多解码样本数（对齐 FFmpeg blocks_per_loop 默认 4608）
+/// 每块最多解码样本数（对齐 验收基准 blocks_per_loop 默认 4608）
 const BLOCKS_PER_LOOP = 4608;
 
 /// 单帧原始数据合理上限（压缩帧不可能超过原始 PCM 大小）
@@ -71,7 +75,7 @@ const ApeCtx = struct {
     predictor: predictor.Predictor = .{},
     predictor64: predictor.Predictor64 = .{},
     filters: predictor.Filters = .{},
-    /// 24-bit interim 双趟模式：open 时按 bps 设 -1 / 0，帧间保持（对齐 FFmpeg）
+    /// 24-bit interim 双趟模式：open 时按 bps 设 -1 / 0，帧间保持（对齐 验收基准）
     interim_mode: i32 = 0,
 
     // 块解码缓冲
@@ -107,7 +111,7 @@ fn positionSamplesImpl(ctx: *anyopaque) i64 {
     return @intCast(a.samples_done);
 }
 
-/// CRC-32/MPEG（IEEE 反射表，poly 0xEDB88320），对齐 FFmpeg av_crc(AV_CRC_32_IEEE_LE)
+/// CRC-32/MPEG（IEEE 反射表，poly 0xEDB88320），对齐 验收基准 av_crc(AV_CRC_32_IEEE_LE)
 const crc32_table = blk: {
     @setEvalBranchQuota(100000);
     var t: [256]u32 = undefined;
@@ -136,7 +140,7 @@ fn crcUpdateBytes(crc: u32, bytes: []const u8) u32 {
 // ---------------------------------------------------------------------------
 
 /// 读帧数据 → bswapped 缓冲 → 熵/预测/滤波初始化（对齐 init_frame_decoder）。
-/// 截断帧（文件尾数据不足）按 FFmpeg 语义处理：读入可用前缀继续解码，
+/// 截断帧（文件尾数据不足）按 验收基准 语义处理：读入可用前缀继续解码，
 /// 熵解码将在数据耗尽处置 rc.err（decodeFrame 保留已成功块输出）。
 /// 返回 false = 帧位置无任何数据（EOF，视为播放结束）。
 fn initFrame(ctx: *ApeCtx, frame_idx: usize) Error!bool {
@@ -159,7 +163,7 @@ fn initFrame(ctx: *ApeCtx, frame_idx: usize) Error!bool {
     @memset(data, 0);
     std.mem.writeInt(u32, data[0..4], f.nblocks, .little);
     std.mem.writeInt(u32, data[4..8], f.skip, .little);
-    // 对齐 FFmpeg：仅复制 buf_size 字节（截断帧的尾部不足 4 字节被丢弃，参考 bswap_buf）
+    // 对齐 验收基准：仅复制 buf_size 字节（截断帧的尾部不足 4 字节被丢弃，参考 bswap_buf）
     @memcpy(data[8..buf_size], ctx.frame_buf[0 .. buf_size - 8]);
     var wi: usize = 0;
     while (wi < (buf_size >> 2)) : (wi += 1) {
@@ -258,7 +262,7 @@ fn unpackStereo(ctx: *ApeCtx, count: usize) Error!void {
     }
 }
 
-/// 输出打包：逐样本写交错 PCM（对齐 FFmpeg bps 转换）
+/// 输出打包：逐样本写交错 PCM（对齐 验收基准 bps 转换）
 fn packChunk(ctx: *ApeCtx, base_off: usize, count: usize) void {
     const bps = ctx.out_bps;
     var off = base_off;
@@ -315,7 +319,7 @@ fn crcSample(crc: u32, tmp: *[4]u8, v: i32, bps: u32) u32 {
 
 /// 解码整帧到 out_buf；帧末做 CRC 校验（>= 3900）。
 /// 截断/损坏帧（熵解码数据耗尽置 rc.err）：保留已成功块输出、跳过 CRC、
-/// 置 EOF（对齐 FFmpeg：失败块整体丢弃，先前块正常输出）。
+/// 置 EOF（对齐 验收基准：失败块整体丢弃，先前块正常输出）。
 /// 返回后 current_frame 前进；EOF 后调用不产生帧。
 fn decodeFrame(ctx: *ApeCtx, frame_idx: usize) Error!void {
     if (!try initFrame(ctx, frame_idx)) {

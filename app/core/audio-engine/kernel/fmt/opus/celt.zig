@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! CELT 解码器编排（docs/audio-kernel-zig.md §9.2，P2）
 //!
@@ -765,7 +769,7 @@ fn deemphasis(y: []f32, x: []const f32, coeff_in: f32, len: usize, accum: bool) 
     const c = 0.850006103515625; // libopus float build coef0 = QCONST16(0.850006103515625,15)
     var i: usize = 0;
     // 快路径（CELT-only）：IIR 仍串行，但把 `r → f32` 的转换与存储 8 lane 一起做，
-    // 消去逐样本 `cvtsi2ss`+`mulss`。逐 lane 运算顺序与标量相同，位级一致。
+    // 消去逐样本 `cvtsi2ss`+`mulss`。逐 lane 运算顺序与标量相同，逐样本一致。
     if (!accum) {
         const inv: f32 = 1.0 / 8388608.0;
         while (i + 8 <= len) : (i += 8) {
@@ -789,7 +793,7 @@ fn deemphasis(y: []f32, x: []const f32, coeff_in: f32, len: usize, accum: bool) 
             // accum=0：参考输出 RES2INT24(SIG2RES(tmp)) 再 RES2FLOAT。
             // SIG2RES=×2^-15、RES2INT24=float2int(×2^23) —— 两次乘 2 的幂、逐级精确，
             // 合并为 tmp×2^8（消一次 mulss）；量化用无分支就近偶数舍入（位级等同 C
-            // lrintf）；回写 r×2^-23 亦精确。输出与旧实现逐位一致。
+            // lrintf）；回写 r×2^-23 亦精确。输出与旧实现逐样本一致。
             const r: i32 = lrintfEven(tmp * 256.0);
             y[i] = @as(f32, @floatFromInt(r)) / 8388608.0;
         }
@@ -801,7 +805,7 @@ fn deemphasis(y: []f32, x: []const f32, coeff_in: f32, len: usize, accum: bool) 
 ///
 /// double magic：`x + 1.5·2^52` 把结果抬到 ulp=1 的区间，加法按当前舍入模式
 /// （就近偶数）取整，再减回 magic 得精确整数。对 |x| < 2^51 全程精确（音频路径远
-/// 小于此），与 C `lrintf`（IEEE 就近偶数）位级一致。
+/// 小于此），与 C `lrintf`（IEEE 就近偶数）逐样本一致。
 ///
 /// 动机：Zig 的 `@trunc`/`@round` 在无 SSE4.1 的基线目标下会降级为 libm
 /// `truncf`/`roundf` **每样本一次调用**（见 decode-optimization 热区），此实现规避之。

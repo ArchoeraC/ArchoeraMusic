@@ -76,7 +76,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
     var frame: [2 * 2048]f32 align(4) = undefined;
     var i: usize = 0;
     while (i < nobj) : (i += 1) {
-        // 丢弃解码器前两个 priming superframe（对齐 ffmpeg 输出）
+        // 丢弃解码器前两个 priming superframe（对齐 验收基准 输出）
         if (i < 2) {
             _ = dec.decodeSuperframe(objs[i * block_align ..][0..block_align], &frame) catch {};
             continue;

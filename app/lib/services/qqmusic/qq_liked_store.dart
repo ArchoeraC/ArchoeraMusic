@@ -2,18 +2,18 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// QM红心收藏（「我喜欢」）**本机持久化数据源**。
+/// QM 红心收藏（「我喜欢」）**本机持久化数据源**。
 ///
-/// QQ 平台与NT/KG不同：在线收藏接口为**社区逆向实验 RPC**
+/// QM 平台与NT/KG 不同：在线收藏接口为**社区逆向实验 RPC**
 /// （见 apis/qqmusic/modules/favorite.dart 调研），不可作为收藏唯一真源。
-/// 因此 QQ 红心以**本机列表为主**——任意 QQ 曲目可离线点亮红心并持久化，
-/// 不受在线成败影响；登录 QQ 后再把在线「我喜欢」（dirid=201）**并入**
+/// 因此 QM 红心以**本机列表为主**——任意 QM 曲目可离线点亮红心并持久化，
+/// 不受在线成败影响；登录 QM 后再把在线「我喜欢」（dirid=201）**并入**
 /// 本地（add-only，绝不用在线列表覆盖/清空本地）。
 ///
 /// - 持久化：`<dataDir>/qq_liked.json`（Track 全量 JSON，最新收藏在前）；
 /// - [LikeController] 的红心 songmid 集合由此派生（红心状态与「我喜欢」
 ///   页列表同源，页内切歌/移除后状态实时一致）；
-/// - 「我喜欢」页 QQ 平台直接以本 store 为数据源（不走 LikedStore 的
+/// - 「我喜欢」页 QM 平台直接以本 store 为数据源（不走 LikedStore 的
 ///   服务器缓存语义）。
 library;
 
@@ -27,14 +27,14 @@ import '../log/log.dart';
 import '../netease/track.dart';
 import '../../stores/data_dir.dart';
 
-/// QQ 红心键：songmid 优先，缺失回退 Track.id（对齐 song_row.songLikeKey /
+/// QM 红心键：songmid 优先，缺失回退 Track.id（对齐 song_row.songLikeKey /
 /// LikeController 的 qqmusic 路由键）。
 String qqLikeKey(Track t) {
   final mid = t.qqmusic?.mid;
   return (mid != null && mid.isNotEmpty) ? mid : t.id;
 }
 
-/// 本机 QQ「我喜欢」列表（ChangeNotifier：页面直接订阅）。
+/// 本机 QM「我喜欢」列表（ChangeNotifier：页面直接订阅）。
 class QqLikedStore extends ChangeNotifier {
   /// [dir] 数据目录覆写（仅测试注入；null 时用 [resolveDataDir]）。
   QqLikedStore({String? dir}) : _dirOverride = dir {
@@ -59,10 +59,10 @@ class QqLikedStore extends ChangeNotifier {
   bool get loading => _loading;
   String get error => _error;
 
-  /// 本机 QQ「我喜欢」曲目（最新收藏在前，只读视图）。
+  /// 本机 QM「我喜欢」曲目（最新收藏在前，只读视图）。
   List<Track> get tracks => _tracks;
 
-  /// 本机 QQ 红心 songmid 集合（红心填充态判定用）。
+  /// 本机 QM 红心 songmid 集合（红心填充态判定用）。
   Set<String> get midSet =>
       {for (final t in _tracks) if (qqLikeKey(t).isNotEmpty) qqLikeKey(t)};
 

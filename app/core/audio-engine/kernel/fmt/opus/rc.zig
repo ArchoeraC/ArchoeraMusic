@@ -1,14 +1,18 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! Opus 区间解码器（docs/audio-kernel-zig.md §9.2）
 //!
 //! RFC 6716 §4.1 32-bit 区间解码；参考重构对照 FFmpeg `libavcodec/opus/rc.c`
 //! 与 libopus `entdec.c`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
 //!
-//! 语义要点（对齐参考实现，保证 bit-exact）：
+//! 语义要点（对齐参考实现，保证逐样本一致）：
 //!   - 位流经 GetBitContext 读取（MSB-first），字节取反（`get_bits(8) ^ 0xFF`，
 //!     编码端补码）；帧数据须零填充（越界读按零处理，对齐 FFmpeg 填充缓存）；
 //!   - `dec_init`：range=128，value=127 - 7bit，total_bits=9，随后归一化；
@@ -27,7 +31,7 @@ const RC_TOP: u32 = 1 << 31;
 const RC_BOT: u32 = RC_TOP >> RC_SYM;
 const RC_SHIFT: u32 = RC_BITS - RC_SYM - 1;
 
-/// MSB-first 位读取（零填充越界，对齐 FFmpeg get_bits 的填充缓存语义）
+/// MSB-first 位读取（零填充越界，对齐 验收基准 get_bits 的填充缓存语义）
 pub const BitReader = struct {
     data: []const u8,
     bit_pos: usize = 0,

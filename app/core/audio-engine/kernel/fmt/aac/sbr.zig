@@ -7,7 +7,7 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AAC SBR（频谱带复制）解码器（bit-exact 移植 FFmpeg n9.0.1 浮点路径）。
+//! AAC SBR（频谱带复制）解码器（移植 FFmpeg n9.0.1 浮点路径）。
 //!
 //! 复刻对象：libavcodec/{aacsbr_template.c,aacsbr.c,sbrdsp_template.c,sbrdsp.c}
 //! （非 USAC 路径）+ libavcodec/aacsbrdata.h 表。数值路径逐一对齐：
@@ -209,7 +209,7 @@ pub const Sbr = struct {
         psmod.resetTransition(&self.ps);
     }
 
-    /// 清零全部未定义状态缓冲（对齐 FFmpeg av_mallocz：calloc 零初始化）
+    /// 清零全部未定义状态缓冲（对齐 验收基准 av_mallocz：calloc 零初始化）
     pub fn zeroState(self: *Sbr) void {
         const bytes: [*]u8 = @ptrCast(self);
         @memset(bytes[0..@sizeOf(Sbr)], 0);
@@ -478,7 +478,7 @@ fn makeFMaster(self: *Sbr) bool {
     start_min = ((@as(u32, temp) << 7) + @as(u32, @intCast(self.sample_rate >> 1))) / @as(u32, @intCast(self.sample_rate));
     stop_min = ((@as(u32, temp) << 8) + @as(u32, @intCast(self.sample_rate >> 1))) / @as(u32, @intCast(self.sample_rate));
 
-    // 偏移为有符号（负值表示起始频率前移）；用 i32 计算防 u32 溢出（ffmpeg 同款）
+    // 偏移为有符号（负值表示起始频率前移）；用 i32 计算防 u32 溢出（验收基准 同款）
     const k0: i32 = @as(i32, @intCast(start_min)) + @as(i32, sbr_offset_ptr[self.spectrum_params.bs_start_freq]);
     if (k0 < 0) return false;
     self.k[0] = @intCast(k0);
@@ -1034,7 +1034,7 @@ fn readData(self: *Sbr, gb: *BitReader, id_aac: i32) !void {
             num_bits_left -= 2;
             const bs_extension_id = gb.readBits(2) catch return error.Corrupt;
             if (bs_extension_id == 2) {
-                // EXTENSION_ID_PS：解析参数立体声；返回消费位数，剩余填充位跳过（对齐 ffmpeg）
+                // EXTENSION_ID_PS：解析参数立体声；返回消费位数，剩余填充位跳过（对齐 验收基准）
                 const before = gb.bit_pos;
                 const consumed = psmod.psReadData(gb, &self.ps.common) catch {
                     gb.bit_pos = before;
@@ -1330,7 +1330,7 @@ fn qmfDeintNeg(v: []f32, src: []const f32) void {
     }
 }
 
-/// sbr_sum_square：复数能量（n 必须偶数）。累加顺序对齐 ffmpeg
+/// sbr_sum_square：复数能量（n 必须偶数）。累加顺序对齐 验收基准
 /// sbr_sum_square_c：sum0 逐个累加实部（i、i+1 分两次 +=），sum1 累加虚部。
 fn sumSquare(x: []const f32, n: usize) f32 {
     var sum0: f32 = 0;
@@ -1515,7 +1515,7 @@ fn sbrEnvEstimate(self: *Sbr, ch_data: *SbrData) void {
             if (ilb >= 40) return;
             var m: u32 = 0;
             while (m < self.m[1]) : (m += 1) {
-                // 对齐 ffmpeg sbr_env_estimate：用 sum_square（特定累加顺序）
+                // 对齐 验收基准 sbr_env_estimate：用 sum_square（特定累加顺序）
                 const seg: []const f32 = @as([*]const f32, @ptrCast(&self.X_high[m + kx1][ilb][0]))[0 .. 2 * (iub - ilb)];
                 const sum: f32 = sumSquare(seg, iub - ilb);
                 self.e_curr[e][m] = sum * recip_env_size;
@@ -1606,7 +1606,7 @@ fn sbrGainCalc(self: *Sbr, ch_data: *SbrData, e_a: *const [2]i32) void {
 
 /// sbr_hf_apply_noise（4 变体）。noise 为调用方（sbrHfAssemble）的
 /// 运行噪声索引（每时隙 +m_max 推进），本函数内部仅推进局部副本，
-/// 不写回 ch_data（对齐 ffmpeg hf_apply_noise 语义）。
+/// 不写回 ch_data（对齐 验收基准 hf_apply_noise 语义）。
 fn hfApplyNoise(self: *Sbr, ch_data: *SbrData, e: u32, i: usize, kx: u32, m_max: u32, indexsine: u32, noise_in: u32, q_filt_in: []const f32) void {
     const s_m = &self.s_m[e];
     const q_filt = q_filt_in;

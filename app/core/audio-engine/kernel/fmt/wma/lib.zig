@@ -1,19 +1,23 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! WMA（ASF → wmav1/wmav2/wmapro/wmalossless/wmavoice）解码器正式接入层。
 //!
 //! open：整读 ASF 文件 → 头解析 → Data 包重组 → 按 codec_tag 分派：
 //!   0x160/161 → wmadec（本文件 wmav1/wmav2，s16 输出）
 //!   0x162 → wmapro/lib.zig（S16P）
-//!   0x163 → wmalossless/lib.zig（s16 / 24bit<<8 s32，与 ffmpeg 逐位一致）
+//!   0x163 → wmalossless/lib.zig（s16 / 24bit<<8 s32，与 ffmpeg 逐样本一致）
 //!   0x000A → wmavoice/lib.zig（WMA Voice，s16；内部 float 合成滤波+APF）
 //! 其余见各自子模块头部说明。wmav1/wmav2 支持采样率 8k–48k、单/双声道、
 //! 帧长 512/1024/2048，LSP/exp-VLC 指数与低码率噪声编码；bit_reservoir /
-//! variable_block_len 等 ffmpeg 编码器不置位的 flag → error.UnsupportedFormat
-//! （引擎回退 FFmpeg）。
+//! variable_block_len 等 验收基准 编码器不置位的 flag → error.UnsupportedFormat
+//! （引擎回退 验收基准）。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;

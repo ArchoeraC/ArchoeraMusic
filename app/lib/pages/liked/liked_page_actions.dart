@@ -25,7 +25,7 @@ extension _LikedPageActions on _LikedPageState {
     if (adapter.likedAvailable(ref)) adapter.ensureLikedLoaded(ref);
   }
 
-  /// 登录态变化：重置该平台并（可用时）重新加载。QQ 本机库无需重置。
+  /// 登录态变化：重置该平台并（可用时）重新加载。QM 本机库无需重置。
   void _onAuthChanged(String platform) {
     final adapter = collectionPlatform(platform);
     if (adapter.localLikedStore) {

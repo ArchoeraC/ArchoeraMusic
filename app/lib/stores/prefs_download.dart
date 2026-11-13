@@ -29,7 +29,7 @@ const downloadStreamingNoticeDismissedKey =
 /// - kgMid：`kg_calc_mid(kgGuid)`（md5 → 十进制大整数）
 /// - nmDeviceId：26 位大写 hex（对齐 resolvers.rs `{:X}` 随机 deviceId）
 /// - nmNuid：32 位小写 hex（对齐 resolvers.rs `rand_hex_bytes(16)`）
-/// - osver：网易系统版本伪装（[generateOsver]，Windows 读真实版本）
+/// - osver：NT 系统版本伪装（[generateOsver]，Windows 读真实版本）
 ///
 /// 首次启动生成后持久化，此后跨会话不变（同一用户指纹稳定、异用户隔离）。
 Map<String, String> generateDownloaderIdentity() {
@@ -47,12 +47,12 @@ Map<String, String> generateDownloaderIdentity() {
   };
 }
 
-/// 网易 osver 系统版本字符串（对齐 resolvers.rs 回落格式
+/// NT osver 系统版本字符串（对齐 resolvers.rs 回落格式
 /// `Microsoft-Windows-10-Professional-build-19045-64bit`）。
 ///
 /// Windows：读真实系统版本（`Platform.operatingSystemVersion` 如
 /// "Windows 10 10.0.22631"），build ≥ 22000 记 Windows 11，否则 Windows 10。
-/// Linux/macOS：回落官方值——网易 osver 仅接受 Windows 风格字符串（下载器
+/// Linux/macOS：回落官方值——NT osver 仅接受 Windows 风格字符串（下载器
 /// 始终伪装 Windows 客户端），改用本机真实系统名会被服务端拒绝
 /// （downloader-identity-plan §3.2 权衡，见该文档）。
 String generateOsver() {

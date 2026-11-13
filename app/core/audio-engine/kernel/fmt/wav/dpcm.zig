@@ -17,7 +17,7 @@ const std = @import("std");
 
 /// XAN DPCM 解码一块（block_align 字节：块头 2B/通道 predictor + 数据）。
 /// `out` 容量须 >= (src.len - 2*channels) 个 s16（声道交替）。
-/// 镜像 FFmpeg dpcm.c 339-369 行：每字节取低 2 位自适应 shift，
+/// 镜像 验收基准 dpcm.c 339-369 行：每字节取低 2 位自适应 shift，
 /// 高 6 位左移 8 后符号扩展为差分，predictor += diff>>shift 并 clip 到 int16。
 pub fn decodeXan(src: []const u8, channels: usize, out: []i16) void {
     var predictor: [2]i32 = .{ 0, 0 };

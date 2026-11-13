@@ -1,14 +1,18 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! APE 预测解码器 + 长滤波器 + 终级滤波器（docs/audio-kernel-zig.md §9.10）
 //!
 //! 参考重构对照 FFmpeg libavcodec/apedec.c：filter_fast_3320 / filter_3800 /
 //! long_filter_high_3800 / long_filter_ehigh_3830 / predictor_update_3930 /
 //! predictor_update_filter（64-bit）/ do_apply_filter / do_init_filter，
-//! 逐位复刻（含所有 (unsigned)/uint32/uint64 回绕与算术右移语义）保证 bit-exact；
+//! 逐位复刻（含所有 (unsigned)/uint32/uint64 回绕与算术右移语义）保证逐样本一致；
 //! 许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
 //!
 //! 版本分派（对齐 ape_decode_init）：

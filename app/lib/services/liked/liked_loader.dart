@@ -4,7 +4,7 @@
 
 /// 「我喜欢」收藏列表全局数据源（ChangeNotifier，由 Riverpod provider 持有）。
 ///
-/// **只管列表全量**：KG / NT收藏 Track 一次拉全、缓存秒开。
+/// **只管列表全量**：KG / NT 收藏 Track 一次拉全、缓存秒开。
 /// 红心状态与列表解耦——LikeController.sync 走各平台轻量 id 集合
 /// （NT likelist / KG likedHashSet 只取 hash），不经过这里，
 /// 避免启动同步触发全量拉取（与收藏页并行双拉、被进程退出/写失败干扰）。
@@ -138,7 +138,7 @@ class LikedStore extends ChangeNotifier {
   /// 集合：列表含 → 点亮；不含 → 熄灭（跨设备移除后刷新即熄灭）。
   ///
   /// 仅本 store（netease/kugou 收藏页权威列表）触发——普通歌单不经过本
-  /// store，不会被误当成收藏集合清空红心。QQ 本机红心列表不走本 store、
+  /// store，不会被误当成收藏集合清空红心。QM 本机红心列表不走本 store、
   /// 红心与列表同源，无需对账。对账在 [LikeController] 内部有缓冲期防
   /// 与本端刚 toggle 竞争；异常绝不影响列表展示。
   void _reconcileHearts(String platform, List<Track> tracks) {
