@@ -18,7 +18,6 @@ import '../widgets/layout/side_bar.dart';
 import '../widgets/common/offstage_when_complete.dart';
 import 'appearance_styles/appearance_style_registry.dart';
 import 'route_transitions/route_transition_registry.dart';
-import 'shell_expand_transition.dart';
 
 /// 应用壳（对齐原项目 MainLayout.vue）：
 /// 左侧 SideBar（可折叠分组导航）+ 右侧（顶部 NavHeader + 页面区）
@@ -43,12 +42,12 @@ class AppShell extends ConsumerWidget {
     final background = appearanceStyle.buildBackground(context, prefs);
     final floating = prefs.floatingPlayerBar;
     final collapsed = prefs.sidebarCollapsed;
-    // 全屏播放器展开时，主壳内容（侧边栏 + 页面区）缩放淡出，展开动画结束
-    // 后卸载、仅留纯色占位（收敛内存与绘制开销）；收起时立即恢复。
+    // 全屏播放器展开时，主壳内容保持原位：不做缩放 / 淡出，只有播放页
+    // 自身从下方上滑盖住它。
     //
-    // 用**播放页路由自身的动画**驱动（经 provider 传入）：该动画由播放页的
-    // Ticker 逐帧推进，与播放页进出同帧同步；壳层无需自建 Ticker，避免下方
-    // 路由被 offstage 时动画停摆（0=折叠，1=完全展开）。
+    // 用**播放页路由自身的动画**判断遮挡完成（经 provider 传入）：该动画由
+    // 播放页的 Ticker 逐帧推进；壳层无需自建 Ticker，避免下方路由被 offstage
+    // 时动画停摆（0=折叠，1=完全展开）。
     final playerRouteAnim =
         ref.watch(playerRouteAnimationProvider) ??
         const AlwaysStoppedAnimation<double>(0);
@@ -99,16 +98,9 @@ class AppShell extends ConsumerWidget {
         Positioned.fill(
           child: Padding(
             padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
-            // 展开：壳内容缩放淡出，动画结束后卸载，仅保留纯色占位；
-            // 收起：立即恢复壳内容并随动画反向展开（与 1.0.6+4 首发一致）。
-            child: ShellExpandTransition(
-              animation: playerRouteAnim,
-              disableAnimations: noAnim(context),
-              placeholder: ColoredBox(
-                color: Theme.of(context).scaffoldBackgroundColor,
-              ),
-              child: content,
-            ),
+            // 播放页打开/关闭时壳内容不做任何动效，原位保留；完全展开后
+            // 只停绘/停 ticker（State 保留），收起即恢复。
+            child: occludedWhenPlayerOpen(content),
           ),
         ),
         // 底部播放条（悬浮层，不占布局空间——对齐原版 MainLayout 的

@@ -3,15 +3,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /// [shell_page_state] 回归测试：平台 / Tab 选择存于应用级 provider，因此在
-/// `ShellExpandTransition` 卸载/重挂载壳内容（全屏播放页展开后）时得以保留，
-/// 不会回到默认值。
+/// 播放页展开/收起（壳内容停绘）后仍保留，不会回到默认值。
+/// 2026-11-09 起壳内容只停绘、不再卸载，本测试同时守住「State 不重建」。
 library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:archoera_music/app/shell_expand_transition.dart';
+import 'package:archoera_music/widgets/common/offstage_when_complete.dart';
 import 'package:archoera_music/stores/shell_page_state.dart';
 
 /// 模拟「页面」：把平台与 Tab 选择存在 provider，`State` 重建时从中恢复。
@@ -53,9 +53,8 @@ Widget _host(Animation<double> animation) {
   return ProviderScope(
     child: MaterialApp(
       home: Scaffold(
-        body: ShellExpandTransition(
+        body: OffstageWhenComplete(
           animation: animation,
-          placeholder: const Text('placeholder'),
           child: const _PlatformPicker(),
         ),
       ),
@@ -86,7 +85,7 @@ void main() {
     });
   });
 
-  group('壳内容卸载/重挂载', () {
+  group('壳内容展开/收起', () {
     testWidgets('保留平台与 Tab 选择（不回到默认 NT / 首个 Tab）', (tester) async {
       final c = AnimationController(
         vsync: const TestVSync(),
@@ -101,13 +100,16 @@ void main() {
       await tester.pump();
       expect(find.text('platform:kugou tab:2'), findsOneWidget);
 
-      // 展开 → 壳内容从树上卸载。
+      // 展开 → 壳内容停绘（Offstage），但 State / 选择仍在。
       c.value = 1;
       await tester.pumpAndSettle();
-      expect(find.text('placeholder'), findsOneWidget);
       expect(find.text('platform:kugou tab:2'), findsNothing);
+      expect(
+        find.text('platform:kugou tab:2', skipOffstage: false),
+        findsOneWidget,
+      );
 
-      // 收起 → 壳内容重新挂载（全新 `State`），选择应被恢复。
+      // 收起 → 立即恢复，选择不变。
       c.reverse();
       await tester.pumpAndSettle();
       expect(find.text('platform:kugou tab:2'), findsOneWidget);
