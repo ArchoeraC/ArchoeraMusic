@@ -27,9 +27,12 @@
 - **[KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi)（MIT）** —— 酷狗平台接口调研与协议思路
 - **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)（MIT）** —— 网易云平台接口流程思路
 - **[ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs)（WTFPL）** —— Rust 化签名实现方案
-- **[MoeKoeMusic](https://github.com/MoeKoeMusic/MoeKoeMusic)** —— 开源高颜值酷狗第三方客户端，桌面端体验与平台接入思路；
-  酷狗新版**安装级设备身份**（GUID/MID/DEV/WebGL 持久化）与登录风控方案参考，分析见 [`kugou-risk-control.md`](kugou-risk-control.md)
-- **[Mineradio](https://github.com/XxHuberrr/Mineradio)** —— Windows 桌面沉浸式音乐播放器，歌词舞台与视觉呈现思路
+- **[MoeKoeMusic](https://github.com/MoeKoeMusic/MoeKoeMusic)（GPL-2.0-only）** —— 开源高颜值酷狗第三方客户端，桌面端体验与平台接入思路；
+  酷狗新版**安装级设备身份**（GUID/MID/DEV/WebGL 持久化）与登录风控方案参考，分析见 [`kugou-risk-control.md`](kugou-risk-control.md)。
+  **仅参考公开行为与接口约定，未复制其源代码**（设备字段算法来源于 MIT 许可的 KuGouMusicApi `util/util.js`；
+  GPL-2.0-only 与本项目 AGPL-3.0 不兼容，故代码中不引用该项目的实现）
+- **[Mineradio](https://github.com/XxHuberrr/Mineradio)（未声明开源许可）** —— Windows 桌面沉浸式音乐播放器，歌词舞台与视觉呈现**思路**参考；
+  仅借鉴交互与视觉方向，**未复制其代码或美术资源**
 - **[denialwm/denial](https://github.com/denialwm/denial)（GPL-3.0-or-later）** —— Flutter 原生 Wayland 合成器。其「低且稳定帧时间」的渲染优化方法论（动画收敛到 render object、显式栅格化缓存、模糊成本模型、渲染审计与零构建回归测试）是本项目渲染专项的参考来源之一。本项目**仅借鉴思想/方法/实测结论，未复制其代码**；依本仓约定，不以该项目命名任何文档/模块，调研详情见 [`rendering-reference-research.md`](rendering-reference-research.md)
 - **[NekoMusic / Neko 歌姬计划](https://github.com/FantasyNetworkCN/NekoMusicDocs)（服务端 GPL-3.0；PC 客户端 AGPL-3.0 并附 AGPLv3 §7 附加条款）** ——
   **实验性第三方音源**（登录 / 搜索 / 收藏 / 歌单 / 直链 / 歌词）的 API 契约来源。本项目**仅经其公开 HTTP API 互操作，

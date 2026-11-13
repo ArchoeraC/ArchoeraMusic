@@ -146,7 +146,7 @@ class KugouTrackInfo {
     return q != null ? hashes[q] : null;
   }
 
-  /// 由档位 key 生成 [quality] 参数值（对齐 MoeKoeMusic /v5/url quality 枚举）。
+  /// 由档位 key 生成 [quality] 参数值（对齐 /v5/url 的 quality 枚举）。
   static String? qualityParam(String qualityKey) =>
       _kugouQualityParam[qualityKey];
 }
@@ -669,8 +669,8 @@ class Track {
       kugou: hashes.isEmpty
           ? null
           : KugouTrackInfo(hash: hash, hashes: hashes, sizes: sizes),
-      // 原唱标识（MoeKoeMusic `Number(IsOriginal) === 1`）+ KG版权
-      // privilege == 10 → VIP（对齐 MoeKoeMusic PlaylistDetail）
+      // 原唱标识（`IsOriginal == 1`）+ KG版权
+      // privilege == 10 → VIP（接口约定）
       isOriginal: _kgIsOriginal(song['IsOriginal'] ?? song['isOriginal']),
       fee: _kgFee(song['privilege']),
     );

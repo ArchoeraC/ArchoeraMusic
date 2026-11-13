@@ -1,7 +1,13 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: BSD-3-Clause
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植自 libopus 1.6.1（BSD-3-Clause）。
+// Copyright (c) 2001-2024 Xiph.Org, Skype Limited, Octasic, Jean-Marc Valin,
+// Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding,
+// Erik de Castro Lopo。本文件保留上游版权声明，按 BSD-3-Clause 分发；
+// 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! 自动生成：libopus 1.6.1 static_modes_float.h 静态 48k/960 模式表（权威参考）。
 //! 注意：与运行时 clt_mdct_init/kiss_fft_alloc 计算值差 ≤1 ULP，opus_demo 实际使用本静态表。

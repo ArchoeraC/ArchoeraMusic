@@ -151,7 +151,7 @@ String kgTrackId(Map<String, dynamic> item, String hash) {
 
 /// 从「歌单/榜单/推荐/搜索」通用条目结构构建 [Track]（source == 'kugou'）。
 ///
-/// 兼容字段别名（对齐 MoeKoeMusic formatPlaylistTracks 等映射）：
+/// 兼容字段别名（对齐接口实际字段）：
 /// - 名称：`songname` / `ori_audio_name` / `audio_name` / `name`（"歌手 - 歌名"合并名拆分）
 /// - 歌手：`singerinfo` / `author_name` / `singername`，或合并名前半
 /// - 封面：`trans_param.union_cover` / `sizable_cover` / `cover`（含 {size} 占位）
@@ -160,7 +160,7 @@ String kgTrackId(Map<String, dynamic> item, String hash) {
 ///
 /// [preferMergedName]：公开歌单接口（get_other_list_file_nofilt）的 `name`
 /// 恒为 "歌手 - 歌名" 合并名且无独立歌手字段，传 true 时强制以合并名拆分
-/// 覆盖歌名/歌手（对齐 MoeKoeMusic formatPlaylistTracks 的 split 逻辑）。
+/// 覆盖歌名/歌手（接口把两者合并在 `name` 里）。
 Track kgTrackFromKgPlain(
   Map<String, dynamic> item, {
   bool preferMergedName = false,
@@ -230,7 +230,7 @@ Track kgTrackFromKgPlain(
 
   // 公开歌单接口（get_other_list_file_nofilt）的音质档位列表：relate_goods
   // 与主条目同结构（quality/hash/size/level），level 0 不可用跳过，
-  // 对齐 MoeKoeMusic OnlineMusicQueue getPrivilegeVariants。
+  // 与公开接口 relate_goods 的档位语义一致。
   final relateGoods = item['relate_goods'];
   if (relateGoods is List && relateGoods.isNotEmpty) {
     for (final g in relateGoods.whereType<Map<String, dynamic>>()) {
@@ -278,8 +278,8 @@ Track kgTrackFromKgPlain(
     ),
     cover: kgFillCover(coverTpl, 300),
     source: 'kugou',
-    // 原唱标识（MoeKoeMusic `Number(IsOriginal) === 1`）+ 版权
-    // privilege == 10 → VIP（对齐 MoeKoeMusic PlaylistDetail）
+    // 原唱标识（`IsOriginal == 1`）+ 版权
+    // privilege == 10 → VIP（接口约定）
     isOriginal: _kgIsOriginal(item['IsOriginal'] ?? item['isOriginal']),
     fee: _kgFee(item['privilege']),
     kugou: hashes.isEmpty
