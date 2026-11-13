@@ -1,7 +1,8 @@
-# 第三方音源移植报告（baka-plugins / go-music-dl → ArchoeraMusic）
+# 第三方音源移植报告（归档·摘要）
 
+> 归档说明：具体项目名、仓库与实现细节从略；结论仅作历史参考。
 > 状态：调研稿 v1 · 2026-09-14
-> 范围：`baka-plugins`（JS 插件集）与 `go-music-dl`（Go 多源工具）对 ArchoeraMusic
+> 范围：某 JS 插件集与某 Go 聚合下载器对 ArchoeraMusic
 > 在线音乐（第三方平台接入）的可移植性评估、目标架构与分阶段落地清单。
 > 结论导向：**因三端架构完全不同（主项目 = 纯 Dart 平台协议层 + FFI 原生模块、零侧车），
 > 两个项目都只能「移植」——即参考其协议与接口设计，在 Dart 侧重实现；不引入运行时、不整包移植。
@@ -12,10 +13,10 @@
 ## 0. 结论速览（TL;DR）
 
 1. **架构不同 → 只能移植，不能引入**：
-   - `baka-plugins` 是 **Node/CommonJS 运行时**，且 **未声明任何许可证**（`package.json` 无 `license` 字段，仓库无 `LICENSE`）——命中
+   - `某 JS 插件集` 是 **Node/CommonJS 运行时**，且 **未声明任何许可证**（`package.json` 无 `license` 字段，仓库无 `LICENSE`）——命中
      `CONTRIBUTING.md` §2.2「禁止非 FFI 大运行时」与 §9「许可必须可溯、登记」，**不可复制代码**。
-   - `go-music-dl` 是 **Go 程序**（AGPL-3.0，许可兼容），但其真正协议实现位于外部依赖
-     `github.com/guohuiyuan/music-lib`（**未随仓库分发、未在本地 module cache**）；引入 Go 运行时同样命中
+   - `某 Go 聚合下载器` 是 **Go 程序**（AGPL-3.0，许可兼容），但其真正协议实现位于外部依赖
+     某公开聚合库（**未随仓库分发、未在本地 module cache**）；引入 Go 运行时同样命中
      §2.2/戒律 #11，且 §2.2 明确「高度不建议第三方『预制菜』整包引入」。**不可作为业务载体**。
    - 主项目在线音乐是**纯 Dart 直连**（戒律 #2，`app/lib/apis/` + `app/lib/services/<platform>/`），
      与上述两项目的进程/插件模型不兼容；**唯一可行路径是把协议与设计移植为 Dart**。
@@ -25,23 +26,23 @@
 3. **建议路线**：
    - **P0（先做）**：把主项目现有的「按 `source` 字符串 switch」收敛为纯 Dart 的
      `OnlineSource` 接口 + `OnlineSourceRegistry`（行为零回归），并给 `Track` 增加通用 `extra` 载荷。
-   - **P1**：用两个项目的实现补强现有 QQ / 酷狗 / 网易云（QQ 桌面搜索 `zzcSign`+`ct=19`、酷狗全局歌单、
-     网易云 YRC/eapi 歌词与 `trackIds` 缓存等）。
-   - **P2（新增，性价比最高）**：**酷我 kuwo**、**咪咕 migu**（baka 有完整可读 JS，go-music-dl 有 Go 对照）。
+   - **P1**：用两个项目的实现补强现有 QM / 酷狗 / NT（QM 桌面搜索 `zzcSign`+`ct=19`、酷狗全局歌单、
+     NT YRC/eapi 歌词与 `trackIds` 缓存等）。
+   - **P2（新增，性价比最高）**：**酷我 kuwo**、**咪咕 migu**（其一有完整可读 JS，另一有 Go 对照）。
    - **P3**：Bilibili、千千、5sing、Jamendo、JOOX、Apple（小众/受限，按需）。
    - **P4（后期 R&D）**：**本地签名 + 下载增强**（解密/标签内嵌）——彻底去第三方，
      补齐全量官方能力。先做算法明确的（Bilibili WBI、千千、酷我、咪咕）。
      详见 §7-P4。
 4. **合规动作**：所有参考移植须在 PR 说明来源，并在对应模块 `THIRD-PARTY-LICENSES.md` 登记
-   `baka-plugins`（无许可，仅作协议事实参考，不复制表达）与 `go-music-dl` / `music-lib`（AGPL-3.0）。
-5. **请求去向审计（§10）**：两个项目的**业务请求全部直达平台官方域名**；唯一第三方是 baka
+   `某 JS 插件集`（无许可，仅作协议事实参考，不复制表达）与 `某 Go 聚合下载器` / `某聚合库`（AGPL-3.0）。
+5. **请求去向审计（§10）**：两个项目的**业务请求全部直达平台官方域名**；唯一第三方是 该插件集
    源插件的**播放 URL 聚合服务**（只收 `{source, songId, quality}`，无凭据）——主项目应改用官方取流、
    **不移植该聚合层**。故平台接入无红线障碍。
-6. **第三方网关实测（§11）**：对 baka 各音源端点做了无凭据探测——它们都只是**官方 CDN 直链网关**
+6. **第三方网关实测（§11）**：对 该插件集 各音源端点做了无凭据探测——它们都只是**官方 CDN 直链网关**
    （多数 302/返回官方 URL），且有卡密/限速/试听阉割/易失效问题；**无独立价值**，
    仅作官方取流的参数对照，**按硬约束一律不接入**。
 7. **硬约束（本次确认）**：**任何数据都不得经过官方平台以外的第三方**。因此——
-   - baka 的第三方音源网关（ikun/linglan/cihedai/changqing/quandouyao/hyw）**一律不接入**；
+   - 该插件集 的第三方音源网关（具体网关不列）**一律不接入**；
    - 两项目**只作为「官方协议实现」的参考**；新增平台的解析能力必须**直连官方**（见 §8.1 映射表）。
 8. **按需加载 / 即时卸载（§6.5）**：平台变多后**不能启动即构造全部 facade**；注册表用
    「工厂懒构造 + 租约引用计数 + 空闲 TTL 卸载 + 任务互斥」，并解除 `bootstrap` 的全量实例化。
@@ -51,17 +52,17 @@
 
 ## 1. 三项目总览
 
-| 项 | ArchoeraMusic（主项目） | baka-plugins | go-music-dl |
+| 项 | ArchoeraMusic（主项目） | 某 JS 插件集 | 某 Go 聚合下载器 |
 |---|---|---|---|
 | 形态 | Flutter 桌面播放器 | 音源插件分发服务（Netlify/Vercel/Express） | Go CLI + Web + 桌面壳 |
 | 语言/运行时 | Dart（业务）+ C/C#/C++/Rust/Go（FFI 原生模块） | Node.js / CommonJS | Go 1.25 |
-| 在线音乐协议位置 | `app/lib/apis/<platform>/` + `app/lib/services/<platform>/` | 每个 `plugins/*.js` 自包含 | 外部依赖 `music-lib/*`（本仓库只做编排） |
+| 在线音乐协议位置 | `app/lib/apis/<platform>/` + `app/lib/services/<platform>/` | 每个 `plugins/*.js` 自包含 | 外部依赖 `某聚合库/*`（本仓库只做编排） |
 | 已接入平台 | netease、kugou、qqmusic（+ streaming：Subsonic/Jellyfin） | wy、kg、kw、qq、mg、bilibili | netease、qq、kugou、kuwo、migu、fivesing、jamendo、joox、qianqian、bilibili、apple |
-| 许可 | AGPL-3.0-or-later | **无许可证声明** | AGPL-3.0（music-lib 同源） |
+| 许可 | AGPL-3.0-or-later | **无许可证声明** | AGPL-3.0（某聚合库 同源） |
 | 对主项目的直接可用性 | — | 仅协议参考 | 仅协议/设计参考 |
 
-> 说明：本报告中 `go-music-dl` 自身的文件（`core/`、`internal/web/`）已本地核对；
-> `music-lib` 的具体端点/算法来自其公开说明与通用知识，**移植前必须以实际拉取的 `music-lib` 源码为准**。
+> 说明：本报告中 `某 Go 聚合下载器` 自身的文件（`core/`、`internal/web/`）已本地核对；
+> `某聚合库` 的具体端点/算法来自其公开说明与通用知识，**移植前必须以实际拉取的 `某聚合库` 源码为准**。
 
 ---
 
@@ -118,13 +119,13 @@
 
 ---
 
-## 3. baka-plugins 解析
+## 3. 某 JS 插件集 解析
 
 ### 3.1 架构
 
 - `functions/plugin.js`：分发单个插件脚本，并向「源插件」注入 `requestMusicUrl(source, songId, quality)`
   （由 `apiType` 生成不同音源 API 调用）。
-- `functions/source-config.js`：`SOURCE_CONFIG` 音源注册表（ikun/linglan/cihedai/changqing/quandouyao/hyw），
+- `functions/source-config.js`：`SOURCE_CONFIG` 音源注册表（具体网关不列），
   含 `requiresKey`、`apiType`、每插件音质覆盖。
 - `functions/subscription.js`：扫描 `plugins/` 返回订阅清单。
 - `plugins/*.js`：平台协议自包含。`FREE_PLUGINS = ['bilibili.js','mg.js']`（自解析 URL），
@@ -164,7 +165,7 @@ supportedVideoQualities / userVariables / hints / supportedSearchType`。
 
 | 插件 | 关键 Host | 签名/加密 | 独有价值 |
 |---|---|---|---|
-| `qq.js` | `u.y.qq.com/cgi-bin/musicu.fcg`、`musics.fcg`、`c.y.qq.com` | `zzcSign`（SHA1 + 索引取字 + XOR + base64，`qq.js:315`）；`ct=19` 取全量 `size_hires`（`qq.js:179`） | 桌面签名搜索、专辑/榜单分页（999/页）、MV、评论 |
+| `qq.js` | `u.y.qq.com/cgi-bin/musicu.fcg`、`musics.fcg`、`c.y.qq.com` | `zzcSign`（SHA1 + 索引取字 + XOR + base64，`qq.js`）；`ct=19` 取全量 `size_hires`（`qq.js`） | 桌面签名搜索、专辑/榜单分页（999/页）、MV、评论 |
 | `wy.js` | `music.163.com/weapi`、`interface3.../eapi`、`/api` | weapi AES-CBC+RSA（`getParamsAndEnc` :80）、eapi AES-ECB（:22） | eapi 歌词、YRC→QRC、批量音质、`trackIds` 本地缓存（:430）、榜单 HTML |
 | `kg.js` | `songsearch/mobilecdn/gateway.kugou.com/lyrics.kugou.com` | `signatureParams` MD5（:525）、KRC XOR+pako（:419） | 全局收藏歌单（`get_other_list_file_nofilt`）、酷狗码解析、分享歌单 |
 | `kw.js` | `search.kuwo.cn`、`nplserver.kuwo.cn`、`newlyric.kuwo.cn` | `yeelion` XOR+base64（:656）、歌词 pako + **gb18030**（:437） | 完整酷我客户端（搜索/歌单/专辑/歌手/MV/榜单/评论） |
@@ -176,21 +177,21 @@ supportedVideoQualities / userVariables / hints / supportedSearchType`。
 - 契约模型（§3.2）→ 直接映射为 Dart `OnlineSource` 接口。
 - 音质词表与 `supportedQualities` → 主项目 `qualityBitrate`/`qualityLabels` 的扩展依据。
 - 分页契约 → 主项目歌单导入/`SearchResult.hasMore` 的语义规范。
-- QQ/KG/NT 的新端点与算法 → P1 补强；KW/MG/Bilibili → P2/P3 新源。
+- QM/KG/NT 的新端点与算法 → P1 补强；KW/MG/Bilibili → P2/P3 新源。
 
 ---
 
-## 4. go-music-dl 解析
+## 4. 某 Go 聚合下载器 解析
 
 ### 4.1 架构（本地已核对）
 
-- `core/`：源工厂（`GetSearchFunc` `service.go:148` 等）、Cookie 管理（`CookieManager` `:53`）、
-  下载管线（`download.go`）、元数据内嵌（`service.go:1589` `EmbedSongMetadata`）、WebDAV、下载记录去重。
-- `internal/web/`：Gin HTTP 服务，路由见 `RegisterMusicRoutes`（`music.go:352`）、`RegisterQRLoginRoutes`
-  （`qr_login.go:50`）、本地歌单/本地音乐/视频生成/更新。
+- `core/`：源工厂（`GetSearchFunc` `service.go` 等）、Cookie 管理（`CookieManager` `:53`）、
+  下载管线（`download.go`）、元数据内嵌（`service.go` `EmbedSongMetadata`）、WebDAV、下载记录去重。
+- `internal/web/`：Gin HTTP 服务，路由见 `RegisterMusicRoutes`（`music.go`）、`RegisterQRLoginRoutes`
+  （`qr_login.go`）、本地歌单/本地音乐/视频生成/更新。
 - `cmd/music-dl`：Cobra CLI；`cmd/search-server`：独立 JSON 搜索服务。
-- **平台协议在外部 `music-lib`**：`core/service.go:24-37` 直接 import
-  `music-lib/{netease,qq,kugou,kuwo,migu,fivesing,jamendo,joox,qianqian,bilibili,apple}`。
+- **平台协议在外部 `某聚合库`**：`core/service.go:24-37` 直接 import
+  `某聚合库/{netease,qq,kugou,kuwo,migu,fivesing,jamendo,joox,qianqian,bilibili,apple}`。
 
 源清单（`core/service.go:1005`）：
 `netease, qq, kugou, kuwo, migu, fivesing, jamendo, joox, qianqian, bilibili, apple, local`；
@@ -198,7 +199,7 @@ supportedVideoQualities / userVariables / hints / supportedSearchType`。
 QR 登录源（`:402`）`netease, qq, qq_wx, kugou, bilibili`；
 用户歌单源（`:422`）`netease, qq, kugou`。
 
-### 4.2 可借鉴的接口设计（music-lib `provider/interface.go`）
+### 4.2 可借鉴的接口设计（某聚合库 `provider/interface.go`）
 
 `SongSearcher / SongParser / SongDownloader / LyricProvider / MusicProvider / AlbumProvider /
 PlaylistProvider / RecommendedPlaylistProvider / PlaylistCategoryProvider / UserPlaylistProvider /
@@ -214,29 +215,29 @@ IsInvalid, IsVIP bool
 ```
 
 要点：**没有独立 Album/Artist 实体**——专辑 = `Playlist` + `Extra["type"]="album"`，
-歌手是分隔字符串；**源 ID 是复合的**（酷狗 hash、QQ songmid、咪咕 `contentId|resourceType|formatType`、
+歌手是分隔字符串；**源 ID 是复合的**（酷狗 hash、QM songmid、咪咕 `contentId|resourceType|formatType`、
 Bilibili `bvid|cid`、5sing `songid|songtype`），`Extra` 必须端到端保留。
 
 ### 4.3 独有能力（主项目目前没有）
 
 | 能力 | 位置 | 价值 |
 |---|---|---|
-| 统一 Provider 接口 | `music-lib/provider` | P0 架构蓝本 |
-| 自动换源打分 | `internal/web/music.go:1321` `findBestSwitchSong` + `core.CalcSongSimilarity`（`service.go:895`，名称 0.7+歌手 0.3）、`IsDurationClose`（:873，±10s/15%）、`ValidatePlayable`（:766，Range 探测） | 主项目 `_tryFallbackSource`（仅 netease↔kugou、纯标题歌手匹配）的升级蓝本 |
-| 下载元数据内嵌 | `service.go:1589` + 纯 Go ID3v2.3 写入 `embedMP3ID3v23Metadata`（:1193）+ ffmpeg 回退 | 与主项目 Rust downloader 能力互补 |
-| 扩展名魔数探测 | `service.go:807/814/836` | 下载落盘格式判定 |
-| 并行 Range 流式下载 | `service.go:1324` `NewSourceRangeFetch`（首块 32KB，后续 256KB，16 并发，3 重试） | 在线播放/缓存参考 |
+| 统一 Provider 接口 | `某聚合库/provider` | P0 架构蓝本 |
+| 自动换源打分 | `internal/web/music.go:1321` `findBestSwitchSong` + `core.CalcSongSimilarity`（`service.go`，名称 0.7+歌手 0.3）、`IsDurationClose`（:873，±10s/15%）、`ValidatePlayable`（:766，Range 探测） | 主项目 `_tryFallbackSource`（仅 netease↔kugou、纯标题歌手匹配）的升级蓝本 |
+| 下载元数据内嵌 | `service.go` + 纯 Go ID3v2.3 写入 `embedMP3ID3v23Metadata`（:1193）+ ffmpeg 回退 | 与主项目 Rust downloader 能力互补 |
+| 扩展名魔数探测 | `service.go` | 下载落盘格式判定 |
+| 并行 Range 流式下载 | `service.go` `NewSourceRangeFetch`（首块 32KB，后续 256KB，16 并发，3 重试） | 在线播放/缓存参考 |
 | QR 登录矩阵 | `core/service.go:364-402` | 主项目已有 NT/KG/QQ，可补 Bilibili |
-| 随机国内 IP 头 | `music-lib/utils/ip.go`（`X-Forwarded-For`/`X-Real-IP`） | 主项目 netease 已有类似 `system.neteaseRealIp` |
+| 随机国内 IP 头 | `某聚合库/utils/ip.go`（`X-Forwarded-For`/`X-Real-IP`） | 主项目 netease 已有类似 `system.neteaseRealIp` |
 
-### 4.4 各源协议（**须以实际 `music-lib` 源码复核**）
+### 4.4 各源协议（**须以实际 `某聚合库` 源码复核**）
 
 - **netease**：weapi/eapi/linuxapi；`/api/linux/forward` 搜索、`/weapi/song/enhance/player/url`、
   eapi v1（`lossless/hires/exhigh` 逐档）、`/weapi/v3/song/detail`、`/weapi/v3/playlist/detail`、
   `/weapi/song/lyric`（lv/tv/rv/yv=-1）；VIP 用 `nuser/account/get`。
 - **qq**：`c.y.qq.com/soso/fcgi-bin/search_for_qq_cp`、`music.vkey.GetVkey`、musicu.fcg 专辑/歌词
   （`PlayLyricInfo`，QRC hex→DES→zlib）、`i.y.qq.com/qzone-music/.../fcg_ucc_getcdinfo_byids_cp.fcg`；
-  QR 含 QQ 与微信（`qq_wx`）。
+  QR 含 QM 与微信（`qq_wx`）。
 - **kugou**：`songsearch.kugou.com/song_search_v2`、`/v5/url`、`tracker.kugou.com/v6/priv_url`、
   `wwwapi.kugou.com/play/songinfo`、KRC（base64→去 4 字节→XOR→zlib）；签名
   `md5(salt+sorted(k=v)+data+salt)`；设备注册 AES-CBC + RSA-PKCS1v15。
@@ -255,11 +256,11 @@ Bilibili `bvid|cid`、5sing `songid|songtype`），`Extra` 必须端到端保留
 
 ### 5.1 平台覆盖 vs 主项目
 
-| 平台 | 主项目现状 | baka-plugins | go-music-dl | 建议 |
+| 平台 | 主项目现状 | 某 JS 插件集 | 某 Go 聚合下载器 | 建议 |
 |---|---|---|---|---|
-| 网易云 netease | ✅ 75 模块 | ✅ 完整 | ✅ | P1 补强 |
+| NT netease | ✅ 75 模块 | ✅ 完整 | ✅ | P1 补强 |
 | 酷狗 kugou | ✅ services 完整 | ✅ 完整 | ✅ | P1 补强 |
-| QQ qqmusic | ✅ 15 模块 | ✅ 完整 | ✅ | P1 补强 |
+| QM qqmusic | ✅ 15 模块 | ✅ 完整 | ✅ | P1 补强 |
 | **酷我 kuwo** | ❌ | ✅ 完整 | ✅ | **P2 新增（首选）** |
 | **咪咕 migu** | ❌ | ✅ 完整 | ✅ | **P2 新增** |
 | Bilibili | ❌ | ✅ 完整 | ✅ | P3 |
@@ -269,15 +270,15 @@ Bilibili `bvid|cid`、5sing `songid|songtype`），`Extra` 必须端到端保留
 
 ### 5.2 能力覆盖
 
-| 能力 | 主项目 | baka | go-music-dl | 缺口结论 |
+| 能力 | 主项目 | 该插件集 | 某 Go 聚合下载器 | 缺口结论 |
 |---|---|---|---|---|
 | 搜索（歌/专/歌手/歌单） | ✅ 三家 | ✅ 六家 | ✅ 十一家 | 随新源补齐 |
 | 歌曲 URL | ✅ | ✅ | ✅ | 已具备 |
 | 歌词（含逐字） | ✅ LRC/YRC/KRC/QRC/TTML | ✅ 含 MRC/QRC 转换 | ✅ 含 QRC/KRC/YRC | 新增源需补 MRC、酷我 `<start,dur>` |
 | 歌单详情/导入 | 部分 | ✅ 分页契约完善 | ✅ | P1/P2 补齐 |
 | 专辑/歌手 | 部分 | ✅ | ✅ | P2/P3 |
-| 评论 | 部分（NT/KG/QQ，QQ 仅读） | ✅ | ❌ | 参考 baka |
-| MV | ❌ | ✅ | ❌ | 可选（baka 参考） |
+| 评论 | 部分（NT/KG/QQ，QM 仅读） | ✅ | ❌ | 参考 该插件集 |
+| MV | ❌ | ✅ | ❌ | 可选（该插件集 参考） |
 | 榜单/推荐标签 | 部分 | ✅ | ✅ | P2/P3 |
 | 登录/QR | NT/KG/QQ | Cookie 变量 | NT/QQ/QQ_WX/KG/Bili | 新源按需 |
 | 自动换源 | 弱（NT↔KG） | ❌ | ✅ 打分+可播性校验 | P1 升级 |
@@ -287,12 +288,12 @@ Bilibili `bvid|cid`、5sing `songid|songtype`），`Extra` 必须端到端保留
 
 | 难度 | 项 | 依赖 |
 |---|---|---|
-| 低 | 酷狗 MD5 签名、千千 MD5、酷我 `yeelion` XOR、QQ `zzcSign` | `crypto`、`dart:io` zlib |
-| 中 | 网易云 weapi/eapi、咪咕策略解密/MD5、Bilibili WBI/ticket、QQ QRC 3DES | `pointycastle`、`crypto` |
-| 高 | 酷狗设备注册 RSA/AES、QQ QMC/BKC、NCM | `pointycastle`、自行实现 DES 解析 |
+| 低 | 酷狗 MD5 签名、千千 MD5、酷我 `yeelion` XOR、QM `zzcSign` | `crypto`、`dart:io` zlib |
+| 中 | NT weapi/eapi、咪咕策略解密/MD5、Bilibili WBI/ticket、QM QRC 3DES | `pointycastle`、`crypto` |
+| 高 | 酷狗设备注册 RSA/AES、QM QMC/BKC、NCM | `pointycastle`、自行实现 DES 解析 |
 | 特殊 | 酷我歌词 **gb18030** 解码 | 需新增依赖或内嵌码表 |
 
-> 主项目已有：netease 的 xeapi（X25519+HKDF+AES-GCM）、QQ TripleDES、酷狗 RSA/AES、KRC 解码。
+> 主项目已有：netease 的 xeapi（X25519+HKDF+AES-GCM）、QM TripleDES、酷狗 RSA/AES、KRC 解码。
 > 因此**新增酷我/咪咕的加密都在能力范围内**。
 
 ---
@@ -332,7 +333,7 @@ abstract class OnlineSource {
 ### 6.2 `Track` 改造
 
 - 保留现有 `KugouTrackInfo`/`QqMusicTrackInfo` 以零回归；
-- **新增通用 `Map<String, dynamic>? extra`**（对齐 go-music-dl `Song.Extra`），新源统一走 `extra`，
+- **新增通用 `Map<String, dynamic>? extra`**（对齐 某 Go 聚合下载器 `Song.Extra`），新源统一走 `extra`，
   避免每加一个源就改 `Track` 与 `fromJson/toJson`；
 - `Track.source` 扩为开放字符串（无中心枚举，维持现状），由 registry 兜底「暂不支持」。
 
@@ -413,27 +414,27 @@ Dart 机制说明（避免误用）：
       确保重构后全绿；`dart analyze lib` 0 issue。
 
 ### P1 现有三源补强（参考两个项目）
-- [x] QQ：**搜索已重写为签名桌面协议**（`zzcSign` + `musics.fcg` `DoSearchForQQMusicDesktop`，
+- [x] QM：**搜索已重写为签名桌面协议**（`zzcSign` + `musics.fcg` `DoSearchForQQMusicDesktop`，
       `ct=19` 全量 size），单曲/歌手/专辑/歌单四类统一（`search_type` 0/1/2/3）；**移动搜索已移除**。
       **评论已接入**（`music.globalComment.CommentRead` `GetHotCommentList`/`GetNewCommentList`，
       读取需登录；`QqMusicApi.songComments` + 评论弹窗 hot/new 两 Tab，仅读不发）。
-      仍待补：专辑分页、榜单增强（baka `qq.js:179/869`）。
-- [ ] 酷狗：全局收藏歌单 `get_other_list_file_nofilt`、酷狗码解析、分享歌单（baka `kg.js:1356/1682/1625`）。
-- [ ] 网易云：eapi 歌词、YRC→QRC、批量音质、`trackIds` 本地缓存（baka `wy.js:880/553/317/430`）。
-- [ ] 自动换源升级：多候选源 + 相似度打分 + 时长校验 + Range 可播性探测（go-music-dl `music.go:1321`、`service.go:895/873/766`）。
+      仍待补：专辑分页、榜单增强（该插件集 `qq.js`）。
+- [ ] 酷狗：全局收藏歌单 `get_other_list_file_nofilt`、酷狗码解析、分享歌单（该插件集 `kg.js`）。
+- [ ] NT：eapi 歌词、YRC→QRC、批量音质、`trackIds` 本地缓存（该插件集 `wy.js`）。
+- [ ] 自动换源升级：多候选源 + 相似度打分 + 时长校验 + Range 可播性探测（某 Go 聚合下载器 `music.go`、`service.go`）。
 
 ### P2 新增酷我 + 咪咕（首选）
 - [ ] `lib/apis/kuwo/`（core 签名 + modules）与 `lib/services/kuwo/`（门面）：搜索/URL/歌词/歌单/专辑/歌手/MV/榜单/评论。
-      - 参考 baka `kw.js`（`buildParams` :656、歌词 :437）与 go-music-dl `music-lib/kuwo`。
+      - 参考 该插件集 `kw.js`（`buildParams` :656、歌词 :437）与 某 Go 聚合下载器 `某聚合库/kuwo`。
       - **注意**：歌词 gb18030 解码需引依赖或内嵌码表（新增依赖须 §9 登记）。
 - [ ] `lib/apis/migu/` + `lib/services/migu/`：搜索/URL 策略解密/歌词 MRC(TEA)/专辑/歌手/歌单。
-      - 参考 baka `mg.js`（签名 :463、策略解密 :89、TEA :589）。
+      - 参考 该插件集 `mg.js`（签名 :463、策略解密 :89、TEA :589）。
 - [ ] 各自注册进 `OnlineSourceRegistry`，加登录（如需要）、加 i18n key。
 
 ### P3 扩展源（按需）
-- [ ] Bilibili（WBI、DASH、收藏夹、字幕歌词；参考 baka `bilibili.js`、go-music-dl `music-lib/bilibili`）。
+- [ ] Bilibili（WBI、DASH、收藏夹、字幕歌词；参考 该插件集 `bilibili.js`、某 Go 聚合下载器 `某聚合库/bilibili`）。
 - [ ] 千千（`music.91q.com`，签名简单）。
-- [ ] 5sing / Jamendo / JOOX（小众；go-music-dl `music-lib/*`）。
+- [ ] 5sing / Jamendo / JOOX（小众；某 Go 聚合下载器 `某聚合库/*`）。
 - [ ] Apple（仅试听，价值低，可跳过）。
 
 ### P4 本地签名与下载增强（后期 R&D，彻底去第三方）
@@ -446,34 +447,34 @@ Dart 机制说明（避免误用）：
 
 | 平台 | 待实现的签名 | 难度 | 参考 |
 |---|---|---|---|
-| Bilibili | WBI（mixin key + `w_rid`）、ticket HMAC-SHA256 | 低（算法明确） | baka `bilibili.js:209/223` |
-| 千千 qianqian | `md5(sorted(k=v) + Secret)` | 低 | `music-lib/qianqian` |
-| 酷我 kuwo | `yeelion` XOR + base64、官方 `convert_url_with_sign` | 低 | baka `kw.js:656` |
-| 咪咕 migu | MD5 签名、策略响应解密、MRC TEA | 中 | baka `mg.js:463/89/589` |
-| QQ | 搜索结果签名已落地（`core/sign.dart` `qmZzcSign` + `musics.fcg`，四类）；`song_url`/GetVkey 已具备 | — | 主项目 `apis/qqmusic/core/sign.dart` |
-| 网易云/酷狗 | 已具备（weapi/eapi/xeapi、酷狗签名/KRC） | — | 主项目现有 |
+| Bilibili | WBI（mixin key + `w_rid`）、ticket HMAC-SHA256 | 低（算法明确） | 该插件集 `bilibili.js` |
+| 千千 qianqian | `md5(sorted(k=v) + Secret)` | 低 | `某聚合库/qianqian` |
+| 酷我 kuwo | `yeelion` XOR + base64、官方 `convert_url_with_sign` | 低 | 该插件集 `kw.js` |
+| 咪咕 migu | MD5 签名、策略响应解密、MRC TEA | 中 | 该插件集 `mg.js` |
+| QM | 搜索结果签名已落地（`core/sign.dart` `qmZzcSign` + `musics.fcg`，四类）；`song_url`/GetVkey 已具备 | — | 主项目 `apis/qqmusic/core/sign.dart` |
+| NT/酷狗 | 已具备（weapi/eapi/xeapi、酷狗签名/KRC） | — | 主项目现有 |
 
 **B. 下载端增强（与现有 Rust `archoera-downloader` / C++ scraper 协同）**
 
 - [x] **QQMusic 下载接入**（2026-09-14）：Rust `SourcePlatform` 增加 `Qqmusic`，
       无自研解析 → 解析阶段返回可重试错误，由 **Dart 播放管线回退**（§12.1
       `resolvePlaySource` + `retry_with_url`）注入 URL；Dart 回退门控/预解析 headers 扩展
-      （QQ 带 Cookie/UA/Referer）；下载 UI 放开 QQ 入口。
+      （QM 带 Cookie/UA/Referer）；下载 UI 放开 QM 入口。
       Rust 单测 + Dart 请求单测 + `cargo build --release` 通过。
 - [x] **加密容器解密（原生 Rust，2026-09-14）**：`app/core/downloader/src/decrypt.rs` 自研重写
-      网易 **NCM**（含 `ncm_metadata` 标题/歌手/专辑/封面提取）、QQ **QMC**（静态掩码 58 + 首块掩码
+      网易 **NCM**（含 `ncm_metadata` 标题/歌手/专辑/封面提取）、QM **QMC**（静态掩码 58 + 首块掩码
       探测）；通用入口 `decrypt_container`（按魔数/扩展名分派），**已接入下载器**（下载落盘后自动
-      识别解密 → 扩展名归正 → 再写标签）。参考 `music-lib`（AGPL-3.0）Go 实现，**未复制**无许可证
+      识别解密 → 扩展名归正 → 再写标签）。参考 `某聚合库`（AGPL-3.0）Go 实现，**未复制**无许可证
       项目代码。单测：NCM/QMC 往返 + NCM 元数据 + 分派。**QMC 完整流密码（2026-09-14 续）**：
       `src/qmc.rs` 另实现 `QTag`/legacy/`musicex` footer 解析、`deriveKey`/`deriveKeyV2`（TEA-CBC）、
       `Static`/`Map`/`RC4` 密码（参考 MIT 的 `lantianhcgp/unlock-music` + `pushbox/qmc2`，随附其
-      测试向量对拍全绿）。**注意**：新版 PC 缓存 **`musicex` 文件不含密钥**——需 QQ 客户端本地
+      测试向量对拍全绿）。**注意**：新版 PC 缓存 **`musicex` 文件不含密钥**——需 QM 客户端本地
       MMKV key 库按 `MediaFileName` 查得；本项目只做算法、不内置密钥。**待补**：客户端 MMKV key
       导入、NCM 扫描入库链路。
-- [ ] **扩展名魔数探测**（wma/flac/ID3/ogg/ftyp…）——参考 go-music-dl `service.go:807/814/836`。
-- [ ] **Range 并行下载**（首块 32KB，后续 256KB，多并发 + 重试）——参考 `service.go:1324`。
+- [ ] **扩展名魔数探测**（wma/flac/ID3/ogg/ftyp…）——参考 某 Go 聚合下载器 `service.go`。
+- [ ] **Range 并行下载**（首块 32KB，后续 256KB，多并发 + 重试）——参考 `service.go`。
 - [ ] **标签内嵌**：ID3v2.3 / Xiph / MP4 / RIFF——主项目已有 C++ TagLib 刮削，优先复用；
-      纯 Dart/Go 参考 go-music-dl `service.go:1589`。
+      纯 Dart/Go 参考 某 Go 聚合下载器 `service.go`。
 
 **C. 约束与验收**
 
@@ -486,13 +487,13 @@ Dart 机制说明（避免误用）：
 
 **已实测（本机，免凭据）**：
 
-- **QQ**：`zzcSign` + `POST u.y.qq.com/cgi-bin/musics.fcg?sign=…`（`ct=19`）→ `code:0`、
+- **QM**：`zzcSign` + `POST u.y.qq.com/cgi-bin/musics.fcg?sign=…`（`ct=19`）→ `code:0`、
   `meta.sum:999`、`file` 含 `size_hires` / `size_new[14]` / `size_dolby` / `size_dts` /
   `hires_sample` / `hires_bitdepth`。算法索引越界（`hash[40]`）按 JS `join` 语义**丢弃为空**。
 
 **起步计划（各自可独立验证；不引新依赖、不碰原生层）**：
 
-- **QQ P1（✅ 已完成，2026-09-14）**：
+- **QM P1（✅ 已完成，2026-09-14）**：
   - [x] `core/sign.dart`：`qmZzcSign`（SHA1 大写 + 索引取字 XOR 混淆 + 去填充 base64；越界下标按
         JS `join` 语义丢弃）。
   - [x] `modules/search.dart`：**整体重写为签名桌面协议**——`musics.fcg` + `?sign=`、
@@ -506,7 +507,7 @@ Dart 机制说明（避免误用）：
   - [x] 验证：`dart analyze lib` 0 issue；`qqmusic_search_failure_test.dart` /
         `qqmusic_session_comm_test.dart` 全绿；`qqmusic_direct_test.dart` 真实联网 8/8。
 
-**待真实账号验证（新会话需注意）**：QQ 登录态音质 / 下载。
+**待真实账号验证（新会话需注意）**：QM 登录态音质 / 下载。
 
 ---
 
@@ -514,18 +515,18 @@ Dart 机制说明（避免误用）：
 
 | 约束 | 出处 | 对移植的影响 |
 |---|---|---|
-| 禁止非 FFI 大运行时（Node/Python/JVM） | `CONTRIBUTING.md` §2.2、戒律 #11 | baka-plugins **不可运行**，只能参考 |
+| 禁止非 FFI 大运行时（Node/Python/JVM） | `CONTRIBUTING.md` §2.2、戒律 #11 | 某 JS 插件集 **不可运行**，只能参考 |
 | 纯 Dart 平台协议层 | 戒律 #2 | 所有协议必须纯 Dart 重实现，不起子进程、不引 Go/JS |
 | 高度不建议第三方「预制菜」整包引入 | §2.2、§9 | 不可整包复制；须「参考移植 + 来源可溯 + 逐项登记」 |
-| 新增语言栈须走 §13 决策修订 | §2.2、戒律 #11 | 不得为 go-music-dl 引入 Go 业务层（Subsonic 属既有例外） |
-| 许可白名单 + 登记义务 | §9 | `go-music-dl`/`music-lib`（AGPL-3.0）可在 `THIRD-PARTY-LICENSES.md` 登记为参考；`baka-plugins` **无许可**，只能参考协议事实，不得复制代码/表达 |
+| 新增语言栈须走 §13 决策修订 | §2.2、戒律 #11 | 不得为 某 Go 聚合下载器 引入 Go 业务层（Subsonic 属既有例外） |
+| 许可白名单 + 登记义务 | §9 | `某 Go 聚合下载器`/`某聚合库`（AGPL-3.0）可在 `THIRD-PARTY-LICENSES.md` 登记为参考；`某 JS 插件集` **无许可**，只能参考协议事实，不得复制代码/表达 |
 | **零第三方数据流（硬约束，本次确认）** | 本次确认 | 任何聚合网关 / 签名服务 / 代理不得进入请求链路；只与官方域名通信（见 §8.1） |
 | 用户数据仅存本地、禁止向第三方上传 | §2.1、§10 | 会话/凭据只入本地 vault，不出本机；新增源不得引入外部上报 |
 | 禁止遥测/埋点、禁强制联网验证 | §2.1 | 不得引入插件分发/订阅/更新回调 |
 | 禁付费解锁/会员墙 | §2.1 | 只做正常登录态音质，不做 VIP 破解/解锁逻辑 |
 
 > 具体动作：新建/更新对应模块 `THIRD-PARTY-LICENSES.md`，逐项列明
-> `baka-plugins`（来源、无许可证、涉及参考的文件范围）、`go-music-dl` + `music-lib`（AGPL-3.0、commit
+> `某 JS 插件集`（来源、无许可证、涉及参考的文件范围）、`某 Go 聚合下载器` + `某聚合库`（AGPL-3.0、commit
 > `v1.1.1-0.20260828151741-02402db9ef9d`）；PR 说明中写清「参考了哪些文件、重实现了什么」。
 
 ### 8.1 零第三方硬约束：逐平台官方路径映射
@@ -536,26 +537,26 @@ Dart 机制说明（避免误用）：
 
 现状与缺口：
 
-- **已完整（官方直连）**：网易云（`lib/apis/netease/` + `lib/services/netease/`）、
+- **已完整（官方直连）**：NT（`lib/apis/netease/` + `lib/services/netease/`）、
   酷狗（`lib/services/kugou/`）。
-- **已有官方直连、待补强**：QQ（`lib/apis/qqmusic/`）。
+- **已有官方直连、待补强**：QM（`lib/apis/qqmusic/`）。
 - **缺失解析能力、需新增（全部走官方）**：酷我、咪咕、Bilibili、千千、5sing、Jamendo、JOOX、
   Apple。
 
 | 平台 | 官方取流路径（建议） | 参考来源 | 禁止的第三方 |
 |---|---|---|---|
-| 酷我 kuwo | 官方 `m.kuwo.cn` / `mobi.kuwo.cn/mobi.s?type=convert_url_with_sign`（`br=128kmp3/320kmp3/2000kflac`） | baka `kw.js`、`music-lib/kuwo` | `music.nxinxz.com` 等网关 |
-| 咪咕 migu | 官方 `app.pd.nf.migu.cn/.../listenSong.do`（302 Location 为真链） | baka `mg.js`（本身全官方）、`music-lib/migu` | 无 |
-| Bilibili | 官方 `api.bilibili.com/x/player/playurl`（DASH） | baka `bilibili.js`、`music-lib/bilibili` | 无 |
-| 千千 qianqian | 官方 `music.91q.com/v1/song/tracklink` | `music-lib/qianqian` | 无 |
-| 5sing | 官方 `mobileapi.5sing.kugou.com` | `music-lib/fivesing` | 无 |
-| Jamendo | 官方 `www.jamendo.com/api/*` | `music-lib/jamendo` | 无 |
-| JOOX | 官方 `api.joox.com` / `www.joox.com` 页面数据 | `music-lib/joox` | 无 |
-| Apple | 官方 `amp-api.music.apple.com`（仅试听） | `music-lib/apple` | 无 |
+| 酷我 kuwo | 官方 `m.kuwo.cn` / `mobi.kuwo.cn/mobi.s?type=convert_url_with_sign`（`br=128kmp3/320kmp3/2000kflac`） | 该插件集 `kw.js`、`某聚合库/kuwo` | `music.nxinxz.com` 等网关 |
+| 咪咕 migu | 官方 `app.pd.nf.migu.cn/.../listenSong.do`（302 Location 为真链） | 该插件集 `mg.js`（本身全官方）、`某聚合库/migu` | 无 |
+| Bilibili | 官方 `api.bilibili.com/x/player/playurl`（DASH） | 该插件集 `bilibili.js`、`某聚合库/bilibili` | 无 |
+| 千千 qianqian | 官方 `music.91q.com/v1/song/tracklink` | `某聚合库/qianqian` | 无 |
+| 5sing | 官方 `mobileapi.5sing.kugou.com` | `某聚合库/fivesing` | 无 |
+| Jamendo | 官方 `www.jamendo.com/api/*` | `某聚合库/jamendo` | 无 |
+| JOOX | 官方 `api.joox.com` / `www.joox.com` 页面数据 | `某聚合库/joox` | 无 |
+| Apple | 官方 `amp-api.music.apple.com`（仅试听） | `某聚合库/apple` | 无 |
 
 补充：
 
-- QQ / 网易云 / 酷狗：baka 的 `requestMusicUrl` 第三方网关**不移植**，只用其**官方协议**部分
+- QM / NT / 酷狗：该插件集 的 `requestMusicUrl` 第三方网关**不移植**，只用其**官方协议**部分
   （搜索/歌词/歌单/专辑/评论）与官方 `song_url`。
 - 落地验收：新增平台的出站域名白名单必须只含该平台官方域名（可在测试中断言，
   参考 `app/test/` 现有注入式 transport 测试）。
@@ -567,8 +568,8 @@ Dart 机制说明（避免误用）：
 | 风险 | 说明 | 缓解 |
 |---|---|---|
 | 平台风控变化 | 端点/签名随时失效 | 协议隔离在 `apis/<platform>/core`，可单点更新；加 `SearchSourceCooldown` 退避 |
-| 加密算法复杂度 | QQ QMC、酷狗设备注册易错 | 先做低/中难度源；高风险项后置并有单测对照 |
-| 参考来源不可信 | `music-lib` 未随仓库分发，端点需复核 | 移植前 `go mod download github.com/guohuiyuan/music-lib@<commit>` 拉源码逐项核对 |
+| 加密算法复杂度 | QM QMC、酷狗设备注册易错 | 先做低/中难度源；高风险项后置并有单测对照 |
+| 参考来源不可信 | `某聚合库` 未随仓库分发，端点需复核 | 移植前 `go mod download github.com/guohuiyuan/某聚合库@<commit>` 拉源码逐项核对 |
 | gb18030 依赖 | 酷我歌词解码 | 评估 `charset`/`fast_gbk` 等（须 §9 登记）或内嵌最小码表 |
 | 重构回归 | P0 触及播放/歌词/红心主链路 | 复用现有注入式单测 + 手动回归清单（`architecture.md` §12.2） |
 | 本地签名逆向成本/失效 | 混淆/VM 实现随版本失效 | P4 先做算法明确的（WBI/千千/酷我/咪咕）；失败静默降级，不影响播放 |
@@ -582,18 +583,18 @@ Dart 机制说明（避免误用）：
 > 方法：对每个插件的所有出站 URL 去重，并核对 `getMediaSource` / `requestMusicUrl` 调用链
 > （2026-09-14 静态审计）。
 > 结论：**所有平台的元数据（搜索/歌词/歌单/专辑/歌手/评论）请求都直达平台官方域名**；
-> 唯一的第三方是 baka「源插件」的**播放 URL 解析**（委托第三方音源聚合服务）。
+> 唯一的第三方是 该插件集「源插件」的**播放 URL 解析**（委托第三方音源聚合服务）。
 > 主项目对这些平台已有官方取流能力，移植时**用官方 `song_url` 即可，无需第三方音源**。
 
-### 10.1 baka-plugins 各插件
+### 10.1 某 JS 插件集 各插件
 
 | 插件 | 元数据/业务请求 | 播放 URL 解析 | 第三方域名 |
 |---|---|---|---|
-| `wy.js`（网易云） | ✅ 官方 `music.163.com` / `interface.music.163.com` / `interface3.music.163.com` | ⚠️ `requestMusicUrl('wy')` → 第三方音源（`wy.js:695`）；`share.duanx.cn/url/wy/...` 仅作字段（`wy.js:214/242`） | 音源聚合服务 |
-| `qq.js` | ✅ 官方 `u.y.qq.com` / `c.y.qq.com` / `y.qq.com` / `y.gtimg.cn` | ⚠️ `requestMusicUrl('tx')`（`qq.js:469`） | 音源聚合服务 |
-| `kg.js` | ✅ 官方 `*.kugou.com` | ⚠️ `requestMusicUrl('kg')`（`kg.js:930`） | 音源聚合服务 |
-| `kw.js` | ✅ 官方 `*.kuwo.cn` | ⚠️ `requestMusicUrl('kw')`（`kw.js:853`） | 音源聚合服务 |
-| `mg.js`（咪咕） | ✅ 官方 `*.migu.cn` | ✅ 自带 `requestMusicUrl`，全走官方咪咕（`mg.js:178/1366`） | 无 |
+| `wy.js`（NT） | ✅ 官方 `music.163.com` / `interface.music.163.com` / `interface3.music.163.com` | ⚠️ `requestMusicUrl('wy')` → 第三方音源（`wy.js`）；`share.duanx.cn/url/wy/...` 仅作字段（`wy.js`） | 音源聚合服务 |
+| `qq.js` | ✅ 官方 `u.y.qq.com` / `c.y.qq.com` / `y.qq.com` / `y.gtimg.cn` | ⚠️ `requestMusicUrl('tx')`（`qq.js`） | 音源聚合服务 |
+| `kg.js` | ✅ 官方 `*.kugou.com` | ⚠️ `requestMusicUrl('kg')`（`kg.js`） | 音源聚合服务 |
+| `kw.js` | ✅ 官方 `*.kuwo.cn` | ⚠️ `requestMusicUrl('kw')`（`kw.js`） | 音源聚合服务 |
+| `mg.js`（咪咕） | ✅ 官方 `*.migu.cn` | ✅ 自带 `requestMusicUrl`，全走官方咪咕（`mg.js`） | 无 |
 | `bilibili.js` | ✅ 官方 `api.bilibili.com` / `www.bilibili.com` / `s1.hdslb.com` | ✅ 自解析官方 DASH（`getMediaSource`） | 无 |
 
 第三方音源聚合服务清单（`functions/source-config.js`）：
@@ -602,21 +603,21 @@ Dart 机制说明（避免误用）：
 `hywmusicsource.xn--9tra.work`(hyw)。这些服务收到 `{source, songId, quality}`（**不含账号凭据**），
 仅用于换取播放直链。
 
-### 10.2 go-music-dl / music-lib
+### 10.2 某 Go 聚合下载器 / 某聚合库
 
-- `go-music-dl` 自身出站：仅平台官方域名 + GitHub 代理（`gh-proxy.com` / `edgeone.gh-proxy.com` /
+- `某 Go 聚合下载器` 自身出站：仅平台官方域名 + GitHub 代理（`gh-proxy.com` / `edgeone.gh-proxy.com` /
   `gh.llkk.cc`，仅「检查更新」）+ 占位图 `picsum.photos`。
-- `music-lib`：各源直连官方域名，含随机 `X-Forwarded-For` / `X-Real-IP`（国内 IP 池）反爬，仍是官方端点。
+- `某聚合库`：各源直连官方域名，含随机 `X-Forwarded-For` / `X-Real-IP`（国内 IP 池）反爬，仍是官方端点。
 - 结论：**无第三方音源聚合**，协议实现更接近主项目「官方直连」定位。
 
 ### 10.3 对主项目的结论
 
 1. **全部可以做**：两个项目的平台业务请求都以官方域名为主，符合主项目「纯 Dart 直连官方平台」定位。
-2. **不要移植第三方音源聚合**：baka 的 `wy/qq/kg/kw` 播放 URL 委托第三方；主项目已有官方
+2. **不要移植第三方音源聚合**：该插件集 的 `wy/qq/kg/kw` 播放 URL 委托第三方；主项目已有官方
    `resolvePlayUrl`（netease/kugou/qqmusic），新增酷我/咪咕也应走**官方取流**（酷我官方接口、
    咪咕官方 `listenSong.do`），**不引入 `requestMusicUrl` 聚合层**。
 3. **第三方一律隔离（硬约束，见 §8.1）**：
-   - baka 源插件的音源聚合服务（`source-config.js`）——**不接入**。
+   - 该插件集 源插件的音源聚合服务（`source-config.js`）——**不接入**。
    - `share.duanx.cn`（`wy.js` 字段）——不移植。
 4. **平台接入本身无合规红线问题**：审计显示业务请求均直达官方；两个项目仅作为**官方协议实现**的
    参考。落地时须保证新增平台出站域名**只含官方域名**。
@@ -638,10 +639,10 @@ Dart 机制说明（避免误用）：
 | ikun | `https://c.wwwweb.top/music/url` | POST / `X-API-Key`（可空） | `{source, musicId, quality}` | `{code:200, ekey, quality, url}` |
 | linglan | `https://source.shiqianjiang.cn/api/music/url` | GET / `X-API-Key`（卡密） | `?source=&songId=&quality=` | 需公益卡，否则 `{code:401}` |
 | cihedai / GD | `https://music-api.gdstudio.xyz/api.php?use_xbridge3=true&loader_name=forest` | GET / 无 | `&types=url&source=netease&id=&br=` | `{url, br, size, from}` |
-| cihedai / QQ | `https://tang.api.s01s.cn/music_open_api.php` | GET / 无 | `?mid=` | 元数据 + `song_play_url{,_sq,_hq,_standard,_fq}` |
+| cihedai / QM | `https://tang.api.s01s.cn/music_open_api.php` | GET / 无 | `?mid=` | 元数据 + `song_play_url{,_sq,_hq,_standard,_fq}` |
 | cihedai / KW | `http://music.nxinxz.com/kw.php` | GET / 无 | `?id=&level=&type=mp3` | 302 → 官方 `car-er.kuwo.cn` |
 | changqing | `175.27.166.236/*.php`、`musicapi.haitangw.net`、`music.haitangw.cc` | GET / 无 | `?type=mp3&id=&level=` | 实测 404 / 空 |
-| quandouyao / QQ | `https://api.vkeys.cn/v2/music/tencent/geturl` | GET / 无 | `?mid=&quality=` | `{code:200,data:{url,...}}` |
+| quandouyao / QM | `https://api.vkeys.cn/v2/music/tencent/geturl` | GET / 无 | `?mid=&quality=` | `{code:200,data:{url,...}}` |
 | quandouyao / WY | `https://api.bugpk.com/api/163_music` | GET / 无 | `?ids=&type=json&level=` | `{status:200,url,...}` |
 | quandouyao / KW | `https://nmobi.kuwo.cn/mobi.s?...convert_url_with_sign` | GET / 无 | `?rid=&br=&user=&loginUid=` | `{code:200,data:{url}}` |
 | quandouyao / KG | `https://music.haitangw.cc/kgqq/kg.php` | GET / 无 | `?type=mp3&id=&level=` | 需有效 hash |
@@ -653,9 +654,9 @@ Dart 机制说明（避免误用）：
   带 `ekey`（加密文件密钥，普通曲目为 `""`）。tx/kg 用网易 id 时返回同一个 `cdn-img.gitcode.com`
   兜底 URL（说明 id 不匹配时其兜底不可靠）。
 - **gdstudio(cihedai)**：仅支持 `source=netease`；返回官方 `m701.music.126.net` 直链 + `br/size`。
-- **s01s(cihedai QQ)**：返回官方 `isure6.stream.qqmusic.qq.com` 多档直链
+- **s01s(cihedai QM)**：返回官方 `isure6.stream.qqmusic.qq.com` 多档直链
   （`C600`≈128k、`F000`=flac 等）+ `vip` 标记。
-- **vkeys(quandouyao QQ)**：返回官方 `ws.stream.qqmusic.qq.com`，但 `quality:"音乐试听"`
+- **vkeys(quandouyao QM)**：返回官方 `ws.stream.qqmusic.qq.com`，但 `quality:"音乐试听"`
   （非会员仅试听）。
 - **nxinxz(KW)**：302 → 官方 `car-er.kuwo.cn/.../M500...mp3`；`level` 映射
   `M500=128k / M800=320k / F000=flac`。
@@ -669,7 +670,7 @@ Dart 机制说明（避免误用）：
    且有卡密、限速、易失效、质量阉割（试听）等问题——**不建议作为主链路**。
 2. **隐私无新增风险**：请求只含 `{source, songId, quality}`，不含账号凭据。
 3. **可参考价值**：其参数映射可作为主项目官方取流实现的对照，例如
-   酷我 `level→M500/M800/F000`、QQ 文件名前缀 `C600/F000`、`ekey`（加密文件密钥）字段、
+   酷我 `level→M500/M800/F000`、QM 文件名前缀 `C600/F000`、`ekey`（加密文件密钥）字段、
    酷我 `convert_url_with_sign` 的 `br` 取值。
 4. **主项目决策（硬约束）**：只做官方直连；第三方网关**一律不接入**（含「失效兜底」），
    也不移植其分发/订阅体系。
@@ -684,13 +685,13 @@ Dart 机制说明（避免误用）：
 - 范式：`app/lib/services/streaming/streaming_client.dart`、`app/lib/apis/runtime.dart`
 - 分发点：`playback_notifier_queue.dart:11`、`lyrics_provider.dart:40`、`like_controller.dart`
 
-**baka-plugins（`https://github.com/Zencok/baka-plugins`）**
+**某 JS 插件集（`https://github.com/Zencok/某 JS 插件集`）**
 - 契约/分发：`functions/plugin.js`、`functions/source-config.js`、`functions/subscription.js`
 - 分页契约：`docs/playlist-import-pagination.md`
 - 平台：`plugins/{wy,qq,kg,kw,mg,bilibili}.js`
 
-**go-music-dl（`https://github.com/guohuiyuan/go-music-dl`）**
+**某 Go 聚合下载器（`https://github.com/guohuiyuan/某 Go 聚合下载器`）**
 - 编排/源清单：`core/service.go`（`:148` 起工厂、`:1005` 源清单、`:895` 相似度、`:1324` Range）
 - 下载/元数据：`core/download.go`、`core/service.go:1589`
 - 自动换源：`internal/web/music.go:1321`
-- 协议实现：外部 `github.com/guohuiyuan/music-lib`（`https://github.com/guohuiyuan/music-lib`）
+- 协议实现：外部 某公开聚合库（`https://github.com/guohuiyuan/某聚合库`）
