@@ -14,65 +14,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/l10n.dart';
-import '../common/anim.dart';
 import '../player/s_controls.dart';
-
-/// 自动隐藏包装：开启时仅在指针进入时显示 [child]（窗口右上角的按钮组）。
-///
-/// - 默认关闭：触摸屏 / 无鼠标设备仍可直接点击。
-/// - 隐藏态用 [IgnorePointer] 禁用命中，并提供淡出 + 轻微上移的过渡；
-///   指针进入本区域即恢复显示，离开即隐藏。
-/// - 隐藏时仍占位，顶栏布局不跳动。
-class AutoHideOnHover extends StatefulWidget {
-  const AutoHideOnHover({
-    super.key,
-    required this.enabled,
-    required this.child,
-  });
-
-  /// 是否启用自动隐藏；false 时原样渲染 [child]。
-  final bool enabled;
-
-  final Widget child;
-
-  @override
-  State<AutoHideOnHover> createState() => _AutoHideOnHoverState();
-}
-
-class _AutoHideOnHoverState extends State<AutoHideOnHover> {
-  bool _hovered = false;
-
-  void _setHovered(bool value) {
-    if (_hovered == value) return;
-    setState(() => _hovered = value);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
-    final visible = _hovered;
-    final duration = animDuration(context, const Duration(milliseconds: 180));
-    return MouseRegion(
-      onEnter: (_) => _setHovered(true),
-      onExit: (_) => _setHovered(false),
-      child: AnimatedOpacity(
-        opacity: visible ? 1 : 0,
-        duration: duration,
-        curve: Curves.easeOut,
-        child: AnimatedSlide(
-          offset: visible ? Offset.zero : const Offset(0, -0.25),
-          duration: duration,
-          curve: Curves.easeOutCubic,
-          // 键盘焦点也不应停在看不见的按钮上。
-          child: ExcludeFocus(
-            excluding: !visible,
-            child: IgnorePointer(ignoring: !visible, child: widget.child),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// 铺满父级的「拖动窗口」手势层，位于内容**之下**。
 ///
