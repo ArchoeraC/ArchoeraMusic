@@ -7,28 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! TAK (Tom's lossless Audio Kompressor, .tak) 帧解码核心（逐句对齐 FFmpeg
-//! n9.0.1 libavcodec/takdec.c + tak.c）。纯整数定点，无浮点。
-//!
-//! 语义要点：
-//!   - 位流为 **LSB-first**（BITSTREAM_READER_LE）；帧头 sync = 0xA0FF（盘上字节
-//!     FF A0）；越界读 0（CACHED reader + AV_INPUT_BUFFER_PADDING 零填充语义）；
-//!   - 帧结构：sync16/标志3/帧号21 [+ IS_LAST: 末帧样本14+2] [+ HAS_INFO:
-//!     STREAMINFO 位段 + 可选 25 位字段 + 字节对齐] + 24-bit CRC（解码路径不校验，
-//!     帧边界扫描时才校验）；
-//!   - 通道模型：1 个种子样本 + nb_subframes 个子帧（预测阶 4..256、filter_quant
-//!     移位自适应、量化反射系数经 tfilter 逆变换成滤波器抽头）；子帧残差用
-//!     xcodes[50] 分段 Rice 码（模式自适应、多块模式），定点重建
-//!     `out = (clip(pred>>fq,13) << dshift) - residual`；
-//!   - 双声道联合去相关 dmode 1..7（L/S、S/R、S/M、缩放 S/L、S/R、8/16 抽头 FIR）；
-//!     多声道（codec=4）mcdparams 链式去相关；
-//!   - 帧末：整通道 lpc_mode（1/2/3 差分积分）+ sample_shift 左移还原；
-//!   - 溢出/符号语义完全复刻 C：int16_t 存储回绕、乘加在 u32/i32 回绕域、
-//!     算术右移、av_clip_intp2、544 元素 i16 残差滑动环。
-//!
-//! 输出布局对齐 验收基准 内部样本格式：8bit → u8(+0x80)、16bit → s16、
-//! 24bit → int32<<8（=`-f s32le`）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const T = @import("tables.zig");

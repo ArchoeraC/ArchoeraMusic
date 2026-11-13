@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Auto-generated WMA MDCT tables (FULL_IMDCT len 2048, scale 1/32768)
-//! mdct_exp_2048: [permuted(1024) | raw(1024)] complex interleaved f32 (dump of system av_tx).
-//! mdct_map_2048: fold gather map (un-doubled). fft_tab_1024 computed as ffmpeg init.
-
 pub const mdct_map_2048 = [_]u16{
     0, 1024, 1536, 512, 1792, 768, 256, 1280, 1920, 896, 1408, 384, 128, 1152, 1664, 640,
     1984, 960, 1472, 448, 1728, 704, 192, 1216, 64, 1088, 1600, 576, 1856, 832, 320, 1344,

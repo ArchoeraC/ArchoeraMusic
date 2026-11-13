@@ -3,17 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! APEv2 标签解析（APE / WavPack / Musepack 共用）。
-//!
-//! 结构（tag 位于文件尾，footer 32B）：
-//!   "APETAGEX" | version(4 LE) | tag_size(4 LE) | item_count(4 LE) |
-//!   flags(4 LE) | reserved(8)
-//! flags bit31 = 含 header、bit30 = 本块是 header。item：
-//!   value_size(4 LE) | item_flags(4 LE) | key(NUL 终止) | value(value_size)
-//! item type = (flags>>1)&3：0=UTF-8 文本、1=二进制、2=外部定位（仅文本映射标准字段）。
-//!
-//! 生命周期：`Tags` 持有全部分配，`deinit` 释放。
-
 const std = @import("std");
 const io = @import("../io.zig");
 const decoder = @import("../decoder.zig");

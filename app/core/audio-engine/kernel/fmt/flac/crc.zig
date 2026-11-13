@@ -7,19 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! 校验基础设施（FLAC 帧头 CRC-8 / 整帧与元数据块 CRC-16）
-//!
-//! 与 FFmpeg `libavutil/crc.c` / libFLAC `crc.c` 对齐（许可登记见
-//! audio-engine/THIRD-PARTY-LICENSES.md）：
-//!   - CRC-8 ATM（poly 0x07，MSB 优先，init 0，无反射 / 无最终异或）——
-//!     帧头（含 CRC-8 字节本身）校验和应为 0；
-//!   - CRC-16 ANSI（poly 0x8005，MSB 优先，init 0，无反射 / 无最终异或）——
-//!     整帧（含 2 字节 CRC-16 尾部）与元数据块校验和应为 0。
-//!
-//! FL-5：字节级更新由「逐位循环」改为 **comptime 生成 256 项查表**（每字节一次查表 +
-//! 少量异或/移位），语义与逐位实现逐位相同（表由同一逐位算法生成）。配套 FL-1 的
-//! 懒 CRC，只对位游标已消费的字节累加。
-
 const std = @import("std");
 
 /// CRC-8 查表（poly 0x07，MSB 优先）：表项 = 以该字节为初值的 8 次逐位更新

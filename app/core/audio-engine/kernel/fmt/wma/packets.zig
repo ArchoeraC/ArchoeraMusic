@@ -7,13 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! ASF 数据包 → WMA superframe 重组（最小 asfdec_f.c 移植：单音频流、无扩展）。
-//!
-//! 语义对齐 FFmpeg libavformat/asfdec_f.c：std-ecc 0x82 00 00 同步包；
-//! 每个 segment 的 replicated header（packet_obj_size + timestamp）给出音频对象
-//! 总长；frag_offset/frag_size 描述本段在该对象中的位置。对象完整后按序回调，
-//! 输出为 block_align 大小 superframe 字节流（含解码器所见补零/填充）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const asf = @import("asf.zig");

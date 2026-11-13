@@ -7,20 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Opus 区间解码器（docs/audio-kernel-zig.md §9.2）
-//!
-//! RFC 6716 §4.1 32-bit 区间解码；参考重构对照 FFmpeg `libavcodec/opus/rc.c`
-//! 与 libopus `entdec.c`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 语义要点（对齐参考实现，保证逐样本一致）：
-//!   - 位流经 GetBitContext 读取（MSB-first），字节取反（`get_bits(8) ^ 0xFF`，
-//!     编码端补码）；帧数据须零填充（越界读按零处理，对齐 FFmpeg 填充缓存）；
-//!   - `dec_init`：range=128，value=127 - 7bit，total_bits=9，随后归一化；
-//!   - `dec_update`：value -= scale*(total-high)；range = low ? scale*(high-low)
-//!     : range - scale*(total-high)；u32 回绕算术；
-//!   - CELT rawbits 从帧尾**反向**逐字节读入（`ff_opus_rc_get_raw`）；
-//!   - `tell` / `tell_frac` 供 CELT 位预算（PVQ / 带宽决策）使用。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

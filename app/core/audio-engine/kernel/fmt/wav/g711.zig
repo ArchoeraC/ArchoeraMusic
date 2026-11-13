@@ -3,12 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! G.711 A-LAW / mu-LAW 解码（docs/audio-kernel-zig.md §9.1：WAV/AIFF 编码扩展）
-//!
-//! 以 ITU-T G.711 定义直接公式展开（不自带 FFmpeg 查表，避免版权依赖，
-//! 结果与 FFmpeg alaw.c/mulaw.c 逐值一致——标准定义下的唯一正确解）。
-//! 输入 8-bit 压缩样本 → 16-bit 线性 PCM（s16）。
-
 const std = @import("std");
 
 /// A-LAW 8-bit → 线性 s16（0x00 → -5504，0x55 → 0，0xFF → 5503）

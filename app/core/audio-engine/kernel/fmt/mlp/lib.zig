@@ -7,11 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! MLP / Dolby TrueHD 无损解码器（对照 FFmpeg mlpdec.c / mlp.c / mlpdsp.c）
-//!
-//! 位流为 LSB-first（FFmpeg GetBitContext 语义）；MLP 无损打包，
-//! 输出按 FFmpeg 声道顺序交错 s16。
-
 const std = @import("std");
 const c = @import("ctx.zig");
 const t = @import("tables.zig");

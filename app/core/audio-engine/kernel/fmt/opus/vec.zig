@@ -3,16 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Opus 解码可移植 SIMD 辅助（方向④ B 档：SIMD/浮点重排，仅限**有损**格式，
-//! 见 docs/decode-optimization.md §4.2）。
-//!
-//! 纪律：只用 Zig `@Vector`/`@shuffle`/`@splat`/`@floatFromInt`/`@select`/`@truncate`，
-//! **不引入任何平台 intrinsic**；基线目标（无 SSE4.1/AVX）下退化为多条 SSE/标量指令，
-//! 语义不变。
-//!
-//! **逐样本一致约定**：调用方只把**相互独立**的 lane 打包进向量，且每 lane 的运算顺序
-//! 与标量原实现逐条相同（不重结合、不引入 FMA）；因此输出与标量路径逐位相同。
-
 const std = @import("std");
 
 pub const V8 = @Vector(8, f32);

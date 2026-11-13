@@ -3,15 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AC-3 解码器（Dolby Digital；参考 FFmpeg ac3dec.c，float 路径）
-//!
-//! 文档：Dolby AC-3（ATSC A/52）。帧 = 同步字 + 头 + 6 个音频块（每块 256 样本）。
-//! 处理链：帧同步/头解析（header.zig）→ 每块 decode_audio_block（指数/位分配/尾数/
-//! 耦合/重矩阵/缩放）→ IMDCT（256/128 点 + KBD 窗）→ 重叠相加 → s16 输出。
-//!
-//! 模块拆分：tables.zig（表）/ bitalloc.zig（位分配）/ exponents.zig（指数）/
-//! coupling.zig（耦合）/ mantissa.zig（尾数+变换系数）/ downmix.zig（重矩阵+下混）。
-
 const std = @import("std");
 
 const Error = @import("../../error.zig").Error;

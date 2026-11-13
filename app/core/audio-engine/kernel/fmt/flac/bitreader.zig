@@ -7,23 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! 位级读取（FLAC 音频帧 MSB-first 位流）
-//!
-//! 设计要点（FL-1：u64 位缓存 + peek 批量 refill + 懒 CRC + 帧末 drain）：
-//!   - 基于 `io.Reader` 的 MSB-first 位读取（FLAC 位流约定），
-//!     对应 FFmpeg `GetBitContext`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）；
-//!   - **u64 位缓存**：一次可容纳 64 位，`readBits` 不再逐字节拼装；
-//!   - **peek 批量 refill**：`reader.peek(win[0..16])` 预读一块（**不推进 `pos`**），
-//!     字节按需 append 进 `cache`——复用 `io.Reader` 既有 16 KiB 缓冲，**零新增缓冲**；
-//!   - **懒 CRC**：CRC-8/CRC-16 只在字节**载入位流顺序**时累加（`loadByte`）。位流
-//!     按需最小取字节（只在 `bits_avail < n` 时补），有效帧绝不会载入下一帧字节，
-//!     故预读的下一帧字节不会计入 CRC；
-//!   - **帧末 drain**：把已消费字节数用 `read`（≤16B 栈 scratch）推进底层 `pos`，
-//!     `reader.pos` 与消费字节一致；预读未消费字节仍留在流中（peek 不消费），
-//!     不预读下一帧、错误恢复不越界；
-//!   - 元数据块为字节对齐读取，无位操作，由 streaminfo.zig 直接经 io.Reader 读取——
-//!     本模块仅服务音频帧。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

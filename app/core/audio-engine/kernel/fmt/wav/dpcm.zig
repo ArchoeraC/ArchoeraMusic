@@ -3,16 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! WAV 内 DPCM 解码（docs/audio-kernel-zig.md §9.1）
-//!
-//! 支持：
-//!   - XAN DPCM（WAV tag 0x594A，codec "xan_dpcm"）：块式，每块开头每通道
-//!     predictor(2B LE)，随后每字节 1 样本、声道交替输出；shift[2] 每块
-//!     重置为 {4,4}（镜像 FFmpeg dpcm.c dpcm_decode_frame XAN 分支）。
-//!
-//! 算法与常量重构自 FFmpeg `libavcodec/dpcm.c`（reference/FFmpeg，
-//! 参考实现非直接复制）。
-
 const std = @import("std");
 
 /// XAN DPCM 解码一块（block_align 字节：块头 2B/通道 predictor + 数据）。

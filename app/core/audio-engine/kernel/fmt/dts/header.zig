@@ -7,19 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS core 帧头解析（阶段一：16-bit core 子流，BE 或 16-bit 字交换 LE）
-//!
-//! 对照 FFmpeg dca.c ff_dca_parse_core_frame_header / dca_core.c
-//! parse_frame_header + parse_coding_header（主声道头首 7 位）。
-//!
-//! 位流 MSB-first。文件形态差异仅在于每个 16-bit 字的字节序：
-//!   - BE16：sync 文件字节 7F FE 80 01（RB32 = 0x7FFE8001）；
-//!   - LE16：sync 文件字节 FE 7F 01 80（RB32 = 0xFE7F0180，= 每 16-bit 字
-//!     内字节交换，avpriv_dca_convert_bitstream 的 DCA_SYNCWORD_CORE_LE 路径）。
-//! 解析前先将 LE 字交换回 BE（只交换前若干字节窗口即可）。
-//!
-//! 14-bit 打包（0x1FFFE800 / 0xFF1F00E8）为旧式位流，阶段一不支持 → Unsupported14Bit。
-
 const std = @import("std");
 const BitReader = @import("../aac/bitreader.zig").BitReader;
 const t = @import("tables.zig");

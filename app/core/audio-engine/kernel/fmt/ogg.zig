@@ -3,24 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Ogg 容器解复用（docs/audio-kernel-zig.md §9.2）
-//!
-//! 自研 Zig：OggS 页解析（页头 / lacing 分段表 / 非反射 CRC-32）+ 跨页 packet
-//! 重组 + granule 位置跟踪。参考重构对照 FFmpeg `libavformat/oggdec.c` 与
-//! `libavformat/oggparseopus.c`（RFC 3533 + RFC 7845）；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
-//!
-//! 语义要点（对齐 FFmpeg ogg 解复用）：
-//!   - 页头 27 字节：`OggS` + version(1) + header_type(1) + granule(8 LE) +
-//!     serial(4 LE) + page_seq(4 LE) + checksum(4 LE) + page_segments(1)；
-//!   - 分段表：每段 0..255 字节；lacing < 255 结束一个 packet，255 表示续段；
-//!     跨页续段由 header_type bit0（continued）标记，重组进同一 packet 缓冲；
-//!   - CRC-32 多项式 0x04C11DB7（**非反射**），checksum 字段计算时置零；
-//!   - granule：Opus 中 = 已解码 PCM 样本总数（含 pre-skip），末页 granule
-//!     决定整轨时长（供解码器 end-trim）；每个 packet 完成时的页 granule 记录。
-//!
-//! 健壮性（§13.3）：所有长度字段校验 `<= 输入大小`，页/段循环有界，
-//! 坏页（CRC 不匹配 / 越界）→ error.Corrupt；未遇目标序列的无关流跳过。
-
 const std = @import("std");
 const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");

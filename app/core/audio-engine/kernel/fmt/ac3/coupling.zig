@@ -3,20 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AC-3 / E-AC-3 耦合（coupling）解码（对照 FFmpeg ac3dec.c）
-//!
-//! 三个函数（float 路径）：
-//!   decodeBandStructure  — 解码耦合带结构，写 band_struct / band_sizes
-//!   couplingStrategy     — 耦合策略，写 cpl_in_use / channel_in_cpl /
-//!                           phase_flags_in_use / start_freq / end_freq / num_cpl_bands
-//!   couplingCoordinates  — 耦合坐标，写 cpl_coords / phase_flags
-//!
-//! cpl_coords 沿用 C 的 1<<23 归一化整数表示（float 路径在使用处乘以 1/(1<<23)），
-//! 本模块只做位流解析与移位累加，不引入浮点。
-//!
-//! 返回约定：bool（false=成功，对应 C 返回 0；true=错误，对应 C 返回负值）。
-//! 位读取越界（BitReader 的 error.Corrupt）一律映射为 true。
-
 const std = @import("std");
 const t = @import("tables.zig");
 const Ctx = @import("ctx.zig").Ctx;

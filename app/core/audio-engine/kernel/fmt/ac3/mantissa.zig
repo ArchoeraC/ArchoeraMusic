@@ -7,31 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AC-3 / E-AC-3 尾数解包与变换系数（对照 FFmpeg ac3dec.c，float 路径 USE_FIXED=0）
-//!
-//! 移植的函数（以 /tmp/ac3dec.c 为唯一参考源）：
-//!   dequantizeCoeff            — dequantize_coeff（407-419）：尾数 × 2^-exp
-//!   calcTransformCoeffsCpl     — calc_transform_coeffs_cpl（363-396）：耦合声道
-//!                                按 cpl_coord 比例展开各声道耦合区系数
-//!   ac3DecodeTransformCoeffsCh — ac3_decode_transform_coeffs_ch（432-526）：单声道
-//!                                尾数解包（分组/查表/有符号位）+ 反量化
-//!   removeDithering            — remove_dithering（527-537）：零尾数抖动消除
-//!   decodeTransformCoeffsCh    — decode_transform_coeffs_ch（540-556）：AHT 分发
-//!   decodeTransformCoeffs      — decode_transform_coeffs（561-590）：整帧逐声道驱动
-//!
-//! 与 C 的差异（务必知悉）：
-//!   - 抖动 PRNG 状态现放在 Ctx.jitter（每解码器实例一份），对照 验收基准 现行
-//!     libavutil/lfg.h：64 状态加性 LFG，open/seek 时以 seed=0 初始化。
-//!   - C 的 get_bits 越界静默返回 0；本实现 BitReader 越界抛 error.Corrupt，
-//!     函数以 bool 表示错误（false=成功，true=位流损坏），与 coupling.zig 一致。
-//!   - C 中 bap>15 时打印错误并钳位为 15，此处直接钳位（无日志）。
-//!   - E-AC-3 AHT（ff_eac3_decode_transform_coeffs_aht_ch）不在本模块范围，
-//!     AHT 分支仅对 pre_mantissa 做反量化（对照 C 540-556 的循环）。
-//!
-//! 数值说明：calc_transform_coeffs_cpl 的 float 路径不含 cos 表，只做
-//!   coeffs[ch][bin] = coeffs[CPL_CH][bin] * (cpl_coords[ch][band] * 2^-23)，
-//!   相位标志仅对 ch==2 所在带取反。
-
 const t = @import("tables.zig");
 const Ctx = @import("ctx.zig").Ctx;
 const JitterRng = @import("ctx.zig").JitterRng;

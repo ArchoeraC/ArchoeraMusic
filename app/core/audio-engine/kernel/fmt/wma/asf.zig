@@ -7,13 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! ASF（Advanced Systems Format）容器解析——WMA v1/v2 层（阶段 A）。
-//!
-//! 本模块只做：ASF Header 解析（File Properties + 音频 Stream Properties →
-//! WAVEFORMATEX 参数）并定位 Data Object；数据包去包与 WMA 帧重组在后续阶段。
-//! 布局对齐 FFmpeg libavformat/asfdec_f.c + libavcodec/wmadec.c（GUID 字节序按
-//! ff_asf_guid 字面量，[0..16] 直接 eql）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const decoder = @import("../../decoder.zig");

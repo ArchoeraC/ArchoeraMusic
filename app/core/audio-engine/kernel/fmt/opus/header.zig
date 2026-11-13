@@ -7,11 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Opus 头部解析（OpusHead / OpusTags）
-//!
-//! RFC 7845 §5：`OpusHead` 19 字节 + 可选 channel mapping（mapping family ≠ 0）。
-//! 参考重构对照 FFmpeg `libavformat/oggparseopus.c`（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

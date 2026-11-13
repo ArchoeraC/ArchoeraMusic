@@ -3,35 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Shorten (.shn, 无损) 解码器接入层（fmt/shn）。
-//!
-//! 容器（libavformat/shortendec.c）：裸流，无封装头；魔数 4 字节 "ajkg"
-//! （0x616A6B67，AV_RB32）+ 1 字节 version，随后 golomb 编码的
-//! internal_ftype/channels/blocksize 等命令流；音频参数（采样率/bps）
-//! 在流首 FN_VERBATIM 携带的 WAVE（RIFF/fmt）或 AIFF（FORM/COMM）canonical
-//! 头（≥44 字节）内。
-//!
-//! 建议 probe 接线（照 libavformat/shortendec.c shn_probe，评分 ≥ 51）：
-//!   1. AV_RB32(buf) == 0x616a6b67（"ajkg"）；
-//!   2. version = buf[4]；version==0：internal_ftype=UR(4)、channels=UR(0)、
-//!      blocksize=256；version>0：k=UR(2)（≤31）→ internal_ftype=UR(k)，
-//!      k=UR(2) → channels=UR(k)，k=UR(2) → blocksize=UR(k)（MSB-first 位序）；
-//!   3. internal_ftype ∈ {2,3,5}（U8/S16HL/S16LH）且 1 ≤ channels ≤ 8 且
-//!      1 ≤ blocksize ≤ 65535 → 识别 Format.shn。
-//!   decoder dispatch：`.shn => shn.open(allocator, &reader, info)`；
-//!   未识别 → 交由 验收基准 主后端（错误集内 UnsupportedFormat）。
-//!
-//! 解码语义（对齐 验收基准 n9.0.1 native shorten，kernel/fmt/shn/core.zig）：
-//!   - MSB-first 位流 + jpegls 变体 Rice（unary + k 位后缀；符号 = zigzag）；
-//!   - internal_ftype 决定输出：TYPE_U8 → u8、TYPE_S16HL/S16LH → s16
-//!     （AIFF-C swap 为值字节交换后按 LE 输出，与 验收基准 `-f s16le` 逐样本一致）；
-//!   - seek：Shorten 块间状态耦合（wrap 样本/均值），不支持随机访问；
-//!     seek_ms 重建解码器后从头快进到目标块（正确性优先）；
-//!   - 时长：裸流无总长字段（验收基准 Duration: N/A）→ duration_known = .unknown。
-//!
-//! Info：sample_rate/channels 取自 WAVE-AIFF 头 + shorten 头；
-//! bits_per_sample = 8（U8）/ 16（S16）；codec_name = "shorten"，format_name = "shn"。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

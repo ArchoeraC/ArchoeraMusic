@@ -3,19 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! ID3 标签解析（ID3v2.2 / v2.3 / v2.4 + ID3v1）—— MP3 元数据
-//!
-//! 对齐 FFmpeg av_dict 语义（参考 id3v2.c / id3v1.c）：
-//!   - ID3v2 帧 → Metadata 标准字段 + 通用 tags（含 TXXX / TPE2 / TRCK 等
-//!     全部保留，重复键全保留，key 原样大小写）；
-//!   - TXXX REPLAYGAIN_* → ReplayGain（单位对齐 AVReplayGain：
-//!     gain 0.001dB / peak 0.00001）；
-//!   - APIC → Picture（mime / description / 图片数据）；
-//!   - ID3v1 文件尾 → 标准字段（若 ID3v2 未覆盖）。
-//!
-//! 内存契约：open 时经 parse 分配全部字段（NUL 终止 / 零长 slice），
-//! 生命周期与 Decoder 一致，由 freeMeta / freePictures 释放。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

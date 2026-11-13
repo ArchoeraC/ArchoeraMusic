@@ -7,25 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! APE 区间解码器 + 版本化熵解码（docs/audio-kernel-zig.md §9.10）
-//!
-//! 参考重构对照 FFmpeg libavcodec/apedec.c：APERangecoder（§"range decoding
-//! functions"）、update_rice / get_rice_ook / ape_decode_value_3860 / _3900 /
-//! _3990 / decode_array_0000 与各版本 entropy_decode_mono/stereo 编排；
-//! 逐位复刻以保证逐样本一致；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
-//!
-//! 版本分派（对齐 ape_decode_init）：
-//!   < 3860  → decode_array_0000（GetBitContext 位流）
-//!   3860-3889 → ape_decode_value_3860
-//!   3900-3929 → ape_decode_value_3900（stereo 含 range 回退重开：先整行 ch0，
-//!               normalize + ptr-1 回退 + 重开区间，再整行 ch1）
-//!   3930-3989 → mono 用 3900，stereo 用 3900（逐样本交错，无回退）
-//!   >= 3990 → ape_decode_value_3990（pivot 自适应 base 编码）
-//!
-//! 健壮性（§13.3）：所有读取先校验边界，越界/除零 → error.Corrupt，
-//! 不产生越界读与除零崩溃；区间归一化在数据耗尽时按零填充推进并置 error
-//! 标志（对齐 验收基准 `ptr >= data_end` 分支），帧末统一检查。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const BitReader = @import("bitreader.zig").BitReader;

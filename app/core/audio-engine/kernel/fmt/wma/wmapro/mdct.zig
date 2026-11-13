@@ -7,15 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Pro 逆 MDCT（plain inv-MDCT，复刻 FFmpeg n9.0.1 av_tx
-//! AV_TX_FLOAT_MDCT inv，非 FULL）。长度 L ∈ {64…2048} 幂次。
-//!
-//! av_tx mdct_inv(L)：读 L 谱值 → 写 L 时域样，scale 折叠进 exp 表
-//! （ff_tx_mdct_gen_exp：exp = RESCALE(cos/sin(alpha)·√|scale|)，alpha 由
-//! 长度与 1/8 相位决定）。本模块 exp/map 表为系统 av_tx n9.0.1 位模式转储
-//! （mdct_tables.zig，bps=24 scale）；子 FFT 复用 wma_mdct.fftSr（split-radix，
-//! 各层余弦取 wma/aac 同源 av_tx 表）。
-
 const std = @import("std");
 const wmt = @import("../wma_mdct.zig");
 const mt = @import("mdct_tables.zig");

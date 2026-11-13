@@ -3,16 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Musepack 静态表（自动生成 → 勿手改）。
-//!
-//! 来源与溯源：mpc8data.h / mpc8huff.h / mpc7data.h / mpcdata.h /
-//!   mpegaudiodsp_data.c（FFmpeg n9.0.1 libavcodec；本文件仅数据转写，
-//!   数值与位型原样保留，float 以十进制原文由 Zig 编译器按 IEEE-754 舍入解析，
-//!   与 C 常量语义一致）。生成脚本：tools 内 mpc 表抽取（见 fmt/mpc/README）。
-//!
-//! 注意：哈夫曼“符号”列顺序即 FFmpeg ff_vlc_init_from_lengths 输入顺序，
-//! 码字在 vlc.zig 编译期按同一增量算法（code += 1<<(32-len)）重建。
-
 const std = @import("std");
 
 /// (mpc_CC+1)[res]：res = -1..17 缩放乘数（float 原文，mpcdata.h）。
