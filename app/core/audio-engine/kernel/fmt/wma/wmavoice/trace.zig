@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! 对拍插桩工具（env 门控）：WMAVOICE_TRACE=<路径> 时按
-//! [u32 tag][u32 count][u32 is_double][payload] 记录与 reference C 侧
-//! 插桩（wmavoice_traced.c）完全同格式的中间信号序列，供 python 对拍。
-
 const std = @import("std");
 
 extern "c" fn getenv(name: [*:0]const u8) ?[*:0]u8;

@@ -7,8 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! SBR 表：QMF 窗口 + 噪声表（aacsbrdata.h / sbrdsp_template.c 浮点值，位模式嵌入）。
-
 pub const sbr_qmf_window_ds = [320]f32{
     @bitCast(@as(u32, 0x00000000)), @bitCast(@as(u32, 0xBA1343B1)), @bitCast(@as(u32, 0xB9FF9A30)), @bitCast(@as(u32, 0xBA0423A9)), @bitCast(@as(u32, 0xBA0F4D7F)), @bitCast(@as(u32, 0xBA19E725)), @bitCast(@as(u32, 0xBA257A6C)), @bitCast(@as(u32, 0xBA31AC4F)),
     @bitCast(@as(u32, 0xBA3BA2C1)), @bitCast(@as(u32, 0xBA430F4F)), @bitCast(@as(u32, 0xBA495CCF)), @bitCast(@as(u32, 0xBA4D5F50)), @bitCast(@as(u32, 0xBA4C9181)), @bitCast(@as(u32, 0xBA4B5EE7)), @bitCast(@as(u32, 0xBA4564FB)), @bitCast(@as(u32, 0xBA3D25AB)),

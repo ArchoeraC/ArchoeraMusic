@@ -7,15 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! TAK (Tom's lossless Audio Kompressor) 静态表 + CRC-24（对齐 FFmpeg n9.0.1）。
-//!
-//! 来源：libavcodec/takdec.c、libavcodec/tak.c、libavutil/crc.c
-//!   - predictor_sizes：filter_order 索引表（16 项，末项 0）；
-//!   - xcodes[50]：decode_segment 分段 Rice 码参数（CParam{init,escape,scale,aescape,bias}）；
-//!   - mc_dmodes：多声道去相关类型表（索引 → 去相关 dmode）；
-//!   - frame_duration_type_quants + tak_get_nb_samples：帧样本数换算；
-//!   - CRC-24/IEEE（av_crc AV_CRC_24_IEEE，le=0 表，init 0xCE04B7）逐句复刻。
-
 const std = @import("std");
 
 // ---- tak.h 常量 ----

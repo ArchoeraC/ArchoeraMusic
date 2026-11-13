@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AAC 静态结构表（采样率 / 声道 / swb 偏移 / TNS 上限）。
-//! 数值取自 ISO/IEC 14496-3 规范表，与 FFmpeg n9.0.1 aactab.c/mpeg4audio.c 数值交叉核对。
-
 pub const sample_rates = [13]u32{
     96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350,
 };

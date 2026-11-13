@@ -7,33 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! APE（Monkey's Audio）解码器（docs/audio-kernel-zig.md §9.10）
-//!
-//! 以 Zig 实现（不依赖 Monkey's Audio 官方 SDK），参考重构对照
-//! FFmpeg libavcodec/apedec.c + libavformat/ape.c（reference/FFmpeg，n9.0.1），
-//! 逐位复刻保证逐样本对照验收（§17.2；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 解码流程（对齐 ape_decode_frame / ape_unpack_* / init_frame_decoder）：
-//!   1. 帧数据 → 4 字节字级 bswap（大端帧数据 → 主机序）+ buf_size 零填充
-//!      （< 3950 额外 +2 字节，对齐参考实现 overread）；
-//!   2. nblocks/offset 头 → init_entropy_decoder（CRC / frameflags / rice /
-//!      区间或位流初始化）→ init_predictor_decoder → init_filter（每帧重置）；
-//!   3. 每帧按 blocks_per_loop=4608 分块（< 3930 整帧一块）：
-//!      熵解码（按版本 0000/3860/3900/3990）→ 终级滤波（>= 3930）→ 预测
-//!      （3800/3930/3950）→ 立体声去相关 → 输出打包 + CRC 累计；
-//!   4. 帧末 CRC-32/MPEG 比对（>= 3900）定位损坏帧。
-//!
-//! 输出契约（对齐 验收基准 ape 解码器输出，保证 逐字节一致）：
-//!   - bps 8  → u8（decoded+0x80 & 0xff）；bps 16 → s16；
-//!   - bps 24 → s32（decoded*256，顶对齐）；
-//!   - 交错小端 PCM，`Info.bits_per_sample` = 8 / 16 / 32。
-//!
-//! 范围与容错（§9.10 / §13.3）：
-//!   - 仅 mono / stereo（验收基准 同限）；bps ∈ {8,16,24}；
-//!   - 版本 3800-3990；压缩级别须为 1000 的倍数且 ≤ 5000（< 3930 禁 insane）；
-//!   - 帧数据越界 / 区间越界 / CRC 不匹配 / 位流耗尽 → error.Corrupt；
-//!   - seek 按帧重解（每帧独立状态），目标超出文件尾 → EOF。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

@@ -7,19 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Pro (wmapro, ASF codec tag 0x162) 解码接入层。
-//!
-//! 复用 fmt/wma 的 ASF 容器解析与数据包去包（asf.zig / packets.zig）。open 整读
-//! ASF → Header 解析 → Data Object 重组为「WMA packet」序列（每个完整音频对象
-//! = 一个 packet，通常 block_align 字节）→ 按 FFmpeg decode core 喂包循环驱动
-//! `core.Dec.decodePacket`（同一 packet 可分多次消费；流尾补一次空包触发 EOF
-//! flush 输出重叠尾）→ 交错 s16。采样率/声道按容器 + extradata。
-//!
-//! 解码为浮点（对齐 ffmpeg fltp）；s16 用 round(x*32768)+clamp。IMDCT 为
-//! av_tx 位精确内核（mdct.zig）；scale-factor 量化步进的 exp10 用 f64 数学，
-//! 与系统 验收基准 的 f32 近似存在末位差异 → s16 逐样本一致 非 100%（实测比例见
-//! fmt/wma/README），corr ≥ 0.9999。
-
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
 const io = @import("../../../io.zig");

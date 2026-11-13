@@ -3,15 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! MP3 热路径可移植 SIMD 辅助（仅 mp3 引用）。
-//!
-//! 纪律：只使用 Zig `@Vector` / `@shuffle` / `@splat` / `@bitCast`，**不引入任何平台
-//! intrinsic**；`-Dtarget=x86_64-windows-gnu` 等基线目标同样可编译（无 AVX 时退化为多
-//! 条 SSE/标量指令，语义不变）。
-//!
-//! 逐样本一致约定：调用方只把**相互独立**的 lane 打包进向量，且每 lane 的运算顺序与
-//! 标量原实现逐条相同（不重结合、不引入 FMA）；这样输出与标量路径逐位相同。
-
 pub const V4 = @Vector(4, f32);
 pub const V8 = @Vector(8, f32);
 

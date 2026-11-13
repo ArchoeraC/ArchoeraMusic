@@ -7,18 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS-HD 扩展子流（EXSS）解析（DTS-HD MA / HRA asset 描述）
-//!
-//! 对照 FFmpeg n9.0.1 dca_exss.c（ff_dca_exss_parse / parse_descriptor /
-//! set_exss_offsets / parse_xll_parameters）。位流 MSB-first。
-//!
-//! 输入为一段自 EXSS sync（0x64582025）起的数据，size 为该子流的可用字节数
-//! （通常即 exss_size，demux 层保证）。输出首个（唯一支持）asset 的各分量
-//! 偏移/大小（均相对 EXSS 子流起点）。
-//!
-//! CRC16（header / asset descriptor）不校验 —— 位流中 CRC 不消费数据位，
-//! 帧内读取位置只依赖 header_size/descr_size 字段，故与 验收基准 逐样本一致。
-
 const std = @import("std");
 const BitReader = @import("../aac/bitreader.zig").BitReader;
 const dt = @import("dca_tables.zig");

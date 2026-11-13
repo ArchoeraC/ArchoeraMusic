@@ -7,15 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Voice postfilter 变换——复刻 FFmpeg av_tx float RDFT/DCT-I/DST-I 语义
-//! （reference libavutil/tx_template.c n9.0.1）。
-//!
-//! wmavoice 后处理所需：
-//!   - RDFT-128 forward（r2c）与 inverse（c2r），scale=1
-//!   - DCT-I-64 / DST-I-64 forward，scale=1/64（内部经 RDFT half r2r/r2i_mod2 len 126）
-//! 内部复数 FFT 用 f64 朴素 DFT（与 av_tx split-radix/PFA 输出差 ~1e-7）；RDFT/
-//! DCT/DST 的运算次序与组合系数按 tx_template.c 逐行复刻。
-
 const std = @import("std");
 const dsp = @import("dsp.zig");
 const once = @import("../../../once.zig");

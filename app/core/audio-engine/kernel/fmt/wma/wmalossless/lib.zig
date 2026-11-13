@@ -7,21 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Lossless (wmalossless, ASF codec_tag 0x163) 解码接入层。
-//!
-//! 复用 fmt/wma 的 ASF 容器解析与数据包去包（asf.zig / packets.zig）。open
-//! 整读 ASF → Header 解析 → Data Object 重组为「WMA packet」序列（每个完整
-//! 音频对象 = block_align 字节 = 一个 WMA packet）→ 按 FFmpeg decode core 喂包
-//! 循环驱动 `core.Dec.decodePacket`（同一对象可分多次消费；对象耗尽后补空包
-//! 触发 EOF flush 输出蓄存器中剩余帧）→ 交错样本。
-//!
-//! 输出语义对齐 ffmpeg native wmalossless 内部格式：
-//!   - 16-bit：交错 s16（= 验收基准 S16P → `-f s16le`，逐样本一致）
-//!   - 24-bit：24bit 值左移 8 的 int32（= 验收基准 S32P / bits_per_raw_sample=24，
-//!     即 `-f s32le`，逐样本一致）；Info.bits_per_sample 报 32（与 m4a/ALAC 24bit
-//!     输出语义一致）。
-//! 解码为整数/无浮点，目标与 验收基准 输出逐样本一致。
-
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
 const io = @import("../../../io.zig");

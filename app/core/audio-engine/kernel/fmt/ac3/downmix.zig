@@ -7,32 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AC-3 / E-AC-3 重矩阵 + 上混延迟 + 立体声下混系数（对照 FFmpeg ac3dec.c，float 路径 USE_FIXED=0）
-//!
-//! 移植的函数（以 /tmp/ac3dec.c 为唯一参考源）：
-//!   setDownmixCoeffs — set_downmix_coeffs（255-311）：依据帧头声道模式与下混电平
-//!                      计算立体声（或单声道）下混系数，写 s.downmix_coeffs[2][fbw]
-//!   doRematrixing    — do_rematrixing（597-614）：立体声重矩阵，恢复被编码器合并的
-//!                      两声道（§7.5.4）
-//!   ac3UpmixDelay    — ac3_upmix_delay（662-706）：混合变换块下，把已下混的 delay
-//!                      缓冲区上混回原声道布局
-//!
-//! 与 C 的差异（务必知悉）：
-//!   - C 的 do_rematrixing 在调用点（decode_audio_block 1328-1329）以
-//!     `channel_mode == AC3_CHMODE_STEREO` 守卫；本实现把该守卫收进函数体，
-//!     非立体声时直接返回（对输出无影响，行为一致）。
-//!   - 任务描述里 doRematrixing 作用于 transform_coeffs[1]/[2]，但 C 作用于
-//!     s->coeffs[1]/[2]。两者算术完全相同（见下），仅数组不同；因 STEREO 模式
-//!     下 C 的增益缩放对 ch1/ch2 相同（audio_channel=0），重矩阵与缩放可交换，
-//!     作用于 transform_coeffs 与作用于 coeffs 数值结果一致。
-//!   - 任务描述把 doRematrixing 写成 (n0-n1)/2、(n0+n1)/2，并称 ac3UpmixDelay
-//!     用 downmix_coeffs 做线性组合；这两处与实际 C 不符（C 为 ch1=n0+n1、
-//!     ch2=n0-n1；ac3_upmix_delay 仅 memcpy/memset）。为与 C 数值逐样本一致，
-//!     本实现严格照搬 C。
-//!   - C 的 set_downmix_coeffs 返回 int（仅 malloc 失败），float 路径 FIXR12 为
-//!     恒等映射，故此处为 void 且直接存 f32。
-//!   - C 仅写 downmix_coeffs 的 [0, fbw_channels) 项（LFE 不参与），本实现同。
-
 const t = @import("tables.zig");
 const Ctx = @import("ctx.zig").Ctx;
 

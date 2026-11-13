@@ -7,35 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! LOAS/LATM（AAC 音频传输流，`.latm`/`.loas`）容器：逐 LOAS 帧定位 +
-//! AudioMuxElement/StreamMuxConfig/PayloadLengthInfo 解析，提取 raw AAC
-//! 帧复用 fmt/aac/lib.zig（AAC-LC 自研解码核心），与 ADTS 同一解码核心/同一
-//! 输出契约（s16 交错小端）。语义对照 FFmpeg n9.0.1 libavformat/loasdec.c +
-//! libavcodec/aac/aacdec_latm.h（参考对照；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! LOAS 帧：11-bit 同步字 0x2B7（24-bit 前缀 0x56E000）+ 13-bit
-//! audioMuxLengthBytes（不含 3 字节帧头）；整帧 = 3 + audioMuxLengthBytes。
-//! 帧内是 AudioMuxElement：
-//!   - useSameStreamMux(1)；0 → 紧跟 StreamMuxConfig（音频流配置，约每 N 帧重复）；
-//!   - StreamMuxConfig（audio_mux_version=0/1，AudioMuxVersionA=0）：含
-//!     AudioSpecificConfig（AAC-LC/Main/LTP，直接位读取）+ frameLengthType
-//!     （AAC 用 0=变长 / 1=定长）+ latmBufferFullness 等；
-//!   - PayloadLengthInfo（变长字节计数，每字节值 255 续传）→ PayloadMux 载荷；
-//!     AAC 载荷 = 原始 raw AAC 帧（raw_data_block，通常字节对齐，但 LATM 内
-//!     起始位可不按字节对齐 → 位拷贝回对齐缓冲后喂内核）。
-//!
-//! 支持范围（对齐 验收基准 aac_latm）：audio_mux_version 0/1（非 A）；
-//! numProgram==0 / numLayer==0（单节目单层；多节目/多流 → UnsupportedFormat）；
-//! 每元素仅解码第一个子帧（numSubFrames 后续子帧丢弃，与 验收基准 逐包
-//! aac_decode_frame 语义一致）；frameLengthType 0（变长）/1（定长）。
-//! AAC-LC/Main/LTP（AOT 1/2/4）帧复用内核；ASC 内 PCE（chan_config=0）布局、
-//! ER/ELD、AudioMuxVersionA → UnsupportedFormat（回退 验收基准 主后端 §8.3）。
-//! 采样率/声道来自 StreamMuxConfig 内 AudioSpecificConfig（与 ffprobe 一致）。
-//!
-//! Seek：按 LOAS 帧头顺序跳过（每元素固定 1 音频帧，1024/960 样本），无需
-//! 解码即可定位；时长：LOAS 帧头跳帧计数（帧数 × 每帧样本 = exact；
-//! 扫描区上限 128 MiB / 重同步失败 → 回落首帧平均帧长估算 estimate）。
-
 const std = @import("std");
 const Error = @import("../error.zig").Error;
 const io = @import("../io.zig");

@@ -7,14 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Musepack SV8 解码 —— FFmpeg n9.0.1 libavcodec/mpc8.c 逐句移植。
-//!
-//! 含容器（MPCK chunk：SH/AP…）与逐帧解码。帧间状态（Q/oldDSCF/合成滤波/噪声
-//! RNG）跨 chunk 持续，`cur_frame` 以 SH 头 `frames`（1<<(3bit*2)）为模 ——
-//! 与 FFmpeg 解码器在连续 AVPacket 流中的行为一致（每帧一解、wrap 即 keyframe）。
-//!
-//! 帧长固定 1152 样本/声道，S16。
-
 const std = @import("std");
 const synth = @import("synth.zig");
 const vlc = @import("vlc.zig");

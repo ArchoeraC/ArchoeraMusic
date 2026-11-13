@@ -7,25 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! FLAC 残差解码（分区 Rice 编码，参考重构对照 flacdec.c decode_residuals）
-//!
-//! 位排布：
-//!   method_type(2) + rice_order(4) + 每分区参数 k(rice_bits) +
-//!   每样本 Rice 码 / escape 原始值
-//!
-//! 语义：
-//!   - `samples = blocksize >> rice_order`，分区数 = 1 << rice_order；
-//!   - `rice_bits = 4 + method_type`（0→4 位 k，1→5 位 k），
-//!     `rice_esc = (1 << rice_bits) - 1`（k == rice_esc → escape：跟 5 位原始
-//!     位宽，读 `samples` 个有符号原始值）；
-//!   - 正常路径：前缀 `i` 个 0 + 1 停止位 + k 位尾部，`u = (i << k) | tail`，
-//!     符号折叠 `(u>>1) ^ -(u&1)`（golomb.h get_sr_golomb_flac）：
-//!       u 偶 → 正 u/2；u 奇 → 负 -(u+1)/2；
-//!   - **第一分区**样本循环从 `pred_order` 起（前 pred_order 个为 warm-up），
-//!     其后各分区从 0 起（flacdec.c 的 `i = 0` 复位）；
-//!   - 非法输入：method_type > 1、blocksize 不能整除分区数、
-//!     pred_order > samples、前缀超界 → error.Corrupt。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const bitreader = @import("bitreader.zig");

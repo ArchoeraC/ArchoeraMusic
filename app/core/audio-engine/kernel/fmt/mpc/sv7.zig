@@ -7,29 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Musepack SV7 解码 —— FFmpeg n9.0.1 libavcodec/mpc7.c + libavformat/mpc.c
-//! （SV7 分支）逐句移植。
-//!
-//! 容器：`MP+\x07/\x17` 打包帧流。头部 8 字节（魔数+版本 / fcount LE u32）后跟
-//! 16 字节 extradata；帧表由 mpc_read_packet 的逐帧链式推导重建（20-bit 帧长
-//! 场 + 32-bit 字内位偏移 curbits 链），与 FFmpeg 解封装逐字节一致。
-//!
-//! 解码（mpc7_decode_frame）：
-//!   - 包前 4 字节为 [skip, last_frame, 0, 0]；载荷按 32-bit 字 bswap（LE 存储
-//!     → MSB-first 位流），skip_bits_long(skip) 后进入位流；
-//!   - 逐子带 res（首带 4-bit 原码，其后 hdr_vlc 差分）、MSS 强度标志、
-//!     scfi_vlc / dscf_vlc 标度索引差分链、idx_to_quant 量化样本；
-//!   - 尾部复用 synth.zig 的 ff_mpc_dequantize_and_synth（CC×SCF 浮点去量化 +
-//!     MPEG 定点合成滤波），帧间状态（oldDSCF/合成窗/LFG 噪声）跨帧持续。
-//!
-//! last_frame/lastframelen（mpc7.c 的末帧截断）：demux 侧 data[1] =
-//! (curframe > fcount) && fcount 在 fcount>0 时恒为 0（curframe 自增后至多等于
-//! fcount），故 验收基准 实际解码路径永远输出整帧 1152 样本 —— 本实现保持一致，
-//! 仅保留字段以对齐结构。
-//!
-//! 验证目标：与 `验收基准 n9.0.1 -i x.mpc -f s16le` 逐样本一致
-//! （FATE inside-mp7.mpc 全流 456 帧已对齐）。
-
 const std = @import("std");
 const synth = @import("synth.zig");
 const vlc = @import("vlc.zig");
