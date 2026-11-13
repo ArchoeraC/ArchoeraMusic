@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:archoera_music/eta/icon/eta_icons.dart';
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
 import 'package:archoera_music/stores/prefs_appearance.dart';
@@ -161,6 +162,47 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1600));
     await tester.pumpAndSettle();
     expect(controlsOpacity().opacity, 0);
+  });
+
+  testWidgets('自动隐藏窗口按钮时天气组件随头像/菜单一起右移', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appPrefsProvider.overrideWith(
+            () => _PrefsNotifier({
+              windowDecorKey: 'borderless',
+              autoHideWindowControlsKey: true,
+              // 未配置位置 → 只显示占位云图标，不发网络请求。
+              weatherEnabledKey: true,
+            }),
+          ),
+        ],
+        child: _app(const NavHeader()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final weatherIcon = find.descendant(
+      of: find.byType(NavHeader),
+      matching: find.byIcon(EtaIcons.cloudOutline),
+    );
+    expect(weatherIcon, findsOneWidget, reason: '天气组件应已渲染');
+
+    // 隐藏态：整组右移；显示态：归位。两者差值应正好是按钮占位宽度。
+    final hiddenRight = tester.getTopRight(weatherIcon).dx;
+    final header = tester.getRect(find.byType(NavHeader));
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(Offset(header.right - 24, header.top + 4));
+    await tester.pumpAndSettle();
+
+    final shownRight = tester.getTopRight(weatherIcon).dx;
+    expect(
+      hiddenRight - shownRight,
+      closeTo(125, 0.5),
+      reason: '天气组件必须和头像/菜单一起移动，否则右侧会留下空洞',
+    );
   });
 
   testWidgets('未开启自动隐藏时按钮始终可见、可点击', (tester) async {

@@ -588,10 +588,9 @@ class _NavHeaderState extends ConsumerState<NavHeader>
           ),
         ),
         const Spacer(),
-        // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）
-        const _WeatherMini(),
-        // 账号头像 + 菜单：自动隐藏窗口按钮时整体右移，填补按钮让出的空间
-        // （按钮仍保留占位，只做透明度/平移，不触发重新布局）。
+        // 天气 + 账号头像 + 菜单：自动隐藏窗口按钮时**整组**右移，填补按钮
+        // 让出的空间（按钮仍保留占位，只做透明度/平移，不触发重新布局）。
+        // 天气必须留在这组里，否则右侧会露出它和被移走的头像之间的空洞。
         AnimatedContainer(
           duration: animDuration(context, const Duration(milliseconds: 200)),
           curve: Curves.easeOutCubic,
@@ -603,6 +602,8 @@ class _NavHeaderState extends ConsumerState<NavHeader>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）
+              const _WeatherMini(),
               // 与账号菜单保持间距（避免组件过小且贴太近）
               const SizedBox(width: 12),
               // 账号（多平台：NT / KG / QM占位）
