@@ -30,7 +30,7 @@ const kgLiteSignSalt = 'LnT6xpN3khm36zse0QzvmgTZ3waWdRSA';
 /// /v5/url 的 key 签名盐值（signKey 概念版 lite）
 const kgLiteKeySalt = '185672dd44712f60bb1736df5a377e82';
 
-/// 概念版 lite 的 appid / clientver（MoeKoeMusic --platform=lite）
+/// 概念版 lite 的 appid / clientver（lite 平台参数）
 const kgLiteAppid = 3116;
 const kgLiteClientver = 11440;
 
@@ -382,7 +382,7 @@ String kgSignatureWeb(Map<String, dynamic> params) {
 /// 参数密钥签名（signParamsKey，对齐 KuGouMusicApi helper.signParamsKey）：
 /// md5(appid + 盐 + clientver + data)。top_playlist / artist_audios 等
 /// 模块把 `key` 放进请求体/参数。默认 lite（appid 3116 / clientver 11440 /
-/// [kgLiteSignSalt]），与 MoeKoeMusic --platform=lite 一致。
+/// [kgLiteSignSalt]），与 lite 平台一致。
 String kgSignParamsKey(
   String data, {
   int? appid,

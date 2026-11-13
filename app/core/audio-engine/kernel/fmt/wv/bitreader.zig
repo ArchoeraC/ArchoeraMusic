@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: BSD-3-Clause
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 对照自 WavPack（BSD-3-Clause，David Bryant 等）。
+// 上游版权归 WavPack 作者所有；本文件按 BSD-3-Clause 分发，
+// 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! WavPack 帧内位读取（LSB-first，内存缓冲）
 //!
