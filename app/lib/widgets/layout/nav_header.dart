@@ -103,6 +103,22 @@ class _NavHeaderState extends ConsumerState<NavHeader>
   /// 搜索框宽度伸展动效时长（保持原节奏，不随面板加长）。
   static const Duration _widthExpandMs = Duration(milliseconds: 180);
 
+  // ── 无边框窗口按钮：右上角自动隐藏（可选，默认关）──────────────
+  /// 按钮组（含分隔线与间距）占位宽度，菜单右移时按此值平移。
+  /// = 6 + 1(分隔线) + 6 + 3×36(圆按钮) + 2×2(按钮间距)。
+  static const double _windowControlsSlotWidth = 125;
+
+  /// 右上角唤出热区宽度 / 高度：只覆盖顶栏顶部一条窄边，
+  /// 不压到下方的头像与菜单，避免悬停冲突。
+  static const double _windowControlsTriggerWidth = 150;
+  static const double _windowControlsTriggerHeight = 12;
+
+  /// 指针在右上角时是否显示（仅自动隐藏开启时生效）。
+  bool _windowControlsShown = false;
+
+  /// 指针离开按钮 / 热区后的延迟隐藏计时器（留出从热区移到按钮的时间）。
+  Timer? _windowControlsHideTimer;
+
   // ── 热搜 / 建议（NT + KG，对齐原版 getHotSearches / getSearchSuggest）──
   Timer? _suggestDebounce;
   String _suggestQuery = '';
@@ -133,8 +149,27 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     _widthCtrl = AnimationController(vsync: this, duration: _widthExpandMs);
   }
 
+  /// 指针进入右上角热区 / 按钮组：立即显示窗口按钮。
+  void _showWindowControls() {
+    _windowControlsHideTimer?.cancel();
+    if (!_windowControlsShown) {
+      setState(() => _windowControlsShown = true);
+    }
+  }
+
+  /// 指针离开后延迟隐藏：留出从顶部热区移到按钮上的时间，
+  /// 避免刚显示就因指针离开热区而收回。
+  void _scheduleHideWindowControls() {
+    _windowControlsHideTimer?.cancel();
+    _windowControlsHideTimer = Timer(const Duration(milliseconds: 280), () {
+      if (!mounted || !_windowControlsShown) return;
+      setState(() => _windowControlsShown = false);
+    });
+  }
+
   @override
   void dispose() {
+    _windowControlsHideTimer?.cancel();
     _searchFocus.removeListener(_onSearchFocusChanged);
     _suggestDebounce?.cancel();
     // 浮层必须**同步**摘除，不能等收起动画：顶栏被停绘/收起时 controller
@@ -490,6 +525,11 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     final borderless =
         ref.watch(appPrefsProvider.select((p) => p.windowDecor)) ==
         WindowDecor.borderless;
+    // 自动隐藏窗口按钮（可选项，默认关）：隐藏时头像/菜单右移填满空位。
+    final autoHideControls =
+        borderless &&
+        ref.watch(appPrefsProvider.select((p) => p.autoHideWindowControls));
+    final controlsHidden = autoHideControls && !_windowControlsShown;
     final row = Row(
       children: [
         // 返回（pop 栈内页面优先，否则回主页；恒可点，不随
@@ -519,47 +559,91 @@ class _NavHeaderState extends ConsumerState<NavHeader>
         const Spacer(),
         // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）
         const _WeatherMini(),
-        // 与账号菜单保持间距（避免组件过小且贴太近）
-        const SizedBox(width: 12),
-        // 账号（多平台：NT / KG / QM占位）
-        const _AccountsMenu(),
-        const SizedBox(width: 4),
-        const _NavHeaderActionsMenu(),
-        if (borderless) ...[
-          const SizedBox(width: 6),
-          // 自动隐藏（可选项，默认关）：仅在指针移到右上角时显示，
-          // 区域覆盖顶栏全高，便于从窗口右上角边缘唤出。
-          SizedBox(
-            height: 64,
-            child: AutoHideOnHover(
-              enabled: ref.watch(
-                appPrefsProvider.select((p) => p.autoHideWindowControls),
-              ),
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 1,
-                      height: 20,
-                      color: Theme.of(context).colorScheme.outlineVariant
-                          .withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(width: 6),
-                    const WindowControls(),
-                  ],
+        // 账号头像 + 菜单：自动隐藏窗口按钮时整体右移，填补按钮让出的空间
+        // （按钮仍保留占位，只做透明度/平移，不触发重新布局）。
+        AnimatedContainer(
+          duration: animDuration(context, const Duration(milliseconds: 200)),
+          curve: Curves.easeOutCubic,
+          transform: Matrix4.translationValues(
+            controlsHidden ? _windowControlsSlotWidth : 0,
+            0,
+            0,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 与账号菜单保持间距（避免组件过小且贴太近）
+              const SizedBox(width: 12),
+              // 账号（多平台：NT / KG / QM占位）
+              const _AccountsMenu(),
+              const SizedBox(width: 4),
+              const _NavHeaderActionsMenu(),
+            ],
+          ),
+        ),
+        if (borderless)
+          AnimatedOpacity(
+            opacity: controlsHidden ? 0 : 1,
+            duration: animDuration(context, const Duration(milliseconds: 180)),
+            curve: Curves.easeOut,
+            child: ExcludeFocus(
+              excluding: controlsHidden,
+              child: IgnorePointer(
+                ignoring: controlsHidden,
+                // 指针停在按钮上时保持显示（在热区外也能续命）。
+                child: MouseRegion(
+                  onEnter: autoHideControls
+                      ? (_) => _showWindowControls()
+                      : null,
+                  onExit: autoHideControls
+                      ? (_) => _scheduleHideWindowControls()
+                      : null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 1,
+                        height: 20,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(width: 6),
+                      const WindowControls(),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ],
       ],
     );
     return SizedBox(
       height: 64,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: borderless ? WindowDragArea(child: row) : row,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: borderless ? WindowDragArea(child: row) : row,
+            ),
+          ),
+          // 右上角热区：只占顶栏顶部一条窄边（按钮隐藏时头像/菜单在下方，
+          // 不会被误触）；移入即唤出按钮，移出由延迟计时器收回。
+          if (autoHideControls)
+            Positioned(
+              top: 0,
+              right: 0,
+              width: _windowControlsTriggerWidth,
+              height: _windowControlsTriggerHeight,
+              child: MouseRegion(
+                onEnter: (_) => _showWindowControls(),
+                onExit: (_) => _scheduleHideWindowControls(),
+                child: const SizedBox.expand(),
+              ),
+            ),
+        ],
       ),
     );
   }
