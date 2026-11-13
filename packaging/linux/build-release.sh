@@ -112,7 +112,13 @@ do_build() {
     # 解析，把 nativeapi 升到 0.5.10（需要更新的 Dart），全平台构建一起红。
     flutter pub get --enforce-lockfile
     dart analyze lib
-    flutter build linux --release
+    # 发布通道：0=Release / 1=Beta / 2=Dev(默认) / 3=Nightly。
+    # 未设置时不传 define，由应用内默认回退到 Dev；CI 按触发方式设置。
+    channel_args=()
+    if [ -n "${ARCHOERA_CHANNEL:-}" ]; then
+      channel_args+=(--dart-define="ARCHOERA_CHANNEL=${ARCHOERA_CHANNEL}")
+    fi
+    flutter build linux --release "${channel_args[@]}"
   )
 }
 

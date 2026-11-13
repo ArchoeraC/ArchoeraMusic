@@ -60,6 +60,7 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
                     subtitle: widget.version.isEmpty
                         ? l10n.settingsVersionUnknown
                         : l10n.settingsVersionFormat(version: widget.version),
+                    subtitleWidget: _versionSubtitle(l10n),
                     // 官方构建徽标：二进制内水印验签通过才显示该图标；
                     // 失败/缺失则不显示（无文字、无悬浮提示）。
                     trailing: ref.watch(archoeraOfficialBuildProvider)
@@ -110,7 +111,7 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
               l10n.settingsEnvVersion,
               widget.version.isEmpty
                   ? l10n.settingsVersionUnknown
-                  : widget.version,
+                  : '${widget.version} · ${ReleaseChannel.current.label}',
             ),
             _envRow(
               l10n.settingsEnvPlatform,
@@ -306,6 +307,49 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
   /// Neko 歌姬计划 API 文档（其附加条款要求的原始链接）。
   static const String _kNekoApiDocsUrl =
       'https://github.com/FantasyNetworkCN/NekoMusicDocs';
+
+  /// 版本副标题：`v<version>` + 通道徽标 + 本地化后缀。
+  ///
+  /// 用本地化模板（`v{version} · …`）拆分前后缀，保证各语言下徽标都紧贴版本号；
+  /// 图片外观下徽标为固定深色实心，不随主题/壁纸变化。
+  Widget _versionSubtitle(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final style = TextStyle(
+      fontSize: 11.5,
+      color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+    );
+    if (widget.version.isEmpty) {
+      return Text(
+        l10n.settingsVersionUnknown,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      );
+    }
+    const sentinel = '\u0000';
+    final template = l10n.settingsVersionFormat(version: sentinel);
+    final index = template.indexOf(sentinel);
+    final prefix = index >= 0 ? template.substring(0, index) : 'v';
+    final suffix = index >= 0 ? template.substring(index + 1) : '';
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: prefix),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: ReleaseChannelBadge(channel: ReleaseChannel.current),
+            ),
+          ),
+          if (suffix.isNotEmpty) TextSpan(text: suffix),
+        ],
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    );
+  }
 
   Widget _envRow(String label, String value) {
     final scheme = Theme.of(context).colorScheme;
