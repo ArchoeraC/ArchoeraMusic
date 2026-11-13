@@ -206,7 +206,9 @@ class _BakedImageBackgroundState extends State<BakedImageBackground> {
               image: baked,
               width: size.width,
               height: size.height,
-              fit: BoxFit.fill,
+              // 窗口拖动改尺寸时，旧烘焙纹理在下一帧新纹理就绪前复用：
+              // 用 cover 裁切而不是 fill 拉伸，避免缩放过程中背景变形。
+              fit: BoxFit.cover,
               filterQuality: FilterQuality.low,
             );
           }
