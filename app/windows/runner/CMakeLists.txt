@@ -71,7 +71,10 @@ target_compile_definitions(archoerashell PRIVATE "FLUTTER_VERSION_MINOR=${FLUTTE
 target_compile_definitions(archoerashell PRIVATE "FLUTTER_VERSION_PATCH=${FLUTTER_VERSION_PATCH}")
 target_compile_definitions(archoerashell PRIVATE "FLUTTER_VERSION_BUILD=${FLUTTER_VERSION_BUILD}")
 target_link_libraries(archoerashell PRIVATE "${SHELL_STATIC_LIB}")
-target_link_libraries(archoerashell PRIVATE ntdll userenv ws2_32 dbghelp)
+# Rust std 在 Windows 上使用 WaitOnAddress / WakeByAddress*（Windows 8+），
+# 这些符号位于 synchronization.lib；MSVC 不会从 Rust staticlib 自动带入，
+# 缺失时报 LNK2019（__imp_WaitOnAddress 等）。
+target_link_libraries(archoerashell PRIVATE ntdll userenv ws2_32 dbghelp synchronization)
 add_dependencies(archoerashell shell_cargo)
 
 # Run the Flutter tool portions of the build. This must not be removed.
