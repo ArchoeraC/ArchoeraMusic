@@ -1964,6 +1964,41 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsFloatingBarOff => 'Breit angedockt（Standard）';
 
   @override
+  String get settingsSectionWindow => 'Fenster';
+
+  @override
+  String get settingsWindowDecor => 'Fensterdekoration';
+
+  @override
+  String get settingsWindowDecorDesc =>
+      'Randlos: Inhalte füllen das Fenster, Fenstertasten liegen in der oberen Leiste.';
+
+  @override
+  String get settingsWindowDecorSystem => 'System';
+
+  @override
+  String get settingsWindowDecorCaption => 'Eigene Titelleiste';
+
+  @override
+  String get settingsWindowDecorBorderless => 'Randlos';
+
+  @override
+  String get settingsWindowDecorNote =>
+      'Wirkt sofort; bei fehlerhafter Titelleiste die App neu starten.';
+
+  @override
+  String get windowMinimize => 'Minimieren';
+
+  @override
+  String get windowMaximize => 'Maximieren';
+
+  @override
+  String get windowRestore => 'Wiederherstellen';
+
+  @override
+  String get windowClose => 'Schließen';
+
+  @override
   String get settingsSectionFont => 'Oberflächenschriftart';
 
   @override

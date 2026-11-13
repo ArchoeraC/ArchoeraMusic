@@ -56,8 +56,7 @@ extension _PlayerPageView on _PlayerPageState {
     final coverKey = current != null
         ? '${current.source}/${current.id}'
         : 'local:$source';
-    // 重内容（歌词块、背景的水纹/流体层）等路由进入动画结束后再挂载；性能
-    // 模式直切视为已完成。背景的轻量预览层不在此门控内。
+    // 重内容（背景 / 歌词）在路由进入动画结束后才挂载；性能模式直切视为已完成。
     final contentMounted =
         _contentMounted ||
         (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
@@ -101,9 +100,8 @@ extension _PlayerPageView on _PlayerPageState {
     final backdrop = layout.buildBackdrop(context, layoutCtx);
     final scrims = layout.buildScrims(context, layoutCtx);
 
-    // 播放页常驻不透明底色：任何背景层尚未绘制时也保证整页不透明，
-    // 避免透出下方壳层。背景本身从进入动画第一帧就挂载（见下方
-    // PlayerBackground 的 active 参数），不再留出发黑的空档。
+    // 播放页常驻不透明底色：重内容（背景）延迟挂载期间也保证整页不透明，
+    // 避免透出下方壳层（进入动画那 500ms 出现白/黑空档）。
     final playerBg =
         theme.extension<AppChromeColors>()?.playerBackground ??
         colorScheme.surface;
@@ -111,12 +109,7 @@ extension _PlayerPageView on _PlayerPageState {
       backgroundColor: playerBg,
       // 硬裁切到播放页范围（对齐原版 FullPlayer 根节点 `overflow-hidden`）：
       // 封面背景经 blur/scale 后的绘制不会溢出到播放页之外。
-      // 收起动画期间冻结页内所有 ticker（歌词墙 / 封面脉冲 / 频谱等），只保留
-      // 路由自身的下滑；对齐 SPlayer-Next 在 `before-leave` 里 `lyric.freeze()`
-      // + 停表，把帧预算让给壳层恢复布局，避免收起时卡顿。
-      body: TickerMode(
-        enabled: !_closing,
-        child: MouseRegion(
+      body: MouseRegion(
           onEnter: (_) {
             if (!mounted) return;
             if (!_pointerInside) setState(() => _pointerInside = true);
@@ -143,23 +136,22 @@ extension _PlayerPageView on _PlayerPageState {
               child: Stack(
                 children: [
                   Positioned.fill(child: ColoredBox(color: playerBg)),
-                  Positioned.fill(
-                    // 背景独立成层：歌词/频谱/进度持续重绘时，背景（已烘焙的
-                    // 静态贴图 + 压暗）不再随父层重放光栅化；Skia 后端可将其
-                    // 缓存为纹理复用（对齐 runtime-resource-optimization §4）。
-                    //
-                    // 进入动画期间即挂载：轻量样式（渐变 / 纯色 / 模糊 / 主色）
-                    // 直接出最终画面；水纹 / 流体等重效果先由模糊封面预览铺底，
-                    // 等路由动画结束（contentMounted）再挂载并淡入，避免黑屏。
-                    child: RepaintBoundary(
-                      child: PlayerBackground(
-                        cover: current?.cover,
-                        playing: playing,
-                        active: contentMounted,
-                        paused: _closing,
+                  if (contentMounted)
+                    Positioned.fill(
+                      // 背景独立成层：歌词/频谱/进度持续重绘时，背景（已烘焙的
+                      // 静态贴图 + 压暗）不再随父层重放光栅化；Skia 后端可将其
+                      // 缓存为纹理复用（对齐 runtime-resource-optimization §4）。
+                      //
+                      // 进入动画期间不挂载：转场时只铺上方主题底色，动画结束后
+                      // 再挂载背景（与 1.0.6+4 首发一致），避免解码 + 烘焙抢占
+                      // 滑动帧。
+                      child: RepaintBoundary(
+                        child: PlayerBackground(
+                          cover: current?.cover,
+                          playing: playing,
+                        ),
                       ),
                     ),
-                  ),
                   // 布局层：封面 / 曲目信息 / 歌词由新布局的 live 元素从旧
                   // 矩形变换到自身矩形，其余 chrome 交叉淡化。背景层保持常驻。
                   Positioned.fill(
@@ -239,6 +231,9 @@ extension _PlayerPageView on _PlayerPageState {
                                             : null,
                                         onSelectQuality: notifier.setQuality,
                                         onToggleFullscreen: _toggleFullscreen,
+                                        borderless:
+                                            prefs.windowDecor ==
+                                            WindowDecor.borderless,
                                       ),
                                     ),
                                   ),
@@ -290,7 +285,6 @@ extension _PlayerPageView on _PlayerPageState {
             ),
           ),
         ),
-      ),
     );
   }
 }
@@ -311,6 +305,7 @@ class _PlayerTopBar extends StatelessWidget {
     required this.onToggleLyrics,
     required this.onSelectQuality,
     required this.onToggleFullscreen,
+    required this.borderless,
   });
 
   final AppLocalizations l10n;
@@ -331,72 +326,76 @@ class _PlayerTopBar extends StatelessWidget {
   final ValueChanged<String> onSelectQuality;
   final Future<void> Function() onToggleFullscreen;
 
+  /// 无边框窗口：顶栏空白处整行可拖动窗口（窗口按钮不放播放页）。
+  final bool borderless;
+
   @override
   Widget build(BuildContext context) {
+    final row = Row(
+      children: [
+        IconButton(
+          tooltip: l10n.playerBarCollapsePlayer,
+          onPressed: onClose,
+          icon: const Icon(EtaIcons.downSmall),
+          iconSize: 32,
+        ),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: showLyrics
+              ? l10n.playerBarHideLyrics
+              : l10n.playerBarShowLyrics,
+          child: InkResponse(
+            radius: 24,
+            onTap: onToggleLyrics,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                EtaIcons.fileMusicOutline,
+                size: 26,
+                color:
+                    (showLyrics
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant)
+                        .withValues(
+                          alpha: onToggleLyrics == null
+                              ? 0.35
+                              : (hasLyrics ? 1 : 0.35),
+                        ),
+              ),
+            ),
+          ),
+        ),
+        const Spacer(),
+        const _SleepTimerButton(),
+        // 当前曲目可切音质档位（Neko 自可选音质流起同样支持）。
+        if (current != null)
+          QualityMenu(
+            levels: qualityLevels,
+            current: quality,
+            onSelected: onSelectQuality,
+          ),
+        // 播放页内快速切换布局（与设置里的「封面布局」同一份偏好）。
+        _LayoutMenuButton(
+          l10n: l10n,
+          currentId: layoutId,
+          onSelected: onSelectLayout,
+        ),
+        Tooltip(
+          message: isFullScreen
+              ? l10n.playerBarExitFullscreen
+              : l10n.playerBarFullscreen,
+          child: IconButton(
+            onPressed: onToggleFullscreen,
+            icon: Icon(
+              isFullScreen ? EtaIcons.fullscreenExit : EtaIcons.fullscreen,
+            ),
+          ),
+        ),
+      ],
+    );
     return SizedBox(
       height: 56,
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: l10n.playerBarCollapsePlayer,
-            onPressed: onClose,
-            icon: const Icon(EtaIcons.downSmall),
-            iconSize: 32,
-          ),
-          const SizedBox(width: 4),
-          Tooltip(
-            message: showLyrics
-                ? l10n.playerBarHideLyrics
-                : l10n.playerBarShowLyrics,
-            child: InkResponse(
-              radius: 24,
-              onTap: onToggleLyrics,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Icon(
-                  EtaIcons.fileMusicOutline,
-                  size: 26,
-                  color:
-                      (showLyrics
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant)
-                          .withValues(
-                            alpha: onToggleLyrics == null
-                                ? 0.35
-                                : (hasLyrics ? 1 : 0.35),
-                          ),
-                ),
-              ),
-            ),
-          ),
-          const Spacer(),
-          const _SleepTimerButton(),
-          // 当前曲目可切音质档位（Neko 自可选音质流起同样支持）。
-          if (current != null)
-            QualityMenu(
-              levels: qualityLevels,
-              current: quality,
-              onSelected: onSelectQuality,
-            ),
-          // 播放页内快速切换布局（与设置里的「封面布局」同一份偏好）。
-          _LayoutMenuButton(
-            l10n: l10n,
-            currentId: layoutId,
-            onSelected: onSelectLayout,
-          ),
-          Tooltip(
-            message: isFullScreen
-                ? l10n.playerBarExitFullscreen
-                : l10n.playerBarFullscreen,
-            child: IconButton(
-              onPressed: onToggleFullscreen,
-              icon: Icon(
-                isFullScreen ? EtaIcons.fullscreenExit : EtaIcons.fullscreen,
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: borderless ? WindowDragArea(child: row) : row,
     );
   }
 }

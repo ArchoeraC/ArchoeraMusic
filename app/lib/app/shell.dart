@@ -43,8 +43,8 @@ class AppShell extends ConsumerWidget {
     final background = appearanceStyle.buildBackground(context, prefs);
     final floating = prefs.floatingPlayerBar;
     final collapsed = prefs.sidebarCollapsed;
-    // 全屏播放器展开时，主壳内容（侧边栏 + 页面区）缩放淡出并忽略指针
-    // （对齐原版 MainLayout：scale-95 opacity-0 pointer-events-none）。
+    // 全屏播放器展开时，主壳内容（侧边栏 + 页面区）缩放淡出，展开动画结束
+    // 后卸载、仅留纯色占位（收敛内存与绘制开销）；收起时立即恢复。
     //
     // 用**播放页路由自身的动画**驱动（经 provider 传入）：该动画由播放页的
     // Ticker 逐帧推进，与播放页进出同帧同步；壳层无需自建 Ticker，避免下方
@@ -99,10 +99,14 @@ class AppShell extends ConsumerWidget {
         Positioned.fill(
           child: Padding(
             padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
+            // 展开：壳内容缩放淡出，动画结束后卸载，仅保留纯色占位；
+            // 收起：立即恢复壳内容并随动画反向展开（与 1.0.6+4 首发一致）。
             child: ShellExpandTransition(
               animation: playerRouteAnim,
               disableAnimations: noAnim(context),
-              // 完全展开后只停绘/停布局，壳内容与 State 保留，收起即恢复。
+              placeholder: ColoredBox(
+                color: Theme.of(context).scaffoldBackgroundColor,
+              ),
               child: content,
             ),
           ),

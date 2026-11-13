@@ -12,6 +12,7 @@ import '../../l10n/l10n.dart';
 import '../../utils/format.dart';
 import '../list/cover_image.dart';
 import '../common/glass_blur.dart';
+import '../common/smooth_wheel_scroll_controller.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 

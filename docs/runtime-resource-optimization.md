@@ -762,9 +762,10 @@ API + AOT，Impeller 直连 KMS，无二次合成 pass；名称与出处见
 > **已落地（2026-10-01；2026-11-09 修订）**：
 > 1. **后台只停帧/降频**：最小化 / 托盘隐藏直接 0 帧，失焦 / 熄屏 1 FPS；
 >    `power_saver.dart` 不再清缓存、不再 invalidate 页面数据。
-> 2. **壳内容不卸载**：播放页展开后 `ShellExpandTransition` 只 `Offstage` +
->    `TickerMode(false)` 停绘/停布局，element/state 全保留；`OffstageWhenComplete`
->    同理。返回时零重建。
+> 2. **播放页展开后卸载壳内容**：`ShellExpandTransition` 在展开动画结束时把
+>    壳内容从树上移除、仅留纯色占位（收起时按同一曲线重建恢复），避免被完全
+>    遮挡的列表 / 图片每帧重放；`OffstageWhenComplete` 用于壳背景与播放条等
+>    无需重建的大面积层。
 > 3. **拆掉 `preset.unloadAllMemory` / `BackgroundUnloadGate`**：实测卸载/重建
 >    整棵路由子树会 churn 渲染资源（表面/图层/驱动缓存只涨不缩），
 >    `ImageCache.clear()` 还会让恢复时全量重新解码封面；净效果是水位抬高、

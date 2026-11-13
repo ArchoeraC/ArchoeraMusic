@@ -150,28 +150,31 @@ extension _QueuePanelView on QueuePanel {
     if (queue.isEmpty) {
       return _QueuePanelEmpty(theme: theme, scheme: scheme, l10n: l10n);
     }
-    return ReorderableListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      buildDefaultDragHandles: false,
-      shrinkWrap: style != QueuePanelStyle.slide,
-      proxyDecorator: (child, index, animation) =>
-          Material(color: Colors.transparent, child: child),
-      itemCount: queue.length,
-      onReorderItem: (oldIndex, newIndex) =>
-          notifier.moveInQueue(oldIndex, newIndex),
-      itemBuilder: (context, index) {
-        final track = queue[index];
-        final current = index == queueIndex;
-        return _QueueTile(
-          key: ValueKey('${track.source}:${track.id}:$index'),
-          track: track,
-          index: index,
-          current: current,
-          playing: current && playing,
-          onTap: () => notifier.playAtIndex(index),
-          onRemove: () => notifier.removeFromQueue(index),
-        );
-      },
+    return SmoothWheelScrollScope(
+      builder: (context, controller) => ReorderableListView.builder(
+        scrollController: controller,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        buildDefaultDragHandles: false,
+        shrinkWrap: style != QueuePanelStyle.slide,
+        proxyDecorator: (child, index, animation) =>
+            Material(color: Colors.transparent, child: child),
+        itemCount: queue.length,
+        onReorderItem: (oldIndex, newIndex) =>
+            notifier.moveInQueue(oldIndex, newIndex),
+        itemBuilder: (context, index) {
+          final track = queue[index];
+          final current = index == queueIndex;
+          return _QueueTile(
+            key: ValueKey('${track.source}:${track.id}:$index'),
+            track: track,
+            index: index,
+            current: current,
+            playing: current && playing,
+            onTap: () => notifier.playAtIndex(index),
+            onRemove: () => notifier.removeFromQueue(index),
+          );
+        },
+      ),
     );
   }
 

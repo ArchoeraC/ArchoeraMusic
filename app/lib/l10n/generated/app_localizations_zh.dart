@@ -1875,6 +1875,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsFloatingBarOff => '全宽停靠（默认）';
 
   @override
+  String get settingsSectionWindow => '窗口';
+
+  @override
+  String get settingsWindowDecor => '窗口装饰方案';
+
+  @override
+  String get settingsWindowDecorDesc => '无边框：内容铺满窗口，窗口按钮并入顶栏。';
+
+  @override
+  String get settingsWindowDecorSystem => '系统原生';
+
+  @override
+  String get settingsWindowDecorCaption => '自绘标题栏';
+
+  @override
+  String get settingsWindowDecorBorderless => '无边框';
+
+  @override
+  String get settingsWindowDecorNote => '切换立即生效；若标题栏显示异常，重启应用即可。';
+
+  @override
+  String get windowMinimize => '最小化';
+
+  @override
+  String get windowMaximize => '最大化';
+
+  @override
+  String get windowRestore => '还原';
+
+  @override
+  String get windowClose => '关闭';
+
+  @override
   String get settingsSectionFont => '界面字体';
 
   @override
@@ -8086,6 +8119,39 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsFloatingBarOff => '全宽停靠（默认）';
 
   @override
+  String get settingsSectionWindow => '窗口';
+
+  @override
+  String get settingsWindowDecor => '窗口装饰方案';
+
+  @override
+  String get settingsWindowDecorDesc => '无边框：内容铺满窗口，窗口按钮并入顶栏。';
+
+  @override
+  String get settingsWindowDecorSystem => '系统原生';
+
+  @override
+  String get settingsWindowDecorCaption => '自绘标题栏';
+
+  @override
+  String get settingsWindowDecorBorderless => '无边框';
+
+  @override
+  String get settingsWindowDecorNote => '切换立即生效；若标题栏显示异常，重启应用即可。';
+
+  @override
+  String get windowMinimize => '最小化';
+
+  @override
+  String get windowMaximize => '最大化';
+
+  @override
+  String get windowRestore => '还原';
+
+  @override
+  String get windowClose => '关闭';
+
+  @override
   String get settingsSectionFont => '界面字体';
 
   @override
@@ -14295,6 +14361,39 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsFloatingBarOff => '全寬停靠（預設）';
+
+  @override
+  String get settingsSectionWindow => '視窗';
+
+  @override
+  String get settingsWindowDecor => '視窗裝飾方案';
+
+  @override
+  String get settingsWindowDecorDesc => '無邊框：內容鋪滿視窗，視窗按鈕併入頂欄。';
+
+  @override
+  String get settingsWindowDecorSystem => '系統原生';
+
+  @override
+  String get settingsWindowDecorCaption => '自繪標題列';
+
+  @override
+  String get settingsWindowDecorBorderless => '無邊框';
+
+  @override
+  String get settingsWindowDecorNote => '切換立即生效；若標題列顯示異常，重新啟動應用程式即可。';
+
+  @override
+  String get windowMinimize => '最小化';
+
+  @override
+  String get windowMaximize => '最大化';
+
+  @override
+  String get windowRestore => '還原';
+
+  @override
+  String get windowClose => '關閉';
 
   @override
   String get settingsSectionFont => '介面字型';

@@ -1972,6 +1972,41 @@ class AppLocalizationsEs extends AppLocalizations {
       'Acoplado ancho completo（predeterminado）';
 
   @override
+  String get settingsSectionWindow => 'Ventana';
+
+  @override
+  String get settingsWindowDecor => 'Decoración de ventana';
+
+  @override
+  String get settingsWindowDecorDesc =>
+      'Sin bordes: el contenido ocupa toda la ventana y los botones se integran en la barra superior.';
+
+  @override
+  String get settingsWindowDecorSystem => 'Sistema';
+
+  @override
+  String get settingsWindowDecorCaption => 'Barra de título personalizada';
+
+  @override
+  String get settingsWindowDecorBorderless => 'Sin bordes';
+
+  @override
+  String get settingsWindowDecorNote =>
+      'Se aplica al instante; si la barra de título se ve mal, reinicia la aplicación.';
+
+  @override
+  String get windowMinimize => 'Minimizar';
+
+  @override
+  String get windowMaximize => 'Maximizar';
+
+  @override
+  String get windowRestore => 'Restaurar';
+
+  @override
+  String get windowClose => 'Cerrar';
+
+  @override
   String get settingsSectionFont => 'Fuente de interfaz';
 
   @override
