@@ -64,15 +64,15 @@ struct KugouState {
 #[derive(Default, Clone, Debug, serde::Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct DownloaderIdentity {
-    /// 酷狗 guid（随机 16 位大写字母数字）
+    /// KG guid（随机 16 位大写字母数字）
     kg_guid: Option<String>,
-    /// 酷狗 mid（= kg_calc_mid(kg_guid)；缺省时由 kg_guid 推导）
+    /// KG mid（= kg_calc_mid(kg_guid)；缺省时由 kg_guid 推导）
     kg_mid: Option<String>,
-    /// 网易 deviceId（26 位大写 hex）
+    /// NT deviceId（26 位大写 hex）
     nm_device_id: Option<String>,
-    /// 网易 _ntes_nuid（32 位小写 hex）
+    /// NT _ntes_nuid（32 位小写 hex）
     nm_nuid: Option<String>,
-    /// 网易 osver（真实系统版本，Dart 生成；缺省回落硬编码旧值）
+    /// NT osver（真实系统版本，Dart 生成；缺省回落硬编码旧值）
     osver: Option<String>,
 }
 
@@ -445,7 +445,7 @@ pub(crate) fn bilibili_cookie() -> Option<String> {
         .map(|s| s.as_str().to_string())
 }
 
-/// 设备指纹（resolvers 生成网易 cookie / 酷狗 mid 时优先取注入值）
+/// 设备指纹（resolvers 生成NT cookie / KG mid 时优先取注入值）
 pub(crate) fn downloader_identity() -> DownloaderIdentity {
     GLOBAL.lock().unwrap().identity.clone()
 }
@@ -763,7 +763,7 @@ async fn run_task(
     } else {
         let resolved_result = match resolver_for(request.source.as_str()) {
             Some(resolver) => resolver.resolve_play_url(&request, &cancel).await,
-            // QQ / Neko / Streaming / 未知音源：Rust 无自研解析 → 直接失败，
+            // QM / Neko / Streaming / 未知音源：Rust 无自研解析 → 直接失败，
             // 交由 Dart 播放管线回退（§12.1）。
             None => Err(anyhow::anyhow!("执行部分操作时发生错误")),
         };
@@ -1248,7 +1248,7 @@ pub extern "C" fn archoera_downloader_init(
     };
 
     let client = match reqwest::Client::builder()
-        // 对齐 Dart HttpClient：仅 HTTP/1.1（酷狗风控对 HTTP/2 请求返回空 data）
+        // 对齐 Dart HttpClient：仅 HTTP/1.1（KG 风控对 HTTP/2 请求返回空 data）
         .http1_only()
         // 重定向封顶 + 拒绝被 3xx 引到本机/内网（公网 CDN 的正常跨主机跳转不受影响）
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
@@ -1884,8 +1884,8 @@ pub extern "C" fn archoera_downloader_set_bilibili_cookie(cookie_header: *const 
 
 /// 注入设备指纹（Dart 持久化的 downloaderIdentity JSON，见 [DownloaderIdentity]）。
 ///
-/// 优先用注入值：酷狗 mid 显式给 `kgMid` 直接用，否则由 `kgGuid` 推导；
-/// 网易 deviceId/_ntes_nuid 由 resolvers 消费。未注入字段回落 init 随机值。
+/// 优先用注入值：KG mid 显式给 `kgMid` 直接用，否则由 `kgGuid` 推导；
+/// NT deviceId/_ntes_nuid 由 resolvers 消费。未注入字段回落 init 随机值。
 /// 幂等：可在 init 后随时调用，重复注入以最后一次为准。
 #[no_mangle]
 pub extern "C" fn archoera_downloader_set_identity(json: *const c_char) -> c_int {
@@ -1912,9 +1912,9 @@ pub extern "C" fn archoera_downloader_set_identity(json: *const c_char) -> c_int
 
 /// 清除已注入的设备指纹，回退旧版「每次启动随机」动态值行为（动态指纹开关）。
 ///
-/// 与 [archoera_downloader_set_identity] 互补：清空 identity（网易 cookie 各字段
+/// 与 [archoera_downloader_set_identity] 互补：清空 identity（NT cookie 各字段
 /// 回落进程随机，见 resolvers::build_netease_cookie 的 unwrap_or_else 分支）并置
-/// 空酷狗 mid——下一次 [kugou_mid] 惰性生成新的会话随机 mid（本会话内稳定）。
+/// 空KG mid——下一次 [kugou_mid] 惰性生成新的会话随机 mid（本会话内稳定）。
 /// 幂等：重复调用无副作用；随后再次注入指纹（set_identity）立即恢复持久化行为。
 #[no_mangle]
 pub extern "C" fn archoera_downloader_clear_identity() -> c_int {
@@ -2095,7 +2095,7 @@ mod identity_tests {
         archoera_downloader_set_identity(c.as_ptr())
     }
 
-    /// 注入值优先：酷狗 mid / 网易 deviceId / _ntes_nuid 全部用注入值
+    /// 注入值优先：KG mid / NT deviceId / _ntes_nuid 全部用注入值
     #[test]
     fn identity_injection_overrides_random() {
         let _g = IDENTITY_TEST_LOCK.lock().unwrap();
@@ -2127,8 +2127,8 @@ mod identity_tests {
         assert_eq!(kugou_mid(), "9876543210");
     }
 
-    /// 动态指纹开关：clear 后回落会话随机（酷狗 mid 惰性生成且会话内稳定；
-    /// 网易 cookie 各字段回落进程随机），再注入恢复持久化指纹
+    /// 动态指纹开关：clear 后回落会话随机（KG mid 惰性生成且会话内稳定；
+    /// NT cookie 各字段回落进程随机），再注入恢复持久化指纹
     #[test]
     fn identity_clear_falls_back_to_random() {
         let _g = IDENTITY_TEST_LOCK.lock().unwrap();

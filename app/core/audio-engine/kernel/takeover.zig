@@ -9,7 +9,7 @@
 //! 「哪些格式已被接管」视图，以免对必然失败的格式做无效 native open：
 //!   - [`bitmap`]：按 `probe.Format` 枚举序折叠 `probe.enabled` 的 u64 位图
 //!     （bit i = 第 i 个 Format 是否接管），供 C 壳一次性取回；
-//!   - [`ofFormat`]：单格式判定（与位图同源，逐位一致性由 C 测试对拍）；
+//!   - [`ofFormat`]：单格式判定（与位图同源，逐样本一致性由 C 测试对拍）；
 //!   - [`ofExt`]：扩展名 → Format 判定（编译期表），`unknown` 让 C 壳保留
 //!     try-then-fallback（probe 仍可能按内容识别）。
 //!
@@ -20,7 +20,7 @@ const probe = @import("probe.zig");
 
 /// 扩展名判定结果（与 C ABI 的 1/0/-1 对齐）。
 pub const Verdict = enum(c_int) {
-    /// 扩展名明确**未**接管：C 壳可跳过无效 native open，直接 FFmpeg。
+    /// 扩展名明确**未**接管：C 壳可跳过无效 native open，直接 验收基准。
     no = 0,
     /// 扩展名明确已接管：优先 native（失败仍按既有语义回退）。
     yes = 1,
@@ -129,7 +129,7 @@ pub fn ofExt(ext: []const u8) Verdict {
 
 const testing = std.testing;
 
-test "takeover: bitmap 与 ofFormat 逐位一致" {
+test "takeover: bitmap 与 ofFormat 逐样本一致" {
     inline for (@typeInfo(probe.Format).@"enum".field_names) |name| {
         const fmt = @field(probe.Format, name);
         const bit = (bitmap >> @intCast(@intFromEnum(fmt))) & 1;

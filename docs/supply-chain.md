@@ -105,7 +105,7 @@
 - **第三方音源明文 HTTP 端点——上游既定行为，MITM 可篡改内容**：
   `http://login.user.kugou.com`（短信验证码发送，见 `app/lib/services/kugou/kugou_request.dart`）、
   `http://lyrics.kugou.com`（歌词搜索）、`http://mobilecdn.kugou.com`（歌曲搜索）、
-  `http://aqqmusic.tc.qq.com`（QQ 音乐媒体直链）
+  `http://aqqmusic.tc.qq.com`（QM 媒体直链）
   均走**明文 HTTP**：这是**上游服务的既定行为**，客户端无法单方面改成 TLS。
   影响面：同网络路径上的 MITM 可**篡改歌词/媒体内容**（返回错误歌词、替换音频流），
   也可能观察到查询参数（关键词、手机号在查询串中）。

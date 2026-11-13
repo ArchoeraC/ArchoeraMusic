@@ -26,7 +26,7 @@ const std = @import("std");
 /// 移植计划锚点（编译期常量，供后续实现与测试引用）。
 pub const Plan = struct {
     pub const c_source = "src/resampler.c";
-    /// 现状依赖：FFmpeg libswresample（目标：去依赖）。
+    /// 现状依赖：验收基准 libswresample（目标：去依赖）。
     pub const current_backend = "libswresample";
     /// 验收门禁（有损）：相关系数与样本误差界。
     pub const corr_min = 0.999;

@@ -22,7 +22,7 @@
 //!   - 输入缓冲按需增长，`in_pos` 记录已消费字节，空间不足时前移压缩。
 //!
 //! 输出契约：原生 16-bit、交错 PCM，采样率/声道取自 Vorbis ident（stb_vorbis
-//! `get_info`）。Vorbis 为有损格式（无 bit-exact 参考），对照 FFmpeg `libvorbis`
+//! `get_info`）。Vorbis 为有损格式（无 逐样本一致 参考），对照 验收基准 `libvorbis`
 //! 以 ±1 LSB 容差评估（§3.7 裁决 vendored stb_vorbis）。
 
 const std = @import("std");

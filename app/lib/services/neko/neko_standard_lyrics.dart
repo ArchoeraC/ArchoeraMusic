@@ -7,7 +7,7 @@
 /// 背景：Neko 是第三方直传音源，其内嵌/平台歌词常为站点广告或非标准
 /// 格式（见 `parseNekoLyrics`），不可信。下载写标签时需改用标准音源歌词。
 ///
-/// 顺序：网易（天然标准 LRC）→ QQ → 酷狗；富文本（yrc/qrc/krc）先经
+/// 顺序：NT（天然标准 LRC）→ QM → KG；富文本（yrc/qrc/krc）先经
 /// 统一解码器解析，再**重新序列化为标准 LRC**（标签只接受纯文本 LRC）。
 /// 全部失败返回 null（Rust 侧再走 LRCLIB 兜底）。
 library;
@@ -21,7 +21,7 @@ import '../netease/track.dart';
 
 /// 按曲目元数据搜索并返回标准 LRC 文本；无命中返回 null。
 Future<String?> fetchStandardNekoLyrics(Track track) async {
-  // 1) 网易：直接取标准 LRC 字段（无需格式转换）。
+  // 1) NT：直接取标准 LRC 字段（无需格式转换）。
   try {
     final lrc = await nmGetLrcByQuery(track);
     if (lrc != null && lrc.trim().isNotEmpty) return lrc;
@@ -29,7 +29,7 @@ Future<String?> fetchStandardNekoLyrics(Track track) async {
     // 继续下一源
   }
 
-  // 2) QQ / 酷狗：优先标准 LRC；富文本解码后序列化回标准 LRC。
+  // 2) QM / KG：优先标准 LRC；富文本解码后序列化回标准 LRC。
   final fetchers = <Future<LyricMatchResult?> Function(Track)>[
     (t) => qmGetLyricByQuery(t, preferRich: false),
     (t) => kgGetLyricByQuery(t, preferRich: false),

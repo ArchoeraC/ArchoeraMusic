@@ -354,22 +354,22 @@ headless 基准：无失焦 **6.3ms**、逐行失焦 **28.5ms**、整层 1/4 重
 
 ## 7. 解析格式补齐 + AMLL DB TTML 覆盖（2026-09-30）
 
-> 起因：部分歌词（尤其 QQ 音乐逐字）显示异常。对照 SPlayer-Next / AMLL 的
+> 起因：部分歌词（尤其 QM 逐字）显示异常。对照 SPlayer-Next / AMLL 的
 > `parseQRC` / `parseLRC` / `bg.ts` / `parseTTML` 补齐解析层。
 
-### 7.1 QRC（QQ 音乐逐字）
+### 7.1 QRC（QM 逐字）
 
 云端 QRC 是 **XML 外壳**（`<Lyric_1 LyricContent="[0,2250]晴(0,160)天…"/>`），
 且字级为 `字(绝对起始,时长)`（文字在前、时间为绝对毫秒）。此前
 `parseLyricGroups` 只认 `[mm:ss.xxx]` + `<相对,时长>`，QRC 解析为 **0 行**，
-引擎随即把 QQ 当成「无歌词」回退到别的平台（或空）——即「部分歌词显示异常」。
+引擎随即把 QM 当成「无歌词」回退到别的平台（或空）——即「部分歌词显示异常」。
 
 - 新增 `convertQrcToYrc`：解 XML 外壳（含实体还原）→ 归一化为
   `[m:ss.xxx]<相对起始,时长>字`，复用既有逐字管线；对齐 AMLL `parseQRC`
   的字级切分（裸括号仅在 `(` 后紧跟数字时才算时间标记）。
 - 归一化放在**解码器**（`parseLyricGroups`）而非抓取层：历史缓存里未解包的
   QRC 也能恢复。
-- QQ 的 **罗马音同样是 QRC**（`romajiFormat` 标为 qrc）：`_parseSubLines`
+- QM 的 **罗马音同样是 QRC**（`romajiFormat` 标为 qrc）：`_parseSubLines`
   按 `translationFormat` / `romajiFormat` 解析子行并剥残留字级标签。
 
 ### 7.2 增强 LRC / ESLRC

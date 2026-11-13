@@ -101,10 +101,10 @@ abstract class SourcePlatform {
   /// 是否参与搜索页 `'all'` 聚合。
   bool get inAggregate => true;
 
-  /// 搜索失败后是否需要退避（防连打触发风控；QQ 覆写为 true）。
+  /// 搜索失败后是否需要退避（防连打触发风控；QM 覆写为 true）。
   bool get searchCoolable => false;
 
-  /// 搜索失败的用户可见说明（默认原始异常；QQ 覆写为分类文案）。
+  /// 搜索失败的用户可见说明（默认原始异常；QM 覆写为分类文案）。
   String searchErrorDetail(AppLocalizations l10n, Object? err) => '$err';
 
   /// 下载器（Rust）回退是否支持本源；QQMusic 明确不支持。
@@ -133,7 +133,7 @@ abstract class SourcePlatform {
   /// B 站等只有评论、没有本地红心的源单独覆写为 true。
   bool get trackMenuComment => trackMenuLikeComment;
 
-  /// 通用曲目右键菜单是否显示「查看歌手 / 媒体详情 / 下载」（NT / KG / QQ）。
+  /// 通用曲目右键菜单是否显示「查看歌手 / 媒体详情 / 下载」（NT / KG / QM）。
   bool get trackMenuArtistDownload => false;
 
   /// 是否显示「查看歌手」（默认随 [trackMenuArtistDownload]；B 站 UP 主详情未接）。
@@ -298,7 +298,7 @@ abstract class SourcePlatform {
 
   /// 可用最高音质徽标（label + 是否无损档）；null = 无信息（不显示）。
   ///
-  /// 默认由 [Track.quality] 反推；各源可覆写（KG hash 链 / QQ 文件大小）。
+  /// 默认由 [Track.quality] 反推；各源可覆写（KG hash 链 / QM 文件大小）。
   ({String label, bool lossless})? qualityBadge(
     Track t,
     AppLocalizations l10n, {
@@ -346,10 +346,10 @@ abstract class SourcePlatform {
   /// 是否支持 AMLL DB TTML 覆盖歌词（目录见 `apis/lyric/ttml.dart`）。
   bool get supportsTtml => false;
 
-  /// AMLL DB 平台目录（`%p`）：NT `ncm-lyrics` / QQ `qq-lyrics`。
+  /// AMLL DB 平台目录（`%p`）：NT `ncm-lyrics` / QM `qq-lyrics`。
   String get ttmlPath => '';
 
-  /// AMLL DB TTML 候选 id（默认 [trackId]；QQ 额外用 mid）。
+  /// AMLL DB TTML 候选 id（默认 [trackId]；QM 额外用 mid）。
   List<String> ttmlCandidateIds(Track t, String? trackId) => [
     if (trackId != null && trackId.isNotEmpty) trackId,
   ];
@@ -933,7 +933,7 @@ class _KugouSource extends SourcePlatform {
   }
 }
 
-// ── QQ ─────────────────────────────────────────────────────────────────
+// ── QM ─────────────────────────────────────────────────────────────────
 
 class _QqSource extends SourcePlatform {
   @override
@@ -1081,7 +1081,7 @@ class _QqSource extends SourcePlatform {
     required int loaded,
     required int limit,
   }) {
-    // QQ 歌手搜索单页上限 30（>30 服务端返回空）：分页除数跟随实际请求量，
+    // QM 歌手搜索单页上限 30（>30 服务端返回空）：分页除数跟随实际请求量，
     // 避免页号漂移。
     const size = 30;
     final page = append ? (loaded ~/ size) + 1 : 1;

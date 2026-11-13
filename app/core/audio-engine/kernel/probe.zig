@@ -568,7 +568,7 @@ test "identify: Musepack SV8（MPCK）与 SV7（MP+ 07/17）" {
     try testing.expectEqual(Format.unknown, fmtBytes("MPCX"));
 }
 
-test "probe: mpc 开启 → 识别（SV8 解码已接入；SV7 由 open 回退 FFmpeg）" {
+test "probe: mpc 开启 → 识别（SV8 解码已接入；SV7 由 open 回退 验收基准）" {
     var r = io.Reader.openMem("MPCKSH\x0e\xf7\x65\xa0\xdb\x08\x9f\xff\x75\x00");
     try testing.expectEqual(Format.mpc, probe(&r));
     var r7 = io.Reader.openMem("MP+\x07\xc8\x01\x00\x00");
@@ -589,7 +589,7 @@ test "probe: tta 开启 → 识别（fmt/tta 已接入）" {
     try testing.expectEqual(@as(u64, 0), r.pos);
 }
 
-test "identify: DTS core sync 四种形态" {    // BE16（ffmpeg dca 编码器输出）：7F FE 80 01
+test "identify: DTS core sync 四种形态" {    // BE16（验收基准 dca 编码器输出）：7F FE 80 01
     try testing.expectEqual(Format.dts, fmtBytes("\x7F\xFE\x80\x01\xFC\x3C\x00\x00"));
     // LE16（每 16-bit 字内字节交换）：FE 7F 01 80
     try testing.expectEqual(Format.dts, fmtBytes("\xFE\x7F\x01\x80\x3C\xFC\x00\x00"));

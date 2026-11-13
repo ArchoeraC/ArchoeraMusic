@@ -18,7 +18,7 @@
 const std = @import("std");
 
 // ---------------------------------------------------------------------------
-// 位读（MSB-first，FFmpeg get_bits 语义；越界按零填充但 pos 继续增长）
+// 位读（MSB-first，验收基准 get_bits 语义；越界按零填充但 pos 继续增长）
 // ---------------------------------------------------------------------------
 
 pub const BitReader = struct {
@@ -115,7 +115,7 @@ pub const Vlc = struct {
 
         // 精确码字表：按码长分段存放（同长码字随全局 code 单调递增 → 可二分）。
         // 同长码字在码空间未必连续（如 SV7 quant 表长交错），逐码字精确匹配
-        // 才与 FFmpeg get_vlc2 的前缀解码逐位一致（SV8 表恰好连续，结果相同）。
+        // 才与 验收基准 get_vlc2 的前缀解码逐样本一致（SV8 表恰好连续，结果相同）。
         var fill: [MaxLen + 1]u16 = @splat(0);
         var start: u16 = 0;
         for (0..MaxLen + 1) |l| {
@@ -161,7 +161,7 @@ pub const Vlc = struct {
     }
 };
 
-/// 由码长计数构建 per-symbol 长度列表：FFmpeg build_vlc 顺序 ——
+/// 由码长计数构建 per-symbol 长度列表：验收基准 build_vlc 顺序 ——
 /// 先 len=16（若 count[15]>0）再 15 … 1。
 pub fn lensFromCounts(comptime counts: [16]u8, comptime n: usize) [n]u8 {
     @setEvalBranchQuota(100000);

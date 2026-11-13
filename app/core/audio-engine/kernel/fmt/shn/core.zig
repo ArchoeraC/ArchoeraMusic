@@ -22,7 +22,7 @@
 //!   - 命令流：每命令 get_ur_golomb_shorten(FNSIZE=2) 读函数码；
 //!     is_audio_command = {1,1,1,1,0,0,0,1,1,0}；块 = channels 个音频命令
 //!     （每命令一通道）→ 输出一帧交错 PCM；未知命令 = 本块中止复位重来
-//!     （与 ffmpeg 分包 decode 调用语义逐位等价，见 nextBlock）。
+//!     （与 验收基准 分包 decode 调用语义逐位等价，见 nextBlock）。
 //!
 //! EOF 边界：越界读按零填充（GetBitContext 缓冲零填充语义），
 //! bit_pos 可越过 size_in_bits（get_bits_left 可为负，与 C 一致）。
@@ -279,7 +279,7 @@ pub const Decoder = struct {
     }
 
     /// decode_aiff_header（shorten.c；bytestream2 越界读 0 语义以内联
-    /// 长度检查等价实现——canonical 头（≥44 字节）路径逐位一致）
+    /// 长度检查等价实现——canonical 头（≥44 字节）路径逐样本一致）
     fn decodeAiffHeader(self: *Decoder, header: []const u8) Error!void {
         var gb = header;
         if (gb.len < 4) return error.Corrupt;
@@ -505,9 +505,9 @@ pub const Decoder = struct {
     /// 解码下一个完整块（channels 个音频命令），交错写入 out。
     /// out 长度必须 ≥ 初始 blocksize * channels * sampleWidth。
     /// 返回 true = 输出一块；false = 流结束（QUIT / 位流耗尽）。
-    /// 致命错误（ffmpeg 中止解码的情形）以 Error 返回。
+    /// 致命错误（验收基准 中止解码的情形）以 Error 返回。
     ///
-    /// 与 ffmpeg 分包语义的等价性：ffmpeg 每次 decode 调用复位 cur_chan=0
+    /// 与 验收基准 分包语义的等价性：验收基准 每次 decode 调用复位 cur_chan=0
     /// 并处理命令直到帧完成/位不足；未知命令只中止本块（位置已推进），
     /// 下一次调用复位后继续。整文件缓冲下逐位等价于本循环：
     /// 未知命令 → cur_chan=0 后继续读下一命令。
@@ -652,7 +652,7 @@ pub const Decoder = struct {
         return false;
     }
 
-    /// 输出一帧（planar → 交错、clip、AIFF-C swap），对齐 ffmpeg
+    /// 输出一帧（planar → 交错、clip、AIFF-C swap），对齐 验收基准
     /// s16p/u8p frame → `-f s16le` / `-f u8`（planar→packed）输出。
     fn emitFrame(self: *Decoder, out: []u8) void {
         const chs = self.channels;
@@ -723,7 +723,7 @@ pub fn avLog2(v: usize) u32 {
 }
 
 // ---------------------------------------------------------------------------
-// 单元测试（golomb/位读取对齐 ffmpeg 语义）
+// 单元测试（golomb/位读取对齐 验收基准 语义）
 // ---------------------------------------------------------------------------
 
 const testing = std.testing;
@@ -788,7 +788,7 @@ test "BitReader: EOF 零填充语义（越界读 0，bits_left 为负）" {
     try testing.expectEqual(@as(u32, 0), br.getURJpegLS(0)); // 全 0 → bits_left ≤ 0 停止，i=0
 }
 
-test "avLog2 对齐 ffmpeg" {
+test "avLog2 对齐 验收基准" {
     try testing.expectEqual(@as(u32, 8), avLog2(256));
     try testing.expectEqual(@as(u32, 0), avLog2(0));
     try testing.expectEqual(@as(u32, 0), avLog2(1));

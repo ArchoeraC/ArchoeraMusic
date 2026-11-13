@@ -22,7 +22,7 @@
 //!   - 节拍用对数幅度谱通量 + 最近 43 帧中位数自适应阈值 + 100ms 冷却；
 //!   - 所有核/表在 create 时一次构建，每帧零分配；reset 只清状态。
 //!
-//! 命名自有（`era_` 前缀），不照搬 FFmpeg / librosa 等上游标识符。
+//! 命名自有（`era_` 前缀），不照搬 验收基准 / librosa 等上游标识符。
 
 const std = @import("std");
 const Stage = @import("stage.zig").Stage;

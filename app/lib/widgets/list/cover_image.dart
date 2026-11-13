@@ -11,7 +11,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 import '../../services/source/media_request_headers.dart';
 import '../../stores/app_prefs.dart';
 
-/// 网络封面浏览器 UA（NT封面 CDN `p1.music.126.net` 对 Dart 默认 UA 403）。
+/// 网络封面浏览器 UA（NT 封面 CDN `p1.music.126.net` 对 Dart 默认 UA 403）。
 ///
 /// 通过 [HttpOverrides] 设为全局 HttpClient 默认 UA：Flutter [Image.network]
 /// 内部用 `request.headers.add` 追加自定义头，若经 headers 传 UA 会与默认

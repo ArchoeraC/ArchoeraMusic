@@ -5,7 +5,7 @@
 /// QM（QM）播放音源服务（对齐 kugou/netease 服务形态的轻量封装）。
 ///
 /// - 底层：apis/qqmusic（Dart 直连，musicu.fcg 明文 JSON + UA/comm 伪装）
-/// - 登录：QQ 扫码 → musickey 落盘到 host sessionStore（vault
+/// - 登录：QM 扫码 → musickey 落盘到 host sessionStore（vault
 ///   加密，平台键 'qqmusic'）；cookie/uin 由 request 层自动注入
 /// - 搜索 / 歌单 / 专辑 / 歌手 / 榜单 → 归一为 netease 的 [Track]/[CoverItem]
 /// - 播放：song_url（music.vkey.GetVkey）多音质降级；访客可播免费曲，
@@ -23,7 +23,7 @@ import '../netease/comment.dart';
 import '../netease/netease_api.dart' show CoverItem, SearchResult;
 import '../netease/track.dart';
 
-/// QM业务异常（resolve 失败 / 登录缺失等；message 可直接展示）。
+/// QM 业务异常（resolve 失败 / 登录缺失等；message 可直接展示）。
 ///
 /// [kind]/[code] 仅在请求层归一后携带（kind=risk 表示风控/限流拦截，code 为
 /// outer/inner 业务码），供界面决定本地化文案与重试策略。
@@ -46,15 +46,15 @@ class QqApiException implements Exception {
 ///
 /// 在线红心 RPC（dirid=201 族）为社区逆向、非官方文档，存在接口失效 /
 /// 风控风险。开启后：
-/// - 已登录 QQ 时，[QqMusicApi.likedSongs]/[likedSongmids] 拉在线红心并入；
+/// - 已登录 QM 时，[QqMusicApi.likedSongs]/[likedSongmids] 拉在线红心并入；
 /// - [QqMusicApi.like] 写在线红心；失败由红心控制器**回滚本地**并提示。
 ///
-/// 无论本开关如何，**本机 QQ 红心（app 本地「我喜欢」）始终可用**，不受
+/// 无论本开关如何，**本机 QM 红心（app 本地「我喜欢」）始终可用**，不受
 /// 在线成败影响。若某端点失效：可整体置 false 关闭在线收藏（本地不受
 /// 影响），并参考 favorite.dart 顶部的调研来源替换端点族。
 const bool kQqFavExperimental = true;
 
-/// QM登录资料（user_detail 归一）。
+/// QM 登录资料（user_detail 归一）。
 class QqMusicProfile {
   const QqMusicProfile({
     required this.userId,
@@ -71,7 +71,7 @@ class QqMusicProfile {
   final int vipLevel;
 }
 
-/// 搜索请求统一入口（QM模块协议）。
+/// 搜索请求统一入口（QM 模块协议）。
 class QqMusicApi extends ChangeNotifier {
   QqMusicApi();
 
@@ -140,9 +140,9 @@ class QqMusicApi extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── QQ 扫码登录 ──────────────────────────────────────────────────────
+  // ── QM 扫码登录 ──────────────────────────────────────────────────────
 
-  /// 生成 QQ 登录二维码。
+  /// 生成 QM 登录二维码。
   /// 返回 {key, content(data:image/...base64)}。
   Future<Map<String, dynamic>> qrKey() async {
     final body = await qmCall('login_qr_key', {'type': 'qq'});
@@ -159,7 +159,7 @@ class QqMusicApi extends ChangeNotifier {
     return {'key': key, 'content': content, 'type': body['type'] ?? 'qq'};
   }
 
-  /// 轮询 QQ 扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（cookie 已写入）。
+  /// 轮询 QM 扫码状态：0=过期/取消 1=等待 2=已扫码待确认 4=成功（cookie 已写入）。
   /// 返回 {status, nickname?, avatarUrl?}。
   Future<Map<String, dynamic>> qrCheck(String key) async {
     final body = await qmCall('login_qr_check', {'type': 'qq', 'key': key});
@@ -330,7 +330,7 @@ class QqMusicApi extends ChangeNotifier {
     return raw.map(_toTrack).toList();
   }
 
-  /// 榜单分类（topid → 名称/封面）；QM固定榜单入口。
+  /// 榜单分类（topid → 名称/封面）；QM 固定榜单入口。
   static const leaderboardCategories = <CoverItem>[
     CoverItem(id: '26', title: 'QM巅峰榜·流行', trackCount: 100),
     CoverItem(id: '27', title: '新歌榜', trackCount: 100),
@@ -519,7 +519,7 @@ class QqMusicApi extends ChangeNotifier {
   /// 红心 / 取消红心（登录态，社区逆向 dirid=201 写接口，**实验性**）。
   ///
   /// - [mid]：songmid（红心键）；
-  /// - [songId]：QQ 歌曲数字 id（`Track.id`）。写接口按 songid 操作，
+  /// - [songId]：QM 歌曲数字 id（`Track.id`）。写接口按 songid 操作，
   ///   缺失时抛可读错误（不猜测、不静默跳过）。
   /// - 失败抛 [QqApiException]（message 可展示；由红心控制器回滚本地）。
   Future<void> like(String mid, {required bool like, String? songId}) async {
@@ -549,7 +549,7 @@ class QqMusicApi extends ChangeNotifier {
 
   // ── 播放 URL（GetVkey 直链 + 音质降级）──────────────────────────────
 
-  /// 解析 QQ 曲目可播放 URL。
+  /// 解析 QM 曲目可播放 URL。
   ///
   /// [quality] 为档位（lq/sq/hq/lossless/hi-res），缺省 hq；解析内部按
   /// 高→低顺位自动降级。访客可播免费曲；VIP/无版权按接口语义抛
@@ -587,7 +587,7 @@ class QqMusicApi extends ChangeNotifier {
 
   // ── 评论 ────────────────────────────────────────────────────────────
 
-  /// QQ 歌曲评论（`music.globalComment.CommentRead`）。
+  /// QM 歌曲评论（`music.globalComment.CommentRead`）。
   ///
   /// 官方接口**读取需登录态**（访客返回 `request.code=10000` 空列表），
   /// 未登录由调用方先引导登录。[hot] 热门 / 最新两 Tab。
@@ -622,7 +622,7 @@ class QqMusicApi extends ChangeNotifier {
     });
   }
 
-  /// QQ 评论项 → [NeteaseComment]（`CmId/Nick/Avatar/Content/PraiseNum/PubTime/SubComments`）。
+  /// QM 评论项 → [NeteaseComment]（`CmId/Nick/Avatar/Content/PraiseNum/PubTime/SubComments`）。
   static NeteaseComment _toComment(Map<String, dynamic> c) {
     final avatar = c['Avatar']?.toString() ?? '';
     final pubTime = int.tryParse('${c['PubTime'] ?? ''}') ?? 0;
@@ -661,7 +661,7 @@ class QqMusicApi extends ChangeNotifier {
     throw QqApiException('$err');
   }
 
-  /// 包裹一次 QQ 模块调用（搜索等），统一错误归一。
+  /// 包裹一次 QM 模块调用（搜索等），统一错误归一。
   Future<T> _guard<T>(Future<T> Function() run) async {
     try {
       return await run();
@@ -682,7 +682,7 @@ class QqMusicApi extends ChangeNotifier {
     }, cover: cover == null ? null : qmNormalizeCover(cover));
   }
 
-  /// QQ 搜索条目 → [CoverItem]（专辑）。
+  /// QM 搜索条目 → [CoverItem]（专辑）。
   CoverItem _coverFromQq(Map<String, dynamic> a) => CoverItem(
     id: a['id']?.toString() ?? '',
     title: a['name']?.toString() ?? '',

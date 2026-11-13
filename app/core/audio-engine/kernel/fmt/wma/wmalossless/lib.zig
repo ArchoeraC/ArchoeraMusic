@@ -16,11 +16,11 @@
 //! 触发 EOF flush 输出蓄存器中剩余帧）→ 交错样本。
 //!
 //! 输出语义对齐 ffmpeg native wmalossless 内部格式：
-//!   - 16-bit：交错 s16（= ffmpeg S16P → `-f s16le`，逐位一致）
-//!   - 24-bit：24bit 值左移 8 的 int32（= ffmpeg S32P / bits_per_raw_sample=24，
-//!     即 `-f s32le`，逐位一致）；Info.bits_per_sample 报 32（与 m4a/ALAC 24bit
+//!   - 16-bit：交错 s16（= 验收基准 S16P → `-f s16le`，逐样本一致）
+//!   - 24-bit：24bit 值左移 8 的 int32（= 验收基准 S32P / bits_per_raw_sample=24，
+//!     即 `-f s32le`，逐样本一致）；Info.bits_per_sample 报 32（与 m4a/ALAC 24bit
 //!     输出语义一致）。
-//! 解码为整数/无浮点，目标与 ffmpeg 输出逐位一致。
+//! 解码为整数/无浮点，目标与 验收基准 输出逐样本一致。
 
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
@@ -104,7 +104,7 @@ fn readU32le(b: []const u8, off: usize) u32 {
 }
 
 /// 解码全部音频对象（WMA packet 序列）为交错样本字节。
-/// 16-bit → s16；24-bit → s32（24bit<<8，ffmpeg S32P 语义）。
+/// 16-bit → s16；24-bit → s32（24bit<<8，验收基准 S32P 语义）。
 pub fn decodeAll(a: std.mem.Allocator, file_data: []const u8, hdr: *const asf.Header) Error!struct { pcm: []u8, total_frames: usize } {
     const audio = hdr.audio.?;
     const bits_per_sample = readU16le(audio.extradata, 0);
@@ -175,7 +175,7 @@ pub fn decodeAll(a: std.mem.Allocator, file_data: []const u8, hdr: *const asf.He
         const consumed = dec.decodePacket(cur) catch |e| switch (e) {
             error.OutOfMemory => return error.OutOfMemory,
             else => {
-                // 与 ffmpeg decode core 一致：错误 → 丢弃本对象剩余部分
+                // 与 验收基准 decode core 一致：错误 → 丢弃本对象剩余部分
                 cur = &.{};
                 continue;
             },
@@ -192,7 +192,7 @@ pub fn decodeAll(a: std.mem.Allocator, file_data: []const u8, hdr: *const asf.He
         }
     }
 
-    // EOF flush：蓄存器中剩余帧（对齐 ffmpeg drain）
+    // EOF flush：蓄存器中剩余帧（对齐 验收基准 drain）
     while (true) : (guard += 1) {
         if (guard > (n + 2) * 2048 + 16) return error.Corrupt;
         const consumed = dec.decodePacket(&.{}) catch break;
@@ -239,7 +239,7 @@ pub fn openFromAsf(allocator: std.mem.Allocator, file_data: []u8, hdr: *const as
     const bits_per_sample = readU16le(audio.extradata, 0);
     if (bits_per_sample != 16 and bits_per_sample != 24) return error.UnsupportedFormat;
     if (audio.sample_rate == 0) return error.UnsupportedFormat;
-    // 帧长 = 1<<frame_len_bits ≤ 2^13（96k 及以下），超出回退 ffmpeg
+    // 帧长 = 1<<frame_len_bits ≤ 2^13（96k 及以下），超出回退 验收基准
     if (audio.sample_rate > 96000) return error.UnsupportedFormat;
 
     const r = try decodeAll(allocator, file_data, hdr);
@@ -275,7 +275,7 @@ pub fn openFromAsf(allocator: std.mem.Allocator, file_data: []u8, hdr: *const as
 }
 
 // ---------------------------------------------------------------------------
-// golden 回归（vs ffmpeg n9.0.1 native wmalossless，逐字节）
+// golden 回归（vs 验收基准 n9.0.1 native wmalossless，逐字节）
 // ---------------------------------------------------------------------------
 
 fn runE2e(embedded: []const u8, golden: []const u8) !struct { sr: u32, ch: u8, bytes: usize, equal: usize } {
@@ -315,7 +315,7 @@ fn runE2e(embedded: []const u8, golden: []const u8) !struct { sr: u32, ch: u8, b
 const sample_lucky = @embedFile("sample_lucky.wma");
 const golden_lucky = @embedFile("golden_lucky.s16");
 
-test "wmalossless e2e: 44.1k/16bit 2ch（LMS+inter+ac filter，210 帧）== ffmpeg" {
+test "wmalossless e2e: 44.1k/16bit 2ch（LMS+inter+ac filter，210 帧）== 验收基准" {
     const r = try runE2e(sample_lucky, golden_lucky);
     try std.testing.expectEqual(@as(u32, 44100), r.sr);
     try std.testing.expectEqual(@as(u8, 2), r.ch);
@@ -326,7 +326,7 @@ test "wmalossless e2e: 44.1k/16bit 2ch（LMS+inter+ac filter，210 帧）== ffmp
 const sample_g2 = @embedFile("sample_g2.wma");
 const golden_g2 = @embedFile("golden_g2.s32");
 
-test "wmalossless e2e: 44.1k/24bit 2ch（rawpcm tile + 尾帧截断）== ffmpeg s32le" {
+test "wmalossless e2e: 44.1k/24bit 2ch（rawpcm tile + 尾帧截断）== 验收基准 s32le" {
     const r = try runE2e(sample_g2, golden_g2);
     try std.testing.expectEqual(@as(u32, 44100), r.sr);
     try std.testing.expectEqual(@as(u8, 2), r.ch);
@@ -337,7 +337,7 @@ test "wmalossless e2e: 44.1k/24bit 2ch（rawpcm tile + 尾帧截断）== ffmpeg 
 const sample_master = @embedFile("sample_master.wma");
 const golden_master = @embedFile("golden_master.s32");
 
-test "wmalossless e2e: 48k/24bit 2ch（LMS 45 帧）== ffmpeg s32le" {
+test "wmalossless e2e: 48k/24bit 2ch（LMS 45 帧）== 验收基准 s32le" {
     const r = try runE2e(sample_master, golden_master);
     try std.testing.expectEqual(@as(u32, 48000), r.sr);
     try std.testing.expectEqual(@as(u8, 2), r.ch);
@@ -348,7 +348,7 @@ test "wmalossless e2e: 48k/24bit 2ch（LMS 45 帧）== ffmpeg s32le" {
 const sample_mega = @embedFile("sample_mega.wma");
 const golden_mega = @embedFile("golden_mega.s32");
 
-test "wmalossless e2e: 48k/24bit 2ch（9 帧，末帧越界截断）== ffmpeg s32le" {
+test "wmalossless e2e: 48k/24bit 2ch（9 帧，末帧越界截断）== 验收基准 s32le" {
     const r = try runE2e(sample_mega, golden_mega);
     try std.testing.expectEqual(@as(u32, 48000), r.sr);
     try std.testing.expectEqual(@as(u8, 2), r.ch);

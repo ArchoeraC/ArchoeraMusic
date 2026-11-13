@@ -41,7 +41,7 @@ class _LikedPageState extends ConsumerState<LikedPage> {
   late String _platform;
   bool _resolving = false;
 
-  /// 当前平台「我喜欢」是否可用（QQ 本机红心无需登录）。
+  /// 当前平台「我喜欢」是否可用（QM 本机红心无需登录）。
   bool get _available => collectionPlatform(_platform).likedAvailable(ref);
 
   @override

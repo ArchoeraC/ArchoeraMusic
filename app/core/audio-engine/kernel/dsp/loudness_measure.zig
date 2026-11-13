@@ -24,8 +24,8 @@
 //! 有界块喂入 `era_loudness_meter_push`。
 //!
 //! 命名自有（`era_` 前缀）；系数设计参数与门限常量来自规范（事实），不照搬
-//! FFmpeg / libebur128 等上游标识符。规范锚点：立体声 1 kHz 满幅正弦 ≈ 0.0 LUFS
-//! （ffmpeg `ebur128` 同源复核；−23 dBFS 立体声 1 kHz 正弦 ≈ −23.0 LUFS）。
+//! 验收基准 / libebur128 等上游标识符。规范锚点：立体声 1 kHz 满幅正弦 ≈ 0.0 LUFS
+//! （验收基准 `ebur128` 同源复核；−23 dBFS 立体声 1 kHz 正弦 ≈ −23.0 LUFS）。
 
 const std = @import("std");
 const Biquad = @import("biquad.zig").EraBiquadState;
@@ -302,7 +302,7 @@ fn measureSine(
     return era_loudness_meter_finish(m);
 }
 
-test "era_r128: 立体声 1kHz 满幅正弦 ≈ 0.0 LUFS（规范锚点；ffmpeg ebur128 复核）" {
+test "era_r128: 立体声 1kHz 满幅正弦 ≈ 0.0 LUFS（规范锚点；验收基准 ebur128 复核）" {
     // 说明：规范校准为 −23 dBFS 立体声 1kHz 正弦 ≈ −23.0 LUFS，故满幅 ≈ 0.0 LUFS。
     const r = try measureSine(testing.allocator, 48000, 2, 2, 1000.0, 1.0);
     try testing.expect(r.valid);

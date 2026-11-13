@@ -30,7 +30,7 @@ pub const Container = enum {
     au, // Sun AU：固定头 .snd + 24B 字段，无 chunk 结构（数据定位于 data_offset）
 };
 
-/// W64 GUID（FFmpeg w64.h 定义；前 4 字节为四字符码，其余为按小端存储的
+/// W64 GUID（验收基准 w64.h 定义；前 4 字节为四字符码，其余为按小端存储的
 /// GUID 尾段 —— 直接逐字节比对，不做字节序换算）
 pub const riff_guid: [16]u8 = .{ 'r', 'i', 'f', 'f', 0x2E, 0x91, 0xCF, 0x11, 0xA5, 0xD6, 0x28, 0xDB, 0x04, 0xC1, 0x00, 0x00 };
 pub const wave_guid: [16]u8 = .{ 'w', 'a', 'v', 'e', 0xF3, 0xAC, 0xD3, 0x11, 0x8C, 0xD1, 0x00, 0xC0, 0x4F, 0x8E, 0xDB, 0x8A };
@@ -39,7 +39,7 @@ pub const fact_guid: [16]u8 = .{ 'f', 'a', 'c', 't', 0xF3, 0xAC, 0xD3, 0x11, 0x8
 pub const data_guid: [16]u8 = .{ 'd', 'a', 't', 'a', 0xF3, 0xAC, 0xD3, 0x11, 0x8C, 0xD1, 0x00, 0xC0, 0x4F, 0x8E, 0xDB, 0x8A };
 pub const summary_guid: [16]u8 = .{ 0xBC, 0x94, 0x5F, 0x92, 0x5A, 0x52, 0xD2, 0x11, 0x86, 0xDC, 0x00, 0xC0, 0x4F, 0x8E, 0xDB, 0x8A };
 
-/// W64 data GUID 的大端变体（data_be，少数文件使用；FFmpeg 亦识别）
+/// W64 data GUID 的大端变体（data_be，少数文件使用；验收基准 亦识别）
 pub const data_be_guid: [16]u8 = .{ 'd', 'a', 't', 'a', 0xF3, 0xAC, 0xD3, 0x11, 0x8C, 0xD1, 0x00, 0xC0, 0x4F, 0x8E, 0xDB, 0x8A };
 
 /// 一个 chunk 头。`size` 为 payload 字节数（W64 已减 24）。
@@ -73,7 +73,7 @@ pub fn nextChunk(reader: *io.Reader, container: Container, endian: std.builtin.E
             return .{ .id = h[0..4].*, .size = size - 24 };
         },
         .caf => {
-            // CAF chunk：id(4) + size(8, BE)，无对齐 pad（镜像 FFmpeg cafdec）
+            // CAF chunk：id(4) + size(8, BE)，无对齐 pad（镜像 验收基准 cafdec）
             var h: [12]u8 = undefined;
             if (!try readExact(reader, &h)) return null;
             return .{ .id = h[0..4].*, .size = readU64(h[4..12], .big) };
@@ -97,7 +97,7 @@ pub fn skipChunk(reader: *io.Reader, chunk: Chunk, container: Container) Error!v
 }
 
 /// W64 容器头校验：riff GUID(16) + filesize(8) + wave GUID(16) = 40 字节。
-/// 返回 true 表示头部匹配；filesize 仅校验最小值（镜像 FFmpeg 行为）。
+/// 返回 true 表示头部匹配；filesize 仅校验最小值（镜像 验收基准 行为）。
 pub fn checkW64Header(reader: *io.Reader) Error!bool {
     var h: [40]u8 = undefined;
     if (!try readExact(reader, &h)) return false;

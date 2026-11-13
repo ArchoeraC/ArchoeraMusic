@@ -10,7 +10,7 @@
 //! **不引入任何平台 intrinsic**；基线目标（无 SSE4.1/AVX）下退化为多条 SSE/标量指令，
 //! 语义不变。
 //!
-//! **位级一致约定**：调用方只把**相互独立**的 lane 打包进向量，且每 lane 的运算顺序
+//! **逐样本一致约定**：调用方只把**相互独立**的 lane 打包进向量，且每 lane 的运算顺序
 //! 与标量原实现逐条相同（不重结合、不引入 FMA）；因此输出与标量路径逐位相同。
 
 const std = @import("std");
@@ -120,7 +120,7 @@ pub inline fn copyForwardsGap8(dst: [*]f32, src: [*]const f32, len: usize) void 
 }
 
 // ---------------------------------------------------------------------------
-// 测试：向量路径与标量参考**逐位一致**（B 档纪律）
+// 测试：向量路径与标量参考**逐样本一致**（B 档纪律）
 // ---------------------------------------------------------------------------
 
 const testing = std.testing;
@@ -134,7 +134,7 @@ fn refF32ToS16(v: f32) i16 {
     return @intCast((s + 128) >> 8);
 }
 
-test "vec: f32ToS16x8 与标量逐位一致（含特殊值/边界）" {
+test "vec: f32ToS16x8 与标量逐样本一致（含特殊值/边界）" {
     const specials = [_]f32{
         0.0,  -0.0, 1.0,  -1.0,                          std.math.inf(f32), -std.math.inf(f32),
         std.math.nan(f32), 0.5 / 8388608.0, -0.5 / 8388608.0, 1.5 / 8388608.0,
@@ -165,7 +165,7 @@ test "vec: f32ToS16x8 与标量逐位一致（含特殊值/边界）" {
     }
 }
 
-test "vec: scaleInPlace/scaleCopy/avgHalf/intToFloat 与标量逐位一致" {
+test "vec: scaleInPlace/scaleCopy/avgHalf/intToFloat 与标量逐样本一致" {
     var prng = std.Random.DefaultPrng.init(0xabcdef);
     const rnd = prng.random();
     var a: [64]f32 = undefined;

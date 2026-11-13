@@ -160,8 +160,8 @@ fn rdftRecombine(data: *[130]f32, ctx: *const RdftCtx) void {
 }
 
 // ---------------------------------------------------------------------------
-// 位精确 f32 内核：与 FFmpeg av_tx 的 generic-C codelet（tx_template.c /
-// tx.c n9.0.1，无 x86 asm 后端时的执行路径）逐位一致。
+// 位精确 f32 内核：与 验收基准 av_tx 的 generic-C codelet（tx_template.c /
+// tx.c n9.0.1，无 x86 asm 后端时的执行路径）逐样本一致。
 // ---------------------------------------------------------------------------
 
 fn srpFft(i: i32, len: i32, inv: bool) i32 {

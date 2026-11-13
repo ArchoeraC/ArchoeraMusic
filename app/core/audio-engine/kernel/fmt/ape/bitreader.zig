@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! APE 位读取（GetBitContext 等价，MSB-first，内存缓冲）
 //!
@@ -14,7 +18,7 @@
 //!   - `unaryStop(stop, len)`：计数直到读到等于 stop 的位，返回 stop 位之前的
 //!     连续非 stop 位数（最多 len）；若 len 内未找到 stop 位，消费 len 位并返回 len；
 //!   - 越界读返回 error.Corrupt（数据缓冲已由帧解码器按 buf_size 零填充，
-//!     合法帧不会越界；FFmpeg 的零填充缓存在此语义等价）。
+//!     合法帧不会越界；验收基准 的零填充缓存在此语义等价）。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
@@ -55,14 +59,14 @@ pub const BitReader = struct {
         return bit;
     }
 
-    /// 前进 n 位（对齐 FFmpeg skip_bits_long：无边界校验，越界由后续读取报错）。
+    /// 前进 n 位（对齐 验收基准 skip_bits_long：无边界校验，越界由后续读取报错）。
     pub fn skipBits(self: *BitReader, n: usize) void {
         self.bit_pos +%= n;
     }
 
-    /// 计数直到读到等于 `stop` 的位（FFmpeg get_unary 语义）。
+    /// 计数直到读到等于 `stop` 的位（验收基准 get_unary 语义）。
     /// 返回 stop 位之前连续的非 stop 位数；len 内未命中则消费 len 位并返回 len。
-    /// 越界读取按零填充处理（FFmpeg 零填充缓存等价），不报错。
+    /// 越界读取按零填充处理（验收基准 零填充缓存等价），不报错。
     pub fn unaryStop(self: *BitReader, stop: u1, len: usize) usize {
         var i: usize = 0;
         while (i < len) : (i += 1) {

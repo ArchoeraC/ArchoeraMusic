@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// KG登录入口 + 扫码登录对话框。
+/// KG 登录入口 + 扫码登录对话框。
 ///
 /// 扫码登录方案：拿 token/userid 后注入
 /// v5/url 请求，即可获取 VIP 曲目。登录态存 [KugouApi.session]

@@ -18,13 +18,13 @@
 //!     不含可听样本；ffmpeg demuxer 同样 seek 越过 vbr tag frame 后解码）；
 //!   - 若其后带 LAME/Lavf/Lavc 编码扩展（encoder 短名后固定 36B 布局，
 //!     24-bit = (encoder_delay<<12)|padding），则解码流头丢 encoder_delay+529
-//!     样本（ffmpeg start_skip_samples），输出截至于 frames×spf−(padding−529)
+//!     样本（验收基准 start_skip_samples），输出截至于 frames×spf−(padding−529)
 //!     （即总输出 = frames×spf − delay − padding），Info.duration_us 同式。
-//!   - 无 Xing / 无上述编码扩展的文件不裁剪（对齐 ffmpeg 实测），保证不误裁。
-//! 解码输出与 ffmpeg mp3 解码按样本流对齐：长度一致、内容按 0 偏移相关
-//! （codec 层 ffmpeg 定点 vs minimp3 浮点有 ±1 LSB 舍入差，不作逐位断言）。
+//!   - 无 Xing / 无上述编码扩展的文件不裁剪（对齐 验收基准 实测），保证不误裁。
+//! 解码输出与 验收基准 mp3 解码按样本流对齐：长度一致、内容按 0 偏移相关
+//! （codec 层 验收基准 定点 vs minimp3 浮点有 ±1 LSB 舍入差，不作逐位断言）。
 //!
-//! 与 minimp3 参考逐位对齐（CC0 移植），经 minimp3_test 全部 Layer I/II/III
+//! 与 minimp3 参考逐样本对齐（CC0 移植），经 minimp3_test 全部 Layer I/II/III
 //! 向量与真实样本验证（PCM 精确一致）。
 
 const std = @import("std");
@@ -86,10 +86,10 @@ const Ctx = struct {
     has_toc: bool = false,
     /// Xing 提供的总样本数（无 = 0）
     total_samples_xing: u64 = 0,
-    /// 解码起点偏移（= 首帧或其后一帧；Xing 首帧整体跳过，对齐 ffmpeg mp3dec）
+    /// 解码起点偏移（= 首帧或其后一帧；Xing 首帧整体跳过，对齐 验收基准 mp3dec）
     stream_start: u64 = 0,
     /// LAME/Lavf/Lavc 扩展（Xing 后 36B 内 24-bit delay/padding 语义）：
-    /// 头部应丢弃的解码流样本数 = encoder_delay + 529（ffmpeg start_skip_samples）
+    /// 头部应丢弃的解码流样本数 = encoder_delay + 529（验收基准 start_skip_samples）
     gapless_skip: u64 = 0,
     /// 解码输出上限（trim 后总样本数 = Xing frames×spf − delay − padding；maxInt = 不限）
     out_limit: u64 = std.math.maxInt(u64),
@@ -167,7 +167,7 @@ inline fn be24(b: []const u8) u32 {
 }
 
 /// 首帧内 Xing/Info VBR 头 + LAME/Lavf/Lavc 扩展的解析结果。
-/// 语义对齐 ffmpeg libavformat/mp3dec.c 的 mp3_parse_vbr_tags / mp3_parse_info_tag：
+/// 语义对齐 验收基准 libavformat/mp3dec.c 的 mp3_parse_vbr_tags / mp3_parse_info_tag：
 ///   - Xing/Info 标记位于 Layer III 首帧「帧头 + side_info」处
 ///     （xing_offtbl[mpeg_lsf][mono]：MPEG1 stereo 32 / mono 17，LSF stereo 17 / mono 9）；
 ///   - 标记后 flags(4) → frames(4) → bytes(4) → TOC(100) → qscale(4)（按 flags 位存在与否）；
@@ -308,11 +308,11 @@ pub fn open(allocator: Allocator, reader: *Reader, info: *decoder.Info) Error!de
             ctx.xing_bytes = xg.bytes;
             ctx.toc = xg.toc;
             ctx.has_toc = xg.has_toc;
-            // ffmpeg mp3dec：存在 Xing/Info 且含 frames/bytes → 首帧（Xing 帧）整体跳过
+            // 验收基准 mp3dec：存在 Xing/Info 且含 frames/bytes → 首帧（Xing 帧）整体跳过
             ctx.stream_start = first + @as(u64, @intCast(ctx.frame_bytes));
             if (xg.has_enc) {
                 // LAME/Lavf/Lavc：解码流头丢 encoder_delay+529 样本；
-                // 输出上限 = frames×spf − delay − padding（ffmpeg duration 同式）
+                // 输出上限 = frames×spf − delay − padding（验收基准 duration 同式）
                 ctx.gapless_skip = @as(u64, xg.delay) + 529;
                 if (ctx.total_frames > 0 and ctx.frame_samples > 0) {
                     const raw = @as(u128, ctx.total_frames) * ctx.frame_samples;
@@ -403,7 +403,7 @@ fn buildInfo(ctx: anytype) decoder.Info {
     if (ctx.sample_rate > 0 and ctx.frame_samples > 0) {
         if (ctx.total_frames > 0) {
             // Xing/Info 提供精确总帧数 → 精确时长（gapless 扣 encoder delay/padding，
-            // 对齐 ffmpeg mp3dec：duration = (frames×spf − delay − padding)/rate）
+            // 对齐 验收基准 mp3dec：duration = (frames×spf − delay − padding)/rate）
             const total_samples: u128 = if (ctx.out_limit != std.math.maxInt(u64))
                 ctx.out_limit // 已按 trim 后总样本截断
             else
@@ -452,7 +452,7 @@ inline fn quantS16(v: f32) i16 {
 const I16x8 = @Vector(8, i16);
 
 /// 8 路并行量化：逐 lane 与 `quantS16` 同序（f32→f64 精确扩展、×32768 为 2 的幂、
-/// 截断/钳位一致）→ 位级一致。仅用于 ch=1/2 的连续样本段。
+/// 截断/钳位一致）→ 逐样本一致。仅用于 ch=1/2 的连续样本段。
 /// 截断目标用 i32（与标量 `quantS16` 一致；AVX2 上 f64→i32 比 f64→i64 廉价得多）。
 inline fn quantS16x8(v: @Vector(8, f32)) I16x8 {
     const d: @Vector(8, f64) = @floatCast(v);
@@ -474,7 +474,7 @@ inline fn storeS16x8(out: []u8, oi: usize, v: I16x8) void {
 
 /// 把 pcm 的 `frames` 帧交错样本量化写入 out[oi0..]。
 /// ch=2 按 4 帧（8 样本）一批做 8 路并行量化，尾帧走标量；ch=1 同理。
-/// 其余声道数走通用标量路径（无每样本整除，算术与旧实现同序 → 位级一致）。
+/// 其余声道数走通用标量路径（无每样本整除，算术与旧实现同序 → 逐样本一致）。
 inline fn quantWrite(out: []u8, oi0: usize, pcm: []const f32, frames: usize, channels: usize, frame_bytes: usize) void {
     if (channels == 2) {
         var oi = oi0;
@@ -885,7 +885,7 @@ const s_lame_lsf_s16 = @embedFile("samples/lame_lsf.s16");
 const s_noxing = @embedFile("samples/noxing.mp3");
 const s_noxing_s16 = @embedFile("samples/noxing.s16");
 
-/// gapless 样本与 ffmpeg `-f s16le` 逐样本对拍：
+/// gapless 样本与 验收基准 `-f s16le` 逐样本对拍：
 /// 长度（样本数）严格相等 + 内容按 0 偏移相关（mp3 codec 层 ±1 LSB 舍入，不作逐位断言）
 fn expectGaplessMatch(
     label: []const u8,
@@ -903,10 +903,10 @@ fn expectGaplessMatch(
     try testing.expectEqual(ch, got.info.channels);
     try testing.expectEqual(@as(u16, 16), got.info.bits_per_sample);
     try testing.expectEqual(known, got.info.duration_known);
-    // gapless 裁剪后总输出 = ffmpeg 解码样本流（长度一致，含起/末裁剪点）
+    // gapless 裁剪后总输出 = 验收基准 解码样本流（长度一致，含起/末裁剪点）
     try testing.expectEqual(golden.len, got.bytes.len);
     const c = comparePcm(got.bytes, golden);
-    // mp3 codec 层与 ffmpeg 为固定点 vs 浮点舍入差（±1 LSB）；相关性需 >0.9999
+    // mp3 codec 层与 验收基准 为固定点 vs 浮点舍入差（±1 LSB）；相关性需 >0.9999
     try testing.expect(c.corr > 0.9999);
     try testing.expect(c.max_abs <= 1);
     std.debug.print("mp3 gapless {s}: ch={d} bytes mine={d} golden={d} corr={d:.6} max_abs={d} equal {d}/{d}\n", .{
@@ -914,25 +914,25 @@ fn expectGaplessMatch(
     });
 }
 
-test "mp3 gapless: CBR Lavc/Info mono 44.1k → 与 ffmpeg 长度与内容对齐（chunk 大）" {
+test "mp3 gapless: CBR Lavc/Info mono 44.1k → 与 验收基准 长度与内容对齐（chunk 大）" {
     try expectGaplessMatch("cbr_mono/big", s_cbr_mono, s_cbr_mono_s16, 65536 / 2, 44100, 1, .exact);
 }
 
-test "mp3 gapless: CBR Lavc/Info mono 44.1k → 与 ffmpeg 长度与内容对齐（chunk 小/跨帧）" {
+test "mp3 gapless: CBR Lavc/Info mono 44.1k → 与 验收基准 长度与内容对齐（chunk 小/跨帧）" {
     // 小 chunk 强制帧尾残余（tail）与裁剪点跨 read 边界，输出必须与整块一致
     try expectGaplessMatch("cbr_mono/small", s_cbr_mono, s_cbr_mono_s16, 37, 44100, 1, .exact);
 }
 
-test "mp3 gapless: LAME CBR mono 44.1k（真 LAME 标签）→ 与 ffmpeg 对齐" {
+test "mp3 gapless: LAME CBR mono 44.1k（真 LAME 标签）→ 与 验收基准 对齐" {
     try expectGaplessMatch("lame_mono/big", s_lame_mono, s_lame_mono_s16, 65536 / 2, 44100, 1, .exact);
 }
 
-test "mp3 gapless: LAME CBR stereo 22.05k（MPEG2/LSF）→ 与 ffmpeg 对齐" {
+test "mp3 gapless: LAME CBR stereo 22.05k（MPEG2/LSF）→ 与 验收基准 对齐" {
     try expectGaplessMatch("lame_lsf/big", s_lame_lsf, s_lame_lsf_s16, 65536 / 4, 22050, 2, .exact);
 }
 
-test "mp3 无 Xing：全帧解码不裁剪，与 ffmpeg 对齐" {
-    // 无 Xing → ffmpeg 不裁 delay/padding（全物理帧解码），mine 须一致；
+test "mp3 无 Xing：全帧解码不裁剪，与 验收基准 对齐" {
+    // 无 Xing → 验收基准 不裁 delay/padding（全物理帧解码），mine 须一致；
     // 无精确帧数 → duration 为按首帧参数估算（estimate）
     try expectGaplessMatch("noxing/big", s_noxing, s_noxing_s16, 65536 / 4, 44100, 2, .estimate);
 }
@@ -1033,7 +1033,7 @@ test "mp3 帧索引: 帧 0 = stream_start 且相邻帧偏移差 = 帧字节数" 
 // ---- parseXing（Xing/Info 结构 + LAME/Lavf/Lavc 24-bit delay/padding）----
 
 /// 构造一帧含 Xing/Info 标记与编码扩展的 synthetic 首帧（MPEG1 L3 44100 st，
-/// frame_bytes=417；frame 内各字段按 ffmpeg mp3dec 顺序排布）
+/// frame_bytes=417；frame 内各字段按 验收基准 mp3dec 顺序排布）
 fn buildXingFrame(marker: [4]u8, magic: [4]u8, delay: u32, padding: u32) [417]u8 {
     var b: [417]u8 = @splat(0);
     @memcpy(b[0..4], &[_]u8{ 0xFF, 0xFB, 0x90, 0x00 }); // MPEG1 L3 128k 44100 stereo

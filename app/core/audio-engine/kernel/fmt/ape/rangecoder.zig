@@ -1,14 +1,18 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! APE 区间解码器 + 版本化熵解码（docs/audio-kernel-zig.md §9.10）
 //!
 //! 参考重构对照 FFmpeg libavcodec/apedec.c：APERangecoder（§"range decoding
 //! functions"）、update_rice / get_rice_ook / ape_decode_value_3860 / _3900 /
 //! _3990 / decode_array_0000 与各版本 entropy_decode_mono/stereo 编排；
-//! 逐位复刻以保证 bit-exact；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
+//! 逐位复刻以保证逐样本一致；许可登记见 audio-engine/THIRD-PARTY-LICENSES.md。
 //!
 //! 版本分派（对齐 ape_decode_init）：
 //!   < 3860  → decode_array_0000（GetBitContext 位流）
@@ -20,7 +24,7 @@
 //!
 //! 健壮性（§13.3）：所有读取先校验边界，越界/除零 → error.Corrupt，
 //! 不产生越界读与除零崩溃；区间归一化在数据耗尽时按零填充推进并置 error
-//! 标志（对齐 FFmpeg `ptr >= data_end` 分支），帧末统一检查。
+//! 标志（对齐 验收基准 `ptr >= data_end` 分支），帧末统一检查。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
@@ -31,7 +35,7 @@ pub const EXTRA_BITS: u32 = 7;
 /// BOTTOM_VALUE = TOP_VALUE >> 8 = (1<<31) >> 8 = 0x00800000
 pub const BOTTOM_VALUE: u32 = 0x0080_0000;
 pub const MODEL_ELEMENTS: usize = 64;
-/// FFmpeg MIN_CACHE_BITS（get_bits.h）；rice.k 上限由调用处保证 <= 24
+/// 验收基准 MIN_CACHE_BITS（get_bits.h）；rice.k 上限由调用处保证 <= 24
 pub const MIN_CACHE_BITS: u32 = 25;
 
 /// counts_3970：Monkey's Audio 3.97 固定概率起点（22 项）
@@ -73,7 +77,7 @@ pub fn zigzag(x: u32) i32 {
     return @as(i32, @bitCast((x >> 1) ^ ((x & 1) -% 1))) +% 1;
 }
 
-/// update_rice（对齐 FFmpeg：k 上限 24，ksum u32 回绕）
+/// update_rice（对齐 验收基准：k 上限 24，ksum u32 回绕）
 pub fn updateRice(rice: *Rice, x: u32) void {
     const lim: u32 = if (rice.k != 0) @as(u32, 1) << @intCast(rice.k + 4) else 0;
     rice.ksum +%= ((x + 1) / 2) -% ((rice.ksum + 16) >> 5);
@@ -104,7 +108,7 @@ pub const Ctx = struct {
     /// 字节游标（区间解码 / bytestream 读取共用）
     ptr: usize = 0,
     fileversion: u32,
-    /// 区间归一化越过数据尾时置位（FFmpeg ctx->error 语义），帧末检查
+    /// 区间归一化越过数据尾时置位（验收基准 ctx->error 语义），帧末检查
     err: bool = false,
 
     low: u32 = 0,
@@ -196,7 +200,7 @@ pub const Ctx = struct {
         return sym;
     }
 
-    /// range_get_symbol（counts 线性搜索，非二分——逐位对齐参考实现）
+    /// range_get_symbol（counts 线性搜索，非二分——逐样本对齐参考实现）
     pub fn getSymbol(self: *Ctx, counts: *const [22]u16, counts_diff: *const [21]u16) Error!u32 {
         const cf = try self.culShift(16);
         if (cf > 65492) {

@@ -437,8 +437,6 @@ const List<_ThanksItem> _kThanksDesign = [
     'WTFPL',
     'https://github.com/SPlayer-Dev/ncm-api-rs',
   ),
-  _ThanksItem('MoeKoeMusic', '', 'https://github.com/MoeKoeMusic/MoeKoeMusic'),
-  _ThanksItem('Mineradio', '', 'https://github.com/XxHuberrr/Mineradio'),
   // 实验性第三方音源（Neko 歌姬计划）：仅经其公开 HTTP API 互操作，未并入其源代码。
   _ThanksItem(
     'NekoMusic (Neko歌姬计划)',

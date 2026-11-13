@@ -44,7 +44,7 @@ pub fn mulawDecode(u: u8) i16 {
 const testing = std.testing;
 
 test "g711: A-LAW 标准锚点值（16-bit 尺度，ITU-T G.711 表）" {
-    // 对照 ITU 表 / FFmpeg alaw2linear（输出为 16-bit 尺度，max = ±32256 = 4032*8）：
+    // 对照 ITU 表 / 验收基准 alaw2linear（输出为 16-bit 尺度，max = ±32256 = 4032*8）：
     //   - A-law 为"中平"量化：无精确 0，静音码 0x55 解码为 -8；
     //   - 最小码 0x00 → -5504，最大正 0xAA → +32256，最大负 0x2A → -32256。
     try testing.expectEqual(@as(i16, -5504), alawDecode(0x00));
@@ -56,7 +56,7 @@ test "g711: A-LAW 标准锚点值（16-bit 尺度，ITU-T G.711 表）" {
 }
 
 test "g711: mu-LAW 标准锚点值（16-bit 尺度）" {
-    // 对照 ITU 表 / FFmpeg ulaw2linear：
+    // 对照 ITU 表 / 验收基准 ulaw2linear：
     //   - mu-law 为"中阶"量化：0xFF 与 0x7F 都解码为 0（静音死区）；
     //   - 最小码 0x00 → -32124（最大负），0x80 → +32124（最大正）。
     try testing.expectEqual(@as(i16, 0), mulawDecode(0xFF));

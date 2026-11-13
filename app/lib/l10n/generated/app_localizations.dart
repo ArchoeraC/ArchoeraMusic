@@ -1097,7 +1097,7 @@ abstract class AppLocalizations {
   /// No description provided for @navHeaderNeteaseAccount.
   ///
   /// In zh_CN, this message translates to:
-  /// **'NT账号'**
+  /// **'NT 账号'**
   String get navHeaderNeteaseAccount;
 
   /// No description provided for @navHeaderNeteaseMusic.
@@ -1403,13 +1403,13 @@ abstract class AppLocalizations {
   /// No description provided for @toastLoginRequiredKugou.
   ///
   /// In zh_CN, this message translates to:
-  /// **'操作失败（请确认已登录KG账号）'**
+  /// **'操作失败（请确认已登录KG 账号）'**
   String get toastLoginRequiredKugou;
 
   /// No description provided for @toastLoginRequiredNetease.
   ///
   /// In zh_CN, this message translates to:
-  /// **'操作失败（请确认已登录NT账号）'**
+  /// **'操作失败（请确认已登录NT 账号）'**
   String get toastLoginRequiredNetease;
 
   /// No description provided for @toastNoQualityInfo.
@@ -1725,13 +1725,13 @@ abstract class AppLocalizations {
   /// No description provided for @kugouRiskVerifyTitle.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗安全验证'**
+  /// **'KG 安全验证'**
   String get kugouRiskVerifyTitle;
 
   /// No description provided for @kugouRiskVerifySmsDescription.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗要求完成短信验证，验证码已发送到账号绑定的手机号。'**
+  /// **'KG 要求完成短信验证，验证码已发送到账号绑定的手机号。'**
   String get kugouRiskVerifySmsDescription;
 
   /// No description provided for @kugouRiskVerifySmsHint.
@@ -1761,19 +1761,19 @@ abstract class AppLocalizations {
   /// No description provided for @kugouRiskVerifyTcaptchaTitle.
   ///
   /// In zh_CN, this message translates to:
-  /// **'需要在酷狗官方客户端完成验证'**
+  /// **'需要在KG 官方客户端完成验证'**
   String get kugouRiskVerifyTcaptchaTitle;
 
   /// No description provided for @kugouRiskVerifyTcaptchaBody.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗要求腾讯人机验证（TCaptcha），当前版本无法在应用内嵌网页完成。请打开酷狗官方客户端完成安全验证后，再回到本应用重试。'**
+  /// **'KG 要求腾讯人机验证（TCaptcha），当前版本无法在应用内嵌网页完成。请打开KG 官方客户端完成安全验证后，再回到本应用重试。'**
   String get kugouRiskVerifyTcaptchaBody;
 
   /// No description provided for @kugouRiskVerifyUnsupported.
   ///
   /// In zh_CN, this message translates to:
-  /// **'酷狗要求完成安全验证（类型 {type}），请在酷狗官方客户端完成后重试。'**
+  /// **'KG 要求完成安全验证（类型 {type}），请在KG 官方客户端完成后重试。'**
   String kugouRiskVerifyUnsupported({required int type});
 
   /// No description provided for @loginRiskBody.
@@ -2625,7 +2625,7 @@ abstract class AppLocalizations {
   /// No description provided for @pageLikedNeteaseLoginHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'登录后可同步NT收藏'**
+  /// **'登录后可同步NT 收藏'**
   String get pageLikedNeteaseLoginHint;
 
   /// No description provided for @pageLikedLoadFailed.
@@ -2655,31 +2655,31 @@ abstract class AppLocalizations {
   /// No description provided for @toastQqLikeSyncFailed.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QM在线收藏同步失败（实验接口），本次红心已撤销'**
+  /// **'QM 在线收藏同步失败（实验接口），本次红心已撤销'**
   String get toastQqLikeSyncFailed;
 
   /// No description provided for @pageLikedQqHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QM红心保存在本机（始终可用）；登录后可实验同步在线「我喜欢」'**
+  /// **'QM 红心保存在本机（始终可用）；登录后可实验同步在线「我喜欢」'**
   String get pageLikedQqHint;
 
   /// No description provided for @pageLikedQqEmptyTitle.
   ///
   /// In zh_CN, this message translates to:
-  /// **'还没有 QM红心歌曲'**
+  /// **'还没有 QM 红心歌曲'**
   String get pageLikedQqEmptyTitle;
 
   /// No description provided for @pageLikedQqEmptyHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'在搜索/播放页给 QM歌曲点亮红心后会出现在这里（保存在本机）'**
+  /// **'在搜索/播放页给 QM 歌曲点亮红心后会出现在这里（保存在本机）'**
   String get pageLikedQqEmptyHint;
 
   /// No description provided for @pageLikedQqLoginSync.
   ///
   /// In zh_CN, this message translates to:
-  /// **'登录 QM同步在线收藏（实验）'**
+  /// **'登录 QM 同步在线收藏（实验）'**
   String get pageLikedQqLoginSync;
 
   /// No description provided for @pageLikedQqSyncOnline.
@@ -2991,7 +2991,7 @@ abstract class AppLocalizations {
   /// No description provided for @pageHomeDailyLoginHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'登录NT账号后，每天为你更新'**
+  /// **'登录NT 账号后，每天为你更新'**
   String get pageHomeDailyLoginHint;
 
   /// No description provided for @pageHomeDailyPlay.
@@ -4999,7 +4999,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFingerprintNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'下载器向KG / NT请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。'**
+  /// **'下载器向KG / NT 请求时携带的设备标识；首次启动生成后固定，不同用户互不相同。'**
   String get settingsFingerprintNote;
 
   /// No description provided for @settingsDownloadDynamicFingerprint.
@@ -5023,7 +5023,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsResetFingerprintDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'重置后本机在KG / NT看来是新设备，旧指纹下的在线状态可能失效。确定重置？'**
+  /// **'重置后本机在KG / NT 看来是新设备，旧指纹下的在线状态可能失效。确定重置？'**
   String get settingsResetFingerprintDesc;
 
   /// No description provided for @toastFingerprintReset.
@@ -5461,7 +5461,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSecurityNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、NT/KG登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。'**
+  /// **'不可逆删除本机全部账号凭据与登录会话（流媒体服务器密码、NT/KG 登录态、本地 Subsonic 账号），并主动失效平台 token；不影响曲库、历史与下载文件。'**
   String get settingsSecurityNote;
 
   /// No description provided for @settingsSecurityStreaming.
@@ -7927,19 +7927,19 @@ abstract class AppLocalizations {
   /// No description provided for @loginQqQrLogin.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QM扫码登录'**
+  /// **'QM 扫码登录'**
   String get loginQqQrLogin;
 
   /// No description provided for @loginQqScanHint.
   ///
   /// In zh_CN, this message translates to:
-  /// **'请使用手机 QQ 扫一扫登录'**
+  /// **'请使用手机 QM 扫一扫登录'**
   String get loginQqScanHint;
 
   /// No description provided for @navHeaderQqId.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QQ {id}'**
+  /// **'QM {id}'**
   String navHeaderQqId({required String id});
 
   /// No description provided for @searchSourceFailed.
@@ -7951,7 +7951,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchQqRiskDetail.
   ///
   /// In zh_CN, this message translates to:
-  /// **'QM接口限流或风控拦截（代码 {code}），已停止自动重试，请稍后再试'**
+  /// **'QM 接口限流或风控拦截（代码 {code}），已停止自动重试，请稍后再试'**
   String searchQqRiskDetail({required Object code});
 
   /// No description provided for @searchNetworkError.
@@ -10313,7 +10313,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsMcpCapSearchDesc.
   ///
   /// In zh_CN, this message translates to:
-  /// **'在网易云/酷狗/QQ 音乐等音源搜索歌曲'**
+  /// **'在NT/KG/QM 等音源搜索歌曲'**
   String get settingsMcpCapSearchDesc;
 
   /// No description provided for @settingsMcpCapLibrary.

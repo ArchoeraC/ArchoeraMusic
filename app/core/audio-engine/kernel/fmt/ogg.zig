@@ -39,7 +39,7 @@ pub const crc_table = blk: {
     break :blk t;
 };
 
-/// 页 CRC 逐字节更新（FFmpeg ogg.c crc_update 语义）
+/// 页 CRC 逐字节更新（验收基准 ogg.c crc_update 语义）
 pub fn crcUpdate(crc: u32, byte: u8) u32 {
     return (crc << 8) ^ crc_table[((crc >> 24) ^ byte) & 0xFF];
 }
@@ -144,7 +144,7 @@ pub const TailPage = struct {
 };
 
 /// 尾窗大小：≥ 单页上限 27+255+255×255 = 65307B，必含文件最后一个完整页
-/// （对齐 FFmpeg ogg_get_length 的 MAX_PAGE_SIZE 尾窗策略）。
+/// （对齐 验收基准 ogg_get_length 的 MAX_PAGE_SIZE 尾窗策略）。
 const TAIL_WINDOW: usize = 64 * 1024;
 
 /// 尾窗扫描：定位流的末页 granule（open 时 O(1) 计算精确时长，替代整流预扫描）。
@@ -348,7 +348,7 @@ pub const Demux = struct {
         self.seg_idx = 0;
         self.payload_off = 0;
 
-        // 序列号锁定：首个 `OggS` 页即目标流（FFmpeg 以首个流为准）
+        // 序列号锁定：首个 `OggS` 页即目标流（验收基准 以首个流为准）
         if (!self.serial_locked) {
             self.serial = self.page.?.serial;
             self.serial_locked = true;

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// QQ 桌面端请求签名 `zzcSign`——移植自 baka-plugins `plugins/qq.js:315`。
+/// QM 桌面端请求签名 `zzcSign`——移植自 baka-plugins `plugins/qq.js:315`。
 ///
 /// 桌面协议入口 `u.y.qq.com/cgi-bin/musics.fcg` 要求对**即将发送的 JSON 串**
 /// 计算 `?sign=`：

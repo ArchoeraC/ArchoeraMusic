@@ -62,7 +62,7 @@ List<T> interleaveSources<T>(List<List<T>> groups) {
 }
 
 /// 失败后的防抖 / 退避闸门：来源失败后的一段时间内不自动也不允许反复手动
-/// 重试，避免连打把平台风控阈值刷得更高（QQ 实测风险内码 2001）。
+/// 重试，避免连打把平台风控阈值刷得更高（QM 实测风险内码 2001）。
 class SearchSourceCooldown {
   SearchSourceCooldown({this.cooldown = const Duration(seconds: 20)});
 

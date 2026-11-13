@@ -435,7 +435,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     final ne = results[0];
     final kg = results[1];
     setState(() {
-      // KG建议条目 source=='kugou'，合并进同一分类列表（行内带平台角标）
+      // KG 建议条目 source=='kugou'，合并进同一分类列表（行内带平台角标）
       _suggest = SuggestData(
         songs: [...ne.songs, ...kg.songs],
         albums: [...ne.albums, ...kg.albums],
@@ -489,7 +489,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     _searchFocus.unfocus();
   }
 
-  /// 建议专辑：按来源分发专辑详情弹窗（NT / KG各自专辑接口，
+  /// 建议专辑：按来源分发专辑详情弹窗（NT / KG 各自专辑接口，
   /// albumid 不能跨平台混用，对齐搜索页 `_onCoverTap` 的平台分发）。
   void _openSuggestAlbum(SuggestSimpleItem album) {
     _searchFocus.unfocus();
@@ -503,7 +503,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
         .openCover(context, ref, SourceSearchKind.album, cover);
   }
 
-  /// 建议歌手：NT歌手热门歌曲弹窗。
+  /// 建议歌手：NT 歌手热门歌曲弹窗。
   void _openSuggestArtist(SuggestSimpleItem artist) {
     _searchFocus.unfocus();
     showNeteaseArtistDialog(
@@ -512,7 +512,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     );
   }
 
-  /// 建议歌单：NT歌单详情弹窗。
+  /// 建议歌单：NT 歌单详情弹窗。
   void _openSuggestPlaylist(SuggestSimpleItem playlist) {
     _searchFocus.unfocus();
     showPlaylistDetailDialog(
@@ -606,7 +606,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
               const _WeatherMini(),
               // 与账号菜单保持间距（避免组件过小且贴太近）
               const SizedBox(width: 12),
-              // 账号（多平台：NT / KG / QM占位）
+              // 账号（多平台：NT / KG / QM 占位）
               const _AccountsMenu(),
               const SizedBox(width: 4),
               const _NavHeaderActionsMenu(),

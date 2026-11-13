@@ -134,7 +134,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     f.channels = f.head.channels;
     f.pre_skip_left = f.head.pre_skip;
 
-    // 时长：尾窗扫描末页 granule（对齐 FFmpeg ogg_get_length 的尾窗策略；
+    // 时长：尾窗扫描末页 granule（对齐 验收基准 ogg_get_length 的尾窗策略；
     // seek 不可用（callback 流）→ 保持 unknown）。granule 含 pre-skip
     // （RFC 7845 §4：granule = 已解码 PCM 样本总数），有效时长 =
     // granule − pre_skip；末页带 EOS → exact，EOS 页缺失/损坏（尾窗内
@@ -144,7 +144,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
     var duration_known: decoder.DurationKnown = .unknown;
     if ((ogg.scanTailPage(&f.demux.reader, f.demux.serial) catch null)) |tail| {
         if (tail.granule > 0) {
-            // 时长取 granule（含 pre-skip 区间）以对齐 ffprobe/ffmpeg 的容器时长
+            // 时长取 granule（含 pre-skip 区间）以对齐 ffprobe/验收基准 的容器时长
             // 语义与 Stable 引擎显示；有效样本数（granule−pre_skip）仍由
             // pre_skip_left 在解码侧消费，二者职责分离。
             if (tail.granule < 48000 * 12 * 3600) {
@@ -862,12 +862,12 @@ fn celtEndBand(config: u8) usize {
 
 const testing = std.testing;
 
-/// ffmpeg libopus 生成（0.5s 440Hz 正弦 48k mono，32kbps）：3 页
+/// 验收基准 libopus 生成（0.5s 440Hz 正弦 48k mono，32kbps）：3 页
 /// （OpusHead / OpusTags / 单音频 EOS 页 granule 24312，pre_skip 312）
 /// —— 单音频页首末同页的极短流形态。
 const tiny_opus = @embedFile("samples/tiny.opus");
 
-/// ffmpeg libopus 生成（2.013s 440Hz 正弦 48k mono）：5 页（头/标签/3 音频页，
+/// 验收基准 libopus 生成（2.013s 440Hz 正弦 48k mono）：5 页（头/标签/3 音频页，
 /// 末页 EOS granule 96936，pre_skip 312）—— 常规多页流形态。
 const multi_opus = @embedFile("samples/multi.opus");
 

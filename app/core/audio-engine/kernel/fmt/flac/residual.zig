@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! FLAC 残差解码（分区 Rice 编码，参考重构对照 flacdec.c decode_residuals）
 //!
@@ -31,7 +35,7 @@ const BitReader = bitreader.BitReader;
 /// 解码单个 FLAC Rice 码（有符号）。
 /// k ∈ 0..30（rice_esc 已在外层排除）。
 pub fn readGolombFlac(br: *BitReader, k: u8) Error!i32 {
-    // 前缀：i 个 0 后跟 1 停止位（缓存内批量数零；逐位一致）
+    // 前缀：i 个 0 后跟 1 停止位（缓存内批量数零；逐样本一致）
     const i: u32 = try br.readUnary1(63);
     if (i > 63) return error.Corrupt; // 恶意长前缀上限
     const kk: u5 = @intCast(k); // k ≤ 30（rice_esc 已排除）

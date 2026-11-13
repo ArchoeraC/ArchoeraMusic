@@ -122,7 +122,7 @@ class SongList extends ConsumerStatefulWidget {
 
   /// 批量「添加到歌单」回调（null → 不显示该按钮）。
   ///
-  /// 仅网易云曲目场景由宿主接入（目标为 NT 自建歌单）；其余来源不传。
+  /// 仅NT 曲目场景由宿主接入（目标为 NT 自建歌单）；其余来源不传。
   final Future<void> Function(List<Track> tracks)? onBatchAddToPlaylist;
 
   /// 可选搜索结果高亮（给定展示文本 → 命中区间），默认 `null`。

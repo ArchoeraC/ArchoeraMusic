@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// NT API 传输层：`call(name, params)` 返回NT原始响应体
+/// NT API 传输层：`call(name, params)` 返回NT 原始响应体
 /// （`{result: {...}}` / `{data: [...]}`），由 [NeteaseApi] 统一解析。
 ///
 /// 实现：`ApisNeteaseCaller`（纯 Dart 直连，apis 包全量移植，不经侧车）。
@@ -29,7 +29,7 @@ abstract class NeteaseCaller {
   Future<Map<String, dynamic>?> call(String name, Map<String, dynamic> params);
 }
 
-/// NT接口业务异常（code != 200 等；对齐原项目 NeteaseApiError）。
+/// NT 接口业务异常（code != 200 等；对齐原项目 NeteaseApiError）。
 class NeteaseApiError implements Exception {
   NeteaseApiError(this.message, [this.body]);
 
@@ -103,7 +103,7 @@ class NeteaseApiBase {
 /// （侧车 RPC 或 Dart 原生直连）。
 ///
 /// 对应原项目 `src/apis/search/netease.ts` + `src/apis/song/netease.ts`；
-/// caller 返回NT原始响应体（`{result: {...}}` / `{data: [...]}`）。
+/// caller 返回NT 原始响应体（`{result: {...}}` / `{data: [...]}`）。
 ///
 /// 业务域以 mixin 混合进本类：
 /// - [NeteaseSearchApi]：cloudsearch 搜索（歌曲/专辑/歌手/歌单）
@@ -161,7 +161,7 @@ class NeteaseApi extends NeteaseApiBase
   }
 }
 
-/// NT登录账号（login_status profile 子集）。
+/// NT 登录账号（login_status profile 子集）。
 class NeteaseAccount {
   const NeteaseAccount({
     required this.userId,

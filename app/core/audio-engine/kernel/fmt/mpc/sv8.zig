@@ -146,7 +146,7 @@ pub const Decoder8 = struct {
     cur_chunk: usize = 0,
     /// 相对当前 AP chunk 载荷的位偏移
     bitpos: u64 = 0,
-    /// 当前 chunk 内帧计数（与 FFmpeg mpc8 一致：跨 chunk 持续，
+    /// 当前 chunk 内帧计数（与 验收基准 mpc8 一致：跨 chunk 持续，
     /// 达 cfg.frames 回绕即 keyframe —— 标准编码的 AP chunk 恰含 frames 帧，
     /// 故 wrap 位置 == chunk 边界）
     era_cur_frame: u16 = 0,
@@ -211,7 +211,7 @@ pub const Decoder8 = struct {
     }
 
     /// 生成下一帧 1152×ch 样本到 out_planar；返回 false = EOF。
-    /// out 布局 [ch][1152]（对应 FFmpeg planar S16）。
+    /// out 布局 [ch][1152]（对应 验收基准 planar S16）。
     pub fn next(self: *Decoder8, out_planar: *[2][era_mpc_frame_size]i16) bool {
         if (self.eof) return false;
         while (true) {
@@ -223,7 +223,7 @@ pub const Decoder8 = struct {
             const payload = self.data[chunk.off .. chunk.off + chunk.len];
             const total_bits = @as(u64, chunk.len) * 8;
             if (self.bitpos + 8 > total_bits) {
-                // 本 chunk 已无足够位（FFmpeg overread 语义：整包吞掉，帧计数不回绕）
+                // 本 chunk 已无足够位（验收基准 overread 语义：整包吞掉，帧计数不回绕）
                 self.cur_chunk += 1;
                 self.bitpos = 0;
                 continue;
@@ -232,14 +232,14 @@ pub const Decoder8 = struct {
             var br = vlc.BitReader{ .data = payload };
             br.pos = self.bitpos;
             if (self.decodeFrame(&br, keyframe, out_planar)) |_| {} else |_| {
-                // 帧截断：FFmpeg 置 got_frame=0 并吞掉该 chunk 剩余字节（帧计数不回绕）
+                // 帧截断：验收基准 置 got_frame=0 并吞掉该 chunk 剩余字节（帧计数不回绕）
                 self.cur_chunk += 1;
                 self.bitpos = 0;
                 continue;
             }
             self.bitpos = br.pos;
             // 帧计数推进；达 frames 回绕 → 下一帧即 keyframe，chunk 同步结束
-            // （FFmpeg：cur_frame==0 时返回整包，丢弃其后 >8 位的填充）
+            // （验收基准：cur_frame==0 时返回整包，丢弃其后 >8 位的填充）
             var wrapped = false;
             self.era_cur_frame += 1;
             if (self.era_cur_frame >= self.parsed.cfg.frames) {

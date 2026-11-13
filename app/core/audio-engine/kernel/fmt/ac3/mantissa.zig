@@ -20,7 +20,7 @@
 //!   decodeTransformCoeffs      — decode_transform_coeffs（561-590）：整帧逐声道驱动
 //!
 //! 与 C 的差异（务必知悉）：
-//!   - 抖动 PRNG 状态现放在 Ctx.jitter（每解码器实例一份），对照 FFmpeg 现行
+//!   - 抖动 PRNG 状态现放在 Ctx.jitter（每解码器实例一份），对照 验收基准 现行
 //!     libavutil/lfg.h：64 状态加性 LFG，open/seek 时以 seed=0 初始化。
 //!   - C 的 get_bits 越界静默返回 0；本实现 BitReader 越界抛 error.Corrupt，
 //!     函数以 bool 表示错误（false=成功，true=位流损坏），与 coupling.zig 一致。
@@ -54,7 +54,7 @@ inline fn dequantizeCoeff(mantissa: i32, exponent: i32) f32 {
     return @as(f32, @floatFromInt(mantissa)) * scale_factors[e];
 }
 
-/// 读 n 位并符号扩展（对照 FFmpeg get_sbits）。
+/// 读 n 位并符号扩展（对照 验收基准 get_sbits）。
 fn getSBits(gb: *BitReader, n: u6) !i32 {
     const raw = try gb.readBits(n);
     const sign_bit: u32 = @as(u32, 1) << @intCast(n - 1);

@@ -24,7 +24,7 @@ Future<void> downloadTracks(
     final proceed = await _confirmStreamingDownload(context, ref);
     if (!proceed || !context.mounted) return;
   }
-  // 登录门槛由注册表声明（KG / NT 需要；QQ 免费曲免登录，VIP 失败由任务错误呈现）。
+  // 登录门槛由注册表声明（KG / NT 需要；QM 免费曲免登录，VIP 失败由任务错误呈现）。
   for (final src in {
     for (final t in online)
       if (sourcePlatform(t.source).downloadRequiresLogin) t.source,

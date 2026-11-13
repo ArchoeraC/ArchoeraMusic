@@ -124,10 +124,10 @@ extension _SearchPageFetch on _SearchPageState {
     limit: _SearchPageState._pageSize,
   );
 
-  /// 聚合搜索（'all'）单曲：网易 + KG + QQ **三方并行、各源独立容错**。
+  /// 聚合搜索（'all'）单曲：NT + KG + QM **三方并行、各源独立容错**。
   ///
   /// 任一源失败只标记该源（展示「该源暂不可用」占位 + 手动重试），成功源
-  /// 照常展示——修复「QQ 一源失败 → 整页 all 聚合一起失败」的问题。
+  /// 照常展示——修复「QM 一源失败 → 整页 all 聚合一起失败」的问题。
   Future<void> _fetchSongsAll({required bool append}) async {
     final all = _aggActive;
     final active = append
@@ -268,7 +268,7 @@ extension _SearchPageFetch on _SearchPageState {
 
   /// 单个平台专辑/歌手/歌单下一页（[loaded] = 该平台已累计条数）。
   ///
-  /// 分页游标、KG 分类参数、QQ 歌手单页上限、Neko 无分页等差异均由注册表
+  /// 分页游标、KG 分类参数、QM 歌手单页上限、Neko 无分页等差异均由注册表
   /// 适配器封装（见 [SourcePlatform.searchCover]）。
   Future<SearchResult<CoverItem>> _searchCoversFrom(
     String platform, {
