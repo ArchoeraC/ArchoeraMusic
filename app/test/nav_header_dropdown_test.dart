@@ -14,10 +14,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:archoera_music/app/shell_expand_transition.dart';
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
 import 'package:archoera_music/stores/player_route_animation.dart';
-import 'package:archoera_music/widgets/common/offstage_when_complete.dart';
 import 'package:archoera_music/widgets/layout/nav_header.dart';
 
 /// 回归（2026-10）：搜索栏**展开后不能保持**——旧实现用 `Positioned.fill` 不透明拦截层收起下拉，
@@ -117,7 +117,7 @@ void main() {
 }
 
 /// 回归（2026-10）：播放页开始展开时，搜索下拉浮层（挂在**根 Overlay**，不在
-/// 壳子树内、不随壳内容停绘）必须立刻收起，而不是悬在播放页上方。
+/// 壳子树内、不随壳内容缩放淡出）必须立刻收起，而不是悬在播放页上方。
 void _playerExpandRegression() {
   testWidgets('播放页路由动画开始展开 → 搜索下拉收起并摘除', (tester) async {
     await tester.pumpWidget(
@@ -165,7 +165,7 @@ void _playerExpandRegression() {
 }
 
 /// 回归（2026-10）：聚焦搜索框后立刻展开全屏播放页 —— 壳内容（含 NavHeader）
-/// 停绘，下拉面板必须同步摘除。
+/// 随 [ShellExpandTransition] 停绘/收起，下拉面板必须同步摘除。
 ///
 /// 旧实现把「移除 OverlayEntry」挂在 `_panelCtrl.reverse().whenComplete(...)` 上，
 /// 而 dispose 紧接着就销毁了 controller：ticker 被取消，`TickerFuture` **永不
@@ -194,7 +194,7 @@ void _shellUnmountRegression() {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: OffstageWhenComplete(
+            body: ShellExpandTransition(
               animation: expandCtrl,
               child: const NavHeader(),
             ),
