@@ -5,10 +5,10 @@
 //! 刮削器的纯 Rust 加密后端（替换 C++ 侧对 `OpenSSL::Crypto` 的链接）。
 //!
 //! 只覆盖 `app/core/scraper` 实际用到的窄接口：
-//! - AES-128-ECB / AES-128-CBC + PKCS7 填充（网易云 linuxapi / weapi）；
-//! - RSA 裸模幂（网易云固定 modulus/exponent，不做密钥解析）；
+//! - AES-128-ECB / AES-128-CBC + PKCS7 填充（NT linuxapi / weapi）；
+//! - RSA 裸模幂（NT 固定 modulus/exponent，不做密钥解析）；
 //! - 随机字节（临时密钥 / UUID）；
-//! - MD5 / SHA1 一次性摘要（酷狗签名、酷我 Cross、本地文件 id）。
+//! - MD5 / SHA1 一次性摘要（KG 签名、酷我 Cross、本地文件 id）。
 //!
 //! 所有导出函数走 C ABI（`era_crypto_*`），成功返回 [`ERA_CRYPTO_OK`]，失败返回
 //! 负值。输出缓冲区由调用方提供；容量不足时返回 [`ERA_CRYPTO_ERR_BUFFER`] 并

@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! MLP / Dolby TrueHD 无损解码器（对照 FFmpeg mlpdec.c / mlp.c / mlpdsp.c）
 //!
@@ -15,7 +19,7 @@ const decoder = @import("../../decoder.zig");
 const io = @import("../../io.zig");
 
 // ---------------------------------------------------------------------------
-// LSB-first 位读取（FFmpeg GetBitContext 语义）
+// LSB-first 位读取（验收基准 GetBitContext 语义）
 // ---------------------------------------------------------------------------
 
 pub const BitReader = struct {
@@ -26,7 +30,7 @@ pub const BitReader = struct {
         return .{ .data = data };
     }
 
-    /// FFmpeg UNCHECKED 位读取：越界读 padding（0），不报错（与 C get_bits 一致）。
+    /// 验收基准 UNCHECKED 位读取：越界读 padding（0），不报错（与 C get_bits 一致）。
     fn readBit(self: *BitReader) u1 {
         var b: u1 = 0;
         if (self.pos < self.data.len * 8) {
@@ -36,7 +40,7 @@ pub const BitReader = struct {
         return @intCast(b);
     }
 
-    /// 读 n 位（MSB-first，FFmpeg get_bits 语义），第一个读的位在结果高位。
+    /// 读 n 位（MSB-first，验收基准 get_bits 语义），第一个读的位在结果高位。
     pub fn readBits(self: *BitReader, n: u6) u32 {
         if (n == 0) return 0;
         var out: u32 = 0;
@@ -76,7 +80,7 @@ pub const BitReader = struct {
 // CRC / 校验（对照 mlp.c）
 // ---------------------------------------------------------------------------
 
-/// av_crc 表生成（FFmpeg av_crc_init，MSB-first：左移 + av_bswap32）。
+/// av_crc 表生成（验收基准 av_crc_init，MSB-first：左移 + av_bswap32）。
 fn crcTableMsb(bits: u8, poly: u32) [256]u32 {
     var ctx: [256]u32 = undefined;
     for (0..256) |i| {
@@ -90,7 +94,7 @@ fn crcTableMsb(bits: u8, poly: u32) [256]u32 {
     return ctx;
 }
 
-/// av_crc 查表（FFmpeg av_crc）。
+/// av_crc 查表（验收基准 av_crc）。
 fn avCrc(ctx: *const [256]u32, init: u32, data: []const u8) u32 {
     var crc = init;
     for (data) |b| {
@@ -99,13 +103,13 @@ fn avCrc(ctx: *const [256]u32, init: u32, data: []const u8) u32 {
     return crc;
 }
 
-/// CRC-8 多项式 0x63（FFmpeg av_crc，初始 0x3c 用于 checksum8）。
+/// CRC-8 多项式 0x63（验收基准 av_crc，初始 0x3c 用于 checksum8）。
 fn crc8_63(data: []const u8, len: usize, init: u8) u8 {
     const ctx = crcTableMsb(8, 0x63);
     return @intCast(avCrc(&ctx, init, data[0..len]) & 0xFF);
 }
 
-/// CRC-16 多项式 0x002D（FFmpeg av_crc）。
+/// CRC-16 多项式 0x002D（验收基准 av_crc）。
 fn crc16_2d(data: []const u8, len: usize) u16 {
     const ctx = crcTableMsb(16, 0x002D);
     return @intCast(avCrc(&ctx, 0, data[0..len]) & 0xFFFF);

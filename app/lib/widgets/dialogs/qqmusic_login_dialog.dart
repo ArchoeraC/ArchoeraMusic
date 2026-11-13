@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// QM扫码登录对话框（仅支持手机 QQ 扫码）。
+/// QM 扫码登录对话框（仅支持手机 QM 扫码）。
 ///
 /// 官方只有轮询接口、无推送，故**不做自动轮询**：`qrKey()` 取二维码后由用户
 /// 扫码并在手机确认，点「我已确认」触发一次 `qrCheck()`；status=4 登录成功
@@ -28,7 +28,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'qqmusic_login_dialog/qqmusic_login_dialog_view.dart';
 
-/// 打开 QM扫码登录弹窗（先弹登录风险提示，确认后才继续）。
+/// 打开 QM 扫码登录弹窗（先弹登录风险提示，确认后才继续）。
 Future<bool?> showQqMusicLoginDialog(BuildContext context) async {
   if (!await showLoginRiskNotice(context)) return false;
   if (!context.mounted) return false;

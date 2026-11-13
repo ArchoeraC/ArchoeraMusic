@@ -8,7 +8,7 @@
 /// - [toggle] 乐观更新 + 失败回滚（失败返回 false 由调用方提示）；
 /// - [sync] 按当前登录态刷新集合（登录/退出后调用）。
 ///
-/// 平台差异（红心键归一、id 集合拉取、收藏/取消、QQ 本机库、Neko 实验开关等）
+/// 平台差异（红心键归一、id 集合拉取、收藏/取消、QM 本机库、Neko 实验开关等）
 /// 全部由 `widgets/dialogs/collection_platform.dart` 的适配器提供；**新增音源
 /// 只需注册适配器**，本文件无需改动。
 library;
@@ -96,7 +96,7 @@ class LikeController extends ChangeNotifier {
 
   /// 用服务端权威「我喜欢的」列表对账该平台红心集合（收藏页刷新成功后调用）。
   ///
-  /// 仅 [CollectionPlatform.reconcileLiked] 的平台参与（QQ 本机列表不走对账）。
+  /// 仅 [CollectionPlatform.reconcileLiked] 的平台参与（QM 本机列表不走对账）。
   /// **双向**：权威列表含 → 点亮；不含 → 熄灭；缓冲期内本端刚 toggle 的键
   /// 以本地为准。对账后 notify UI 重绘。
   void reconcileFromAuthoritative(String platform, List<Track> tracks) {
@@ -111,7 +111,7 @@ class LikeController extends ChangeNotifier {
     if (_alignToServer(platform, serverKeys)) notifyListeners();
   }
 
-  /// 手动「同步在线收藏」/ 登录并入后刷新 QQ 红心（**add-only**，对应
+  /// 手动「同步在线收藏」/ 登录并入后刷新 QM 红心（**add-only**，对应
   /// [QqLikedStore.mergeOnline] 已并入本机列表的曲目）——使刷新后列表新增
   /// 行的红心即时点亮；缓冲期内本端刚熄灭的键不因在线写未生效而回光。
   void mergeOnlineQq(Iterable<Track> online) {
@@ -227,9 +227,9 @@ class LikeController extends ChangeNotifier {
 
   /// 服务端确认成功后，同步维护收藏列表增量（新喜欢插入头部 /
   /// 取消喜欢移除）并写库——与「刷新=全量重拉+写库」同一持久化语义。
-  /// QQ 走 [QqLikedStore]、NK 不做本地增量（与既有行为一致）。
+  /// QM 走 [QqLikedStore]、NK 不做本地增量（与既有行为一致）。
   void _applyStoreDelta(Track track, bool target) {
-    // 仅维护共享「我喜欢」列表增量的平台（NT / KG；QQ 走本机库、NK 不增量）。
+    // 仅维护共享「我喜欢」列表增量的平台（NT / KG；QM 走本机库、NK 不增量）。
     if (!collectionPlatform(track.source).likedLocalDelta) return;
     final store = _ref.read(likedStoreProvider);
     if (target) {
@@ -239,12 +239,12 @@ class LikeController extends ChangeNotifier {
     }
   }
 
-  /// 退出登录清理（登出回调中调用；QQ 本机红心不清空，见 [QqLikedStore]）。
+  /// 退出登录清理（登出回调中调用；QM 本机红心不清空，见 [QqLikedStore]）。
   void reset() {
-    // 注：QQ 红心以本机库为主源，登出 QQ 不清空其分桶（sync 会按登录态重算——
+    // 注：QM 红心以本机库为主源，登出 QM 不清空其分桶（sync 会按登录态重算——
     // 未登录时仍保留本机 songmid）。
     for (final entry in _sets.entries) {
-      // 本机红心库（QQ）以本机为主源，登出不清空。
+      // 本机红心库（QM）以本机为主源，登出不清空。
       if (collectionPlatform(entry.key).localLikedStore) continue;
       entry.value.clear();
     }

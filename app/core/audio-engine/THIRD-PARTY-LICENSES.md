@@ -173,7 +173,7 @@ GPL 参考源；后续若需变更实现方式，应先做许可评估。任何 
 | 文件范围 | SPDX | 说明 |
 |---|---|---|
 | 本项目独立编写 | `AGPL-3.0-or-later` | 其余内核文件 |
-| FFmpeg `libavcodec` / `libavformat` 移植 / 转录 | `LGPL-2.1-or-later` | wma / wmapro / wmalossless / wmavoice / aac sbr·mdct / latm / ac3 / als / amrwb / mpc / spx / dst / dsd / opus celt_tables / tta / tak / shn |
+| FFmpeg `libavcodec` / `libavformat` 移植 / 转录 | `LGPL-2.1-or-later` | wma 全家（含 ASF 容器 / MDCT）、aac sbr·ps·mdct / latm / rt 表、ac3、als、amrwb、mpc、spx、dst、dsd、opus celt_tables·celt·pvq·rc·fft·header、tta、tak、shn、**flac**、**ape**、**dts**、**mlp**、**alac** |
 | libopus 移植（SILK、kissfft、静态模式表） | `BSD-3-Clause` | 文件头保留 Xiph.Org 等上游版权声明 |
 | WavPack 移植 / 对照 | `BSD-3-Clause` | 文件头保留 David Bryant 等上游版权声明 |
 | minimp3 解码表转录 | `CC0-1.0` | 表值为事实数据，来源仍标注 |
@@ -184,9 +184,12 @@ GPL 参考源；后续若需变更实现方式，应先做许可评估。任何 
 - 所有这些许可均与 AGPL-3.0 **聚合作品兼容**（LGPL-2.1+、BSD-3、CC0 均可并入
   AGPL-3.0 分发；BSD-3 仅要求保留版权声明与免责声明，已随文件头 + 本文档 + 包内
   `licenses/BSD-3-Clause.txt` 一并保留）。
-- 仅作「对照参考」、按规范 / 行为独立重写的模块（FLAC、DTS、MLP、MP3 码流层、APE、
-  ALAC、Ogg/M4A 容器、Opus CELT/PVQ/RangeCoder）保持 AGPL-3.0-or-later；如日后认定
-  其中个别文件构成衍生，改按对应上游许可标注即可，不影响整体分发。
+- 文件头明确写着「移植 / 逐位复刻 / 位级一致 / 表值来自 FFmpeg」的模块，即使文档曾
+  归入「对照参考」，也按 **LGPL-2.1-or-later** 标注（FLAC、DTS、MLP、APE、ALAC、
+  AAC PS/SBR 表、Opus CELT/PVQ/RangeCoder/FFT、WMA ASF 容器与 MDCT、WMA 帧解码）。
+- 仅按规范 / 公开行为独立重写、无上游代码级对应的模块（MP3 码流层、WAV/AIFF、Ogg/M4A
+  容器、mka、probe/takeover、DSP 等）保持 AGPL-3.0-or-later；如日后认定个别文件构成
+  衍生，改按对应上游许可标注即可，不影响整体分发。
 
 ## 合规评估与义务清单
 

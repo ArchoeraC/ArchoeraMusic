@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! DTS Express（DCA-LBR，低码率扩展）解码器
 //!
@@ -14,13 +18,13 @@
 //! 混合滤波器组（lbr_bank：短窗 + 8 点 MDCT + 高频混叠抵消）→ 音调合成 →
 //! 全带 IMDCT（TDAC 长窗重叠相加）→ FLTP 平面；LFE 经 5 级双二阶 IIR 插值。
 //!
-//! 与 FFmpeg 的差异（公开渠道无 LBR 真实样本可对拍，见测试与交付报告）：
+//! 与 验收基准 的差异（公开渠道无 LBR 真实样本可对拍，见测试与交付报告）：
 //!   - IMDCT 以直达公式（f64 累加）实现，数学定义与 av_tx FULL_IMDCT 一致
 //!     （以 av_tx 参考向量验证），浮点舍入可差低序位；
-//!   - lbr_bank / lfe_iir 与 FFmpeg C 实现输出逐位一致（参考向量测试）；
+//!   - lbr_bank / lfe_iir 与 验收基准 C 实现输出逐样本一致（参考向量测试）；
 //!   - 其余运算顺序与 dca_lbr.c 逐句对应。
 //!
-//! 不支持（与 FFmpeg 一致地拒绝）：>48kHz、非 (无/1_2/1_4) 带限、
+//! 不支持（与 验收基准 一致地拒绝）：>48kHz、非 (无/1_2/1_4) 带限、
 //! LBR_FLAG_DMIX_MULTI_CH、LBR 流版本非 0x08xx。
 
 const std = @import("std");
@@ -334,13 +338,13 @@ pub const LbrDecoder = struct {
     mdct_len: usize = 0,
     mdct_scale: f32 = 0,
 
-    // 输出平面（帧内有效）：按 ffmpeg 帧声道序（AV_CH 规范序）
+    // 输出平面（帧内有效）：按 验收基准 帧声道序（AV_CH 规范序）
     out_planes: [8][]f32 = @splat(&.{}),
     out_buf: []f32 = &.{},
     out_nch: u8 = 0,
 
     vlc: ?VlcSet = null,
-    /// 当前 chunk 位流（parse_tonal/grid/ts 系列共用；对齐 ffmpeg s->gb 复用）
+    /// 当前 chunk 位流（parse_tonal/grid/ts 系列共用；对齐 验收基准 s->gb 复用）
     curr_gb: BitReaderLE = BitReaderLE.init(&.{}),
 
     pub fn init(alloc: std.mem.Allocator) LbrDecoder {
@@ -524,7 +528,7 @@ pub const LbrDecoder = struct {
             frame.pos += chunk_len;
         }
 
-        // 解析各 chunk（失败不致命；对齐 ffmpeg 非 EXPLODE 语义）
+        // 解析各 chunk（失败不致命；对齐 验收基准 非 EXPLODE 语义）
         self.parseLfeChunk(&chunk_lfe_c) catch {};
         self.parseTonalChunk(&chunk_tonal_c) catch {};
         for (0..5) |i| {
@@ -629,7 +633,7 @@ pub const LbrDecoder = struct {
         if (old_rate != self.sample_rate or old_band_limit != self.band_limit)
             try self.initSampleRate();
 
-        // 立体声内嵌下混（FFmpeg：警告后仍按立体声重配）
+        // 立体声内嵌下混（验收基准：警告后仍按立体声重配）
         if (self.flags & flag_dmix_stereo != 0) {
             if (self.nchannels_total < 3 or self.nchannels_total > LBR_CHANNELS_TOTAL - 2)
                 return error.Invalid;
@@ -658,7 +662,7 @@ pub const LbrDecoder = struct {
     fn initSampleRate(self: *LbrDecoder) LbrError!void {
         // C 源：sqrt(1 << (2 - limited_range))。limited_range > 2 时为 C 移位 UB，
         // GCC/x86 实际计算 1 << 31 = INT_MIN → sqrt → NaN（av_tx 参考向量证实）。
-        // 为与 FFmpeg 输出一致，此处显式复现该行为。
+        // 为与 验收基准 输出一致，此处显式复现该行为。
         // limited_range ≤ 2（parse_decoder_init 保证）→ C 源 sqrt(1 << (2-lr)) 无 UB
         const imdct_scale: f64 = (-1.0 / @as(f64, 1 << 17)) *
             @sqrt(@as(f64, @floatFromInt(@as(i32, 1) << @intCast(2 - self.limited_range))));
@@ -1863,7 +1867,7 @@ fn ceilLog2(v: usize) u6 {
 }
 
 // ---------------------------------------------------------------------------
-// 测试：VLC 往返、参考向量（lbr_bank / lfe_iir / IMDCT vs FFmpeg）
+// 测试：VLC 往返、参考向量（lbr_bank / lfe_iir / IMDCT vs 验收基准）
 // ---------------------------------------------------------------------------
 const testing = std.testing;
 
@@ -1973,7 +1977,7 @@ test "lbr vlc: 逃逸路径（存储符号 -1 → 3+bits）" {
     try testing.expectEqual(@as(i32, @intCast(want_val)), got);
 }
 
-// FFmpeg 参考向量（由 reference/FFmpeg 以 lbr_ref.c 采集）
+// 验收基准 参考向量（由 reference/验收基准 以 lbr_ref.c 采集）
 const ref_vectors = @embedFile("lbr_ref_vectors.bin");
 
 fn readRefVec(pos: *usize) struct { name: []const u8, n: usize, data: []const u8 } {
@@ -1990,7 +1994,7 @@ fn readRefVec(pos: *usize) struct { name: []const u8, n: usize, data: []const u8
     return .{ .name = name, .n = n, .data = data };
 }
 
-test "lbr dsp: lbr_bank / lfe_iir 与 FFmpeg C 实现逐位一致" {
+test "lbr dsp: lbr_bank / lfe_iir 与 验收基准 C 实现逐样本一致" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -2097,24 +2101,24 @@ test "lbr dsp: 全带 IMDCT 与 av_tx FULL_IMDCT 参考一致（f64 累加容差
 }
 
 // ---------------------------------------------------------------------------
-// 多声道 / 采样率验证（合成 decoder-init 帧 + FFmpeg C 参考锚定）
+// 多声道 / 采样率验证（合成 decoder-init 帧 + 验收基准 C 参考锚定）
 //
 // 公开渠道无真实 LBR（DTS Express）多声道样本（fate-suite /dcadec-suite 均无
-// LBR asset；samples.ffmpeg.org 亦无），故以合成 LBR 帧头驱动 parseDecoderInit +
-// filterFrame，逐字段与 FFmpeg n9.0.1 语义对拍：
+// LBR asset；samples.验收基准.org 亦无），故以合成 LBR 帧头驱动 parseDecoderInit +
+// filterFrame，逐字段与 验收基准 n9.0.1 语义对拍：
 //   - 采样率表须用 ff_dca_sampling_freqs（dca.c），而非 core 的 sample_rate_tab；
 //   - 声道掩码为 DCA_SPEAKER_PAIR 布局（bit0=C bit1=LR bit2=LsRs bit3=LFE1），
 //     全带声道数由 ff_dca_count_chs_for_mask 给出，输出布局取低 3 位定出的
 //     7 档（mono…5.0）+ 可选 LFE → ≤5.1；
 //   - 期望的 sample_rate / 输出声道数 / 每帧样本数均用 in-repo reference
-//     FFmpeg（no-asm 构建）实际解码锚定（ffprobe / f32 字节数）。
+//     验收基准（no-asm 构建）实际解码锚定（ffprobe / f32 字节数）。
 // 该矩阵同时回归以下已修正的路径差异：
 //   - parse_decoder_init 采样率表错用 core 表（真实 48k LBR 会被误判 24k 且
 //     LFE 被清除）；
 //   - init_sample_rate 长窗抽取位移错用 limited_range（应为 freq_range），
 //     带限 1/2 + 48k 会越界崩溃；
 //   - filter_frame 对 >5 全带声道的掩码（如 0x17 带 Cs）曾越界 reorder 表
-//     （FFmpeg C 此路同为 UB，此处以丢弃越界声道 + 结构一致替代）。
+//     （验收基准 C 此路同为 UB，此处以丢弃越界声道 + 结构一致替代）。
 // ---------------------------------------------------------------------------
 
 const TestInitCase = struct {
@@ -2193,9 +2197,9 @@ fn runLbrInitCase(c: TestInitCase) !void {
     try testing.expectEqual(c.out_samples, dec.outputNsamples());
 }
 
-// FFmpeg C 参考锚定矩阵（期望值由 in-repo no-asm reference FFmpeg 解码得出：
+// 验收基准 C 参考锚定矩阵（期望值由 in-repo no-asm reference 验收基准 解码得出：
 // ffprobe sample_rate/channels + f32 输出字节数 / 声道数）
-test "lbr: 多声道 decoder_init 参数 vs FFmpeg C（mono→5.1、带限、LFE、掩码）" {
+test "lbr: 多声道 decoder_init 参数 vs 验收基准 C（mono→5.1、带限、LFE、掩码）" {
     const cases = [_]TestInitCase{
         // 8k mono（freq_range 0）
         .{ .sr_code = 0, .mask = 0x0001, .flags = 0x14, .bit_rate = 32000, .sr = 8000, .freq_range = 0, .limited_range = 0, .nsubbands = 8, .nch_total = 1, .nch = 1, .out_nch = 1, .out_samples = 1024 },
@@ -2222,9 +2226,9 @@ test "lbr: 多声道 decoder_init 参数 vs FFmpeg C（mono→5.1、带限、LFE
 }
 
 test "lbr: 超布局声道掩码（带 Cs/LwRw）仅做结构校验、不崩溃" {
-    // FFmpeg C 对 ch_mask & 0xfff0（额外声道对）仅警告并继续，但 >5 全带声道
+    // 验收基准 C 对 ch_mask & 0xfff0（额外声道对）仅警告并继续，但 >5 全带声道
     // 在 filter_frame 会越界读 reorder 表（UB）；此处验证 mine 丢弃越界声道、
-    // 输出仍为低 3 位定出的布局（5.1）且与 FFmpeg 结构一致（6ch × 4096）。
+    // 输出仍为低 3 位定出的布局（5.1）且与 验收基准 结构一致（6ch × 4096）。
     const cases = [_]TestInitCase{
         .{ .sr_code = 12, .mask = 0x0017, .flags = 0x16, .bit_rate = 192000, .sr = 48000, .freq_range = 2, .limited_range = 2, .nsubbands = 32, .nch_total = 6, .nch = 6, .out_nch = 6, .out_samples = 4096 },
         .{ .sr_code = 12, .mask = 0x0407, .flags = 0x16, .bit_rate = 192000, .sr = 48000, .freq_range = 2, .limited_range = 2, .nsubbands = 32, .nch_total = 7, .nch = 6, .out_nch = 6, .out_samples = 4096 },
@@ -2256,7 +2260,7 @@ test "lbr: 全部 ≤48k 采样率码经 ff_dca_sampling_freqs 正确映射" {
     }
 }
 
-test "lbr: 非法掩码/非法 dmix 被拒绝（与 FFmpeg 一致）" {
+test "lbr: 非法掩码/非法 dmix 被拒绝（与 验收基准 一致）" {
     var arena = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
@@ -2268,7 +2272,7 @@ test "lbr: 非法掩码/非法 dmix 被拒绝（与 FFmpeg 一致）" {
         defer dec.deinit();
         try testing.expectError(error.Unsupported, dec.parse(frame));
     }
-    // mono（nchannels_total=1）带 dmix_stereo → FFmpeg “Invalid number of channels
+    // mono（nchannels_total=1）带 dmix_stereo → 验收基准 “Invalid number of channels
     // for LBR stereo downmix”（dca_lbr.c 同条件 AVERROR_INVALIDDATA）
     {
         const frame = try buildLbrInitFrame(a, .{ .sr_code = 12, .mask = 0x0001, .flags = 0x34, .bit_rate = 192000 }, &.{});

@@ -15,17 +15,17 @@
 //!   - 每样本：unary(1 前缀，0 终止) → 分段 Rice(k0/k1 双自适应) → 逆 zigzag
 //!     映射 → 8 抽头自适应 LMS（qm/dx/dl，round/shift 定点舍入）→ 一阶定点
 //!     预测 PRED（(1-2^-k) 偏差）→ 多声道差分去相关；
-//!   - 溢出/无符号减法语义完全复刻 C（uint32 回绕 + int32 算术移位），逐位一致。
+//!   - 溢出/无符号减法语义完全复刻 C（uint32 回绕 + int32 算术移位），逐样本一致。
 //!
-//! 位深语义（bytes_per_sample 对齐 ffmpeg s->bps）：1=8bit、2=16bit、3=24bit；
+//! 位深语义（bytes_per_sample 对齐 验收基准 s->bps）：1=8bit、2=16bit、3=24bit；
 //! 滤波 shift = ff_tta_filter_configs[bps-1] = {10,9,10,12}；预测系数 k：
-//! 8bit→4、16/24bit→5。输出布局对齐 ffmpeg 内部样本格式：
+//! 8bit→4、16/24bit→5。输出布局对齐 验收基准 内部样本格式：
 //!   8bit → u8(样本+0x80)；16bit → s16；24bit → int32<<8（= `-f s32le`）。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 
-/// 与 ffmpeg tta_decode_init 一致：channels 1..16
+/// 与 验收基准 tta_decode_init 一致：channels 1..16
 pub const MAX_CHANNELS: usize = 16;
 
 /// ff_tta_shift_1：2^0..2^30、0x80000000×9、0xFFFFFFFF（C 共 41 项）；
@@ -277,7 +277,7 @@ pub const FrameDecoder = struct {
     }
 
     /// 解码一帧的 nb 个时间步，交错写入 out（bytes = nb×channels×width）。
-    /// width 依 bps：1 → u8(+0x80)、2 → s16、3 → s32<<8（对齐 ffmpeg 内部）。
+    /// width 依 bps：1 → u8(+0x80)、2 → s16、3 → s32<<8（对齐 验收基准 内部）。
     pub fn decode(self: *FrameDecoder, br: *BitReader, bps: u8, nb: usize, out: []u8) Error!void {
         self.reset(bps);
         const ch = self.chans.len;

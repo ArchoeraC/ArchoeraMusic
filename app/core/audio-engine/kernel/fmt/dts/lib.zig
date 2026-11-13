@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! DTS core 流帧扫描/统计（阶段一）
 //!
@@ -163,7 +167,7 @@ pub const Iterator = struct {
     }
 };
 
-/// core 声道/扩展判定（阶段一展示用；与 FFmpeg 输出声道数一致的简化模型）：
+/// core 声道/扩展判定（阶段一展示用；与 验收基准 输出声道数一致的简化模型）：
 ///   channels = popcount(ch_mask)；ch_mask = amode 表掩码 + LFE + XCH(Cs)。
 /// X96 不增声道（提高采样率 2×）；XXCH 需读 XXCH 头才能定声道（阶段一仅标记）。
 pub const ChannelInfo = struct {
@@ -203,7 +207,7 @@ pub fn channelConfig(h: *const Header) ChannelInfo {
 // ---------------------------------------------------------------------------
 // 测试
 // ---------------------------------------------------------------------------
-// 样本头部（真实 ffmpeg dca 编码器 / fate-suite dts_es 首帧前 64 字节）
+// 样本头部（真实 验收基准 dca 编码器 / fate-suite dts_es 首帧前 64 字节）
 const head_48s = @embedFile("test_head_48s.bin"); // 48k 立体声 512kbps
 const head_48x = @embedFile("test_head_48x.bin"); // 48k 5.1(side)+LFE 1536kbps
 const head_8m = @embedFile("test_head_8m.bin"); // 8k mono 512kbps
@@ -233,7 +237,7 @@ fn padFrame(head: []const u8, frame_size: usize, count: usize, out: []u8) usize 
     return frame_size * count;
 }
 
-test "dts: 48k 立体声帧头字段（ffmpeg dca 编码器）" {
+test "dts: 48k 立体声帧头字段（验收基准 dca 编码器）" {
     const h = try parse(head_48s, .be16);
     try testing.expect(h.normal_frame);
     try testing.expectEqual(@as(u8, 32), h.deficit_samples);
@@ -855,7 +859,7 @@ fn openWhole(allocator: stdio.mem.Allocator, reader: *io2.Reader, info: *decoder
     } else if (is_container) {
         // .dtshd 容器：先解出 STRMDATA 载荷，再按访问单元（core + EXSS）解码。
         // 容器开头的初始填充单元（AUPR-HDR initial_padding，样本集 = 2 个 core
-        // 帧）只用于填充解码状态、不产生输出（与 ffmpeg dtshd 解封装/dca 解析
+        // 帧）只用于填充解码状态、不产生输出（与 验收基准 dtshd 解封装/dca 解析
         // 丢弃 start_skip_samples 及 dtshd_dump 工具 -skip 2 行为一致）。
         const skip = auprInitialPaddingUnits(buf);
         const dec = try decodePayloadToS16(allocator, payload, false, skip);
@@ -939,13 +943,13 @@ fn openWhole(allocator: stdio.mem.Allocator, reader: *io2.Reader, info: *decoder
     return .{ .vtable = &dts_vtable, .ctx = ctx };
 }
 
-/// DTS 编码 profile 名（对齐 ffmpeg ffprobe：core→DTS / X96 96k core→DTS 96/24 /
+/// DTS 编码 profile 名（对齐 验收基准 ffprobe：core→DTS / X96 96k core→DTS 96/24 /
 /// EXSS 扩展（HRA，无 XLL）→DTS-HD HRA / XLL 上混→DTS-HD MA）
 fn dtsProfile2(xll_used: bool, has_exss: bool, xll_x_profile: u8, lbr_used: bool, sample_rate: u32) ?[:0]const u8 {
-    // ffmpeg dcadec：LBR 输出优先（DCA_PACKET_LBR）→ AV_PROFILE_DTS_EXPRESS
+    // 验收基准 dcadec：LBR 输出优先（DCA_PACKET_LBR）→ AV_PROFILE_DTS_EXPRESS
     if (lbr_used) return "DTS Express";
     if (xll_used) {
-        // ffmpeg profiles.c：DTS:X / IMAX 由 XLL 帧尾扩展 sync 判定
+        // 验收基准 profiles.c：DTS:X / IMAX 由 XLL 帧尾扩展 sync 判定
         if (xll_x_profile == 2) return "DTS-HD MA + DTS:X IMAX";
         if (xll_x_profile == 1) return "DTS-HD MA + DTS:X";
         return "DTS-HD MA";
@@ -960,7 +964,7 @@ fn dtsProfile2(xll_used: bool, has_exss: bool, xll_x_profile: u8, lbr_used: bool
 // ---------------------------------------------------------------------------
 
 /// .dtshd 容器初始填充单元数（AUPR-HDR initial_padding / samples_per_frame）；
-/// 无 AUPR-HDR 时 0（与 ffmpeg dtshd demux 缺省一致）。
+/// 无 AUPR-HDR 时 0（与 验收基准 dtshd demux 缺省一致）。
 fn auprInitialPaddingUnits(buf: []const u8) usize {
     if (buf.len < 8 or !stdio.mem.eql(u8, buf[0..8], "DTSHDHDR")) return 0;
     var off: usize = 0; // 平铺 chunk 表（首 chunk tag = "DTSHDHDR"）
@@ -1128,8 +1132,8 @@ fn exssSubstreamSize(buf: []const u8) ?usize {
 /// 返回已 owned PCM（调用方 free）。
 ///
 /// 输出语义：core 平面与 XLL 24bit 平面均为定点 clip23 值，右移 8 得到 s16
-/// （即 ffmpeg `-f s32le` 24bit<<8 输出再经 s32→s16 转换 v>>16 的等价结果）；
-/// XLL storage16 平面即为 s16 值，直接输出。声道序 = ffmpeg 默认 remap 序。
+/// （即 验收基准 `-f s32le` 24bit<<8 输出再经 s32→s16 转换 v>>16 的等价结果）；
+/// XLL storage16 平面即为 s16 值，直接输出。声道序 = 验收基准 默认 remap 序。
 fn decodePayloadToS16(
     a: stdio.mem.Allocator,
     payload: []const u8,
@@ -1261,7 +1265,7 @@ fn decodePayloadToS16(
         }
 
         // 3) core 扩展声道（XCH/XXCH/XBR）与 X96 解析（ff_dca_core_parse_exss；
-        //    XLL 激活时跳过 X96 数据解析，对齐 ffmpeg）
+        //    XLL 激活时跳过 X96 数据解析，对齐 验收基准）
         core_dec.parseCoreExssXbr(
             frame_buf,
             if (exss_buf.len != 0) exss_buf else null,
@@ -1278,7 +1282,7 @@ fn decodePayloadToS16(
             else => return error.Corrupt,
         };
 
-        // 4) 决定 core 合成模式（对齐 ffmpeg：有 XLL 时忽略 core CSS X96；
+        // 4) 决定 core 合成模式（对齐 验收基准：有 XLL 时忽略 core CSS X96；
         //    chset base 频 = 96k 且 core 48k → XLL 残余上混需 96k core 输入）
         var want_core_x96 = false;
         if (xll_parse_ok) {
@@ -1363,7 +1367,7 @@ fn decodePayloadToS16(
     };
 }
 
-/// LBR float 平面样本 → s16（ffmpeg swresample FLT→S16：
+/// LBR float 平面样本 → s16（验收基准 swresample FLT→S16：
 /// av_clip_int16(lrintf(v * 32768))；lrintf = 四舍五入取偶）
 fn lbrF32ToS16(v: f32) i16 {
     const scaled = v * 32768.0;
@@ -1389,7 +1393,7 @@ fn toXllS16(v: i32, storage: u8) i16 {
 /// 的 chunk 链扫描，见 libavformat dtshddec.c）。
 fn extractStreamPayload(buf: []const u8) ![]const u8 {
     if (buf.len < 16) return error.UnsupportedFormat;
-    // 平铺 chunk 表（ffmpeg dtshddec）：首 chunk tag 即 "DTSHDHDR"，
+    // 平铺 chunk 表（验收基准 dtshddec）：首 chunk tag 即 "DTSHDHDR"，
     // 其后 AUPR-HDR / STRMDATA 等每 chunk = tag(8) + size(8BE) + payload。
     var off: usize = 0;
     while (off + 16 <= buf.len) {
@@ -1407,8 +1411,8 @@ fn extractStreamPayload(buf: []const u8) ![]const u8 {
 }
 
 // ---------------------------------------------------------------------------
-// XLL 全管线回归：.dtshd STRMDATA 载荷 → 逐单元 core+XLL 上混 → 与 ffmpeg 定点
-// s32le 逐字节对照（容器初始 2 个填充单元丢弃，与 ffmpeg/dtshd_dump 一致）。
+// XLL 全管线回归：.dtshd STRMDATA 载荷 → 逐单元 core+XLL 上混 → 与 验收基准 定点
+// s32le 逐字节对照（容器初始 2 个填充单元丢弃，与 验收基准/dtshd_dump 一致）。
 // ---------------------------------------------------------------------------
 const xll51_payload = @embedFile("xll51_24_48_768_payload.bin"); // 48k/24bit 5.1 XLL
 const xll51_gt = @embedFile("xll51_24_48_768_gt.s32.bin");
@@ -1506,14 +1510,14 @@ fn decodeXllPayloadToS32(payload: []const u8, out: []u8) !usize {
     return pos;
 }
 
-test "dts xll: 5.1 48k/24bit 全 6 声道 XLL 上混 == ffmpeg s32le（含 core LFE 平面）" {
+test "dts xll: 5.1 48k/24bit 全 6 声道 XLL 上混 == 验收基准 s32le（含 core LFE 平面）" {
     var buf: [49152]u8 = undefined;
     const n = try decodeXllPayloadToS32(xll51_payload, &buf);
     try stdio.testing.expectEqual(@as(usize, 49152), n);
     try stdio.testing.expectEqualSlices(u8, xll51_gt, buf[0..n]);
 }
 
-test "dts xll: 7.1 48k/24bit 双 chset（层次 dmix 撤销）== ffmpeg s32le" {
+test "dts xll: 7.1 48k/24bit 双 chset（层次 dmix 撤销）== 验收基准 s32le" {
     var buf: [65536]u8 = undefined;
     const n = try decodeXllPayloadToS32(xll71_payload, &buf);
     try stdio.testing.expectEqual(@as(usize, 65536), n);
@@ -1523,7 +1527,7 @@ test "dts xll: 7.1 48k/24bit 双 chset（层次 dmix 撤销）== ffmpeg s32le" {
 // ---------------------------------------------------------------------------
 // 生产整合回归：decoder.open（fmt/dts）对 .dtshd 容器全链路 → s16
 // ---------------------------------------------------------------------------
-// 输出语义：ffmpeg `-flags2 skip_manual -f s32le`（24bit<<8 / 16bit<<16）再经
+// 输出语义：验收基准 `-flags2 skip_manual -f s32le`（24bit<<8 / 16bit<<16）再经
 // s32→s16 转换（av_clip_int16(v>>16)）即为本路径 s16 → 逐样本相等。
 
 const core51_payload = @embedFile("core51_24_48_768_payload.bin");
@@ -1598,7 +1602,7 @@ fn expectS16EqS32Downshift(s16: []const i16, gt_s32: []const u8) !void {
     }
 }
 
-test "dts 生产: .dtshd 容器 XLL 5.1 48k → open 全链路 s16 == ffmpeg s32>>16" {
+test "dts 生产: .dtshd 容器 XLL 5.1 48k → open 全链路 s16 == 验收基准 s32>>16" {
     const r = try openContainerToS16(stdio.testing.allocator, xll51_payload, 512, 1024);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 48000), r.info.sample_rate);
@@ -1608,7 +1612,7 @@ test "dts 生产: .dtshd 容器 XLL 5.1 48k → open 全链路 s16 == ffmpeg s32
     try expectS16EqS32Downshift(r.pcm, xll51_gt);
 }
 
-test "dts 生产: .dtshd 容器 XLL 7.1 48k 双 chset → open 全链路 s16 == ffmpeg s32>>16" {
+test "dts 生产: .dtshd 容器 XLL 7.1 48k 双 chset → open 全链路 s16 == 验收基准 s32>>16" {
     const r = try openContainerToS16(stdio.testing.allocator, xll71_payload, 512, 1024);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 48000), r.info.sample_rate);
@@ -1617,7 +1621,7 @@ test "dts 生产: .dtshd 容器 XLL 7.1 48k 双 chset → open 全链路 s16 == 
     try expectS16EqS32Downshift(r.pcm, xll71_gt);
 }
 
-test "dts 生产: .dtshd 容器无 XLL（纯 core）→ open 回落 core s16 == ffmpeg s32>>16" {
+test "dts 生产: .dtshd 容器无 XLL（纯 core）→ open 回落 core s16 == 验收基准 s32>>16" {
     const r = try openContainerToS16(stdio.testing.allocator, core51_payload, 512, 1024);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 48000), r.info.sample_rate);
@@ -1660,7 +1664,7 @@ const x96_51_gt = @embedFile("x96_51_24_96_1509_gt.s16.bin");
 const xll192_payload = @embedFile("xll192_51_16_192_payload.bin");
 const xll192_gt = @embedFile("xll192_51_16_192_gt.s16.bin");
 
-test "dts 生产: .dtshd DTS96/24 core（CSS X96）→ open 96k s16 == ffmpeg -bitexact" {
+test "dts 生产: .dtshd DTS96/24 core（CSS X96）→ open 96k s16 == 参考 CLI（-bitexact）" {
     const r = try openContainerToS16(stdio.testing.allocator, x96_51_payload, 1024, 2048);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 96000), r.info.sample_rate);
@@ -1670,7 +1674,7 @@ test "dts 生产: .dtshd DTS96/24 core（CSS X96）→ open 96k s16 == ffmpeg -b
     try stdio.testing.expectEqualSlices(u8, x96_51_gt, got);
 }
 
-test "dts 生产: .dtshd XLL 192k（2 频带 + 96k core 合成）→ open s16 == ffmpeg -bitexact" {
+test "dts 生产: .dtshd XLL 192k（2 频带 + 96k core 合成）→ open s16 == 参考 CLI（-bitexact）" {
     const r = try openContainerToS16(stdio.testing.allocator, xll192_payload, 2048, 4096);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 192000), r.info.sample_rate);
@@ -1690,7 +1694,7 @@ const x96_xch_gt = @embedFile("x96_xch_61_24_96_3840_gt.s16.bin");
 const x96_xxch_payload = @embedFile("x96_xxch_71_24_96_3840_payload.bin");
 const x96_xxch_gt = @embedFile("x96_xxch_71_24_96_3840_gt.s16.bin");
 
-test "dts 生产: .dtshd HRA 96k/6.1 XCH（CSS XCH + EXSS X96）→ open s16 == ffmpeg -bitexact" {
+test "dts 生产: .dtshd HRA 96k/6.1 XCH（CSS XCH + EXSS X96）→ open s16 == 参考 CLI（-bitexact）" {
     const r = try openContainerToS16(stdio.testing.allocator, x96_xch_payload, 1024, 2048);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 96000), r.info.sample_rate);
@@ -1700,7 +1704,7 @@ test "dts 生产: .dtshd HRA 96k/6.1 XCH（CSS XCH + EXSS X96）→ open s16 == 
     try stdio.testing.expectEqualSlices(u8, x96_xch_gt, got);
 }
 
-test "dts 生产: .dtshd HRA 96k/7.1 XXCH（EXSS XXCH + EXSS X96）→ open s16 == ffmpeg -bitexact" {
+test "dts 生产: .dtshd HRA 96k/7.1 XXCH（EXSS XXCH + EXSS X96）→ open s16 == 参考 CLI（-bitexact）" {
     const r = try openContainerToS16(stdio.testing.allocator, x96_xxch_payload, 1024, 2048);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 96000), r.info.sample_rate);
@@ -1720,7 +1724,7 @@ const xbr_xxch_gt = @embedFile("xbr_xxch_71_24_48_3840_gt.s16.bin");
 const xxch2046_payload = @embedFile("xxch_71_24_48_2046_payload.bin");
 const xxch2046_gt = @embedFile("xxch_71_24_48_2046_gt.s16.bin");
 
-test "dts 生产: .dtshd HRA 48k/7.1 XBR+XXCH（EXSS XBR 残差写入 core 子带）→ open s16 == ffmpeg -bitexact" {
+test "dts 生产: .dtshd HRA 48k/7.1 XBR+XXCH（EXSS XBR 残差写入 core 子带）→ open s16 == 参考 CLI（-bitexact）" {
     const r = try openContainerToS16(stdio.testing.allocator, xbr_xxch_payload, 512, 0);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 48000), r.info.sample_rate);
@@ -1730,7 +1734,7 @@ test "dts 生产: .dtshd HRA 48k/7.1 XBR+XXCH（EXSS XBR 残差写入 core 子�
     try stdio.testing.expectEqualSlices(u8, xbr_xxch_gt, got);
 }
 
-test "dts 生产: .dtshd HRA 48k/7.1 XBR+X96+RSV1（RSV 位掩码跳过）→ open s16 == ffmpeg -bitexact" {
+test "dts 生产: .dtshd HRA 48k/7.1 XBR+X96+RSV1（RSV 位掩码跳过）→ open s16 == 参考 CLI（-bitexact）" {
     const r = try openContainerToS16(stdio.testing.allocator, xxch2046_payload, 512, 0);
     defer stdio.testing.allocator.free(r.pcm);
     try stdio.testing.expectEqual(@as(u32, 48000), r.info.sample_rate);
@@ -1744,7 +1748,7 @@ test "dts 生产: .dtshd HRA 48k/7.1 XBR+X96+RSV1（RSV 位掩码跳过）→ op
 // LBR（DTS Express）合成流回归：无公开真实 LBR 样本（FATE/dcadec-suite 均无），
 // 以合成 EXSS-only 流驱动全链路（exss asset LBR 偏移 → lbr.parse 块结构 →
 // filterFrame（bank/IMDCT/LFE-IIR 路径）→ lbrF32ToS16 → open 裸流检测），
-// 验证结构性正确与确定性输出；数值精度由 lbr.zig 内 FFmpeg 参考向量测试保证。
+// 验证结构性正确与确定性输出；数值精度由 lbr.zig 内 验收基准 参考向量测试保证。
 // ---------------------------------------------------------------------------
 
 /// 测试用 MSB-first 位写入器
@@ -1796,7 +1800,7 @@ test "lbr 生产: 合成纯 EXSS LBR 流（8k mono）→ open 全链路 s16" {
     lbr_frame[lp] = @intCast((96000 & 0xFF));
     lbr_frame[lp + 1] = @intCast((96000 >> 8) & 0xFF);
     lp += 2; // scaled le16
-    // frame chunk（NO_CSUM）+ 若干子块（数据可任意，截断处按 ffmpeg 语义跳过/随机填充）
+    // frame chunk（NO_CSUM）+ 若干子块（数据可任意，截断处按 验收基准 语义跳过/随机填充）
     lbr_frame[lp] = 0x06; // frame chunk no csum
     lp += 1;
     const flen_pos = lp;

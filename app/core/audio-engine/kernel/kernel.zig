@@ -98,8 +98,8 @@ export fn zk_decoder_open_cb(
 }
 
 /// 从 **EraAudio 原生 HTTP(S)** 打开解码器（在线直链；内核自研请求/响应解析，
-/// 不经宿主 FFmpeg AVIO）。契约同 [zk_decoder_open]；失败（非 http(s)/连接/
-/// TLS/状态码/未接管格式）返回 null 并写 errbuf，C 壳据此回退 AVIO/FFmpeg。
+/// 不经宿主 验收基准 AVIO）。契约同 [zk_decoder_open]；失败（非 http(s)/连接/
+/// TLS/状态码/未接管格式）返回 null 并写 errbuf，C 壳据此回退 AVIO/验收基准。
 /// URL 仅在本调用内存活；成功后网络流归 Engine，[zk_decoder_close] 自动关闭。
 export fn zk_decoder_open_url(
     url: [*:0]const u8,
@@ -1280,7 +1280,7 @@ fn urlStreamDestroy(ctx: *anyopaque, allocator: std.mem.Allocator) void {
 /// 请求/响应解析（net.zig）；URL 仅在本调用内被读取。会话复用回调 seam：ctx 即
 /// HttpStream，on_read/on_seek 指向其回调，cb_owner 在会话销毁时关闭网络流。
 /// 失败（非 http(s)/连接/TLS/状态码/重定向/格式未接管/OOM）返回 NULL，
-/// 调用方可回退 [zk_decoder_open_url]（再回退宿主 FFmpeg/AVIO）。
+/// 调用方可回退 [zk_decoder_open_url]（再回退宿主 验收基准/AVIO）。
 export fn zk_engine_open_url(
     h: ?*khost.Host,
     url: [*:0]const u8,
@@ -2274,7 +2274,7 @@ fn bigWavBytes(allocator: std.mem.Allocator, nframes: usize) ![]u8 {
     return b;
 }
 
-test "AS4 zk_submit format_hint: 正确提示免 probe；错误提示回退；均与 decode_once 逐位一致" {
+test "AS4 zk_submit format_hint: 正确提示免 probe；错误提示回退；均与 decode_once 逐样本一致" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
     const io_inst = std.Io.Threaded.global_single_threaded.io();
@@ -2310,7 +2310,7 @@ test "AS4 zk_submit format_hint: 正确提示免 probe；错误提示回退；�
         zk_task_free(t);
     }
 
-    // 错误提示（flac=2）→ 直分派失败 → 回退 probe → 仍逐位一致
+    // 错误提示（flac=2）→ 直分派失败 → 回退 probe → 仍逐样本一致
     {
         var out: [16]f32 = undefined;
         var oc: c_int = 0;

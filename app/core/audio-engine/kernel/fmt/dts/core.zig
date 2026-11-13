@@ -1,17 +1,21 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! DTS（DCA Coherent Acoustics）core → PCM 解码（阶段二）
 //!
 //! 主线对照 FFmpeg dca_core.c 的 parse_frame_header / parse_coding_header /
-//! parse_subframe_header / parse_subframe_audio / parse_frame_data（位级一致）+
+//! parse_subframe_header / parse_subframe_audio / parse_frame_data（逐样本一致）+
 //! filter_frame_fixed / ff_dca_core_filter_fixed（定点合成，整数逐句一致）。
 //!
 //! 位流：MSB-first，输入 frame 须为已还原的 BE16 字节（LE16 字交换在 lib 层完成）。
 //! 输出：与 `ffmpeg -bitexact -f s32le` 对齐的 24-bit<<8 S32 平面
-//! （声道序 = ffmpeg 默认 remap 序）。定点路径全部整数运算 → bit-exact。
+//! （声道序 = ffmpeg 默认 remap 序）。定点路径全部整数运算 → 逐样本一致。
 //!
 //! 范围：core 主声道（mono/stereo/3.0/2.1/3.1/2.2/5.0/5.1 + LFE 64x）+ CSS X96
 //! （DTS 96/24：core 帧内 X96 扩展 64 子带数据 + 64-band 合成 → 96k 采样率；
@@ -21,7 +25,7 @@
 //!   嵌入 XCH 降混撤销）与 CSS/EXSS XXCH（speaker mask 声道组 + 附加声道
 //!   dmix 撤销），以及 EXSS X96（parse_x96_frame_exss 多声道组）——对照
 //!   dca_core.c parse_xch_frame / parse_xxch_frame / parse_x96_frame_exss 与
-//!   ff_dca_core_parse_exss。LBR 未实现；LFE 128x 定点模式 FFmpeg 亦不支持。
+//!   ff_dca_core_parse_exss。LBR 未实现；LFE 128x 定点模式 验收基准 亦不支持。
 //! 14-bit 打包与阶段一一致不支持。
 
 const std = @import("std");
@@ -63,7 +67,7 @@ pub const xxch_dmix_coeff_max: usize = xxch_channels_max * 6;
 /// core 扩展声道编码头类型（dca_core.c HeaderType）
 const HdrType = enum(u2) { core, xch, xxch };
 
-/// 一个已解码帧的平面（值 = 定点 24bit 样本，即 ffmpeg 定点路径 clip23(sample)
+/// 一个已解码帧的平面（值 = 定点 24bit 样本，即 验收基准 定点路径 clip23(sample)
 /// 左移 8 位前的原始范围；输出时 ×256 即为 s32le）。平面缓冲属解码器所有，
 /// 下次 decode 前有效。
 pub const DecodedFrame = struct {
@@ -155,7 +159,7 @@ pub const DcaDecoder = struct {
     hist2_x96: [DCA_CHANNELS][64]i32 = @splat(@splat(0)),
     offset_x96: [DCA_CHANNELS]u10 = @splat(0),
     lfe_history_x96: i32 = 0,
-    /// 上一帧合成模式（true = 64-band）；切换时清空 DSP 历史（对齐 ffmpeg）
+    /// 上一帧合成模式（true = 64-band）；切换时清空 DSP 历史（对齐 验收基准）
     filter_x96_mode: bool = false,
 
     // ---- X96 扩展状态（随帧更新）----
@@ -670,7 +674,7 @@ pub const DcaDecoder = struct {
             step_scale >>= @intCast(shift);
         }
         for (audio, 0..) |av, k| {
-            // ffmpeg: output[n] += clip23(norm__(...))（残差先 clip 再环绕相加）
+            // 验收基准: output[n] += clip23(norm__(...))（残差先 clip 再环绕相加）
             band_data[ofs + k] +%= dsp.clip23(dsp.norm__(@as(i64, av) * step_scale, 22 - shift));
         }
     }
@@ -710,7 +714,7 @@ pub const DcaDecoder = struct {
             var nn: usize = 0;
             while (nn < nlfesamples) : (nn += 1) {
                 const u = try br.readBits(8);
-                // ffmpeg get_array() → get_sbits(8)：8-bit 带符号（补码）
+                // 验收基准 get_array() → get_sbits(8)：8-bit 带符号（补码）
                 const s: i32 = if (u >= 0x80) @as(i32, @intCast(u)) - 256 else @intCast(u);
                 lfe_audio[nn] = s;
             }
@@ -868,7 +872,7 @@ pub const DcaDecoder = struct {
     }
 
     fn crc16Ccitt(buf: []const u8) u16 {
-        // FFmpeg av_crc(AV_CRC_16_CCITT, 0xffff, buf, len)：CRC-16/CCITT-FALSE，
+        // 验收基准 av_crc(AV_CRC_16_CCITT, 0xffff, buf, len)：CRC-16/CCITT-FALSE，
         // 表驱动 crc = table[(crc ^ byte) & 0xff] ^ (crc >> 8)。
         var crc: u16 = 0xffff;
         for (buf) |b| {
@@ -1137,7 +1141,7 @@ pub const DcaDecoder = struct {
             if (self.parseXxchFrame(&br)) |_| {
                 self.ext_audio_mask |= exss_xxch;
             } else |_| {
-                // 失败：回退到主声道组（对齐 ffmpeg 非 EXPLODE 语义）
+                // 失败：回退到主声道组（对齐 验收基准 非 EXPLODE 语义）
                 self.revertExssChannels();
             }
         } else if (self.xxch_pos != 0) {
@@ -1156,7 +1160,7 @@ pub const DcaDecoder = struct {
             }
         }
 
-        // XBR（解析失败忽略，对齐 ffmpeg 非 EXPLODE 语义）
+        // XBR（解析失败忽略，对齐 验收基准 非 EXPLODE 语义）
         if (extension_mask & exss_xbr != 0) {
             const exss_data = exss_buf orelse return error.Corrupt;
             if (xbr_offset + xbr_size > exss_data.len) return error.Corrupt;
@@ -1166,7 +1170,7 @@ pub const DcaDecoder = struct {
             } else |_| {}
         }
 
-        // X96（XLL 解码时跳过，对齐 ffmpeg DCA_PACKET_XLL）
+        // X96（XLL 解码时跳过，对齐 验收基准 DCA_PACKET_XLL）
         if (!xll_active) {
             if (extension_mask & exss_x96 != 0) {
                 const exss_data = exss_buf orelse return error.Corrupt;
@@ -1493,7 +1497,7 @@ pub const DcaDecoder = struct {
     // ======================================================================
     pub fn filter(self: *DcaDecoder, out: *DecodedFrame, x96_synth: bool) !void {
         if (x96_synth != self.filter_x96_mode) {
-            // 切换 32/64-band：清空 DSP 历史（对齐 ffmpeg set_filter_mode）
+            // 切换 32/64-band：清空 DSP 历史（对齐 验收基准 set_filter_mode）
             for (&self.hist1) |*h| h.* = @splat(0);
             for (&self.hist2) |*h| h.* = @splat(0);
             for (&self.hist2_x96) |*h| h.* = @splat(0);
@@ -1746,7 +1750,7 @@ fn mapPrmChToSpkrStatic(audio_mode: u8, ch: usize) usize {
     return @intCast(row[ch]);
 }
 
-/// ffmpeg ff_dca_set_channel_layout 默认通道序（CHANNEL_ORDER_DEFAULT）。
+/// 验收基准 ff_dca_set_channel_layout 默认通道序（CHANNEL_ORDER_DEFAULT）。
 const dca2wav_norm = [28]u8{
     2,  0,  1, 9, 10, 3,  8,  4,  5,  9,  10, 6, 7, 12,
     13, 14, 3, 6, 7,  11, 12, 14, 16, 15, 17, 8, 4, 5,
@@ -1780,7 +1784,7 @@ pub fn remapOrder(mask: u32, order: *[8]u32) usize {
     return nout;
 }
 
-test "dts core: remapOrder 声道序与 ffmpeg 一致" {
+test "dts core: remapOrder 声道序与 验收基准 一致" {
     var o: [8]u32 = undefined;
     try std.testing.expectEqual(@as(usize, 2), remapOrder(t.speaker_l | t.speaker_r, &o));
     try std.testing.expectEqual(@as(u32, 1), o[0]);
@@ -1800,7 +1804,7 @@ test "dts core: remapOrder 声道序与 ffmpeg 一致" {
 const golden_frame_48s = @embedFile("golden_48s_frame.bin");
 const golden_pcm_48s = @embedFile("golden_48s_frame_pcm.bin");
 
-test "dts core: 48k 立体声首帧 decode == ffmpeg bitexact s32" {
+test "dts core: 48k 立体声首帧 decode == 验收基准 逐样本一致 s32" {
     var dec = DcaDecoder.init(std.testing.allocator);
     defer dec.deinit();
     var f: DecodedFrame = undefined;
@@ -1823,11 +1827,11 @@ test "dts core: 48k 立体声首帧 decode == ffmpeg bitexact s32" {
 // core_51_24_48_768_0：.dtshd STRMDATA 载荷 = 6 个连续 core 帧（每帧 1024B）。
 // golden：ffmpeg -flags +bitexact -core_only -f s32le 输出（容器丢掉前 2 个
 // 初始填充单元后 4 帧 = 2048 样本 × 6ch × 4B）。修复点：LFE 采样须按
-// ffmpeg get_sbits(8) 有符号读取，此前误按无符号 → 真实内容帧 LFE 平面偏差。
+// 验收基准 get_sbits(8) 有符号读取，此前误按无符号 → 真实内容帧 LFE 平面偏差。
 const core51_content_payload = @embedFile("core51_24_48_768_payload.bin");
 const core51_content_gt = @embedFile("core51_24_48_768_gt.s32.bin");
 
-test "dts core: 5.1 24bit 内容多帧（含 LFE）== ffmpeg bitexact（丢 2 初始帧后）" {
+test "dts core: 5.1 24bit 内容多帧（含 LFE）== 验收基准 逐样本一致（丢 2 初始帧后）" {
     var dec = DcaDecoder.init(std.testing.allocator);
     defer dec.deinit();
 
@@ -1856,7 +1860,7 @@ test "dts core: 5.1 24bit 内容多帧（含 LFE）== ffmpeg bitexact（丢 2 �
         try std.testing.expectEqual(@as(usize, 6), f.nch);
         try std.testing.expectEqual(@as(usize, 512), f.nsamples);
         if (frame_no >= 2) {
-            // 仅对照 ffmpeg 输出的 4 帧（丢容器前 2 个初始填充单元）
+            // 仅对照 验收基准 输出的 4 帧（丢容器前 2 个初始填充单元）
             for (0..f.nsamples) |n| {
                 for (0..f.nch) |ch| {
                     const v = f.planes[ch][n];

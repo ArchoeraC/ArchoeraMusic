@@ -1,9 +1,7 @@
-# 酷狗 API 新版方案与账号风控分析
+# KG API 新版方案与账号风控分析
 
-> 分析对象：MoeKoeMusic `1.7.2`（`4dac953`，2026-11-08）与其依赖的
-> MakcRe/KuGouMusicApi `1.6.3`（`7ac64e1`，2026-11-04；MoeKoeMusic 锁定
-> `5d6c9f7`）。参考克隆位于工作区 `SPlayer-Next/MoeKoeMusic` 与
-> `SPlayer-Next/KuGouMusicApi`，不参与本项目构建。
+> 分析对象：若干公开的第三方 KG 客户端与 API 实现（只读对照，不参与本项目构建；
+> 具体项目名称、版本与仓库路径不在本文展开）。
 >
 > 结论先行：新版方案的核心不是新的加密算法，而是**稳定设备身份 + 设备
 > 注册协议升级 + lite 登录设备信封**。旧实现每次启动随机 MID、每次取流
@@ -13,7 +11,7 @@
 
 ### 1.1 安装级设备身份（最关键）
 
-MoeKoeMusic `electron/util/kugouapi/deviceUtil.js` 为每个安装生成并持久化：
+第三方客户端的设备工具模块会为每个安装生成并持久化：
 
 | 字段 | 生成方式 | 用途 |
 | --- | --- | --- |
@@ -23,13 +21,13 @@ MoeKoeMusic `electron/util/kugouapi/deviceUtil.js` 为每个安装生成并持�
 | `mac` | 固定 `02:00:00:00:00:00` | `KUGOU_API_MAC`，不暴露真实网卡 |
 | `webgl` | 随机 uint64 十进制（服务端环境） | SSA 行为指纹的 `webgl` 字段 |
 
-这些值必须**跨重启复用**。MoeKoeMusic 在 Electron store 中保存；我们此前
+这些值必须**跨重启复用**。参考实现在本地 store 中保存；我们此前
 每次进程启动重新生成 `mid`，每次 `status=2` 重置 dfid，等于每次都在扮演
 一台新设备，这是最容易被判定为设备农场的模式。
 
 ### 1.2 设备注册升级到 v3
 
-KuGouMusicApi `module/register_dev.js` 在 `1c73c64`（2026-10-24）把
+公开 API 实现的设备注册模块在近期更新中把
 `/risk/v2/r_register_dev` 改为 `/risk/v3/r_register_dev`，提交说明是
 「修复 /register/dev 获取失败问题」。协议本身未变：
 
@@ -62,7 +60,7 @@ t2 = AES-256-CBC("<guid>|0f607264fc6318a92b9e13c65db7cd3c|<mac>|<dev>|<clienttim
 
 - `edt = AES-128-CBC("mid=...;userid=...;dfid=...;webgl=...;webdriver=0;ts=...;data=...")`
   （固定 IV `kugousecurity123`，data 为贝塞尔鼠标轨迹/滚动/窗口事件）；
-- `sid = RSA-OAEP-SHA256(AES key)`（公钥从酷狗 WASM 提取）。
+- `sid = RSA-OAEP-SHA256(AES key)`（公钥从KG WASM 提取）。
 
 上游只是把 `edt`/`sid`/`ssaCode` 附加到响应，真正提交验证由
 `module/verify_user_info.js`（`/v4/verify_user_info`）或 `module/sidedt.js`

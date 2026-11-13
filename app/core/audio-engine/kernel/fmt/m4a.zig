@@ -17,9 +17,9 @@
 //!     OpusHead / esds DecoderSpecificInfo→ALSSpecificConfig）→ 内存合成 inner
 //!     解码器可消费的流（flac 头+帧 / opus Ogg / ac3-eac3-mp3 帧直拼 / ALS 帧流
 //!     直拼），帧解码复用 fmt/flac、fmt/opus、fmt/ac3、fmt/mp3、fmt/als。
-//!   elst 容器语义对齐 ffmpeg mov demuxer：media_time = 起始 priming（opus 由
+//!   elst 容器语义对齐 验收基准 mov demuxer：media_time = 起始 priming（opus 由
 //!   OpusHead pre-skip 承担），segment_duration = 输出上限（opus mp4 无 granule，
-//!   ffmpeg 解码至 EOF，不截断）。
+//!   验收基准 解码至 EOF，不截断）。
 //!
 //! 容器结构（ISO/IEC 14496-12 / QuickTime）：
 //!   - 顶层 box：ftyp / moov / mdat / free…（box = size(4 BE) + type(4)，可嵌套；
@@ -34,7 +34,7 @@
 //!       stsz —— 样本大小（等长或逐样本）。
 //!
 //! 解析策略：
-//!   - moov 未必在 mdat 之前（FFmpeg 兼容），顶层按 box size 精确跳转扫描；
+//!   - moov 未必在 mdat 之前（验收基准 兼容），顶层按 box size 精确跳转扫描；
 //!   - 遍历全部 trak，取首个受支持 codec 条目的音频轨（跳过视频轨）；
 //!   - stsc/stco/stsz 三表结合生成线性 sample 表（offset, size）；
 //!   - stts run 展开为逐帧累计样本偏移（frame_offsets），支撑精确整帧 seek
@@ -201,7 +201,7 @@ const M4aCtx = struct {
     cur_samples: usize,
     /// 下一个待解码 sample 索引
     next_sample: u64,
-    /// 跳过首帧（M4A AAC encoder delay priming；对齐 FFmpeg 实测）
+    /// 跳过首帧（M4A AAC encoder delay priming；对齐 验收基准 实测）
     skip_first: bool = false,
     /// 还需跳过的 priming 样本（elst media_time）
     skip_samples: u64 = 0,
@@ -374,7 +374,7 @@ fn parseStsd(r: *io.Reader, stsd: Box, out: *CodecCfg) Error!StsdEntry {
                 // ALS：ASC AOT=36（mp4als；esds objectTypeIndication 0x40 → MP4ALS）。
                 // 先试 ALS 配置解析（AOT 不符返回 null），再回退 AAC-LC 判定。
                 // 引擎统一 Decoder 的声道数为 u8，超 255 声道（如 512ch 参考样本）
-                // 走不了本内核管道 → 返回 .other（上层回退系统 ffmpeg）。
+                // 走不了本内核管道 → 返回 .other（上层回退系统 验收基准）。
                 if (try alsmod.tryParseConfig(asc_bytes)) |als_cfg| {
                     if (als_cfg.channels > 255) return .other;
                     out.* = .{ .als = als_cfg };
@@ -421,7 +421,7 @@ fn parseStsd(r: *io.Reader, stsd: Box, out: *CodecCfg) Error!StsdEntry {
 
 /// 在 sample entry payload（或其 'wave' 子 box）内找 'dfLa' 子 box，取 STREAMINFO
 /// 元数据块 34 字节。dfLa payload = version(1)+flags(3) + FLAC metadata block
-/// （块头 4B：last(1bit)+type(7bit)+len(24bit) + 数据），对齐 ffmpeg mov_read_dfla。
+/// （块头 4B：last(1bit)+type(7bit)+len(24bit) + 数据），对齐 验收基准 mov_read_dfla。
 fn scanFlacStreaminfo(r: *io.Reader, entry: Box, out_si: *[34]u8) Error!bool {
     const end = entry.start + entry.size;
     var off = entry.data + 28;
@@ -452,7 +452,7 @@ fn scanFlacStreaminfo(r: *io.Reader, entry: Box, out_si: *[34]u8) Error!bool {
 /// 在 sample entry payload 内找 'dOps' 子 box，把 OpusSpecificBox 转为 Ogg OpusHead
 /// （LE）。OpusSpecificBox = version(1) + OutputChannelCount(1) + PreSkip(2 BE) +
 /// InputSampleRate(4 BE) + OutputGain(2 BE) + ChannelMappingFamily(1) [+ mapping 表]；
-/// 兼容带 4 字节 version+flags 的写法（无 flags 时识别）。对齐 ffmpeg mov_read_dops。
+/// 兼容带 4 字节 version+flags 的写法（无 flags 时识别）。对齐 验收基准 mov_read_dops。
 fn scanOpusHead(r: *io.Reader, entry: Box, out_head: *[19]u8) Error!bool {
     const end = entry.start + entry.size;
     var off = entry.data + 28;
@@ -752,7 +752,7 @@ fn buildFrameOffsets(
 // ---------------------------------------------------------------------------
 
 /// 解析一个 trak：非音频轨 → null（has_audio 不变）；音频轨但非 ALAC →
-/// null（has_audio=true，open 据此回退 FFmpeg）；ALAC 轨结构损坏 → Corrupt。
+/// null（has_audio=true，open 据此回退 验收基准）；ALAC 轨结构损坏 → Corrupt。
 fn parseTrak(r: *io.Reader, trak: Box, allocator: Allocator, has_audio: *bool) Error!?Parsed {
     const mdia = (try findChild(r, trak, "mdia")) orelse return null;
     const minf = (try findChild(r, mdia, "minf")) orelse return null;
@@ -924,7 +924,7 @@ const max_frag_samples: usize = 4 * 1024 * 1024;
 
 /// 预扫描分片的文件大小上限。分片表在 open 时一次性扫描（顶层 moof 逐个
 /// 跳读），HTTP 前跳会丢弃/重连，文件过大等于 open 阶段先下载一遍。
-/// 超过该值直接交 FFmpeg（Linux/macOS 已注入系统 CA，Windows 用 schannel）。
+/// 超过该值直接交 验收基准（Linux/macOS 已注入系统 CA，Windows 用 schannel）。
 /// 12 MiB ≈ 192kbps 音频 8.5 分钟，覆盖绝大多数音乐稿件。
 const max_frag_scan_bytes: u64 = 12 * 1024 * 1024;
 
@@ -1186,7 +1186,7 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     const moov_end = moov.start + moov.size;
 
     // 遍历 trak，取首个受支持 codec 的音频轨；其余音频轨（HE-AAC 等）→
-    // UnsupportedFormat，由引擎回退 FFmpeg 主后端（§8.3）；无音频轨 → Corrupt。
+    // UnsupportedFormat，由引擎回退 验收基准 主后端（§8.3）；无音频轨 → Corrupt。
     var parsed: ?Parsed = null;
     var has_audio = false;
     var off = moov.data;
@@ -1206,7 +1206,7 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     // 分片 MP4（fMP4，如 B 站 DASH `.m4s`）：moov 里样本表为空，媒体样本全部
     // 在 moof 分片里。音轨独立（B 站音视频线路分开）且体积可控：扫描顶层
     // moof/traf/trun 建线性样本表，后续解码/seek 与 stbl 路径完全同构。
-    // 无分片可解析 → UnsupportedFormat（交引擎回退 FFmpeg）。
+    // 无分片可解析 → UnsupportedFormat（交引擎回退 验收基准）。
     if (p.samples.len == 0) {
         const fallback_dur = frameSamplesForCodec(p.codec);
         const frag = (try parseFragments(
@@ -1285,7 +1285,7 @@ pub fn open(allocator: Allocator, reader: *io.Reader, info: *decoder.Info) Error
     p.frame_offsets = &.{};
 
     // 委托 codec（fLaC/Opus/ac-3/ec-3/.mp3）：合成流 + inner 解码。
-    // priming 语义对齐 ffmpeg mov demuxer（elst media_time 起始丢弃；
+    // priming 语义对齐 验收基准 mov demuxer（elst media_time 起始丢弃；
     // opus 的 pre-skip 由 OpusHead 承担，不重复丢）。
     if (isDelegate(p2.codec)) {
         try initDelegate(ctx, reader, p2, duration_known, info);
@@ -1537,7 +1537,7 @@ fn delegateOf(codec: CodecCfg) DelegateCodec {
 /// 委托模式下 ctx 初始化：构建合成流 → inner 解码器 → 输出状态就绪。
 /// priming/cap 依容器语义：elst media_time = 起始丢弃样本（flac/ac3/eac3/mp3；
 /// opus 由 OpusHead pre-skip 承担，此处不重复），elst segment_duration 或 stts
-/// 总数 = 输出样本上限（opus 不设上限——mp4 无 granule，ffmpeg 亦解码至 EOF）。
+/// 总数 = 输出样本上限（opus 不设上限——mp4 无 granule，验收基准 亦解码至 EOF）。
 fn initDelegate(
     ctx: *M4aCtx,
     reader: *io.Reader,
@@ -1992,7 +1992,7 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
                 else => return err,
             } orelse break;
             // HE-AAC v2（PS）：首帧解析后声道数可能 1→2（mono core → 立体声输出），
-            // 帧字节宽 / 输出声道数 / 容量随之后续使用最新值（对齐 ffmpeg）
+            // 帧字节宽 / 输出声道数 / 容量随之后续使用最新值（对齐 验收基准）
             if (outChannelCount(f) * f.out_bps / 8 != frame_bytes) {
                 frame_bytes = @as(usize, outChannelCount(f)) * f.out_bps / 8;
                 cap = @min(max_samples, out.len / frame_bytes);
@@ -2003,7 +2003,7 @@ fn readImpl(ctx: *anyopaque, out: []u8, max_samples: usize, out_channels: *u8) E
             if (f.skip_first) {
                 f.skip_first = false;
                 // HE-AAC（SBR）：首帧为 QMF 起始延迟，直接输出（不 skip priming，
-                // 对齐 ffmpeg——首帧含 QMF 合成延迟样本）
+                // 对齐 验收基准——首帧含 QMF 合成延迟样本）
                 if (f.codec == .aac and f.st.aac.sbr_enabled) {
                     // 输出本帧（不 continue，不 skip）
                 } else {
@@ -2866,7 +2866,7 @@ test "m4a 集成: 缺 stts / 缺 stco → UnsupportedFormat（按分片 init 处
     defer testing.allocator.free(file);
 
     // stts type 改为 sttx → findChild 找不到 → 样本表缺失：按 fMP4 init 段处理
-    // （无 moof 分片可解析）→ UnsupportedFormat，交引擎回退 FFmpeg。
+    // （无 moof 分片可解析）→ UnsupportedFormat，交引擎回退 验收基准。
     const pos_stts = std.mem.indexOf(u8, file, "stts").?;
     file[pos_stts + 3] = 'x';
     var info: decoder.Info = undefined;
@@ -2888,7 +2888,7 @@ test "m4a 集成: 分片 MP4 空表且无 moof → UnsupportedFormat" {
     const file = try buildAlacM4a(testing.allocator, .{ .alac = cookie }, 4, &frames, 0);
     defer testing.allocator.free(file);
 
-    // moov 样本表清空但没有 moof 分片：不是可解码的 fMP4，交引擎回退 FFmpeg。
+    // moov 样本表清空但没有 moof 分片：不是可解码的 fMP4，交引擎回退 验收基准。
     const pos_stts = std.mem.indexOf(u8, file, "stts").?;
     @memset(file[pos_stts + 8 .. pos_stts + 12], 0);
     const pos_stsz = std.mem.indexOf(u8, file, "stsz").?;
@@ -2977,9 +2977,9 @@ test "m4a 集成: fMP4 分片（moof/trun）建表并解码" {
     try testing.expectEqual(@as(usize, 0), try dec.read(&pcm, 4, &ch)); // EOF
 }
 
-test "m4a 集成: 音频轨但 stsd 无 alac 条目 → open UnsupportedFormat（回退 FFmpeg）" {
+test "m4a 集成: 音频轨但 stsd 无 alac 条目 → open UnsupportedFormat（回退 验收基准）" {
     // 手工构建：stsd 只有一个 'mp4a' 条目（无 alac cookie）→ parseStsd 返回 false，
-    // hdlr='soun' 已存在 → has_audio → UnsupportedFormat（引擎回退 FFmpeg 解 AAC）
+    // hdlr='soun' 已存在 → has_audio → UnsupportedFormat（引擎回退 验收基准 解 AAC）
     const cookie = makeCookie(4096, 16, 1, 44100, 40, 10, 14);
     const fr = try writeUncompressedFrame(16, 1, &[_]i32{ 1, 2, 3, 4 });
     defer testing.allocator.free(fr);
@@ -3034,14 +3034,14 @@ test "m4a 集成: AAC 轨（mp4a+esds）识别与解码" {
 }
 
 // ---------------------------------------------------------------------------
-// 多 codec（fLaC/Opus/ac-3/ec-3/.mp3）真实样本 e2e —— 与 ffmpeg `-f s16le` 对拍
+// 多 codec（fLaC/Opus/ac-3/ec-3/.mp3）真实样本 e2e —— 与 验收基准 `-f s16le` 对拍
 //
-// 样本自造：0.63s 正弦（mono 44.1k / stereo 48k）经 ffmpeg mov 封装为 mp4，
-// 各 codec 一份（f_*_*.mp4），golden = ffmpeg 解该 mp4 的 s16le（f_*_*.s16）。
-// 容器语义（照 ffmpeg mov demuxer 实测）：
+// 样本自造：0.63s 正弦（mono 44.1k / stereo 48k）经 验收基准 mov 封装为 mp4，
+// 各 codec 一份（f_*_*.mp4），golden = 验收基准 解该 mp4 的 s16le（f_*_*.s16）。
+// 容器语义（照 验收基准 mov demuxer 实测）：
 //   - elst media_time = priming（flac=0 / ac3-eac3=256 / mp3=1105 / opus 经
 //     OpusHead pre-skip，不重复丢）；opus mp4 无 granule，解码至 EOF（输出
-//     略多于媒体时长，与 ffmpeg 一致），其余 codec 截断至 elst seg_dur。
+//     略多于媒体时长，与 验收基准 一致），其余 codec 截断至 elst seg_dur。
 //   - 内嵌样本 mp4 均已含真实编码数据；测试逐字节/相关性对拍。
 // ---------------------------------------------------------------------------
 
@@ -3053,8 +3053,8 @@ const SampleSet = struct {
     codec_name: [:0]const u8,
     /// 允许的输出长度差（字节；帧宽粒度由解码器决定；flac 等应 0）
     allow_short: usize = 0,
-    /// mp3 内核与 ffmpeg 有 codec 层差异（mka 同）：仅锁容器接入 + 确定性，
-    /// 不对 ffmpeg 逐样本断言（corr 仅打印）
+    /// mp3 内核与 验收基准 有 codec 层差异（mka 同）：仅锁容器接入 + 确定性，
+    /// 不对 验收基准 逐样本断言（corr 仅打印）
     skip_corr: bool = false,
 };
 
@@ -3121,7 +3121,7 @@ fn checkDelegateSample(set: SampleSet, min_corr: f64, print: bool) !void {
         try testing.expect(buf.items.len <= set.s16.len + set.allow_short);
     }
     if (set.skip_corr) {
-        // 确定性：二次解码逐字节一致（mp3 内核不逐样本对齐 ffmpeg，锁接入）
+        // 确定性：二次解码逐字节一致（mp3 内核不逐样本对齐 验收基准，锁接入）
         var buf2 = std.ArrayList(u8).empty;
         defer buf2.deinit(testing.allocator);
         _ = try decodeAllM4a(testing.allocator, set.mp4, &buf2);
@@ -3145,7 +3145,7 @@ fn checkDelegateSample(set: SampleSet, min_corr: f64, print: bool) !void {
     try testing.expect(c.corr > min_corr);
 }
 
-// ---- 内嵌样本（真实 ffmpeg mov 封装；golden = ffmpeg 解 mp4 的 s16le）----
+// ---- 内嵌样本（真实 验收基准 mov 封装；golden = 验收基准 解 mp4 的 s16le）----
 const s_flac_m44 = @embedFile("m4a/samples/f_flac_m44.mp4");
 const s_flac_m44_s16 = @embedFile("m4a/samples/f_flac_m44.s16");
 const s_flac_st48 = @embedFile("m4a/samples/f_flac_st48.mp4");
@@ -3163,41 +3163,41 @@ const s_eac3_st48_s16 = @embedFile("m4a/samples/f_eac3_st48.s16");
 const s_mp3_dot = @embedFile("m4a/samples/f_mp3_dot.mp4");
 const s_mp3_dot_s16 = @embedFile("m4a/samples/f_mp3_dot.s16");
 
-test "m4a 委托: FLAC 轨（'fLaC'+dfLa，mono 44.1k）端到端 == ffmpeg（bit-exact）" {
+test "m4a 委托: FLAC 轨（'fLaC'+dfLa，mono 44.1k）端到端 == 验收基准（逐样本一致）" {
     try checkDelegateSample(.{ .mp4 = s_flac_m44, .s16 = s_flac_m44_s16, .rate = 44100, .ch = 1, .codec_name = "flac" }, 0.999999, true);
 }
 
-test "m4a 委托: FLAC 轨（'fLaC'+dfLa，stereo 48k）端到端 == ffmpeg（bit-exact）" {
+test "m4a 委托: FLAC 轨（'fLaC'+dfLa，stereo 48k）端到端 == 验收基准（逐样本一致）" {
     try checkDelegateSample(.{ .mp4 = s_flac_st48, .s16 = s_flac_st48_s16, .rate = 48000, .ch = 2, .codec_name = "flac" }, 0.999999, true);
 }
 
-test "m4a 委托: Opus 轨（'Opus'+dOps，mono→48k）端到端 ≈ ffmpeg（pre-skip 120）" {
+test "m4a 委托: Opus 轨（'Opus'+dOps，mono→48k）端到端 ≈ 验收基准（pre-skip 120）" {
     try checkDelegateSample(.{ .mp4 = s_opus_m44, .s16 = s_opus_m44_s16, .rate = 48000, .ch = 1, .codec_name = "opus" }, 0.999, true);
 }
 
-test "m4a 委托: Opus 轨（'Opus'+dOps，stereo 48k）端到端 ≈ ffmpeg（pre-skip 120）" {
+test "m4a 委托: Opus 轨（'Opus'+dOps，stereo 48k）端到端 ≈ 验收基准（pre-skip 120）" {
     try checkDelegateSample(.{ .mp4 = s_opus_st48, .s16 = s_opus_st48_s16, .rate = 48000, .ch = 2, .codec_name = "opus" }, 0.999, true);
 }
 
-test "m4a 委托: AC-3 轨（'ac-3'，stereo 48k，elst priming 256）端到端 ≈ ffmpeg" {
+test "m4a 委托: AC-3 轨（'ac-3'，stereo 48k，elst priming 256）端到端 ≈ 验收基准" {
     try checkDelegateSample(.{ .mp4 = s_ac3_st48, .s16 = s_ac3_st48_s16, .rate = 48000, .ch = 2, .codec_name = "ac3" }, 0.999, true);
 }
 
-test "m4a 委托: AC-3 轨（'ac-3'，mono 44.1k，elst priming 256）端到端 ≈ ffmpeg" {
+test "m4a 委托: AC-3 轨（'ac-3'，mono 44.1k，elst priming 256）端到端 ≈ 验收基准" {
     try checkDelegateSample(.{ .mp4 = s_ac3_m44, .s16 = s_ac3_m44_s16, .rate = 44100, .ch = 1, .codec_name = "ac3" }, 0.999, true);
 }
 
-test "m4a 委托: E-AC-3 轨（'ec-3'，stereo 48k，elst priming 256）端到端 ≈ ffmpeg" {
+test "m4a 委托: E-AC-3 轨（'ec-3'，stereo 48k，elst priming 256）端到端 ≈ 验收基准" {
     try checkDelegateSample(.{ .mp4 = s_eac3_st48, .s16 = s_eac3_st48_s16, .rate = 48000, .ch = 2, .codec_name = "eac3" }, 0.999, true);
 }
 
 test "m4a 委托: MP3 轨（'.mp3'，stereo 44.1k，elst priming 1105）端到端（容器接入）" {
-    // 自研 mp3 内核与 ffmpeg 有 codec 层差异（mka 同，§见 fmt/mka/lib.zig 模块头注）：
+    // 自研 mp3 内核与 验收基准 有 codec 层差异（mka 同，§见 fmt/mka/lib.zig 模块头注）：
     // 逐样本 ±1/末帧偏少；本测试锁 m4a 容器接入（帧直拼 + priming/cap）与确定性。
     try checkDelegateSample(.{ .mp4 = s_mp3_dot, .s16 = s_mp3_dot_s16, .rate = 44100, .ch = 2, .codec_name = "mp3", .allow_short = 1152 * 2 * 4, .skip_corr = true }, 0, true);
 }
 
-test "m4a 委托: FLAC 轨 seek（mono 44.1k，0.3s 与 ffmpeg golden 同段一致）" {
+test "m4a 委托: FLAC 轨 seek（mono 44.1k，0.3s 与 验收基准 golden 同段一致）" {
     var info: decoder.Info = undefined;
     var reader = io.Reader.openMem(s_flac_m44);
     var dec = try open(testing.allocator, &reader, &info);
@@ -3252,9 +3252,9 @@ test "m4a 委托: AC-3 轨 seek + 容器 priming（stereo 48k，0.315s 与 golde
 }
 
 // ---------------------------------------------------------------------------
-// ALS 轨（'mp4a'+esds AOT_ALS；ffmpeg mp4als）：fate conformance 子集内嵌。
-// golden = 系统 ffmpeg n9.0.1 `-f s16le` 全轨输出；整轨长度 + 全轨 MD5 +
-// 200KB 前缀逐字节 == ffmpeg（整数无损解码，要求 100% bit-exact）。
+// ALS 轨（'mp4a'+esds AOT_ALS；验收基准 mp4als）：fate conformance 子集内嵌。
+// golden = 系统 验收基准 n9.0.1 `-f s16le` 全轨输出；整轨长度 + 全轨 MD5 +
+// 200KB 前缀逐字节 == 验收基准（整数无损解码，要求 100% 逐样本一致）。
 // ---------------------------------------------------------------------------
 
 const s_als_00 = @embedFile("m4a/samples/f_als_00.mp4");
@@ -3275,9 +3275,9 @@ const AlsSet = struct {
     pre: []const u8,
     rate: u32,
     ch: u8,
-    /// 全轨 s16le 字节数（ffmpeg golden 长度）
+    /// 全轨 s16le 字节数（验收基准 golden 长度）
     total: usize,
-    /// 全轨 MD5（ffmpeg golden）
+    /// 全轨 MD5（验收基准 golden）
     md5: []const u8,
     /// 一句描述
     what: []const u8,
@@ -3311,7 +3311,7 @@ fn checkAlsSample(set: AlsSet) !void {
     try testing.expectEqual(c.n, c.equal);
 }
 
-test "m4a 委托: ALS 轨（adapt_order+RA，2ch 48k）== ffmpeg（bit-exact，全轨 MD5+前缀）" {
+test "m4a 委托: ALS 轨（adapt_order+RA，2ch 48k）== 验收基准（逐样本一致，全轨 MD5+前缀）" {
     try checkAlsSample(.{
         .mp4 = s_als_00,
         .pre = s_als_00_pre,
@@ -3323,7 +3323,7 @@ test "m4a 委托: ALS 轨（adapt_order+RA，2ch 48k）== ffmpeg（bit-exact，�
     });
 }
 
-test "m4a 委托: ALS 轨（BGMC，2ch 48k）== ffmpeg（bit-exact，全轨 MD5+前缀）" {
+test "m4a 委托: ALS 轨（BGMC，2ch 48k）== 验收基准（逐样本一致，全轨 MD5+前缀）" {
     try checkAlsSample(.{
         .mp4 = s_als_05,
         .pre = s_als_05_pre,

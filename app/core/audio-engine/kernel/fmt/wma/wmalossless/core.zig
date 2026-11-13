@@ -16,22 +16,22 @@
 //!   两档更新 + lms 更新衰减）→ 多声道 LMS（mclms）/ 声道对去相关
 //!   （revert_inter_ch_decorr）/ AC 滤波（revert_acfilter）→ 样本。本编解码为
 //!   无损整数路径（无浮点舍入）；本模块与 ffmpeg native wmalossless 输出逐位
-//!   一致（s16 / 24bit<<8 s32 均经实测 bit-exact）。
+//!   一致（s16 / 24bit<<8 s32 均经实测 逐样本一致）。
 //!
 //! 位流/数组语义（全部对齐 C，经 4 样本逐字节比对）：
 //!   - MSB-first 位读（get_bits.h）。Bits 按「safe bitstream reader」语义把
-//!     index 夹在 cap+8 内、越过 cap 的位读 frame_data 物理陈旧字节（与 ffmpeg
+//!     index 夹在 cap+8 内、越过 cap 的位读 frame_data 物理陈旧字节（与 验收基准
 //!     缓存读一致）；越过物理缓冲读 0（AV_INPUT_BUFFER_PADDING）。
 //!   - frame_data 为持久物理缓冲：save_bits 每写一段前缀，末尾 `flush_put_bits`
-//!     副本把滞留的尾部位补 0 落盘 → [0,ceil(num_saved/8)) 逐字节与 ffmpeg 相同；
+//!     副本把滞留的尾部位补 0 落盘 → [0,ceil(num_saved/8)) 逐字节与 验收基准 相同；
 //!     未覆盖区保留旧内容。BitWriter = put_bits/ff_copy_bits 逐字移植。
 //!   - decode_channel_residues 位耗尽返回 -1 但被 decode_subframe 忽略（C 语义），
-//!     截断帧仍按部分残差 + LMS 重建输出 → 文件截断尾帧与 ffmpeg 一致。
+//!     截断帧仍按部分残差 + LMS 重建输出 → 文件截断尾帧与 验收基准 一致。
 //!   - cdlms 的 scalarproduct_and_madd 按 C 参考实现（无 SIMD）：SSE2/SSE4 只改
 //!     模加顺序，结果逐位相同；迭代长度用 FFALIGN(order,16|8) 使系数 pad/环形
 //!     缓冲陈旧内容与 C 完全一致。recent 每 icoef 重读（lms_update 递减它）。
-//!   - 不支持：算术编码（do_arith_coding，ffmpeg 同样 request_sample 拒绝）、
-//!     LPC 逆滤波（ffmpeg 只读参数不实现，输出与其对齐）、>8 声道、非 16/24bit。
+//!   - 不支持：算术编码（do_arith_coding，验收基准 同样 request_sample 拒绝）、
+//!     LPC 逆滤波（验收基准 只读参数不实现，输出与其对齐）、>8 声道、非 16/24bit。
 
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
@@ -122,9 +122,9 @@ inline fn fAlignI(a: i32, m: usize) i32 {
     return @intCast(fAlign(@intCast(a), m));
 }
 
-/// 位写器（逐函数移植 ffmpeg put_bits.h / ff_copy_bits：BE，BitBuf=u32、
+/// 位写器（逐函数移植 验收基准 put_bits.h / ff_copy_bits：BE，BitBuf=u32、
 /// BUF_BITS=32，满 32 位才落 4 字节大端字，尾部不足一字的位留在 bit_buf 中
-/// 不物理写盘 → 解码器越过 num_saved 读到的陈旧字节与 ffmpeg 物理缓冲一致。
+/// 不物理写盘 → 解码器越过 num_saved 读到的陈旧字节与 验收基准 物理缓冲一致。
 const BitWriter = struct {
     buf: []u8,
     buf_ptr: usize = 0,
@@ -240,7 +240,7 @@ const Cdlms = struct {
     scaling: i32 = 0,
     coefsend: i32 = 0,
     bitsend: i32 = 0,
-    /// 系数 + pad（MAX_ORDER + 8 个 i16；ffmpeg 数组为
+    /// 系数 + pad（MAX_ORDER + 8 个 i16；验收基准 数组为
     /// MAX_ORDER + WMALL_COEFF_PAD_SIZE/2）
     coefs: [MAX_ORDER + COEF_PAD_ELEMS]i16 = undefined,
     /// 历史样本延迟线（环形 + 备份区）。16-bit 流用 i16 视图、24-bit 用 i32；
@@ -1035,7 +1035,7 @@ pub const Dec = struct {
             for (0..self.num_channels) |i| {
                 if (self.is_channel_coded[i] != 0) {
                     // C 中 decode_channel_residues 的返回被忽略（位耗尽时只解出
-                    // 部分残差，仍继续 revert_cdlms——对齐截断帧的 ffmpeg 输出）
+                    // 部分残差，仍继续 revert_cdlms——对齐截断帧的 验收基准 输出）
                     self.decodeChannelResidues(i, subframe_len) catch {};
                     if (self.seekable_tile)
                         self.useHighUpdateSpeed(i)
@@ -1201,7 +1201,7 @@ pub const Dec = struct {
             self.pb.copyBits(gb.buf[gb.count() >> 3 ..], len);
         }
         gb.skip(len);
-        // 对齐 ffmpeg save_bits 尾部 `tmp = s->pb; flush_put_bits(&tmp);`：
+        // 对齐 验收基准 save_bits 尾部 `tmp = s->pb; flush_put_bits(&tmp);`：
         // 通过副本把滞留的尾部位补 0 落盘到物理缓冲（不改动持久 pb 状态）。
         {
             var tmp = self.pb;
@@ -1226,7 +1226,7 @@ pub const Dec = struct {
         } else if (self.packet_done or self.packet_loss) {
             self.packet_done = false;
             // WMA packet 取「末尾 block_align 字节」；最后一个 ASF 对象常短于
-            // block_align（文件截止的残尾），按实际长度处理（对齐 ffmpeg
+            // block_align（文件截止的残尾），按实际长度处理（对齐 验收基准
             // decode_packet：无最小长度限制）。
             self.next_packet_start = buf_size_all - @min(self.block_align, buf_size_all);
             const wsize: usize = @min(self.block_align, buf_size_all);

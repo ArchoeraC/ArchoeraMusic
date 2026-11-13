@@ -4,7 +4,7 @@
 
 /// 歌词候选匹配 - 跨平台共享工具（对齐 apis/common/lyric/utils.ts）。
 ///
-/// 三端（Netease / QQ / Kugou）搜索返回的候选结构不同，归一化成本结构后
+/// 三端（Netease / QM / Kugou）搜索返回的候选结构不同，归一化成本结构后
 /// 用 [pickBestCandidate] 挑出最匹配当前 track 的那一个，避免对多个候选串行请求歌词。
 library;
 

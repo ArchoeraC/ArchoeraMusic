@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: LGPL-2.1-or-later
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植 / 转录自 FFmpeg（LGPL-2.1-or-later）对应源文件。
+// 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
+// LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! DTS core 定点合成 DSP（阶段二，对照 FFmpeg dcamath.h / dcadct.c / dcadsp.c
 //! / dcaadpcm.c / synth_filter.c 的 fixed（整数）路径）
@@ -449,7 +453,7 @@ pub fn synthFilterFixed64(
 
 /// LFE 插值（lfe_fir_fixed_c）：npcmblocks/2 个 LFE 样本 → npcmblocks*32 个输出。
 /// lfe_buf 传入 [8 + npcmblocks/2] 缓冲，其中 [0..8) 为上一帧历史，[8..) 为本帧数据；
-/// 内部按 FFmpeg 语义（指针 = 数据起点 + i，负下标取历史）访问。
+/// 内部按 验收基准 语义（指针 = 数据起点 + i，负下标取历史）访问。
 pub fn lfeFirFixed(pcm: []i32, lfe_buf: []const i32, filter_coeff: *const [256]i32, npcmblocks: usize) void {
     const n = npcmblocks >> 1;
     for (0..n) |i| {

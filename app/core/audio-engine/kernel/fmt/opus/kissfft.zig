@@ -9,7 +9,7 @@
 // Erik de Castro Lopo。本文件保留上游版权声明，按 BSD-3-Clause 分发；
 // 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! libopus kiss_fft + clt_mdct_backward 浮点移植（CELT 合成 bit-exact，§9.2）
+//! libopus kiss_fft + clt_mdct_backward 浮点移植（CELT 合成 逐样本一致，§9.2）
 //!
 //! 重构对照 libopus `celt/kiss_fft.c`（kf_factor / compute_bitrev_table /
 //! compute_twiddles / kf_bfly2/3/4/5 / opus_fft_impl）与 `celt/mdct.c`
@@ -18,7 +18,7 @@
 //! 浮点语义：全部按 libopus FLOAT 构建——S_MUL=普通乘、C_MUL=复数乘、
 //! C_ADD/C_SUB=普通复数加减、HALF_OF=x*0.5、SHL32_ovflw(x,0)=PSHR32_ovflw(x,0)=x
 //! （FLOAT 下 pre_shift=post_shift=fft_shift=0）。twiddle/trig 用 double cos/sin
-//! 后截断 f32；运算顺序逐条对齐以保证位级一致。
+//! 后截断 f32；运算顺序逐条对齐以保证逐样本一致。
 
 const std = @import("std");
 const stables = @import("static_tables.zig");
@@ -60,7 +60,7 @@ inline fn half(x: f32) f32 {
 //
 // 语义约束：向量只打包**相互独立**的 lane，且每条 lane 的浮点运算顺序与标量
 // 逐条相同（严格浮点、不重结合）。这里所有复数乘都保持 `a.r*b.r - a.i*b.i` /
-// `a.r*b.i + a.i*b.r` 的先乘后减/加次序，与标量 cmul 位级一致。
+// `a.r*b.i + a.i*b.r` 的先乘后减/加次序，与标量 cmul 逐样本一致。
 // ---------------------------------------------------------------------------
 const V8 = @Vector(8, f32);
 const V4 = @Vector(4, f32);

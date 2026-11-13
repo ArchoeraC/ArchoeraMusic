@@ -24,14 +24,14 @@
 //!   4. 去相关 terms 级联（t>8 二阶预测 / t≤8 环形缓冲 / t=-1 自预测 / t=-3 交叉）；
 //!   5. joint 反变换 → CRC 校验 → 按输出契约打包。
 //!
-//! 输出契约（对齐 FFmpeg wavpack 默认输出，保证 bit-exact 对照可逐字节比对）：
+//! 输出契约（对齐 验收基准 wavpack 默认输出，保证逐样本一致 对照可逐字节比对）：
 //!   - flags&3 ≤ 1 → 16-bit（post_shift 对齐满幅）；≥ 2 → 32-bit 顶对齐；
 //!   - WV_FLOAT_DATA → 32-bit IEEE float；
 //!   - 交错小端 PCM，`Info.bits_per_sample` = 16 / 32，`is_float` 标记 float。
 //!
 //! 范围与容错（§9.9 / §13.3）：
 //!   - 混合 .wvc 修正、DSD 调制不在本期范围：DSD 在 open 判定 → UnsupportedFormat
-//!     （引擎回退 FFmpeg 主后端，§8.3）；流中段出现 → Corrupt；
+//!     （引擎回退 验收基准 主后端，§8.3）；流中段出现 → Corrupt；
 //!   - 块内位流越界、CRC 不匹配、包内块数失控 → Corrupt；
 //!   - seek 走块头扫描（block_index 定位包），目标超出文件尾 → 置 EOF。
 
@@ -46,7 +46,7 @@ const BitReader = bitreader.BitReader;
 const VTable = decoder.Decoder.VTable;
 
 // ---------------------------------------------------------------------------
-// 常量（对齐 WavPack 规范 / FFmpeg wavpack.h 取值）
+// 常量（对齐 WavPack 规范 / 验收基准 wavpack.h 取值）
 // ---------------------------------------------------------------------------
 
 const MAX_TERMS = 16;
@@ -208,7 +208,7 @@ const WvChannel = struct {
     bitrate_delta: u32 = 0,
 };
 
-/// 输出格式（对齐 FFmpeg 三种输出）
+/// 输出格式（对齐 验收基准 三种输出）
 const OutFmt = enum { s16, s32, float };
 
 /// 单块解码上下文（解析 + 熵解码 + 去相关共用）

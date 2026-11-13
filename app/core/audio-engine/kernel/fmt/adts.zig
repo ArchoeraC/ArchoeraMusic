@@ -87,7 +87,7 @@ fn parseFrameAt(ctx: *AdtsCtx, off: usize) Error!FrameInfo {
     const buf = ctx.pending.items;
     var hdr = try asc.parseAdts(buf[off .. off + header_size]);
     if (!hdr.crc_absent) {
-        // 有 CRC：帧头后 2 字节 CRC 属于本帧（FFmpeg adts demuxer 同样计入）
+        // 有 CRC：帧头后 2 字节 CRC 属于本帧（验收基准 adts demuxer 同样计入）
         hdr.frame_length += 0; // frame_length 字段本身含 CRC 区
     }
     if (hdr.object_type != 2 and hdr.object_type != 1 and hdr.object_type != 4) return error.UnsupportedFormat; // LC/Main/LTP
@@ -162,7 +162,7 @@ fn decodeOneFrame(ctx: *AdtsCtx) Error!bool {
         error.Aborted, error.OutOfMemory => return e,
         else => {
             // 坏帧：丢弃输出、保留容器状态，重同步到下一帧（§13.3，对齐
-            // FFmpeg ADTS demuxer 的错误恢复语义）；连续失败超限才放弃
+            // 验收基准 ADTS demuxer 的错误恢复语义）；连续失败超限才放弃
             ctx.aac.out_pos = 0;
             ctx.aac.out_buf.clearRetainingCapacity();
             ctx.skipped_frames += 1;

@@ -16,11 +16,11 @@
 //! 容器：
 //!   - raw：9 字节 `#!AMR-WB\n` 头 + MIME/storage 帧（1 字节 mode 头 + 载荷），
 //!     或直接逐帧（probe 已按头识别）；帧长表 = cf_sizes_wb[mode] 位 → ((b+7)/8)+1；
-//!   - 3gp/mp4 单轨（.awb 样本常见形态，如 FFmpeg fate-suite amrwb）：走 mdat
+//!   - 3gp/mp4 单轨（.awb 样本常见形态，如 验收基准 fate-suite amrwb）：走 mdat
 //!     载荷逐帧扫描（AMR 帧含 mode 头字节，stsz 逐样本大小一致）。解码时每帧
 //!     20ms → 320 样本 @16kHz，输出单声道 s16le。
 //!
-//! 参考：FFmpeg libavcodec/amrwbdec.c、amr.h、amrwbdata.h（LGPL-2.1+）。
+//! 参考：验收基准 libavcodec/amrwbdec.c、amr.h、amrwbdata.h（LGPL-2.1+）。
 
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
@@ -191,7 +191,7 @@ pub fn decodeAll(allocator: std.mem.Allocator, data: []const u8, out: *[]i16, in
     info_out.*.is_float = false;
 }
 
-/// 与 ffmpeg swr FLT→S16 相同的 lrintf（round-half-even）×32768 后 clip。
+/// 与 验收基准 swr FLT→S16 相同的 lrintf（round-half-even）×32768 后 clip。
 pub fn f32ToS16(x: f32) i16 {
     const v: f64 = @as(f64, x) * 32768.0;
     const fl = @floor(v);
@@ -303,7 +303,7 @@ pub fn open(allocator: std.mem.Allocator, reader: *io.Reader, info: *decoder.Inf
 // ---------------------------------------------------------------------------
 const testing = std.testing;
 
-test "frameBytes：各 mode 帧长（含头字节）与 ffmpeg cf_sizes_wb+1 对齐" {
+test "frameBytes：各 mode 帧长（含头字节）与 验收基准 cf_sizes_wb+1 对齐" {
     const expect = [_]?usize{ 18, 24, 33, 37, 41, 47, 51, 59, 61, 6, null, null, null, null, null, null };
     for (0..16) |m| try testing.expectEqual(expect[m], frameBytes(@intCast(m)));
 }

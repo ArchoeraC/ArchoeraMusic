@@ -135,7 +135,7 @@ int _codeOf(Object? v) =>
 /// 读取内存或宿主存储中的 QM cookies。
 ///
 /// **凭据库锁定期间读到的空值不缓存**：m2a 每次启动库必为锁定，若把空 cookie
-/// 固化进 `_userCookies`，解锁后仍读到空 → QQ 登录态永远恢复不了
+/// 固化进 `_userCookies`，解锁后仍读到空 → QM 登录态永远恢复不了
 /// （2026-10-14 实录，与 NetEase `_sessionCache` 同源）。解锁流程会调用
 /// [qmReloadQQMusicCookies] 显式失效。
 Map<String, String> qmGetQQMusicCookies() {
@@ -181,7 +181,7 @@ String qmGetQQMusicUin() {
   return raw.startsWith('o') ? raw.substring(1) : (raw.isEmpty ? '0' : raw);
 }
 
-/// 当前登录类型：1=微信 / 2=QQ。优先读 cookie，其次按 musickey 前缀推断。
+/// 当前登录类型：1=微信 / 2=QM。优先读 cookie，其次按 musickey 前缀推断。
 int qmLoginType() {
   final cookies = qmGetQQMusicCookies();
   final raw = cookies['tmeLoginType'];
@@ -569,7 +569,7 @@ Future<T> qmRequest<T>(
       if (uin.isNotEmpty && uin != '0') ...{'uin': uin, 'qq': uin},
       if (musickey != null && musickey.isNotEmpty) ...{
         'authst': musickey,
-        // 按实际登录类型（1=微信 / 2=QQ）发送，而不是一律按 QQ。
+        // 按实际登录类型（1=微信 / 2=QM）发送，而不是一律按 QM。
         'tmeLoginType': loginType,
       },
       if (session && _session.uid != null) 'uid': _session.uid!,
