@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,6 +19,7 @@ import '../pages/streaming/album_detail_page.dart';
 import '../pages/streaming/artist_detail_page.dart';
 import '../pages/streaming/playlist_detail_page.dart';
 import '../pages/streaming/streaming_page.dart';
+import '../services/log/log.dart';
 import 'player_route_curves.dart';
 import 'shell.dart';
 
@@ -163,48 +166,114 @@ final appRouter = GoRouter(
   ],
 );
 
-/// 全屏播放页路由的 push 是否在途（push 到 pop 之间为 true）。
+/// 全屏播放页路由路径（`openPlayerPage` / 栈内匹配判定共用）。
+const String kPlayerRoutePath = '/player';
+
+/// 一次 push 是否在途（防止封面连点 / 快捷键长按叠加出多层播放页）。
 ///
-/// 用于 [openPlayerPage] 的幂等防护：快捷键长按 / 封面连点会重复触发
-/// push，若不加防护会不断叠加播放页路由（表现为「播放页可被无限打开」）。
+/// 只表示「已经 push、还没 pop」，**不代表**播放页在栈上（判定见
+/// [isPlayerPageOpen]）。
 bool _playerRouteInFlight = false;
 
-/// 播放页收起动画是否在途（防止快捷键连按重复 pop 掉下层页面）。
+/// 收起动画是否在途（防止快捷键连按重复 pop 掉下层页面）。
+///
+/// 由 [closePlayerPage] 置位，由 [notifyPlayerPageDisposed]（路由真正卸载）
+/// 或兜底定时器复位 —— **不能**用 push future 复位：go_router 在 pop 的瞬间
+/// 就完成 future，此时收起动画才刚开始（见 2026-11-12 的连点误 pop 事故）。
 bool _playerRouteClosing = false;
 
-/// 播放页是否已展开（`push` 成功到 `pop` 完成之间为 true）。
+/// 收起动画期间收到的「打开」请求：等路由真正卸载后再 push。
 ///
-/// **不能**用 `routerDelegate.currentConfiguration.uri.path` 判断：go_router 的
-/// `RouteMatchList.uri` 只反映非 [ImperativeRouteMatch] 的匹配，而 `push('/player')`
-/// 产生的正是 imperative match —— 因此 `uri` 仍停留在壳层地址（如 `/library`）。
-/// 用 uri 判断会恒为 false，`closePlayerPage()` 直接 return，表现为「播放页打开后
-/// 关闭按钮没反应 / 快捷键也关不掉」。
-///
-/// 状态只由本文件的开关入口维护，并在 push 的 future 完成（任何原因导致路由
-/// 出栈，含系统返回 / 深链跳走）时统一复位。
-bool _playerPageOpen = false;
+/// 收起动画还没走完就 push，会让新的 imperative 匹配与正在归还的那一条抢
+/// 同一个位置（go_router 在 release 下可能只更新配置却不重绘，
+/// 见 flutter/flutter#188307）。延迟到卸载后 push 既避开竞态，也不会出现
+/// 「上滑与下滑同时进行」的观感。
+bool _deferredOpen = false;
 
-/// 当前是否已展开全屏播放页。
-bool get isPlayerPageOpen => _playerPageOpen;
+/// 收起兜底定时器（路由万一没有按预期卸载时复位守卫，防止永久锁死）。
+Timer? _closingTimer;
+
+/// 最近一次执行 push 的路由器（测试会注入独立 GoRouter；延迟打开要回到同一个）。
+GoRouter? _openRouter;
+
+/// 当前是否已展开全屏播放页（**从路由栈实时推导**）。
+///
+/// 不能用模块布尔量表示「已打开」，也不能用
+/// `routerDelegate.currentConfiguration.uri.path` 判断：
+/// - `uri` 只反映非 [ImperativeRouteMatch] 的匹配，`push('/player')` 产生的
+///   正是 imperative match，用 uri 判断会恒为 false（2026-11-12：播放页打开后
+///   关不掉）；
+/// - 用 push future 复位布尔量则会**永久锁死**：go_router 的
+///   `GoRouterDelegate._setCurrentConfiguration` 在整栈替换（`go()`、分支跳转、
+///   深链跳转）时直接丢弃 imperative 匹配，**不会完成** push 的 completer，
+///   `whenComplete` 永不触发 —— 播放页从界面上消失，而开关守卫仍认为它开着，
+///   之后封面点击 / 快捷键全部静默无效，且没有任何日志/异常
+///   （2026-11-13 现场复现：播放页打开时按「前往音乐库」等 go 导航）。
+bool get isPlayerPageOpen => _hasPlayerMatch(_openRouter ?? appRouter);
 
 /// 展开全屏播放页（幂等）。
 ///
-/// 双重防护，避免重复入栈：
-/// 1. 播放页已展开 → 直接返回；
-/// 2. 已有一次 push 在途（尚未 pop）→ 直接返回。
+/// 防护：
+/// 1. 播放页已在栈上（真实栈判定）→ 直接返回；
+/// 2. 已有一次 push 在途（尚未 pop）→ 直接返回；
+/// 3. 收起动画未结束 → 记下请求，等播放页路由卸载后再 push（见
+///    [_deferredOpen]）。
 ///
 /// 快捷键（`ShortcutAction.openPlayer`）与播放条封面统一走此入口。
 ///
 /// [router] 仅供测试注入；业务代码一律省略（使用全局 [appRouter]）。
 void openPlayerPage({GoRouter? router}) {
   final r = router ?? appRouter;
-  if (_playerRouteInFlight || _playerPageOpen) return;
+  if (_playerRouteInFlight || _hasPlayerMatch(r)) return;
+  if (_playerRouteClosing) {
+    _deferredOpen = true;
+    return;
+  }
   _playerRouteInFlight = true;
-  _playerPageOpen = true;
-  r.push('/player').whenComplete(() {
+  _openRouter = r;
+  r.push(kPlayerRoutePath).whenComplete(() {
     _playerRouteInFlight = false;
-    _playerRouteClosing = false;
-    _playerPageOpen = false;
+  });
+  _verifyPushed(r);
+}
+
+/// 播放页路由是否在 [router] 的栈上（含 shell 内部，递归查找）。
+bool _hasPlayerMatch(GoRouter router) =>
+    _matchContainsPlayer(router.routerDelegate.currentConfiguration.matches);
+
+bool _matchContainsPlayer(List<RouteMatchBase> matches) {
+  for (final match in matches) {
+    if (match is ImperativeRouteMatch &&
+        match.matchedLocation == kPlayerRoutePath) {
+      return true;
+    }
+    if (match is ShellRouteMatch && _matchContainsPlayer(match.matches)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// push 之后核对一次：匹配没进栈就释放守卫，避免「再也打不开」。
+///
+/// push 的匹配由路由解析（微任务）写入配置，正常情况下隔一帧必然可见。
+/// 若仍不可见，说明这次 push 被上游吞掉了（整栈替换丢弃 imperative 匹配、
+/// 路由解析事务被新导航覆盖等）—— completer 不会完成，
+/// [_playerRouteInFlight] 会永久为真。这里自愈：最多让用户多点一次。
+void _verifyPushed(GoRouter router) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    // 期间已经正常关闭 / 已复位：无需核对（避免误报）。
+    if (!_playerRouteInFlight || _playerRouteClosing) return;
+    if (!_hasPlayerMatch(router)) {
+      _playerRouteInFlight = false;
+      Log.w('player', 'open: 播放页一帧后仍未进栈，已释放开关守卫（下次点击重试）');
+      return;
+    }
+    // 匹配在栈上：补一次 Router 通知。release 下 go_router 偶发只更新了
+    // 配置却不重绘（flutter/flutter#188307），补通知后新页必定被重建出来，
+    // 避免「配置里已打开、界面上打不开」的静默状态。
+    // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+    router.routerDelegate.notifyListeners();
   });
 }
 
@@ -214,17 +283,61 @@ void openPlayerPage({GoRouter? router}) {
 /// 再 close，此时页栈里还没有播放页，`pop()` 会抛 `GoError: There is nothing to pop`。
 void closePlayerPage({GoRouter? router}) {
   final r = router ?? appRouter;
-  if (_playerRouteClosing || !_playerPageOpen || !r.canPop()) return;
+  if (_playerRouteClosing || !_hasPlayerMatch(r) || !r.canPop()) return;
   _playerRouteClosing = true;
   r.pop();
+  // 兜底：路由万一没有走到 dispose（异常卸载 / 被整栈替换吞掉），
+  // 也不能让守卫永久停在收起态 —— 转场时长之后强制复位。
+  _closingTimer?.cancel();
+  _closingTimer = Timer(
+    kPlayerRouteTransitionDuration + const Duration(milliseconds: 100),
+    () {
+      _closingTimer = null;
+      if (!_playerRouteClosing) return;
+      _playerRouteClosing = false;
+      _flushDeferredOpen();
+    },
+  );
+}
+
+/// 播放页路由已从树上卸载（收起动画结束，路由真正移出导航栈）。
+///
+/// 由 `PlayerPage.dispose` 调用：这是「收起完成」唯一可靠的时点——
+/// push future 在 pop 瞬间就完成，那时动画才刚开始。
+void notifyPlayerPageDisposed() {
+  _playerRouteClosing = false;
+  // 播放页已不在栈上：无论这次 push 是正常 pop、还是被整栈替换静默丢弃，
+  // 「push 在途」都必须放开（后者不会完成 push future，只能在这里兜住）。
+  _playerRouteInFlight = false;
+  _closingTimer?.cancel();
+  _closingTimer = null;
+  _flushDeferredOpen();
+}
+
+/// 执行收起期间挂起的打开请求。
+void _flushDeferredOpen() {
+  if (!_deferredOpen) return;
+  _deferredOpen = false;
+  // dispose / 兜底定时器可能落在 Navigator 的帧内收尾流程里：push 推迟到
+  // 帧末，避免在 build 阶段触发路由通知（release 下会被静默丢弃）。
+  final binding = WidgetsBinding.instance;
+  binding.addPostFrameCallback((_) {
+    final r = _openRouter ?? appRouter;
+    if (_hasPlayerMatch(r)) return;
+    openPlayerPage(router: r);
+  });
+  // 挂起请求可能发生在帧末兜底定时器里（此时没有待渲染的内容）：
+  // 显式要一帧，保证上面的帧末回调一定会被执行。
+  binding.ensureVisualUpdate();
 }
 
 /// 打开 / 关闭全屏播放页（快捷键 `ShortcutAction.openPlayer` 的切换入口）。
 void togglePlayerPage({GoRouter? router}) {
-  if (_playerPageOpen) {
-    closePlayerPage(router: router);
+  final r = router ?? appRouter;
+  if (_hasPlayerMatch(r)) {
+    closePlayerPage(router: r);
   } else {
-    openPlayerPage(router: router);
+    openPlayerPage(router: r);
   }
 }
 
@@ -233,5 +346,8 @@ void togglePlayerPage({GoRouter? router}) {
 void resetPlayerPageRouteStateForTest() {
   _playerRouteInFlight = false;
   _playerRouteClosing = false;
-  _playerPageOpen = false;
+  _deferredOpen = false;
+  _openRouter = null;
+  _closingTimer?.cancel();
+  _closingTimer = null;
 }
