@@ -587,6 +587,8 @@
   "settingsWindowDecorCaption": "自繪標題列",
   "settingsWindowDecorBorderless": "無邊框",
   "settingsWindowDecorNote": "切換立即生效；若標題列顯示異常，重新啟動應用程式即可。",
+  "settingsWindowControlsAutoHide": "自動隱藏視窗按鈕",
+  "settingsWindowControlsAutoHideDesc": "僅「無邊框」方案生效；游標移到右上角時才顯示，觸控螢幕使用者將無法點擊，預設關閉。",
   "windowMinimize": "最小化",
   "windowMaximize": "最大化",
   "windowRestore": "還原",

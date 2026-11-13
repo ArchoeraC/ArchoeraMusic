@@ -587,6 +587,8 @@
   "settingsWindowDecorCaption": "カスタムタイトルバー",
   "settingsWindowDecorBorderless": "ボーダーレス",
   "settingsWindowDecorNote": "すぐに反映されます。タイトルバーの表示がおかしい場合はアプリを再起動してください。",
+  "settingsWindowControlsAutoHide": "ウィンドウボタンを自動的に隠す",
+  "settingsWindowControlsAutoHideDesc": "「ボーダーレス」でのみ有効。カーソルを右上隅に移動したときだけ表示されます。タッチユーザーはクリックできません。既定ではオフです。",
   "windowMinimize": "最小化",
   "windowMaximize": "最大化",
   "windowRestore": "元に戻す",

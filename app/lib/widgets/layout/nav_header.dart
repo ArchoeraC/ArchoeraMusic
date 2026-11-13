@@ -527,14 +527,31 @@ class _NavHeaderState extends ConsumerState<NavHeader>
         const _NavHeaderActionsMenu(),
         if (borderless) ...[
           const SizedBox(width: 6),
-          Container(
-            width: 1,
-            height: 20,
-            color: Theme.of(context).colorScheme.outlineVariant
-                .withValues(alpha: 0.5),
+          // 自动隐藏（可选项，默认关）：仅在指针移到右上角时显示，
+          // 区域覆盖顶栏全高，便于从窗口右上角边缘唤出。
+          SizedBox(
+            height: 64,
+            child: AutoHideOnHover(
+              enabled: ref.watch(
+                appPrefsProvider.select((p) => p.autoHideWindowControls),
+              ),
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 1,
+                      height: 20,
+                      color: Theme.of(context).colorScheme.outlineVariant
+                          .withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(width: 6),
+                    const WindowControls(),
+                  ],
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 6),
-          const WindowControls(),
         ],
       ],
     );

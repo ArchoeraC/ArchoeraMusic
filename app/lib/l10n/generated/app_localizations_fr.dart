@@ -1991,6 +1991,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'Prise en compte immédiate ; redémarrez lapplication si la barre de titre saffiche mal.';
 
   @override
+  String get settingsWindowControlsAutoHide =>
+      'Masquer automatiquement les boutons de fenêtre';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      'S’applique uniquement à « Sans bordure » ; affiché seulement lorsque le curseur se déplace dans le coin supérieur droit. Les utilisateurs tactiles ne peuvent pas cliquer. Désactivé par défaut.';
+
+  @override
   String get windowMinimize => 'Réduire';
 
   @override

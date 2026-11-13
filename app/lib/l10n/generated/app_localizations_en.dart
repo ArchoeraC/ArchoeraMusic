@@ -1968,6 +1968,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Takes effect immediately; restart the app if the title bar looks wrong.';
 
   @override
+  String get settingsWindowControlsAutoHide => 'Auto-hide window buttons';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      'Only applies to Borderless; shown only when the cursor moves to the top-right corner. Touch users cannot click them. Off by default.';
+
+  @override
   String get windowMinimize => 'Minimize';
 
   @override

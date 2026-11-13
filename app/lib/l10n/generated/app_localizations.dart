@@ -3598,6 +3598,18 @@ abstract class AppLocalizations {
   /// **'切换立即生效；若标题栏显示异常，重启应用即可。'**
   String get settingsWindowDecorNote;
 
+  /// No description provided for @settingsWindowControlsAutoHide.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'自动隐藏窗口按钮'**
+  String get settingsWindowControlsAutoHide;
+
+  /// No description provided for @settingsWindowControlsAutoHideDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'仅「无边框」方案生效；光标移到右上角时才显示，触摸屏用户将无法点击，默认关闭。'**
+  String get settingsWindowControlsAutoHideDesc;
+
   /// No description provided for @windowMinimize.
   ///
   /// In zh_CN, this message translates to:

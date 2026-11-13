@@ -1987,6 +1987,14 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wirkt sofort; bei fehlerhafter Titelleiste die App neu starten.';
 
   @override
+  String get settingsWindowControlsAutoHide =>
+      'Fensterschaltflächen automatisch ausblenden';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      'Gilt nur für „Randlos“; wird nur angezeigt, wenn der Mauszeiger in die obere rechte Ecke bewegt wird. Touch-Nutzer können nicht klicken. Standardmäßig aus.';
+
+  @override
   String get windowMinimize => 'Minimieren';
 
   @override

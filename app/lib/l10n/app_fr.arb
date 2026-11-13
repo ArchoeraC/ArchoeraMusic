@@ -587,6 +587,8 @@
   "settingsWindowDecorCaption": "Barre de titre personnalisée",
   "settingsWindowDecorBorderless": "Sans bordure",
   "settingsWindowDecorNote": "Prise en compte immédiate ; redémarrez l'application si la barre de titre s'affiche mal.",
+  "settingsWindowControlsAutoHide": "Masquer automatiquement les boutons de fenêtre",
+  "settingsWindowControlsAutoHideDesc": "S’applique uniquement à « Sans bordure » ; affiché seulement lorsque le curseur se déplace dans le coin supérieur droit. Les utilisateurs tactiles ne peuvent pas cliquer. Désactivé par défaut.",
   "windowMinimize": "Réduire",
   "windowMaximize": "Agrandir",
   "windowRestore": "Restaurer",
