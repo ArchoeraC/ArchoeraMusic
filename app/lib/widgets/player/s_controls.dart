@@ -121,7 +121,11 @@ class SButton extends StatelessWidget {
                   ? EdgeInsets.zero
                   : const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: bg.withValues(alpha: enabled ? 1 : 0.45),
+                // `Colors.transparent.withValues(alpha: 1)` 会变成不透明黑，
+                // 幽灵按钮（无底色）必须原样保留透明。
+                color: bg.a == 0
+                    ? bg
+                    : bg.withValues(alpha: enabled ? 1 : 0.45),
                 borderRadius: BorderRadius.circular(
                   circle || round ? AppRadius.pill : AppRadius.control,
                 ),

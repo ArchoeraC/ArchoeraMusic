@@ -1896,6 +1896,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsWindowDecorNote => '切换立即生效；若标题栏显示异常，重启应用即可。';
 
   @override
+  String get settingsWindowControlsAutoHide => '自动隐藏窗口按钮';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      '仅「无边框」方案生效；光标移到右上角时才显示，触摸屏用户将无法点击，默认关闭。';
+
+  @override
   String get windowMinimize => '最小化';
 
   @override
@@ -8140,6 +8147,13 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsWindowDecorNote => '切换立即生效；若标题栏显示异常，重启应用即可。';
 
   @override
+  String get settingsWindowControlsAutoHide => '自动隐藏窗口按钮';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      '仅「无边框」方案生效；光标移到右上角时才显示，触摸屏用户将无法点击，默认关闭。';
+
+  @override
   String get windowMinimize => '最小化';
 
   @override
@@ -14382,6 +14396,13 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsWindowDecorNote => '切換立即生效；若標題列顯示異常，重新啟動應用程式即可。';
+
+  @override
+  String get settingsWindowControlsAutoHide => '自動隱藏視窗按鈕';
+
+  @override
+  String get settingsWindowControlsAutoHideDesc =>
+      '僅「無邊框」方案生效；游標移到右上角時才顯示，觸控螢幕使用者將無法點擊，預設關閉。';
 
   @override
   String get windowMinimize => '最小化';

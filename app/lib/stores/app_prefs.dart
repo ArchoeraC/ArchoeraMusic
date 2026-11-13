@@ -686,6 +686,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 无边框方案下自动隐藏窗口按钮（默认关，触摸屏用户需要保持可点击）。
+  void setAutoHideWindowControls(bool value) {
+    state = state.copyWithAutoHideWindowControls(value);
+    state.save();
+  }
+
   /// 设置播放器内显示歌词。
   void setShowLyricsInPlayer(bool value) {
     state = state.copyWithLyrics(showInPlayer: value);
