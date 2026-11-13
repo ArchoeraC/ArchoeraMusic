@@ -117,7 +117,7 @@ void main() {
 }
 
 /// 回归（2026-10）：播放页开始展开时，搜索下拉浮层（挂在**根 Overlay**，不在
-/// 壳子树内、不随壳内容缩放淡出）必须立刻收起，而不是悬在播放页上方。
+/// 壳子树内、不随壳内容卸载/收起）必须立刻收起，而不是悬在播放页上方。
 void _playerExpandRegression() {
   testWidgets('播放页路由动画开始展开 → 搜索下拉收起并摘除', (tester) async {
     await tester.pumpWidget(
@@ -165,7 +165,7 @@ void _playerExpandRegression() {
 }
 
 /// 回归（2026-10）：聚焦搜索框后立刻展开全屏播放页 —— 壳内容（含 NavHeader）
-/// 随 [ShellExpandTransition] 停绘/收起，下拉面板必须同步摘除。
+/// 随 [ShellExpandTransition] 卸载，下拉面板必须同步摘除。
 ///
 /// 旧实现把「移除 OverlayEntry」挂在 `_panelCtrl.reverse().whenComplete(...)` 上，
 /// 而 dispose 紧接着就销毁了 controller：ticker 被取消，`TickerFuture` **永不
@@ -196,6 +196,7 @@ void _shellUnmountRegression() {
           home: Scaffold(
             body: ShellExpandTransition(
               animation: expandCtrl,
+              placeholder: const SizedBox.shrink(),
               child: const NavHeader(),
             ),
           ),
@@ -220,29 +221,24 @@ void _shellUnmountRegression() {
       reason: '聚焦后应展开下拉',
     );
 
-    // 播放页展开：壳内容随动画结束停绘（Offstage，State 保留）
+    // 播放页展开：壳内容随动画结束被卸载（NavHeader dispose）
     expandCtrl.forward();
     await tester.pumpAndSettle();
-    expect(find.byType(NavHeader), findsNothing, reason: '壳内容应停绘');
-    expect(
-      find.byType(NavHeader, skipOffstage: false),
-      findsOneWidget,
-      reason: '壳内容不应被卸载',
-    );
+    expect(find.byType(NavHeader), findsNothing, reason: '壳内容应已卸载');
 
     // 浮层必须随之摘除：否则会永久卡在根 Overlay 左上角
     expect(
       find.byType(SingleChildScrollView),
       findsNothing,
-      reason: '壳内容收起后下拉浮层必须移除（旧实现 whenComplete 永不触发 → 卡死）',
+      reason: '壳内容卸载后下拉浮层必须移除（旧实现 whenComplete 永不触发 → 卡死）',
     );
   }
 
-  testWidgets('搜索下拉展开后壳内容停绘（播放页完全展开）→ 浮层不残留', (tester) async {
+  testWidgets('搜索下拉展开后壳内容卸载（播放页完全展开）→ 浮层不残留', (tester) async {
     await unmountWhileOpen(tester, openAnimation: const Duration(seconds: 1));
   });
 
-  testWidgets('聚焦后立刻展开播放页（下拉动画途中壳内容停绘）→ 浮层不残留', (tester) async {
+  testWidgets('聚焦后立刻展开播放页（下拉动画途中壳内容卸载）→ 浮层不残留', (tester) async {
     await unmountWhileOpen(
       tester,
       openAnimation: const Duration(milliseconds: 120),

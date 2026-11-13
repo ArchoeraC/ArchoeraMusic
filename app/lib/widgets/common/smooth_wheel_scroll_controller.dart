@@ -118,10 +118,7 @@ class _WheelScrollActivity extends ScrollActivity {
     TickerProvider vsync, {
     required double initialPixels,
     required double initialTarget,
-  }) : _spring = Spring1D(
-         initialPosition: initialPixels,
-         params: _params,
-       ) {
+  }) : _spring = Spring1D(initialPosition: initialPixels, params: _params) {
     _ticker = vsync.createTicker(_tick);
     _ticker.start();
     _spring.setTarget(initialTarget);
@@ -168,4 +165,40 @@ class _WheelScrollActivity extends ScrollActivity {
     _ticker.dispose();
     super.dispose();
   }
+}
+
+/// 为**无状态**组件里一次性创建的滚动容器注入 [SmoothWheelScrollController]。
+///
+/// 控制器属于本作用域的 State：父级重建只会重新执行 [builder]（沿用同一个
+/// 控制器，滚动位置不丢），并随作用域一起销毁；不必为「只差一个控制器」把
+/// 无状态组件整体改成 StatefulWidget。
+///
+/// ```dart
+/// SmoothWheelScrollScope(
+///   builder: (context, controller) =>
+///       ListView.builder(controller: controller, ...),
+/// )
+/// ```
+class SmoothWheelScrollScope extends StatefulWidget {
+  const SmoothWheelScrollScope({super.key, required this.builder});
+
+  /// 用控制器构建滚动容器（传给 `ListView` / `SingleChildScrollView` 等）。
+  final Widget Function(BuildContext context, ScrollController controller)
+  builder;
+
+  @override
+  State<SmoothWheelScrollScope> createState() => _SmoothWheelScrollScopeState();
+}
+
+class _SmoothWheelScrollScopeState extends State<SmoothWheelScrollScope> {
+  final ScrollController _controller = SmoothWheelScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _controller);
 }
