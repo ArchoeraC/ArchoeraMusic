@@ -7,9 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AAC 运行时初始化表——由 FFmpeg n9.0.1 同款初始化算法在本机计算后以精确位模式嵌入
-//! （tabdump.c 探针，LGPL 参考对照产物；pow2sf/KBD/sine/cbrt 初始化舍入顺序敏感）。
-
 pub const pow2sf_tab = [428]f32{
     @bitCast(@as(u32, 0x26800000)), @bitCast(@as(u32, 0x269837F0)), @bitCast(@as(u32, 0x26B504F3)), @bitCast(@as(u32, 0x26D744FD)), @bitCast(@as(u32, 0x27000000)), @bitCast(@as(u32, 0x271837F0)),
     @bitCast(@as(u32, 0x273504F3)), @bitCast(@as(u32, 0x275744FD)), @bitCast(@as(u32, 0x27800000)), @bitCast(@as(u32, 0x279837F0)), @bitCast(@as(u32, 0x27B504F3)), @bitCast(@as(u32, 0x27D744FD)),

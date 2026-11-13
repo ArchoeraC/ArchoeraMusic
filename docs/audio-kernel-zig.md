@@ -93,7 +93,7 @@
 | **导出 C ABI / 可混合编译** | Zig 内核以 `export fn ... callconv(.C)` 导出 `zk_*` 桥接符号供 C 壳调用；`zig cc` 直接编译 C 壳源码（`addCSourceFiles`），`@cImport` 复用 C 头契约；Dart FFI（`engine_bindings.dart`）零改动 |
 | **安全默认 + 性能** | 处理不可信媒体输入时，Zig 的边界/溢出检查（Debug/Safe 模式）+ ReleaseFast 高性能，天然比 C 稳 |
 | **std 自足** | 自带 allocator、fs、thread/mutex/cond、哈希（含 CRC）、ArrayList 等，内核基础设施不再依赖任何三方库 |
-| **一个语言贯穿内核** | 内核（解码 / 采样 / DSP / 容器 / 测试）全用 Zig 完成；C 壳仅保留 FFI/CLI 边界（2026-08-16 决策：调用部分留在 C），tempo-rs 仅作过渡兜底，自研 WSOLA 完成后移除（§9.6） |
+| **一个语言贯穿内核** | 内核（解码 / 采样 / DSP / 容器 / 测试）全用 Zig 完成；C 壳仅保留 FFI/CLI 边界（2026-08-16 决策：调用部分留在 C），tempo-rs 仅作过渡兜底，自研 WSOLA 完成后移除（§9） |
 
 > **为什么不选纯 C 重写**：现状 C 方案仍依赖 CMake + 三平台脚本 + FFmpeg/vcpkg 打包链，且"复用 miniaudio
 > 内嵌 dr_*"意味着依赖 miniaudio 单头文件整体（含输出层），与 P2 冲突；Zig 能把"自研优先"贯彻到底。
@@ -132,34 +132,18 @@
 
 ### 3.2 依赖账本
 
-> **许可证列的含义**：下表的 `AGPL` 指该项目在对应模块中**独立编写的部分**；
-> 逐文件许可以 `kernel/**` 文件头 `SPDX-License-Identifier` 为**权威**。
-> 其中由 FFmpeg 移植 / 逐位复刻的解码器（FLAC、DTS、MLP、APE、ALAC、AAC SBR/PS、
-> WMA 及 ASF/MDCT、Opus CELT/PVQ/RC/FFT 等）按 **LGPL-2.1-or-later** 标注；
-> libopus / WavPack 移植按 **BSD-3-Clause**、minimp3 表按 **CC0-1.0** 标注。
-> 完整清单见 `app/core/audio-engine/THIRD-PARTY-LICENSES.md`。
-
-| 模块 | 形态 | 许可证 | 引入理由 / 自研成本 |
+| 组件 | 形态 | 许可证 | 说明 |
 |---|---|---|---|
-| WAV / AIFF / W64 / RF64 解复用 | **自研 Zig**（~250 行） | AGPL | RIFF 家族纯表结构，无数学复杂度 |
-| OGG 解复用（页解析 / granule / CRC） | **自研 Zig**（~300 行） | AGPL | RFC 3533 简单；CRC-32 自写表（Ogg 用非反射多项式） |
-| MP4 / M4A 音频轨解复用 | **自研 Zig**（~700 行） | AGPL | `ftyp/moov/mvhd/stbl/stco/stsc/stsz/stts` 表解析，无数学；视频轨直接跳过 |
-| ADTS（AAC 裸流）解复用 | **自研 Zig**（~150 行） | AGPL | 帧头解析 |
-| PCM 格式转换 / 下混 / 重采样 | **自研 Zig** | AGPL | 数学 + 表驱动，完全自研 |
-| DSP：EQ / loudness / limiter / FFT | **自研 Zig**（移植现有 C，~1200 行） | AGPL | 现有 C 实现移植 + 增强 |
-| OGG 封装（Opus muxer） | **自研 Zig**（~250 行） | AGPL | RFC 7845，页面/CRC/lacing |
-| **FLAC 解码** | **自研 Zig**（~2500 行） | AGPL | 无损可 bit-exact 校验；dr_flac（MIT-0/PD）仅兜底 |
-| **APE 解码** | **自研 Zig**（~1500 行，§9.10） | AGPL | 无损可 bit-exact 校验；参考 FFmpeg `apedec.c` |
-| **ALAC 解码** | **自研 Zig**（已实现，~1800 行）；alac.c（Apache-2.0）兜底 | AGPL | 无损可 bit-exact 校验；Apple 参考 alac.c 作对照 |
-| **WavPack 解码** | **自研 Zig**（目标，~2500 行）；libwavpack（BSD）兜底 | AGPL | 无损/混合可 bit-exact 校验；libwavpack 作对照 |
-| DSD→PCM | **自研 Zig**（~400 行） | AGPL | 1-bit 抽取 + 低通，纯信号处理 |
-| **MP3 解码** | **自研 Zig**（`fmt/mp3/`，~3500 行：Layer I/II/III + 合成滤波器 + ID3 标签 + Xing/Info 头，§9.4） | AGPL | Layer III 含 IMDCT/霍夫曼/滤波器组/联合立体声，但**可逐位对照 minimp3（CC0）验收**（§17.2）；minimp3（CC0）作参考对照；dr_mp3 移除 |
-| **Opus 解码** | **自研 Zig**（P2 CELT / P3 SILK，§9.2） | AGPL | 用户决策（2026-08-17）：解码器完全自研，bit-exact 对照 libopus / FFmpeg opusdec / RFC testvector |
-| **Opus 编码** | vendored `libopus` 源码 | BSD-3-Clause | 编码器心理声学模型不自研（§11，`encode/opus_encoder.zig` 封装） |
-| **AAC 解码** | **自研 Zig**（`fmt/aac/`，AAC-LC + SBR + PS） | AGPL | 参考 FFmpeg `aacdec*.c`/`aacsbr_template.c`/`aacps*.c` 对照（§17.2）；**LC/PS 100% bit-exact、SBR 内容帧 bit-exact**（2026-09-01 运算顺序对齐后；整体 corr 0.9996，首尾为探测/flush 对齐假象），LC/5.1 100% 逐位 |
-| 音频输出（播放设备） | **自研 Zig `device.zig`**（目标）；miniaudio 过渡兜底 | AGPL / MIT-0-PD | 三平台设备 API 自研可控（§15），逐步替换 player.c 内的 miniaudio 调用 |
-| 变速变调 | **自研 Zig WSOLA**（目标）；tempo-rs 过渡兜底 | AGPL / MIT | WSOLA 自研可行（§9.6）；tempo-rs 仅作迁移期参考 |
-| **FFmpeg（默认主引擎）** | **默认开启**（`-Duse-ffmpeg` 默认 true，链接 `libav*` / `libsw*`） | LGPL-3.0+ / LGPL-2.1+ | 保持现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（格式级开关，§8.3）；发布版默认带（LGPL 动态链接 + 合规说明，同现状） |
+| Zig 内核（容器 / 解复用 / 解码 / DSP / 封装） | 自研 + 部分按上游许可移植 | 逐文件 SPDX | 见 §9 与 `THIRD-PARTY-LICENSES.md`；不是单一许可 |
+| Opus 编码 | vendored `libopus` | BSD-3-Clause | 编码器封装（§11） |
+| Vorbis 解码 | vendored `stb_vorbis` | Public Domain / MIT-0 | §9 |
+| AMR-NB 解码 | vendored OpenCORE | Apache-2.0 | §9 |
+| FFmpeg（默认主引擎） | 动态链接 | LGPL-3.0+ / LGPL-2.1+ | 未接管格式兜底；随包内嵌（§8.3） |
+| 音频输出 | `miniaudio` | MIT-0 / Public Domain | 过渡实现（§15） |
+| 变速变调 | `signalsmith-stretch`（tempo-rs） | MIT | 过渡实现（§9） |
+
+> **许可证以文件头 `SPDX-License-Identifier` 为准**；完整来源、版权与许可正文见
+> `app/core/audio-engine/THIRD-PARTY-LICENSES.md`。本文不逐格式展开实现细节。
 
 ### 3.3 "自研 vs 引入"决策规则（P2 落地方案）
 
@@ -172,7 +156,7 @@
    b. 源码入库（git），构建期零下载
    c. 许可证 ∈ { MIT / MIT-0 / PD / BSD / Apache-2.0 } 且与 AGPL 兼容
    （MP3 已从本类移出：Layer I/II/III 全链可逐位对照 minimp3（CC0）验收，见 §3.7 裁决变更）
-4. 每个 vendored 组件必须登记"是否可自研"的裁决结论（§3.7），新格式一律先按自研评估（AAC 依此由 🔴 改 ✅ 自研，§9.5）
+4. 每个 vendored 组件必须登记"是否可自研"的裁决结论（§3.7），新格式一律先按自研评估（AAC 依此由 🔴 改 ✅ 自研，§9）
 5. FFmpeg（LGPL；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）：**保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，动态链接 + 内嵌运行库），
    保证现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（§8.3），发布版默认带（LGPL 合规说明同现状）；
    明确不引入：faad2（GPL）、libfdk-aac（非自由）、任何 GPL/SSPL/商业源可用（[docs/licensing.md §2.5](licensing.md#25-第三方代码的约束)）
@@ -188,74 +172,20 @@
 | 平台差异 | 隐藏在各平台脚本 | 收敛到构建 target + 自研输出层边界 |
 | 依赖面 | miniaudio（含输出层）为主要复用 | 自研优先；仅不可自研编解码器引入（§3.7 裁决）；FFmpeg 保持**默认主引擎**（§8.3），Zig 逐格式接管 |
 
-### 3.5 格式覆盖总表（本地播放器兼容面，P6）
+### 3.5 格式覆盖总表
 
-> 覆盖基线对齐 C# 扫描器 `ScannerEngine.cs:33-34` 的扩展名清单
-> （mp3/flac/ogg/opus/oga/m4a/aac/wav/ape/wv/dsf/dsd/dff/mp4/aiff/aif），
-> 并扩充到常见的 Hi-Res / 无损收藏格式。**容器（解复用）与编解码分离**：容器尽量自研，
-> 编解码按 §3.3 规则自研或 vendored。
+> 容器（解复用）与编解码分离：容器尽量自研，编解码按 §3.3 规则选择；
+> 逐文件许可与来源见 `app/core/audio-engine/THIRD-PARTY-LICENSES.md`，本文不展开实现细节。
 
-| 优先级 | 格式 | 容器实现 | 解码实现 | 许可证 | 状态 |
-|---|---|---|---|---|---|
-| **T0 核心** | MP3 | `fmt/mp3/`（帧头/索引/ID3） | **自研 Zig**（Layer I/II/III 全链 + 合成滤波器 + ID3v2/v1 标签 + APIC 封面 + ReplayGain + Xing/Info 头，minimp3 参考对照，§9.4） | AGPL | **已完成**（接管） |
-| **T0 核心** | FLAC | `fmt/flac.zig`（帧/校验自研） | **自研 Zig**（~2500 行：解码 + 全量标签 + REPLAYGAIN + CUESHEET 提示点 + PICTURE 封面图 + ID3v2 前置 + 未知块跳过 + 坏帧重同步，§9.3） | AGPL | **已完成**（接管） |
-| **T0 核心** | WAV / AIFF / W64 / RF64 | `fmt/wav.zig` 自研 | 自研（PCM/float/G.711/ADPCM 全系 + GSM + MACE，§9.1） | AGPL | **已完成**（接管） |
-| **T0 核心** | OGG/Opus | `fmt/ogg.zig` 自研（P1 完成） | **自研 Zig**（P2 CELT / P3 SILK；编码走 vendored libopus） | AGPL / BSD-3 | **已完成**（接管） |
-| **T0 核心** | OGG/Vorbis | `fmt/ogg.zig` 自研 | **vendored stb_vorbis 已接入**（`fmt/vorbis/lib.zig`，pushdata 流式 + granule 定位 seek；多格式 corr 1.0 ±1 LSB） | AGPL / PD | ✅ 已接入 |
-| **T0 核心** | AAC / M4A / ADTS | `fmt/m4a.zig` 自研 | **自研 `fmt/aac/`** | AGPL | **已完成（接管）** |
-| **T1 无损收藏** | ALAC（M4A 内） | `fmt/m4a.zig` 自研 | **自研 Zig**（~980 行）；`alac.c` 兜底 | AGPL / Apache-2.0 | **已完成**（接管） |
-| **T1 无损收藏** | WavPack（.wv） | `fmt/wv.zig`（自研容器 ~150 行） | **自研 Zig**（~1450 行）；libwavpack 兜底 | AGPL / BSD-3 | **已完成**（接管） |
-| **T1 无损收藏** | APE（Monkey's Audio） | `fmt/ape/container.zig`（自研容器 ~250 行） | **自研 Zig 解码器**（range coder + 多预测器，~1500 行，参考 FFmpeg `apedec.c` 校验，§9.10） | AGPL | **已完成**（2026-08-17 接管） |
-| **T1 无损收藏** | DSD（.dsf/.dff/.dsd） | `fmt/dsd.zig` 自研 | **已接入**：DSF/DFF 容器 + dsd2pcm（对照 FFmpeg dsd.c）+ 8× 抽取；DSF 与 DFF 输出 100% 一致，正弦幅值精确 | AGPL | ✅ 已接入 |
-| **T1 常见** | AMR（.amr/.3gp 音频） | `fmt/amr.zig` 自研（#!AMR 头 + 帧重同步） | **vendored OpenCORE AMR-NB 已接入**（92 源按 -x c 编译，与参考 100% 位一致） | Apache-2.0 | ✅ 已接入 |
-| **T2 长尾** | WMA（.wma） | — | **生态待评估**（无干净的 Permissive 单文件） | ⚠️ 低优先 | Phase F 可选 |
-| **T2 长尾** | MP2 / Speex / AU / CAF | 容器自研 | 按 §3.3 规则逐项评估 | — | Phase F 可选 |
-| **T2 长尾** | GSM（WAV/AIFF 容器内） | `fmt/wav.zig` 自研 | **自研 Zig** `gsm.zig`（GSM_MS tag 0x31/0x32/0x1500 + AIFC "GSM "，§9.1） | AGPL | 已完成 |
+| 级别 | 格式 | 状态 |
+|---|---|---|
+| T0 核心 | MP3 / FLAC / WAV·AIFF·W64·RF64 / OGG(Opus·Vorbis) / AAC·M4A·ADTS | 已接管 |
+| T1 无损 | ALAC / WavPack / APE / DSD(DSF·DFF) | 已接管 |
+| T1 常见 | AMR / AMR-WB / AC-3·E-AC-3 / MLP·TrueHD / DTS / TTA·TAK·Shorten / Musepack / Speex / WMA | 已接管或按格式回退 |
+| T2 长尾 | AU / CAF 等 | 由 FFmpeg 兜底 |
 
-> **容器 vs 编解码分离的意义**：一个"有视频轨的 MP4"也要能取音频（`fmt/m4a.zig` 只解析 `mp4a`），
-> 而"纯音频 M4A（ALAC/AAC）"复用同一容器模块——加格式往往只加一个解码器 + 一行注册，不动容器。
-
-### 3.5.1 格式实现状态总表（2026-08-22 核对）
-
-> 依据当前 `app/core/audio-engine/kernel/fmt/*` 实际代码核实（`decoder.zig` 工厂分发 + probe 枚举），
-> 与 §3.5 覆盖表互补：本表聚焦**实现完成度**（代码规模 / 解码器接入 / 逐位验收），
-> 非"规划目标"。
-
-| 格式 | 容器 | 解码 | 代码（行） | decoder 工厂 | 验收 | 状态 |
-|---|---|---|---|---|---|---|
-| **WAV / AIFF / W64 / RF64** | 自研 `fmt/wav/` | 自研（PCM/float/G.711/ADPCM/GSM/MACE） | ~14450 | ✅ `.wav` | ✓ ffmpeg bit-exact | ✅ 接管 |
-| **FLAC** | 自研 `fmt/flac/` | 自研（+ID3v2/VORBIS_COMMENT/CUESHEET/PICTURE/ReplayGain/坏帧重同步） | ~3830 | ✅ `.flac` | ✓ ffmpeg bit-exact | ✅ 接管 |
-| **MP3（Layer I/II/III）** | 自研 `fmt/mp3/`（帧头/ID3/Xing） | 自研（Layer I/II/III 全链 + synth + ID3v2/v1 + APIC + ReplayGain） | ~2850 | ✅ `.mp3` | ✓ minimp3 逐位 | ✅ 接管 |
-| **M4A（ALAC + AAC-LC 双 codec）** | 自研 `fmt/m4a.zig` | ALAC 自研 `fmt/alac/`；AAC-LC 自研 `fmt/aac/`（mp4a+esds → ASC） | ~2300 | ✅ `.m4a` | ✓ 本地参考 100% 逐位 | ✅ 接管（ALAC + AAC-LC + SBR + **PS**；ilst 标签 2026-08-31） |
-| **WavPack (.wv)** | 自研 `fmt/wv/` | 自研 | ~1450 | ✅ `.wv` | ✓ ffmpeg bit-exact | ✅ 接管 |
-| **APE** | 自研 `fmt/ape/` | 自研（range coder + 多预测器） | ~2040 | ✅ `.ape` | ✓ ffmpeg bit-exact | ✅ 接管 |
-| **OGG / Opus** | 自研 `fmt/ogg.zig`（~350，解复用） | Opus 自研 `fmt/opus/`（CELT/SILK）；seek 按 granule 页定位（2026-08-31） | ~7120 | ✅ `.ogg_opus` | ✓ libopus/FFmpeg 对照 | ✅ 接管（seek corr 1.0；OpusTags 标签 2026-08-31） |
-| **OGG / Vorbis** | 自研 `fmt/ogg.zig`（复用 granule/页定位） | ✅ `fmt/vorbis/lib.zig`（vendored stb_vorbis） | — | ✅ 接管 | — | ✅ 已接入（Vorbis comment 标签 2026-08-31） |
-| **OGG / FLAC** | 自研 `fmt/oggflac.zig`（Ogg-FLAC mapping；callback Reader 喂包） | 复用 `fmt/flac/`（frame/subframe/去相关全复用，metadata 跨包收集） | ~250 | ✅ `.ogg_flac` | ✓ mono/stereo 16-bit bit-exact（192000/192000） | ✅ 已接入（2026-08-31；seek 待补） |
-| **AAC / ADTS** | 自研 `fmt/adts.zig`（ADTS 容器，帧定位/坏帧重同步/seek） | **自研 `fmt/aac/`**（AAC-LC + SBR + PS + **Main 预测** + LTP：ICS/频谱/TNS/MS/intensity/PNS/pulse/CCE 耦合 + 前向/逆向 MDCT + 加窗 + QMF/HF 重建 + 参数立体声 + PCE 布局） | ~4600 | ✅ `.aac` | ✓ 本地参考 100% 逐位（§17.2）；**SBR/PS 内容帧 bit-exact**（2026-09-01）；**AAC-Main（AOT1）`hulu`/`am00_88` + ISO 符合性流 mono/stereo/3ch byte-exact**（2026-09-02） | ✅ 接管（AAC-LC + SBR + **PS** + **PCE/CCE** + **Main/LTP 预测**） |
-| **DSD (.dsf/.dff/.dsd)** | ✅ `fmt/dsd.zig` 已实现 | ✅ 已实现 | — | ✅ 接管（`.dsd` probe 识别） | — | ✅ 已接入 |
-| **AMR** | ✅ `fmt/amr.zig` 已实现（帧重同步 + seek 帧头跳过 2026-08-31） | ✅ vendored OpenCORE AMR-NB | — | ✅ 接管（`.amr` probe 识别） | — | ✅ 已接入（AMR-WB 已修误判 → UnsupportedFormat 回退） |
-| **AC-3 / E-AC-3** | 自研 `fmt/ac3/lib.zig`（帧同步/帧头/bsi） | 自研（耦合/重矩阵/DRC/SPX/下混）+ AVLFG + MDCT；mono 修复 | ~4600（含子模块） | ✅ `.ac3`/`.eac3` | ✓ float 参考 corr 1.0（sine/噪声）；mono E-AC-3 corr 1.0 | ✅ 接管（2026-08-31；seek 帧级跳过） |
-| **MLP / TrueHD** | 自研 `fmt/mlp/lib.zig` | 自研（无损 + Atmos 标志检测；JOC 逆向放弃见 §9.14） | ~1440 | ✅ `.truehd`/`.mlp` | ✓ bit-exact 40960/40960 | ✅ 接管（2026-08-31；seek 已精确） |
-
-> **说明**：
-> - **已接管（✅）**：`decoder.zig` 工厂已分发、`probe.formats.* = true`，可直接播放且经逐位对照验收；
-> - **⏳ 规划中**：`probe.zig` 已能识别（`.ogg_vorbis` / `.aac` / `.dsd` / `.amr`），但 decoder 工厂无分支，
->   当前打开返回 `error.UnsupportedFormat`（由 FFmpeg 主引擎兜底，§8.3）；
-> - **格式缺口全景**：见 `docs/archive/format-gap-analysis.md`（对照 ffmpeg 227 codec / 368 demuxer 逐项核对：
->   常见缺口 WMA / DTS / AMR-WB，小众缺口 CAF/AU/Musepack 等，其余为游戏/广播专用建议 FFmpeg 兜底）；
-> - **ALAC 与 M4A 关系**：M4A 容器承载 ALAC 与 AAC-LC 双 codec（均已接管）——stsd
->   条目分发：`alac` → ALAC 解码器、`mp4a`+`esds`（ASC）→ AAC-LC 解码器；**多声道
->   （chan_config 2–7、11、12、14，含 5.1/7.1）已支持**（2026-08-23 验收：mono/5.1/7.1
->   m4a 与本地参考构建 100% 逐位一致）；**HE-AAC（SBR）已自研支持**（ADTS/M4A，
->   2026-08-23：corr ~0.957，帧对齐）；**HE-AAC v2（PS）已自研实现**（语法/表/DSP/
->   apply/集成完整：位流解析与参考逐帧一致，6 个关键 bug 已修（ileave 基址/hybrid2_re/
->   伪造包络/delay 清零/is34 判定/HA-HB 表 M_SQRT2 缩放 0.707→1.414）+ 全缓冲零初始化
->   消除 ReleaseSafe 未定义行为；立体声源 corr 0.997、能量 0.978、L/R 分离正确，单声道源
->   正确输出 L=R，LC/5.1/HE-v1 无回归；仅剩 1 帧解码延迟差异（mine 早 1 帧，内容无损））；
->   **2026-09-01 运算顺序对齐后**：PS/SBR 内容帧与参考构建 **bit-exact**（见 §9.5，含
->   QMF 窗表符号 ×4、sumSquare 顺序、hfApplyNoise q_filt/噪声索引、getVlc 20 位、m4a 声道切换）。
-> - 代码行数按 2026-08-22 `wc -l` 实测，含模块内全部 `.zig`（含注释/测试），仅作规模参考。
+> 格式是否由 Zig 内核接管由 `kernel/probe.zig` 的编译期开关与 `kernel/takeover.zig` 决定；
+> 未接管格式始终由 FFmpeg 主引擎兜底，行为与旧版一致。
 
 ### 3.6 格式插件化（comptime 特性开关，P6 的落地）
 
@@ -268,16 +198,16 @@ const formats = .{
     .mp3   = true,   // 自研（minimp3 参考），T0 默认开
     .ogg   = true,   // 自研解复用，T0 默认开
     .opus  = true,   // 自研解码（CELT/SILK），T0 默认开
-    .m4a   = true,   // 自研容器 + ALAC/AAC-LC 双 codec（§9.5/§9.8 已接管）
-    .alac  = true,   // 自研已验收（§9.8，随 m4a 接管）
-    .wv    = true,   // 自研已验收（§9.9，2026-08-17 接管）
-    .ape   = true,   // 自研已验收接管（§9.10，2026-08-17）
-    .dsd   = true,   // 自研已接入（§9.11）
-    .vorbis = true, // vendored stb_vorbis 已接入（§9.12）
-    .amr   = true,   // vendored OpenCORE AMR-NB（§9.13）
-    .ac3   = true,   // 自研 Dolby Digital AC-3/E-AC-3（§9.14）
-    .mlp   = true,   // 自研 MLP（§9.14）
-    .truehd = true,  // 自研 Dolby TrueHD（§9.14）
+    .m4a   = true,   // 自研容器 + ALAC/AAC-LC 双 codec（§9/§9 已接管）
+    .alac  = true,   // 自研已验收（§9，随 m4a 接管）
+    .wv    = true,   // 自研已验收（§9，2026-08-17 接管）
+    .ape   = true,   // 自研已验收接管（§9，2026-08-17）
+    .dsd   = true,   // 自研已接入（§9）
+    .vorbis = true, // vendored stb_vorbis 已接入（§9）
+    .amr   = true,   // vendored OpenCORE AMR-NB（§9）
+    .ac3   = true,   // 自研 Dolby Digital AC-3/E-AC-3（§9）
+    .mlp   = true,   // 自研 MLP（§9）
+    .truehd = true,  // 自研 Dolby TrueHD（§9）
 };
 
 // probe 与 decoder 工厂经 comptime 生成，未开启的格式不编译、不占体积：
@@ -321,10 +251,10 @@ pub fn open(path: []const u8, info: *Info) !Decoder {
 | **变速变调（tempo）** | 🟡 自研目标 | WSOLA 可实现 + 主观/客观对照 | tempo-rs 兜底 |
 | **播放输出层** | 🟡 自研目标 | 平台设备 API 直调（§15） | miniaudio 兜底 |
 | **MP3 解码** | ✅ 自研（已验收） | Layer I/II/III 全链可逐位对照 minimp3（CC0，MIT-0 系）验收；minimp3（CC0）作参考对照 | minimp3（CC0）参考对照 |
-| **Opus 解码** | ✅ 自研（已验收） | 确定性解码可 bit-exact 对照 libopus/FFmpeg；CELT/SILK 自研完成（§9.2） | 参考 libopus / FFmpeg `opusdec.c` |
+| **Opus 解码** | ✅ 自研（已验收） | 确定性解码可 bit-exact 对照 libopus/FFmpeg；CELT/SILK 自研完成（§9） | 参考 libopus / FFmpeg `opusdec.c` |
 | **Opus 编码** | 🔴 vendored（不可自研） | 心理声学模型 + 编码器 ~5 万行 | libopus（BSD，源码入库） |
 | **AAC 解码** | 🟡 自研目标（AAC-LC 已验收） | 无损 bit-exact + FFmpeg `aacdec.c` 参考 | HE-AAC（SBR/PS）回退 FFmpeg |
-| **Vorbis 解码** | 🟢 vendored stb_vorbis（§9.12，已接入） | 有损、无 bit-exact 参考（±1 LSB） | stb_vorbis（PD 单文件） |
+| **Vorbis 解码** | 🟢 vendored stb_vorbis（§9，已接入） | 有损、无 bit-exact 参考（±1 LSB） | stb_vorbis（PD 单文件） |
 | **AMR / WMA / 长尾** | 🔴 vendored 或砍（按需评估） | 低频格式 | 按 §3.3 评估 |
 
 > **裁决判据**：是否无损（有无 bit-exact 校验闭环）+ 是否有可逐位对照的参考实现 + 自研量是否可控。
@@ -378,8 +308,8 @@ app/core/audio-engine/                # C 壳保留 + Zig 内核（FFmpeg 依赖
 │   │   │   │                        #   bitreader.zig / id3.zig
 │   │   ├── opus/                      # 自研：CELT/SILK 解码（已接管，T0）
 │   │   ├── alac/                      # 自研：ALAC 帧解码（已验收，随 m4a 接管）
-│   │   ├── wv/                        # 自研：WavPack 解码（已验收接管，§9.9）
-│   │   ├── ape/                       # 自研解码器（已验收接管，§9.10）
+│   │   ├── wv/                        # 自研：WavPack 解码（已验收接管，§9）
+│   │   ├── ape/                       # 自研解码器（已验收接管，§9）
 │   │   ├── dsd.zig                    # 自研 DSF/DFF + DSD→PCM（T1，Phase D）
 │   │   ├── vorbis.zig                 # vendored stb_vorbis（T0，Phase D）
 │   │   └── amr.zig                    # vendored OpenCORE AMR（T1，Phase F 可选）
@@ -392,7 +322,7 @@ app/core/audio-engine/                # C 壳保留 + Zig 内核（FFmpeg 依赖
 │   │   ├── loudness.zig              # EBU R128 增益（移植）
 │   │   ├── limiter.zig               # 限幅（移植）
 │   │   ├── spectrum.zig              # 频谱 v2.1 纯计算核心（VQT/AGC/γ/倾斜/峰值/通量）
-│   ├── tempo.zig                     # 自研 WSOLA（目标）；tempo-rs FFI 兜底（§9.6）
+│   ├── tempo.zig                     # 自研 WSOLA（目标）；tempo-rs FFI 兜底（§9）
 │   ├── encode/
 │   │   ├── opus_encoder.zig          # libopus 编码（可选模块）
 │   │   └── ogg_muxer.zig             # 自研 Ogg 封装（Opus）
@@ -1126,552 +1056,24 @@ per-context 兜底；每按格式接管一份，可模块化并发的覆盖面�
 
 ---
 
-## 9. 各格式实现与依赖账本明细
+## 9. 各格式实现（索引）
 
-### 9.1 WAV / AIFF / W64 / RF64 —— **自研完成** `fmt/wav/`（Phase A）
+> 各格式的具体算法、上游对照与验收细节不再在本文展开；实现位于 `kernel/fmt/*`，
+> 逐文件来源与许可见 `app/core/audio-engine/THIRD-PARTY-LICENSES.md` 与文件头 SPDX。
 
-> 状态：**已实现并通过 bit-exact 对照验收**（§17.2），可直接开启 `-Dzig-wav=true` 接管。
-
-- 模块结构：`chunk.zig`（容器头/块遍历：RIFF/RIFX/RF64/W64/AIFF，W64 8 字节对齐）、
-  `decl.zig`（fmt 解析与 codec 判定）、`g711.zig`（G.711 a-law/µ-law 解码）、
-  `adpcm.zig`（ADPCM/DPCM 解码：IMA WAV / MS / IMA QT / DK4 块解码 + OKI / Yamaha /
-  Creative CT / ZORK 连续流解码 + SWF 块式位流 + G.722 / G.726 连续位流，多声道 ≤8）、
-  `dpcm.zig`（XAN DPCM 块解码）、`gsm.zig`（GSM 06.10 解码）、`mace.zig`
-  （MACE MAC3/MAC6 解码）、`lib.zig`（VTable + 输出）；
-- 解析 `RIFF/RIFX/RF64/W64/FORM` 容器 + `fmt ` chunk（PCM 整数 8/16/24/32/64 位 /
-  IEEE float **16**/32/64 位（float16 为 2 字节 half；**float24 拒绝** → FFmpeg 兜底：
-  3 字节 float 无统一位布局，不发明格式）/ G.711 / ADPCM：IMA WAV tag 0x11、MS tag 2、
-  OKI tag 0x10/0x17、Yamaha tag 0x20、Creative CT tag 0x200、IMA DK4 tag 0x61、
-  DK3 tag 0x62（sum/diff 立体声）、XBOX tag 0x69、SANYO tag 0x125（3/4/5-bit，
-  块样本数存 fmt 扩展区 LE16）、XAN DPCM tag 0x594A（块式，每块 2B/通道 predictor
-  头 + 每字节 1 交错样本，shift[2] 每块重置 {4,4}）、ZORK DPCM tag 0x0011（bits 8，
-  连续流）、SWF ADPCM tag 0x5346（块式 MSB 位流，首 2 bit = nbits 2..5，块头
-  22*ch bits）、G.722 tag 0x028F（每字节高 2 位高带 + 低 6 位低带 → 2 帧 s16）、
-  G.726 tag 0x0045/0x0014/0x0040/0x0064（MSB 位流，code_size = byte_rate*8/sample_rate
-  推导，2..5），解码输出 s16；GSM 06.10：
-  WAV tag 0x31/0x32/0x1500（GSM_MS，LSB 位序，块 41..65B = 2 帧 320 样本）；
-  AIFF-C `COMM` 压缩类型 "ima4" → IMA QT、"GSM " → 纯 GSM（MSB）、"MAC3"/"MAC6"
-  → MACE（块 2B/1B 每声道，每块 6 样本/声道，输出 s16，≤2 声道）；其余 tag →
-  UnsupportedFormat 回退 FFmpeg；
-- 块解码（IMA WAV / MS / IMA QT / GSM / MACE）：状态按块重训，seek 按整块对齐；
-  GSM / MACE 的流式状态（GSM ref_buf/lar/msr，MACE index/factor/level）跨块保持、
-  seek 时 flush（镜像 FFmpeg）；IMA QT 跨块保持展开状态（镜像 FFmpeg：step 相同且
-  predictor 差 ≤0x7f 时沿用上块状态）；MS ADPCM >2 声道按每通道独立连续段布局解码
-  （镜像 FFmpeg adpcm.c 1637-1658，输出交错）；
-- 连续流解码（OKI / Yamaha / CT / ZORK）：无块头，每字节 2 个交错 nibble 样本
-  （OKI/Yamaha/CT；帧数 = 数据字节数×2/channels）；ZORK 每字节 1 交错样本
-  （8-bit 控制量，stereo 声道交替）；open 时按 codec 初始化状态（CT step=511）；
-  seek 从 `data` 起点顺序重训练状态（FFmpeg flush 语义），定位仅精确到字节；
-- 变长/位流解码（SWF / G.722 / G.726）：状态均跨 read 调用保持、seek 时 flush
-  重训练（镜像 FFmpeg）。SWF 块式 MSB 位流（块头 22*ch bits + 数据位流，nbits 2..5，
-  每块 ≤4096 样本/通道）；G.722 每字节 2 帧（mono）；G.726 每样本 code_size 位
-  （MSB-first，位级游标；帧边界跨字节时保证 bit-exact）；G.722/G.726 仅单声道
-  （validate 拒绝立体声 → UnsupportedFormat）；
-- 标签元数据：WAV `LIST`/`INFO` 子列表（INAM/IART/IPRD/ICRD/IGNR/ICMT →
-  title/artist/album/date/genre/comment）与 AIFF `NAME`/`AUTH`/`ANNO`（pascal
-  字符串）解析，填充 `decoder.Info.metadata`；奇对齐、尾部清理、单字段限长
-  4KB、截断/超长声明容错（seek 跳过不报错），字符串分配于解码器上下文、
-  deinit 释放（生命周期与 Decoder 一致，C 侧只读不释放）；
-- 采样循环点：WAV `smpl` chunk（36B 头 + 每循环 24B：type/start/end/playCount）与
-  `cue ` chunk（4B 计数 + 每点 24B：id/position，帧偏移相对 data 起点）解析，
-  填充 `decoder.Info.loops` / `cue_points`（allocator 分配、deinit 释放；RIFX
-  大端字段按容器字节序读取；条目数 clamp 到 chunk 实际承载、截断时保留已解析
-  条目，§13.3）；§16.1 桥接可按需暴露，当前内核侧只读；
-- 采样率上限放宽至 **4 MHz**：覆盖 DXD 768k 与高频专业 PCM（§17.2 验收行）；
-- 输出契约：**原生位深交错小端**（8-bit WAV 无符号 u8 / s16 / s24 / s32 / f16 / f32 / f64），
-  G.711 / ADPCM（含 ZORK/SWF/G.722/G.726） / GSM / MACE 解码为 s16；`data` 大小 →
-  精确时长；`seek` 直接定位 `data` 内偏移；
-- 覆盖现状 `dr_wav` 的全部容器子集；纯表解析，全 Zig 无外部依赖。
-
-### 9.2 OGG / Opus —— **解码器完全自研（已完成验收；CELT/SILK/Hybrid 全支持）**
-
-> 决策（2026-08-17，用户）：Opus **解码器完全自研**（SILK + CELT），bit-exact
-> 对照 libopus / FFmpeg 原生 opusdec 与 RFC 6716 官方 testvector（.dec 规范参考）；
-> **编码器**仍走 vendored libopus 封装（§11 `encode/opus_encoder.zig`，心理声学
-> 模型不在自研范围）。
-
-**P1 地基（已完成，`zig build test` 278/278 全绿）**：
-
-| 模块 | 内容 | 参考对照 |
+| 格式 | 模块 | 说明 |
 |---|---|---|
-| `fmt/ogg.zig` | OggS 页解析（页头 / lacing 分段表 / **非反射 CRC-32** poly 0x04C11DB7）+ 跨页 packet 重组 + granule 跟踪 + Demux 状态机 | `libavformat/oggdec.c` / RFC 3533 |
-| `fmt/opus/header.zig` | OpusHead（channels / pre_skip / gain / mapping family）+ OpusTags 识别 + 整轨样本数 | `oggparseopus.c` / RFC 7845 |
-| `fmt/opus/packet.zig` | TOC（RFC 6716 **Table 2**：config 0-11 SILK / 12-15 Hybrid / 16-31 CELT）+ code 0-3 帧分割（xiph lacing 1-2 字节 / padding）+ 每帧样本数 + 带宽 | `opus/parse.c` |
-| `fmt/opus/rc.zig` | 32-bit 区间解码（dec_cdf / dec_log / dec_uint / uint_step / uint_tri / laplace / get_raw / tell_frac）+ MSB 位流 + 帧尾反向 rawbits | `opus/rc.c` / libopus `entdec.c` |
-| `kernel/opus_dump.zig` | P1 对照工具：Demux 提取 packets + 头部/包解析统计（packet 数 / 模式 / 时长 / granule） | — |
-
-**P1 实测验证**：ffmpeg 编码 3 种模式文件（CELT 128k / SILK 8k / Hybrid 28k voip），
-Demux 均提取 **151 packets 与 ffprobe `nb_read_packets` 完全一致**；OpusHead
-（pre_skip=312）与末页 granule（144312 → 音频 144000 样本 = 3.0s）核对一致；
-packet TOC/模式/带宽/帧大小解析正确（CELT config 31 / SILK config 1 / Hybrid
-config 15，均为 20ms 960 样本）。
-
-**后续阶段（已按序推进）**：
-
-- **P2 CELT（已完成，2026-08-17~18，bit-exact）**：`fmt/opus/celt_tables.zig`（全部 CELT 表，
-  U(N,K) 组合数经递推校验）、`fmt/opus/fft.zig`（混合基 FFT + 逆 MDCT）、`fmt/opus/pvq.zig`
-  （PVQ 解码全路径）、`fmt/opus/celt.zig`（状态 + 全解码链：header/粗细能量/tf/bitalloc/
-  quant_bands/后滤波/去加重/重叠相加）。**验收**：`opus_demo -celt_test` 32 种配置
-  （4 带宽 × 4 帧长 × mono/stereo）1081 帧 rc tell+rng 与 libopus 完全一致；PCM 对照 libopus
-  float 构建：mono 20ms RMSE 1.3e-8（bit-exact）、10ms 帧 2.6e-8、全 32 配置 1.0e-3、
-  2.5ms 短帧 2.1e-3（去加重递归浮点精度，非 bitstream 差异）。修复记录：粗能量 laplace 用错
-  算法（改 CELT `ec_laplace_decode`）、u8 移位掩码、Zig `@min(i,20)<<1` 编译器 bug、intra 模型
-  偏移、final energy 优先级反转 + 公式、stereo transient hadamard deinterleave 命名/漏解。
-- **P3 SILK（核心已完成，2026-08-18，mono+stereo bit-exact）**：`fmt/opus/silk.zig` +
-  `fmt/opus/silk_tables.zig`（自动生成全部表 + NLSF 码本）。已落地：SILK 区间熵解码
-  （`decIcdf`/`decIcdf16`，与 CELT 共用 `ec_dec`）、`decode_indices`（信号/增益/NLSF/音高/
-  LTP/种子）、`decode_pulses`（rate_level + shell coder + LSB + 符号）、`decode_parameters`
-  （`gains_dequant` + `NLSF_decode` + `NLSF2A` 全链含 Levinson 稳定性 + `decode_pitch`）、
-  `decode_core`（逆 NSQ：LTP 重白化/长时预测/LPC 综合）、dec_API 前导（VAD/LBRR + 跳过）、
-  **立体声**（MS 预测 + mid_only + `stereo_MS_to_LR`）。**验收**：SILK-only（config 9）与
-  SILK 立体声各 301 帧 rc tell+rng 与 libopus 完全一致，内部 16k 样本 bit-exact。
-  重采样器（16k→48k，IIR_FIR + up2_HQ + FIR 插值 + delay matrix）已移植，内部 16k bit-exact；
-  48k 输出仍有帧边界状态累积差异（RMSE ~0.26，待精化）。
-  修复记录：`lbrr_flags` 未初始化触发假 LBRR 跳过、`LSHIFT/RSHIFT` i16/i8 移位回绕（统一提升
-  i32）、重采样器状态未清零/`input_delay` 缺失/`lpcFit` chirp 写成乘法。
-- **P4 整合（进行中）**：
-  - **hybrid 分层（32/32 帧 bit-exact）**：SILK 解码 LP（内部 16k）→ opus_decoder 级
-    redundancy 位（`dec_log(12)` + celt_to_silk/redundancy_bytes）→ 同一 `ec_dec` 上
-    `celt.decodeFrame(start_band=17)` 解码 HP 并累加。**修复**：① `start_band>0` 时跳过
-    postfilter 解码（libopus `if (start==0 && ...)`）；② redundancy_bytes 用
-    `ec_dec_uint(256)`（ftb=8 走全范围解码分支，非 `decUint(257)` 的拆分分支），且须按
-    libopus 语义 `dec.storage -= redundancy_bytes`（`BitReader.limit` + `RawBits.bytes`
-    同步收缩，令 CELT 段超读按 0 填充、rawbits 反向读取不越入冗余区）。实测 32 个
-    hybrid 包 rc tell+rng 与 libopus **全部一致**（含 SILK→CELT 模式转换边界包）。
-  - **重采样器 48k 输出（完成，全 bit-exact）**：内部 16k 已 bit-exact；48k 输出经修正
-    `input_delay`（delay matrix）、以及 dec_API 的 **+2 缓冲偏移喂入**（首样本=上一帧
-    末样本 sMid[1]，丢弃本帧末样本）后，**整轨与 libopus 逐样本一致（0 差异）**。此前
-    记录的「削波区 1-ULP 漂移」根因是 SILK 解码器本身的两处 bug（见下），非重采样器。
-  - **`fmt/opus/lib.zig`（新增，Opus VTable 封装）**：`decoder.zig` 已接线
-    `.ogg_opus` → `opus.open`（probe 识别 OpusHead）。含 Ogg 解复用 + SILK/CELT/HYBRID
-    全模式 + pre-skip（OpusHead）+ end-trim（末页 granule）+ 输出增益（Q7.8 浮点）。
-    局部验收：silk_test（mono）与 silk_st（stereo）整轨 48k s16 PCM 与 libopus
-    **逐样本 0 差异**。hybrid 定位（2026-08-18）：SILK LP（重采样 48k）与 CELT HP
-    **每帧头部逐样本 bit-exact**（含最后一帧）；仅帧 31（最后 hybrid 帧）尾部
-     （输出样本 840+，即模式转换边界区）发散。根因：**CELT 合成层定点状态累积漂移**
-     ——CELT-only 文件（fb_st）同样存在（2.6% 样本 >1 LSB，逐帧增至 ~100 LSB），
-     系逆 MDCT/重叠相加/后滤波状态累积的舍入差异（rc/位分配全 bit-exact，
-     CELT `preemph_memD`、`oldBandE` 状态需精化）。CELT 精化定位（2026-08-18）：
-     **去加重公式修正**为 libopus 精确语义 `tmp=x+mem; mem=preemph*tmp; y=tmp`
-     （原 `y=x+c*y` 且返回 y[N-1] 语义错误）；`preemph` 依 CELT 模式（float build：
-     24k 0.8500061 / 48k 0.92300415，fb_st 与参考一致用 0.85）。**CELT 100% 达成
-     （2026-08-19，anticollapse 顺序修复）**：上述「残余」的真正根因并非 FFT/MDCT
-     浮点舍入，而是 **anti_collapse 的通道/band 循环顺序**——libopus
-     `anti_collapse` 是 **band 外层 + channel 内层**（`for band { for c { ...celt_lcg_rand } }`），
-     我原实现按 channel 外层调用（block0 全部 band 再 block1），导致 `celtRng`
-     消耗顺序与 lib 不同 → 尾帧（transient，`anti_collapse_rsv=8,on=1`）噪声填充
-     290 个系数符号翻转。重构 `processAnticollapse(f)` 为单入口、band 外层 +
-     channel 内层后：fb_st（CELT-only，含 transient/stereo/anticollapse 尾帧）与
-     celt_test_st **f32 与 s16 双路径均 100% 逐位一致**（576000/576000 与
-     577680/577680，diff=0）。验证工具 `opus_dump` 新增 `--s16` 输出（`s16FromF32`：
-     `float2int(8388608*v)` 截断 → clamp ±0x007fff00 → `(s+128)>>8`，与 opus_demo
-     RES2INT24→s16 链逐位一致）。
-     hybrid→CELT 模式转换淡入（pcm_transition cross-fade）尚未实现。
-  - **SILK 立体声修复（本会话定位，silk.zig/lib.zig）**：
-    ① `stereoDecodePred` 用 `SMLABB`（libopus 16×16 乘累加），原误用 `SMLAWB`（移位 16）；
-    ② 反量化步长常数 `SILK_FIX_CONST(0.1,16)` 需 **+0.5 舍入**（6554 非 6553）；
-    ③ `decodeFrame` 解码成功后须 `prev_signal_type = indices.signal_type`（影响后续帧
-    的 voiced PLC 判定）且清 `first_frame_after_reset`（否则 NLSF 插值被强制关闭，
-    A 系数偏差 → 帧 3 起累积发散）；④ `lpcInversePredGainQa` 缺失循环后 k=0 反射
-    系数更新（稳定化迭代多跑一轮 → A 系数 1-ULP 漂移，后续帧累积）；⑤ 重采样器喂入
-    须精确复刻 dec_API `&samplesOut1_tmp[n][1]`：单声道 `{decoded[319]_prev, d[0..318]}`，
-    立体声 MS→LR 后 **`{x1[1], L[0..318]}`**（x1[1] = 上一帧 sMid[1] ± 本帧插值 side[0]，
-    即 MS_to_LR 输出的 out_l[1]/out_r[1]），且 out_l/out_r 需 +2 偏移（decoded 在
-    [2..fl+2]）；⑥ 侧声道 `dec1` 状态须跨包保留（仅 `n_frames_decoded` 每包清零，
-    否则侧声道 VAD/LBRR 前导被跳过、rc 错位）；⑦ 单声道包 + OpusHead 双声道 → 复制
-    mono 到双输出声道。
-  - **SILK PLC（实现，silk/PLC.c 移植）**：`PlcState` + `plcUpdate`（好帧）/ `plcConceal`
-    （丢包）/ `plc` 调度 + `glueFrames`（丢失→正常边界能量淡入，`SQRT_APPROX`）+ `decodeLostFrame`
-    入口。**修复**：`BWE_AFTER_LOSS_Q16` 应为 **63570**（误用 64536）；好帧解码后须
-    `lossCnt=0` 且顺序在 `glueFrames` 前；`SMULWW/SMLAWB` 改回绕语义（匹配 gcc 补码回绕，
-    正常解码无溢出则不变）。`sqrtApprox` 的 `(24-lz)&31` 须用 i32 运算（CLZ32 返回 u6，
-    lz>24 时 u6 下溢 panic）。
-  - **PLC 完整对照（2026-08-21，`plc_test` vs `opus_demo -lossfile`）**：silk16 全 37 包
-    任意单点丢包（lost@1/5/8/14/20/25/30/33/36）与连续多包（lost@14×2/20×3/28×2/5×3）
-    全部 **100% 逐位精确**。对齐约定：mine 跳过 pre_skip 312 样本，ref 完整，
-    `mine[i] vs ref[i+624]`；`lost@N` 的 lossfile 行号 = N-1（0-based）。关键修复链：
-    ① `decodeLostFrame` 须按 `n_frames_per_packet` 循环生成多子帧 PLC（60/40ms 包
-    逐 20ms 子帧，`resampleChannelInto` 支持写入偏移）；② **首包即丢 libopus 输出 0 样本**
-    （`prev_mode=0`，last_packet_duration=0），非全零帧——`!decoded_any` 时 `interleaveOut(0)`
-    直接返回；③ **PLC 帧长 = 上一好帧时长**（libopus `last_packet_duration`），丢包帧自身
-    frame_size 不更新 `prev_frame_size`（连续丢包才对齐）；④ **丢包时 nChannelsInternal 用
-    上一好帧的 stereo 状态**（`prev_stereo`），非丢包帧的 toc——pkt28 丢失时 pkt27 首个
-    stereo 帧被当作 mono PLC；⑤ **mid-only 判定每帧读取**（VAD_flags[fi]，非仅 nfd==0）；
-    ⑥ PLC 帧后须更新 `sst.s_mid=[out[fl-2],out[fl-1]]`（mono 分支，供后续 stereo 帧
-    resample 输入用）；⑦ `prev_decode_only_middle` 跨帧跟踪（sst 字段），PLC 时
-    has_side=!prev dom → side 置 0。libopus 插桩已全部 git checkout 恢复干净。
-  - **SILK→CELT 冗余帧 + smooth_fade（2026-08-21，lib.zig）**：frame15 的
-    SILK→CELT redundancy（`celt_to_silk=0, rb=134`）此前完全跳过，导致 CELT 首帧
-    （frame16）起全部失配。现已实现 `decodeSilkToCeltRedundant`：`OPUS_RESET_STATE`
-    等价 flush + `start_band=0` + 独立 `ec_dec` 解码 5ms（F5=240）冗余帧，再以
-    `window²` 权重 `smooth_fade` 混合进 pcm 尾部 F2_5，并**在 interleaveOut 之前**
-    应用（此前在之后导致 smooth_fade 修改不生效）。同时跟踪 `prev_redundancy`
-    （`redundancy && !celt_to_silk`），frame16 因 `!prev_redundancy` 不满足而
-    **不 reset CELT**，直接沿用冗余帧解码后的 CELT 状态。`decodeRedundancy` 返回
-    `RedundancyInfo{has, celt_to_silk, bytes}` 供后续使用。
-  - **sc2 整轨对照（SILK×15→HYB×1→CELT×34，2026-08-21）**：修复合用/降采样
-    `out_len=fl*3` 硬编码为 `fl*(48/silk_fs_khz)`、hybrid deemphasis 改 float 域
-    累加（`accum` 参数）后，再补上冗余帧 + smooth_fade + `prev_redundancy`，
-    **整轨 99.14% 逐位精确（94558/95376）**，剩余差异全部 ≤4 LSB：frame15
-    （HYB，SILK+CELT 分层累加舍入）±1~4 共 813，其余帧零星 ±1（共 5）。
-    此前 frame16-25（CELT 段）1920/1920 全失配 → 现 0 差异。
-  - **8k SILK（silk8，config=0x18/0x10/0x08/0x00，2026-08-21）**：修复 NLSF 表
-    `silk_NLSF_CB_NB_MB` 的 `quant_step_size_q16`（应 0.18→11796，was 9830）与
-    `inv_quant_step_size_q6`（应 356，was 427）；`prepSilk` 的 `nFramesPerPacket`/
-    `nb_subfr` 映射（60ms→nfpp=3/每次解 20ms 子帧共享 rc）、`decodeSilkFrame`
-    循环 nfpp 次 + `resampleChannelInto` 支持写入偏移、`prev_last` 跨子帧延续；
-    修复 mono→stereo 切换的 3 个状态问题：**libopus 在 mono 帧也更新
-    `sStereo.sMid`**（mine 的 mono 分支补 `s_mid=[out[fl-2],out[fl-1]]`）、
-    **mono→stereo 切换时把 ch0 resampler 状态拷给 ch1**（dec_API.c:223）、
-    **mid-only 标志每帧都读**（非仅 nFramesDecoded==0，dec_API.c:294）。
-    **整轨 100% 逐位精确（96336/96336）**。libopus 侧插桩打印均已清理；
-    mine 侧 debug 打印与 db 字段已全部移除（2026-08-21），sc2 回归 99.14% 无退化。
-  - **ffmpeg libopus 全链路对照（2026-08-21）**：用 `ffmpeg -c:a libopus` 编码 3s 立体声
-    WAV 为 Ogg/Opus（SILK voip 16k@20ms、CELT audio 128k@20ms、audio 24k@20ms、audio
-    64k@60ms），mine（`opus_full_dump`）解码对照 libopus（`opus_demo -d` 裸流）：
-    **全部 100% 在 ±1 LSB 内（maxd=1）**。修复：**`decodeCeltPacket` 多帧包（60ms=3×20ms）
-    `written` 未乘 `f.channels`**，导致第 2/3 子帧覆盖前帧写入（0-100% 错位）——
-    现 `pcm_buf[(written+i)*channels+c]`。mine 尊重 granule（total_valid）截断输出
-    （3s 文件输出 144000 样本），opus_demo 输出含编码 padding（146880）属正常差异。
-    剩余差异全部为 f32→s16 舍入边界 ±1 LSB。
-- **CRC 注意**：Ogg 页 CRC 用**非反射** CRC-32（poly 0x04C11DB7），
-  Zig `std.hash.Crc32` 是反射（zlib）变体，已自写 256 项表（§3.2）；已用真实
-  Ogg 页校验匹配。
-- **Seek（2026-08-31，已验证 corr 1.0）**：`fmt/ogg.zig` 新增 `Demux.reset()` 与
-  `seekToGranule()`（逐页扫 granule 找目标页 → 字节定位 → 清重组状态）；
-  `fmt/opus/lib.zig` `seekMsImpl` 按 **granule = ms×48 + pre_skip** 页定位 + 解码
-  丢弃到目标样本。**关键修复**：seek 后 `pre_skip_left` 不应重置（pre-skip 只在从头
-  解码时消耗），否则位置少跳 pre_skip。验证：5 个位置（100/300/700/1000/1900ms）
-  输出 vs `ffmpeg -ss` 全部 **corr=1.0000 @ 偏移 0**（噪声样本，SILK/CELT 重置后
-  与 FFmpeg 解码一致）。
- - **OpusTags（2026-08-31，已实现）**：`OpusHead` 后的 OpusTags 包解析（RFC 7845 §5.2：
-   vendor + N×"KEY=value"，Vorbis comment 布局），映射 TITLE/ARTIST/ALBUM/DATE/GENRE/
-   COMMENT/DESCRIPTION → 6 标准字段 + 全量 tags；deinit 释放。验证：ffmpeg 带标签样本
-   6 字段 + 7 条 tags 全部提取。
- - **编码器**：`encode/opus_encoder.zig` 保持 vendored libopus 封装（§11）。
-
-### 9.3 FLAC —— **自研完成** `fmt/flac/`（2026-08-16，f0-f6 落地 + FFmpeg 对齐扩展）
-
-> 状态：**已实现并通过 bit-exact 对照验收**（§17.2），可直接开启 `-Dzig-flac=true` 接管。
-
-- 模块结构（约 2500 行，全 Zig，无外部依赖）：
-  - `crc.zig`：CRC-8 ATM / CRC-16 ANSI；`bitreader.zig`：MSB-first 位读取 + 滚动 CRC-8；
-  - `streaminfo.zig`：可选 **ID3v2 前置标签跳过**（FLAC 规范允许，ffmpeg 带 `-id3v2_version`
-    转出的文件）→ `fLaC` 头 + 元数据块遍历（显式 switch 判定块类型，未定义值 7..126 /
-    127 INVALID → **跳过**（FFmpeg flacdec default 分支 avio_skip 同款容错），不依赖
-    `@enumFromInt`）+ STREAMINFO / SEEKTABLE / **VORBIS_COMMENT** / **CUESHEET** / **PICTURE**
-    解析；
-  - `frame.zig`：帧头解析（UTF-8 帧号、blocksize/sr 扩展位、ch_mode、bps_code、CRC-8）；
-  - `residual.zig`：分区 Rice（method 0/1 + escape + 符号折叠）；
-  - `subframe.zig`：constant / verbatim / fixed 0-4 / LPC + wasted bits；
-  - `lib.zig`：`open` + VTable + 帧循环 + 去相关（left/right/mid_side，32 位 u32 环绕与 33 位
-    wide 路径）+ seek（SEEKTABLE 最近点 / 无表估算+CRC-8 同步扫描）+ 输出打包；
-- 标签元数据：VORBIS_COMMENT 块（字段长度 LE；TITLE/ARTIST/ALBUM/DATE/GENRE/COMMENT
-  （COMMENT 与 DESCRIPTION 同义，首字段优先）→ `decoder.Info.metadata`，键大小写不敏感、
-  单字段限长 4KB、字段越界停止该块解析不报 Corrupt）填充 `decoder.Info.metadata`，
-  字符串分配于解码器上下文、deinit 释放（生命周期与 Decoder 一致，C 侧只读不释放）；
-  **全部条目**（含 TRACKNUMBER/ALBUMARTIST/encoder 等非标准键，key 原样大小写、value 已
-  trim、重复键全保留）→ `Metadata.tags`（对齐 FFmpeg av_dict），deinit 统一释放；
-- 提示点：CUESHEET 块（CD 目录：头 396B + 每 track 36B + 每 index 12B；index offset（样本，
-  相对音频流起点）→ `decoder.Info.cue_points`，`id` 顺序编号、条目数 clamp 到块实际承载，
-  §13.3）；`Info.loops` 恒空（FLAC 无采样器循环点）；
-- 附加图片：PICTURE 块（FLAC 规范 §5.8 / ID3v2 APIC 布局，字段长度 BE：type / mime /
-  description / width / height / depth / colors / data）→ `decoder.Info.pictures`；
-  mime/desc 限长 4KB、data 限长 64MiB（§13.3 防超大分配），任一字段越界/截断 → 放弃该图
-  不报 Corrupt 且块对齐不破坏后续块；`decoder.Picture`（§8.1）生命周期与 Decoder 一致、
-  deinit 释放、C 侧只读不释放；
-- **REPLAYGAIN**：`REPLAYGAIN_TRACK/ALBUM_GAIN`（`"±X.XX dB"` → 千分之一 dB 整数）、
-  `REPLAYGAIN_TRACK/ALBUM_PEAK`（→ 十万分之一单位整数）→ `Info.replay_gain`
-  （`decoder.ReplayGain`，单位对齐 FFmpeg `AVReplayGain`；畸形值保持 null 不崩溃）；
-- **坏帧重同步**：帧解码 Corrupt（帧头一致性 / 子帧 / 整帧 CRC-16 失败）→ 从当前位置向后
-  扫描合法帧起点（0xFFF8 同步码 + 帧头 CRC-8/一致性校验）**跳过坏帧继续**（§13.3 容错，
-  对齐 FFmpeg flacdec 损坏帧跳过语义）；无法恢复且无产出 → Corrupt 透出；
-- 输出契约对齐 FFmpeg：bps≤16 → 16-bit 左移 `16-bps` 对齐满幅；bps>16 → 32-bit 左移 `32-bps`；
-  交错小端 PCM。
-- 接线：`kernel/decoder.zig` 工厂 `.flac` 分支；`kernel/flac_dump.zig` 为对照导出工具
-  （stderr 摘要含全部标签 / REPLAYGAIN / 提示点 / 封面）。
-- 兜底已不再需要（原计划 dr_flac 取消）。
-
-### 9.4 MP3 —— **自研完成** `fmt/mp3/`（2026-08-22，minimp3 参考逐位验收）
-
-- `fmt/mp3/` 模块分解：
-  - `lib.zig` —— 统一解码视图（VTable：open/read/seek_ms/position_ms/deinit），ID3v2 跳过与解析、
-    ID3v1 文件尾、Xing/Info 头、时长估算、seek 估算 + 帧同步扫描、int16 交错输出；
-  - `layer3.zig` —— Layer III 完整管线（side info / scalefactor / huffman / requant / stereo
-    MS+intensity / reorder / antialias / IMDCT36/12/short / bit reservoir / findFrame）；
-  - `layer12.zig` —— Layer I/II（bitalloc / scalefactor / dequantize / scf384）；
-  - `synth.zig` —— 合成滤波器（DCT-II + 多相 g_win / g_sec / g_aa，mono qmf 特例）；
-  - `header.zig` / `bitreader.zig` / `huffman_tables.zig` / `layer3_tables.zig` —— 帧头 / 位读 / 表；
-  - `id3.zig` —— ID3v2.2/2.3/2.4（标准字段 + 通用 tags + TXXX + APIC 封面 + UTF-8/16/Latin-1）、
-    ID3v1 文件尾、ReplayGain（TXXX REPLAYGAIN_*）。
-- **参考对照**：minimp3（CC0）标量路径（`MINIMP3_FLOAT_OUTPUT` + `MINIMP3_NO_SIMD`）作逐位参考，
-  参考对照、未并入其源码；全部 Layer I/II/III 向量（minimp3_test 的 l1-fl* / ILL2* / performance*）与真实样本
-  （mono/stereo、MPEG1/2/2.5、8k-320kbps、CBR/VBR）PCM 精确一致（worst=0，§17.2）；
-- **标签 / 时长**：ID3v2/v1 标签 → `Info.metadata`（含 APIC 封面 → `Info.pictures`、
-  ReplayGain → `Info.replay_gain`）；Xing/Info 头 → `duration_known = exact`；
-- **seek**：无帧级 seek 表 → 按总帧数（Xing 精确 / 首帧估算）比例估算字节偏移 + 帧同步扫描
-  定位最近帧边界（§12.3）；bit reservoir 依赖帧自动跳过到最近可独立解码帧。
-- 产出 `Info.codec_name = "mp3"`，`bits_per_sample = 16`（MPEG 音频原生 16 位）。
-
-### 9.5 AAC / M4A —— **解码器完全自研**（AAC-LC 已验收接管；2026-08-23）
-
-> 裁决变更（2026-08-23，用户决策"尽可能自主实现"）：AAC 由 🔴 vendored OpenCORE
-> 改为 ✅ **自研 Zig**（`fmt/aac/`）。与 MP3/Opus 同模式：**参考实现逐位对照验收**
-> （`reference/FFmpeg` n9.0.1 `libavcodec/aac/aacdec*.c` 浮点路径 + 本地构建无优化
-> ffmpeg 作黄金基准，§17.2）；OpenCORE 不再引入。
-
-- **范围（Phase C）**：AOT 2 (AAC-LC) 无 SBR/PS；raw_data_block 元素 SCE/CPE/DSE/FIL；
-  CCE/PCE 暂拒（chan_config ≤ 2 mono/stereo）；工具 MS/intensity/TNS/PNS/pulse 全支持；
-  HE-AAC（SBR/PS）→ `UnsupportedFormat` 回退 FFmpeg 主后端（§8.3）；
-- **模块**（`kernel/fmt/aac/`）：
-  - `bitreader.zig` —— MSB 位读 + 非规范序 Huffman 精确匹配 VLC 解码；
-  - `asc.zig` —— AudioSpecificConfig（隐式/显式 SBR 信令）+ ADTS 帧头解析；
-  - `tables.zig` / `huffman_tables.zig` / `rt_tables.zig` / `mdct_tables.zig` —— 表生成器
-    从参考源提取（§3.2/§3.6），运行时初始化表（pow2sf/KBD/sine/cbrt）以本机精确位模式嵌入；
-  - `mdct.zig` —— 逆 MDCT 复刻 av_tx 浮点路径（split-radix 单块 FFT），参考源逐位校验；
-  - `lib.zig` —— ICS 语法/频谱反量化/TNS/MS/intensity/PNS/pulse/加窗重叠相加 + 输出；
-- **容器**：`fmt/adts.zig`（ADTS 裸流 VTable，帧定位/坏帧重同步/seek）；
-  M4A 内 AAC 轨（`fmt/m4a.zig` stsd `mp4a` 条目 → esds → ASC 提取 + 逐 sample 喂包）
-  **已接线验收**（2026-08-23，§17.2）；HE-AAC（SBR/PS）与 chan_config>2 的
-  mp4a 条目 → `UnsupportedFormat` 回退 FFmpeg；
-- **输出契约**：s16 交错小端，float ×32768 后 `lrintf`（最近偶数舍入，对齐 FFmpeg
-  swresample `av_clip_int16(lrintf(x*32768))`）+ 饱和；
-- **验收（§17.2，2026-08-23）**：与本地参考构建（无优化，同源 n9.0.1）s16 输出
-  **100% 逐位一致**（3 样本：mono/stereo × sine/粉噪，48k/44.1k）；与系统 ffmpeg
-  （LTO+AVX2）99.99%+ 一致，残留全部 ±1 LSB（构建浮点差异，非算法错误）；
-- 接线：`probe.formats.aac = true`、decoder 工厂 `.aac → adts.open` 已接入。
-- **HE-AAC 验收（2026-08-31 起，2026-09-01 达 bit-exact）**：对照 ffmpeg 验证 ——
-  - **SBR（HE-AAC v1）**：`ct_nero-heaac.mp4`（stereo 44100 HE-AAC）输出 **corr 0.9965 @ 偏移 0**（QMF 高频重建浮点差异）；2026-09-01 运算顺序对齐后内容帧与参考构建 **bit-exact**（QMF 窗表符号错误为根因）。
-  - **PS（HE-AAC v2）**：`aacPlusDecoderCheckPackage` `File2.mp4`（HE-AACv2）曾 corr ≈ -0.13；**2026-09-01 已 bit-exact**（`ps_st_v2.m4a` 100% 逐位、`ps_File2.mp4` 内容帧逐位）。历史深修过程如下：
-    - **修复 1**：`ps_tables.zig` `ff_k_to_i_34` 表错误（索引 60-90 段应为 31/32/33，原写 30/31/31）→ 34-band 模式高频带参数带映射错（已对照 `aacpsdata.c` 修正）。
-    - **修复 2**：`sbr.zig` `bs_extension_id==2`（PS）后不跳剩余填充位 → 跨帧位流错位；改 `psReadData` 返回消费位数 + 跳过剩余（对齐 ffmpeg `skip_bits_long`）。
-    - **静态对照**（子代理 ×2 + 人工，逐行）：`aacpsdsp_template.c`（hybrid_analysis/decorrelate/stereo_interpolate(_ipdopd)/ileave）、`aacps.c`（hybrid_analysis/hybrid6_cx/hybrid2_re/decorrelation/stereo_processing/hybrid_synthesis）、`aacps_common.c`（ff_ps_read_data/ps_read_extension_data）、`aacsbr_template.c`（sbr_x_gen/ff_aac_sbr_apply PS 集成）、`aacps_tablegen.h`（pd/Q_fract/HA/HB 表）**全部一致**。
-    - **运行时参数验证**（文件导出，非打印）：File2 为 20-band（is34=0, nr_iid=20, nr_icc=20, enable_ipdopd=0），top_in=43（kx[1]+m[1]），num_time_slots=16 —— 全部正常。
-    - **剩余**：静态全一致 + 参数正常但输出仍错 → **编译 ffmpeg aacps 对比工具**（`/tmp/opencode/ps_compare.c` + mine 转储）定位到决定性证据：**mine 的 `X_low`（AAC 核心 QMF 分析输出）对 File2 指数爆炸**（帧4 起 7.8 → 2.8万 → 41万，146/166 帧 >1000），而 SBR 高频 `Y` 正常（<130）→ PS 输入（`X_saved`）巨大 → 输出 clamp → corr -0.13。**最终定位**：AAC 核心输出正常（<0.3），但 `qmfAnalysis`（QMF 分析滤波器）对 File2 的 **22050 采样率**放大约 140 万倍（0.3 → 41万）→ **根因在 SBR QMF 分析层**（File2 核心 22050 的滤波器系数/状态路径，ct_nero 44100 正常）——非 PS。（2026-08-31）
-  - **修复（2026-08-31）**：
-    - `sbr.zig` `makeFMaster` 偏移为有符号（负值表），原 `@bitCast(i32→u32)` 使负偏移变正数 → u32 溢出 panic；改 i32 计算 + k0<0 检查（对照 ffmpeg）。
-    - **probe ADTS/MP3 误判**：带 ID3v2 标签的 ADTS（如 `File1.aac`）超出探测窗口时，probe 兜底判 MP3 → 改 ID3 后 seek 完整 `identify` 判定（ADTS/MP3/FLAC）。
-    - **adts.open 跳过 ID3v2 前导**（`File1.aac` 头部 113 字节 ID3 导致读帧头失败 UnsupportedFormat）。
-- **运算顺序对齐（2026-09-01，PS/SBR 达 bit-exact）**：转储 mine 与参考构建（无优化 n9.0.1 浮点标量路径）逐帧对比 DSP 内部，逐级收敛：
-  - **QMF 窗表符号错误 ×4**：`sbr_qmf_window_ds[192]/[256]`、`sbr_qmf_window_us[384]/[512]` 丢失源码 `-Q31(...)` 取负 → 值正负相反，单点符号翻转串扰整条 HF 链。修复后 **QMF 分析（X_low）与参考构建逐位一致**。
-  - **`sumSquare` 累加顺序**：原 `sum0 += (a²+b²)`（先求和再累加），ffmpeg 为 `sum0 += a²; sum0 += b²`（分两次累加）；`sbrEnvEstimate` 插值分支改用 `dsp.sum_square` 语义。
-  - **`hfApplyNoise` q_filt**：原固定用原始 `q_temp[i]`，平滑模式（h_SL≠0）应用平滑后 `q_filt`。
-  - **`hfApplyNoise` 噪声索引（决定性）**：原每个时隙都从 `ch_data.f_indexnoise`（帧起始值）开始，且函数末尾回写污染状态；ffmpeg 用组装循环里**每时隙 +m_max 推进的运行 indexnoise**。改为参数传入 + 局部副本 → **Y（HF 组装输出）与参考构建逐位一致**。
-  - **`getVlc` 码长上限**：`while (len <= 13)` 应为 20（SBR Huffman 表最长 20 位），长码字帧（包络切换）此前抛 Corrupt 被整帧丢弃 → 输出提前/变短。
-  - **m4a 声道切换**：HE-AAC v2 PS 首帧解析后声道 1→2，`readImpl` 帧字节宽/容量须随其后更新，否则输出 framing 错位。
-  - 结果：`ps_st_v2.m4a`/`n44_st.aac` **100% bit-exact**；`he_st.aac`/`he_st_v2.m4a`/`ps_File2.mp4` **内容帧 bit-exact**（整体 corr 0.9996~0.9974，差异仅为探测/flush 对齐 + 系统 ffmpeg SIMD 舍入的 ±1 LSB）。
-- **元素补全（2026-09-01）**：
-  - **PCE（program_config_element，元素 5）**：chan_config=0 时布局由 PCE 定义。实现 PCE 解析 + 动态布局构建（front/side/back/lfe/cc 声道映射到 AV_CH 输出序）+ ADTS/m4a 首帧预热以确定声道数（含 chan_config=0 无 PCE 时按帧内元素推导默认布局的回退）。验证：`ffmpeg -aac_pce` 生成的 ADTS 与 m4a 均 **bit-exact**（corr 1.0/0.99999999）。
-  - **CCE（coupling channel element，元素 2）**：实现耦合点（BEFORE_TNS / BETWEEN / AFTER_IMDCT）解析、目标元素表、增益（GET_GAIN=cce_scale^−gain）、依赖耦合（谱域相加）与独立耦合（时域相加）在 spectral_to_sample 三点的应用。CCE 流极罕见、无测试样本，按 ffmpeg 逐位移植（构造正确性）。
-- **预测：AAC Main（AOT 1）+ LTP（AOT 4）（2026-09-02）**：
-  - **Main 预测器（AOT 1）**：`decodePrediction`（predictor_reset_group + prediction_used）+ `applyPrediction`（672 预测器，`flt16_round/even/trunc` 截断、二阶自适应系数、`a=0.953125/α=0.90625`、分组复位每 30 个），在耦合后、TNS 前应用（对齐 ffmpeg decode_ics/decode_cpe 的 predictor_initialized/复位语义）。**验证**：`hulu_main.flv`（真为 **AOT 1 Main**，此前误判为 LTP）48k 立体声——修复前整体 corr≈0.007 + 每 ~7 帧丢 1 帧，修复后**全部 613 帧内容与参考 ffmpeg 逐字节一致**（仅 ffmpeg ADTS demux 端丢弃的 1 帧异常前导（74B）mine 解码为静音 → 输出多 1 帧纯前导零；LC 对照 `t48_m.aac` 则完全零偏移 byte-exact）。
-  - **根因**：`fmt/adts.zig` 建解码器时 **object_type 硬编码 2（LC）**（历史遗留，AOT 1/4 门禁早已放宽），Main/LTP 流被当 LC 解 → 含 predictor 的帧被 LC 分支以 `Prediction not allowed` 拒为 Corrupt 丢弃、其余帧无预测纯 LC 输出（故内容虽对齐仍零相关）。
-   - **LTP（AOT 4）**：`decodeLtp` 补 `ltp.present` 位（decode_ics_info 内 ltp.present=1 才跟 lag/coef/used）+ CPE common_window 下 ch1 独立 `ltp.present`（在 ms_present 之前读）；`apply_ltp`（predTime=ltp_state[+2048−lag]·coef → 448/128 拼接加窗（LONG_STOP/START）→ **1024 点前向 MDCT**（`mdct.zig` 新增 `initLtp/transformFwd`，复刻 `ff_tx_mdct_fwd` scatter 折叠 + split-radix FFT + post-twiddle，scale −65536，黄金向量 **bit-exact 1024/1024**）→ TNS 编码向 → used sfb 加回 coeffs）+ `update_ltp`（IMDCT 后 buf_mdct 过渡段存 saved_ltp（复用 coeffs）+ ltp_state 平移；buf_mdct 共享故逐声道紧随各自 IMDCT）。`ch.output` 扩到 2048 对齐 ffmpeg `sce->output`。**LTP 已逐行对照 ffmpeg 审计通过**（加窗/apply/update/共享 buf 时序无误）；真实 AOT-4 流公网/FATE/编码器均不存在（LTP 从未有商用编码器，属死 profile），仅能以"前向 MDCT 黄金向量 bit-exact + 忠实移植"验收，无法端到端比特级验证。
-- **符合性流回归（2026-09-02）**：用 FATE ISO 流（`fate-suite.ffmpeg.org/aac/al*/am00_88`）逐一验收，修复三处真实 bug 后 mono/stereo/3ch/Main 全部 **byte-exact**：
-  - **pulse 除数为 4 次根**：mine 误用 `cbrt`(3 次根)，ffmpeg 浮点路径为 `co/sqrtf(sqrtf(|co|))`（`al04_44` mono LC 帧2起 ±1..±500 谱纹波 → 现 byte-exact）。
-  - **PCE front 声道序**：chan_config0+PCE 的 3/0（front=[SCE,CPE]）ffmpeg 把前中心夹在 L/R 之间；mine 顺序铺到 FL 槽。front 分配改为"奇数声道且首元素 lone SCE → 前中心 FC(2)，其余成对 (FL,FR)"+ 其余排列回退元素序，输出前按 AV 位置**密集重编号**（`al06_44` 3ch → byte-exact）。
-  - **PCE 的 cc（coupling）元素误当输出声道 → pcePos(4)=null 直接 Corrupt**：cc 非输出，剔除后 `al07_96/al15_44` 由"整段 Corrupt 丢弃"改为可解码；随后**完整移植 ffmpeg `assign_channels`/`count_paired_channels`/sniff 稳定排序**（front/side/back/lfe 按 `ff_aac_channel_map` layer0 行分配 AV 位、按位值排序成 native 序）替换原先的启发式 → **声道序与 ffmpeg native（chprobe 验证 [FL FR FC LFE …]）一致**。
-  - **±1 专项（f32 harness）**：建 f32 级对比（mine 在 s16 打包前 dump 原始 float，对参考构建 f32 输出）定位残余。**确证**：cbrt_tab（用 ffmpeg 奇数根分解算法逐位复刻）、pow2sf_tab（读参考运行时表）均 **0 差异**；差异自 `al07_96` 帧 189 起、集中在两个 CPE 声道，**仅单样本差异且邻样本 float 逐位一致**（如 BR 帧189 采样658：mine≈-3.4e-6 vs ref≈-2.6e-5，×32768 各舍入到 0/-1），即非宽带误差、非表错误，指向 CPE 声道某罕见单样本级 dequant/高频 bin 舍入路径；FC/LFE 及全部 44.1/48k mono/stereo/3ch/Main 仍 byte-exact。根因定位需参考解码器内部 coeffs（超出黑盒），已如实归档（corr≈1.0，听觉无损）。
-- **M4A 标签（2026-08-31，已实现）**：`fmt/m4a.zig` `parseMetadata()` 解析
-  moov → udta → meta（fullbox，跳过 4 字节 version/flags，**遍历子 box 找 ilst**，
-  注意 ilst 前有 hdlr）→ ilst 原子 → data box（version/flags+locale+value）。
-  标准映射 `©nam/©ART/©alb/©day/©gen/©cmt/aART/©wrt` → 6 字段（首字段优先），
-  其余原子（含 `©wrt` composer、`©too` encoder 等）全量入 `tags`；仅接受
-  data_type==1（UTF-8）文本，binary（trkn/covr 等）跳过。生命周期随 `M4aCtx`
-  destroyCtx 释放。验证：ffmpeg 生成带标签 ALAC M4A，6 标准字段 + 8 条 tags
-  全部提取正确。**缺口**：`covr` 封面图未解析。
-
-### 9.6 变速变调 —— **自研 Zig WSOLA**（目标）；`tempo-rs` 兜底
-
-> 决策（2026-08-15）：变速变调升级为自研目标（§3.7），消除内核中唯一的非 Zig 组件。
-
-- **自研 WSOLA（波形相似重叠叠加）**：`kernel/tempo.zig`——按"时间伸缩"帧级对齐 + 交叉淡化，
-  速度 [0.5~2.0]；变调经相位声码器（短窗 STFT + 相位传播）或 WSOLA+重采样组合；~800 行；
-- **验证**：与 `tempo-rs`（signalsmith-stretch）主观 A/B + 客观（对齐后互相关/频谱包络）对照；
-  质量对语音/乐音可接受（WSOLA 特性）；黄金文件时长伸缩后采样数断言；
-- 兜底：`tempo-rs` 静态库保留（`extern fn rs_tempo_*` + `RunStep cargo build`），
-  自研完成后移除；
-- `HAS_TEMPO` 条件编译语义保留（自研完成前关闭时 tempo bypass）。
-
-### 9.7 音频输出 —— **自研 Zig `device.zig`**（目标）；miniaudio 过渡兜底
-
-> 决策（2026-08-15）：输出层升级为自研目标（§3.7），设计见 §15。
-> 现状（2026-08-16 确认）：`include/miniaudio.h` 已 vendored（v0.11.25），`src/player.c:22-23`
-> 是**唯一** `MINIAUDIO_IMPLEMENTATION` 实例化点；C 壳保留后 player.c 维持现状，不新建 `c/miniaudio.c`。
-
-- `kernel/device.zig`：跨平台设备抽象（打开/播放/暂停/seek/音量/位置），每平台一个后端；
-- 过渡期 `src/player.c` 继续使用 miniaudio（实例化点保持在 player.c）；`device.zig` 完成后，
-  对应后端经 `kernel_bridge.h` 替换 player.c 内的 miniaudio 调用，接口层一致（§15.2）；
-- 跨平台边界说明见 §15（Linux ALSA/Pulse/PipeWire、Windows WASAPI、macOS CoreAudio）。
-
-### 9.8 ALAC（M4A 内无损） —— **自研 Zig**（已实现，2026-08-16）；`alac.c` 兜底
-
-> 决策（2026-08-15）：ALAC 与 FLAC/APE 同类（无损、可 bit-exact 校验、有参考实现），
-> 升级为自研目标（§3.7）。
-
-- 算法：帧内自适应线性预测（LPC 系数逐样本自适应更新）+ Rice 风格残差熵编码（自适应
-  history / 零块压缩 / escape 路径 / sign_modifier）+ 多声道 element 组合（SCE/CPE/LFE，
-  按 FFmpeg `ff_alac_channel_layout_offsets` 布局）+ 立体声去相关；~1800 行；
-- 容器：`fmt/m4a.zig` 一并自研（ISO-BMFF：ftyp/moov→trak→mdia→minf→stbl 的 stsd/stts/
-  stsc/stco/co64/stsz 表解析 + hdlr 'soun' 音频轨判定 + stsd 'alac' 36 字节 magic cookie
-  提取 + 三表合成线性 sample 表 + stts 展开帧偏移支撑整帧 seek），~700 行；
-- 输出契约（对齐 FFmpeg alac 解码器）：sample_size ≤ 16 → 16-bit 输出；20/24/32 →
-  32-bit 输出（左移 32-sample_size）；
-- **验证闭环**：Apple 参考 `alac.c`（Apache-2.0，作对照不引入运行时）与 FFmpeg alac.c
-  逐位复刻（lpc_prediction 指针递增语义、rice_decompress、decorrelate_stereo）；黄金文件
-  （mono/stereo/5.1 × 16bit + mono 24bit）经 `alac_dump` 与 ffmpeg s16le/s32le 输出
-  逐字节比对全 bit-exact（§17.2）；
-- 兜底：非 ALAC 音频轨（如 AAC）→ `error.UnsupportedFormat` 回退 FFmpeg 主后端；
-  `alac.c`（单文件 C，Apache-2.0）编译进内核，接口隔离无缝切换。
-
-### 9.9 WavPack（.wv） —— **已实现并通过 bit-exact 对照验收**
-
-> 决策（2026-08-15）：WavPack 支持无损模式，可 bit-exact 校验，升级为自研目标（§3.7）。
->
-> 状态（2026-08-17）：**已实现并通过 bit-exact 对照验收**（§17.2），`probe.formats.wv` 已开启接管。
-
-- 容器：`wvpk` 头 + metadata 遍历自研（DECTERMS/DECWEIGHTS/DECSAMPLES/ENTROPY/HYBRID/
-  INT32INFO/FLOATINFO/DATA/EXTRABITS/CHANINFO，`fmt/wv/lib.zig`）；
-- 解码：LSB-first 熵解码（零块压缩 + unary 区间 + median 自适应 + 混合模式逐位逼近）+
-  去相关 terms（t>8 二阶预测 / t≤8 环形缓冲 / t=-1/-2/-3 自预测交叉项）+ joint 反变换 +
-  s16 u32 模乘权重快速路径 + float 重建；混合模式/浮点/多声道包（INITIAL..FINAL 块流）；
-- 输出契约：s16 → 16-bit、s32 → 32-bit 顶对齐、float → 32-bit IEEE，交错小端，`Info.bits_per_sample`=16/32；
-- **验证闭环**：`wv_dump` 对照工具 + 4 黄金样本（s16 mono/stereo、s32 stereo、f32 stereo）经
-  ffmpeg 编码，与 `ffmpeg -f s16le/s32le/f32le` 输出**逐字节比对全 bit-exact**（§17.2）；
-- 范围：混合有损 `.wvc` 修正文件、DSD 调制为加分项不做承诺（DSD 在 open 判
-  `error.UnsupportedFormat` 回退 FFmpeg 主后端，§8.3）；
-- 兜底：vendored `libwavpack`（BSD-3-Clause，源码入库）`WavpackUnpackSamples`。
-
-### 9.10 APE（Monkey's Audio） —— **已实现并通过 bit-exact 对照验收**
-
-> 决策（2026-08-15）：APE 能力**自研实现**，不再依赖 Monkey's Audio 官方 SDK，
-> 彻底消除 §20 的许可证阻塞项，符合 P2"能自研就自研"。无损解码可 **bit-exact 校验**，
-> 验证闭环优于有损编解码。
->
-> 状态（2026-08-17）：**已实现并通过 bit-exact 对照验收**（§17.2），
-> `probe.formats.ape` 已开启接管；样本覆盖版本 3.80 / 3.88 / 3.89 / 3.91 / 3.92 /
-> 3.94 / 3.99（normal / extra-high 压缩级别，16-bit 立体声 + 24-bit 立体声）。
-
-**算法构成（自研实现，模块结构 `kernel/fmt/ape/`）**：
-
-| 模块 | 说明 | 参考对照 |
-|---|---|---|
-| `container.zig` | `MAC ` 魔数 + 描述符（v≥3980：descriptor/header/seektable/wavheader 布局；v<3980：紧凑头 + peak/seek + 内嵌 WAV 头在 seektable 之前）+ seektable 帧表 + bittable（<3810） | `libavformat/ape.c` |
-| `rangecoder.zig` | 无乘法区间编码（low/range/help/buffer + 归一化）+ counts_3970/3980 固定概率表 + Rice（k/ksum 自适应）+ 版本化熵解码：decode_array_0000（<3860，GetBitContext 位流）/ ape_decode_value_3860 / _3900 / _3990（pivot 自适应 base）；stereo 3900-3929 含「normalize + ptr-1 回退 + 区间重开」怪癖对齐 | `libavcodec/apedec.c` |
-| `predictor.zig` | 多预测器：filter_fast_3320（<3930 FAST）/ filter_3800（<3930 常规，d0..d4 派生 + A/B 系数自适应）/ predictor_update_3930（3930-3949）/ predictor_update_filter（≥3950 64-bit，interim_mode 双趟）；长滤波 long_filter_high_3800 / long_filter_ehigh_3830（HIGH/EXTRA_HIGH）；终级滤波 do_apply_filter（≥3930，版本 <3980 / ≥3980 两套自适应 + clip_int16 延迟历史） | `libavcodec/apedec.c` |
-| `bitreader.zig` | GetBitContext 等价（MSB-first + unaryStop），供 <3900 位流路径 | `get_bits.h` / `unary.h` |
-| `lib.zig` | 帧解码编排（bswap 帧缓冲 → 熵 → 滤波 → 预测 → 去相关 → 输出打包 + CRC）+ VTable + seek | `libavcodec/apedec.c` ape_decode_frame |
-
-**验证闭环（bit-exact，全样本全绿，§17.2）**：
-
-1. **黄金文件**：FFmpeg FATE 样本（`samples.ffmpeg.org/fate-suite/lossless-audio/`，
-   入库 `samples/ape/`）——版本 3.80/3.88/3.89b1/3.91b1/3.92b2/3.94b1（c2000/c4000）、
-   3.99（partial）、24-bit 3.99（NoLegacy-cut）；
-2. **对照参考**：`ape_dump`（直连 `fmt/ape/lib.zig`）输出与系统 FFmpeg 9.0.1
-   （与 `reference/FFmpeg` n9.0.1 同源）`-f s16le / -f s32le` 参考输出**逐字节比对全 bit-exact**；
-3. **CRC 校验**：帧末回算 AV_CRC_32_IEEE_LE（反射表，对齐 av_crc）比对帧头 CRC，
-   不匹配 → error.Corrupt（可定位损坏帧）；
-4. **截断容错**：帧数据不足（截断文件 / 越界 seek）→ 保留已成功块输出、跳过 CRC、
-   置 EOF（对齐 FFmpeg 对短包的「部分解码」行为）；
-5. 上线：`probe.formats.ape = true`（APE 接管）；实现无需兜底（无外部依赖）。
-
-**输出契约（对齐 FFmpeg，bit-exact 对照锚定）**：
-
-- bps 8 → u8（`(decoded + 0x80) & 0xff`）；bps 16 → s16；bps 24 → s32（`decoded * 256U` 顶对齐）；
-- 交错小端 PCM，`Info.bits_per_sample` = 8 / 16 / 32。
-
-**范围与容错（§9.10 / §13.3）**：
-
-- 仅 mono / stereo（FFmpeg 同限）、bps ∈ {8,16,24}、版本 3800-3990；
-- 压缩级别须为 1000 的倍数且 ≤ 5000（< 3930 禁 insane）；
-- 帧/位流越界、除零、CRC 不匹配 → error.Corrupt（不崩溃）；区间归一化数据耗尽置
-  error 标志零填充推进（对齐 FFmpeg `ptr >= data_end`）；
-- 预测器更新规则逐位复刻（u32/u64 回绕 + 算术右移 + 符号自适应全对齐），
-  interim_mode 双趟（24-bit ≥3950）含帧间状态保持。
-
-**风险控制（实现完成后的剩余项）**：
-
-- 冷门版本（3.80 以前）不支持 → 明确 `UnsupportedFormat` 回退 FFmpeg 主后端；
-- 无 FAST/INSANE 压缩级别样本（FATE 无 c1000/c5000 样本）——两条预测器路径
-  （filter_fast_3320 / insane 终级滤波 order 1280）已按 FFmpeg 语义实现但未经
-  bit-exact 样本锚定，后续如有对应样本再补充验收；
-- 若自研质量不可控（极端情况），回退方案仍为 §3.3 的 vendored 路径——但**许可审查仍按 §20 独立完成**，
-  自研成功后该回退不再需要。
-
-### 9.11 DSD（.dsf / .dff / .dsd） —— 自研
-
-- 容器：DSF（`DSD ` 头 + chunk 表）/ DFF（`FRM8`）自研（~150 行）；
-- DSD→PCM：1-bit 流 → 抽取 + 低通（CIC/多级 IIR，~200 行）——**纯信号处理，自研可行**；
-- 目标输出 44.1kHz 倍率 PCM（按声道数×倍率，常见 DSD64/128/256）；
-- 无损收藏播放的"软 DSD"路径：不追求 bit-exact DoP，转 PCM 播放入耳可接受。
-
-### 9.12 Vorbis（OGG 内） —— vendored `stb_vorbis`（裁决：ROI 低，不自研）
-
-- 复用 `fmt/ogg.zig`；解码走 `stb_vorbis`（public domain，单文件）；
-- **裁决结论（§3.7）**：Vorbis 为有损编解码、无 bit-exact 参考闭环，自研需 MDCT + 码本
-  （矢量量化）+ Floor0/1 + 残差 + 声道耦合全链 ≈4000 行，且已是 Opus 替代的黄昏格式 →
-  **不自研**，vendored PD 单文件（零许可风险、零维护成本）；
-- 若未来 Vorbis 使用率显著回升，再按 §3.3 规则重新评估。
-- **标签（2026-08-31，已实现）**：`fmt/vorbis/lib.zig` open 后调
-  `stb_vorbis_get_comment` 取 comment_list（`"KEY=value"` C 字符串数组），映射
-  TITLE/ARTIST/ALBUM/DATE/GENRE/COMMENT/DESCRIPTION → 6 标准字段（首字段优先，
-  大小写不敏感），全部条目（含 encoder/REPLAYGAIN_* 等非标准键）入 `tags`；
-  生命周期随 `VorbisCtx` deinit 释放（本地 `freeMeta`）。验证：ffmpeg 带标签
-  样本 6 字段 + 7 条 tags 全部提取。**缺口**：replaygain 数值映射（键保留在
-  tags）、PICTURE 图（Vorbis 无标准图片注释）。
-
-### 9.13 AMR（.amr / 3GP 音频） —— 自研容器 + vendored OpenCORE AMR（Apache-2.0，Phase F）
-
-- `#!AMR` 头 + 帧重同步自研（~100 行）；解码走 OpenCORE AMR-NB（Apache-2.0）；
-- 低频格式，仅 Phase F 按需开启。
-- **Seek（2026-08-31，已实现）**：`fmt/amr.zig` `seekMsImpl` 帧头顺序跳过
-  （读 1 字节 ftype → 按 `frame_sizes[ftype]` seek 载荷，不解码），并按帧数回填
-  `samples_done`（160/帧 @8k）；OpenCORE 解码器 `Decoder_Interface_exit/init` 重置。
-  验证：51.5s 样本 5 位置（0/1/10/25/45s）`position_ms` 精确到目标，输出 vs
-  `ffmpeg -ss` corr 0.9991（±1 LSB，AMR 有损 + 重置状态）。
-- **AMR-WB 误判修正（2026-08-31）**：`probe.zig` 原 `#!AMR` 前缀匹配会把
-  `#!AMR-WB\n` 误判为 `.amr`，open 全等校验报 `Corrupt` 而非回退。已改：probe
-  `#!AMR\n` 全等或排除 `#!AMR-WB` → 非 AMR-NB 返回 UnsupportedFormat 交 FFmpeg。
-- **C 源码 UB 修复（2026-08-31）**：vendored OpenCORE 有符号负左移
-  （`lsp_az.c:198/209/215/219`，如 `-x << 10`）在 zig Debug 下触发 UB 检测 panic
-  （ReleaseFast 亦属未定义行为）。处理：`lsp_az.c` 三处改等价乘法（`-x*1024`、
-  `t0*4`、`*lsp*1024`），并在 `build.zig` 对 vendored C（stb_vorbis + OpenCORE）
-  编译 flags 统一加 `-fno-sanitize=undefined`。验证：51.5s 样本完整解码
-  （2493 帧/398880 样本）不再 panic。
-
-### 9.14 AC-3 / E-AC-3 / TrueHD（Dolby 家族） —— **自研完成**（2026-08-31 接管）
-
-> 决策（2026-08-30~31）：Dolby 数字音频家族（AC-3/E-AC-3/TrueHD-MLP）**完全自研**，
-> 对照 FFmpeg `ac3dec_float`/`mlpdec` 逐位/相关验收。Atmos JOC 因 Dolby 专有格式
-> 法律风险（无公开文档、专利风险、FFmpeg 亦跳过）**放弃逆向**，保持 ffmpeg 一致的
-> 7.1 输出。
-
-- **AC-3 / E-AC-3（`fmt/ac3/`）**：
-  - `header.zig` —— 帧头/bsi（acmod、lfe、bsid、E-AC-3 strmtyp/frmsiz 优先级
-    `(x+1)<<1`、dependent substream 解析）、`mantissa.zig`（bap 分档反量化 + AHT
-    + 耦合 calcTransformCoeffsCpl + removeDithering）、`downmix.zig`（重矩阵 + 下混）、
-    `md5.zig`（libavutil AVLFG 复刻：64 状态加性 LFG + MD5 填充）、`kbdwin.zig`。
-  - **关键修复记录**：mdct_exp_256 表重新生成（含 1/8388608 缩放 bug）；
-    dynamic_range_tab 初始化（`2^v × ((i&0x1F)|0x20)`，原漏 mantissa 且错除 4）；
-    DithLcg → AVLFG（64 状态，对齐 libavutil）；EAC3 frame_size 优先级；
-    open() 预读回退、EOF 死循环、输出转换去 ×8388608、window_256 f64→f32。
-  - **mono E-AC-3 静音修复（2026-08-31）**：根因 `decodeAudioBlock` 中 E-AC-3
-    的 `cpl_strategy_exists==0`（mono 无耦合）时错误 `return 1` → 全块静音。
-    对照 FFmpeg `decode_audio_block`（`else if (!s->eac3)` 分支只对 AC-3 生效），
-    改为 E-AC-3 无策略时不做任何操作。修复后 mono E-AC-3 corr **1.0**。
-  - **Seek（2026-08-31）**：帧级跳过（`decodeFrame` 逐帧重解，目标帧 = ms×rate/1536）。
-    关键修复：跳过帧的 out 须丢弃（off-by-one，否则位置错 1 帧）。验证：stereo
-    AC-3/E-AC-3 内部一致性 100%（seek1000 == 从头 31 帧后）、vs `ffmpeg -ss`
-    corr 1.0；mono E-AC-3 3 位置 corr 1.0。
-- **MLP / TrueHD（`fmt/mlp/`）**：MLP(0xbb)/TrueHD(0xba) 无损全链路；每帧实际输出
-  样本 = `blockpos`（40，≠ access_unit_size_pow2 64）；Atmos 标志（第 4 子流）检测
-  但不解码。**验证**：fate TrueHD Atmos 样本 `atmos.thd` **bit-exact 40960/40960**。
-  **Seek（2026-08-31）**：positionMs 累计实际输出样本 + seek 回开头重解跳过 +
-  positionMs 校准 + **seek 后清 out_len=0**（根因：跳过最后一帧 out_len 残留导致
-  readImpl 重复复制错位 1 帧）；seek 内部一致性 100%（seek50ms == 从头到 50ms）。
-- 接线：`probe.zig` `.ac3`（`\x0b\x77`）/ `.truehd`（`\xf8\x72\x6f\xba`）已接入。
-
----
+| WAV / AIFF / W64 / RF64 | `fmt/wav/` | PCM / float / G.711 / ADPCM / GSM / MACE |
+| OGG / Opus / Vorbis | `fmt/ogg.zig`、`fmt/opus/`、`fmt/vorbis/` | 解复用 + 解码（Vorbis 为 vendored） |
+| FLAC / Ogg-FLAC | `fmt/flac/`、`fmt/oggflac.zig` | 帧解码 + 标签 + seek |
+| MP3 | `fmt/mp3/` | Layer I/II/III + 标签 |
+| AAC / M4A / ADTS / LATM | `fmt/aac/`、`fmt/m4a.zig`、`fmt/adts.zig`、`fmt/latm.zig` | LC / SBR / PS，容器含 ALAC |
+| ALAC / WavPack / APE | `fmt/alac/`、`fmt/wv/`、`fmt/ape/` | 无损 |
+| DSD / DST | `fmt/dsd.zig`、`fmt/dst/` | DSF/DFF → PCM |
+| AMR / AMR-WB | `fmt/amr.zig`、`fmt/amrwb/` | NB（vendored）/ WB |
+| AC-3 / E-AC-3 / MLP / TrueHD | `fmt/ac3/`、`fmt/mlp/` | 多声道 + 下混 |
+| DTS / TTA / TAK / Shorten / Musepack / Speex | `fmt/dts/`、`fmt/tta/`、`fmt/tak/`、`fmt/shn/`、`fmt/mpc/`、`fmt/spx/` | 按格式接管 |
+| WMA（ASF） | `fmt/wma/` | WMA v1/v2 / Pro / Lossless / Voice |
 
 ## 10. 采样转换：格式转换 / 下混 / 重采样
 
@@ -1747,17 +1149,17 @@ Info.duration_us + Info.duration_known ∈ { exact, estimate, unknown }
 
 ### 12.3 各格式 seek 实现（已实现）
 
-- **MP3（§9.4）**：按总帧数（Xing 精确 / 首帧估算）比例估算字节偏移，再帧同步扫描定位最近帧边界；
+- **MP3（§9）**：按总帧数（Xing 精确 / 首帧估算）比例估算字节偏移，再帧同步扫描定位最近帧边界；
   XING/Info 头 → 直接利用其帧数，免全扫，时长精确；bit reservoir 依赖帧自动跳过到最近可独立解码帧
   （minimp3 同款语义）；批量模式（不 seek）无额外开销。
-- **Opus（§9.2，2026-08-31）**：`Demux.seekToGranule` 逐页扫 granule（含 pre-skip）→ 字节定位目标页 →
+- **Opus（§9，2026-08-31）**：`Demux.seekToGranule` 逐页扫 granule（含 pre-skip）→ 字节定位目标页 →
   清重组状态 → 解码丢弃到目标样本；**pre-skip 只在从头解码时消耗**（seek 不重置）。验证 5 位置
   corr 1.0。
-- **AC-3 / E-AC-3（§9.14，2026-08-31）**：目标帧 = ms×rate/1536 → 从头逐帧 `decodeFrame` 跳过；
+- **AC-3 / E-AC-3（§9，2026-08-31）**：目标帧 = ms×rate/1536 → 从头逐帧 `decodeFrame` 跳过；
   跳过帧 out 丢弃（off-by-one 修复）。内部一致性 100%。
-- **AMR（§9.13，2026-08-31）**：帧头顺序跳过（读 ftype → seek 载荷，不解码）+ OpenCORE 解码器
+- **AMR（§9，2026-08-31）**：帧头顺序跳过（读 ftype → seek 载荷，不解码）+ OpenCORE 解码器
   `exit/init` 重置。position 精确到目标。
-- **TrueHD / MLP（§9.14，2026-08-31）**：回开头重解跳过 + positionMs 校准 + seek 后清 out_len=0；
+- **TrueHD / MLP（§9，2026-08-31）**：回开头重解跳过 + positionMs 校准 + seek 后清 out_len=0；
   内部一致性 100%（seek50ms == 从头到 50ms）。
 
 ### 12.4 seek 语义约束
@@ -1799,8 +1201,8 @@ pub const Error = error{
 - Debug/Safe 模式下数组越界/整数溢出由编译器检查（处理不可信媒体输入的核心收益）；
 - 解析器所有长度字段校验 `<= 输入大小`，循环有界（页数/帧数上限），防 zip-bomb/畸形文件 DoS；
 - 变长条目 clamp 语义：`smpl`/`cue ` 的条目计数 clamp 到 chunk 实际承载（`min(count, size/24)`），
-  文件截断时保留已解析条目、不越界读（§9.1）；RIFX 大端按容器字节序读取。
-- FLAC（§9.3）：ID3v2 前置标签按 synchsafe 28 位计算 size 后**有界跳过**（超窗时 probe seek
+  文件截断时保留已解析条目、不越界读（§9）；RIFX 大端按容器字节序读取。
+- FLAC（§9）：ID3v2 前置标签按 synchsafe 28 位计算 size 后**有界跳过**（超窗时 probe seek
   判定后再跳，位置不消耗）；未知元数据块类型（7..126 保留 + 127 INVALID）一律跳过不拒播
   （FFmpeg flacdec default 分支同款容错）；坏帧触发**重同步**（跳过损坏帧、复用同步码扫描
   定位下一合法帧，连续放弃计数，对齐现状容错不中断整体）；REPLAYGAIN 畸形值（非数值 /
@@ -1856,7 +1258,7 @@ pub const Error = error{
 ## 15. 播放器输出层（跨平台难点）
 
 现状 `player.c` 用 miniaudio 播放引擎落盘的 float32 WAV（全解码、即时 seek）。Zig 方案
-（**自研目标**，§3.7 / §9.7）：
+（**自研目标**，§3.7 / §9）：
 
 ### 15.1 目标：`kernel/device.zig` 自研设备抽象
 
@@ -1945,9 +1347,9 @@ void        zk_dsp_destroy(ZkDspChain *d);
   `adpcm_ima_dk4`/`adpcm_ima_dk3`/`adpcm_ima_xbox`、`adpcm_sanyo`、`xan_dpcm`、
   `adpcm_zork`、`adpcm_swf`、`adpcm_g722`、`adpcm_g726`、`pcm_f16le`/`pcm_f16be`）；
   `decoder.Info` 另含 WAV `smpl`/`cue `
-  采样循环点 `loops` / `cue_points`（§9.1）与 FLAC VORBIS_COMMENT 标签 `metadata` /
+  采样循环点 `loops` / `cue_points`（§9）与 FLAC VORBIS_COMMENT 标签 `metadata` /
   全量标签条目 `metadata.tags` / REPLAYGAIN 增益 `replay_gain` / CUESHEET 提示点
-  `cue_points` / PICTURE 封面图 `pictures`（§9.3），当前为内核侧只读，
+  `cue_points` / PICTURE 封面图 `pictures`（§9），当前为内核侧只读，
   C ABI 需要时再扩展 `ZkInfo` 导出（不破坏既有字段布局）；
 - 线程模型（修订 2026-09-09，取代"内核本身不持线程，仅被 C 壳调用"）：**Zig 内核自持调度
   线程**——Master 事件线程 + Pool worker 由 `kernel_init` 创建、`kernel_shutdown` join（不变量
@@ -2070,7 +1472,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   | wadpcm_ct | Creative CT（tag 0x200，连续流，step=511 初始化） | s16le | ✓ |
   | wadpcm_ms/ima 4ch/8ch | WAVEFORMATEXTENSIBLE 多声道（MS ≤6ch 可对照 ffmpeg，其余自验） | s16le | ✓ |
   | waiff | AIFF 大端 s16 立体声 | s16be | ✓ |
-  | ww64 | Sony Wave64（probe 判定 bug 已修，§9.1） | s16le | ✓ |
+  | ww64 | Sony Wave64（probe 判定 bug 已修，§9） | s16le | ✓ |
   | wav_meta | WAV LIST-INFO + AIFF NAME/AUTH/ANNO 标签（title/artist/album/date/genre/comment，含截断容错） | — | ✓ |
 
   本次扩展（ADPCM 编解码器 + 多声道 + 标签元数据）新增 5 组 bit-exact 对照（oki / ct / yamaha /
@@ -2150,7 +1552,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   wpLog2 定点表、median 收敛、getTail zigzag 区间、容器/熵/去相关/float 重建模块测试）。
 
   上线：`probe.formats.wv = true`（WavPack 接管）；DSD 调制在 `fmt/wv` open 判
-  `error.UnsupportedFormat` 回退 FFmpeg 主后端（§9.9）。
+  `error.UnsupportedFormat` 回退 FFmpeg 主后端（§9）。
 
 - **APE 对照验收（2026-08-17，已完成）**：`kernel/ape_dump.zig` 直连 `fmt/ape/lib.zig`
   导出 PCM（16bit 样本 → s16；24bit 样本 → s32 顶对齐），与
@@ -2178,7 +1580,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   容器 3800 老格式 / 3990 描述符 / peak level 偏移解析）。
 
   上线：`probe.formats.ape = true`（APE 接管）；纯自研无兜底（无外部依赖，AGPL）。
-  版本 3800 以前 / FAST(1000) / INSANE(5000) 压缩级别样本缺失 → 后补验收（§9.10 风险控制）。
+  版本 3800 以前 / FAST(1000) / INSANE(5000) 压缩级别样本缺失 → 后补验收（§9 风险控制）。
 - **MP3 对照验收（2026-08-22，已完成）**：解码 PCM（float 中间态 → int16）与 **minimp3（CC0）**
   参考输出逐位比对（minimp3 标量路径 `MINIMP3_FLOAT_OUTPUT` + `MINIMP3_NO_SIMD` 编为参考解码器，
   导出 float PCM 后转 int16 对照，worst = 0），覆盖 Layer I/II/III 全链：
@@ -2220,7 +1622,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
     **M4A 内 AAC 轨**（mp4a+esds → ASC → 逐 sample 喂包）已接线，同一 `t48_m`
     源 M4A 输出与本地参考 100% 逐位一致（§17.2）；HE-AAC/SBR、chan_config>2 回退 FFmpeg。
 
-- **Dolby 家族验收（2026-08-31，§9.14）**：
+- **Dolby 家族验收（2026-08-31，§9）**：
   - E-AC-3 参考为 **float(f32) 解码器**（s16 = round(f32×32768)）；样本：`test.eac3`
     （44100 sine）corr **1.0**（45% ±1）、`eac3_48k`（48000）corr **1.0**（44.4% ±1）、
     `csi_miami_stereo_128_spx_small`（fate SPX）corr 0.9998（4.7% ±1-4）；
@@ -2233,7 +1635,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
     corr 0.9991；
   - **标签验证**：M4A ilst（6 标准字段 + 8 tags）、Vorbis comment（6 字段 + 7 tags）
     均正确提取。
-- **AMR-WB 误判（2026-08-31，§9.13）**：`#!AMR-WB\n` 现 probe 不再认领（`#!AMR\n`
+- **AMR-WB 误判（2026-08-31，§9）**：`#!AMR-WB\n` 现 probe 不再认领（`#!AMR\n`
   全等匹配）→ UnsupportedFormat 交 FFmpeg。
 
 ### 17.3 性能基线
@@ -2272,9 +1674,9 @@ void        zk_dsp_destroy(ZkDspChain *d);
 | 阶段 | 内容 | 出口标准 |
 |---|---|---|
 | **Phase A** Zig 工程骨架 + 内核核心 + C 壳桥接 | `build.zig`（Zig 0.16，C 壳 + Zig 内核混合）落地；`kernel/io.zig` `probe.zig` `decoder.zig` `pcm/*`；`fmt/wav.zig`（自研）；DSP 移植为 Zig（`zk_dsp_*`）；`include/kernel_bridge.h` + `kernel/kernel.zig` 桥接，`pipeline.c` 解码经统一后端接口（FFmpeg 默认主 + Zig 接管分支） | 本地 wav 播放 + FFT + DSP 回归；`engine_bindings.dart` 零改动跑通；三平台 target 构建通过（默认含 FFmpeg） |
-| **Phase B** FLAC / MP3 / OGG-Opus | `fmt/flac.zig`（自研，dr_flac 兜底）、`fmt/mp3/`（**自研完成**，§9.4）、`fmt/ogg.zig` + `fmt/opus.zig`（vendored libopus）；`encode/*`（libopus + 自研 OGG mux）；逐格式对照验收后开 `-Dzig-<fmt>=true` 接管 | 本地 flac/mp3/ogg/wav 播放 + seek + FFT；在线 mp3/flac 播放；CLI 批量 OGG/Opus 输出；接管格式与 FFmpeg 对照全绿（§17.2）。**MP3 已达标**（Layer I/II/III + 标签 + Xing，PCM 逐位一致） |
-| **Phase C** AAC / M4A | `fmt/m4a.zig` `fmt/adts.zig`（自研容器）+ **`fmt/aac/` 自研 AAC-LC**（§9.5）；HE-AAC 回退 FFmpeg | 本地/在线 m4a/aac（LC）播放；未接管源（HE-AAC/长尾）由 FFmpeg 主引擎提供或明确错误 |
-| **Phase D** T1 无损收藏 | **WavPack**（`fmt/wv.zig` 自研，libwavpack 兜底）、**ALAC**（自研，alac.c 兜底）、**APE**（`fmt/ape.zig` 自研解码器，§9.10）、**DSD**（`fmt/dsd.zig` 自研 DSF/DFF→PCM）、**AIFF**（并入 wav.zig）、**Vorbis**（vendored stb_vorbis） | 本地 wv/alac/dsd/ape/aiff/vorbis 播放 + seek + FFT；APE/ALAC/WavPack 与 FFmpeg bit-exact 校验全绿后接管 |
+| **Phase B** FLAC / MP3 / OGG-Opus | `fmt/flac.zig`（自研，dr_flac 兜底）、`fmt/mp3/`（**自研完成**，§9）、`fmt/ogg.zig` + `fmt/opus.zig`（vendored libopus）；`encode/*`（libopus + 自研 OGG mux）；逐格式对照验收后开 `-Dzig-<fmt>=true` 接管 | 本地 flac/mp3/ogg/wav 播放 + seek + FFT；在线 mp3/flac 播放；CLI 批量 OGG/Opus 输出；接管格式与 FFmpeg 对照全绿（§17.2）。**MP3 已达标**（Layer I/II/III + 标签 + Xing，PCM 逐位一致） |
+| **Phase C** AAC / M4A | `fmt/m4a.zig` `fmt/adts.zig`（自研容器）+ **`fmt/aac/` 自研 AAC-LC**（§9）；HE-AAC 回退 FFmpeg | 本地/在线 m4a/aac（LC）播放；未接管源（HE-AAC/长尾）由 FFmpeg 主引擎提供或明确错误 |
+| **Phase D** T1 无损收藏 | **WavPack**（`fmt/wv.zig` 自研，libwavpack 兜底）、**ALAC**（自研，alac.c 兜底）、**APE**（`fmt/ape.zig` 自研解码器，§9）、**DSD**（`fmt/dsd.zig` 自研 DSF/DFF→PCM）、**AIFF**（并入 wav.zig）、**Vorbis**（vendored stb_vorbis） | 本地 wv/alac/dsd/ape/aiff/vorbis 播放 + seek + FFT；APE/ALAC/WavPack 与 FFmpeg bit-exact 校验全绿后接管 |
 | **Phase E** 输出层 + 变速自研 | **`kernel/device.zig`**：先 Linux（ALSA/Pulse 动态加载）→ Windows WASAPI → macOS CoreAudio（§15）；经桥接替换 `src/player.c` 内的 miniaudio 调用；**WSOLA 变速**（`kernel/tempo.zig` 自研，tempo-rs 对照） | 三平台真机出声 + 位置事件正确；tempo A/B 主观 + 客观对照通过；`include/miniaudio.h` 与 Rust 依赖删除（输出层 100% Zig/自研） |
 | **Phase F** 接管收尾（可选升主） | T0/T1 全部 Zig 验收后：各格式开关开启即完成接管，`-Dzig-main=true` 可选使 Zig 升为主（**默认仍 FFmpeg 主**）；`THIRD-PARTY-LICENSES.md` 按开关登记；设置页显示已编译解码器清单与 `backend` 归属；可选 AMR/WMA/MP2 按 §3.3 规则评估 | **默认构建**三平台 `ldd`/`dumpbin` 含 FFmpeg（现状回归通过）；`-Duse-ffmpeg=false` 纯 Zig 构建可裁剪、各格式开关独立可控；`zig build test` 全绿 |
 | **Phase G** 引擎模块化 + 高并发（可与 A–F 并行推进） | §8.4/§8.4.2：`decoder.open()` 硬编码 `switch` 收敛为显式 `Module` 描述符 + Registry（主控：分派 + 实例簿记 + 资源上限）；**优先子项按 §8.4.2 顺序**：① 元数据快路径 `metadata.open()`（批量 tag 先摆脱 FFmpeg）→ ② 接管门控 → ③ 并发/批量基准 → ④ 实例内存池；HTTP 直连经 `io.Reader.callback` 接入（§6.1 双路径）；批量 tag/扫描走宿主 worker 池；每路轻量实例；FFmpeg 依赖拆分延后 Phase F。**二次增强（§8.4.1，后置可选，核心不依赖）**：主控 Async × 模块线 Sync + 完成即领（短任务）/ 按流分配分时驱动（长流） | Registry 分派与现状 `switch` 行为一致（全量回归）；实例计数/上限生效；128 路并发（同/异格式混合）fd 与内存受控、无状态污染；批量 tag 走 Zig 元数据快路径且不再建 FFmpeg 实例（基准吞吐达标）；HTTP 直连流式播放 + Range seek 正确；批量 tag 全量代替 FFmpeg 元数据路径；二次增强落地后加验"完成即领"下无线程空转/队列积压 |
@@ -2287,11 +1689,11 @@ void        zk_dsp_destroy(ZkDspChain *d);
 | 风险/决策 | 说明 | 对策 |
 |---|---|---|
 | **FLAC 自研复杂度** | 无损解码（LPC/Rice/校验）~2500 行 | 目标自研；dr_flac（MIT-0/PD，单文件）兜底，`fmt/flac.zig` 接口隔离无缝切换 |
-| **ALAC 自研复杂度** | 自适应预测 + Rice 熵编码 ~1800 行 | §9.8：Apple `alac.c`（Apache-2.0）对照 bit-exact 校验；兜底 alac.c |
-| **WavPack 自研复杂度** | 块内预测/去相关 + Rice ~2500 行 | §9.9：libwavpack（BSD）对照 bit-exact 校验；兜底 libwavpack |
-| **MP3 seek/时长精度** | 无帧级 seek 表；VBR 无 XING 头 | **已实现**（§9.4/§12.3）：Xing/Info 头 → 时长 exact + 精确 seek；无头 → 按首帧估算 + 帧同步扫描；`duration_known` 分级 |
-| **AAC 集成** | AAC-LC 自研复杂度（ICS/TNS/PNS/MDCT 全链） | §9.5：**已完成**——参考 FFmpeg `aacdec.c` + 本地无优化参考构建逐位基准，本地参考 100% 一致、系统 ffmpeg 99.99%+（±1 LSB）；HE-AAC（SBR/PS）回退 FFmpeg 主后端 |
-| **APE 自研复杂度** | range coder + 多预测器（~1500 行），预测器更新规则须逐位复刻 | §9.10：**已完成**——bit-exact 黄金文件（FATE 样本 3.80-3.99，§17.2）+ FFmpeg `apedec.c` 对照 + 帧 CRC 三重校验全绿后接管（`probe.formats.ape=true`）；版本 <3.80 / FAST / INSANE 样本缺失待补验；极端失败才考虑 §3.3 vendored 回退（许可另行审查） |
+| **ALAC 自研复杂度** | 自适应预测 + Rice 熵编码 ~1800 行 | §9：Apple `alac.c`（Apache-2.0）对照 bit-exact 校验；兜底 alac.c |
+| **WavPack 自研复杂度** | 块内预测/去相关 + Rice ~2500 行 | §9：libwavpack（BSD）对照 bit-exact 校验；兜底 libwavpack |
+| **MP3 seek/时长精度** | 无帧级 seek 表；VBR 无 XING 头 | **已实现**（§9/§12.3）：Xing/Info 头 → 时长 exact + 精确 seek；无头 → 按首帧估算 + 帧同步扫描；`duration_known` 分级 |
+| **AAC 集成** | AAC-LC 自研复杂度（ICS/TNS/PNS/MDCT 全链） | §9：**已完成**——参考 FFmpeg `aacdec.c` + 本地无优化参考构建逐位基准，本地参考 100% 一致、系统 ffmpeg 99.99%+（±1 LSB）；HE-AAC（SBR/PS）回退 FFmpeg 主后端 |
+| **APE 自研复杂度** | range coder + 多预测器（~1500 行），预测器更新规则须逐位复刻 | §9：**已完成**——bit-exact 黄金文件（FATE 样本 3.80-3.99，§17.2）+ FFmpeg `apedec.c` 对照 + 帧 CRC 三重校验全绿后接管（`probe.formats.ape=true`）；版本 <3.80 / FAST / INSANE 样本缺失待补验；极端失败才考虑 §3.3 vendored 回退（许可另行审查） |
 | **WMA 生态** | 无干净 permissive 单文件解码器（FFmpeg 之外的生态稀缺） | 列 T2 低优先；Phase F 按需评估；不做承诺 |
 | **DSD 转 PCM 质量** | 抽取/低通滤波质量决定听感 | 自研 CIC/多级 IIR + 可对照参考（如 `dsd2pcm`）；耳听 + 频谱双重验证 |
 | **SRC 质量/性能** | 自研 FIR 需对标 swr | 多相 FIR + 独立基准；不达标 vendored libsamplerate（BSD） |
@@ -2301,7 +1703,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
 | **OGG 尾页扫描开销** | Opus 精确时长需读尾页 | 先 estimate 后回填；position 事件不受影响 |
 | **格式开关膨胀** | 每个开关带来源码 + 测试 + 许可登记 | 默认只开 T0；扩展格式独立开/关、独立审查；未开格式 probe 判 unsupported 不误报 |
 | **在线源格式漂移** | 平台新增编码 | 探测失败明确错误 + 音源降级（换 flac/mp3）；记录 `unsupported` 日志 |
-| **WSOLA 变速质量** | 变速变调自研质量需对标 signalsmith | §9.6：主观 A/B + 客观互相关/频谱包络对照；不达标保留 tempo-rs |
+| **WSOLA 变速质量** | 变速变调自研质量需对标 signalsmith | §9：主观 A/B + 客观互相关/频谱包络对照；不达标保留 tempo-rs |
 | **FFmpeg 双轨维护成本** | FFmpeg 默认主 + Zig 逐格式接管意味着两条解码路径并存 | FFmpeg 是现状稳定基线（不新增维护负担）；Zig 接管以 §17.2 对照为门槛、按格式收敛；事件带 `backend` 字段监控接管率/回退率；接管完成的格式可 `-Dzig-<fmt>=false` 回退；`-Duse-ffmpeg=false` 纯 Zig 构建随时可验证 |
 | **Web 兼容路径存废** | 桌面不编码 | Phase A 临时禁用；确认废弃则删 `encode/` |
 | **高并发资源失控** | 128+ 路同时 open，fd/内存/CPU 被打满 | §8.4 主控簿记 + `cap` 上限（fd/内存双护栏）报 `error.InstanceLimit`；宿主 worker 池并发限流；HTTP 直连每实例极轻（几十 KiB 级） |
@@ -2351,7 +1753,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
     **按格式接管**，未接管格式始终由 FFmpeg 提供；全部 T0/T1 验收后可选 `-Dzig-main=true` 升主，
     默认仍 FFmpeg。参考实现：`reference/FFmpeg`（2026-08-16 克隆，n9.0.1，§2.1）。
 14. **AAC 解码器自研（2026-08-23，用户决策"尽可能自主实现"）**：AAC 由 🔴 vendored OpenCORE
-    改为 ✅ 自研 Zig（`fmt/aac/`，AAC-LC，§9.5），与 MP3/Opus 同模式——参考 FFmpeg
+    改为 ✅ 自研 Zig（`fmt/aac/`，AAC-LC，§9），与 MP3/Opus 同模式——参考 FFmpeg
     `aacdec*.c` 浮点路径 + 本地无优化参考构建作逐位基准（§17.2）。范围：AOT 2 (LC) 无
     SBR/PS，SCE/CPE/DSE/FIL + MS/intensity/TNS/PNS/pulse 全支持，HE-AAC 回退 FFmpeg；
     验收：本地参考 s16 输出 **100% 逐位一致**（3 样本，ADTS 裸流 + M4A 容器双路径，

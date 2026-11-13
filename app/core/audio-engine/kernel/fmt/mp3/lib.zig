@@ -3,30 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! MPEG Audio（MP3：Layer I/II/III）解码封装 —— 自研 Zig
-//!
-//! 帧解码由 layer3.zig（含 Layer III 完整管线）与 layer12.zig（Layer I/II）
-//! 承担，本模块提供项目统一解码视图（VTable，见 decoder.zig §8）：
-//!   - open：跳过 ID3v2 前导 → 解析首个有效帧头 → 填充 Info；
-//!   - read：按帧读取 → 逐 granule 解码 → 输出 16-bit 交错小端 PCM
-//!     （MPEG 音频原生 16 位；浮点中间态由 layer3/layer12 内部转换）；
-//!   - seek_ms：按帧速率估算字节偏移 + 同步扫描定位最近帧边界，
-//!     重置解码状态后跳转（MP3 无 seek 表，对齐 minimp3 语义）。
-//!
-//! gapless（Xing/Info + LAME/Lavf/Lavc，语义对齐 ffmpeg libavformat/mp3dec.c）：
-//!   - 首帧含 Xing/Info（仅 Layer III）时整体跳过该帧（其为 VBR/CBR 元数据帧，
-//!     不含可听样本；ffmpeg demuxer 同样 seek 越过 vbr tag frame 后解码）；
-//!   - 若其后带 LAME/Lavf/Lavc 编码扩展（encoder 短名后固定 36B 布局，
-//!     24-bit = (encoder_delay<<12)|padding），则解码流头丢 encoder_delay+529
-//!     样本（验收基准 start_skip_samples），输出截至于 frames×spf−(padding−529)
-//!     （即总输出 = frames×spf − delay − padding），Info.duration_us 同式。
-//!   - 无 Xing / 无上述编码扩展的文件不裁剪（对齐 验收基准 实测），保证不误裁。
-//! 解码输出与 验收基准 mp3 解码按样本流对齐：长度一致、内容按 0 偏移相关
-//! （codec 层 验收基准 定点 vs minimp3 浮点有 ±1 LSB 舍入差，不作逐位断言）。
-//!
-//! 与 minimp3 参考逐样本对齐（CC0 移植），经 minimp3_test 全部 Layer I/II/III
-//! 向量与真实样本验证（PCM 精确一致）。
-
 const std = @import("std");
 const builtin = @import("builtin");
 const Error = @import("../../error.zig").Error;

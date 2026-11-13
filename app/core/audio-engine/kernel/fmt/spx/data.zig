@@ -7,10 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! Speex 解码码本/系数表（自 reference/FFmpeg/libavcodec/speexdata.h 逐值转录，
-//! 溯源 libspeex 1.2.x 同名表；f32 以 IEEE-754 位模式 @bitCast 给出，保证逐样本一致）。
-//! 原表许可：BSD（Xiph.org / J.-M. Valin 等，见 speexdata.h 顶部版权声明）。
-
 const std = @import("std");
 
 pub const high_lsp_cdbk = [512]i8{

@@ -9,17 +9,6 @@
 // Erik de Castro Lopo。本文件保留上游版权声明，按 BSD-3-Clause 分发；
 // 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! libopus kiss_fft + clt_mdct_backward 浮点移植（CELT 合成 逐样本一致，§9.2）
-//!
-//! 重构对照 libopus `celt/kiss_fft.c`（kf_factor / compute_bitrev_table /
-//! compute_twiddles / kf_bfly2/3/4/5 / opus_fft_impl）与 `celt/mdct.c`
-//! （clt_mdct_init / clt_mdct_backward_c）（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 浮点语义：全部按 libopus FLOAT 构建——S_MUL=普通乘、C_MUL=复数乘、
-//! C_ADD/C_SUB=普通复数加减、HALF_OF=x*0.5、SHL32_ovflw(x,0)=PSHR32_ovflw(x,0)=x
-//! （FLOAT 下 pre_shift=post_shift=fft_shift=0）。twiddle/trig 用 double cos/sin
-//! 后截断 f32；运算顺序逐条对齐以保证逐样本一致。
-
 const std = @import("std");
 const stables = @import("static_tables.zig");
 

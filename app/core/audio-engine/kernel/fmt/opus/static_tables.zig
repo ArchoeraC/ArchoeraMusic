@@ -9,8 +9,6 @@
 // Erik de Castro Lopo。本文件保留上游版权声明，按 BSD-3-Clause 分发；
 // 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! 自动生成：libopus 1.6.1 static_modes_float.h 静态 48k/960 模式表（权威参考）。
-//! 注意：与运行时 clt_mdct_init/kiss_fft_alloc 计算值差 ≤1 ULP，opus_demo 实际使用本静态表。
 pub const mdct_twiddles960 = [1800]f32{
     0.99999992, 0.99999322, 0.99997582, 0.99994771, 0.99990889, 0.99985936, 0.99979913, 0.99972818,
     0.99964653, 0.99955418, 0.99945112, 0.99933736, 0.99921289, 0.99907773, 0.99893186, 0.9987753,

@@ -7,39 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! ALAC（Apple Lossless）帧解码器 —— 自研 Zig
-//!
-//! 定位（docs/audio-kernel-zig.md §9.8）：M4A 容器内的无损编解码；
-//! 本模块为**纯帧函数**（每 m4a sample 一帧），容器解复用由 fmt/m4a.zig 承担。
-//! 参考重构对照 FFmpeg libavcodec/alac.c（LGPL-2.1+）与
-//! Apple 参考 alac.c（Apache-2.0，作对照不引入运行时）。
-//!
-//! 帧布局：
-//!   element 循环（每 element 3 位类型：0 SCE / 1 CPE / 3 LFE / 7 END）→
-//!   element 头（4 实例标签 + 12 保留 + has_size(1) + extra_bits(2)<<3 +
-//!   is_compressed(1) + output_samples(32, has_size 时)）→
-//!   压缩：decorr_shift(8) + decorr_left_weight(8) + 每声道
-//!   [prediction_type(4) + lpc_quant(4) + rice_history_mult(3) + lpc_order(5)
-//!   + lpc_coefs(16×order 有符号，逆序) + extra_bits 逐样本 + Rice 残差 +
-//!   LPC 预测] → 立体声去相关 → extra_bits 附加。
-//!
-//! 算法组件（§9.8 分解）：
-//!   - Rice 熵解码（自适应 history / 零块压缩 / sign_modifier 修正）；
-//!   - 自适应线性预测 LPC（预热样本 + 系数逐轮自适应更新）；
-//!   - 立体声去相关（左右声道按权重与移位互调）+ extra bits 附加；
-//!   - 多声道 element 组合（SCE/CPE/LFE）按声道布局表映射。
-//!
-//! 输出契约：
-//!   - sample_size ≤ 16 → 输出 16-bit（无移位，native 满幅）；
-//!   - sample_size 20/24/32 → 输出 32-bit（左移 32-sample_size 位，
-//!     补齐至 32 位整数域）；
-//!   - 本模块输出**逐声道 int32**（解码位深原生值），交错打包与左移由
-//!     fmt/m4a.zig 承担（与 flac 的 decode→emit 分工一致）。
-//!
-//! 健壮性（§13.3）：Config 各字段边界校验；帧内所有读取先验剩余位（越界 →
-//! Corrupt）；output_samples 上界 = max_samples_per_frame；bps 越界（>32/<1）
-//! 拒绝；element 声道数与布局越界拒绝；Rice 未完成 → Corrupt。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const BitReader = @import("bitreader.zig").BitReader;

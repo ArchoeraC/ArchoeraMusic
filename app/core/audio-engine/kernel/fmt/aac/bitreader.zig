@@ -3,21 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AAC 位流读取（MSB-first）+ Huffman（VLC）解码。
-//!
-//! 与 flac/alac 位读取的区别：
-//!   - AAC 频谱/scalefactor 用非规范序 Huffman 码表（ISO 14496-3 Table 4.6.x，
-//!     码字分配非按长度递增排列），不能走"canonical 首码差值"解码，
-//!     须按 (长度, 码字) 精确匹配——Vlc 把码表整理为按长度分组的有序列表；
-//!   - FFmpeg 的 VLC 语义：首传位 = 码值最高有效位（code 左对齐后取顶位建表，
-//!     参考 aacdec_tab.c ff_vlc_init_tables_sparse），故累积 `acc = (acc<<1)|bit`
-//!     与 len 位码值直接比较；
-//!   - sparse 表（频谱码本）解码返回打包 idx 符号（低 nibble 序 = 值索引，
-//!     高字节 = 非零计数/掩码），scalefactor 表返回 0..120 直接索引。
-//!
-//! 健壮性（§13.3）：所有读取校验剩余位数，越界 → error.Corrupt；
-//! VLC 无匹配（码流损坏/截断）→ error.Corrupt。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

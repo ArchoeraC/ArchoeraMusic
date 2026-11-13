@@ -7,16 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS core Huffman（VLC）解码（阶段二）
-//!
-//! FFmpeg dcahuff.c 的码表以 (符号, 码长) 给出，码字由 ff_vlc_init_from_lengths
-//! 按"表序累加"分配：code_0 = 0；对每条正长码：取当前 code，随后
-//! code += 1 << (32 - len)（MSB 左对齐）。此处 mk() 以同一规则派生码字，
-//! 再按 (bits, code) 排序分组解码 → 位级消费与 FFmpeg 的 get_vlc2 一致。
-//!
-//! 与 fmt/aac/bitreader.zig 的 Vlc 思路同源：逐位累积 acc，每长度分组内
-//! 二分精确匹配；匹配即返回（前缀码唯一）。
-
 const std = @import("std");
 const BitReader = @import("../aac/bitreader.zig").BitReader;
 const hft = @import("huff_tables.zig");

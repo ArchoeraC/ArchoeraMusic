@@ -7,23 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Voice（wmavoice，ASF codec_tag 0x000A）解码核心——逐函数移植 FFmpeg
-//! libavcodec/wmavoice.c（reference n9.0.1，LGPL v2.1+）。
-//!
-//! 帧结构（对齐 wmavoice.c）：
-//!   - 每个 codec packet（block_align 字节，其自身携带 4bit 序号 + 1bit
-//!     has_residual_lsps + 6bit×n superframe 计数 + spillover_bitsize bit
-//!     spillover 位数）后接 1..n 个 superframe；
-//!   - superframe：1bit 语音/音乐 +（可选 1bit+12bit 样本数）+（可选全局残差
-//!     LSP）+ 3×frame（每帧 160 样本）；frame 头 VLC（帧型 0..16）+ 基音 +
-//!     激励（ACB + 固定码本 / 硬编码 / 噪声），随后合成滤波；
-//!   - do_apf=1 时每半帧（80 样本）做 APF 后处理：零输入合成 → Kalman 平滑
-//!     → 重合成 → 迭代 Wiener 去噪（RDFT/DCT-I/DST-I，见 tx.zig）→ 自适应
-//!     增益 → DC 滤波。
-//!
-//! 位读全走 bitio.zig；变换走 tx.zig；DSP 助手（滤波/lsp/插值）走 dsp.zig。
-//! 输出 = 解码器内部 float（AV_SAMPLE_FMT_FLT），由接入层（lib.zig）转 s16。
-
 const std = @import("std");
 const bitio = @import("bitio.zig");
 const trace = @import("trace.zig");

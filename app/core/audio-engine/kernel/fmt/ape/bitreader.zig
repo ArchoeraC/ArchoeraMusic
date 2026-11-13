@@ -7,19 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! APE 位读取（GetBitContext 等价，MSB-first，内存缓冲）
-//!
-//! 供 fileversion < 3900 的熵解码路径使用（decode_array_0000 /
-//! ape_decode_value_3860 / init_entropy_decoder 的 32-bit CRC 读取）。
-//! 参考重构对照 FFmpeg get_bits.h 的读取语义（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 语义要点（与 FFmpeg GetBitContext 对齐）：
-//!   - 字节内 **MSB-first**：第一个读出的是字节的 bit7；
-//!   - `unaryStop(stop, len)`：计数直到读到等于 stop 的位，返回 stop 位之前的
-//!     连续非 stop 位数（最多 len）；若 len 内未找到 stop 位，消费 len 位并返回 len；
-//!   - 越界读返回 error.Corrupt（数据缓冲已由帧解码器按 buf_size 零填充，
-//!     合法帧不会越界；验收基准 的零填充缓存在此语义等价）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

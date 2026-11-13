@@ -7,10 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! PS（参数立体声）静态表 + 运行时生成表。
-//! 静态数据来自 aacpsdata.c / aacps.c / aacps_tablegen.h；生成逻辑复刻
-//! aacps_tablegen.h ps_tableinit（CONFIG_HARDCODED_TABLES=0 运行时生成路径）。
-
 const std = @import("std");
 const huff = @import("ps_huff.zig");
 const once = @import("../../once.zig");

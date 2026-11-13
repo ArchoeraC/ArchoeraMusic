@@ -7,16 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA 逆 MDCT（复刻 FFmpeg av_tx FLOAT_MDCT inv 路径）。
-//!
-//! wmadec.c 以 `av_tx_init(..., AV_TX_FLOAT_MDCT, 1, 1<<(frame_len_bits-i),
-//! scale=1/32768, AV_TX_FULL_IMDCT)` 建变换：`ff_tx_mdct_inv_full` 包
-//! `ff_tx_mdct_inv`，其子 FFT 为 split-radix L/2 点。mdct_inv(L) 吃 L 谱值出
-//! L 时域样，full 展开成 2L。本实现参数化 L ∈ {512,1024,2048}：每个长度的
-//! mdct_exp/map 表按本机系统 ffmpeg n9.0.1 av_tx 内部位模式嵌入（txdump4.c
-//! 探针），运算顺序与 tx_template.c 逐行一致。子 FFT 各层余弦复用
-//! aac/mdct_tables（同一 av_tx split-radix 余弦）。
-
 const std = @import("std");
 const wmt = @import("wma_mdct_tables.zig");
 const aac_mt = @import("../aac/mdct_tables.zig");

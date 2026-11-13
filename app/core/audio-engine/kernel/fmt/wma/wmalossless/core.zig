@@ -7,32 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WMA Lossless (wmalossless, ASF codec_tag 0x163) 整数解码核心。
-//!
-//! 逐函数移植 FFmpeg libavcodec/wmalosslessdec.c（整数 / 无浮点）。结构：
-//!   packet（=ASF 音频对象，通常 block_align 字节；末个可更短）→ 帧重组
-//!   （跨包位蓄存器 save_bits / frame_data）→ frame → 子帧 → 熵解
-//!   （Rice/指数-Golomb zigzag）→ 级联自回归 LMS（cdlms：use_high/use_normal
-//!   两档更新 + lms 更新衰减）→ 多声道 LMS（mclms）/ 声道对去相关
-//!   （revert_inter_ch_decorr）/ AC 滤波（revert_acfilter）→ 样本。本编解码为
-//!   无损整数路径（无浮点舍入）；本模块与 ffmpeg native wmalossless 输出逐位
-//!   一致（s16 / 24bit<<8 s32 均经实测 逐样本一致）。
-//!
-//! 位流/数组语义（全部对齐 C，经 4 样本逐字节比对）：
-//!   - MSB-first 位读（get_bits.h）。Bits 按「safe bitstream reader」语义把
-//!     index 夹在 cap+8 内、越过 cap 的位读 frame_data 物理陈旧字节（与 验收基准
-//!     缓存读一致）；越过物理缓冲读 0（AV_INPUT_BUFFER_PADDING）。
-//!   - frame_data 为持久物理缓冲：save_bits 每写一段前缀，末尾 `flush_put_bits`
-//!     副本把滞留的尾部位补 0 落盘 → [0,ceil(num_saved/8)) 逐字节与 验收基准 相同；
-//!     未覆盖区保留旧内容。BitWriter = put_bits/ff_copy_bits 逐字移植。
-//!   - decode_channel_residues 位耗尽返回 -1 但被 decode_subframe 忽略（C 语义），
-//!     截断帧仍按部分残差 + LMS 重建输出 → 文件截断尾帧与 验收基准 一致。
-//!   - cdlms 的 scalarproduct_and_madd 按 C 参考实现（无 SIMD）：SSE2/SSE4 只改
-//!     模加顺序，结果逐位相同；迭代长度用 FFALIGN(order,16|8) 使系数 pad/环形
-//!     缓冲陈旧内容与 C 完全一致。recent 每 icoef 重读（lms_update 递减它）。
-//!   - 不支持：算术编码（do_arith_coding，验收基准 同样 request_sample 拒绝）、
-//!     LPC 逆滤波（验收基准 只读参数不实现，输出与其对齐）、>8 声道、非 16/24bit。
-
 const std = @import("std");
 const Error = @import("../../../error.zig").Error;
 

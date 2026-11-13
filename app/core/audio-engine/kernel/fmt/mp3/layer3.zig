@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Layer III 解码（对标 minimp3 标量路径，CC0）。
-//! 含 side info、scalefactor、huffman、requant、stereo、reorder、antialias、IMDCT。
-
 const std = @import("std");
 const hdr = @import("header.zig");
 const br = @import("bitreader.zig");

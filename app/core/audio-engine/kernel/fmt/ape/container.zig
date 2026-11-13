@@ -7,24 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! APE 容器解析（docs/audio-kernel-zig.md §9.10）
-//!
-//! 参考重构对照 FFmpeg libavformat/ape.c 的 ape_read_header：MAC 描述符 /
-//! 头部 / seektable / bittable / 帧表推导（许可登记见 audio-engine/THIRD-PARTY-LICENSES.md）。
-//!
-//! 布局（两个版本分支）：
-//!   - version >= 3980：描述符（padding1 u16 / descriptorlength u32 /
-//!     headerlength u32 / seektablelength u32 / wavheaderlength u32 /
-//!     audiodatalength u32 / audiodatalength_high u32 / wavtaillength u32 /
-//!     md5[16]）+ 头部（compressiontype / formatflags / blocksperframe /
-//!     finalframeblocks / totalframes / bps / channels / samplerate）；
-//!   - version < 3980：紧凑头部（compressiontype / formatflags / channels /
-//!     samplerate / wavheaderlength / wavtaillength / totalframes /
-//!     finalframeblocks）+ 可选 peak level / seek elements + 可选内嵌 WAV 头。
-//!
-//! 帧表：seektable 偏移 + 帧长推导；version < 3810 另有每帧 1 字节 bittable。
-//! 总样本数 = blocksperframe·(totalframes-1) + finalframeblocks。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

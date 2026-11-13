@@ -7,36 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! TAK (Tom's lossless Audio Kompressor, .tak, 无损) 解码器接入层（fmt/tak）。
-//!
-//! 容器（libavformat/takdec.c + tak_parser.c + tak.c）：
-//!   - 可选容器头：魔数 "tBaK"（4 字节）后跟元数据块流。每块 = 1 字节类型
-//!     (&0x7F) + 3 字节 LE size + (size-3) 字节数据 + 3 字节 CRC-24/BE
-//!     （init 0xCE04B7）。块类型：STREAMINFO(1) 位段、LAST_FRAME(7)
-//!     （last_frame_pos 40 位 + last_frame_size 24 位，相对帧区起点）、
-//!     END(0) 终止；ENCODER/MD5/其它跳过。帧区 = END 块后到
-//!     (data_start + pos + size) 的绝对终点；无 tBaK 头则整文件视为帧区；
-//!   - 帧表构建（对齐 tak_parser）：在帧区扫描 sync 字节 FF A0，解析帧头并
-//!     校验头 CRC-24 后才认作帧边界；帧间按边界切分，末帧延至帧区终点；
-//!     每帧样本数 = IS_LAST? last_frame_samples : frame_samples（随 HAS_INFO
-//!     STREAMINFO 逐帧更新）。
-//!
-//! 解码语义（对齐 验收基准 n9.0.1 native tak，kernel/fmt/tak/core.zig）：
-//!   - LSB-first 位流；帧独立可随机访问（帧解码无跨帧状态）；
-//!   - 输出对齐 验收基准 内部样本格式：8bit → u8(+0x80)、16bit → s16
-//!     （=`-f s16le`）、24bit → int32<<8（=`-f s32le`）；Info.bits_per_sample
-//!     报 8/16/32；codec 非 MONO_STEREO/MULTICHANNEL、data_type≠0 或通道>6 →
-//!     UnsupportedFormat。
-//!
-//! 建议 probe/接线（集成者执行）：
-//!   - probe.zig Format 增 `.tak`；formats 增 `.tak = true`；
-//!     identify 增 `if (eql(head[0..4], "tBaK")) return .tak;`
-//!     （与 验收基准 libavformat tak_probe 的 AVPROBE_SCORE_EXTENSION 同源）；
-//!   - decoder.zig dispatch 增 `.tak => tak.open(allocator, &reader, info)`；
-//!   - kernel.zig 聚合测试增 `_ = @import("fmt/tak/tables.zig")`、
-//!     `_ = @import("fmt/tak/core.zig")`、`_ = @import("fmt/tak/lib.zig")`；
-//!   - codec_name = "tak"，format_name = "tak"。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

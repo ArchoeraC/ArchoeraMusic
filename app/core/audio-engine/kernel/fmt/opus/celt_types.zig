@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! CELT 共享类型与常量（docs/audio-kernel-zig.md §9.2，P2）
-//!
-//! celt.zig（编排）与 pvq.zig（PVQ）共同引用，避免循环导入。
-
 const std = @import("std");
 const tables = @import("celt_tables.zig");
 const opus = @import("kissfft.zig");

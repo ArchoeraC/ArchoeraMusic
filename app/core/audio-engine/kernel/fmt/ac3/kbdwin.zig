@@ -3,14 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! AC-3 KBD（Kaiser-Bessel Derived）窗口，256 点，α=5.0。
-//!
-//! 复刻对象：FFmpeg n9.0.1 libavcodec/kbdwin.c `ff_kbd_window_init`（double
-//! 精度内核 + f32 截断）。I0(x) 用 libavutil/mathematics.c `av_bessel_i0`
-//! 的 minimax 有理逼近（Blair & Edwards, AECL-4928）。
-//!
-//! 性质：w[n]² + w[2N-1-n]² = 1（Princen-Bradley，时域混叠对消条件）。
-
 pub const window_256 = [256]f32{
     @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F21D32440000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F2FF7F380000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F3804E440000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F40A35AA0000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F45F4AE60000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F4C079DE0000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F517660C0000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F555A6300000000))))),
     @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F59B85600000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F5E98F280000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F620297A0000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F650321A0000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F6852D360000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F6BF68920000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F6FF33EA0000000))))), @as(f32, @floatCast(@as(f64, @bitCast(@as(u64, 0x3F72270740000000))))),

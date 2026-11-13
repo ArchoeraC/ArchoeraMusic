@@ -3,19 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! GSM 06.10 解码（docs/audio-kernel-zig.md §9.1 边界部分）
-//!
-//! 支持两种容器形态（算法一致，位序与块长不同）：
-//!   - WAV GSM_MS（format tag 0x31/0x32/0x1500，codec "gsm_ms"）：每块
-//!     block_align(41..65，步进 3) 字节含 2 个 GSM 帧 = 320 样本/块；
-//!     bitstream 为 LSB-first（镜像 FFmpeg msgsmdec.c 的 BITSTREAM_READER_LE）；
-//!   - AIFF-C "GSM "（codec "gsm"，见 §t7）：每块 33 字节 = 1 帧 = 160 样本；
-//!     bitstream 为 MSB-first，帧首 4 bit 为 GSM 魔数 0xD（缺失仅忽略，
-//!     镜像 FFmpeg gsmdec.c 仅告警不拒绝）。
-//!
-//! 算法与常量表重构自 FFmpeg `libavcodec/gsmdec_template.c` / `gsmdec_data.c` /
-//! `msgsmdec.c` / `gsmdec.c`（reference/FFmpeg，参考实现非直接复制）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

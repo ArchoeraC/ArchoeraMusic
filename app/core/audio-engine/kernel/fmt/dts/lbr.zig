@@ -7,26 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS Express（DCA-LBR，低码率扩展）解码器
-//!
-//! 逐函数对照 FFmpeg n9.0.1 dca_lbr.c / dcadsp.c（lbr_bank_c / lfe_iir_c）。
-//! 位流为 LSB-first（BITSTREAM_READER_LE）；帧结构为字节块（chunk）流。
-//!
-//! 管线：EXSS asset 的 LBR 分量（sync 0x0A801921）→ 帧头（解码器初始化段：
-//! 采样率/扬声器掩码/码率/带限）→ chunk 解析（LFE ADPCM、音调群、网格 1/2/3、
-//! 高分辨率网格、时域样本）→ 子带域重建（随机填充/部分立体声/LPC 逆预测）→
-//! 混合滤波器组（lbr_bank：短窗 + 8 点 MDCT + 高频混叠抵消）→ 音调合成 →
-//! 全带 IMDCT（TDAC 长窗重叠相加）→ FLTP 平面；LFE 经 5 级双二阶 IIR 插值。
-//!
-//! 与 验收基准 的差异（公开渠道无 LBR 真实样本可对拍，见测试与交付报告）：
-//!   - IMDCT 以直达公式（f64 累加）实现，数学定义与 av_tx FULL_IMDCT 一致
-//!     （以 av_tx 参考向量验证），浮点舍入可差低序位；
-//!   - lbr_bank / lfe_iir 与 验收基准 C 实现输出逐样本一致（参考向量测试）；
-//!   - 其余运算顺序与 dca_lbr.c 逐句对应。
-//!
-//! 不支持（与 验收基准 一致地拒绝）：>48kHz、非 (无/1_2/1_4) 带限、
-//! LBR_FLAG_DMIX_MULTI_CH、LBR 流版本非 0x08xx。
-
 const std = @import("std");
 const lt = @import("lbr_tables.zig");
 const t = @import("tables.zig");

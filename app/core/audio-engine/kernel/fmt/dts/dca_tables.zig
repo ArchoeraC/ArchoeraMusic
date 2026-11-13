@@ -7,14 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS（DCA Coherent Acoustics）core 解码数值表（阶段二）
-//!
-//! 对照 FFmpeg libavcodec dcadata.c / dcahuff.c（n9.0.1）。全部整数表由
-//! tools/gen_dca_tables.py 从 FFmpeg 源自动抽出并经单元测试校验（长度/锚点），
-//! 非手工转录。表语义见 FFmpeg dcadata.h 注释。
-//!
-//! 布局：ffmpeg 多为二维（如 [1024][32]），此处压平为一维，索引 = 行×列宽 + 列。
-
 pub const DCA_CODE_BOOKS: usize = 10;
 pub const DCA_ADPCM_COEFFS: usize = 4;
 pub const DCA_ADPCM_VQCODEBOOK_SZ: usize = 4096;

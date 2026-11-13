@@ -7,18 +7,6 @@
 // 上游版权归 WavPack 作者所有；本文件按 BSD-3-Clause 分发，
 // 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! WavPack 帧内位读取（LSB-first，内存缓冲）
-//!
-//! 与 flac/alac bitreader 的区别：
-//!   - WavPack 的 DATA 位流为 **LSB-first**（逐字节低位在前），与
-//!     FLAC/ALAC 的 MSB-first 相反，故独立实现；
-//!   - 需要 `readUnary0_33`（unary 前缀上限 33）与按位读取，均在
-//!     熵解码（wv_get_value 的 zigzag 区间分段）中使用；
-//!   - 位流独立于字节边界（块内 metadata 与 DATA 各占独立区域）。
-//!
-//! 健壮性（§13.3）：所有读取先校验剩余位数，越界 → error.Corrupt，
-//! 不产生越界读；调用方保证帧缓冲只读不修改。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 

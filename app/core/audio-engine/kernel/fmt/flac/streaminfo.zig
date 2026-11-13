@@ -7,32 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! FLAC 元数据解析（可选 ID3v2 前置 + fLaC 头 + 元数据块遍历 + STREAMINFO + SEEKTABLE）
-//!
-//! 文件布局（参考重构，对照 FFmpeg libavformat/flacdec.c 与 libavcodec/flac.c）：
-//!   [可选 ID3v2 标签] `fLaC`(4B) → 元数据块序列（每块 4B 头：last(1)+type(7) +
-//!   size(24 BE)）→ 音频帧。已实证确认：最后一个元数据块后**无 CRC-16**，帧头紧跟
-//!   （§ 会话记录）。
-//!
-//! 块类型（flac.h FLAC_METADATA_TYPE_*）：
-//!   0 STREAMINFO（34B，必须出现且仅出现一次，其位置在文件开头）
-//!   1 PADDING / 2 APPLICATION —— 跳过
-//!   3 SEEKTABLE（每点 18B：sample_number u64 + stream_offset u64 + frame_samples u16）
-//!   4 VORBIS_COMMENT（Vorbis comment：字段长度 LE；TITLE/ARTIST/ALBUM/DATE/GENRE/COMMENT
-//!     （COMMENT 与 DESCRIPTION 同义）→ `decoder.Metadata`，键大小写不敏感、首字段优先、
-//!     单字段限长 §9.1 同款；全部条目（含 TRACKNUMBER/ALBUMARTIST/REPLAYGAIN_* 等非标准
-//!     键）→ `Metadata.tags`，对齐 验收基准 av_dict；REPLAYGAIN_* 同时解析为增益）
-//!   5 CUESHEET（CD 目录：头 396B + 每 track 36B + 每 index 12B；index offset（样本，相对
-//!     音频流起点）→ `decoder.CuePoint`，条目数 clamp 到块实际承载）
-//!   6 PICTURE（FLAC 规范 §5.8 / ID3v2 APIC：type/mime/desc/宽高/色深/数据，字段长度 BE；
-//!     数据限长 64MiB，字段越界放弃该图 → `decoder.Picture`）
-//!   其余类型（7..126 保留）与 127 INVALID —— 跳过（验收基准 flacdec default 分支 avio_skip
-//!     同款容错，未来新块类型不致拒播）
-//!
-//! 健壮性（§13.3）：magic / STREAMINFO 尺寸 / bps / blocksize / SEEKTABLE 尺寸
-//! 均做边界校验；块循环有界（遇 last=1 终止，流截断 → Corrupt）；
-//! VORBIS_COMMENT / CUESHEET / PICTURE 内部字段越界 → 停止该块解析（不报 Corrupt）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const io = @import("../../io.zig");

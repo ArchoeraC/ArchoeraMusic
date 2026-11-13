@@ -7,8 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! MLP/TrueHD 表（对照 FFmpeg mlp.c / mlp_parse.c / mlpdec.c / mlp_parse.h）
-
 /// 每表的符号数（表 0/1/2 分别 18/16/15 个）
 pub const huff_syms = [3]usize{ 18, 16, 15 };
 pub const huffman_tables = [3][18][2]u8{

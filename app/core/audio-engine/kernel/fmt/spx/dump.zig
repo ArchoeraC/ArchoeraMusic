@@ -3,15 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // EraSync — ArchoeraMusic 自研音频内核
 
-//! Speex 解码 dump/对拍工具：解码 .spx → s16le 写 stdout，stderr 打印 Info 摘要。
-//!
-//! 用法（fmt/spx 内文件不能作独立根上溯 import，须以 kernel/ 为模块根构建，
-//! 例如经副本树根转发：`pub const main = @import("kernel/fmt/spx/dump.zig").main;`）：
-//!   zig build-exe dumproot.zig -O ReleaseSafe -lc -femit-bin=dump
-//!   ./dump <file.spx> > mine.s16
-//! 与 `ffmpeg -c:a libspeex -i <file.spx> -f s16le ref.s16` 对比即完成验收
-//! （NB 亦可对 native `ffmpeg -i`；WB/UWB 以 libspeex 为准，见 decode.zig 头注释）。
-
 const std = @import("std");
 const io = @import("../../io.zig");
 const decoder = @import("../../decoder.zig");

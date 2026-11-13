@@ -7,20 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! DTS-HD MA 无损扩展（XLL）解码
-//!
-//! 逐函数对照 FFmpeg n9.0.1 dca_xll.c / dcadsp.c / dcamath.h 定点路径。
-//! XLL 为纯整数无损解码，目标与 `ffmpeg -f s32le`（XLL s32p 输出）逐位一致：
-//!   输出样本 = clip23(样品 << (24 - pcm_bit_res)) << 8（storage>16）
-//!   storage 16 → s16p：clip_int16(样品 << (16 - pcm_bit_res))
-//! 位流 MSB-first；输入为单个 XLL 帧数据（自 0x41A29547 sync 起）。
-//!
-//! 支持：≤3 chset 分区、自适应/固定预测、pairwise 去相关、MSB/LSB 分层、
-//! 残余声道与 core 上混、2 频带（>96kHz）合成。PBR 平滑缓冲未实现
-//! （样本中 XLL 帧与访问单元一一对应）。
-//!
-//! 本文件不持有 core 引用：残余上混所需 core 平面由调用方按扬声器提供。
-
 const std = @import("std");
 const BitReader = @import("../aac/bitreader.zig").BitReader;
 const dt = @import("dca_tables.zig");

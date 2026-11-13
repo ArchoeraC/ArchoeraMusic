@@ -7,17 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! AAC SBR（频谱带复制）解码器（移植 FFmpeg n9.0.1 浮点路径）。
-//!
-//! 复刻对象：libavcodec/{aacsbr_template.c,aacsbr.c,sbrdsp_template.c,sbrdsp.c}
-//! （非 USAC 路径）+ libavcodec/aacsbrdata.h 表。数值路径逐一对齐：
-//!   - QMF 分析/合成：64 点逆向 MDCT（av_tx inv=1 半长）+ 多相窗口折叠；
-//!   - HF 重建：逆滤波 / chirp / 包络-噪声-正弦增益 / 平滑；
-//!   - 去量化：exp2fi（IEEE 指数位构造 2^x）。
-//!
-//! 数据流：时域 L/R → QMF 分析(W) → X_low → HF 生成(X_high) → 增益/噪声/正弦
-//! → Y → X → QMF 合成 → 时域输出（可 2× 下采样，HE-AAC 输出原采样率）。
-
 const std = @import("std");
 const Error = @import("../../error.zig").Error;
 const BitReader = @import("bitreader.zig").BitReader;

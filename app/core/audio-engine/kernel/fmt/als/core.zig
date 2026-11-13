@@ -7,26 +7,6 @@
 // 上游版权归 FFmpeg 作者所有；本文件中移植部分及本项目改动均按
 // LGPL-2.1-or-later 分发，逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
-//! MPEG-4 ALS（Audio Lossless Coding）解码核心 —— 逐位移植 FFmpeg alsdec.c + bgmc.c
-//!
-//! 覆盖（对照 reference/FFmpeg/libavcodec/{alsdec.c,bgmc.c}）：
-//!   - ALSSpecificConfig 解析（含 mp4 ASC 前置 config_offset 语义：ffmpeg 将 esds
-//!     DecoderSpecificInfo 整段当 extradata，先按 mpeg4audio.c 跳过
-//!     AudioSpecificConfig，再从 als_id 起读特定配置）；
-//!   - 常量块 / 变量块；自适应 / 固定预测阶数；Rice 与 BGMC（块 Gilbert-Moore
-//!     算术码）残差；LTP；块切换（block switching）；随机访问（RA）帧；
-//!   - joint-stereo 配对、mc_coding 多声道相关（als_weighting /
-//!     revert_channel_correlation）；跨帧 carryover 样本；
-//!   - 输出交错 16/24/32 位整数（逐样本对齐 验收基准 `-f s16le/s32le`）。
-//!
-//! 不实现（→ error.UnsupportedFormat，由 fmt/m4a 回退系统 验收基准）：
-//!   浮点 ALS（floating）、RLSLMS、chan_sort 通道重排。
-//!
-//! 位流访问模型：整个 ALS 帧流为内存字节流，帧在字节边界起读、字节边界收尾
-//! （每 block / 每声道数据后 align）。mp4 一包可含多帧（验收基准 语义同：帧长仅
-//! 解码可知）。流末尾 64B 零填充模拟 验收基准 AV_INPUT_BUFFER_PADDING_SIZE，
-//! 越界位返回 0（不越界崩溃）。
-
 const std = @import("std");
 const tables = @import("tables.zig");
 
