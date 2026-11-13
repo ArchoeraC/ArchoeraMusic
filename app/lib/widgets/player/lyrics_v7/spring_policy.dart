@@ -16,7 +16,7 @@ library;
 
 import 'dart:math' as math;
 
-import 'spring.dart';
+import '../../../utils/spring.dart';
 
 /// 缓慢模式刚度（Seek / 间奏 / 首尾边界）。
 const double kSlowSpringStiffness = 90;

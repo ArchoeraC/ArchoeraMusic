@@ -39,7 +39,7 @@ import 'lyrics_fragment_render.dart';
 import 'lyrics_layout.dart';
 import 'lyrics_paragraph_cache.dart';
 import 'lyrics_word_anim.dart';
-import 'spring.dart';
+import '../../../utils/spring.dart';
 import 'spring_policy.dart';
 
 import '../../../l10n/l10n.dart';

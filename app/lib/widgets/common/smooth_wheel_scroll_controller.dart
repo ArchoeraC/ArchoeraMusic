@@ -4,19 +4,28 @@
 
 import 'dart:math' as math;
 
+import 'package:flutter/scheduler.dart' show Ticker;
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:material_ui/material_ui.dart';
 
-/// 给列表的**滚轮 / 触控板滚动**补一段短时缓动（对齐歌词页滚轮的手感）。
+import '../../utils/spring.dart';
+
+/// 给列表的**滚轮 / 触控板滚动**补上与歌词页同款的弹簧跟随。
 ///
 /// 只接管 `ScrollPosition.pointerScroll`（鼠标滚轮、触控板滚动信号）：
-/// - **触摸拖拽**走 `drag()`，**键盘**走 `ScrollAction`，都不经过这里，行为不变；
-/// - 用 `animateTo` 驱动，拖拽会自然接管并中断动画（`DrivenScrollActivity`
-///   被拖拽活动替换），不会出现「手在拖、动画还在抢位置」。
+/// - **触摸拖拽**走 `drag()`、**键盘**走 `ScrollAction`，都不经过这里；
+///   任何新滚动活动（拖拽 / 惯性 / 外部 `animateTo`）都会替换掉弹簧活动，
+///   不会出现「手在拖、弹簧还在抢位置」；
+/// - `MediaQuery.disableAnimations`（性能模式）退回原生瞬时滚动。
 ///
-/// 为什么不直接搬歌词页的弹簧：歌词是逐行 `Spring1D + Ticker + forcePixels`，
-/// 需要自己处理拖拽打断、边界夹取、活动状态通知；列表改用 `ScrollPosition`
-/// 自带的驱动式动画更稳，观感（快速趋近 + 缓停）与 AMLL `DiscreteScroll`
-/// 的过阻尼弹簧一致。
+/// **为什么用弹簧而不是 `animateTo`**：`animateTo` 每来一个滚轮事件都从当前
+/// 位置重启一条缓动曲线（初速度归零），且新动画首帧的 elapsed 为 0——快速连滚
+/// （事件按帧到达）时几乎推不动，列表明显跟不上轮子。这里：
+/// - **一个常驻活动 + 一个 Ticker**：滚轮事件只在活动上**改目标**，不重启动画，
+///   也不重置计时；
+/// - 目标**累加**（`target += delta`），连滚时目标一直前移，位移不丢；
+/// - 弹簧（[Spring1D]）保速重定向，与歌词页 `discreteScroll` 同一套物理；
+/// - 临界阻尼（ζ = 1，不回弹），松手后自然缓停。
 class SmoothWheelScrollController extends ScrollController {
   SmoothWheelScrollController({
     super.initialScrollOffset,
@@ -49,25 +58,17 @@ class _SmoothWheelScrollPosition extends ScrollPositionWithSingleContext {
     super.debugLabel,
   });
 
-  /// 单次滚轮事件的动画时长下限 / 上限。
-  static const Duration minDuration = Duration(milliseconds: 70);
-  static const Duration maxDuration = Duration(milliseconds: 180);
-
-  /// 位移 → 时长换算（毫秒 / 像素）：约 100px/档 ⇒ 110ms。
-  static const double _msPerPixel = 1.1;
+  /// 连滚期间**累积**的目标像素。新一轮滚动的第一个事件用它取代当前像素。
+  double _target = 0;
 
   @override
   void pointerScroll(double delta) {
-    // 触控板「惯性取消」事件（delta == 0）：交给基类收尾。
+    // 触控板「惯性取消」事件：直接收尾。
     if (delta == 0.0) {
-      super.pointerScroll(delta);
+      goIdle();
       return;
     }
-    final double target = math.min(
-      math.max(pixels + delta, minScrollExtent),
-      maxScrollExtent,
-    );
-    if (target == pixels) return;
+    if (!hasPixels || !hasContentDimensions) return;
 
     final BuildContext? ctx = context.notificationContext;
     // 性能模式（MediaQuery.disableAnimations）：保持原生瞬时滚动。
@@ -76,19 +77,95 @@ class _SmoothWheelScrollPosition extends ScrollPositionWithSingleContext {
       return;
     }
 
-    final int ms = ((target - pixels).abs() * _msPerPixel)
-        .clamp(
-          minDuration.inMilliseconds.toDouble(),
-          maxDuration.inMilliseconds.toDouble(),
-        )
-        .round();
-    // 连续滚轮会不断重定目标：新的 animateTo 从**当前**位置续上，形成连贯滑动。
-    // 返回的 Future 无需等待（被下一次滚动或拖拽打断都属正常）。
-    // ignore: discarded_futures
-    animateTo(
-      target,
-      duration: Duration(milliseconds: ms),
-      curve: Curves.easeOutCubic,
+    final ScrollActivity? current = activity;
+    if (current is _WheelScrollActivity) {
+      // 连滚：只改目标，不重启活动 / 不重置 Ticker 计时（这是快速滚动的关键）。
+      _target = _clampTarget(_target + delta);
+      current.retarget(_target);
+      updateUserScrollDirection(
+        delta > 0 ? ScrollDirection.forward : ScrollDirection.reverse,
+      );
+      return;
+    }
+
+    _target = _clampTarget(pixels + delta);
+    if (_target == pixels) return;
+    updateUserScrollDirection(
+      delta > 0 ? ScrollDirection.forward : ScrollDirection.reverse,
     );
+    beginActivity(
+      _WheelScrollActivity(
+        this,
+        context.vsync,
+        initialPixels: pixels,
+        initialTarget: _target,
+      ),
+    );
+  }
+
+  double _clampTarget(double value) =>
+      math.min(math.max(value, minScrollExtent), maxScrollExtent);
+}
+
+/// 弹簧驱动的滚轮活动：一个 Ticker + 一个 [Spring1D]，目标可随时改。
+///
+/// 用真实的 [ScrollActivity] 而不是自己 `setPixels`：`ScrollPositionWithSingleContext`
+/// 的 `setPixels` 断言 `activity!.isScrolling`，并且开始/结束/更新通知、拖拽接管、
+/// 指针穿透设置都由框架统一处理。
+class _WheelScrollActivity extends ScrollActivity {
+  _WheelScrollActivity(
+    super.delegate,
+    TickerProvider vsync, {
+    required double initialPixels,
+    required double initialTarget,
+  }) : _spring = Spring1D(
+         initialPosition: initialPixels,
+         params: _params,
+       ) {
+    _ticker = vsync.createTicker(_tick);
+    _ticker.start();
+    _spring.setTarget(initialTarget);
+  }
+
+  /// ζ = damping / (2·√(stiffness·mass)) = 90 / (2·√2000) ≈ 1.0，临界阻尼（不回弹）。
+  ///
+  /// ω = √(stiffness/mass) ≈ 45 rad/s：一档滚轮（~100px）约 60–80ms 走完大半；
+  /// 快速连滚时稳态滞后 ≈ 2·v/ω（v = 目标速度），保证「轮子越快、列表跟得越快」
+  /// 而不是越落越远。
+  static const SpringParams _params = SpringParams(
+    mass: 1.0,
+    stiffness: 2000.0,
+    damping: 90.0,
+  );
+
+  final Spring1D _spring;
+  late final Ticker _ticker;
+  Duration _lastTick = Duration.zero;
+
+  @override
+  bool get isScrolling => true;
+
+  @override
+  bool get shouldIgnorePointer => false;
+
+  @override
+  double get velocity => _spring.velocity;
+
+  /// 滚轮事件改目标：保留当前速度（[Spring1D.setTarget] 保速重定向）。
+  void retarget(double target) => _spring.setTarget(target);
+
+  void _tick(Duration elapsed) {
+    final double dt = (elapsed - _lastTick).inMicroseconds / 1000000.0;
+    _lastTick = elapsed;
+    if (dt <= 0) return;
+    // 页面挂起后首帧 delta 可能很大：钳到 0.1s 推进（丢掉这一帧会让弹簧停摆）。
+    delegate.setPixels(_spring.update(dt > 0.1 ? 0.1 : dt));
+    if (_spring.arrived()) delegate.goIdle();
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
   }
 }
