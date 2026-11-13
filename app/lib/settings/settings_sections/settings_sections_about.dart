@@ -60,7 +60,6 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
                     subtitle: widget.version.isEmpty
                         ? l10n.settingsVersionUnknown
                         : l10n.settingsVersionFormat(version: widget.version),
-                    subtitleWidget: _versionSubtitle(l10n),
                     // 官方构建徽标：二进制内水印验签通过才显示该图标；
                     // 失败/缺失则不显示（无文字、无悬浮提示）。
                     trailing: ref.watch(archoeraOfficialBuildProvider)
@@ -107,12 +106,25 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
         SettingSection(
           title: l10n.settingsSectionEnvInfo,
           children: [
-            _envRow(
-              l10n.settingsEnvVersion,
-              widget.version.isEmpty
-                  ? l10n.settingsVersionUnknown
-                  : '${widget.version} · ${ReleaseChannel.current.label}',
-            ),
+            if (widget.version.isEmpty)
+              _envRow(l10n.settingsEnvVersion, l10n.settingsVersionUnknown)
+            else
+              _envRowWidget(
+                l10n.settingsEnvVersion,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: SelectableText(
+                        widget.version,
+                        style: const TextStyle(fontSize: 13, height: 1.5),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const ReleaseChannelBadge(),
+                  ],
+                ),
+              ),
             _envRow(
               l10n.settingsEnvPlatform,
               '${Platform.operatingSystem} '
@@ -308,46 +320,24 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
   static const String _kNekoApiDocsUrl =
       'https://github.com/FantasyNetworkCN/NekoMusicDocs';
 
-  /// 版本副标题：`v<version>` + 通道徽标 + 本地化后缀。
-  ///
-  /// 用本地化模板（`v{version} · …`）拆分前后缀，保证各语言下徽标都紧贴版本号；
-  /// 图片外观下徽标为固定深色实心，不随主题/壁纸变化。
-  Widget _versionSubtitle(AppLocalizations l10n) {
+  /// 与 [_envRow] 相同布局，但值为任意控件（版本号 + 通道徽标）。
+  Widget _envRowWidget(String label, Widget value) {
     final scheme = Theme.of(context).colorScheme;
-    final style = TextStyle(
-      fontSize: 11.5,
-      color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
-    );
-    if (widget.version.isEmpty) {
-      return Text(
-        l10n.settingsVersionUnknown,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: style,
-      );
-    }
-    const sentinel = '\u0000';
-    final template = l10n.settingsVersionFormat(version: sentinel);
-    final index = template.indexOf(sentinel);
-    final prefix = index >= 0 ? template.substring(0, index) : 'v';
-    final suffix = index >= 0 ? template.substring(index + 1) : '';
-    return Text.rich(
-      TextSpan(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextSpan(text: prefix),
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 6),
-              child: ReleaseChannelBadge(channel: ReleaseChannel.current),
+          SizedBox(
+            width: 76,
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
             ),
           ),
-          if (suffix.isNotEmpty) TextSpan(text: suffix),
+          Expanded(child: value),
         ],
       ),
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      style: style,
     );
   }
 
@@ -379,7 +369,7 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
   String _envText(AppLocalizations l10n) {
     final v = widget.version.isEmpty
         ? l10n.settingsVersionUnknown
-        : widget.version;
+        : '${widget.version} · ${ReleaseChannel.current.label}';
     return '${l10n.settingsEnvVersion}: $v\n'
         '${l10n.settingsEnvPlatform}: ${Platform.operatingSystem} '
         '${Platform.operatingSystemVersion}\n'

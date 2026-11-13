@@ -12,16 +12,12 @@ class SettingTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.trailing,
-    this.subtitleWidget,
     this.enabled = true,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-
-  /// 副标题的富文本版本（如版本号 + 通道徽标）；提供时替代 [subtitle]。
-  final Widget? subtitleWidget;
   final Widget trailing;
 
   /// 禁用时整行变灰（图标/标题/副标题降透明度），配合右侧控件禁用。
@@ -66,15 +62,12 @@ class SettingTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                if (subtitleWidget != null)
-                  subtitleWidget!
-                else
-                  Text(
-                    subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11.5, color: subFg),
-                  ),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11.5, color: subFg),
+                ),
               ],
             ),
           ),
