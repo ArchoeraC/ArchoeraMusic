@@ -1890,6 +1890,41 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsFloatingBarOff => '全幅ドック（デフォルト）';
 
   @override
+  String get settingsSectionWindow => 'ウィンドウ';
+
+  @override
+  String get settingsWindowDecor => 'ウィンドウの装飾';
+
+  @override
+  String get settingsWindowDecorDesc =>
+      'ボーダーレス：コンテンツがウィンドウ全体に広がり、ウィンドウボタンは上部バーに統合されます。';
+
+  @override
+  String get settingsWindowDecorSystem => 'システム';
+
+  @override
+  String get settingsWindowDecorCaption => 'カスタムタイトルバー';
+
+  @override
+  String get settingsWindowDecorBorderless => 'ボーダーレス';
+
+  @override
+  String get settingsWindowDecorNote =>
+      'すぐに反映されます。タイトルバーの表示がおかしい場合はアプリを再起動してください。';
+
+  @override
+  String get windowMinimize => '最小化';
+
+  @override
+  String get windowMaximize => '最大化';
+
+  @override
+  String get windowRestore => '元に戻す';
+
+  @override
+  String get windowClose => '閉じる';
+
+  @override
   String get settingsSectionFont => 'インターフェースフォント';
 
   @override

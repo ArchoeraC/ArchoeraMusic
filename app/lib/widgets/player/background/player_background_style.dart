@@ -55,7 +55,6 @@ class PlayerBackgroundContext {
     required this.gradient,
     required this.ripple,
     required this.fluid,
-    this.onReady,
   });
 
   /// 当前曲目封面地址。
@@ -72,10 +71,6 @@ class PlayerBackgroundContext {
 
   final RippleBackgroundConfig ripple;
   final FluidBackgroundConfig fluid;
-
-  /// 重效果首帧可绘制时回调（供 [PlayerBackgroundStyle.needsPreview] 的样式
-  /// 通知预览层淡出）；轻量样式可忽略。
-  final VoidCallback? onReady;
 }
 
 /// 一种播放页背景样式。
@@ -84,14 +79,6 @@ abstract class PlayerBackgroundStyle {
 
   /// 偏好里的稳定 id（须登记到 `playerBgTypes`）。
   String get id;
-
-  /// 是否有需要异步准备的重效果（水纹 / 流体）。
-  ///
-  /// 为 true 时 `PlayerBackground` 会在进入播放页的路由动画期间先显示
-  /// 「模糊封面缩略图」预览层，等重效果上报就绪后再淡出（对齐 SPlayer-Next
-  /// `PlayerBackground.vue` 的 `.bg-blur-wrap`：流体采样就绪前先铺缩略图，
-  /// 避免露出纯底色）。
-  bool get needsPreview => false;
 
   /// 构建背景；无封面/降级由实现自行回退 [PlayerBackgroundContext.gradient]。
   Widget build(BuildContext context, PlayerBackgroundContext c);

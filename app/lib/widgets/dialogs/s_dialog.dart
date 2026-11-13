@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../theme/app_theme.dart';
 import '../common/glass_surface.dart';
+import '../common/smooth_wheel_scroll_controller.dart';
 
 class SDialog extends StatelessWidget {
   const SDialog({
@@ -121,7 +122,12 @@ class SDialog extends StatelessWidget {
                     constraints: BoxConstraints(
                       maxHeight: maxContentHeight ?? double.infinity,
                     ),
-                    child: SingleChildScrollView(child: child),
+                    child: SmoothWheelScrollScope(
+                      builder: (context, controller) => SingleChildScrollView(
+                        controller: controller,
+                        child: child,
+                      ),
+                    ),
                   ),
                 ),
               ),

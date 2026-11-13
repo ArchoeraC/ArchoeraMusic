@@ -96,7 +96,9 @@ class AppPrefs {
       data.remove(mcpAccessKeyKey);
       // 安全写入：同目录唯一临时名 + rename（符号链接只被替换、不被穿透）。
       SafeFile.writeAtomicString(
-          filePath, const JsonEncoder.withIndent('  ').convert(data));
+        filePath,
+        const JsonEncoder.withIndent('  ').convert(data),
+      );
     } catch (_) {
       // 持久化失败不阻塞（自用项目，偏好丢失可接受）
     }
@@ -675,6 +677,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置播放条悬浮模式。
   void setFloatingPlayerBar(bool value) {
     state = state.copyWithFloatingBar(value);
+    state.save();
+  }
+
+  /// 设置窗口装饰方案（system / caption / borderless）。
+  void setWindowDecor(String value) {
+    state = state.copyWithWindowDecor(value);
     state.save();
   }
 

@@ -93,10 +93,15 @@ class _SearchDropdown extends ConsumerWidget {
                     460.0,
                   ),
                 ),
-                child: ScrollConfiguration(
-                  behavior: ScrollConfiguration.of(context)
-                      .copyWith(scrollbars: false),
-                  child: SingleChildScrollView(child: body),
+                child: SmoothWheelScrollScope(
+                  builder: (context, controller) => ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(scrollbars: false),
+                    child: SingleChildScrollView(
+                      controller: controller,
+                      child: body,
+                    ),
+                  ),
                 ),
               ),
             ),

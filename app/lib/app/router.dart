@@ -17,7 +17,6 @@ import '../pages/streaming/album_detail_page.dart';
 import '../pages/streaming/artist_detail_page.dart';
 import '../pages/streaming/playlist_detail_page.dart';
 import '../pages/streaming/streaming_page.dart';
-import 'player_route_curves.dart';
 import 'shell.dart';
 
 /// 根导航器 key（供 MaterialApp 外的组件，如托盘确认弹窗，定位根 Navigator）。
@@ -129,26 +128,23 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => CustomTransitionPage(
         key: state.pageKey,
         // 非不透明：过渡期间 Overlay 仍绘制下方主页，才能看到主页同步收缩
-        // （不透明路由会立刻把下方路由 offstage）。展开动画结束后壳内容由
-        // ShellExpandTransition 停绘/停布局（State 保留），背后绘制开销为零。
+        // （不透明路由会立刻把下方路由 offstage）。展开动画结束后壳内容已被
+        // ShellExpandTransition 卸载为轻量占位，背后绘制开销可忽略。
         opaque: false,
-        transitionDuration: kPlayerRouteTransitionDuration,
-        reverseTransitionDuration: kPlayerRouteTransitionDuration,
+        transitionDuration: const Duration(milliseconds: 500),
+        reverseTransitionDuration: const Duration(milliseconds: 500),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           // 性能模式（MediaQuery.disableAnimations）：播放页直切，无展开动效
           if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
             return child;
           }
-          // 纯垂直上滑（对齐原版 FullPlayer 的 `translate-y-full → 0`，
-          // 时长见 `kPlayerRouteTransitionDuration`）。
-          // 曲线改成单峰：展开先快后慢、收起先慢后快（见
-          // `player_route_curves.dart`）；收起走 reverseCurve，Flutter 直接把它
-          // 作用在 1 → 0 的递减值上，因此两条曲线都用 ease-out 形状。
-          // 壳层由 `ShellExpandTransition` 用同一组曲线驱动，天然同步。
+          // 纯垂直上滑（对齐原版 FullPlayer：enter/leave 均
+          // `translate-y-full → 0`，500ms cubic-bezier(0.7,0,0.3,1)）。
+          // 壳层由壳路由的 secondaryAnimation 驱动同一节奏，天然同步。
           final curved = CurvedAnimation(
             parent: animation,
-            curve: kPlayerRouteOpenCurve,
-            reverseCurve: kPlayerRouteCloseCurve,
+            curve: const Cubic(0.7, 0, 0.3, 1),
+            reverseCurve: const Cubic(0.7, 0, 0.3, 1),
           );
           return SlideTransition(
             position: Tween<Offset>(

@@ -17,9 +17,6 @@ class RippleBackgroundStyle extends PlayerBackgroundStyle {
   String get id => 'ripple';
 
   @override
-  bool get needsPreview => true;
-
-  @override
   Widget build(BuildContext context, PlayerBackgroundContext c) {
     if (!c.hasCover) return c.gradient;
     final ripple = c.ripple;
@@ -27,8 +24,8 @@ class RippleBackgroundStyle extends PlayerBackgroundStyle {
       fit: StackFit.expand,
       children: [
         c.gradient,
-        // RippleBackground 每帧画出不透明的预烘焙（模糊+饱和）封面；其内部
-        // 负责切歌双缓冲交叉淡化。
+        // RippleBackground 每帧画出不透明的预烘焙（模糊+饱和）封面，无需再叠
+        // 一层 BlurredCover；其内部负责切歌双缓冲交叉淡化。
         RippleBackground(
           cover: c.cover,
           playing: c.playing,
@@ -38,7 +35,6 @@ class RippleBackgroundStyle extends PlayerBackgroundStyle {
           renderScale: ripple.renderScale,
           damageClippedDynamic: ripple.damageClippedDynamic,
           fallbackColor: Colors.transparent,
-          onReady: c.onReady,
         ),
       ],
     );

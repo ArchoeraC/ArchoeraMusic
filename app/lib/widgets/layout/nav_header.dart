@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme_provider.dart';
 import '../../services/netease/netease_api.dart';
+import '../../services/platform/window_decor.dart';
 import '../../services/source/media_request_headers.dart';
 import '../../services/source/source_platform.dart';
 import '../../services/playback/playback_notifier.dart';
@@ -22,6 +23,7 @@ import '../../stores/providers.dart';
 import '../../stores/shell_page_state.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../common/smooth_wheel_scroll_controller.dart';
 import '../dialogs/kugou_login_button.dart';
 import '../dialogs/bilibili_login_dialog.dart';
 import '../dialogs/neko_login_dialog.dart';
@@ -32,6 +34,7 @@ import '../player/s_controls.dart';
 import '../common/anim.dart';
 import '../common/glass_blur.dart';
 import '../common/toast.dart';
+import 'window_controls.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
@@ -44,8 +47,9 @@ part 'nav_header/nav_header_weather.dart';
 ///
 /// 布局：返回 / 全局搜索框（SInput，回车跳搜索页）/（弹性留白）/ 用户 /
 /// 齿轮下拉（主题循环 light→dark→system + 全局设置占位）。
-/// 窗口控制（最小化/关闭）由 Linux 系统窗口管理，桌面壳不绘制
-/// （原项目 WindowControls 仅在无边框窗口启用）。
+/// 窗口装饰设为 `borderless` 时，右端并入窗口按钮（最小化/最大化/关闭），
+/// 整行空白处可拖动窗口（对齐 SPlayer-Next 的 WindowControls）；其余方案
+/// 由系统标题栏或自绘标题条接管。
 class NavHeader extends ConsumerStatefulWidget {
   const NavHeader({super.key});
 
@@ -74,7 +78,7 @@ class _NavHeaderState extends ConsumerState<NavHeader>
 
   /// 当前全屏播放页的路由动画（0 = 折叠，1 = 完全展开；由 `PlayerPage`
   /// 经 [playerRouteAnimationProvider] 写入）。展开开始即收起搜索下拉：浮层挂在
-  /// 根 Overlay 上，**不会**随壳内容一起缩放淡出。
+  /// 根 Overlay 上，**不会**随壳内容一起停绘。
   Animation<double>? _playerRouteAnim;
 
   /// 输入文本 + 宽度动画合并监听（浮层面板内容实时刷新）。
@@ -217,10 +221,10 @@ class _NavHeaderState extends ConsumerState<NavHeader>
     _onPlayerRouteExpand();
   }
 
-  /// 播放页开始展开（壳内容随后整体缩放淡出、最终停绘）→ 收起搜索下拉。
+  /// 播放页开始展开（壳内容随后整体停绘）→ 收起搜索下拉。
   ///
   /// 下拉浮层在**根 Overlay** 里（见 [_buildSearchOverlay]），不在壳子树内，
-  /// 因此不会随壳内容淡出。这里必须**同步**摘除：壳内容停绘时 `TickerMode`
+  /// 因此不会随壳内容停绘。这里必须**同步**摘除：壳内容停绘时 `TickerMode`
   /// 会暂停本 State 的动画，面板的收起反转可能永远走不到 `dismissed`，
   /// 浮层会永久悬在播放页左上角。
   void _onPlayerRouteExpand() {
@@ -475,53 +479,70 @@ class _NavHeaderState extends ConsumerState<NavHeader>
         selection: TextSelection.collapsed(offset: value.length),
       );
     });
-    // 播放页展开（壳内容即将缩放淡出并停绘）→ 收起搜索下拉（浮层不在壳内，
-    // 不随淡出；见 [_onPlayerRouteExpand]）。
+    // 播放页展开（壳内容即将停绘）→ 收起搜索下拉（浮层不在壳内，
+    // 不随停绘；见 [_onPlayerRouteExpand]）。
     ref.listen(
       playerRouteAnimationProvider,
       (_, next) => _bindPlayerRouteAnim(next),
+    );
+    // 无边框方案：窗口按钮并入顶栏，整行作为拖动区域（交互控件优先命中，
+    // 等价 SPlayer-Next 的 drag / no-drag 分区）。
+    final borderless =
+        ref.watch(appPrefsProvider.select((p) => p.windowDecor)) ==
+        WindowDecor.borderless;
+    final row = Row(
+      children: [
+        // 返回（pop 栈内页面优先，否则回主页；恒可点，不随
+        // go_router 分支历史禁用）
+        IconButton(
+          tooltip: l10n.commonBack,
+          onPressed: () => _handleBack(context),
+          icon: const Icon(EtaIcons.leftSmall, size: 22),
+        ),
+        const SizedBox(width: 8),
+        TapRegion(
+          groupId: _searchTapGroup,
+          onTapOutside: (_) => _searchFocus.unfocus(),
+          child: _NavHeaderSearchField(
+            layerLink: _searchLayerLink,
+            widthAnimation: _widthCtrl,
+            collapsedWidth: _searchCollapsedWidth,
+            expandedWidth: _searchExpandedWidth,
+            searchFocus: _searchFocus,
+            searchCtrl: _searchCtrl,
+            hintText: l10n.navHeaderSearchHint,
+            onChanged: _onSearchChanged,
+            onSubmitted: _submitSearch,
+            onTapOutside: (_) {},
+          ),
+        ),
+        const Spacer(),
+        // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）
+        const _WeatherMini(),
+        // 与账号菜单保持间距（避免组件过小且贴太近）
+        const SizedBox(width: 12),
+        // 账号（多平台：NT / KG / QM占位）
+        const _AccountsMenu(),
+        const SizedBox(width: 4),
+        const _NavHeaderActionsMenu(),
+        if (borderless) ...[
+          const SizedBox(width: 6),
+          Container(
+            width: 1,
+            height: 20,
+            color: Theme.of(context).colorScheme.outlineVariant
+                .withValues(alpha: 0.5),
+          ),
+          const SizedBox(width: 6),
+          const WindowControls(),
+        ],
+      ],
     );
     return SizedBox(
       height: 64,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            // 返回（pop 栈内页面优先，否则回主页；恒可点，不随
-            // go_router 分支历史禁用）
-            IconButton(
-              tooltip: l10n.commonBack,
-              onPressed: () => _handleBack(context),
-              icon: const Icon(EtaIcons.leftSmall, size: 22),
-            ),
-            const SizedBox(width: 8),
-            TapRegion(
-              groupId: _searchTapGroup,
-              onTapOutside: (_) => _searchFocus.unfocus(),
-              child: _NavHeaderSearchField(
-                layerLink: _searchLayerLink,
-                widthAnimation: _widthCtrl,
-                collapsedWidth: _searchCollapsedWidth,
-                expandedWidth: _searchExpandedWidth,
-                searchFocus: _searchFocus,
-                searchCtrl: _searchCtrl,
-                hintText: l10n.navHeaderSearchHint,
-                onChanged: _onSearchChanged,
-                onSubmitted: _submitSearch,
-                onTapOutside: (_) {},
-              ),
-            ),
-            const Spacer(),
-            // 微型天气（头像左侧；默认关闭，见设置 → 外观 → 天气）
-            const _WeatherMini(),
-            // 与账号菜单保持间距（避免组件过小且贴太近）
-            const SizedBox(width: 12),
-            // 账号（多平台：NT / KG / QM占位）
-            const _AccountsMenu(),
-            const SizedBox(width: 4),
-            const _NavHeaderActionsMenu(),
-          ],
-        ),
+        child: borderless ? WindowDragArea(child: row) : row,
       ),
     );
   }
