@@ -15,7 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/services/lyrics/lyric_line.dart';
 import 'package:archoera_music/widgets/player/lyrics_v7/lyrics_physics_wall.dart';
-import 'package:archoera_music/widgets/player/lyrics_v7/spring.dart';
+import 'package:archoera_music/utils/spring.dart';
 
 /// 100 行、每行 1000ms 的规整歌词。
 List<LyricGroup> buildGroups(int count) => [
