@@ -11,6 +11,9 @@ import 'dart:typed_data';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:archoera_music/app/appearance_styles/image_appearance_style.dart';
+import 'package:archoera_music/stores/app_prefs.dart';
+import 'package:archoera_music/stores/prefs_appearance.dart';
 import 'package:archoera_music/widgets/common/baked_image_background.dart';
 
 /// 1x1 透明 PNG（避免引入额外测试依赖）。
@@ -56,5 +59,31 @@ void main() {
     await tester.pumpWidget(_wrap(blur: 0, scale: 1.0, dim: 0.6));
     await tester.pump();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('背景图按长边等比解码，不随窗口比例拉伸', (tester) async {
+    Widget? background;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            background = ImageAppearanceStyle().buildBackground(
+              context,
+              AppPrefs(initialData: {backgroundImageKey: '/tmp/bg.jpg'}),
+            );
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    await tester.pumpWidget(MaterialApp(home: background!));
+
+    final baked = tester.widget<BakedImageBackground>(
+      find.byType(BakedImageBackground),
+    );
+    final resize = baked.provider as ResizeImage;
+    expect(resize.policy, ResizeImagePolicy.fit, reason: '必须等比缩放，不能用 fill 拉伸');
+    expect(resize.width, resize.height);
+    expect(resize.allowUpscaling, isFalse);
   });
 }
