@@ -135,8 +135,8 @@ class KugouSession {
   String toString() => 'KugouSession(userid=$userid, nickname=$nickname)';
 }
 
-/// KG用户曲库条目类型（对齐 MoeKoeMusic Library.vue 对 `/v7/get_all_list`
-/// 的分类：创建的歌单 / 收藏的歌单 / 收藏的专辑）。
+/// KG用户曲库条目类型（对齐 `/v7/get_all_list` 的分类：
+/// 创建的歌单 / 收藏的歌单 / 收藏的专辑）。
 enum KugouLibraryType {
   /// 我创建的歌单（含系统「我喜欢」）。
   createdPlaylist,
@@ -162,7 +162,7 @@ class KugouLibraryItem {
   final KugouLibraryType type;
 
   /// 详情弹窗用 id（`list_create_gid` 优先，`global_collection_id` 兜底；
-  /// 对齐 MoeKoeMusic Library.vue 跳转 PlaylistDetail 的取参）。
+  /// 跳转 PlaylistDetail 时的取参约定）。
   final String id;
 
   final String title;

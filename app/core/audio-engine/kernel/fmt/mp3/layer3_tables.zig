@@ -1,7 +1,11 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: CC0-1.0
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 数据转录：解码表转录自 minimp3（CC0-1.0，lieff）。
+// 表值本身为事实数据，本文件按 CC0-1.0 保留来源说明；
+// 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! Layer III 解码表（移植自 minimp3, CC0）。
 pub const scf_long = [8][23]u8{
