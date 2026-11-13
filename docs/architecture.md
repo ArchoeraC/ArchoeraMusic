@@ -283,13 +283,11 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - 登录：二维码（login_qr_create/key/check）→ Flutter 展示二维码 + 轮询
 
 ### 7.2 KuGou（首期）
-1. **上游基线**：MakcRe/KuGouMusicApi **v1.6.3（2026-11-04）** + MoeKoeMusic `1.7.2`（2026-11-08，内置同一 API）。新版设备注册/登录/风控分析见
+1. **接口基线**：以 KG 平台公开接口的实际行为为准；设备身份与稳定性经验见
    [`docs/kugou-risk-control.md`](kugou-risk-control.md)。
-   - 参考克隆放在工作区 `SPlayer-Next/`，不参与本项目构建
-2. **提取核心**：`util/crypto.js`（token/签名）、`util/request.js`、`util/runtime.js`、各 `module/*.js`（160+ 端点）逻辑
-3. **移植进模块架构**：以纯 Dart 移植为落地形态（`app/lib/services/kugou/` + `app/lib/apis/kugou/`，search/lyric/登录/取流等已可用），按需从 KuGouMusicApi 补：
-   - `song_url`（音源 URL）、`rank_list`/`rank_info`（榜单）、`playlist_detail`/`sheet_*`（歌单）、`search_suggest`、`comment_*`、`login*` 等
-   - 注意 `platform` 完整版 vs `lite` 概念版 token 不通用，自用选定一版并在 modules 内封装隔离
+2. **实现形态**：纯 Dart（`app/lib/services/kugou/` + `app/lib/apis/kugou/`），按需补齐
+   搜索 / 歌词 / 登录 / 取流 / 榜单 / 歌单等能力。
+3. **参数版本**：完整版与 lite 概念版 token 不通用，在模块内封装隔离。
 4. KRC 歌词解析：已有 `core/krc.ts`（KRC → 标准时间轴），直接复用
 
 ### 7.3 QM Music（后期）
