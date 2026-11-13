@@ -195,6 +195,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
     // 清空路由动画（壳层恢复折叠态）；旧实例不能清掉新实例刚写入的动画。
     _routeAnimNotifier?.clear(_routeAnimation);
+    // 收起真正完成（路由已移出导航栈）：复位开关守卫，并执行收起期间
+    // 挂起的打开请求。不能依赖 push future —— 它在 pop 的瞬间就完成了。
+    notifyPlayerPageDisposed();
     _hideTimer?.cancel();
     _coverPulse.dispose();
     super.dispose();
