@@ -69,7 +69,7 @@ pub mod kugou {
     pub const KG_LITE_SIGN_SALT: &str = "LnT6xpN3khm36zse0QzvmgTZ3waWdRSA";
     /// /v5/url 的 key 签名盐值（signKey 概念版 lite）
     pub const KG_LITE_KEY_SALT: &str = "185672dd44712f60bb1736df5a377e82";
-    /// 概念版 lite 的 appid / clientver（MoeKoeMusic --platform=lite）
+    /// 概念版 lite 的 appid / clientver（lite 平台参数）
     pub const KG_LITE_APPID: i64 = 3116;
     pub const KG_LITE_CLIENTVER: i64 = 11440;
     /// 来源 appid（扫码登录必需，KuGouMusicApi config.json srcappid=2919）

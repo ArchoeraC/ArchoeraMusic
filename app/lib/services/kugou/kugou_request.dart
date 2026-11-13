@@ -719,7 +719,7 @@ Map<String, String> _kgBaseHeaders(String mid, int ts) => {
 /// 对齐 KuGouMusicApi：POST userservice.kugou.com/risk/v3/r_register_dev，
 /// AES-CBC 加密设备信息 + RSA-PKCS1 加密 {aes, uid, token}，android 签名。
 /// 采用概念版 lite 平台（appid 3116/clientver 11440/lite 盐/lite 公钥，
-/// 对齐 MoeKoeMusic 后端 --platform=lite；标准版参数已被官方风控）。
+/// 采用 lite 平台参数；标准版参数已被官方风控）。
 ///
 /// [mid]/[guid] 必须来自持久化的 [KugouDevice]（同一安装长期复用），
 /// 否则每次注册都是「新设备」，是账号风控的高危信号。缺省仅用于测试兜底。
@@ -800,7 +800,7 @@ void _checkKgStatus(dynamic body) {
   }
   final raw = body['error_code'] ?? body['errcode'] ?? body['err_code'] ?? 0;
   final code = raw is num ? raw.toInt() : int.tryParse('$raw') ?? 0;
-  // MoeKoeMusic 将 20028 视为账号级风控（即使没有 ssa-code 头）。
+  // 20028 为账号级风控（即使没有 ssa-code 头）。
   if (code == 20028) {
     throw KgRiskVerifyRequiredException('酷狗要求完成安全验证（20028），请在酷狗官方客户端完成验证后重试。');
   }

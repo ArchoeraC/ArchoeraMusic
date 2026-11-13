@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-/// KG 设备身份（对齐 MoeKoeMusic `electron/util/kugouapi/deviceUtil.js`）。
+/// KG 设备身份（字段与取值约定来源：KuGouMusicApi `util/util.js`，MIT）。
 ///
 /// 风控要点：同一安装必须长期复用同一套 GUID / MID / DEV / MAC / WebGL
 /// 指纹，`register_dev` 返回的 dfid 也应持久化复用。每次启动、甚至每次
@@ -36,7 +36,7 @@ class KugouDevice {
   /// 设备名（10 位大写；请求里对应 KUGOU_API_DEV）。
   final String dev;
 
-  /// 设备 MAC（对齐 MoeKoeMusic 固定值）。
+  /// 设备 MAC（固定值；不暴露真实网卡地址）。
   final String mac;
 
   /// WebGL 指纹哈希（随机 uint64 十进制；SSA 行为指纹会带上）。
@@ -98,7 +98,7 @@ class KugouDevice {
       'dev=$dev, dfid=${dfid.isEmpty ? '-' : 'set'})';
 }
 
-/// 对齐 MoeKoeMusic deviceUtil.js 的固定 MAC（不暴露真实网卡地址）。
+/// 固定 MAC：不暴露真实网卡地址，同时保持安装级身份稳定。
 const _defaultMac = '02:00:00:00:00:00';
 
 String _randomDev(Random rng) => String.fromCharCodes(

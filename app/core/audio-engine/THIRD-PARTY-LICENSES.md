@@ -1,8 +1,9 @@
 # 音频引擎第三方许可证声明（audio-engine / C 引擎 + Zig 内核）
 
 本目录 `app/core/audio-engine` 为 ArchoeraMusic 的音频引擎（FFmpeg 解码 +
-miniaudio 播放 + Rust tempo + Zig 解码内核）。其**自研代码**随本软件以 AGPL-3.0 授权；
-第三方组件按各自许可使用，逐项登记见下。
+miniaudio 播放 + Rust tempo + Zig 解码内核）。**本项目独立编写的代码**随本软件以
+AGPL-3.0 授权；由第三方源码移植 / 转录而来的文件按**各自原许可**分发，文件头
+`SPDX-License-Identifier` 为逐文件权威标注（见下文「文件级许可标注」），逐项登记见下。
 
 > 架构调整（2026-08-16，见 `docs/audio-kernel-zig.md`）：**FFmpeg 保持默认主解码引擎**
 > （`-Duse-ffmpeg` 默认开启，行为零回归），Zig 内核逐格式验收后按格式接管（格式级开关），
@@ -164,6 +165,28 @@ GPL-2.0、SoftSound shorten GPL），**不得直接转录/引用其源码**。�
 **FFmpeg（LGPL-2.1+）通道**逐句对齐（见上文移植表，属 LGPL-2.1+ 衍生登记），禁止改换到官方
 GPL 参考源；后续若需变更实现方式，应先做许可评估。任何 GPL 系参考源码（含 GPL-2.0-only）
 一律不得并入 Zig 内核或本引擎。
+
+## 文件级许可标注（SPDX，2026-11 审计补齐）
+
+`kernel/` 下每个 `.zig` 文件头部都有 `SPDX-License-Identifier`，**以该行为准**：
+
+| 文件范围 | SPDX | 说明 |
+|---|---|---|
+| 本项目独立编写 | `AGPL-3.0-or-later` | 其余内核文件 |
+| FFmpeg `libavcodec` / `libavformat` 移植 / 转录 | `LGPL-2.1-or-later` | wma / wmapro / wmalossless / wmavoice / aac sbr·mdct / latm / ac3 / als / amrwb / mpc / spx / dst / dsd / opus celt_tables / tta / tak / shn |
+| libopus 移植（SILK、kissfft、静态模式表） | `BSD-3-Clause` | 文件头保留 Xiph.Org 等上游版权声明 |
+| WavPack 移植 / 对照 | `BSD-3-Clause` | 文件头保留 David Bryant 等上游版权声明 |
+| minimp3 解码表转录 | `CC0-1.0` | 表值为事实数据，来源仍标注 |
+| vendored 源码（stb_vorbis / OpenCORE AMR） | 各自文件头（PD / Apache-2.0） | 完整第三方源码，保留原文件头 |
+
+- 标注为 `LGPL-2.1-or-later` / `BSD-3-Clause` / `CC0-1.0` 的文件属于**上游衍生或转录**，
+  **不能**被理解为仅以 AGPL-3.0 授权；本项目对其的修改部分按同一原许可提供。
+- 所有这些许可均与 AGPL-3.0 **聚合作品兼容**（LGPL-2.1+、BSD-3、CC0 均可并入
+  AGPL-3.0 分发；BSD-3 仅要求保留版权声明与免责声明，已随文件头 + 本文档 + 包内
+  `licenses/BSD-3-Clause.txt` 一并保留）。
+- 仅作「对照参考」、按规范 / 行为独立重写的模块（FLAC、DTS、MLP、MP3 码流层、APE、
+  ALAC、Ogg/M4A 容器、Opus CELT/PVQ/RangeCoder）保持 AGPL-3.0-or-later；如日后认定
+  其中个别文件构成衍生，改按对应上游许可标注即可，不影响整体分发。
 
 ## 合规评估与义务清单
 

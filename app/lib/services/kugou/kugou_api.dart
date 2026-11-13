@@ -1088,8 +1088,8 @@ class KugouApi extends ChangeNotifier {
   /// 返回 `(tracks, total)`：tracks 为当页歌曲，**保持接口返回顺序**
   /// （最新收藏在前）。[gid] 非空时走公开歌单接口
   /// `/pubsongs/v2/get_other_list_file_nofilt`（global_collection_id，
-  /// 按「最新收藏在前」稳定分页，对齐 MoeKoeMusic /playlist/track/all
-  /// 方案）；该 id 无法用于公开接口（实为 listid）时回退个人接口
+  /// 按「最新收藏在前」稳定分页，与官方客户端 /playlist/track/all
+  /// 行为一致）；该 id 无法用于公开接口（实为 listid）时回退个人接口
   /// `/v4/get_list_all_file`。两种接口均不按 sort 排序——sort 字段在
   /// 部分条目缺失/不稳定，依赖它会打乱接口顺序。
   /// 返回 `(tracks, total, rawCount)`：tracks 为当页歌曲，total 为歌单
@@ -1152,7 +1152,7 @@ class KugouApi extends ChangeNotifier {
         ? totalRaw.toInt()
         : int.tryParse('$totalRaw') ?? tracks.length;
     // rawCount：本页 RAW 响应条数（过滤前），短页终止判定用（见
-    // [playlistTracksAllNew]，对齐 MoeKoeMusic loadAllRemainingTracks）
+    // [playlistTracksAllNew] 的短页终止判定）
     return (tracks, total, songs is List ? songs.length : 0);
   }
 
@@ -1202,7 +1202,7 @@ class KugouApi extends ChangeNotifier {
   /// 私有歌单（用户歌单/"我喜欢"）全量歌曲。
   ///
   /// 300/页循环翻页。终止条件 = 本页 RAW 响应不足即停 或 收敛到接口
-  /// total（对齐 MoeKoeMusic loadAllRemainingTracks 与 b2e6415 原链路，
+  /// total（对齐接口实际行为与 b2e6415 原链路，
   /// **非纯 total 收敛**）：RAW 不足说明已是末页；total 仅作兜底防接口
   /// 异常。逐条按 hash 去重防接口边界重复。[gid] 非空走公开歌单接口
   /// （顺序稳定），否则回退 listid 个人接口。
@@ -1269,7 +1269,7 @@ class KugouApi extends ChangeNotifier {
 
   /// 拉取KG用户曲库并按归属分类（创建的歌单 / 收藏的歌单 / 收藏的专辑）。
   ///
-  /// 对齐 MoeKoeMusic Library.vue 对 `/v7/get_all_list` 的解析：
+  /// 对齐 `/v7/get_all_list` 的实际返回结构：
   /// - `list_create_userid == 登录 userid` 或 `name == '我喜欢'` → 创建的歌单；
   /// - 其余按 `authors` 字段区分「收藏的歌单」（无）与「收藏的专辑」（有）。
   /// 详情 id 取 `list_create_gid` 优先 / `global_collection_id` 兜底。
@@ -1328,7 +1328,7 @@ class KugouApi extends ChangeNotifier {
         ),
       );
     }
-    // 「我喜欢」置顶（对齐 MoeKoeMusic sort 优先）
+    // 「我喜欢」置顶（官方客户端同样优先展示）
     items.sort((a, b) {
       final al = a.title == '我喜欢' ? -1 : 0;
       final bl = b.title == '我喜欢' ? -1 : 0;
@@ -1340,8 +1340,7 @@ class KugouApi extends ChangeNotifier {
   /// 「我喜欢」歌单 listid（进程内缓存；未找到返回 null）。
   String? _likeListId;
 
-  /// 查找「我喜欢」歌单 listid（对齐 MoeKoeMusic Library.vue 约定：
-  /// 用户歌单里 `name == '我喜欢'`）。
+  /// 查找「我喜欢」歌单 listid（约定：用户歌单里 `name == '我喜欢'`）。
   Future<String?> likeListId() async {
     final cached = _likeListId;
     if (cached != null) return cached;
@@ -1355,7 +1354,7 @@ class KugouApi extends ChangeNotifier {
   String? _likeGid;
 
   /// 查找「我喜欢」歌单的公开 id（list_create_gid / global_collection_id，
-  /// 对齐 MoeKoeMusic Library.vue：打开歌单用 global_collection_id 调
+  /// 打开歌单用 global_collection_id 调
   /// `/playlist/track/all` 公开接口，分页顺序稳定「最新收藏在前」）。
   /// 账号数据缺失公开 id 时返回 null（调用方回退 listid 个人接口）。
   Future<String?> likeGid() async {
@@ -1595,7 +1594,7 @@ class KugouApi extends ChangeNotifier {
       final parsed = list
           .whereType<Map<String, dynamic>>()
           .map((s) {
-            // hash 嵌套在 deprecated 内（对齐 MoeKoeMusic formatArtistTracks 结构）
+            // hash 嵌套在 deprecated 内（接口实际结构）
             final deprecated = s['deprecated'];
             final item = <String, dynamic>{
               if (deprecated is Map) ...Map<String, dynamic>.from(deprecated),
