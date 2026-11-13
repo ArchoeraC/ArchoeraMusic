@@ -2,8 +2,16 @@
 // Copyright (C) 2026 Archoera && BetaStudio2
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import 'dart:io' show Platform;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:window_manager/window_manager.dart'
+    show
+        DragToMoveArea,
+        VirtualWindowFrame,
+        WindowCaption,
+        kWindowCaptionHeight;
 
 import '../apis/runtime.dart';
 import '../easter_egg/easter_egg.dart';
@@ -28,6 +36,14 @@ import 'appearance_styles/appearance_style_registry.dart';
 import 'bootstrap.dart';
 import 'router.dart';
 import 'theme_provider.dart';
+
+/// 桌面端启用自绘窗口框（配合 main.dart 的 TitleBarStyle.hidden）：
+/// WindowCaption 提供标题栏（拖拽 + 双击最大化 + 最小化/最大化/关闭），
+/// VirtualWindowFrame 提供边缘缩放与窗口边框/阴影（Linux 全边缘；
+/// Windows 左右下走原生 thickframe 仅补顶部；macOS 原生缩放直通）。
+/// 关闭按钮调用 nativeapi 可取消的关闭请求，仍由 TrayIntegration 接管。
+final bool _kCustomWindowFrame =
+    Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
 /// ArchoeraMusic 应用根：主题 + 路由 + 启动门。
 ///
@@ -159,6 +175,51 @@ class ArchoeraMusicApp extends ConsumerWidget {
                     data: MediaQuery.of(context)
                         .copyWith(disableAnimations: true),
                     child: gate,
+                  );
+                }
+                // 自绘窗口框包在最外层：标题栏悬浮于一切路由（含播放页）之上，
+                // 启动门/解锁门期间仍可最小化/关闭；无边框窗口的边缘缩放由
+                // VirtualWindowFrame 提供（最大化/全屏时自动收边）。
+                if (_kCustomWindowFrame) {
+                  // 先把当前内容快照到局部变量再包装：Builder 的闭包捕获的是
+                  // 变量而非值，若闭包里直接引用 gate，而 gate 紧接着被重新赋
+                  // 值为这个 Builder 本身 → 挂载时无限自嵌套（栈溢出）。
+                  final content = gate;
+                  gate = Builder(
+                    builder: (frameContext) => VirtualWindowFrame(
+                      child: Column(
+                        children: [
+                          if (Platform.isMacOS)
+                            // macOS：TitleBarStyle.hidden 保留原生红绿灯按钮
+                            // （悬浮于内容左上），这里只补一条拖拽/双击最大化区，
+                            // 避免与原生按钮重复。
+                            DragToMoveArea(
+                              child: SizedBox(
+                                height: 28,
+                                child: ColoredBox(
+                                  color: Theme.of(frameContext)
+                                      .colorScheme
+                                      .surface,
+                                ),
+                              ),
+                            )
+                          else
+                            // WindowCaption 内部用 SizedBox(height: double.infinity)
+                            // 撑满，必须由父级给出确定高度（官方示例放在 AppBar 下）；
+                            // 直接塞进 Column 会拿到无限高度约束而断言失败。
+                            SizedBox(
+                              height: kWindowCaptionHeight,
+                              child: WindowCaption(
+                                brightness: Theme.of(frameContext).brightness,
+                                backgroundColor: Theme.of(frameContext)
+                                    .colorScheme
+                                    .surface,
+                              ),
+                            ),
+                          Expanded(child: content),
+                        ],
+                      ),
+                    ),
                   );
                 }
                 return gate;
