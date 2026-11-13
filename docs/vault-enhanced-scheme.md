@@ -395,18 +395,20 @@ swap/pagefile，Windows 上实测可在会话内存中扫到已删除凭据。**
 
 ---
 
-## 13. 非常规撬开尝试与修补（2026-10，本地实测）
+## 13. 非常规路径与修补（摘要）
 
-在 §12 规范攻击之外，做了"非常规"尝试（LD_PRELOAD / 环境注入 / 伪造 vault / 父进程伪造）：
+在规范攻击之外，还验证过加载器注入、环境变量、伪造二进制与父进程等路径。以下只记录结论与
+防线，不复述可操作的攻击步骤：
 
-- **A · LD_PRELOAD 注入（曾经成立，已修）**：vault 为动态链接 PIE、继承环境；`LD_PRELOAD=<evil.so>` hook `read` 即可读到标准输入握手里的明文口令 → 再用该口令离线解出全部凭据（**实测完全失守**）。
-  - **修补**：① Dart 侧 spawn vault（`start`+`runSync`）改用**净化环境**（剔除 `LD_PRELOAD`/`LD_AUDIT`/`LD_LIBRARY_PATH`/`DYLD_*`，并以 `includeParentEnvironment:false` 不再合并父环境）；② vault 侧 `VerifyAndArm` 在 Linux 检出 `LD_PRELOAD`/`LD_AUDIT` 非空、macOS 检出 `DYLD_INSERT_LIBRARIES` 非空即**拒绝运行**（在读任何输入之前）。
-  - **残余**：属"提高门槛"而非边界——系统级 `/etc/ld.so.preload`、或已被攻陷的父程序注入不受控。**根治办法是静态链接**（`ld.so` 不参与，`LD_PRELOAD` 失效）——**Linux 已落地**：`native/archoera-vault` 改由 `app/core/vault-rs` 的 **Rust 静态单文件**承接（`+crt-static`；CI 走 musl 静态），C# NativeAOT 因链接器断言失败无法静态化（§13-E）。**Windows / macOS 亦已改用同一 Rust 版**（`app/core/vault-rs`：Windows 走 DPAPI、无 `LD_PRELOAD` 类加载器注入面；macOS 走 Keychain，仍以过程护栏「拒绝非空 `DYLD_INSERT_LIBRARIES`」+ Dart 侧环境净化兜底）；Windows/macOS 运行期行为：**Windows 已在 Wine 上端到端实测**（见 §14 与 `app/core/vault-rs/test-windows.sh`），macOS 仅完成 Linux 交叉编译检查、运行期待真机。**内存护栏（mlock/VirtualLock + zeroize）已由 `app/core/vault-rs/src/memguard.rs` 在 Rust 三端落地**（见 §14、SEC-35/36）。C# NativeAOT vault 已不再进入任何平台产物。
-- **B · `/proc/<pid>/environ`**：被 `PR_SET_DUMPABLE=0` 拒绝（口令也不经 env 传递）。
-- **C · `ARCHOERA_VAULT_BIN` 伪造 vault（曾经成立，已修）**：应用会把明文口令交给 env 指定的二进制，而 marker 与握手 HMAC 均可自算，**不构成对 vault 二进制的认证**。
-  - **修补**：`ARCHOERA_VAULT_BIN` **仅在 debug/测试构建生效**（`kDebugMode`；或显式 `ARCHOERA_ALLOW_VAULT_BIN`）；**release 忽略**，走默认解析 + key1 签名清单校验 + 父进程身份校验。
-- **D · 伪造"主程序"满足父进程 pin**：把一份 fork 包装器命名为 `archoera_music` 放在打包布局的预期路径，vault 即接受（已验证 pin 可通过）。此为**"替换主程序"的已知上限**，本地防线无法阻止。
-- **E · 静态链接**：NativeAOT `-r linux-musl-x64 -p:StaticExecutable=true` 在本机 `ld.bfd` 断言失败 → 暂不可得（若换环境可尝试 `lld`）。**已改走备选**：Linux 用 Rust（`app/core/vault-rs`）静态单文件（`+crt-static`；CI 走 musl 静态）替代 C# NativeAOT，从根上消除 `ld.so` 参与。
+| 路径 | 结论 | 处置 |
+|---|---|---|
+| 加载器注入（`LD_*` / `DYLD_*`） | 曾经成立，已修复 | 净化子进程环境 + 拒绝非空注入变量；Linux 改静态单文件，`ld.so` 不参与 |
+| 环境变量 / `/proc` 读取 | 已被进程硬化拒绝 | `PR_SET_DUMPABLE=0`（Linux）；口令不经 env 传递 |
+| 伪造 vault 二进制 | 曾经成立，已修复 | release 忽略覆盖路径 + 签名清单 + 父进程身份校验 |
+| 伪造“主程序”满足父进程 pin | 本地防线已知上限 | 属“替换主程序”残余；依赖 OS 签名/信任根 |
+| 静态链接 | 已落地（Rust 静态单文件） | 三端统一 Rust 版；消除 `ld.so` 参与 |
+
+> 具体复现步骤不在公开文档展开；漏洞报告请按 [SECURITY.md](../SECURITY.md) 走私密渠道。
 
 ## 14. 多端"需真机验证"清单（本地仅交叉编译 / 单测）
 
