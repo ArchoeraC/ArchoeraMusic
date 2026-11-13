@@ -49,6 +49,8 @@ import '../stores/data_dir.dart';
 import '../stores/providers.dart';
 import '../theme/app_theme.dart';
 import '../theme/theme_sources/theme_source_registry.dart';
+import '../utils/app_version.dart';
+import '../widgets/common/release_channel_badge.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/dialogs/legal_dialogs.dart';
 import '../widgets/dialogs/neko_login_dialog.dart';
