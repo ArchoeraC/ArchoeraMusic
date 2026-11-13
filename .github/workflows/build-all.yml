@@ -42,6 +42,11 @@
 #  │  故在 job 级覆盖顶层 permissions。tag 名即版本（沿用仓库现有 v* 标签）。
 #  └──────────────────────────────────────────────────────────────────
 #
+#  ┌─ nightly job ─────────────────────────────────────────────────────
+#  │  schedule（UTC 18:00）或手动勾选 nightly 时，全平台构建后把产物滚动
+#  │  覆盖到固定 `nightly` prerelease；通道自动为 Nightly(3)，不产生 v* 标签。
+#  └──────────────────────────────────────────────────────────────────
+#
 #  ┌─ preflight（点菜）────────────────────────────────────────────────
 #  │  workflow_dispatch 可勾选构建哪些平台（默认全选）：macos / windows /
 #  │  linux_deb / linux_deepin / linux_rpm / linux_arch / linux_appimage /
@@ -96,8 +101,15 @@ on:
         description: 'Linux NixOS（源码 flake）'
         type: boolean
         default: true
+      nightly:
+        description: '构建完成后发布 Nightly 滚动预览（需九项全选）'
+        type: boolean
+        default: false
   push:
     tags: ['v*']
+  # 每夜自动构建：默认分支最新提交 → 通道 Nightly(3)，滚动覆盖 prerelease。
+  schedule:
+    - cron: '0 18 * * *'   # UTC 18:00 / 北京时间 02:00
 
 permissions:
   contents: read
@@ -148,8 +160,8 @@ jobs:
         run: |
           set -euo pipefail
           truthy() { case "${1:-}" in true|TRUE|True|1|yes|YES) echo true ;; *) echo false ;; esac; }
-          if [ "$EV" = "push" ]; then
-            # tag 发版：忽略点菜、强制全选（发版必须全平台）。
+          if [ "$EV" = "push" ] || [ "$EV" = "schedule" ]; then
+            # tag 发版 / 夜间构建：忽略点菜、强制全选（必须全平台）。
             MACOS=true; WINDOWS=true; DEB=true; DEEPIN=true; RPM=true
             ARCH=true; APPIMAGE=true; FLATPAK=true; NIX=true
           else
@@ -1227,3 +1239,81 @@ jobs:
               --title "ArchoeraMusic ${VER}" \
               --notes-file "$NOTES"
           fi
+
+  # =====================================================================
+  #  nightly：定时构建三端产物，滚动覆盖到固定 `nightly` prerelease。
+  #  - 仅 schedule（或手动勾选 nightly）触发；tag 发版走 release 作业。
+  #  - 通道由 workflow 级 ARCHOERA_CHANNEL 统一设为 3（Nightly）。
+  #  - 每次覆盖同名 prerelease，不产生版本 tag，不参与 v* 发版。
+  # =====================================================================
+  nightly:
+    name: Nightly rolling preview
+    needs: [preflight, build, linux-deb, linux-rpm, linux-arch, linux-deepin, linux-appimage, linux-flatpak, linux-nix]
+    if: >-
+      (github.event_name == 'schedule' ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.event.inputs.nightly == 'true')) &&
+      needs.preflight.outputs.all_selected == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: nightly-preview
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Download all platform build artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          path: artifacts
+
+      - name: Collect nightly assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p nightly-assets
+          find artifacts -type f \
+            \( -name '*.deb' -o -name '*.rpm' -o -name '*.pkg.tar.zst' \
+               -o -name '*.AppImage' -o -name '*.flatpak' -o -name '*.dmg' \
+               -o -name '*.zip' -o -name '*.exe' -o -name '*.tar.gz' \) \
+            -exec cp -t nightly-assets {} +
+          # 去掉纯日志/调试压缩包（Windows 构建日志等）
+          find nightly-assets -type f -name '*logs*' -delete
+          test "$(find nightly-assets -type f | wc -l)" -gt 0
+          echo "── nightly assets ──"
+          ls -lh nightly-assets
+
+      - name: Publish / update nightly prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          NOTES=nightly-notes.md
+          {
+            echo "滚动预览构建（Nightly），可能不稳定；正式使用请下载 v* Release。"
+            echo
+            echo "- 通道: Nightly (3)"
+            echo "- 提交: \`${GITHUB_SHA}\`"
+            echo "- 构建: $(date -u +'%Y-%m-%d %H:%M UTC')"
+            echo
+            echo '最近提交:'
+            git log -1 --pretty='- `%h` %s'
+          } > "$NOTES"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f nightly
+          git push -f origin nightly
+
+          if gh release view nightly --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete nightly --repo "$GITHUB_REPOSITORY" --yes
+          fi
+
+          gh release create nightly nightly-assets/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --prerelease \
+            --title "Nightly $(date -u +'%Y-%m-%d') · ${GITHUB_SHA:0:7}" \
+            --notes-file "$NOTES"
