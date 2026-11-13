@@ -28,6 +28,48 @@ String get appVersion => _appVersion;
 /// 语义版本（截断构建号；供客户端标识）。
 String get clientVersion => _clientVersion;
 
+/// 发布通道（编译期 `--dart-define=ARCHOERA_CHANNEL=…`）。
+///
+/// - `0` Release（正式版）
+/// - `1` Beta（CI 手动构建）
+/// - `2` Dev（默认：未传 define 的本地/开发构建）
+/// - `3` Nightly（自动构建产物）
+///
+/// 未传 define 或数值越界时回退 [ReleaseChannel.dev]。
+enum ReleaseChannel {
+  release(0, 'Release'),
+  beta(1, 'Beta'),
+  dev(2, 'Dev'),
+  nightly(3, 'Nightly');
+
+  const ReleaseChannel(this.value, this.label);
+
+  /// define 的数值（0–3）。
+  final int value;
+
+  /// 用户可见的通道名（不展示原始数字）。
+  final String label;
+
+  /// 当前编译期通道。
+  static ReleaseChannel get current =>
+      fromValue(int.tryParse(_channelDefine) ?? dev.value);
+
+  /// 数值 → 通道；未知值回退 [dev]。
+  static ReleaseChannel fromValue(int? value) => switch (value) {
+    0 => release,
+    1 => beta,
+    2 => dev,
+    3 => nightly,
+    _ => dev,
+  };
+
+  /// 编译期定义（`String.fromEnvironment` 只接受字符串 define）。
+  static const String _channelDefine = String.fromEnvironment(
+    'ARCHOERA_CHANNEL',
+    defaultValue: '2',
+  );
+}
+
 /// 从内置 `pubspec.yaml` 读取 `version:` 并缓存完整 / 语义两个视图（失败静默）。
 Future<void> loadAppVersion() async {
   if (_appVersion.isNotEmpty) return;
