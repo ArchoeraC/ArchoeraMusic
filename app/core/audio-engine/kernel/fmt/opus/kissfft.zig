@@ -1,7 +1,13 @@
 // ArchoeraMusic Audio Framework
 // Copyright (C) 2026 Archoera && BetaStudio2
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// EraSync — ArchoeraMusic 自研音频内核
+// SPDX-License-Identifier: BSD-3-Clause
+// EraSync — ArchoeraMusic 音频内核
+//
+// ⚠ 衍生作品：移植自 libopus 1.6.1（BSD-3-Clause）。
+// Copyright (c) 2001-2024 Xiph.Org, Skype Limited, Octasic, Jean-Marc Valin,
+// Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding,
+// Erik de Castro Lopo。本文件保留上游版权声明，按 BSD-3-Clause 分发；
+// 逐文件溯源见 audio-engine/THIRD-PARTY-LICENSES.md。
 
 //! libopus kiss_fft + clt_mdct_backward 浮点移植（CELT 合成 bit-exact，§9.2）
 //!

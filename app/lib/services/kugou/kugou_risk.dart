@@ -4,8 +4,7 @@
 
 /// 酷狗 SSA 安全验证的协议模型与行为指纹生成。
 ///
-/// 对齐 KuGouMusicApi `util/generate_simulate.js` 与 MoeKoeMusic
-/// `src/utils/riskVerify.js` / `src/components/RiskVerifyModal.vue`：
+/// 对齐 KuGouMusicApi `util/generate_simulate.js` 的协议模型：
 ///
 /// - `ssa-code` 响应头 = 风控事件 id（eventid）；
 /// - `/verifyservice/v3/get_verify_info` 返回 `v_type`
