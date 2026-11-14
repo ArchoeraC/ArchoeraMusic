@@ -58,9 +58,6 @@ class _SmoothWheelScrollPosition extends ScrollPositionWithSingleContext {
     super.debugLabel,
   });
 
-  /// 连滚期间**累积**的目标像素。新一轮滚动的第一个事件用它取代当前像素。
-  double _target = 0;
-
   @override
   void pointerScroll(double delta) {
     // 触控板「惯性取消」事件：直接收尾。
@@ -80,16 +77,23 @@ class _SmoothWheelScrollPosition extends ScrollPositionWithSingleContext {
     final ScrollActivity? current = activity;
     if (current is _WheelScrollActivity) {
       // 连滚：只改目标，不重启活动 / 不重置 Ticker 计时（这是快速滚动的关键）。
-      _target = _clampTarget(_target + delta);
-      current.retarget(_target);
+      //
+      // 目标**只能**从弹簧自身取，不能缓存在本位置对象上：主题变化等祖先依赖
+      // 变化会让 `Scrollable.didChangeDependencies` 重建 `ScrollPosition`
+      // （见 flutter 的 `_ScrollableState.didChangeDependencies`，主题动画期间
+      // 每帧一次），活动与弹簧经 `absorb` 迁到新位置，而位置上缓存的累加目标
+      // 会归零——下一次滚轮就会以 0 为起点重定目标，把列表从当前位置拉回顶部
+      // （播放开始时封面取色完成 → 主题变化 → 滚动即跳顶）。
+      final double target = _clampTarget(current.target + delta);
+      current.retarget(target);
       updateUserScrollDirection(
         delta > 0 ? ScrollDirection.forward : ScrollDirection.reverse,
       );
       return;
     }
 
-    _target = _clampTarget(pixels + delta);
-    if (_target == pixels) return;
+    final double target = _clampTarget(pixels + delta);
+    if (target == pixels) return;
     updateUserScrollDirection(
       delta > 0 ? ScrollDirection.forward : ScrollDirection.reverse,
     );
@@ -98,7 +102,7 @@ class _SmoothWheelScrollPosition extends ScrollPositionWithSingleContext {
         this,
         context.vsync,
         initialPixels: pixels,
-        initialTarget: _target,
+        initialTarget: target,
       ),
     );
   }
@@ -147,6 +151,13 @@ class _WheelScrollActivity extends ScrollActivity {
 
   @override
   double get velocity => _spring.velocity;
+
+  /// 当前弹簧目标（像素）。
+  ///
+  /// 连滚时由 `pointerScroll` 以它为准累加位移。这是弹簧自己的状态，
+  /// 随活动经 `absorb` 迁移到新 `ScrollPosition`；不能改用位置对象上的
+  /// 字段缓存（位置会被 `Scrollable.didChangeDependencies` 重建）。
+  double get target => _spring.targetPosition;
 
   /// 滚轮事件改目标：保留当前速度（[Spring1D.setTarget] 保速重定向）。
   void retarget(double target) => _spring.setTarget(target);
