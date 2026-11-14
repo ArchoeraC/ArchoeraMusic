@@ -14,7 +14,7 @@
 
 part of '../settings_dialog.dart';
 
-/// 由设置源码生成的搜索索引（255 条）。
+/// 由设置源码生成的搜索索引（291 条）。
 List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
   // 设置行与小节标题（按分类顺序）。
   _SearchEntry(
@@ -636,6 +636,66 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
     SettingsCategory.audioEffects.icon,
   ),
   _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsEqPreamp,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsLowfreqHpfFreq,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsLowfreqBassGain,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsLowfreqBassFreq,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsChorusVoices,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsChorusStep,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsPlaybackSpeed,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsPitch,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsPeqFreq,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.audioEffects,
+    l10n.settingsPeqGain,
+    '',
+    SettingsCategory.audioEffects.icon,
+  ),
+  _SearchEntry(
     SettingsCategory.lyrics,
     l10n.settingsSectionPlayerLyrics,
     '',
@@ -1045,6 +1105,36 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
   ),
   _SearchEntry(
     SettingsCategory.storage,
+    l10n.settingsCacheLiked,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsCacheLyric,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsCacheLyricMatch,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsCacheLyricTtml,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsCacheCover,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
     l10n.settingsSongCacheLimitTitle,
     '',
     SettingsCategory.storage.icon,
@@ -1112,6 +1202,36 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
   _SearchEntry(
     SettingsCategory.storage,
     l10n.settingsHistoryStats,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsSecuritySection,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsSecurityStreaming,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsSecuritySession,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsSecurityUserDb,
+    '',
+    SettingsCategory.storage.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.storage,
+    l10n.settingsSchemeSection,
     '',
     SettingsCategory.storage.icon,
   ),
@@ -1320,6 +1440,24 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
     SettingsCategory.scanner.icon,
   ),
   _SearchEntry(
+    SettingsCategory.scanner,
+    l10n.settingsScanMaxFileSizeMb,
+    l10n.settingsScanNumberDesc,
+    SettingsCategory.scanner.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.scanner,
+    l10n.settingsScanMaxScanFiles,
+    l10n.settingsScanNumberDesc,
+    SettingsCategory.scanner.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.scanner,
+    l10n.settingsScanMaxErrors,
+    l10n.settingsScanNumberDesc,
+    SettingsCategory.scanner.icon,
+  ),
+  _SearchEntry(
     SettingsCategory.searchIndex,
     l10n.settingsSectionSearchIndex,
     '',
@@ -1354,6 +1492,18 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
     l10n.settingsSearchIndexStatusBuilding,
     '',
     SettingsCategory.searchIndex.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mediaSource,
+    l10n.settingsDefaultSource,
+    '',
+    SettingsCategory.mediaSource.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mediaSource,
+    l10n.streamingQualityTitle,
+    '',
+    SettingsCategory.mediaSource.icon,
   ),
   _SearchEntry(
     SettingsCategory.experimentalSource,
@@ -1424,6 +1574,72 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
   _SearchEntry(
     SettingsCategory.mcp,
     l10n.settingsMcpCapsTitle,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapRead,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapPlayback,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapQueue,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapSearch,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapLibrary,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapPreferences,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapAppearance,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapCollection,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapHistory,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapLyrics,
+    '',
+    SettingsCategory.mcp.icon,
+  ),
+  _SearchEntry(
+    SettingsCategory.mcp,
+    l10n.settingsMcpCapDownload,
     '',
     SettingsCategory.mcp.icon,
   ),
