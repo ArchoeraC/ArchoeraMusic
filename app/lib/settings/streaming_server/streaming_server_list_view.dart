@@ -147,45 +147,48 @@ extension _StreamingServerListView on _StreamingServerListState {
       ('medium', l10n.streamingQualityMedium),
       ('low', l10n.streamingQualityLow),
     ];
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: cardDecoration(scheme),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.streamingQualityTitle,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: scheme.onSurface,
+    return SettingsAnchor(
+      label: l10n.streamingQualityTitle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: cardDecoration(scheme),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.streamingQualityTitle,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: scheme.onSurface,
+              ),
             ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            l10n.streamingQualityNote,
-            style: TextStyle(
-              fontSize: 11.5,
-              height: 1.4,
-              color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+            const SizedBox(height: 3),
+            Text(
+              l10n.streamingQualityNote,
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.4,
+                color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final (key, label) in options)
-                ChoiceChip(
-                  label: Text(label),
-                  selected: current == key,
-                  onSelected: (_) => ref
-                      .read(appPrefsProvider.notifier)
-                      .setStreamingQuality(key),
-                ),
-            ],
-          ),
-        ],
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final (key, label) in options)
+                  ChoiceChip(
+                    label: Text(label),
+                    selected: current == key,
+                    onSelected: (_) => ref
+                        .read(appPrefsProvider.notifier)
+                        .setStreamingQuality(key),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -9,7 +9,8 @@
 ///   - [kEasterEggEffects]：全局彩蛋注册表（新增彩蛋往这里加）；
 ///   - [pickEasterEgg]：先按概率（默认 50%）决定是否触发，再按权重抽取；
 ///   - [EasterEggVisualHost]：把缩放/镜像/躲鼠标等效果施加到整棵 UI；
-///   - [showEasterEggGate]：「千万别点」警告门（标题 + 警告 + 三个「确定」）。
+///   - [showEasterEggGate]：「千万别点」警告门（标题 + 警告 + 三个「确定」）；
+///   - [kEasterEggUnlockQuery]：设置搜索框里的入口解锁暗号（界面无提示）。
 ///
 /// 新增彩蛋：写一个 `Future<void> Function(EasterEggContext)`，在
 /// [kEasterEggEffects] 追加一条 `EasterEggEffect` 即可。
@@ -55,3 +56,9 @@ part 'easter_egg_gate.dart';
 part 'effects/window_effects.dart';
 part 'effects/app_effects.dart';
 part 'effects/media_effects.dart';
+
+/// 「千万别点」入口的解锁暗号（设置搜索框精确输入才生效）。
+///
+/// 界面上**没有任何提示**：入口不会出现在搜索索引里，只有完整输入该串时
+/// 搜索结果才浮现「千万别点」。比较时统一按小写处理，用户大小写随意。
+const String kEasterEggUnlockQuery = 'archoeramusic.powerfull.settings';

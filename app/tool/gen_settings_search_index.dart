@@ -8,7 +8,8 @@
 /// 漏项/失效（曾出现「搜得到但跳不过」）。这里把**设置源码本身**当作唯一
 /// 事实来源：扫描各 section 里 `SettingTile` / `SettingSwitchTile` /
 /// `SettingSliderTile` / `SettingSection(Title)` 的 `title:` 与 `subtitle:`，
-/// 生成 `lib/settings/settings/settings_search_index.g.dart`。
+/// 并补充 `SettingsAnchor(label:)`（自定义卡片）；辅助方法参数与返回标题键的
+/// 箭头函数会回查 / 展开，生成 `lib/settings/settings/settings_search_index.g.dart`。
 ///
 /// 设计约束：
 /// - **纯文本分析**，不引入 build_runner / analyzer 依赖，产物是普通 Dart 源码；
@@ -37,9 +38,11 @@ const _fileCategory = <String, String>{
   'settings_sections_storage.dart': 'storage',
   'cache_section.dart': 'storage',
   'history_section.dart': 'storage',
+  'security_section_view.dart': 'storage',
   'scans_section.dart': 'scanner',
   'settings_sections_scrape.dart': 'scrape',
   'search_section.dart': 'searchIndex',
+  'streaming_server_list_view.dart': 'mediaSource',
   'settings_sections_mcp.dart': 'mcp',
   'settings_sections_about.dart': 'about',
   'settings_sections_developer.dart': 'developer',
@@ -76,6 +79,10 @@ const _titleWidgets = [
   'SettingSection',
 ];
 
+/// 自定义设置卡片：标题不经过 [SettingTile]，但用 `SettingsAnchor(label: …)`
+/// 登记了跳转锚点，同样应进入搜索索引。
+const _anchorWidgets = ['SettingsAnchor'];
+
 const _outFile = 'lib/settings/settings/settings_search_index.g.dart';
 
 class _Entry {
@@ -100,13 +107,15 @@ void main(List<String> args) {
     return;
   }
   if (checkOnly) {
-    stderr.writeln('[gen-settings-index] 生成结果已过期，请运行：'
-        'dart run tool/gen_settings_search_index.dart');
+    stderr.writeln(
+      '[gen-settings-index] 生成结果已过期，请运行：'
+      'dart run tool/gen_settings_search_index.dart',
+    );
     exit(1);
   }
   file.parent.createSync(recursive: true);
   file.writeAsStringSync(generated);
-  stdout.writeln('[gen-settings-index] 已更新 ${_outFile}：${entries.length} 条');
+  stdout.writeln('[gen-settings-index] 已更新 $_outFile：${entries.length} 条');
 }
 
 /// 扫描 `lib/settings` 下所有 section 源码。
@@ -120,27 +129,38 @@ List<_Entry> _scan() {
   final seen = <String>{};
   final entries = <_Entry>[];
 
-  final files = dir
-      .listSync(recursive: true)
-      .whereType<File>()
-      .where((f) => f.path.endsWith('.dart'))
-      .where((f) => _fileCategory.containsKey(_basename(f.path)))
-      .toList()
-    ..sort((a, b) => a.path.compareTo(b.path));
+  void add(String category, String titleKey, String? subtitleKey) {
+    // 同一分类内按标题去重（锚点表也按标题文本定位，重复无意义）。
+    if (!seen.add('$category\u0000$titleKey')) return;
+    entries.add(_Entry(category, titleKey, subtitleKey));
+  }
+
+  final files =
+      dir
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart'))
+          .where((f) => _fileCategory.containsKey(_basename(f.path)))
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
 
   for (final f in files) {
     final category = _fileCategory[_basename(f.path)]!;
     final source = f.readAsStringSync();
-    for (final call in _widgetCalls(source)) {
+    for (final call in _widgetCalls(source, _titleWidgets)) {
       final title = _namedArg(source, call, 'title');
       if (title == null) continue;
-      // 只接受「无参数」的 l10n getter：l10n.settingsXxx（后面紧跟 , 或 )）
-      final titleKey = _simpleL10n(title);
-      if (titleKey == null) continue;
-      final subtitleKey = _simpleL10n(_namedArg(source, call, 'subtitle') ?? '');
-      // 同一分类内按标题去重（锚点表也按标题文本定位，重复无意义）。
-      if (!seen.add('$category\u0000$titleKey')) continue;
-      entries.add(_Entry(category, titleKey, subtitleKey));
+      final subtitleKey = _simpleL10n(
+        _namedArg(source, call, 'subtitle') ?? '',
+      );
+      for (final titleKey in _titleKeys(source, call, title)) {
+        add(category, titleKey, subtitleKey);
+      }
+    }
+    // 自定义卡片（不走 SettingTile）用 SettingsAnchor 登记锚点，一并入索引。
+    for (final call in _widgetCalls(source, _anchorWidgets)) {
+      final labelKey = _simpleL10n(_namedArg(source, call, 'label') ?? '');
+      if (labelKey != null) add(category, labelKey, null);
     }
   }
 
@@ -159,14 +179,161 @@ List<_Entry> _scan() {
 }
 
 /// 逐个找出 `WidgetName(` 的起始偏移（忽略注释与字符串里的同名文本）。
-List<int> _widgetCalls(String source) {
+List<int> _widgetCalls(String source, List<String> widgets) {
   final offsets = <int>[];
-  final pattern = RegExp('\\b(${_titleWidgets.join('|')})\\(');
+  final pattern = RegExp('\\b(${widgets.join('|')})\\(');
   for (final m in pattern.allMatches(source)) {
     if (!_isCodePosition(source, m.start)) continue;
     offsets.add(m.end);
   }
   return offsets;
+}
+
+/// 标题表达式 → 一个或多个 l10n 键。
+///
+/// 覆盖设置源码里的三种声明式写法：
+/// - 直接 `l10n.xxx`（绝大多数）；
+/// - 辅助方法参数（`title: title` / `label: label`）→ 回查同文件调用点传入的
+///   `l10n.xxx`（具名 / 位置参数都支持）；
+/// - 返回 l10n 键的箭头函数（如 `_mcpCapabilityTitle(l10n, cap)`）→ 展开函数体。
+List<String> _titleKeys(String source, int callStart, String expr) {
+  final direct = _simpleL10n(expr);
+  if (direct != null) return [direct];
+
+  final trimmed = expr.trim();
+  if (RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(trimmed)) {
+    return _helperParamKeys(source, callStart, trimmed);
+  }
+  final fn = RegExp(r'^([A-Za-z_][A-Za-z0-9_]*)\s*\(').firstMatch(trimmed);
+  if (fn != null) return _arrowFunctionKeys(source, fn.group(1)!);
+  return const [];
+}
+
+/// `title: title` / `label: label`：找到包含该调用的辅助方法，回查调用点传进来的
+/// 具名参数或位置参数。只接受能静态确定为单个 `l10n.xxx` 的实参。
+List<String> _helperParamKeys(String source, int callStart, String param) {
+  final head = _enclosingFunction(source, callStart);
+  if (head == null) return const [];
+  final (name, params, nameStart) = head;
+
+  final named = RegExp(r'\{([\s\S]*?)\}').firstMatch(params)?.group(1);
+  final isNamed =
+      named != null && RegExp('\\b${RegExp.escape(param)}\\b').hasMatch(named);
+  final positional = params.replaceAll(RegExp(r'\{[\s\S]*\}'), '');
+  final positionalParams = positional.split(',');
+  final paramIndex = positionalParams.indexWhere(
+    (p) => RegExp('\\b${RegExp.escape(param)}\\b').hasMatch(p),
+  );
+  if (!isNamed && paramIndex < 0) return const [];
+
+  final keys = <String>[];
+  final callRe = RegExp('\\b${RegExp.escape(name)}\\s*\\(');
+  for (final m in callRe.allMatches(source)) {
+    if (m.start == nameStart) continue;
+    String? value;
+    if (isNamed) {
+      value = _namedArg(source, m.end, param);
+    } else {
+      final args = _splitArgs(source, m.end);
+      if (paramIndex < args.length) value = args[paramIndex];
+    }
+    final key = value == null ? null : _simpleL10n(value);
+    if (key != null && !keys.contains(key)) keys.add(key);
+  }
+  return keys;
+}
+
+/// 拆分调用实参（顶层逗号），用于读取位置参数。
+List<String> _splitArgs(String source, int start) {
+  final args = <String>[];
+  final current = StringBuffer();
+  var depth = 0;
+  for (var i = start; i < source.length; i++) {
+    final ch = source[i];
+    if (ch == '(' || ch == '[' || ch == '{') {
+      depth++;
+    } else if (ch == ')') {
+      if (depth == 0) break;
+      depth--;
+    } else if (ch == ']' || ch == '}') {
+      depth--;
+    } else if (ch == ',' && depth == 0) {
+      args.add(current.toString().trim());
+      current.clear();
+      continue;
+    }
+    current.write(ch);
+  }
+  final tail = current.toString().trim();
+  if (tail.isNotEmpty) args.add(tail);
+  return args;
+}
+
+/// 最近的函数签名 `(name, params, nameStart)`（仅类成员 / 顶层函数）。
+///
+/// 限制行首缩进 ≤3：方法体内的 `return SettingTile(` 等语句缩进更深，
+/// 不会被误当成函数声明。
+(String, String, int)? _enclosingFunction(String source, int index) {
+  final re = RegExp(
+    r'^[ ]{0,3}(?:Widget|String|void|bool|int|double|Future<[^\n]*>|'
+    r'[A-Za-z_][A-Za-z0-9_<>?, ]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(',
+    multiLine: true,
+  );
+  final matches = re.allMatches(source.substring(0, index)).toList();
+  if (matches.isEmpty) return null;
+  final m = matches.last;
+  final open = m.end - 1;
+  final close = _matchingParen(source, open);
+  if (close < 0) return null;
+  final name = m.group(1)!;
+  final nameStart = m.start + m.group(0)!.indexOf(name);
+  return (name, source.substring(open + 1, close), nameStart);
+}
+
+/// `open` 处 `(` 对应的 `)` 下标；找不到返回 -1。
+int _matchingParen(String source, int open) {
+  var depth = 0;
+  for (var i = open; i < source.length; i++) {
+    final ch = source[i];
+    if (ch == '(') {
+      depth++;
+    } else if (ch == ')') {
+      depth--;
+      if (depth == 0) return i;
+    }
+  }
+  return -1;
+}
+
+/// 展开 `X => switch (...) { … l10n.xxx … }` 这类返回标题键的箭头函数。
+List<String> _arrowFunctionKeys(String source, String name) {
+  final def = RegExp(
+    r'^[ ]{0,3}(?:String|[A-Za-z_][A-Za-z0-9_<>?, ]*)\s+' +
+        RegExp.escape(name) +
+        r'\s*\([^;]*?\)\s*=>',
+    multiLine: true,
+  ).firstMatch(source);
+  if (def == null) return const [];
+  var i = def.end;
+  var depth = 0;
+  while (i < source.length) {
+    final ch = source[i];
+    if (ch == '(' || ch == '[' || ch == '{') {
+      depth++;
+    } else if (ch == ')' || ch == ']' || ch == '}') {
+      depth--;
+    } else if (ch == ';' && depth == 0) {
+      break;
+    }
+    i++;
+  }
+  final keys = <String>[];
+  final body = source.substring(def.end, i);
+  for (final m in RegExp(r'l10n\.([A-Za-z0-9_]+)').allMatches(body)) {
+    final key = m.group(1)!;
+    if (!keys.contains(key)) keys.add(key);
+  }
+  return keys;
 }
 
 /// 粗略判断 [index] 是否位于代码区（不在 `//` 注释或字符串字面量里）。
@@ -226,8 +393,12 @@ String _render(List<_Entry> entries) {
     ..writeln()
     ..writeln('// GENERATED FILE — 请勿手改。')
     ..writeln('//')
-    ..writeln('// 来源：lib/settings 下各 section 的 SettingTile / SettingSwitchTile /')
-    ..writeln('//       SettingSliderTile / SettingSection(Title) 的 title: 与 subtitle:。')
+    ..writeln(
+      '// 来源：lib/settings 下各 section 的 SettingTile / SettingSwitchTile /',
+    )
+    ..writeln(
+      '//       SettingSliderTile / SettingSection(Title) 的 title: 与 subtitle:。',
+    )
     ..writeln('// 重新生成：dart run tool/gen_settings_search_index.dart')
     ..writeln('//')
     ..writeln('// 说明：标题取自设置页真实渲染的文案，因此新增设置项无需手工登记；')
