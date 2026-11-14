@@ -631,7 +631,7 @@ jobs:
         # Release 默认 universal，会和 native/ 的单架构 FFI 库错配。
         env:
           FLUTTER_XCODE_ARCHS: ${{ matrix.arch }}
-        run: flutter build macos --release --dart-define=ARCHOERA_CHANNEL=${ARCHOERA_CHANNEL:-2}
+        run: flutter build macos --release --dart-define=ARCHOERA_CHANNEL="${ARCHOERA_CHANNEL:-2}"
 
       - name: Build Flutter Windows
         if: matrix.os == 'windows'
@@ -1385,6 +1385,9 @@ jobs:
             echo "- 构建: $(date -u +'%Y-%m-%d %H:%M UTC')"
             echo
             echo '最近提交:'
+            # git pretty 占位符（%h/%s）与 Markdown 反引号都按字面量写入 release
+            # 正文：单引号是刻意为之，shellcheck 会误报「未展开的表达式」。
+            # shellcheck disable=SC2016
             git log -1 --pretty='- `%h` %s'
           } > "$NOTES"
 
