@@ -18,12 +18,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../easter_egg/easter_egg.dart';
 import '../stores/app_prefs.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_version.dart';
 import '../widgets/common/anim.dart';
 import '../widgets/common/glass_surface.dart';
 import '../widgets/common/ink_clip.dart';
+import '../widgets/common/smooth_wheel_scroll_controller.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/layout/side_bar/nav_styles/sidebar_nav_style.dart';
 import '../widgets/layout/side_bar/nav_styles/sidebar_nav_style_registry.dart';
@@ -105,7 +107,16 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog>
   final GlobalKey _contentHostKey = GlobalKey();
 
   /// 右侧内容滚动控制（切分类回顶 / 搜索跳转定位用）。
-  final ScrollController _contentScrollCtrl = ScrollController();
+  final ScrollController _contentScrollCtrl = SmoothWheelScrollController();
+
+  /// 搜索结果滚动控制（滚轮 / 触控板与内容区同款弹簧跟随）。
+  final ScrollController _searchScrollCtrl = SmoothWheelScrollController();
+
+  /// 左侧分类列表滚动控制（同上）。
+  final ScrollController _catScrollCtrl = SmoothWheelScrollController();
+
+  /// 「千万别点」入口是否已解锁：搜索框输入暗号后置位，仅本次弹窗内有效。
+  bool _eggUnlocked = false;
 
   /// 搜索跳转后的「闪几下」高亮（相对内容区的位置）。
   Rect? _flashRect;
@@ -132,6 +143,8 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog>
     _flashCtrl.dispose();
     _searchCtrl.dispose();
     _contentScrollCtrl.dispose();
+    _searchScrollCtrl.dispose();
+    _catScrollCtrl.dispose();
     _devHoldTimer?.cancel();
     super.dispose();
   }
@@ -163,7 +176,12 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog>
   }
 
   void _setQuery(String query) {
-    setState(() => _query = query);
+    // 精确输入暗号才解锁「千万别点」；无提示、无 toast、不写入任何偏好。
+    final unlock = query.trim().toLowerCase() == kEasterEggUnlockQuery;
+    setState(() {
+      _query = query;
+      if (unlock) _eggUnlocked = true;
+    });
   }
 
   void _clearQuery() {
