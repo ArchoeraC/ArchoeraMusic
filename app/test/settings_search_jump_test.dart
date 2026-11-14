@@ -138,4 +138,114 @@ void main() {
     expect(tester.state<ScrollableState>(restored).position.pixels, 0);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('彩蛋入口默认不可见，搜索暗号后才浮现（仅本次弹窗）', (tester) async {
+    _ignoreTestFontOverflow();
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final container = ProviderContainer(
+      overrides: [appPrefsProvider.overrideWith(_NoSavePrefs.new)],
+    );
+    addTearDown(container.dispose);
+    final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: SettingsDialog()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 关于页滚到底也不该出现「千万别点」。
+    await tester.scrollUntilVisible(
+      find.text(l10n.settingsCatAbout),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text(l10n.settingsCatAbout));
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.settingsNeverTap), findsNothing);
+
+    // 普通查询不会带出入口。
+    final field = find.byType(TextField).first;
+    await tester.enterText(field, 'egg');
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.settingsNeverTap), findsNothing);
+
+    // 精确输入暗号（大小写随意）→ 搜索结果出现入口。
+    await tester.enterText(field, 'ArchoeraMusic.PowerFull.Settings');
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.settingsNeverTap), findsOneWidget);
+
+    // 清空搜索：入口在本次弹窗内保持，回关于页底部仍可见。
+    await tester.enterText(field, '');
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.settingsNeverTap), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('搜索索引覆盖动态标题与自定义卡片', (tester) async {
+    _ignoreTestFontOverflow();
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final container = ProviderContainer(
+      overrides: [appPrefsProvider.overrideWith(_NoSavePrefs.new)],
+    );
+    addTearDown(container.dispose);
+    final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: SettingsDialog()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final field = find.byType(TextField).first;
+    // 曾漏索引的几类：辅助方法参数标题（缓存 / 扫描 / 安全销毁）、
+    // SettingsAnchor 自定义卡片（默认音源 / 转码档位）、箭头函数标题（MCP 能力）。
+    final titles = <String>[
+      l10n.settingsCacheLiked,
+      l10n.settingsScanMaxFileSizeMb,
+      l10n.settingsSecurityStreaming,
+      l10n.settingsDefaultSource,
+      l10n.streamingQualityTitle,
+      l10n.settingsMcpCapRead,
+    ];
+    for (final title in titles) {
+      await tester.enterText(field, title);
+      await tester.pumpAndSettle();
+      // 一条是搜索框里的输入文本，另一条是命中的结果行。
+      expect(find.text(title), findsNWidgets(2), reason: title);
+    }
+
+    // 命中后能跳到对应设置行并高亮（锚点与索引标题一致）。
+    await tester.enterText(field, l10n.settingsSecurityStreaming);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10n.settingsSecurityStreaming).last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(SettingsRowFlash), findsOneWidget);
+    // 安全区初始化会起一个 15s 的 vault 探测超时定时器，推进到超时再收尾。
+    await tester.pump(const Duration(seconds: 16));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }

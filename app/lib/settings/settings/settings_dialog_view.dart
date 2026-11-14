@@ -94,6 +94,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                               behavior: const _NoScrollbarBehavior(),
                               child: InkClip(
                                 child: ListView(
+                                  controller: _catScrollCtrl,
                                   padding: EdgeInsets.zero,
                                   // 每项恒为 40 高 + 上下各 1.5 的 padding。
                                   itemExtent: 43,
@@ -325,6 +326,7 @@ extension _SettingsDialogView on _SettingsDialogState {
                     version: _version,
                     devHolding: _devHolding,
                     devHoldProgress: _devHoldProgress,
+                    eggUnlocked: _eggUnlocked,
                     onDevHoldStart: _startDevHold,
                     onDevHoldCancel: _cancelDevHold,
                   ),
@@ -372,7 +374,9 @@ extension _SettingsDialogView on _SettingsDialogState {
         .where((e) => e.category.visible(devMode, downloadModule))
         .toList();
     final matches = index.where((e) => _searchMatch(e, q, l10n)).toList();
-    if (matches.isEmpty) {
+    // 暗号精确命中时才浮现彩蛋入口；不附带任何说明文字。
+    final unlock = q == kEasterEggUnlockQuery;
+    if (matches.isEmpty && !unlock) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -396,17 +400,24 @@ extension _SettingsDialogView on _SettingsDialogState {
     }
     return InkClip(
       child: SingleChildScrollView(
+        controller: _searchScrollCtrl,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              l10n.settingsSearchMatchCount(count: matches.length),
-              style: TextStyle(
-                fontSize: 11,
-                color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+            if (unlock) ...[
+              _buildEasterEggResultTile(scheme, l10n),
+              if (matches.isNotEmpty) const SizedBox(height: 10),
+            ],
+            if (matches.isNotEmpty) ...[
+              Text(
+                l10n.settingsSearchMatchCount(count: matches.length),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
+            ],
             for (final cat in SettingsCategory.values)
               if (cat.visible(devMode, downloadModule) &&
                   matches.any((e) => e.category == cat)) ...[
@@ -431,6 +442,43 @@ extension _SettingsDialogView on _SettingsDialogState {
                   _buildSearchResultTile(scheme, e, q),
               ],
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 暗号命中的彩蛋入口：外观与普通搜索结果一致，但不附任何说明文字。
+  Widget _buildEasterEggResultTile(ColorScheme scheme, AppLocalizations l10n) {
+    return Material(
+      color: scheme.error.withValues(alpha: 0.07),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        hoverColor: scheme.onSurface.withValues(alpha: 0.05),
+        onTap: () => showEasterEggGate(context, ref: ref),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(EtaIcons.alert, size: 17, color: scheme.error),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  l10n.settingsNeverTap,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ),
+              Icon(
+                EtaIcons.rightSmall,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );
