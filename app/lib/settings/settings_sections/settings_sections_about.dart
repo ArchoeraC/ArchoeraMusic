@@ -10,13 +10,15 @@ part of '../settings_sections.dart';
 /// 说明 + 字体声明 + 免责声明。
 ///
 /// 开发者长按逻辑（Timer/Stopwatch 计时与分类切换）由设置弹窗主 state
-/// 持有，本组件通过回调接入并按需展示按住进度。
+/// 持有，本组件通过回调接入并按需展示按住进度。「千万别点」入口默认不渲染，
+/// 只有设置搜索输入暗号后（[eggUnlocked]）才出现在底部。
 class AboutSection extends ConsumerStatefulWidget {
   const AboutSection({
     super.key,
     required this.version,
     required this.devHolding,
     required this.devHoldProgress,
+    required this.eggUnlocked,
     required this.onDevHoldStart,
     required this.onDevHoldCancel,
   });
@@ -24,6 +26,9 @@ class AboutSection extends ConsumerStatefulWidget {
   final String version;
   final bool devHolding;
   final double devHoldProgress;
+
+  /// 「千万别点」入口是否已解锁（设置搜索输入暗号后，本次弹窗内保持）。
+  final bool eggUnlocked;
   final VoidCallback onDevHoldStart;
   final VoidCallback onDevHoldCancel;
 
@@ -251,18 +256,21 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        // ── 彩蛋入口：底部居中「千万别点」按钮 → 弹出警告门 ──────────
-        // 纯属整活；三个「确定」按钮执行同一批彩蛋（见 easter_egg/）。
-        Center(
-          child: SButton(
-            label: l10n.settingsNeverTap,
-            icon: EtaIcons.alert,
-            variant: SButtonVariant.error,
-            onPressed: () => showEasterEggGate(context, ref: ref),
+        if (widget.eggUnlocked) ...[
+          const SizedBox(height: 20),
+          // ── 彩蛋入口：解锁后底部居中「千万别点」按钮 → 弹出警告门 ──────
+          // 解锁方式见 [kEasterEggUnlockQuery]（设置搜索框输入暗号）；界面上
+          // 不提供任何提示。三个「确定」按钮执行同一批彩蛋（见 easter_egg/）。
+          Center(
+            child: SButton(
+              label: l10n.settingsNeverTap,
+              icon: EtaIcons.alert,
+              variant: SButtonVariant.error,
+              onPressed: () => showEasterEggGate(context, ref: ref),
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
+          const SizedBox(height: 4),
+        ],
       ],
     );
   }
