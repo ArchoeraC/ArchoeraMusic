@@ -330,6 +330,14 @@ void main() {
   });
 
   group('neko-v1 富歌词解析（逐字）', () {
+    // 服务端脏数据：标题卡行把 QRC 字级标记（`字(起始,时长)`）原样写进正文。
+    // 样例来自线上 `/api/music/info/2101`（颜人中《我只能离开》首行）。
+    const dirtyQrcLine =
+        '我只能离开 (2025仲(3160,632)夏(3792,632)毕(4424,632)业(5056,632)'
+        '歌(5688,632)会(6320,632)现(6952,632)场)(7584,632) - (8216,632)'
+        '颜(8848,632)人(9480,632)中(10112,632)';
+    const cleanQrcLine = '我只能离开 (2025仲夏毕业歌会现场) - 颜人中';
+
     const rich = {
       'version': 1,
       'lines': [
@@ -420,6 +428,47 @@ void main() {
         ],
       }));
       expect(groups.map((g) => g.original.text).toList(), ['A', 'B']);
+    });
+
+    test('行内 QRC 字级标记 `(start,dur)` 剥离并重建逐字片段', () {
+      final groups = parseNekoV1Lyrics(jsonEncode({
+        'lines': [
+          {
+            'startMs': 0,
+            'endMs': 10744,
+            'text': dirtyQrcLine,
+            'words': [
+              {'startMs': 0, 'endMs': 632, 'text': '我'},
+              {'startMs': 2528, 'endMs': 3160, 'text': dirtyQrcLine},
+            ],
+          },
+        ],
+      }));
+      final g = groups.single;
+      expect(g.original.text, cleanQrcLine);
+      final frags = g.fragments!;
+      expect(frags.map((f) => f.text).join(), cleanQrcLine);
+      expect(frags.first.text, '我只能离开 (2025仲');
+      expect(frags.first.startMs, 0);
+      expect(frags[1].text, '夏');
+      expect(frags[1].startMs, 3792);
+      expect(frags.last.text, '中');
+      expect(frags.last.startMs, 10112);
+      expect(
+        frags.where((f) => f.text.contains(',') && f.text.contains('(')),
+        isEmpty,
+      );
+    });
+
+    test('标准 LRC 行内嵌 QRC 标记同样清洗（兼容 LRC 候选）', () {
+      final groups = parseLyricGroups(
+        content: '[00:00.000]$dirtyQrcLine\n[00:10.744]词：余竑龙\n',
+        format: 'lrc',
+      );
+      expect(groups.first.original.text, cleanQrcLine);
+      expect(groups.first.fragments, isNotNull);
+      expect(groups.first.fragments!.first.startMs, 0);
+      expect(groups.last.original.text, '词：余竑龙');
     });
   });
 
