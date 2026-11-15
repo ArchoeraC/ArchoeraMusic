@@ -18,6 +18,7 @@ import 'streaming_client.dart';
 import 'streaming_models.dart';
 import 'streaming_session.dart';
 import 'streaming_store.dart';
+import 'songloft/songloft_session.dart';
 import 'streaming_types.dart';
 
 part 'streaming_provider/streaming_provider_core.dart';

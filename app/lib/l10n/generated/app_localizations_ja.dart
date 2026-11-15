@@ -4187,7 +4187,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get streamingServerName => '名前';
 
   @override
-  String get streamingServerNamePlaceholder => '例：マイ Navidrome';
+  String streamingServerNamePlaceholder({required Object type}) {
+    return '例：マイ $type';
+  }
 
   @override
   String get streamingServerHost => 'サーバーアドレス';
@@ -4199,8 +4201,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get streamingServerPort => 'ポート';
 
   @override
-  String get streamingServerPortNote =>
-      'デフォルトポート：4533（Subsonic）/ 8096（Jellyfin）。空欄で自動検出。';
+  String streamingServerPortNote({required Object port, required Object type}) {
+    return '既定のポート：$port（$type）。空欄の場合はプロトコルの既定ポートを使用します。';
+  }
 
   @override
   String get streamingServerLocalTitle => '内蔵ローカルサーバー';

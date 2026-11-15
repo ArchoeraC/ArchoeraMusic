@@ -10,8 +10,9 @@
 ///   播放控制（循环 / 上一首 / 播放 / 下一首 / 随机）→ 音量；
 /// - 右栏：歌词列表取右栏宽度的 90% 并右对齐，文字左对齐；当前行 95%
 ///   前景色、其余行 28%，非当前行缩到 0.95；上下 25% 渐隐；
-/// - 不渲染页面共享底栏（控制已经在封面下方），但底部单独保留一条细频谱，
-///   与其它布局同样消费引擎 `fft` 事件（关闭「频谱可视化」/性能模式时零高度）。
+/// - 不渲染页面共享底栏（控制已经在封面下方），但底部**叠加**一条频谱
+///   （不占布局，避免把垂直居中的左栏顶上去），与其它布局同样消费引擎 `fft`
+///   事件（关闭「频谱可视化」/性能模式时不渲染）。
 ///
 /// 低开销取舍：封面投影用 [BoxShadow]（不再复制一张封面做 blur）；歌词复用
 /// [PlayerLyricsBlock] 的共享取色/引擎入口（Vutron 预设强制 simple 列表），
@@ -68,10 +69,18 @@ class VutronPlayerLayout extends PlayerLayout {
   @override
   Widget buildBody(BuildContext context, PlayerLayoutContext c) {
     // 页面共享底栏（含 90px 频谱）在 vutron 布局下不渲染，底部单独补一条
-    // 细频谱，避免该布局完全没有可视化（与其它布局同源：引擎 fft 事件）。
-    return Column(
+    // 频谱（与其它布局同高同源：引擎 fft 事件）。频谱放在 Stack 底层且不占
+    // 布局，保证左栏仍按整页高度垂直居中，不会被频谱顶上去。
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        Expanded(
+        const Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _VutronSpectrum(),
+        ),
+        Positioned.fill(
           child: LayoutBuilder(
             builder: (context, box) {
               final maxByWidth = (box.maxWidth * coverWidthFraction).clamp(
@@ -147,13 +156,12 @@ class VutronPlayerLayout extends PlayerLayout {
             },
           ),
         ),
-        const _VutronSpectrum(),
       ],
     );
   }
 }
 
-/// vutron 布局底部的细频谱条。
+/// vutron 布局底部的频谱层（叠加、不占布局）。
 ///
 /// 关闭「频谱可视化」/ 性能模式时返回零高度，不改变左栏排版。
 class _VutronSpectrum extends ConsumerWidget {
@@ -165,9 +173,13 @@ class _VutronSpectrum extends ConsumerWidget {
     if (!prefs.enableSpectrum || prefs.performanceMode) {
       return const SizedBox.shrink();
     }
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 2),
-      child: RepaintBoundary(child: SpectrumView(height: 40, opacity: 0.45)),
+    // 与页面共享底栏同高（90），铺满底部；不占布局，避免顶起左栏。
+    return RepaintBoundary(
+      child: SizedBox(
+        width: double.infinity,
+        height: 90,
+        child: SpectrumView(height: 90, opacity: 0.5),
+      ),
     );
   }
 }

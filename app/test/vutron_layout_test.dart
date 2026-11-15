@@ -140,6 +140,7 @@ Future<void> _pumpVutron(
         );
   await tester.pumpWidget(
     ProviderScope(
+      key: UniqueKey(),
       overrides: [
         appPrefsProvider.overrideWith(() => _StubPrefs(prefs)),
         playbackProvider.overrideWith(_StubPlayback.new),
@@ -259,12 +260,27 @@ void main() {
     expect(find.byType(PlayerLyricsBlock), findsNothing);
   });
 
-  testWidgets('底部细频谱：开启时渲染', (tester) async {
+  testWidgets('底部频谱：贴底 90px，且叠加不参与布局', (tester) async {
+    // 关闭频谱时的控件位置作为基线。
+    await _pumpVutron(
+      tester,
+      prefs: {..._prefsData('simple'), enableSpectrumKey: false},
+    );
+    final yWithout = tester.getCenter(find.byType(PlayPauseButton)).dy;
+
     await _pumpVutron(
       tester,
       prefs: {..._prefsData('simple'), enableSpectrumKey: true},
     );
     expect(find.byType(SpectrumView), findsOneWidget);
+    final spectrum = tester.getRect(find.byType(SpectrumView));
+    final page = tester.getRect(find.byType(Scaffold));
+    // 与共享底栏同高，并贴住页面底边（不再被压缩/悬空）。
+    expect(spectrum.height, 90);
+    expect(spectrum.bottom, closeTo(page.bottom, 0.5));
+    // 叠加层不占布局：左栏垂直位置与关闭频谱时一致。
+    final yWith = tester.getCenter(find.byType(PlayPauseButton)).dy;
+    expect(yWith, closeTo(yWithout, 0.5));
     expect(tester.takeException(), isNull);
   });
 

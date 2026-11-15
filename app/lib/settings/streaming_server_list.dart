@@ -41,6 +41,7 @@ const streamingTypeLabels = <StreamingServerType, String>{
   StreamingServerType.gonic: 'Gonic',
   StreamingServerType.lms: 'LMS',
   StreamingServerType.subsonic: 'Subsonic',
+  StreamingServerType.songloft: 'Songloft',
 };
 
 /// 成功绿（已连接 / 测试通过）。
@@ -240,7 +241,11 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
     _useHttps = e?.useHttps ?? false;
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _hostCtrl = TextEditingController(text: e?.host ?? '');
-    _portCtrl = TextEditingController(text: e?.port?.toString() ?? '');
+    // 新增服务器预填当前类型的常用端口；编辑既有配置时保留用户填写的值
+    //（含留空 → 按协议默认端口）。
+    _portCtrl = TextEditingController(
+      text: e != null ? (e.port?.toString() ?? '') : '${_type.defaultPort}',
+    );
     _userCtrl = TextEditingController(text: e?.username ?? '');
     _passCtrl = TextEditingController(text: e?.password ?? '');
   }
@@ -311,8 +316,27 @@ class _ServerFormState extends ConsumerState<_ServerForm> {
   }
 
   void _setType(StreamingServerType value) {
-    setState(() => _type = value);
+    final oldDefault = '${_type.defaultPort}';
+    setState(() {
+      final current = _portCtrl.text.trim();
+      _type = value;
+      if (value == StreamingServerType.songloft) {
+        // Songloft 没有「本机内置服务端」概念。
+        _isLocal = false;
+      }
+      // 用户没改过端口（空 / 仍是上一个类型的默认值）时跟随类型更新；
+      // 自定义端口保持不变。
+      if (current.isEmpty || current == oldDefault) {
+        _portCtrl.text = '${value.defaultPort}';
+      }
+    });
   }
+
+  /// 当前类型的展示名（品牌名不翻译）。
+  String get _typeLabel => streamingTypeLabels[_type] ?? _type.name;
+
+  /// 本机内置服务端开关只对 Subsonic 服务端有意义。
+  bool get _supportsLocal => _type != StreamingServerType.songloft;
 
   Future<void> _handleTest(AppLocalizations l10n) async {
     final invalid = _validate(l10n);
