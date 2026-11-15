@@ -12,6 +12,7 @@ import '../netease/track.dart';
 import '../subsonic/subsonic_client.dart';
 import '../subsonic/subsonic_local.dart';
 import 'jellyfin_client.dart';
+import 'songloft/songloft_client.dart';
 import 'streaming_models.dart';
 import 'streaming_types.dart';
 
@@ -31,6 +32,9 @@ bool isSubsonicType(StreamingServerType type) => subsonicTypes.contains(type);
 /// Subsonic cover URL 中需剥离的鉴权参数。
 const List<String> _subsonicAuthKeys = ['u', 't', 's', 'v', 'c', 'f'];
 
+/// Songloft cover 直链中的鉴权参数（本地缓存路径不带参数）。
+const String _songloftAuthKey = 'access_token';
+
 /// Jellyfin/Emby image URL 中需剥离的鉴权参数。
 const String _jellyAuthKey = 'api_key';
 
@@ -44,6 +48,8 @@ String? stripCoverAuth(String? url, StreamingServerType type) {
       for (final k in _subsonicAuthKeys) {
         params.remove(k);
       }
+    } else if (type == StreamingServerType.songloft) {
+      params.remove(_songloftAuthKey);
     } else if (type == StreamingServerType.jellyfin ||
         type == StreamingServerType.emby) {
       params.remove(_jellyAuthKey);
@@ -89,6 +95,11 @@ class StreamingClient {
           ? JellyfinClient(config)
           : null;
 
+  SongloftClient? get _sl =>
+      config.type == StreamingServerType.songloft
+          ? SongloftClient(config)
+          : null;
+
   UnsupportedError _unsupported() =>
       UnsupportedError('不支持的服务器类型: ${config.type.name}');
 
@@ -107,6 +118,8 @@ class StreamingClient {
     if (sub != null) return sub.ping();
     final jelly = _jelly;
     if (jelly != null) return jelly.ping();
+    final sl = _sl;
+    if (sl != null) return sl.ping();
     return Future.value(
       StreamingPingResult(ok: false, error: '不支持的服务器类型: ${config.type.name}'),
     );
@@ -125,6 +138,8 @@ class StreamingClient {
     if (sub != null) return sub.listAlbums(limit: limit, offset: offset);
     final jelly = _jelly;
     if (jelly != null) return jelly.listAlbums(limit: limit, offset: offset);
+    final sl = _sl;
+    if (sl != null) return sl.listAlbums(limit: limit, offset: offset);
     throw _unsupported();
   }
 
@@ -134,6 +149,8 @@ class StreamingClient {
     if (sub != null) return sub.listArtists();
     final jelly = _jelly;
     if (jelly != null) return jelly.listArtists();
+    final sl = _sl;
+    if (sl != null) return sl.listArtists();
     throw _unsupported();
   }
 
@@ -143,6 +160,8 @@ class StreamingClient {
     if (sub != null) return sub.listPlaylists();
     final jelly = _jelly;
     if (jelly != null) return jelly.listPlaylists();
+    final sl = _sl;
+    if (sl != null) return sl.listPlaylists();
     throw _unsupported();
   }
 
@@ -152,6 +171,8 @@ class StreamingClient {
     if (sub != null) return sub.listSongs(limit: limit, offset: offset);
     final jelly = _jelly;
     if (jelly != null) return jelly.listSongs(limit: limit, offset: offset);
+    final sl = _sl;
+    if (sl != null) return sl.listSongs(limit: limit, offset: offset);
     throw _unsupported();
   }
 
@@ -161,6 +182,8 @@ class StreamingClient {
     if (sub != null) return sub.getAlbumSongs(albumId);
     final jelly = _jelly;
     if (jelly != null) return jelly.getAlbumSongs(albumId);
+    final sl = _sl;
+    if (sl != null) return sl.getAlbumSongs(albumId);
     throw _unsupported();
   }
 
@@ -170,6 +193,8 @@ class StreamingClient {
     if (sub != null) return sub.getPlaylistSongs(playlistId);
     final jelly = _jelly;
     if (jelly != null) return jelly.getPlaylistSongs(playlistId);
+    final sl = _sl;
+    if (sl != null) return sl.getPlaylistSongs(playlistId);
     throw _unsupported();
   }
 
@@ -179,6 +204,8 @@ class StreamingClient {
     if (sub != null) return sub.getArtistAlbums(artistId);
     final jelly = _jelly;
     if (jelly != null) return jelly.getArtistAlbums(artistId);
+    final sl = _sl;
+    if (sl != null) return sl.getArtistAlbums(artistId);
     throw _unsupported();
   }
 
@@ -188,6 +215,8 @@ class StreamingClient {
     if (sub != null) return sub.getArtistSongs(artistId);
     final jelly = _jelly;
     if (jelly != null) return jelly.getArtistSongs(artistId);
+    final sl = _sl;
+    if (sl != null) return sl.getArtistSongs(artistId);
     throw _unsupported();
   }
 
@@ -218,6 +247,10 @@ class StreamingClient {
         streamingQuality: streamingQuality,
       );
     }
+    final sl = _sl;
+    if (sl != null) {
+      return sl.getStreamUrl(originalId, streamingQuality: streamingQuality);
+    }
     throw _unsupported();
   }
 
@@ -233,6 +266,8 @@ class StreamingClient {
     }
     final jelly = _jelly;
     if (jelly != null) return jelly.getLyrics(originalId);
+    final sl = _sl;
+    if (sl != null) return sl.getLyrics(originalId);
     return Future.value(const StreamingLyrics());
   }
 }

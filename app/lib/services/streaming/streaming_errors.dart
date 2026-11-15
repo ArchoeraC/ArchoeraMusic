@@ -37,6 +37,11 @@ class StreamingHttpError extends StreamingError {
   final int status;
 }
 
+/// 网络失败（连接超时 / DNS / TLS 等；Songloft FFI 侧归类）。
+class StreamingNetworkError extends StreamingError {
+  StreamingNetworkError(super.message);
+}
+
 /// 请求超时（fetchWithTimeout 触发的 TimeoutException）。
 class StreamingTimeoutError extends StreamingError {
   StreamingTimeoutError(super.message);
@@ -46,6 +51,7 @@ class StreamingTimeoutError extends StreamingError {
 StreamingErrorCode classifyError(Object err) {
   if (err is StreamingAuthError) return StreamingErrorCode.auth;
   if (err is StreamingTimeoutError) return StreamingErrorCode.network;
+  if (err is StreamingNetworkError) return StreamingErrorCode.network;
   if (err is StreamingHttpError) {
     return err.status >= 500 ? StreamingErrorCode.network : StreamingErrorCode.protocol;
   }

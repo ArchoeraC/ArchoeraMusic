@@ -7711,8 +7711,8 @@ abstract class AppLocalizations {
   /// No description provided for @streamingServerNamePlaceholder.
   ///
   /// In zh_CN, this message translates to:
-  /// **'例如：我的 Navidrome'**
-  String get streamingServerNamePlaceholder;
+  /// **'例如：我的 {type}'**
+  String streamingServerNamePlaceholder({required Object type});
 
   /// No description provided for @streamingServerHost.
   ///
@@ -7735,8 +7735,8 @@ abstract class AppLocalizations {
   /// No description provided for @streamingServerPortNote.
   ///
   /// In zh_CN, this message translates to:
-  /// **'默认端口为 4533（Subsonic）/ 8096（Jellyfin）；留空自动匹配。'**
-  String get streamingServerPortNote;
+  /// **'默认端口：{port}（{type}）；留空则使用协议默认端口。'**
+  String streamingServerPortNote({required Object port, required Object type});
 
   /// No description provided for @streamingServerLocalTitle.
   ///

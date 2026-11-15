@@ -23,7 +23,7 @@ extension _StreamingServerFormView on _ServerFormState {
           l10n.streamingServerName,
           child: SInput(
             controller: _nameCtrl,
-            hintText: l10n.streamingServerNamePlaceholder,
+            hintText: l10n.streamingServerNamePlaceholder(type: _typeLabel),
           ),
         ),
         _buildFormField(
@@ -62,7 +62,10 @@ extension _StreamingServerFormView on _ServerFormState {
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
             child: Text(
-              l10n.streamingServerPortNote,
+              l10n.streamingServerPortNote(
+                port: '${_type.defaultPort}',
+                type: _typeLabel,
+              ),
               style: TextStyle(
                 fontSize: 11,
                 color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
@@ -70,22 +73,24 @@ extension _StreamingServerFormView on _ServerFormState {
             ),
           ),
         ],
-        _buildFormField(
-          scheme,
-          l10n.streamingServerLocalTitle,
-          child: _SwitchTile(value: _isLocal, onChanged: _setLocal),
-        ),
-        if (_isLocal)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Text(
-              l10n.streamingServerLocalDesc,
-              style: TextStyle(
-                fontSize: 11,
-                color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+        if (_supportsLocal) ...[
+          _buildFormField(
+            scheme,
+            l10n.streamingServerLocalTitle,
+            child: _SwitchTile(value: _isLocal, onChanged: _setLocal),
+          ),
+          if (_isLocal)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Text(
+                l10n.streamingServerLocalDesc,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                ),
               ),
             ),
-          ),
+        ],
         _buildFormField(
           scheme,
           l10n.streamingServerUsername,
