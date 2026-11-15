@@ -4,7 +4,7 @@
 `## [<version>]` 段落作为 Release 正文（见 `.github/workflows/build-all.yml`）。
 版本号即 git tag（去掉 `v` 前缀），日期为该版本发布日（UTC）。
 
-## [未发布] - 2026-11-09
+## [1.0.7+0] - 2026-11-15
 
 > [!WARNING]
 > **破坏性更新**：NekoMusic 登录已拆除 NekoAuth OAuth 与账号密码，只保留
@@ -15,11 +15,28 @@
 你好喵～
 本次带来了以下的更新喵：
 
-1、NekoMusic 登录改为**仅扫码**：移除 NekoAuth OAuth（浏览器授权 + `nekomusic://` 回调）以及账号密码 / 忘记密码入口，登录框不再有 tab 切换
-2、`nekomusic://` 从 macOS `Info.plist`、三端命令行 / AppleEvent / D-Bus 白名单和 `main.dart` 深链识别中删除；`archoera://` 深链保持不变
-3、平台桥接 **ABI v6 → v7（破坏性）**：删除只服务于 Neko 忘记密码的 `apl_open_url` / `APL_CAP_OPEN_URL`；`NekoSsoBridge`、`NekoSsoLoginSession`、`beginSsoLogin` / `ssoStartUrl` / `ssoClaim` / `cancelSsoLogin` 等 Dart 接口同步删除
-4、`NekoApi` 重构为纯扫码：移除 `/api/user/sso/*`、`/api/user/login`、`/api/user/sso/password-reset-url` 调用与冷启动 handoff 监听；这些服务端接口属于破坏性移除，不再由本客户端调用
-5、文档同步：`neko-source-identity.md` 重写为仅扫码，`platform-native-bridge.md` 记录 ABI v7 删除项
+1、新增 **Songloft 流媒体客户端**（客户端模式）：服务器类型新增 Songloft，支持歌曲 / 专辑 / 歌手 / 歌单浏览与播放；逐字歌词、翻译、罗马音仅在服务端提供时使用，封面自动缓存到本地；新服务器会自动预填默认端口，表单里的名称占位符与端口提示会跟随所选类型变化
+2、NekoMusic 登录改为**仅扫码**：移除 NekoAuth OAuth 与账号密码 / 忘记密码入口，登录框不再有 tab 切换；`nekomusic://` 深链从三端协议注册与命令行解析中删除，`archoera://` 保持不变
+3、平台桥接 **ABI v6 → v7（破坏性）**：删除只服务于 Neko 忘记密码的 `apl_open_url` / `APL_CAP_OPEN_URL`，以及 `NekoSsoBridge`、`NekoSsoLoginSession`、`beginSsoLogin` / `ssoStartUrl` / `ssoClaim` / `cancelSsoLogin` 等 Dart 接口；`NekoApi` 同步收敛为纯扫码
+4、跨语言搜索：新增读音分层排序、韩文罗马字、罗马音规范化与异体字折叠，模糊词表无候选时回退变体枚举，修复拼音列召回丢失；新增「生成歌词罗马音索引」开关
+5、搜索查询改走 indexer FFI 会话，「播放全部」等宽查询下沉后台 isolate；修复索引排行静默失效，补充可清除的查询日志
+6、设置搜索改为按源码生成索引，覆盖全部设置项；命中后滚动到具体设置行并闪高亮，搜索弹窗接入弹簧滚轮；彩蛋入口改为输入暗号解锁
+7、版本号旁显示发布通道徽标（Release / Beta / Dev / Nightly），新增 Nightly 定时构建与滚动预览
+8、桌面端新增自绘窗口框（系统 / 标题栏 / 无边框三种方案）：标题栏与边缘缩放由 Flutter 绘制，窗口按钮支持自动隐藏、下滑唤出与加宽热区
+9、列表滚轮改为弹簧跟随，音乐库 / 搜索 / 详情 / 评论等长列表快速连滚不再掉队，性能模式下自动退回瞬时滚动
+10、播放页：布局切换改为共享元素实时补间，新增播放 / 暂停椭圆胶囊、单峰转场曲线，播放页固定暗色主题；Vutron 经典布局频谱改为 90px 贴底叠加，不再压缩左栏或把左栏顶上去
+11、图片背景按等比解码，调整窗口不再拉伸；新增按图片亮度计算的可读性遮罩下限，以及 30–165 FPS 渲染帧数上限
+12、歌词：流媒体逐字歌词统一归一化传统 YRC / 新版 YRC / QRC / 非标准行头，清洗 Neko 行内 QRC 标记并重建时间轴；切歌不再短暂显示上一首歌词，播放条循环滚动接缝不再回跳
+13、播放引擎 seek 精确性提升：HE-AAC（SBR/PS）、Ogg-FLAC、FFmpeg `start_time` 与 HTTP 206 Range 向上对齐均按样本级落点修正；音质热切与暂存管线更稳定
+14、酷狗 / QQ 音乐改为安装级设备身份持久化，补齐请求节奏闸门与风控验证，降低 2001 等风控误伤
+15、macOS 发布包改为 DMG（拖拽安装）+ zip；三端发布脚本收敛为各平台单脚本，Linux 增加 ELF 依赖守卫与 Xvfb 启动冒烟，AppImage 补齐 AppStream 元数据
+16、去除刮削器对系统 libcurl 与 OpenSSL 的直接依赖，HTTP / 加密改由内嵌 Rust 后端提供；Linux 运行库收拢只沿直接 NEEDED，不再拖入系统 TLS/HTTP 栈
+17、升级到 Flutter 3.50.0 / Dart 3.14 与 window_manager 0.7；Nix 源构建继续兼容 Flutter 3.47
+18、修复同进程双 SQLite 实例导致扫描后曲库不更新；曲库刷新 / 扫描失败不再静默，补充诊断日志
+19、修复播放页收起后无法再次打开、关闭按钮连点误 pop 下层页面、Windows 快速开关播放页卡死
+20、修复播放开始触发封面取色后列表跳回顶部；修复 Windows 前台窗口被误判后台降频
+21、修复侧栏折叠 / 展开动效闪烁；修复无边框窗口按钮黑底与天气组件在自动隐藏时的错位
+22、修复设置搜索失效条目、发布通道徽标配色与位置，以及 macOS / Linux 打包中的若干架构与依赖问题
 
 我喜欢你！
 
