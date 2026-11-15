@@ -4192,7 +4192,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get streamingServerName => '이름';
 
   @override
-  String get streamingServerNamePlaceholder => '예: 내 Navidrome';
+  String streamingServerNamePlaceholder({required Object type}) {
+    return '예: 내 $type';
+  }
 
   @override
   String get streamingServerHost => '서버 주소';
@@ -4204,8 +4206,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get streamingServerPort => '포트';
 
   @override
-  String get streamingServerPortNote =>
-      '기본 포트: 4533 (Subsonic) / 8096 (Jellyfin). 비우면 자동 감지합니다.';
+  String streamingServerPortNote({required Object port, required Object type}) {
+    return '기본 포트: $port ($type). 비우면 프로토콜 기본 포트를 사용합니다.';
+  }
 
   @override
   String get streamingServerLocalTitle => '내장 로컬 서버';

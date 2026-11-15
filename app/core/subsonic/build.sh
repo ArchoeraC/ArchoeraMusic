@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 构建 Archoera Subsonic 服务端
 #   1. cargo 构建 Rust 转码器 cdylib（libarchoera_transcoder.{so,dylib,dll}）
-#   2. go build -buildmode=c-shared 构建服务端库（libarchoera_subsonic.{so,dylib,dll}，FFI）
+#   2. go build -buildmode=c-shared 构建 FFI 库（libarchoera_subsonic.{so,dylib,dll}；
+#      含 Subsonic 服务端 + Songloft 客户端导出）
 #   3. go build -tags standalone 构建独立可执行（Docker/无宿主部署）
 # 三端通用：Linux .so / macOS .dylib / Windows(Git Bash) .dll
 set -euo pipefail
@@ -32,6 +33,6 @@ fi
 cp "$TRANSCODER_SRC" "$ROOT/build/"
 
 echo "[subsonic] 符号检查:"
-nm -D "$ROOT/build/libarchoera_subsonic.$EXT" | grep -E 'archoera_subsonic' || true
+nm -D "$ROOT/build/libarchoera_subsonic.$EXT" | grep -E 'archoera_(subsonic|songloft)' || true
 nm -D "$ROOT/build/libarchoera_transcoder.$EXT" | grep -E 'archoera_transcode' || true
 echo "[subsonic] 构建完成"

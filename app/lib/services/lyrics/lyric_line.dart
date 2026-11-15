@@ -130,6 +130,73 @@ final RegExp _qrcLineRe = RegExp(r'^\[(\d+),(\d+)\](.*)$');
 /// QRC 字级时间标记：`(起始毫秒,时长毫秒)`（绝对时间，文字在前）。
 final RegExp _qrcTimeRe = RegExp(r'\((\d+),(\d+)\)');
 
+/// 行内 QRC 字级标记（同上，用于「标准 LRC 行头 + 行内字级标记」的混合行）。
+final RegExp _reInlineQrc = RegExp(r'\((\d{1,9}),(\d{1,9})\)');
+
+/// 行内 QRC 解析结果：清洗后的正文 + 逐字片段（相对行首）。
+typedef _InlineQrc = ({String text, List<LyricFragment> fragments});
+
+/// 解析「标准 LRC 行头 + 行内 QRC 字级标记」的混合行。
+///
+///  的部分歌词会出现这种形态（服务端富歌词生成时把字级标记原样
+/// 带进了正文），例如：
+///
+///   `[00:00.000]我只能离开 (2025仲(3160,632)夏(3792,632)…`
+///
+/// QRC 语义是「文字在前、时间在后」：标记前的文字由该标记计时；首个标记前
+/// 的文字没有字级时间，归行首。返回 null 表示没有可信的字级标记。
+///
+/// 判定条件（避免把正文里的 `(1980,1990)` 误当字级时间）：
+/// - 至少 2 个标记，起始时间非递减、时长在 1..60s；或
+/// - 恰好 1 个标记且位于行尾。
+_InlineQrc? _inlineQrc(String rest, int lineStartMs) {
+  final matches = _reInlineQrc.allMatches(rest).toList();
+  if (matches.isEmpty) return null;
+  if (matches.length == 1 && matches.single.end != rest.length) return null;
+  var prevStart = -1;
+  for (final m in matches) {
+    final start = int.parse(m.group(1)!);
+    final dur = int.parse(m.group(2)!);
+    if (start < prevStart || dur <= 0 || dur > 60000) return null;
+    prevStart = start;
+  }
+
+  final fragments = <LyricFragment>[];
+  final text = StringBuffer();
+  var pos = 0;
+  for (var i = 0; i < matches.length; i++) {
+    final m = matches[i];
+    final chunk = rest.substring(pos, m.start);
+    final startAbs = i == 0 ? lineStartMs : int.parse(m.group(1)!);
+    final rel = startAbs < lineStartMs ? 0 : startAbs - lineStartMs;
+    if (chunk.isNotEmpty) {
+      fragments.add(LyricFragment(
+        text: chunk,
+        startMs: rel,
+        durationMs: int.parse(m.group(2)!),
+      ));
+      text.write(chunk);
+    }
+    pos = m.end;
+  }
+  final tail = rest.substring(pos);
+  if (tail.isNotEmpty) {
+    final last = matches.last;
+    final rel = int.parse(last.group(1)!) < lineStartMs
+        ? 0
+        : int.parse(last.group(1)!) - lineStartMs;
+    fragments.add(LyricFragment(
+      text: tail,
+      startMs: rel,
+      durationMs: int.parse(last.group(2)!),
+    ));
+    text.write(tail);
+  }
+  if (text.toString().trim().isEmpty) return null;
+  return (text: text.toString(), fragments: fragments);
+}
+
+
 /// 毫秒 → `[m:ss.xxx]`（与 [parseLrc] 接受的 LRC 时间标签一致）。
 String _fmtMsTag(int ms) {
   final safe = ms < 0 ? 0 : ms;
@@ -376,6 +443,13 @@ List<_LyricRow> _parseRawLine(String raw) {
     }
     final row = _wordRows(words, endHint: endHint);
     if (row != null) return row;
+  }
+
+  // 2.5) 标准 LRC 行头 + 行内 QRC 字级标记（ 部分脏数据的形态）。
+  final inline = _inlineQrc(rest, leads.first);
+  if (inline != null) {
+    final rows = _finalizeRows(leads, inline.text, inline.fragments);
+    if (rows.isNotEmpty) return rows;
   }
 
   // 3) 增强 LRC：行内 [mm:ss]字[mm:ss]（至少两个标签且标签间有文本）。
@@ -646,8 +720,17 @@ List<LyricGroup> parseV1Lyrics(String content) {
     if (raw is! Map) continue;
     final start = _asInt(raw['startMs']);
     if (start == null || start < 0) continue;
-    final text = (raw['text']?.toString() ?? '').trim();
+    var text = (raw['text']?.toString() ?? '').trim();
     if (text.isEmpty) continue;
+    var fragments = _V1Fragments(raw['words'], start);
+    // 服务端富歌词生成时可能把 QRC 字级标记原样写进 text / words
+    // （如首行标题卡「…(2025仲(3160,632)夏…」）。以 text 为准重建正文
+    // 与逐字片段，避免把时间标记当歌词显示。
+    final inline = _inlineQrc(text, start);
+    if (inline != null) {
+      text = inline.text;
+      fragments = inline.fragments;
+    }
     rows.add(_V1Row(
       startMs: start,
       endHint: _asInt(raw['endMs']),
@@ -655,7 +738,7 @@ List<LyricGroup> parseV1Lyrics(String content) {
       translation: _asText(raw['translation']),
       romaji: _asText(raw['romanization']),
       isBG: raw['background'] == true,
-      fragments: _V1Fragments(raw['words'], start),
+      fragments: fragments,
     ));
   }
   if (rows.isEmpty) return const [];

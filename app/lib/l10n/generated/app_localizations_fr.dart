@@ -4426,7 +4426,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get streamingServerName => 'Nom';
 
   @override
-  String get streamingServerNamePlaceholder => 'ex. Mon Navidrome';
+  String streamingServerNamePlaceholder({required Object type}) {
+    return 'ex. Mon $type';
+  }
 
   @override
   String get streamingServerHost => 'Adresse du serveur';
@@ -4438,8 +4440,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get streamingServerPort => 'Port';
 
   @override
-  String get streamingServerPortNote =>
-      'Ports par défaut : 4533 (Subsonic) / 8096 (Jellyfin) ; laissez vide pour la détection automatique.';
+  String streamingServerPortNote({required Object port, required Object type}) {
+    return 'Port par défaut : $port ($type) ; laissez vide pour le port par défaut du protocole.';
+  }
 
   @override
   String get streamingServerLocalTitle => 'Serveur local intégré';
