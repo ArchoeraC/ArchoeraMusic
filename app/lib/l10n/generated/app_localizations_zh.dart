@@ -4137,7 +4137,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get streamingServerName => '名称';
 
   @override
-  String get streamingServerNamePlaceholder => '例如：我的 Navidrome';
+  String streamingServerNamePlaceholder({required Object type}) {
+    return '例如：我的 $type';
+  }
 
   @override
   String get streamingServerHost => '服务器地址';
@@ -4149,8 +4151,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get streamingServerPort => '端口';
 
   @override
-  String get streamingServerPortNote =>
-      '默认端口为 4533（Subsonic）/ 8096（Jellyfin）；留空自动匹配。';
+  String streamingServerPortNote({required Object port, required Object type}) {
+    return '默认端口：$port（$type）；留空则使用协议默认端口。';
+  }
 
   @override
   String get streamingServerLocalTitle => '本机内置服务端';
@@ -10388,7 +10391,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get streamingServerName => '名称';
 
   @override
-  String get streamingServerNamePlaceholder => '例如：我的 Navidrome';
+  String streamingServerNamePlaceholder({required Object type}) {
+    return '例如：我的 $type';
+  }
 
   @override
   String get streamingServerHost => '服务器地址';
@@ -10400,8 +10405,9 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get streamingServerPort => '端口';
 
   @override
-  String get streamingServerPortNote =>
-      '默认端口为 4533（Subsonic）/ 8096（Jellyfin）；留空自动匹配。';
+  String streamingServerPortNote({required Object port, required Object type}) {
+    return '默认端口：$port（$type）；留空则使用协议默认端口。';
+  }
 
   @override
   String get streamingServerLocalTitle => '本机内置服务端';
@@ -16639,7 +16645,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get streamingServerName => '名稱';
 
   @override
-  String get streamingServerNamePlaceholder => '例如：我的 Navidrome';
+  String streamingServerNamePlaceholder({required Object type}) {
+    return '例如：我的 $type';
+  }
 
   @override
   String get streamingServerHost => '伺服器位址';
@@ -16651,8 +16659,9 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get streamingServerPort => '連接埠';
 
   @override
-  String get streamingServerPortNote =>
-      '預設連接埠為 4533（Subsonic）/ 8096（Jellyfin）；留空自動比對。';
+  String streamingServerPortNote({required Object port, required Object type}) {
+    return '預設連接埠：$port（$type）；留空則使用協定預設連接埠。';
+  }
 
   @override
   String get streamingServerLocalTitle => '本機內建伺服器';
