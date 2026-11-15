@@ -63,7 +63,8 @@ app/lib/pages/player/layouts/
   后续加槽位不用再各摆 Row）。开关歌词时左栏用 `AnimatedAlign`
   平移居中（600ms），歌词槽同时滑出，不整棵替换布局。默认布局同理：
   无歌词时封面列用 `AnimatedAlign` 在主体内居中，位移由布局约束推导，
-  不依赖 `coverLyricRatio` 的固定换算比例。
+  不依赖 `coverLyricRatio` 的固定换算比例。底部频谱与共享底栏同高（90px）
+  叠在 Stack 底层、不占布局，保证左栏仍按整页高度垂直居中。
 
 ### 4.1 播放页内布局切换
 
