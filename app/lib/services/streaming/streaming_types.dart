@@ -17,7 +17,8 @@ enum StreamingServerType {
   gonic,
   lms,
   jellyfin,
-  emby;
+  emby,
+  songloft;
 
   /// 按名称解析；未知返回 null。
   static StreamingServerType? tryParse(String? raw) {
@@ -26,6 +27,21 @@ enum StreamingServerType {
     }
     return null;
   }
+}
+
+/// 各服务器类型的常用默认端口（表单提示 / 切换类型时预填）。
+///
+/// 只用于 UI 默认值：用户留空时仍按协议默认端口（http 80 / https 443）连接。
+extension StreamingServerTypeDefaults on StreamingServerType {
+  int get defaultPort => switch (this) {
+    StreamingServerType.subsonic || StreamingServerType.airsonic => 4040,
+    StreamingServerType.gonic => 4747,
+    StreamingServerType.lms => 9000,
+    StreamingServerType.jellyfin || StreamingServerType.emby => 8096,
+    StreamingServerType.songloft => 58091,
+    // Navidrome / OpenSubsonic 常见部署端口。
+    _ => 4533,
+  };
 }
 
 /// 服务器配置（可 JSON 序列化，用于本地持久化）。
@@ -264,14 +280,41 @@ class StreamingListParams {
 
 /// 流媒体歌词结果。
 ///
-/// [lrc] 为服务器返回的歌词文本（LRC 或纯文本）；[fetchOnline] 为
-/// ArchoeraMusic 服务端扩展标记：曲库无内嵌歌词，提示客户端自行在线补全
-/// （仅我方服务端 + 我方客户端会出现；标准 Subsonic 客户端不受影响）。
+/// [lrc] 为服务器返回的标准歌词文本；[wordByWord] 为服务器**自带**的逐字
+/// 歌词（yrc/qrc/krc 原始文本），[wordFormat] 为对应格式。客户端不主动在
+/// 线抓取逐字/罗马音——服务端没有就只用 [lrc]。
+///
+/// [translation] / [romaji] 同样只来自服务端（tlyric / rlyric），格式分别由
+/// [translationFormat] / [romajiFormat] 标注。
+///
+/// [fetchOnline] 为 ArchoeraMusic 服务端扩展标记：曲库无内嵌歌词，提示客户端
+/// 自行在线补全（仅我方服务端 + 我方客户端会出现；标准 Subsonic 客户端不受影响）。
 class StreamingLyrics {
-  const StreamingLyrics({this.lrc, this.fetchOnline = false});
+  const StreamingLyrics({
+    this.lrc,
+    this.wordByWord,
+    this.wordFormat = 'lrc',
+    this.translation,
+    this.translationFormat,
+    this.romaji,
+    this.romajiFormat,
+    this.fetchOnline = false,
+  });
 
   final String? lrc;
+  final String? wordByWord;
+  final String wordFormat;
+  final String? translation;
+  final String? translationFormat;
+  final String? romaji;
+  final String? romajiFormat;
   final bool fetchOnline;
 
   bool get hasLrc => lrc != null && lrc!.trim().isNotEmpty;
+
+  bool get hasWordByWord =>
+      wordByWord != null && wordByWord!.trim().isNotEmpty;
+
+  /// 是否有任何可展示的主歌词（标准或逐字）。
+  bool get hasAny => hasLrc || hasWordByWord;
 }

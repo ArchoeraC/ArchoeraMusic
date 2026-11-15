@@ -355,12 +355,15 @@ class StreamingStore {
     return Map<String, String>.unmodifiable(sec);
   }
 
-  /// 直接写入/合并单条凭据（如 Jellyfin/Emby 鉴权后回填 accessToken），
-  /// 不触碰其它字段（保留既有 password/token）：合并后异步落库。
+  /// 直接写入/合并单条凭据（如 Jellyfin/Emby 鉴权后回填 accessToken，
+  /// 或 Songloft 刷新后回填 access/refresh token），不触碰其它字段：合并后
+  /// 异步落库。
   static void saveSecret(
     String id, {
     String? password,
     String? accessToken,
+    String? refreshToken,
+    int? tokenExpiresAt,
   }) {
     final cache = _secretCache.putIfAbsent(filePath, () => {});
     final cur = Map<String, String>.from(cache[id] ?? const {});
@@ -370,6 +373,20 @@ class StreamingStore {
         cur.remove('accessToken');
       } else {
         cur['accessToken'] = accessToken;
+      }
+    }
+    if (refreshToken != null) {
+      if (refreshToken.isEmpty) {
+        cur.remove('refreshToken');
+      } else {
+        cur['refreshToken'] = refreshToken;
+      }
+    }
+    if (tokenExpiresAt != null) {
+      if (tokenExpiresAt <= 0) {
+        cur.remove('tokenExpiresAt');
+      } else {
+        cur['tokenExpiresAt'] = '$tokenExpiresAt';
       }
     }
     cache[id] = cur;

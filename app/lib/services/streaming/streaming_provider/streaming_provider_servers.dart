@@ -42,6 +42,8 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
   Future<void> _updateServerImpl(String id, StreamingServerInput input) async {
     final old = state.serverById(id);
     if (old == null) return;
+    // 配置变更后旧会话的 token/主机可能已失效，先关闭再重连。
+    SongloftSession.closeServer(id);
     final updated = old.copyWith(
       name: input.name.trim(),
       type: input.type,
@@ -65,6 +67,7 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
   /// 删除服务器；删掉激活服务器时清空连接与浏览缓存。
   Future<void> _removeServerImpl(String id) async {
     if (state.serverById(id) == null) return;
+    SongloftSession.closeServer(id);
     final wasActive = state.activeServerId == id;
     state = state.copyWith(
       servers: state.servers.where((s) => s.id != id).toList(),
@@ -89,7 +92,10 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
       username: input.username.trim(),
       password: input.password,
     );
-    return StreamingClient(probe).ping();
+    return StreamingClient(probe).ping().whenComplete(() {
+      // 测试连接不保留会话（Songloft 会建立 FFI 句柄）。
+      SongloftSession.closeServer(probe.id);
+    });
   }
 
   /// 切换激活服务器并连接。
@@ -166,6 +172,8 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
 
   /// 断开当前连接（清空浏览缓存）。
   Future<void> _disconnectImpl() async {
+    final active = state.activeServerId;
+    if (active != null) SongloftSession.closeServer(active);
     state = state.copyWith(
       connected: false,
       connecting: false,
@@ -179,6 +187,7 @@ mixin _StreamingNotifierServerActions on Notifier<StreamingState>, _StreamingNot
   /// 随后文件本身被覆盖删除，此处落盘空列表仅保证内存态一致）。
   Future<void> _clearAllImpl() async {
     await _disconnectImpl();
+    SongloftSession.closeAll();
     state = state.copyWith(servers: const [], activeServerId: null);
     _persist();
   }
