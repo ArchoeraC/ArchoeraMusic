@@ -70,8 +70,25 @@ internal sealed class SearchRequest
             : fallback;
 }
 
-/// <summary>单条命中（bm25 分数越小越相关）。</summary>
-internal readonly record struct SearchHit(string TrackId, double Score);
+/// <summary>
+/// 单条命中（bm25 分数越小越相关）。
+///
+/// <paramref name="Pass"/> 是**命中原由归因**（精度审计 §6.3 / M-7）：本命中由哪一趟召回。
+/// 排障时「为什么这首会被搜出」的直接答案；也是「同一条命中不能被低优先趟覆盖」的依据
+/// （<see cref="SearchSession"/> 的合并按趟次顺序进行，先到者保留）。
+/// </summary>
+internal readonly record struct SearchHit(string TrackId, double Score, string Pass);
+
+/// <summary>命中趟次名（与 <see cref="PassCounts"/> 的字段一一对应，供 UI / 日志归因）。</summary>
+internal static class SearchPassNames
+{
+    public const string Lexical = "lexical";
+    public const string PinyinLoose = "pinyinLoose";
+    public const string Reading = "reading";
+    public const string CrossLingual = "crossLingual";
+    public const string Fuzzy = "fuzzy";
+    public const string CjkFuzzy = "cjkFuzzy";
+}
 
 /// <summary>本次查询实际执行的兜底趟（0 / 1；用于诊断与回归计数）。</summary>
 internal sealed class PassCounts
@@ -242,17 +259,17 @@ internal sealed class SearchSession : IDisposable
         var tokens = Analyzer.AnalyzeQuery(request.Query);
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        void Merge(string? expression, IReadOnlyList<string[]>? readingSequences = null)
+        void Merge(string? expression, string pass, IReadOnlyList<string[]>? readingSequences = null)
         {
             if (expression is null) return;
-            foreach (var hit in ExecuteMatch(expression, request, readingSequences))
+            foreach (var hit in ExecuteMatch(expression, request, pass, readingSequences))
             {
                 if (seen.Add(hit.TrackId)) result.Items.Add(hit);
             }
         }
 
         // 主趟：精确表达式（词法 / 拼音 / 首字母）。
-        Merge(SearchQuery.CompileMatch(tokens, request.Metadata));
+        Merge(SearchQuery.CompileMatch(tokens, request.Metadata), SearchPassNames.Lexical);
 
         // 兜底趟只在主趟命中不足时付钱（渐进式，绝大多数查询止步于此）。
         if (result.Items.Count < request.MinExact)
@@ -261,7 +278,7 @@ internal sealed class SearchSession : IDisposable
             if (expression is not null)
             {
                 result.Passes.PinyinLoose = 1;
-                Merge(expression);
+                Merge(expression, SearchPassNames.PinyinLoose);
             }
         }
         if (result.Items.Count < request.MinExact && (_meta.HasJapanese || _meta.HasKorean))
@@ -271,7 +288,7 @@ internal sealed class SearchSession : IDisposable
             {
                 result.Passes.Reading = 1;
                 // T1-4：读音趟内按「整词前缀 > 整词包含」重排（bm25 只保证连续子串命中）。
-                Merge(expression, SearchQuery.ReadingSequences(tokens));
+                Merge(expression, SearchPassNames.Reading, SearchQuery.ReadingSequences(tokens));
             }
         }
         if (result.Items.Count < request.MinExact)
@@ -287,7 +304,7 @@ internal sealed class SearchSession : IDisposable
                 if (expression is not null)
                 {
                     result.Passes.CrossLingual = 1;
-                    Merge(expression);
+                    Merge(expression, SearchPassNames.CrossLingual);
                 }
             }
         }
@@ -300,7 +317,8 @@ internal sealed class SearchSession : IDisposable
             result.Passes.Fuzzy = 1;
             // T1-8：先用索引词表过滤变体（只留真实存在且 Damerau ≤1 的 term），
             // 词表加载失败时返回空集 → CompileFuzzy 自动退回旧的变体枚举行为。
-            Merge(SearchQuery.CompileFuzzy(tokens, request.Metadata, _store.LoadFuzzyVocabulary()));
+            Merge(SearchQuery.CompileFuzzy(tokens, request.Metadata, _store.LoadFuzzyVocabulary()),
+                SearchPassNames.Fuzzy);
         }
         if (result.Items.Count >= request.MinExact) return result;
 
@@ -321,7 +339,7 @@ internal sealed class SearchSession : IDisposable
             var joined = parts.Count == 1 ? parts[0] : "(" + string.Join(" OR ", parts) + ")";
             Merge(request.Metadata
                 ? $"{{{SearchQuery.MetadataColumns}}} : ({joined})"
-                : joined);
+                : joined, SearchPassNames.CjkFuzzy);
         }
         return result;
     }
@@ -345,7 +363,8 @@ internal sealed class SearchSession : IDisposable
     }
 
     private List<SearchHit> ExecuteMatch(
-        string expression, SearchRequest request, IReadOnlyList<string[]>? readingSequences = null)
+        string expression, SearchRequest request, string pass,
+        IReadOnlyList<string[]>? readingSequences = null)
     {
         var rows = _store.Search(expression, request.Limit, request.Offset, request.CandidateCap);
         if (rows.Count == 0) return new List<SearchHit>();
@@ -356,7 +375,8 @@ internal sealed class SearchSession : IDisposable
             var plain = new List<SearchHit>(rows.Count);
             foreach (var (docId, score) in rows)
             {
-                if (trackIds.TryGetValue(docId, out var trackId)) plain.Add(new SearchHit(trackId, score));
+                if (trackIds.TryGetValue(docId, out var trackId))
+                    plain.Add(new SearchHit(trackId, score, pass));
             }
             return plain;
         }
@@ -370,7 +390,7 @@ internal sealed class SearchSession : IDisposable
             var tier = readings.TryGetValue(docId, out var text)
                 ? ReadingRanker.Score(text, readingSequences)
                 : ReadingRanker.OtherTier;
-            ranked.Add((new SearchHit(trackId, score), tier));
+            ranked.Add((new SearchHit(trackId, score, pass), tier));
         }
         return ranked
             .OrderByDescending(entry => entry.Tier)

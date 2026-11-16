@@ -1,7 +1,7 @@
 # 本地曲库搜索索引：歌词模糊搜索设计（Local Library Search Index）
 
 > 状态：**已实施（P0–P5 落地）** 设计稿 2026-10-13，实现随分支演进持续更新
-> （schema v7 / `AnalyzerVersion` 11；查询层已整体下沉 C# 索引器，见 §9.3）。
+> （schema v7 / `AnalyzerVersion` 13；查询层已整体下沉 C# 索引器，见 §9.3）。
 > 范围：为本地曲库增加索引能力，支持**歌词 / 元数据的模糊搜索**（中文优先），
 > 重点是 **拼音搜索**与**多语言歌词层（原文 / 译文 / 音译）搜索**；
 > `.lrc` 侧车歌词**可选索引（子开关，默认关闭）**。
@@ -9,6 +9,9 @@
 > （关闭时行为与现状一致，见 §2.4）。
 > 关联：[local-library.md](local-library.md)（扫描与刮削）、[lyrics-amll-alignment.md](lyrics-amll-alignment.md)（歌词表现层）、
 > [architecture.md](architecture.md)、[licensing.md](licensing.md)。
+> **召回精度与误召回**（短查询门控、匹配类型分层、索引污染入口）见
+> [local-search-recall-precision-audit.md](local-search-recall-precision-audit.md)——本文只描述「能力」，
+> 那份文档描述「能力的边界与失效模式」，两者评审时需一起看。
 > 参考实现：KDE **Baloo + KFileMetaData**（`/…/SPlayer-Next/KDE Searcher`）、
 > Groonga `TokenBigram`、Lucene `CJKBigramFilter`、Xapian `CJK_NGRAM`、SQLite FTS5 `trigram`。
 > 实现语言：**C#（NativeAOT）**，与 `scanner` 同栈（见 §9.1）。
@@ -949,6 +952,17 @@ void indexer_set_log_sink(void (*sink)(int, const char*, const char*), int min_l
 10. **总开关默认关的语义**：关闭时 `search.db` 冻结（可保留），重新开启后须先按世代增量收敛，
     期间搜索可能短暂落后（派生数据，可接受）；首次开启的全量构建时间随库大小增长（§7.1），
     需在设置页给出进度与「可随时关闭 / 回退」的明确提示。
+11. **误召回 / 精度（2026-11-16 补记）**：本文的验收基线（§2.3 qbench）衡量的是**召回**
+    （「该找到的找到没」），**不衡量「不该找到的混进来没」**。用户实测反馈「库内无匹配仍返回大量
+    无关结果」，已定位到可复现机制：**单字查询 → 首字母支生成精确单字母匹配 → 整库命中**
+    （`SearchQuery.cs:377-387` 对末词元 <2 字符不加前缀）+ **两字查询 → CJK 容错删一字 → 退化为
+    单字查询**。另存在 6 处索引侧污染入口（LRC 分层按行位置猜、内嵌/侧车并集、脏集只认 mtime、
+    文件名混入拼音/首字母列、日文汉字走中文拼音、折叠链单向改写）。
+    完整分析、参照实现（Navidrome `ftsQueryDegraded`、Typesense `min_len_1typo`、ES `Fuzziness.AUTO`、
+    Lucene `maxQueryFrequency`、Meilisearch `ranking_rules`、Groonga `match_escalation`）、
+    门控参数草案与**零改码只读诊断脚本**见
+    [local-search-recall-precision-audit.md](local-search-recall-precision-audit.md)。
+    **在拿到真实 `library.db` + `search.db` 并跑完那份文档 §7 的诊断之前，不修改召回逻辑。**
 
 ---
 
