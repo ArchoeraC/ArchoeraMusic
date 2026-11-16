@@ -26,7 +26,7 @@ shanghai	shanghai	shang hai	*
 # 4) 带空格全拼：逐音节（与旧行为一致）
 wo ai ni	wo ai ni	wo ai ni	*
 # 5) 中文：拼音逐字主读音，首字母整串
-我爱你	我爱 爱你 我 爱 你	wo ai ni	wan
+我爱你	我爱 爱你 我 你	wo ai ni	wan
 # 6) 中英混合：CJK 段逐字词元 + 拉丁整词（woaini 在拼音列切分）
 我爱woaini	我爱 我 爱 woaini	wo ai wo ai ni	wa woaini
 # 7) NFKC 折叠与索引侧同构：ﬁ→fi（查询侧词元/拼音一致）

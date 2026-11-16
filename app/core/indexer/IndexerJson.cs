@@ -184,6 +184,7 @@ internal static class IndexerJson
         w.WriteNumber("crossLingual", result.Passes.CrossLingual);
         w.WriteNumber("fuzzy", result.Passes.Fuzzy);
         w.WriteNumber("cjkFuzzy", result.Passes.CjkFuzzy);
+        w.WriteNumber("dropTokens", result.Passes.DropTokens);
         w.WriteEndObject();
         w.WriteEndObject();
     });

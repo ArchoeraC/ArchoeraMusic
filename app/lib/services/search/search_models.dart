@@ -98,7 +98,12 @@ enum LocalSearchPass {
   fuzzy,
 
   /// 中文删字 / 换位容错。
-  cjkFuzzy;
+  cjkFuzzy,
+
+  /// 丢词降级：多词查询命中不足时丢掉末词，仍按字面匹配（精度审计 §18）。
+  ///
+  /// 这是**最安全**的放宽方向（减词而非改读音），故排在 [pinyinLoose] 等兜底趟之前。
+  dropTokens;
 
   /// FFI 返回的趟次名 → 枚举；未知 / 缺省一律按 [lexical]（前向兼容）。
   static LocalSearchPass fromName(Object? name) {

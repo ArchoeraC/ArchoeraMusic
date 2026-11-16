@@ -96,6 +96,57 @@ internal static class SearchLayerTests
             Program.Check("负例: 库内无匹配的单字查询返回空",
                 pain.Items.Count == 0, Dump(pain));
 
+            // ---------------------------------------------------------------
+            // v14 分词：CJK 段不给中间字建 unigram（精度审计 §17）
+            //
+            // 「爱」在 t1 的歌词「我爱你」里处于**中间位置**，索引中只有 bigram
+            // `我爱` / `爱你` 与首尾 unigram `我` / `你`；它本身没有 unigram。
+            // 单字查询必须走前缀 `"爱"*` 才能命中（命中以「爱」开头的 bigram）。
+            // 这里直接验证编译产物，确保没有退化成精确匹配。
+            // ---------------------------------------------------------------
+            var singleMatch = SearchQuery.CompileMatch(Analyzer.AnalyzeQuery("爱"), metadata: false);
+            Program.Check("分词: 单字 CJK 查询编译为前缀形式",
+                singleMatch is not null
+                && singleMatch.Contains("\"爱\"*")
+                && !singleMatch.Contains("\"爱\" AND")
+                && !singleMatch.EndsWith("\"爱\")"),
+                singleMatch ?? "<null>");
+
+            // 正例：中间字仍可被召回（title 里「爱」在 t1 标题「晴天」不存在，
+            // 故这里用歌手 / 标题真含「爱」的曲目验证前缀可达）。
+            var midChar = Run(index, "爱", fuzzy: true);
+            Program.Check("正例: 单字前缀仍能召回",
+                midChar.Items.Count > 0, Dump(midChar));
+
+            // 丢词方向（精度审计 §22）：多词查询主趟不足时，先丢**首位**词（歌手），
+            // 保留尾部的歌名。见下方的编译层断言与端到端断言。
+            //
+            // 负例：单词查询**不得**触发丢词（丢到 0 个词等于返回任意结果）。
+            var single = Run(index, "晴天", fuzzy: true);
+            Program.Check("负例: 单词查询不触发丢词趟",
+                single.Passes.DropTokens == 0, Dump(single));
+
+            // 正例：末词库内不存在时，丢掉末词后仍能命中前一词。
+            var dropped = Run(index, "晴天 zzz不存在的词", fuzzy: true);
+            Program.Check("正例: 多词查询走丢词趟",
+                dropped.Passes.DropTokens == 1, Dump(dropped));
+            Program.Check("正例: 丢词后命中前一词的歌",
+                Has(dropped, "sky"), Dump(dropped));
+
+            // 负例：丢词只按「词」为单位，不拆 CJK 词内部。
+            var keptWhole = SearchQuery.CompileDropTokens(
+                Analyzer.AnalyzeQuery("月亮代表我的心"), "月亮代表我的心", metadata: false);
+            Program.Check("负例: 单个 CJK 词不触发丢词",
+                keptWhole is null, keptWhole ?? "<null>");
+
+            // 关键正例（精度审计 §22）：中文「歌手 歌名」查询必须能命中歌名那首。
+            // 本库 t1 = 歌名「晴天」/ 歌手「周杰伦」，故查「周杰伦 晴天」应命中 t1。
+            // 无论走主趟还是丢词趟，**结果都必须包含歌名对应的曲目**——
+            // 这是「保留歌名」这一语义的可观察断言。
+            var singerTitle = Run(index, "周杰伦 晴天", fuzzy: true);
+            Program.Check("正例: 歌手+歌名查询能命中歌名曲目",
+                Has(singerTitle, "sky"), Dump(singerTitle));
+
             // 正例保护：两字以上首字母检索仍可用（qt → 晴天）。
             var qt = Run(index, "qt", fuzzy: true);
             Program.Check("正例: 双字母首字母检索仍命中", Has(qt, "sky"), Dump(qt));
@@ -117,6 +168,84 @@ internal static class SearchLayerTests
             // ProgressiveQuery 覆盖；此处只断言门控没有误伤三字变体生成）。
             Program.Check("正例: 三字仍生成容错变体",
                 SearchQuery.CjkVariants("月亮代").Count > 0);
+
+            // ---------------------------------------------------------------
+            // 读音支脚本分流（精度审计 §12 / §13）
+            //
+            // 核心负例：单字 CJK 输入的拼音是**派生**的，与检索意图无关。
+            // 修前「鬱 → yu」字面 0 命中却返回 17,955 条（真实库，占全库 36.8%），
+            // 因为主趟是 词法 OR 拼音 OR 首字母 的平级组合。
+            // ---------------------------------------------------------------
+
+            // 负例 5：单字 CJK 查询**不得**生成拼音支 / 首字母支。
+            // 注意：主趟现在会被限定到元数据列，而元数据列集合**本身包含**
+            // pinyin_meta_tok / initials_meta_tok，所以不能靠「表达式里有没有这些列名」
+            // 判断；改为直接断言分支未生成（编译结果不应含拼音音节字面量）。
+            var yuTokens = Analyzer.AnalyzeQuery("郁");
+            Program.Check("门控: 单字 CJK 标记 HasCjk",
+                yuTokens.HasCjk, "HasCjk=" + yuTokens.HasCjk);
+            var yuMatch = SearchQuery.CompileMatch(yuTokens, metadata: false);
+            Program.Check("负例: 单字 CJK 主趟不含拼音支",
+                yuMatch is not null && !yuMatch.Contains("\"yu\""), yuMatch ?? "<null>");
+            Program.Check("负例: 单字 CJK 主趟不含首字母支",
+                yuMatch is not null && !yuMatch.Contains("\"y\"*"), yuMatch ?? "<null>");
+            // 单字 CJK 查询必须限定到**可见文本列**（歌名 / 歌手 / 专辑 / 文件名），
+            // 既不扫歌词，也不扫拼音 / 首字母等派生转写列（精度审计 §15）。
+            Program.Check("负例: 单字 CJK 主趟限定可见文本列",
+                yuMatch is not null
+                && yuMatch.Contains("{" + SearchQuery.VisibleTextColumns + "}")
+                && !yuMatch.Contains("lyrics_tok")
+                && !yuMatch.Contains("pinyin_meta_tok"),
+                yuMatch ?? "<null>");
+
+            // 正例：拉丁单字保留首字母列（真实的首字母检索，日志里有 17 个这类查询），
+            // 但排除拼音列（单字母在拼音列毫无区分力）。
+            var latinSingleMatch = SearchQuery.CompileMatch(
+                Analyzer.AnalyzeQuery("z"), metadata: false);
+            Program.Check("正例: 拉丁单字保留首字母列",
+                latinSingleMatch is not null && latinSingleMatch.Contains("initials_meta_tok"),
+                latinSingleMatch ?? "<null>");
+            Program.Check("负例: 拉丁单字排除拼音列",
+                latinSingleMatch is not null && !latinSingleMatch.Contains("pinyin_meta_tok"),
+                latinSingleMatch ?? "<null>");
+
+            // 正例：拉丁输入**必须**保留读音支（用户明确用拼音找中文歌）。
+            // 反例保护：`qingtian` 字面 0 命中但属合法检索，若被拦会误伤。
+            var latinTokens = Analyzer.AnalyzeQuery("qingtian");
+            Program.Check("门控: 拉丁输入不标记 HasCjk",
+                !latinTokens.HasCjk, "HasCjk=" + latinTokens.HasCjk);
+            var latinMatch = SearchQuery.CompileMatch(latinTokens, metadata: false);
+            Program.Check("正例: 拉丁输入保留拼音支",
+                latinMatch is not null && latinMatch.Contains("pinyin_meta_tok"), latinMatch ?? "<null>");
+
+            // 正例：两字以上的 CJK 查询仍保留读音支（多音节串组合更独特）。
+            var multiTokens = Analyzer.AnalyzeQuery("周杰伦");
+            var multiMatch = SearchQuery.CompileMatch(multiTokens, metadata: false);
+            Program.Check("正例: 多字 CJK 保留拼音支",
+                multiMatch is not null && multiMatch.Contains("pinyin_meta_tok"), multiMatch ?? "<null>");
+
+            // 端到端：生僻字在库内完全不存在 → 必须返回空（不受读音支放大）。
+            var rare = Run(index, "龗", fuzzy: true);
+            Program.Check("负例: 生僻字不因读音支放大召回",
+                rare.Items.Count == 0, Dump(rare));
+
+            // ---------------------------------------------------------------
+            // 单字查询列门控（精度审计 §11.5 P0 / §14）
+            //
+            // 单字查询限定到元数据列后**不得**再靠歌词命中召回。
+            // 本段库里 "hate" 标题「恨」、歌词「我恨你 / 啊」；
+            // "love" 标题「爱」、歌词「我爱你」。
+            // 搜「爱」应命中 love（标题），不得命中 hate（歌词不含爱，本来就无关）。
+            // 更强的负例：搜「恨」——hate 的标题确实含「恨」，属正例；
+            // 故这里改为断言「单字查询不因歌词列而扩大召回」：
+            // 搜「你」在库内只出现在歌词里（"我恨你" / "我爱你"），
+            // 限定元数据列后应返回空。
+            // ---------------------------------------------------------------
+            var singleNi = Run(index, "你", fuzzy: true);
+            Program.Check("负例: 单字查询不靠歌词命中召回",
+                singleNi.Items.Count == 0, Dump(singleNi));
+            Program.Check("正例: 单字查询仍命中标题含该字的歌",
+                Has(Run(index, "爱", fuzzy: true), "love"), Dump(Run(index, "爱", fuzzy: true)));
         }
         finally
         {
@@ -132,9 +261,12 @@ internal static class SearchLayerTests
     private static void CompilerGolden()
     {
         var tokens = Analyzer.AnalyzeQuery("我爱你");
-        const string expected = "(\"我爱 爱你\" AND \"我\" AND \"爱\" AND \"你\""
+        // 末词前缀改为 (exact OR prefix) 分层（精度审计 §16），命中集合不变、排序更准。
+        // v14：CJK 段不再给中间字建 unigram，故 tokens 里没有「爱」；
+        // 末词「你」是单个 CJK 字，走前缀 `("你" OR "你"*)`。
+        const string expected = "(\"我爱 爱你\" AND (\"我\" OR \"我\"*) AND (\"你\" OR \"你\"*)"
             + " OR {pinyin_meta_tok pinyin_lyrics_tok} : \"wo ai ni\""
-            + " OR ({initials_meta_tok initials_lyrics_tok} : \"wan\"*))";
+            + " OR ({initials_meta_tok initials_lyrics_tok} : (\"wan\" OR \"wan\"*)))";
         var match = SearchQuery.CompileMatch(tokens, metadata: false);
         Program.Check("查询编译器: 我爱你 主趟", match == expected, match ?? "<null>");
 
@@ -159,6 +291,75 @@ internal static class SearchLayerTests
             shanghai == "{pinyin_meta_tok pinyin_lyrics_tok}"
                 + " : ((\"shang\" OR \"sang\" OR \"shan\" OR \"san\") AND (\"hai\"* OR \"fai\"*))",
             shanghai ?? "<null>");
+
+        // 丢词方向（精度审计 §22）：中文「歌手 + 歌名」查询应优先丢**首位**（歌手），
+        // 因为歌名在尾部且是最该保留的部分；纯拉丁查询沿用 Meilisearch `Last`（先丢尾）。
+        var cjkDropOrder = SearchQuery.DropTokenCandidates(
+            Analyzer.AnalyzeQuery("周杰伦 晴天"), "周杰伦 晴天");
+        Program.Check("丢词方向: 中文查询优先丢首位（保留歌名）",
+            cjkDropOrder.Count == 2 && cjkDropOrder[0] == 0,
+            string.Join(',', cjkDropOrder));
+        var latinDropOrder = SearchQuery.DropTokenCandidates(
+            Analyzer.AnalyzeQuery("love story"), "love story");
+        Program.Check("丢词方向: 拉丁查询沿用从尾丢",
+            latinDropOrder.Count == 2 && latinDropOrder[0] == 1,
+            string.Join(',', latinDropOrder));
+        // 方向差异的可观察证明（§22 的核心）：
+        //   丢首位 → 只剩歌名（精确，返回那首歌）
+        //   丢末位 → 只剩歌手（宽泛，返回该歌手所有歌）—— 这正是旧行为的缺陷
+        var keepSinger = SearchQuery.CompileDropTokens(
+            Analyzer.AnalyzeQuery("周杰伦 晴天"), "周杰伦 晴天", false, 1);
+        Program.Check("丢词方向: 丢末位会退化为「只用歌手」检索",
+            keepSinger is not null
+                && keepSinger.Contains("杰伦", StringComparison.Ordinal)
+                && !keepSinger.Contains("晴天", StringComparison.Ordinal),
+            keepSinger ?? "<null>");
+        // 按字段亲和度重排（§23）：title 命中多的词更像歌名，应**最后**才丢。
+        //
+        // 「晴天 周杰伦」（反向写法）：晴天 title 22 / artist 1，周杰伦 0/0。
+        // 位置顺序会先丢索引 0（晴天 = 歌名，错）；亲和度应把晴天排到最后。
+        var reordered = SearchQuery.OrderDropsByFieldAffinity(
+            new[] { 0, 1 }, new[] { 22, 0 }, new[] { 1, 0 });
+        Program.Check("字段亲和度: 反向写法仍保留歌名",
+            reordered.Count == 2 && reordered[0] == 1,
+            string.Join(',', reordered));
+
+        // 「周杰伦 晴天」（正序）：候选 0,1，周杰伦 0/0、晴天 22/1 → 仍先丢 0。
+        var forward = SearchQuery.OrderDropsByFieldAffinity(
+            new[] { 0, 1 }, new[] { 0, 22 }, new[] { 0, 1 });
+        Program.Check("字段亲和度: 正序写法先丢歌手",
+            forward.Count == 2 && forward[0] == 0,
+            string.Join(',', forward));
+
+        // 信息不足（两词都 0/0）时保持原候选顺序，不瞎猜。
+        var unknown = SearchQuery.OrderDropsByFieldAffinity(
+            new[] { 0, 1 }, new[] { 0, 0 }, new[] { 0, 0 });
+        Program.Check("字段亲和度: 无信号时保持位置顺序",
+            unknown.Count == 2 && unknown[0] == 0 && unknown[1] == 1,
+            string.Join(',', unknown));
+
+        // 丢掉首位「周杰伦」后，表达式必须**只**约束「晴天」。
+        var keepTitle = SearchQuery.CompileDropTokens(
+            Analyzer.AnalyzeQuery("周杰伦 晴天"), "周杰伦 晴天", false, 0);
+        Program.Check("丢词方向: 丢首位后保留歌名词",
+            keepTitle is not null
+                && keepTitle.Contains("\"晴天\"", StringComparison.Ordinal)
+                && !keepTitle.Contains("\"周杰\"", StringComparison.Ordinal),
+            keepTitle ?? "<null>");
+
+        // 变体总预算（精度审计 §20）：多词多音节输入不得组合爆炸。
+        // `shanghai` 单次产出 4 × 2 = 8 个变体；两段共 16，正好卡在预算边界。
+        // 追加第三段后若无预算约束会到 24，有预算则应被压住。
+        var budgeted = SearchQuery.CompilePinyinLoose(
+            Analyzer.AnalyzeQuery("shanghai shanghai shanghai"), metadata: false);
+        // 变体词数 = 表达式里被引号包住的 term 数。
+        var variantTerms = budgeted is null ? 0 : budgeted.Split('"').Length / 2;
+        Program.Check("查询编译器: 多音节拼音受变体总预算约束",
+            budgeted is not null
+                && variantTerms <= SearchQuery.DefaultMaxPinyinVariants
+                // 预算 16 时每段被压到 2 个变体（无预算时应各 4 个，共 24）
+                && budgeted.Contains("(\"shang\" OR \"sang\")", StringComparison.Ordinal),
+            $"变体词 {variantTerms} 个（预算 {SearchQuery.DefaultMaxPinyinVariants}）：{budgeted}");
         // 英文词不是有效拼音音节 → 不套用 n/l、f/h 规则。
         var english = SearchQuery.CompilePinyinLoose(Analyzer.AnalyzeQuery("hello world"), metadata: false);
         Program.Check("查询编译器: 英文词不扩展模糊音",
@@ -196,6 +397,21 @@ internal static class SearchLayerTests
                 && fuzzy.Contains("\"ehllo\"*", StringComparison.Ordinal)
                 && fuzzy.Contains("\"hallo\"*", StringComparison.Ordinal),
             fuzzy ?? "<null>");
+
+        // 首字符错误算 2 错（精度审计 §21）：`night` 的首字母 n 的替换候选是 m，
+        // 旧行为会产出 "might"（首字符不同的 1-错变体）。
+        var firstChar = SearchQuery.CompileFuzzy(Analyzer.AnalyzeQuery("night"), metadata: false);
+        Program.Check("查询编译器: 首字符替换变体不生成（首错算 2 错）",
+            firstChar is not null
+                && !firstChar.Contains("\"might\"", StringComparison.Ordinal)
+                && !firstChar.Contains("\"night\" OR \"might\"", StringComparison.Ordinal),
+            firstChar ?? "<null>");
+        // 删除 / 换位不改变首字符，必须保留。
+        Program.Check("查询编译器: 首字符无关的变体仍保留",
+            firstChar is not null
+                && firstChar.Contains("\"nigh\"", StringComparison.Ordinal)   // 删除末字
+                && firstChar.Contains("\"nigth\"", StringComparison.Ordinal), // 相邻换位
+            firstChar ?? "<null>");
 
         // T1-8 模糊层词典化：Myers 距离判定 + 词表过滤。
         var vocabulary = new[] { "hello", "hello world", "help", "hlelo", "yellow" };
@@ -242,15 +458,13 @@ internal static class SearchLayerTests
             SearchQuery.CompileMatch(Tokens(lexical: new[] { "a*b", "(", ":" }), metadata: false) ?? "<null>");
 
         // 注入尝试：闭合引号后插 OR —— 整体加引号后 `""` 翻倍，结构不破。
-        // 末词元 ≥3 字符照常加前缀 `*`（合法行为），关键是**没有**产生真实 OR 运算符。
+        // 末词元 ≥3 字符照常做精确/前缀分层（合法行为），关键是**引号内内容未被撕裂**。
         var injected = SearchQuery.CompileMatch(Tokens(lexical: new[] { "x\" OR \"y" }), metadata: false);
         Program.Check("转义: 注入 OR 被当字面量",
-            injected == "\"x\"\" OR \"\"y\"*", injected ?? "<null>");
+            injected == "(\"x\"\" OR \"\"y\" OR \"x\"\" OR \"\"y\"*)", injected ?? "<null>");
+        // 用户输入里的 ` OR ` 必须留在引号内：表达式里**唯一合法的 OR** 是分层引入的那个。
         Program.Check("转义: 注入不产生额外 OR 分支",
-            injected is not null
-                && injected.Count(c => c == '"') == 6
-                && !injected.StartsWith('('),
-            injected ?? "<null>");
+            injected is not null && CountUnquotedOr(injected) == 1, injected ?? "<null>");
 
         // 含引号的「类 bigram」不入短语（仅 1 个 CJK 字符），仍逐字转义。
         var quoted = SearchQuery.CompileMatch(Tokens(lexical: new[] { "我\"", "\"爱" }), metadata: false);
@@ -260,7 +474,7 @@ internal static class SearchLayerTests
         // 首字母串含引号 / 空格：列过滤仍闭合（列过滤前缀不被词元内容带偏）。
         var initials = SearchQuery.CompileMatch(Tokens(initials: "a\"b"), metadata: false);
         Program.Check("转义: 首字母含引号仍闭合列过滤",
-            initials == "({initials_meta_tok initials_lyrics_tok} : \"a\"\"b\"*)",
+            initials == "({initials_meta_tok initials_lyrics_tok} : (\"a\"\"b\" OR \"a\"\"b\"*))",
             initials ?? "<null>");
 
         // 跨语言候选含引号：同样按字面量转义。
@@ -488,8 +702,11 @@ internal static class SearchLayerTests
             Program.Check("查询层: metadata 不搜歌词", !Has(lyricsOnly, "t1"), Dump(lyricsOnly));
 
             // 9) limit / offset 翻页。
-            var page1 = Run(index, "爱", limit: 1);
-            var page2 = Run(index, "爱", limit: 1, offset: 1);
+            // 注意：用**两字查询**验证翻页——单字查询会被限定到元数据列（精度审计 §14），
+            // 而本库标题含「爱」的只有 t2 一首，不足以翻页。
+            // 「邓丽」是 t2 / t5 共同歌手「邓丽君」的前两字，稳定命中 2 条。
+            var page1 = Run(index, "邓丽", limit: 1);
+            var page2 = Run(index, "邓丽", limit: 1, offset: 1);
             Program.Check("查询层: limit == 1", page1.Items.Count == 1, Dump(page1));
             Program.Check("查询层: offset 翻页不重复",
                 page1.Items.Count == 1 && page2.Items.Count == 1
@@ -726,6 +943,36 @@ internal static class SearchLayerTests
     private static bool Has(SearchResult result, string trackId)
         => result.Items.Any(hit => string.Equals(hit.TrackId, trackId, StringComparison.Ordinal));
 
+    /// <summary>
+    /// 统计不在双引号内的 <c> OR </c> 出现次数（FTS5 的真实 OR 运算符）。
+    /// 用于验证「用户输入里的 OR 被转义成字面量」——转义后它落在引号内，
+    /// 只有分层引入的 OR 才算真实运算符。
+    /// </summary>
+    private static int CountUnquotedOr(string expression)
+    {
+        var count = 0;
+        var inQuote = false;
+        for (var i = 0; i < expression.Length; i++)
+        {
+            if (expression[i] == '"')
+            {
+                // FTS5 的转义是连续两个引号（""），不切换引号状态。
+                if (inQuote && i + 1 < expression.Length && expression[i + 1] == '"')
+                {
+                    i++;
+                    continue;
+                }
+                inQuote = !inQuote;
+                continue;
+            }
+            if (!inQuote && expression.AsSpan(i).StartsWith(" OR "))
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private static int Rank(SearchResult result, string trackId)
     {
         for (var i = 0; i < result.Items.Count; i++)
@@ -765,13 +1012,16 @@ internal static class SearchLayerTests
             using (var conn = EndToEnd.Open(db))
             {
                 // 三首歌的区别只在「标题命中」vs「仅歌词命中」的次数，便于用 bm25 列权重
-                // 拉开差距：标题命中（权重 4.0）应稳定排在仅歌词命中（1.5）之前。
+                // 拉开差距：标题命中（权重 4.0）应稳定排在仅歌词命中（0.6）之前。
                 EndToEnd.InsertTrack(conn, "title", Path.Combine(media, "t.mp3"), "晴天",
                     """[{"name":"A"}]""", null, null, 1000);
                 EndToEnd.InsertTrack(conn, "lyrics", Path.Combine(media, "l.mp3"), "别的名字",
                     """[{"name":"B"}]""", null, "晴天", 2000);
-                EndToEnd.InsertTrack(conn, "both", Path.Combine(media, "b.mp3"), "晴天",
-                    """[{"name":"C"}]""", null, "晴天 晴天 晴天", 3000);
+                // 歌词里高频重复（TF 放大）：v15 歌词降权要保证它**不会**压过纯标题命中。
+                // 注意标题**不含**「晴天」，否则两处标题命中本身就合理更强。
+                EndToEnd.InsertTrack(conn, "both", Path.Combine(media, "b.mp3"), "另一首歌",
+                    """[{"name":"C"}]""", null,
+                    string.Join(" ", Enumerable.Repeat("晴天", 40)), 3000);
             }
             EndToEnd.RunEngine(db, index, full: true, lrc: false);
             SearchSession.CloseCached();
@@ -801,6 +1051,31 @@ internal static class SearchLayerTests
                 "排序完整性: 标题命中排在仅歌词命中之前",
                 titleRank >= 0 && lyricsRank >= 0 && titleRank < lyricsRank,
                 "顺序=" + string.Join(',', order));
+
+            // v15 歌词降权（精度审计 §19）：直接在权重表层面断言，不依赖 bm25 分值。
+            //
+            // 为什么不在这个小语料上用 bm25 验证顺序：3 篇文档时每列的 IDF 退化，
+            // bm25 会返回 0.0（「分数有区分度」断言在真实库才成立），排序退化成 rowid 顺序。
+            // 真实权重效果用 48k 首曲库验证（见审计 §19.3）。
+            //
+            // 断言强度：歌词权重必须**明显低于**最弱的元数据列（album = 2.0），
+            // 而不只是「低于 title」——后者在 v15 之前（1.5 < 4.0）也成立，锁定不住改动。
+            Program.Check(
+                "排序权重: 歌词列权重低于专辑列（v15 降权）",
+                FtsStore.WeightOf("lyrics_tok") < FtsStore.WeightOf("album_tok"),
+                $"lyrics={FtsStore.WeightOf("lyrics_tok")} album={FtsStore.WeightOf("album_tok")}");
+            Program.Check(
+                "排序权重: 歌词列权重不超过专辑的一半",
+                FtsStore.WeightOf("lyrics_tok") <= FtsStore.WeightOf("album_tok") / 2,
+                $"lyrics={FtsStore.WeightOf("lyrics_tok")} album={FtsStore.WeightOf("album_tok")}");
+            Program.Check(
+                "排序权重: 歌词列仍保有非零可召回权重",
+                FtsStore.WeightOf("lyrics_tok") > 0.0,
+                $"lyrics={FtsStore.WeightOf("lyrics_tok")}");
+            Program.Check(
+                "排序权重: 歌词拼音列权重同步降档",
+                FtsStore.WeightOf("pinyin_lyrics_tok") <= FtsStore.WeightOf("album_tok") / 2,
+                $"pinyin_lyrics={FtsStore.WeightOf("pinyin_lyrics_tok")}");
 
             // candidateCap 不应改变结果（该参数保留仅为 ABI 兼容）。
             var capped = store.Search(expression!, limit: 100, offset: 0, candidateCap: 500);
