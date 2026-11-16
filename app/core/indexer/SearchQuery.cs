@@ -63,6 +63,64 @@ internal static class SearchQuery
     public const int MinInitialsPrefixLength = 2;
 
     /// <summary>
+    /// 首字母支的**整体最小长度**：低于该长度的首字母串**不生成首字母支**。
+    ///
+    /// 单个汉字的首字母是**单个字母**（<c>恨 → h</c>、<c>爱 → a</c>、<c>痛 → t</c>），
+    /// 而单字母 token 在真实曲库里密集存在（歌词整行「啊 / 哦 / 嗯」、文件名 <c>t164</c>、
+    /// 单字标题 <c>A</c> / <c>I</c>）。旧实现在末词元 &lt;2 字符时**不加前缀**、按精确 term
+    /// 匹配，于是任意单字查询都能把整库捞进来（合成库实测 400/400），这是「库内无匹配
+    /// 仍返回大量无关结果」的最直接成因。
+    ///
+    /// 门控取 2：<c>qt</c>（晴天）/ <c>wan</c>（我爱你）这类真实的双字母以上首字母检索
+    /// 完全不受影响；只有退化到单字母时才放弃该支（词法 / 拼音支仍在）。
+    ///
+    /// 参考：Navidrome <c>ftsQueryDegraded</c>（有效 token 全 ≤2 字符即判「查询退化」）、
+    /// Typesense <c>min_len_1typo=4</c>、Bleve <c>FuzzyQuery.prefix_length</c>。
+    /// 详见 <c>docs/local-search-recall-precision-audit.md</c> §2.2 / §6.2。
+    /// </summary>
+    public const int MinInitialsBranchLength = 2;
+
+    /// <summary>
+    /// 跨语言释义支的**最小 CJK 字数**：单字查询不生成跨语言候选。
+    ///
+    /// Unihan 释义对单字极度发散（<c>痛 → ache / bitter / pain / sad / sorry</c>、
+    /// <c>好 → excellent / fine / good / well</c>），而这些英文词在曲库里普遍存在，
+    /// 单字查询因此会被放大到近乎整库。≥2 字（<c>月亮</c>、<c>银河</c>）的释义显著更聚焦，
+    /// 保留原有召回。拉丁词 → 汉字方向不受此限（<c>love → 爱</c> 仍可用）。
+    ///
+    /// 详见 <c>docs/local-search-recall-precision-audit.md</c> §2.4 / §6.2。
+    /// </summary>
+    public const int MinCrossLingualCjkLength = 2;
+
+    /// <summary>
+    /// CJK 容错（删除 / 换位）的**最小字数**：低于该字数不生成变体。
+    ///
+    /// 两字查询删掉一个字后必然退化成**单字**（<c>爱情 → 爱 / 情</c>），而单字查询本身
+    /// 已是宽覆盖（见 <see cref="MinInitialsBranchLength"/>），等于把两字查询放大成两次
+    /// 单字查询（合成库实测「想你」返回 130 条）。三字以上删一字仍保留区分度
+    /// （<c>我的爱 → 我的 / 的爱</c>），维持原行为。
+    ///
+    /// 详见 <c>docs/local-search-recall-precision-audit.md</c> §2.5 / §6.2。
+    /// </summary>
+    public const int MinCjkFuzzyLength = 3;
+
+    /// <summary>
+    /// 拉丁模糊趟的**最小词长**：短于此长度不做编辑距离扩展。
+    ///
+    /// 2 字符词（<c>ai</c> / <c>go</c> / <c>ye</c>）的 ≤1 变体几乎覆盖全部高频二元组，
+    /// 放宽收益远低于噪声成本，故一律不扩展。取 **3**：
+    /// <list type="bullet">
+    ///   <item>Elasticsearch <c>Fuzziness.AUTO</c> 正是「&lt;3 字符 → 0 个编辑」；</item>
+    ///   <item>Typesense <c>min_len_1typo=4</c> 更保守，但那会连带砍掉 3 字符词的拼音召回
+    ///         （回归用例 <c>FuzzyVocabularyRecall</c>：<c>woo</c> 的删除变体 <c>wo</c>
+    ///         只存在于拼音列，是 T1-8 词表回退路径的唯一覆盖）；</item>
+    ///   <item>本项目的模糊趟本来就只在主趟 0 命中后才执行，噪声面已受短路约束。</item>
+    /// </list>
+    /// 详见 <c>docs/local-search-recall-precision-audit.md</c> §6.2。
+    /// </summary>
+    public const int MinFuzzyWordLength = 3;
+
+    /// <summary>
     /// 替换容错的受限字母表（编辑距离 ≤1 的替换集合，刻意不用完整 26 字母）。
     /// 依据「元音误拼 + 键盘邻键 + 视觉 / 语音混淆」，每个字母只给少量候选。
     /// </summary>
@@ -124,14 +182,14 @@ internal static class SearchQuery
         Add(branches, LexicalBranch(tokens.Lexical));
         Add(branches, PinyinBranch(tokens.Pinyin));
         Add(branches, InitialsBranch(tokens.PinyinInitials));
-        if (includeCrossLingual) Add(branches, CrossLingualBranch(tokens.CrossLingual));
+        if (includeCrossLingual) Add(branches, CrossLingualBranch(tokens.CrossLingual, tokens.Lexical));
         return JoinBranches(branches, metadata);
     }
 
     /// <summary>跨语言候选分支（T1）：候选逐字加引号后 OR；无候选返回 <c>null</c>。</summary>
     public static string? CompileCrossLingual(QueryTokens tokens, bool metadata)
     {
-        var branch = CrossLingualBranch(tokens.CrossLingual);
+        var branch = CrossLingualBranch(tokens.CrossLingual, tokens.Lexical);
         if (branch is null) return null;
         return metadata ? $"{{{MetadataColumns}}} : {branch}" : branch;
     }
@@ -297,12 +355,16 @@ internal static class SearchQuery
 
     /// <summary>
     /// 生成 CJK 编辑距离 ≤1 变体（删除任一字符 / 相邻换位）；不含原串，去重保序。
-    /// 子序列长度 &lt;2 或 &gt;<see cref="MaxCjkQueryLength"/> 返回空。
+    /// 子序列长度 &lt;<see cref="MinCjkFuzzyLength"/> 或 &gt;<see cref="MaxCjkQueryLength"/> 返回空。
+    ///
+    /// 下限取 3（精度审计 §2.5）：两字查询删一字必然退化成单字，而单字查询本身宽覆盖，
+    /// 等于把两字查询放大成两次单字查询。
     /// </summary>
     public static List<string> CjkVariants(string query, int maxVariants = DefaultMaxCjkVariants)
     {
         var sequence = CjkSubsequence(query);
-        if (sequence.Length < 2 || sequence.Length > MaxCjkQueryLength) return new List<string>();
+        if (sequence.Length < MinCjkFuzzyLength || sequence.Length > MaxCjkQueryLength)
+            return new List<string>();
 
         var output = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal) { sequence };
@@ -379,6 +441,10 @@ internal static class SearchQuery
         if (string.IsNullOrWhiteSpace(initials)) return null;
         var terms = initials.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ToList();
         if (terms.Count == 0) return null;
+        // 门控（精度审计 §2.2）：单字母首字母串**不生成该支**。单个汉字查询会产出单字母
+        // （恨→h / 爱→a / 痛→t），而单字母 token 在歌词（整行「啊」）、文件名（t164）、
+        // 单字标题（A / I）里密集存在——按精确 term 匹配会命中整库。
+        if (string.Concat(terms).Length < MinInitialsBranchLength) return null;
         var body = QuotedAnd(terms, terms[^1].Length >= MinInitialsPrefixLength);
         // 整体加括号：列过滤与 OR 混排时边界更明确（列过滤只作用于本支）。
         // 注意多列过滤必须用**花括号**：FTS5 的 `a b : expr` 是「列 a 后接词元 b」，
@@ -386,13 +452,56 @@ internal static class SearchQuery
         return $"({{{InitialsColumns}}} : {body})";
     }
 
-    private static string? CrossLingualBranch(IReadOnlyList<string> terms)
+    /// <summary>
+    /// 跨语言候选分支。**汉字侧单字门控**（精度审计 §2.4）：查询只含一个汉字时，
+    /// 丢掉「汉字 → 英文释义词」方向的候选（Unihan 对单字释义极度发散：
+    /// <c>痛 → ache / bitter / pain / sad / sorry</c>，会把这个查询放大到近乎整库）；
+    /// 「拉丁词 → 候选汉字」方向（<c>love → 爱</c>）不受影响。
+    ///
+    /// 判定依据是**查询侧 CJK 词法词元去重后的字数**，不看候选本身——这样
+    /// <c>爱</c>（候选 fond/like/love）与 <c>痛</c> 一致被裁，而 <c>月亮</c>（候选 moon 等）保留。
+    /// </summary>
+    private static string? CrossLingualBranch(IReadOnlyList<string> terms, IReadOnlyList<string>? lexical)
     {
         var clean = Clean(terms);
         if (clean.Count == 0) return null;
+        var cjkChars = CjkCharCount(lexical);
+        if (cjkChars > 0 && cjkChars < MinCrossLingualCjkLength)
+        {
+            // 单字汉字查询：只保留「拉丁 → 汉字」方向的候选（CJK 形态），
+            // 丢掉英文释义词（非 CJK 形态）。
+            clean = clean.Where(IsCjkText).ToList();
+            if (clean.Count == 0) return null;
+        }
         return clean.Count == 1
             ? Quote(clean[0])
             : "(" + string.Join(" OR ", clean.Select(Quote)) + ")";
+    }
+
+    /// <summary>查询侧 CJK 词法词元里**去重后的汉字个数**（bigram 会重复计数，故按字符集去重）。</summary>
+    private static int CjkCharCount(IReadOnlyList<string>? lexical)
+    {
+        if (lexical is null || lexical.Count == 0) return 0;
+        var chars = new HashSet<char>();
+        foreach (var token in lexical)
+        {
+            foreach (var ch in token)
+            {
+                if (ScriptRanges.IsCjk(ch)) chars.Add(ch);
+            }
+        }
+        return chars.Count;
+    }
+
+    /// <summary>整串是否只由 CJK / 假名 / 谚文构成（跨语言候选归属判定用）。</summary>
+    private static bool IsCjkText(string text)
+    {
+        if (text.Length == 0) return false;
+        foreach (var ch in text)
+        {
+            if (!IsIndexedScript(ch)) return false;
+        }
+        return true;
     }
 
     /// <summary>单个变体前缀下最多枚举多少个真实词条；超过则退回前缀匹配（避免枚举爆炸）。</summary>
@@ -609,10 +718,16 @@ internal static class SearchQuery
     private static bool IsPrefixable(string token)
         => !token.EnumerateRunes().Any(r => r.Value <= char.MaxValue && IsIndexedScript((char)r.Value));
 
-    /// <summary>纯小写拉丁 / 数字词元（可做编辑距离扩展）。</summary>
+    /// <summary>
+    /// 纯小写拉丁 / 数字词元且长度 ≥ <see cref="MinFuzzyWordLength"/>（可做编辑距离扩展）。
+    ///
+    /// 短词门控（精度审计 §6.2）：<c>ai</c> / <c>go</c> / <c>ye</c> 这类 2–3 字符词的
+    /// ≤1 变体覆盖了太多高频短词，放宽收益远低于噪声成本。取 4 与 Typesense
+    /// <c>min_len_1typo</c> 默认值一致。
+    /// </summary>
     private static bool IsFuzzyEligible(string token)
     {
-        if (token.Length == 0) return false;
+        if (token.Length < MinFuzzyWordLength) return false;
         foreach (var rune in token.EnumerateRunes())
         {
             var isLower = rune.Value >= 0x61 && rune.Value <= 0x7A;

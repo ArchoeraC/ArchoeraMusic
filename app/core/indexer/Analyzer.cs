@@ -110,8 +110,12 @@ public static class Analyzer
     /// （Unicode 16.0.0）改为纯 .NET <c>string.Normalize(FormKC)</c>（ICU / Unicode 17.0），
     /// 唯一内容差异是新增 <c>U+A7F1 → S</c>（Unicode 17 新增字符）。表内容变了，
     /// 按「表变即重建」的既定规则递增版本，避免新旧表混用产生难以复现的词元差异。
+    /// v13：**文件名退出拼音 / 首字母列**（精度审计 D-4）——<c>pinyin_meta_tok</c> /
+    /// <c>initials_meta_tok</c> 不再并入文件名（<c>filename_tok</c> 独立列不受影响）。
+    /// 索引内容变化（旧库里由文件名贡献的 `t164` → `t` / `164` 等 token 会被去除），
+    /// 故递增触发全量重建。
     /// </summary>
-    public const int AnalyzerVersion = 12;
+    public const int AnalyzerVersion = 13;
 
     /// <summary>查询侧跨语言候选（<see cref="QueryTokens.CrossLingual"/>）合并去重后的总预算。</summary>
     public const int CrossLingualBudget = 32;

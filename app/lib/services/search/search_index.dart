@@ -155,7 +155,12 @@ class SearchIndex {
       final trackId = raw['trackId'];
       final score = raw['score'];
       if (trackId is! String || score is! num) continue;
-      hits.add(LocalSearchHit(trackId: trackId, score: score.toDouble()));
+      hits.add(LocalSearchHit(
+        trackId: trackId,
+        score: score.toDouble(),
+        // 命中原由（精度审计 §6.3）：旧索引器无该字段时按 lexical 兜底。
+        pass: LocalSearchPass.fromName(raw['pass']),
+      ));
     }
     return hits;
   }

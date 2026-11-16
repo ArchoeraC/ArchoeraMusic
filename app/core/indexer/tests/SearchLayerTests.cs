@@ -28,6 +28,101 @@ internal static class SearchLayerTests
         QueryResultCache();
         FuzzyVocabularyRecall();
         RankingIntegrity();
+        RecallPrecisionGates();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 召回精度门控（精度审计 §8.1 负例集）                                */
+    /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 针对「库内无可匹配媒体却返回一堆无关结果」的**负例集**（见
+    /// <c>docs/local-search-recall-precision-audit.md</c> §8.1）。
+    ///
+    /// 这些都是「不该命中」的断言，与 qbench 的召回评测互补——后者只衡量
+    /// 「该找到的找到没」，测不出误召回。
+    /// </summary>
+    private static void RecallPrecisionGates()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(), "archoera-recall-gates-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var db = Path.Combine(root, "library.db");
+            var index = Path.Combine(root, "search.db");
+            var media = Path.Combine(root, "media");
+            Directory.CreateDirectory(media);
+
+            EndToEnd.CreateLibrary(db, generation: 1);
+            using (var conn = EndToEnd.Open(db))
+            {
+                // 反例曲：**完全不含「爱」**，但歌词含整行单字「啊」（首字母 a 的燃料）、
+                // 歌手/标题分别以 h / t 开头（单字母首字母的燃料）。
+                EndToEnd.InsertTrack(conn, "hate", Path.Combine(media, "h1.mp3"), "恨",
+                    """[{"name":"某人"}]""", "专辑", "我恨你\n啊", 1000);
+                // 单字标题：会产出单字母首字母 token（A）。
+                EndToEnd.InsertTrack(conn, "single", Path.Combine(media, "a.mp3"), "A",
+                    """[{"name":"Band"}]""", null, null, 2000);
+                // 英文反例：歌词含 love / like（跨语言候选的目标），但标题不含中文。
+                EndToEnd.InsertTrack(conn, "en", Path.Combine(media, "en.mp3"), "Someone Like You",
+                    """[{"name":"Adele"}]""", null, "I heard that you're settled down, love is all", 3000);
+                // 正例：标题真含「爱」。
+                EndToEnd.InsertTrack(conn, "love", Path.Combine(media, "love.mp3"), "爱",
+                    """[{"name":"邓丽君"}]""", null, "我爱你", 4000);
+                // 正例：四字标题（拼音 / 首字母检索应在门控后仍可用）。
+                EndToEnd.InsertTrack(conn, "sky", Path.Combine(media, "sky.mp3"), "晴天",
+                    """[{"name":"周杰伦"}]""", null, null, 5000);
+            }
+            EndToEnd.RunEngine(db, index, full: true, lrc: false);
+            SearchSession.CloseCached();
+
+            // 负例 1（M-1）：单字查询不得因首字母支而命中单字母 token 的歌。
+            // 修前：「爱」的首字母支是精确 `"a"`，命中标题 A / 歌词整行「啊」→ 整库。
+            var ai = Run(index, "爱", fuzzy: true);
+            Program.Check("负例: 单字查询不命中单字母首字母 token",
+                !Has(ai, "single"), Dump(ai));
+            Program.Check("负例: 单字查询不命中「恨」那首",
+                !Has(ai, "hate"), Dump(ai));
+            Program.Check("负例: 单字查询仍命中真含该字的歌",
+                Has(ai, "love"), Dump(ai));
+
+            // 负例 2（M-5）：单字汉字不走英文释义方向。
+            Program.Check("负例: 单字查询不命中英文 love 歌",
+                !Has(ai, "en") && ai.Passes.CrossLingual == 0, Dump(ai));
+
+            // 负例 3：单字「痛」（库内完全没有）必须返回空。
+            var pain = Run(index, "痛", fuzzy: true);
+            Program.Check("负例: 库内无匹配的单字查询返回空",
+                pain.Items.Count == 0, Dump(pain));
+
+            // 正例保护：两字以上首字母检索仍可用（qt → 晴天）。
+            var qt = Run(index, "qt", fuzzy: true);
+            Program.Check("正例: 双字母首字母检索仍命中", Has(qt, "sky"), Dump(qt));
+
+            // 正例保护：拼音检索仍可用（qingtian → 晴天）。
+            var pinyin = Run(index, "qingtian", fuzzy: true);
+            Program.Check("正例: 全拼检索仍命中", Has(pinyin, "sky"), Dump(pinyin));
+
+            // 负例 4（M-3）：两字查询不得走 CJK 容错（删一字必然退化为单字）。
+            // 「爱情」在库内不存在；修前 CJK 容错会删掉一个字 → 退化成「爱」/「情」的
+            // 完整单字查询（连拼音与首字母支一并带上）。
+            // 注意：≥2 字的**跨语言**释义是刻意保留的（「爱情」→ love 命中「爱」那首
+            // 属合理语义相邻），故此处只断言 CJK 容错趟未执行。
+            var loveWord = Run(index, "爱情", fuzzy: true);
+            Program.Check("负例: 两字查询不启用 CJK 容错趟",
+                loveWord.Passes.CjkFuzzy == 0, Dump(loveWord));
+
+            // 正例保护：三字以上的容错仍然生效（周杰美 → 周杰伦 的同类场景由
+            // ProgressiveQuery 覆盖；此处只断言门控没有误伤三字变体生成）。
+            Program.Check("正例: 三字仍生成容错变体",
+                SearchQuery.CjkVariants("月亮代").Count > 0);
+        }
+        finally
+        {
+            SearchSession.CloseCached();
+            EndToEnd.TryDelete(root);
+        }
     }
 
     /* ------------------------------------------------------------------ */
@@ -190,14 +285,20 @@ internal static class SearchLayerTests
 
     private static void CjkVariants()
     {
-        Program.Check("中文变体: 周伦 → 伦 / 周 / 伦周",
-            Join(SearchQuery.CjkVariants("周伦")) == "伦,周,伦周",
-            Join(SearchQuery.CjkVariants("周伦")));
-        Program.Check("中文变体: 一一 去重（换位无意义）",
-            Join(SearchQuery.CjkVariants("一一")) == "一",
-            Join(SearchQuery.CjkVariants("一一")));
+        // 三字起仍生成变体（删一字 / 相邻换位，去重保序）。
+        Program.Check("中文变体: 三字 周杰美 → 删除×3 + 换位×2",
+            Join(SearchQuery.CjkVariants("周杰美")) == "杰美,周美,周杰,杰周美,周美杰",
+            Join(SearchQuery.CjkVariants("周杰美")));
+        Program.Check("中文变体: 相同字相邻换位去重",
+            !SearchQuery.CjkVariants("一一一").Contains("一一一"),
+            Join(SearchQuery.CjkVariants("一一一")));
         Program.Check("中文变体: 单字不生成",
             SearchQuery.CjkVariants("我").Count == 0);
+        // 门控（精度审计 §2.5）：两字查询删一字必然退化成单字，等于把两字查询放大成
+        // 两次单字查询（合成库实测「想你」返回 130 条）。故 <3 字一律不生成变体。
+        Program.Check("中文变体: 两字不生成（防退化为单字）",
+            SearchQuery.CjkVariants("周伦").Count == 0
+                && SearchQuery.CjkVariants("想你").Count == 0);
         Program.Check("中文变体: 纯拉丁不生成",
             SearchQuery.CjkVariants("hello").Count == 0);
         Program.Check("中文变体: 超长放弃",
@@ -448,11 +549,21 @@ internal static class SearchLayerTests
             Program.Check("语言画像: 纯拉丁库裁剪汉字候选",
                 moon.Passes.CrossLingual == 0, Dump(moon));
 
-            // 反方向保留：汉字查询仍经英文释义候选命中英文标题。
-            var ai = Run(index, "爱", fuzzy: true);
-            Program.Check("语言画像: 汉字查询仍跨语言命中英文标题", Has(ai, "p1"), Dump(ai));
+            // 反方向保留：**多字**汉字查询仍经英文释义候选命中英文标题。
+            var loveWord = Run(index, "恋爱", fuzzy: true);
+            Program.Check("语言画像: 多字汉字查询仍跨语言命中英文标题", Has(loveWord, "p1"),
+                Dump(loveWord));
             Program.Check("语言画像: 汉字方向跨语言趟执行一次",
-                ai.Passes.CrossLingual == 1, Dump(ai));
+                loveWord.Passes.CrossLingual == 1, Dump(loveWord));
+
+            // **单字门控**（精度审计 §2.4 / M-5）：单个汉字不生成英文释义方向。
+            // Unihan 对单字释义极度发散（痛 → ache/bitter/pain/sad/sorry），在含大量
+            // 英文歌词的库里会把单字查询放大到近乎整库。此处断言：纯拉丁库里搜「爱」
+            // 不再命中 Love Me（旧行为会命中）。
+            var singleHan = Run(index, "爱", fuzzy: true);
+            Program.Check("语言画像: 单字汉字不走跨语言释义",
+                !Has(singleHan, "p1") && singleHan.Passes.CrossLingual == 0,
+                Dump(singleHan));
         }
         finally
         {
