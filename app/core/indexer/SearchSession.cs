@@ -88,6 +88,14 @@ internal static class SearchPassNames
     public const string CrossLingual = "crossLingual";
     public const string Fuzzy = "fuzzy";
     public const string CjkFuzzy = "cjkFuzzy";
+
+    /// <summary>
+    /// **丢词降级趟**：多词查询命中不足时，从末尾开始逐个丢弃 query 词后重新召回。
+    ///
+    /// 与 <see cref="Lexical"/> 同属「字面匹配」，只是少了约束——**方向最安全**的放宽
+    /// （指标见 <c>docs/local-search-indexer-references.md</c> §6.2）。
+    /// </summary>
+    public const string DropTokens = "dropTokens";
 }
 
 /// <summary>本次查询实际执行的兜底趟（0 / 1；用于诊断与回归计数）。</summary>
@@ -98,6 +106,7 @@ internal sealed class PassCounts
     public int CrossLingual { get; set; }
     public int Fuzzy { get; set; }
     public int CjkFuzzy { get; set; }
+    public int DropTokens { get; set; }
 }
 
 /// <summary>查询结果（按趟次合并去重后的 top-k）。</summary>
@@ -271,6 +280,47 @@ internal sealed class SearchSession : IDisposable
         // 主趟：精确表达式（词法 / 拼音 / 首字母）。
         Merge(SearchQuery.CompileMatch(tokens, request.Metadata), SearchPassNames.Lexical);
 
+        // 丢词降级（精度审计 §18 / §22 / §23）：多词查询主趟不足时，**先试「少匹配一个词」**，
+        // 而不是直接放宽到读音 / 拼音 / 跨语言 / 容错。
+        //
+        // 理由：减词仍是**字面匹配**，只是少了约束；改读音是**换了一个维度**，
+        // 语义可能完全无关（`鬱 → yu` 召回 36.8% 全库）。见
+        // `docs/local-search-indexer-references.md` §6.2 的方向性区分。
+        //
+        // **逐轮尝试**（§22）：不能只丢末词就收工——`周杰伦 晴天` 丢掉「晴天」后
+        // 仍会靠「周杰伦」返回结果，于是永远轮不到「保留晴天、丢掉周杰伦」这一轮。
+        // 每一轮丢一个词、重新召回，命中数达到阈值即停。
+        //
+        // **按字段亲和度排序**（§23）：位置顺序只是初始猜测；更可靠的信号是
+        // 「该词在 title 与 artist 列的命中分布」——只在 title 命中的词是歌名，最后才丢。
+        // 这样「晴天 周杰伦」这类反向写法也能正确保留歌名。
+        if (result.Items.Count < request.MinExact && SearchQuery.AllowDropTokens)
+        {
+            var candidates = SearchQuery.DropTokenCandidates(tokens, request.Query);
+            if (candidates.Count > 0)
+            {
+                var (titleCounts, artistCounts) = ProbeFieldAffinity(request.Query, candidates.Count);
+                candidates = SearchQuery.OrderDropsByFieldAffinity(
+                    candidates, titleCounts, artistCounts);
+            }
+
+            foreach (var dropIndex in candidates)
+            {
+                var dropped = SearchQuery.CompileDropTokens(
+                    tokens, request.Query, request.Metadata, dropIndex);
+                if (dropped is null) continue;
+
+                result.Passes.DropTokens = 1;
+                Merge(dropped, SearchPassNames.DropTokens);
+
+                // 丢掉第 i 个词后仍有后续丢法；但若本轮的命中已明显优于
+                // 「丢掉更靠前 / 更靠后的词」，继续尝试也只会得到更宽的结果。
+                // 直接以**第一个非空**的丢法为准，既避免取到最宽的结果，
+                // 又保证「保留歌名」的丢法排在前面（见 DropTokenCandidates 的方向）。
+                if (result.Items.Count >= request.MinExact) break;
+            }
+        }
+
         // 兜底趟只在主趟命中不足时付钱（渐进式，绝大多数查询止步于此）。
         if (result.Items.Count < request.MinExact)
         {
@@ -350,6 +400,49 @@ internal sealed class SearchSession : IDisposable
     ///
     /// 只裁「不可能命中」的方向，不裁整趟——纯英文库里输入「爱」仍能经英文释义候选命中英文标题。
     /// </summary>
+    /// <summary>
+    /// 探测每个查询词在 title / artist 列的命中数（精度审计 §23）。
+    ///
+    /// 用于判断「哪个词是歌名」：只在 title 命中、或 title 远多于 artist 的词是歌名，
+    /// 应当最后才丢。这样 <c>晴天 周杰伦</c>（反向写法）也能保留歌名。
+    ///
+    /// **只在丢词趟需要时调用**（主趟 0 命中的多词查询，罕见路径），
+    /// 且每个词只做 2 次 COUNT 查询。返回的两个数组与 <c>words</c> 的顺序一一对应。
+    /// </summary>
+    private (List<int> TitleCounts, List<int> ArtistCounts) ProbeFieldAffinity(
+        string query, int wordCount)
+    {
+        var title = new List<int>(wordCount);
+        var artist = new List<int>(wordCount);
+
+        var words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i < wordCount; i++)
+        {
+            if (i >= words.Length)
+            {
+                title.Add(0);
+                artist.Add(0);
+                continue;
+            }
+
+            // 用该词自己的词元编译（与检索同源），再限定到单列。
+            var tokens = Analyzer.AnalyzeQuery(words[i]);
+            var lexical = SearchQuery.CompileMatch(tokens, metadata: false);
+            if (lexical is null)
+            {
+                title.Add(0);
+                artist.Add(0);
+                continue;
+            }
+
+            // 直接复用编译结果，只把列过滤换成单列。CompileMatch 在没有 metadata
+            // 时不套列过滤，所以这里包一层。
+            title.Add(_store.CountMatches($"{{title_tok}} : ({lexical})"));
+            artist.Add(_store.CountMatches($"{{artist_tok}} : ({lexical})"));
+        }
+        return (title, artist);
+    }
+
     private List<string> FilterCrossLingual(List<string> candidates)
     {
         var output = new List<string>(candidates.Count);

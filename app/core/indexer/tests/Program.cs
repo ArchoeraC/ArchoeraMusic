@@ -52,7 +52,7 @@ public static class Program
 
     private static void RunDirectAssertions()
     {
-        Assert("AnalyzerVersion == 13", Analyzer.AnalyzerVersion == 13,
+        Assert("AnalyzerVersion == 14", Analyzer.AnalyzerVersion == 14,
             Analyzer.AnalyzerVersion.ToString());
 
         // 假名 / 谚文：子串分词（bigram+unigram），**不进拼音 / 首字母列**。
@@ -136,7 +136,7 @@ public static class Program
         // 查询侧结构化结果。
         Assert("AnalyzeQuery initials", Analyzer.AnalyzeQuery("我爱你").PinyinInitials == "wan",
             Analyzer.AnalyzeQuery("我爱你").PinyinInitials);
-        Assert("AnalyzeQuery lexical 数", Analyzer.AnalyzeQuery("我爱你").Lexical.Count == 5,
+        Assert("AnalyzeQuery lexical 数", Analyzer.AnalyzeQuery("我爱你").Lexical.Count == 4,
             Analyzer.AnalyzeQuery("我爱你").Lexical.Count.ToString());
         Assert("AnalyzeQuery pinyin", string.Join(' ', Analyzer.AnalyzeQuery("我爱你").Pinyin) == "wo ai ni");
         Assert("AnalyzeQuery 无 CJK → initials null", Analyzer.AnalyzeQuery("hello").PinyinInitials is null);

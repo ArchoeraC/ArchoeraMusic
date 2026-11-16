@@ -59,22 +59,66 @@ public sealed class FtsStore : IIndexStoreAdmin
     /// 于是首字母查询（`"wan"*`）会命中拼音音节（完 / 万 / 晚…），命中集近乎整库
     /// （30k 语料实测 `"wan"*` 命中 29985/30000、单条 56ms）——独立成列后首字母只与
     /// 真正的首字母串互比。其权重取 2.0（与拼音同档：二者都是「同一批字段的另一种写法」）。
+    ///
+    /// **v15 歌词列降权**（精度审计 §19）：歌词原文 1.5 → **0.6**，歌词拼音 1.5 → **0.5**，
+    /// 首字母歌词 1.5 → **0.5**。
+    ///
+    /// 依据（两个独立问题叠加在歌词列上）：
+    /// <list type="number">
+    ///   <item><b>df 极高</b>：<c>晴天</c> 在标题只命中 22 首，歌词里命中 225 首（**10×**）；
+    ///         <c>的</c> 单字在歌词覆盖全库 42.6%。</item>
+    ///   <item><b>bm25 的 TF 项</b>：歌词文本长、单曲内重复次数多，TF 会进一步抬高其得分。
+    ///         Typesense 明确把 frequency 排除在相关性之外
+    ///         （<c>include/match_score.h:56-68</c>，见
+    ///         <c>docs/local-search-indexer-references.md</c> §4.5）。</item>
+    /// </list>
+    ///
+    /// 两者叠加的结果：「歌词里恰好出现该词」与「歌名就是该词」在同池竞争。
+    /// 真实库实测（<c>晴天</c>）：当前权重下排第 1 的是唯一「标题 + 歌词都命中」的那首
+    /// （rowid 30367）；降权后它掉出前 5，只命中标题的曲目排到前面。
+    ///
+    /// 取 0.6 而非 0：歌词搜索是**真实特性**（「搜歌词找歌」），完全归零会让
+    /// 「歌词独有的词」搜不到。0.6 使其仍能召回，但不再压过标题命中。
     /// </summary>
     private static readonly double[] Bm25Weights =
     {
         4.0,  // title
         3.0,  // artist
         2.0,  // album
-        1.5,  // lyrics（原文）
+        0.6,  // lyrics（原文）—— v15 由 1.5 降档，见上方说明
         1.0,  // lyrics_tr（译文）
         0.5,  // lyrics_rom（音译）
         2.0,  // pinyin_meta（元数据拼音：与 title/artist 同档）
-        1.5,  // pinyin_lyrics（歌词拼音：与歌词原文同档）
+        0.5,  // pinyin_lyrics（歌词拼音）—— v15 由 1.5 降档
         2.0,  // reading_meta（日文读音：与拼音同档；**只索引元数据**——歌词罗马字检索是伪需求，
               //        且整段歌词读音 bigram 会把索引推高约 2×，见设计文档 §4.2）
         1.0,  // filename
         2.0,  // initials_meta
-        1.5,  // initials_lyrics
+        0.5,  // initials_lyrics（歌词首字母）—— v15 由 1.5 降档
+    };
+
+    /// <summary>
+    /// 取某列的 bm25 权重（测试接缝：让排序规则的断言直接校验权重表，
+    /// 而不依赖小语料上会退化为 0 的 bm25 分值）。
+    ///
+    /// 列名与本数组顺序一致（见 <c>search_fts</c> 的建表语句）：
+    /// <c>title_tok, artist_tok, album_tok, lyrics_tok, lyrics_tr_tok, lyrics_rom_tok,
+    /// pinyin_meta_tok, pinyin_lyrics_tok, reading_meta_tok, filename_tok,
+    /// initials_meta_tok, initials_lyrics_tok</c>。
+    /// </summary>
+    public static double WeightOf(string columnName)
+    {
+        var index = Array.IndexOf(WeightedColumnNames, columnName);
+        if (index < 0) throw new ArgumentOutOfRangeException(nameof(columnName), columnName, "未知列");
+        return Bm25Weights[index];
+    }
+
+    /// <summary>FTS5 列名（顺序**必须**与 <see cref="Bm25Weights"/> 一致）。</summary>
+    public static readonly string[] WeightedColumnNames =
+    {
+        "title_tok", "artist_tok", "album_tok", "lyrics_tok", "lyrics_tr_tok", "lyrics_rom_tok",
+        "pinyin_meta_tok", "pinyin_lyrics_tok", "reading_meta_tok", "filename_tok",
+        "initials_meta_tok", "initials_lyrics_tok",
     };
 
     private SqliteConnection? _conn;
@@ -291,9 +335,38 @@ public sealed class FtsStore : IIndexStoreAdmin
         return results;
     }
 
+    /// <summary>
+    /// 统计某个 FTS 表达式命中的**文档数**（用于元数据字段探测）。
+    ///
+    /// 与 <see cref="Search"/> 的区别：只要总数，不排序、不取行，因此很轻量——
+    /// 只走 FTS5 的计数路径。精度审计 §23 用它判断「某查询词更像歌名还是歌手名」。
+    ///
+    /// 表达式由调用方保证已转义（不可传用户原始输入）。
+    /// </summary>
+    public int CountMatches(string matchExpr)
+    {
+        if (string.IsNullOrWhiteSpace(matchExpr)) return 0;
+        var conn = EnsureOpen();
+        CommitTx();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM search_fts WHERE search_fts MATCH @q";
+        cmd.Parameters.AddWithValue("@q", matchExpr);
+        try
+        {
+            return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+        catch (SqliteException)
+        {
+            // 表达式语法错误（理论上不会发生，表达式都是编译器生成的）→ 视为 0，
+            // 让调用方退回默认策略，而不是让整次搜索失败。
+            return 0;
+        }
+    }
+
     /// <summary>批量把 <c>doc_id</c> 映射回 <c>track_id</c>（查询结果组装用）。</summary>
     public Dictionary<long, string> ResolveTrackIds(IReadOnlyCollection<long> docIds)
-    {        var map = new Dictionary<long, string>(docIds.Count);
+    {
+        var map = new Dictionary<long, string>(docIds.Count);
         if (docIds.Count == 0) return map;
 
         var conn = EnsureOpen();

@@ -59,6 +59,21 @@ public sealed class QueryTokens
     public string? PinyinInitials { get; internal set; }
 
     /// <summary>
+    /// 查询文本是否含 CJK 段（汉字 / 假名 / 谚文）。
+    ///
+    /// 用于**读音支的脚本分流**（精度审计 §12.7）：CJK 输入与拉丁输入对读音支的
+    /// 语义完全不同——
+    /// <list type="bullet">
+    ///   <item>CJK 输入（<c>鬱</c>）产出的拼音是**派生**的，与用户的检索意图无关；</item>
+    ///   <item>拉丁输入（<c>qiingtian</c>）产出的拼音**就是用户录入的字面**，
+    ///         是明确的「用拼音找中文歌」意图。</item>
+    /// </list>
+    /// 参考：Typesense 对 <c>zh/ko/ja</c> locale 直接关闭模糊遍历
+    /// （<c>src/index.cpp:5096-5099</c>，见 <c>docs/local-search-indexer-references.md</c> §4.0）。
+    /// </summary>
+    public bool HasCjk { get; internal set; }
+
+    /// <summary>
     /// 跨语言候选（**仅查询侧**，T1）：由 Unihan 释义扩展表（<c>def_en2hanzi</c> /
     /// <c>def_hanzi2en</c>）派生——拉丁/数字词元 → 候选汉字；CJK 段内的字 → 英文释义词。
     /// 合并去重后总预算 ≤ <see cref="Analyzer.CrossLingualBudget"/>（超出截断）。
@@ -115,7 +130,21 @@ public static class Analyzer
     /// 索引内容变化（旧库里由文件名贡献的 `t164` → `t` / `164` 等 token 会被去除），
     /// 故递增触发全量重建。
     /// </summary>
-    public const int AnalyzerVersion = 13;
+    public const int AnalyzerVersion = 14;
+
+    /// <summary>
+    /// CJK 段是否保留**首尾** unigram（去掉中间字的 unigram）。
+    ///
+    /// <c>true</c>（当前）：bigram + 段首 / 段末各一个 unigram —— 单字查询走 <c>字*</c> 前缀，
+    /// 命中范围按 bigram 收敛，且段末尾字仍可查（精度审计 §17）。
+    ///
+    /// <c>false</c>：恢复 v13 行为（每个字都建 unigram）——单字查询走精确匹配，
+    /// 在整个曲库里扫该字的所有出现位置。
+    ///
+    /// **回退**：改回 <c>false</c> 并把 <see cref="AnalyzerVersion"/> 降回 13，
+    /// 然后全量重建索引。
+    /// </summary>
+    public static readonly bool KeepCjkEdgeUnigrams = true;
 
     /// <summary>查询侧跨语言候选（<see cref="QueryTokens.CrossLingual"/>）合并去重后的总预算。</summary>
     public const int CrossLingualBudget = 32;
@@ -184,6 +213,7 @@ public static class Analyzer
         }
 
         query.PinyinInitials = parts.HasCjk ? string.Join(' ', parts.Initials) : null;
+        query.HasCjk = parts.HasCjk;
         query.CrossLingual.AddRange(CollectCrossLingual(text));
         RemovePinyinCollisions(query);
         return query;
@@ -287,8 +317,25 @@ public static class Analyzer
     }
 
     /// <summary>
-    /// CJK 段分词：先按序输出 bigram（相邻二字，位置连续便于短语），再输出 unigram
-    /// （保证单字查询命中）；拼音列按**整段**词级消歧取音节，首字母列合并为一个 token。
+    /// CJK 段分词：**bigram + 首尾 unigram**（不再给中间字建 unigram）。
+    /// 拼音列按**整段**词级消歧取音节，首字母列合并为一个 token。
+    ///
+    /// **为什么去掉中间字的 unigram**（精度审计 §17）：单个汉字在真实曲库里的 df 极高
+    /// （<c>的</c> 覆盖全库 **42.6%**、<c>我</c> 30.2%、<c>心</c> 28.5%），
+    /// 「歌词含某个字」几乎不构成检索意图。去掉后单字查询改走 <c>字*</c> 前缀，
+    /// 命中范围由**以该字开头的 bigram** 决定（<c>的X</c> 最大 5,631 首，只有单字 df 的 27%）。
+    ///
+    /// **为什么保留首尾 unigram**：实测（本地 FTS5 验证）只有 bigram 时，
+    /// 段**末尾**的字会彻底查不到——因为它只作为某个 bigram 的第二个字符存在，
+    /// 而以它开头的 bigram 不存在。首尾各补一个 unigram 后，
+    /// 首字 / 中间字 / 末字都能被 <c>字*</c> 命中。
+    /// 这也是 <c>fts5-cjk</c> 的做法（见 <c>docs/local-search-indexer-references.md</c> §5.1）。
+    ///
+    /// **代价（实测校正）**：索引体积**几乎不变**（20k 首语料实测 v13 257 MB → v14 256 MB）。
+    /// 原先预期「降 30%」是误读——那个数字来自 <c>fts5-cjk</c> 的 bigram → trigram 对比，
+    /// 不是「去 unigram」的收益。实际收益只有 <c>title_tok</c> 单字 term 数
+    /// 2,330 → 1,852（−20%），词表小了但总条目量由 bigram 主导。
+    /// **影响**：需 <see cref="AnalyzerVersion"/> 递增触发全量重建。
     /// </summary>
     private static void AddCjkSegment(string segment, Parts parts)
     {
@@ -296,9 +343,25 @@ public static class Analyzer
         {
             for (int i = 0; i + 1 < segment.Length; i++)
                 parts.Tokens.Add(segment.Substring(i, 2));
+
+            if (KeepCjkEdgeUnigrams)
+            {
+                // 首尾 unigram：保证段首 / 段末的字能被前缀查询命中。
+                // 段中字由 bigram 覆盖（`字*` 会命中以该字开头的 bigram）。
+                parts.Tokens.Add(segment[..1]);
+                parts.Tokens.Add(segment[^1..]);
+            }
+            else
+            {
+                // 旧行为（v13）：每个字都建 unigram。
+                foreach (var ch in segment) parts.Tokens.Add(ch.ToString());
+            }
         }
-        foreach (var ch in segment)
-            parts.Tokens.Add(ch.ToString());
+        else if (segment.Length == 1)
+        {
+            // 单字段落：整段就是一个字，它既是首也是尾。
+            parts.Tokens.Add(segment);
+        }
 
         // 整段一次性过 ToolGood：词级多音字消歧（重庆→chong qing）。
         parts.Pinyin.AddRange(Pinyin.FromCjkRun(segment));
