@@ -76,6 +76,23 @@ enum ShortcutAction {
   /// 持久化 id。
   String get id => name;
 
+  /// 是否响应长按 / 系统自动重复（`KeyRepeatEvent`）。
+  ///
+  /// 只有「持续型」动作（快进/快退、音量、上一首/下一首）响应重复；
+  /// 开关类与导航类**不响应**——按住时按系统重复速率反复触发会把播放页
+  /// 反复 push/pop（实测表现为整个应用卡死），也会让 playPause 之类高频抖动。
+  bool get repeats => switch (this) {
+    seekBackward ||
+    seekForward ||
+    seekBackwardLong ||
+    seekForwardLong ||
+    volumeUp ||
+    volumeDown ||
+    next ||
+    previous => true,
+    _ => false,
+  };
+
   /// 导航类路由（部分动作）。
   String? get route => switch (this) {
     goHome => '/',
