@@ -132,6 +132,15 @@ pkg_deb() {
   cp -a "$stage_icons/hicolor" "$root/usr/share/icons/"
 
   # 注：DEBIAN/control 是 dpkg 格式，不允许 '#' 注释行，说明性注释只能放此处。
+  #
+  # Depends 只声明**非 GTK 传递**的系统库 + GTK3 本身：
+  #   - GTK3 栈（atk-bridge / epoxy / fontconfig / fribidi / X11 / Xi / cloudproviders）
+  #     一律由 libgtk-3-0 自己硬依赖带入，这里重复声明只会被发行版改名连坐；
+  #   - Ubuntu 24.04 起这批包按 64 位 time_t 过渡改名为 *t64
+  #     （libatk-bridge2.0-0 → libatk-bridge2.0-0t64、libgtk-3-0 → libgtk-3-0t64），
+  #     旧名只剩 Provides 虚拟包，dpkg 会报「但是它是虚拟软件包」而装不上；
+  #   - 故 GTK3 用 t64 名优先 + 旧名回退（Debian 12 / Ubuntu 22.04 仍用旧名），
+  #     其余保持稳定包名。
   cat > "$root/DEBIAN/control" <<EOF
 Package: archoera-music
 Version: $version_deb
@@ -140,7 +149,7 @@ Priority: optional
 Architecture: amd64
 Maintainer: io.awa.archoera.betastudio2 <noreply@github.com>
 Homepage: $REPO_URL
-Depends: libc6, libstdc++6, zlib1g, libgtk-3-0 | libgtk-3-0t64, libdbus-1-3, libepoxy0, libfontconfig1, libfribidi0, libx11-6, libxi6, libatk-bridge2.0-0, libcloudproviders0, libsqlite3-0, liblzma5
+Depends: libc6, libstdc++6, zlib1g, libgtk-3-0t64 | libgtk-3-0, libdbus-1-3, libsqlite3-0, liblzma5
 Description: An open-source music player
  Connect to alternative music services, support offline playback, local
  library scanning and a built-in subsonic-compatible server.
@@ -162,6 +171,11 @@ exit 0
 EOF
   chmod +x "$root/DEBIAN/postinst"
   cp "$root/DEBIAN/postinst" "$root/DEBIAN/postrm"
+
+  # 依赖声明门禁：每一组 Depends 至少要在本发行版索引里有真实包名
+  # （只有 Provides 的虚拟包会在用户机 dpkg 阶段直接失败）。
+  bash "$ROOT/packaging/linux/build-release.sh" deb-deps \
+    --control "$root/DEBIAN/control"
 
   dpkg-deb --root-owner-group --build "$root" \
     "$DIST/$APP_NAME-v$version_deb-${DISTRO_TAG}-x86_64.deb" >/dev/null

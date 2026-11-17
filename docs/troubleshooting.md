@@ -88,13 +88,27 @@
 
 ### 1.4 Linux 启动缺依赖
 
-发布包声明了 GTK / D-Bus / SQLite 等运行库。若启动即报共享库缺失，按发行版补齐：
+发布包声明了 GTK / D-Bus / SQLite 等运行库，GTK 的传递依赖（atk-bridge / epoxy /
+fontconfig / X11 等）由 GTK3 包自动带入。若启动即报共享库缺失，按发行版补齐：
 
 ```bash
-# Debian / Ubuntu（deb 包的 Depends 已覆盖，手动解包时需要）
-sudo apt install libgtk-3-0 libdbus-1-3 libepoxy0 libfontconfig1 libfribidi0 \
-  libx11-6 libxi6 libatk-bridge2.0-0 libsqlite3-0 liblzma5
+# Debian 13 / Ubuntu 24.04+（64 位 time_t 过渡后的 *t64 包名）
+sudo apt install libgtk-3-0t64 libdbus-1-3 libsqlite3-0 liblzma5
+
+# Debian 12 / Ubuntu 22.04（旧包名）
+sudo apt install libgtk-3-0 libdbus-1-3 libsqlite3-0 liblzma5
 ```
+
+安装 deb 请走 `apt` 而不是 `dpkg -i` 或图形包管理器双击，让依赖一起装上：
+
+```bash
+sudo apt install ./ArchoeraMusic-*.deb
+```
+
+若提示「软件包系统已损坏」并建议 `apt-get install -f`，注意两点：`apt-get` 需要 `sudo`
+（否则会看到 `无法打开锁文件 /var/lib/dpkg/lock-frontend ... (13: Permission denied)`）；
+第三方源经常是依赖缺口的来源，先 `sudo apt-get update`，仍失败就临时禁用第三方源再
+`sudo apt-get install -f`。
 
 AppImage 在无 FUSE 的环境可解包运行：`./ArchoeraMusic-*.AppImage --appimage-extract-and-run`。
 
