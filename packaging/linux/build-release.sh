@@ -13,6 +13,8 @@
 #    guard    静态依赖守卫：NEEDED / $ORIGIN / 内嵌库实际解析位置 / SONAME /
 #             libssl·libcrypto·libcurl 禁止项 / 伴随库；产出
 #             ARCHOERA-DEPENDENCIES.txt
+#    deb-deps 校验 deb control 的 Depends 在构建机 apt 索引里可安装
+#             （防空包名/虚拟包：如 Ubuntu 24.04 起的 *t64 改名）
 #    verify   guard + 关键伴随库在包内 + Xvfb 下真实启动冒烟（LD_BIND_NOW）
 #    smoke-appimage  对最终 .AppImage 做启动冒烟（--appimage-extract-and-run，
 #                    无需 FUSE）
@@ -25,6 +27,7 @@
 #    bash packaging/linux/build-release.sh all
 #    bash packaging/linux/build-release.sh guard  --bundle <目录>
 #    bash packaging/linux/build-release.sh verify --bundle <目录>
+#    bash packaging/linux/build-release.sh deb-deps --control <control 文件>
 #    bash packaging/linux/build-release.sh smoke-appimage --appimage <文件>
 #    SKIP_BUILD=1 bash packaging/linux/build-release.sh all
 #    ARCHOERA_SMOKE_SECONDS=15   启动冒烟存活秒数
@@ -72,12 +75,18 @@ shift
 
 bundle=""
 appimage=""
+control=""
 allow_extra=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --bundle)
       [ "$#" -ge 2 ] || usage
       bundle="$2"
+      shift 2
+      ;;
+    --control)
+      [ "$#" -ge 2 ] || usage
+      control="$2"
       shift 2
       ;;
     --appimage)
@@ -308,6 +317,55 @@ do_guard() {
     "$(printf '%s\n' ${report_bundled[@]+"${report_bundled[@]}"} | sort -u | sed '/^$/d' | wc -l) 个内嵌库"
 }
 
+# ───────────────────── deb 依赖声明校验 ─────────────────────
+# dpkg/apt 不会替「只有 Provides 的虚拟包」自动挑提供者：Depends 若只写旧包名
+# （如 Ubuntu 24.04 起的 libatk-bridge2.0-0 / libssl3 / libcurl4），用户端会报
+# 「但是它是虚拟软件包」而安装失败。这里按构建机 apt 索引逐组校验：每个逗号
+# 分组至少要有一个**真实存在**的备选包（跨发行版改名一律写 `新名 | 旧名`）。
+do_deb_deps() {
+  [ -n "$control" ] || usage
+  [ -f "$control" ] || die "找不到 control 文件: $control"
+
+  local depends_line errors=0 group alt group_ok group_alts
+  depends_line="$(awk '/^Depends:/{sub(/^Depends:[ \t]*/, ""); print; exit}' "$control")"
+  [ -n "$depends_line" ] || die "control 缺 Depends 字段: $control"
+
+  # 非 Debian 系构建机（或容器里没有 apt 索引）无法判断包名，明确跳过而不是
+  # 误报：该步骤在 Ubuntu CI 上必跑，正是发行版改名会踩到的地方。
+  if ! command -v apt-cache >/dev/null 2>&1 || ! apt-cache show libc6 >/dev/null 2>&1; then
+    log "deb-deps: 本机无可用的 apt 索引（非 Debian 系或未 apt-get update），跳过校验"
+    return 0
+  fi
+
+  local -a groups alts
+  # 用 read -a 切分而不是嵌套管道/进程替换：嵌套 while read 会互相抢同一个 fd，
+  # 后面的分组会被前面的内层循环读空。
+  IFS=',' read -r -a groups <<< "$depends_line"
+  for group in ${groups[@]+"${groups[@]}"}; do
+    group_ok=0
+    group_alts=""
+    IFS='|' read -r -a alts <<< "$group"
+    for alt in ${alts[@]+"${alts[@]}"}; do
+      alt="$(printf '%s' "$alt" |
+        sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//; s/[[:space:]]*\([^)]*\)$//; s/:(any|native)$//')"
+      [ -n "$alt" ] || continue
+      group_alts="${group_alts:+$group_alts | }$alt"
+      if apt-cache show "$alt" >/dev/null 2>&1; then
+        group_ok=1
+      fi
+    done
+    [ -n "$group_alts" ] || continue
+    if [ "$group_ok" -eq 0 ]; then
+      echo "::error::deb Depends 分组里没有真实存在的包：$group_alts（只有虚拟包提供者时 dpkg 会拒绝安装）" >&2
+      errors=$((errors + 1))
+    fi
+  done
+
+  [ "$errors" -eq 0 ] || \
+    die "deb 依赖声明有 ${errors} 组不可安装（Ubuntu 24.04+ 的 *t64 改名请写成「新名 | 旧名」）"
+  log "deb-deps: ${#groups[@]} 组依赖声明均可安装"
+}
+
 # ────────────────────────── 启动冒烟 ─────────────────────────
 # Xvfb + 临时 HOME/XDG + LD_BIND_NOW 真实拉起发布包，存活 N 秒才算通过。
 # smoke_run <可执行文件> [追加参数...]
@@ -404,6 +462,7 @@ case "$step" in
   build) do_build ;;
   prepare) do_prepare ;;
   guard) do_guard ;;
+  deb-deps) do_deb_deps ;;
   verify) do_verify ;;
   smoke-appimage)
     [ -n "$appimage" ] || usage

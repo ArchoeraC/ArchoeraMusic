@@ -30,7 +30,9 @@ Linux 二进制通过「运行时按 soname 查找共享库」加载依赖。发
    （`libssl/libcrypto/libssh2/nghttp2/ngtcp2/krb5…`）整棵拖进产物。
 3. **只有 ABI 稳定的库才允许由系统提供**：当前允许清单见
    `packaging/linux/build-release.sh` 的 `ALLOW_RE`（glibc/GCC runtime、GTK3 栈、
-   X11/Wayland、`libdbus-1`、`libsqlite3` 等）。这些同时在打包 `depends` 中声明。
+   X11/Wayland、`libdbus-1`、`libsqlite3` 等）。打包 `depends` 只声明**非 GTK
+   传递**的那部分 + GTK3 本身（GTK 的 atk-bridge / epoxy / fontconfig / X11 等
+   由 GTK 包自己的硬依赖带入，重复声明只会被发行版改名连坐，见 §3.3）。
 4. **禁止直接依赖 `libssl` / `libcrypto`**。产物中已不存在任何 OpenSSL 使用
    路径：scraper 的加密（Rust staticlib）与 HTTP（`reqwest + rustls`）均静态
    链接；`archoera_scraper` 的 CMake 在链接后调用
@@ -74,12 +76,28 @@ bash packaging/linux/build-release.sh verify --bundle <bundle>
   `undefined symbol` / `GLIBCXX_x.y not found` 等日志直接失败；
 - 不使用真实用户数据（曲库、凭据、偏好均指向临时目录）。
 
+### 3.3 deb 依赖声明门禁
+
+```bash
+bash packaging/linux/build-release.sh deb-deps --control <control 文件>
+```
+
+`packaging/linux/package.sh` 在 `dpkg-deb --build` 之前自动调用。按构建机 apt 索引
+逐个校验 `Depends` 的逗号分组：每组至少要有一个**真实存在**的包名。原因是 dpkg
+不会替「只有 `Provides` 的虚拟包」自动挑提供者——Ubuntu 24.04 起 64 位 time_t
+过渡把 GTK 栈改名为 `*t64`（`libatk-bridge2.0-0t64`、`libgtk-3-0t64`），只写旧名
+会让用户端报「但是它是虚拟软件包」而安装失败。跨发行版改名一律写成
+`新名 | 旧名`（GTK3 已按此声明），其余只声明非传递依赖。
+
+非 Debian 系构建机（本机 Arch 等）没有 apt 索引，该步骤显式跳过并打一行日志；
+Ubuntu 打包 job 上必跑。
+
 ## 4. CI 接入
 
 - `.github/actions/build-linux/action.yml`：`flutter build` + `bundle-linux-runtime.sh`
   之后依次执行依赖守卫与启动冒烟；任一失败则该发行版 job 失败。
 - `packaging/linux/package.sh`：任何打包格式在开始处再跑一次依赖守卫（防止有人
-  跳过 action 直接打包）。
+  跳过 action 直接打包）；deb 打包在写出 control 后再跑 `deb-deps` 依赖声明门禁。
 - 各 Linux 发行版 job 安装 `xvfb` / X 认证 / 软件 GL / `dbus-run-session`。
 - AppImage job 在产出后直接跑最终 `.AppImage`（`--appimage-extract-and-run`，无需
   FUSE），覆盖 linuxdeploy 收拢依赖 + AppRun 环境后的真实用户路径。
@@ -108,6 +126,7 @@ bash packaging/linux/build-release.sh all
 | `RUNPATH 含非 $ORIGIN 路径` | 构建机绝对路径泄漏；同上，归一化 RUNPATH |
 | `未登记的系统依赖 X` | 决策：内嵌，或把精确 soname 加入允许清单并补打包依赖 |
 | `禁止直接依赖 libssl/libcrypto` | 回退到 Rust staticlib / 纯托管实现；不要把系统 OpenSSL 加回允许清单 |
+| `deb Depends 分组里没有真实存在的包` | 该包在当前发行版只有 `Provides`（多为 `*t64` 改名）：改写成 `新名 \| 旧名`，或删掉 GTK 传递依赖 |
 | 启动冒烟 `进程提前退出` | 看日志尾部；常见为缺 GUI/GL/DBus 运行时、schema 或显示环境 |
 | 启动冒烟 `依赖无法解析` | 与静态守卫同类问题；优先查 `$ORIGIN` 与内嵌完整性 |
 
