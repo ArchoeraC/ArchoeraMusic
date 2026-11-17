@@ -95,7 +95,10 @@ final Map<int, String> _tokenByKeyId = {
 };
 
 /// 解析绑定字符串 → [ShortcutActivator]；非法返回 null。
-ShortcutActivator? parseBinding(String raw) {
+///
+/// [includeRepeats] = false 时忽略系统自动重复（长按只触发一次）；开关类 /
+/// 导航类动作应传 false，避免按住时反复推进状态（见 `ShortcutAction.repeats`）。
+ShortcutActivator? parseBinding(String raw, {bool includeRepeats = true}) {
   final parts = raw
       .split('+')
       .map((s) => s.trim())
@@ -139,6 +142,7 @@ ShortcutActivator? parseBinding(String raw) {
     alt: alt,
     shift: shift,
     meta: meta,
+    includeRepeats: includeRepeats,
   );
 }
 

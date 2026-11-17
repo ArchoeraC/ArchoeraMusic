@@ -10,10 +10,11 @@
 /// 于是 `closePlayerPage()` 的守卫恒为 false 直接 return，关闭按钮 / 快捷键都失效。
 library;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:archoera_music/app/player_route_controller.dart';
 import 'package:archoera_music/app/router.dart';
 import 'package:archoera_music/app/player_route_curves.dart';
 
@@ -147,7 +148,7 @@ void main() {
             reverseTransitionDuration: kPlayerRouteTransitionDuration,
             transitionsBuilder: (context, animation, secondary, child) =>
                 FadeTransition(opacity: animation, child: child),
-            // 真实播放页在 dispose 里回报「收起完成」（见 notifyPlayerPageDisposed）。
+            // 真实播放页在 dispose 里回报「路由已卸载」（见 routeDetached）。
             child: const _PlayerRoutePage(),
           ),
         ),
@@ -169,9 +170,158 @@ void main() {
     expect(find.text('player'), findsOneWidget, reason: '收起期间的打开请求不能丢');
     expect(isPlayerPageOpen, isTrue);
   });
+
+  /// 快捷键连按 / 快速点封面：`push` 与 `pop` 挤在同一帧，播放页可能**从未构建**
+  /// （因此既没有 attach 也没有 detach 事件）。旧实现会永远停在 closing，
+  /// 之后的打开请求全部被挂起 → 用户看到「按一下快捷键后整个播放页再也打不开」。
+  testWidgets('同一帧内打开后立刻关闭：不会卡在 closing，之后仍能打开', (tester) async {
+    final router = _testRouter();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    openPlayerPage(router: router);
+    closePlayerPage(router: router); // 页面还没构建/挂载
+    await tester.pumpAndSettle();
+
+    expect(
+      PlayerRouteController.instance.phase,
+      PlayerRoutePhase.closed,
+      reason: '必须收敛为 closed，否则后续打开请求会被挂起',
+    );
+    expect(find.text('player'), findsNothing);
+
+    // 仍然可再次打开（旧实现这里会静默无效）。
+    openPlayerPage(router: router);
+    await tester.pumpAndSettle();
+    expect(find.text('player'), findsOneWidget);
+    expect(PlayerRouteController.instance.phase, PlayerRoutePhase.open);
+  });
+
+  /// 连按快捷键（每帧一次 toggle）：状态机不能因此进入 push/pop 抖动，
+  /// 安静下来后「状态」必须与「界面上有没有播放页」一致。
+  testWidgets('每帧一次连续切换：状态与界面保持一致，且不抛异常', (tester) async {
+    final router = _testRouter();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    for (var i = 0; i < 40; i++) {
+      togglePlayerPage(router: router);
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final visible = find.text('player').evaluate().isNotEmpty;
+    expect(
+      isPlayerPageOpen,
+      visible,
+      reason: '状态机与真实界面不能失步（否则下一次打开/关闭会静默无效）',
+    );
+    expect(
+      PlayerRouteController.instance.phase == PlayerRoutePhase.opening ||
+          PlayerRouteController.instance.phase == PlayerRoutePhase.closing,
+      isFalse,
+      reason: '动画结束后不允许停在过渡态（停在 closing 会让后续打开请求永久挂起）',
+    );
+
+    // 收敛后仍可正常开关。
+    if (isPlayerPageOpen) {
+      closePlayerPage(router: router);
+      await tester.pumpAndSettle();
+    }
+    openPlayerPage(router: router);
+    await tester.pumpAndSettle();
+    expect(find.text('player'), findsOneWidget);
+  });
+
+  testWidgets('同一帧内打开后立刻整栈替换（页面从未构建）：不会卡在 opening', (tester) async {
+    final router = _testRouter();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    openPlayerPage(router: router);
+    // 打开的同时「前往音乐库」：新导航覆盖这次 push，播放页可能从未构建。
+    router.go('/library');
+    await tester.pumpAndSettle();
+
+    expect(
+      PlayerRouteController.instance.phase,
+      isNot(PlayerRoutePhase.opening),
+      reason: '页面从未挂载时必须收敛（帧末核对兜底）',
+    );
+    expect(find.text('player'), findsNothing);
+
+    // 仍能正常打开（旧实现会静默无效）。
+    openPlayerPage(router: router);
+    await tester.pumpAndSettle();
+    expect(find.text('player'), findsOneWidget);
+    expect(PlayerRouteController.instance.phase, PlayerRoutePhase.open);
+  });
+
+  /// 快捷键在弹窗打开时也会触发：关闭播放页不能把顶上的弹窗（或更下层页面）
+  /// 误 pop 掉，更不能靠「重试 pop」连续 pop。
+  testWidgets('播放页顶上有弹窗时，关闭播放页不会误 pop 其它路由', (tester) async {
+    final router = _testRouter();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    openPlayerPage(router: router);
+    await tester.pumpAndSettle();
+    expect(find.text('player'), findsOneWidget);
+
+    router.routerDelegate.navigatorKey.currentState!.push(
+      MaterialPageRoute<void>(builder: (_) => const Text('popup')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('popup'), findsOneWidget);
+
+    closePlayerPage(router: router);
+    await tester.pumpAndSettle();
+
+    expect(find.text('popup'), findsOneWidget, reason: '不能误 pop 顶上的弹窗');
+    // 播放页被不透明弹窗盖住 → offstage，仍应挂在树上。
+    expect(find.text('player', skipOffstage: false), findsOneWidget);
+    expect(PlayerRouteController.instance.phase, PlayerRoutePhase.open);
+
+    // 弹窗关掉之后仍能正常收起播放页。
+    router.routerDelegate.navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+    closePlayerPage(router: router);
+    await tester.pumpAndSettle();
+    expect(find.text('player'), findsNothing);
+    expect(PlayerRouteController.instance.phase, PlayerRoutePhase.closed);
+  });
 }
 
-/// 模拟真实播放页的收起收尾约定：路由卸载时回报 [notifyPlayerPageDisposed]。
+/// 与真实 appRouter 同构的最小路由（`/player` 用非不透明转场页）。
+GoRouter _testRouter() => GoRouter(
+  initialLocation: '/home',
+  routes: [
+    GoRoute(path: '/home', builder: (_, _) => const Text('home')),
+    GoRoute(path: '/library', builder: (_, _) => const Text('library')),
+    GoRoute(
+      path: kPlayerRoutePath,
+      pageBuilder: (context, state) => CustomTransitionPage(
+        key: state.pageKey,
+        opaque: false,
+        transitionDuration: kPlayerRouteTransitionDuration,
+        reverseTransitionDuration: kPlayerRouteTransitionDuration,
+        transitionsBuilder: (context, animation, secondary, child) =>
+            FadeTransition(opacity: animation, child: child),
+        child: const _PlayerRoutePage(),
+      ),
+    ),
+  ],
+);
+
+/// 模拟真实播放页的收起收尾约定：
+/// - `didChangeDependencies` 上报「已绑定路由动画」；
+/// - 动画走完 / 收起走完上报 opened / dismissed；
+/// - `dispose` 上报「路由已卸载」。
 class _PlayerRoutePage extends StatefulWidget {
   const _PlayerRoutePage();
 
@@ -180,9 +330,35 @@ class _PlayerRoutePage extends StatefulWidget {
 }
 
 class _PlayerRoutePageState extends State<_PlayerRoutePage> {
+  Animation<double>? _animation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (identical(animation, _animation)) return;
+    _animation?.removeStatusListener(_onStatus);
+    _animation = animation;
+    animation?.addStatusListener(_onStatus);
+    if (animation != null) {
+      PlayerRouteController.instance.routeAttached(animation, ModalRoute.of(context));
+    }
+  }
+
+  void _onStatus(AnimationStatus status) {
+    final animation = _animation;
+    if (animation == null) return;
+    if (status == AnimationStatus.completed) {
+      PlayerRouteController.instance.routeOpened(animation);
+    } else if (status == AnimationStatus.dismissed) {
+      PlayerRouteController.instance.routeDismissed(animation);
+    }
+  }
+
   @override
   void dispose() {
-    notifyPlayerPageDisposed();
+    _animation?.removeStatusListener(_onStatus);
+    PlayerRouteController.instance.routeDetached(_animation);
     super.dispose();
   }
 
