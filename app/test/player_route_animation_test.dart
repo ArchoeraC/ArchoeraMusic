@@ -53,4 +53,27 @@ void main() {
     notifier.clear(null);
     expect(container.read(playerRouteAnimationProvider), same(route));
   });
+
+  test('clearDeferred 推迟到帧末写入，且仍只清自己写入的动画', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(playerRouteAnimationProvider.notifier);
+
+    final oldRoute = const AlwaysStoppedAnimation<double>(0.2);
+    final newRoute = const AlwaysStoppedAnimation<double>(0.8);
+    notifier.set(oldRoute);
+    notifier.set(newRoute);
+
+    // 旧实例（dispose 路径）不得抹掉新实例的动画。
+    notifier.clearDeferred(oldRoute);
+    expect(container.read(playerRouteAnimationProvider), same(newRoute));
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(playerRouteAnimationProvider), same(newRoute));
+
+    // 新实例自己清空：写入推迟到帧末。
+    notifier.clearDeferred(newRoute);
+    expect(container.read(playerRouteAnimationProvider), same(newRoute));
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(playerRouteAnimationProvider), isNull);
+  });
 }

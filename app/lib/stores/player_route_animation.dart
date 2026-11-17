@@ -35,4 +35,18 @@ class PlayerRouteAnimationNotifier extends Notifier<Animation<double>?> {
     if (!identical(state, animation)) return;
     state = null;
   }
+
+  /// 帧末清空：`PlayerPage.dispose` 专用。
+  ///
+  /// `dispose` 属于 widget 卸载期，此时直接写 provider 会触发 Riverpod 的
+  /// 「构建期修改 provider」断言（`_UncontrolledProviderScopeState` 在构建中
+  /// 不允许 `setState`），故推迟到当前帧结束后的 microtask；归属判断仍在
+  /// [clear] 内完成（旧实例不能抹掉新实例刚写入的动画）。
+  void clearDeferred(Animation<double>? animation) {
+    if (animation == null) return;
+    Future.microtask(() {
+      if (!ref.mounted) return;
+      clear(animation);
+    });
+  }
 }
