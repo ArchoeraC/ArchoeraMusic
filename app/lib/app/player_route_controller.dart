@@ -81,7 +81,12 @@ class PlayerRouteController extends ChangeNotifier {
 
   PlayerRoutePhase get phase => _phase;
 
-  /// 壳层收缩动效要用的动画；[PlayerRoutePhase.closed] 时为 null。
+  /// 当前播放页的路由动画；[PlayerRoutePhase.closed] 时为 null。
+  ///
+  /// **仅供状态机内部核对**（收起是否开始、路由是否栈顶），**不要给渲染层
+  /// 消费**：壳层/顶栏必须继续读 `playerRouteAnimationProvider`（由 `PlayerPage`
+  /// 帧末写入）。2026-11-17 实测把渲染改成从这里取动画后，打开播放页会出现
+  /// 「整窗黑一帧」，恢复 provider 链路即消失。
   Animation<double>? get animation => _animation;
 
   /// 播放页在栈上（含正在展开 / 正在收起）。

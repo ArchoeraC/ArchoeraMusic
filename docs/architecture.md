@@ -543,6 +543,9 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
   **渲染/动效侧保持原实现不变**：`PlayerPage` 仍在帧末把路由动画写入
   `playerRouteAnimationProvider`（壳层 `ShellExpandTransition` / `OffstageWhenComplete`、
   顶栏搜索下拉都照旧消费它）；状态机只负责开关状态与路由动作，不参与渲染。
+  （2026-11-17 实测：把壳层/顶栏改成从状态机取动画，会让打开播放页时出现
+  「整窗黑一帧」——首帧只剩 DEBUG 角标；恢复 provider 链路后消失。故这条链路
+  是**渲染专用**，不要合并到状态机里。）
   状态字段同步生效、通知压到微任务，因此 widget 生命周期里上报也不会触发
   「构建期修改 provider」断言（旧实现正是在这里抛错，把壳层清理逻辑打断 → 界面永久停绘）。
   push/pop 后各做**有限次帧末核对**（不是定时器）：路由没进栈就复位、收起动画没开始就重试
