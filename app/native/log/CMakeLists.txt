@@ -57,8 +57,9 @@ else()
   target_compile_options(archoera_log PRIVATE -Wall -Wextra)
   # 路径缓冲区已按上限预留轮转后缀，GCC 无法证明不截断，按要求静默该告警。
   target_compile_options(archoera_log PRIVATE -Wno-format-truncation)
-  # 严格 C11 下暴露 POSIX（fileno/localtime_r/mkdir/access/isatty）。
-  target_compile_definitions(archoera_log PRIVATE _POSIX_C_SOURCE=200809L)
+  # 严格 C11 下暴露 POSIX / XSI（fileno/localtime_r/mkdir/access/isatty，
+  # 以及崩溃捕获用的 sigaltstack / SA_ONSTACK）。
+  target_compile_definitions(archoera_log PRIVATE _POSIX_C_SOURCE=200809L _XOPEN_SOURCE=700)
 endif()
 
 if(UNIX AND NOT APPLE)

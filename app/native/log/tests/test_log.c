@@ -15,6 +15,9 @@
 #include <direct.h>
 #define ERA_TEST_SEP '\\'
 #else
+#include <dirent.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #define ERA_TEST_SEP '/'
 #endif
@@ -246,6 +249,57 @@ int main(void) {
               "write path masks token");
         if (text != NULL) free(text);
     }
+
+    /* 6) 崩溃捕获（CRASH-01）：子进程触发 SIGSEGV，须留下报告文件，含
+       信号名、崩溃线程与最近日志（环形缓冲）。 */
+#if !defined(_WIN32)
+    {
+        pid_t pid;
+        archoera_log_init(dir, "crashlog", ERA_LOG_INFO, ERA_LOG_COLOR_OFF);
+        archoera_log_write(ERA_LOG_INFO, "crash", "ring-marker-before-crash");
+        CHECK(archoera_crash_install(dir) == 0, "crash handler installed");
+        pid = fork();
+        if (pid == 0) {
+            /* 子进程：制造空指针写入 → SIGSEGV（不返回） */
+            volatile int *p = (volatile int *)0;
+            *p = 1;
+            _exit(99);
+        }
+        CHECK(pid > 0, "fork for crash test");
+        if (pid > 0) {
+            int st = 0;
+            char crash_path[4096];
+            DIR *d;
+            struct dirent *ent;
+            CHECK(waitpid(pid, &st, 0) == pid, "waitpid");
+            CHECK(WIFSIGNALED(st) && WTERMSIG(st) == SIGSEGV,
+                  "child terminated by SIGSEGV");
+            crash_path[0] = '\0';
+            d = opendir(dir);
+            if (d != NULL) {
+                while ((ent = readdir(d)) != NULL) {
+                    if (strncmp(ent->d_name, "crash-", 6) == 0 &&
+                        strstr(ent->d_name, ".txt") != NULL) {
+                        join(crash_path, sizeof(crash_path), dir, ent->d_name);
+                        break;
+                    }
+                }
+                closedir(d);
+            }
+            CHECK(crash_path[0] != '\0', "crash report file created");
+            text = crash_path[0] != '\0' ? read_file(crash_path) : NULL;
+            CHECK(text != NULL, "crash report readable");
+            if (text != NULL) {
+                CHECK(strstr(text, "SIGSEGV") != NULL, "report contains signal name");
+                CHECK(strstr(text, "ring-marker-before-crash") != NULL,
+                      "report contains recent log ring");
+                CHECK(strstr(text, "thread=") != NULL, "report contains thread name");
+                free(text);
+            }
+        }
+        archoera_crash_uninstall();
+    }
+#endif
 
     if (g_fail == 0) fprintf(stderr, "test_log: ALL PASS\n");
     else fprintf(stderr, "test_log: %d FAILED\n", g_fail);
