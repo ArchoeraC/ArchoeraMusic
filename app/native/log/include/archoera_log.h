@@ -119,6 +119,36 @@ ARCHOERA_LOG_API void archoera_log_scrub(char *text);
  */
 typedef void (*ArchoeraLogFn)(int level, const char *tag, const char *message);
 
+/*
+ * 崩溃捕获（CRASH-01）。
+ *
+ * 原生层（Zig 内核 / C 引擎 / Rust / .NET AOT / 平台桥接）发生段错误、总线错误、
+ * 非法指令、浮点异常或 abort 时，进程会被内核直接终止 —— Dart 侧
+ * `FlutterError.onError` / `PlatformDispatcher.onError` 根本来不及执行，日志里
+ * 只会「说到一半就没了」。本接口安装致命信号处理器，在终止前把
+ *
+ *   - 信号 / si_code / 故障地址；
+ *   - 崩溃线程名；
+ *   - 调用栈（模块 + 偏移，尽量含符号）；
+ *   - 最近 N 条统一日志（与 archoera.log 同格式）；
+ *
+ * 写入 `<dir>/crash-<pid>-<epoch>.txt`（同时写 stderr），随后恢复默认处理并
+ * 重新抛出信号，**保留 core dump 与既有崩溃语义**（不吞异常、不阻止退出）。
+ *
+ * 约束：
+ *   - 必须在 [archoera_log_init] 之后调用（日志目录默认取 init 的目录）；
+ *   - 处理器只使用 async-signal-safe 调用（open/write/close/raise/backtrace），
+ *     不取日志互斥量、不分配内存，因此不会因崩溃时持锁而二次死锁；
+ *   - 幂等：重复调用只更新报告目录。返回 0 成功，<0 失败（目录不可用等）。
+ *
+ * dir 为 NULL/空串时沿用 archoera_log_init 的目录；两者都为空则失败
+ * （无落盘目录时退化为仅 stderr，不安装处理器）。
+ */
+ARCHOERA_LOG_API int archoera_crash_install(const char *dir);
+
+/* 卸载崩溃捕获（恢复默认信号处理）。主要供单测/宿主接管场景使用。 */
+ARCHOERA_LOG_API void archoera_crash_uninstall(void);
+
 #ifdef __cplusplus
 }
 #endif
