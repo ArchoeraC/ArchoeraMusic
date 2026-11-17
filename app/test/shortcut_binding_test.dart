@@ -5,6 +5,7 @@
 import 'package:archoera_music/services/shortcuts/shortcut_action.dart';
 import 'package:archoera_music/services/shortcuts/shortcut_binding.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show SingleActivator;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -37,6 +38,37 @@ void main() {
     expect(ShortcutAction.goSearch.defaultBinding, 'ctrl+f');
     expect(ShortcutAction.goLibrary.defaultBinding, 'ctrl+l');
     expect(ShortcutAction.back.defaultBinding, 'escape');
+  });
+
+  test('parseBinding 可关闭系统自动重复', () {
+    final repeating = parseBinding('ctrl+k');
+    final oneShot = parseBinding('ctrl+k', includeRepeats: false);
+    expect((repeating! as SingleActivator).includeRepeats, isTrue);
+    expect((oneShot! as SingleActivator).includeRepeats, isFalse);
+    // 关闭重复不影响编码往返。
+    expect(encodeBinding(oneShot), 'ctrl+k');
+  });
+
+  test('开关/导航类动作不响应按键重复，持续型动作响应', () {
+    for (final action in [
+      ShortcutAction.openPlayer,
+      ShortcutAction.back,
+      ShortcutAction.goHome,
+      ShortcutAction.playPause,
+      ShortcutAction.muteToggle,
+    ]) {
+      expect(action.repeats, isFalse, reason: action.id);
+    }
+    for (final action in [
+      ShortcutAction.seekForward,
+      ShortcutAction.seekBackward,
+      ShortcutAction.volumeUp,
+      ShortcutAction.volumeDown,
+      ShortcutAction.next,
+      ShortcutAction.previous,
+    ]) {
+      expect(action.repeats, isTrue, reason: action.id);
+    }
   });
 
   test('all actions have unique ids', () {

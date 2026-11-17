@@ -535,6 +535,25 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 - `NavHeader`（对齐 NavHeader.vue）：返回 + 全局搜索框（回车跳 `/search?q=`）+ 用户占位 + 主题循环（light→dark→system，`themeModeProvider`）；Linux 窗口控制由系统提供不绘制
 - `PlayerBar`（对齐 PlayerBar.vue）：顶部压缩进度条（拖动 seek）+ 左（封面/曲名/会话，点击 `push('/player')`）+ 播放控制 + 右（时间 + 迷你频谱）
 - `FullPlayer`：`/player` 顶层 GoRoute（parentNavigatorKey 根，盖住整个壳含播放条）= 渐变背景 + 封面大图 + 频谱 + 进度 + 控制；歌词区（§10.2）待接入
+- **播放页开关 = 事件驱动状态机（2026-11-17）**：`app/player_route_controller.dart` 的
+  `PlayerRouteController`（进程级单例）是「开没开」的唯一来源。入口（封面/快捷键/深链/关闭按钮）
+  只发 `open/close/toggle` 事件，`PlayerPage` 回报 `routeAttached/routeOpened/routeDismissed/`
+  `routeDetached`，阶段为 `closed → opening → open → closing → closed`。原来的
+  `inFlight`/`closing`/`deferred` 布尔量与兜底定时器已删除。
+  **渲染/动效侧保持原实现不变**：`PlayerPage` 仍在帧末把路由动画写入
+  `playerRouteAnimationProvider`（壳层 `ShellExpandTransition` / `OffstageWhenComplete`、
+  顶栏搜索下拉都照旧消费它）；状态机只负责开关状态与路由动作，不参与渲染。
+  （2026-11-17 实测：把壳层/顶栏改成从状态机取动画，会让打开播放页时出现
+  「整窗黑一帧」——首帧只剩 DEBUG 角标；恢复 provider 链路后消失。故这条链路
+  是**渲染专用**，不要合并到状态机里。）
+  状态字段同步生效、通知压到微任务，因此 widget 生命周期里上报也不会触发
+  「构建期修改 provider」断言（旧实现正是在这里抛错，把壳层清理逻辑打断 → 界面永久停绘）。
+  push/pop 后各做**有限次帧末核对**（不是定时器）：路由没进栈就复位、收起动画没开始就重试
+  pop，最多几帧后强制收敛并告警——「快捷键连按导致页面从未构建 → 永远收不到卸载事件 →
+  卡在 closing、之后再也打不开」这条死锁由此封死。快捷键侧开关类/导航类动作不响应系统
+  自动重复（`ShortcutAction.repeats`），按住不会反复 push/pop。debug 下每次阶段迁移都会
+  打印 `[player-route] a → b（原因）`，现场复现后看最后一条迁移即可定位停住的阶段；
+  关闭播放页前还会确认该路由是栈顶（顶上有弹窗时忽略，避免误 pop）。
 
 **组件重写清单（S* 组件库 → Flutter）**
 - 交互类：SButton/SInput/SSelect/SCombobox/SRadio/SRadioGroup/SCheckbox/SSwitch/SSlider/SNumberInput → Material / 自绘

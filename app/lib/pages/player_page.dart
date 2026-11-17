@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../app/player_route_controller.dart';
 import '../app/player_theme.dart';
 import '../app/router.dart';
 import '../services/netease/track.dart';
@@ -94,7 +95,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   bool _closing = false;
 
   /// 当前 `ModalRoute` 的进入/退出动画（在 [didChangeDependencies] 绑定，
-  /// 状态变更驱动 [_contentMounted]；同时写入 provider 供壳层驱动收起动效）。
+  /// 状态变更驱动 [_contentMounted]；同时写入 provider 供壳层驱动收起动效，
+  /// 并作为**事件**上报给 [PlayerRouteController] 维护开关状态）。
   Animation<double>? _routeAnimation;
 
   /// 播放页路由动画写入器（dispose 时不能再经 ref 获取，initState 缓存）。
@@ -148,15 +150,23 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 绑定所在路由的进入/退出动画：驱动重内容（背景/歌词）挂载时机，并写入
-    // provider 供壳层驱动主页收缩/展开（同一控制器 → 同帧同步）。
-    final animation = ModalRoute.of(context)?.animation;
+    // 绑定所在路由的进入/退出动画：驱动重内容（背景/歌词）挂载时机；帧末写入
+    // provider 供壳层驱动收起动效（渲染路径不变），同时作为**事件**上报
+    // [PlayerRouteController] 维护开关状态。
+    final route = ModalRoute.of(context);
+    final animation = route?.animation;
     if (!identical(animation, _routeAnimation)) {
       _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
       _routeAnimation = animation;
       _routeAnimation?.addStatusListener(_onRouteAnimationStatus);
+      final routeAnimation = _routeAnimation;
+      if (routeAnimation != null) {
+        // 生命周期里上报是安全的：状态同步更新，通知由状态机推到帧末之后的
+        // 微任务（不会触发「构建期修改」断言）。
+        PlayerRouteController.instance.routeAttached(routeAnimation, route);
+      }
     }
-    // 延后到帧末，避免在构建期修改壳层正在监听的 provider。
+    // 延后到帧末写入（构建期不能改 provider / 本页状态）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _routeAnimNotifier?.set(_routeAnimation);
@@ -179,8 +189,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   }
 
   /// 路由转场状态 → 重内容挂载态（进入完成才挂载背景/歌词）与退出暂停。
+  ///
+  /// 同时把「进入完成 / 收起走完」作为**事件**上报状态机：开关状态只来自
+  /// 这些事件，不再用路由栈 / push future 反推。
   void _onRouteAnimationStatus(AnimationStatus status) {
     if (!mounted) return;
+    final routeAnimation = _routeAnimation;
+    if (routeAnimation != null) {
+      if (status == AnimationStatus.completed) {
+        PlayerRouteController.instance.routeOpened(routeAnimation);
+      } else if (status == AnimationStatus.dismissed) {
+        PlayerRouteController.instance.routeDismissed(routeAnimation);
+      }
+    }
     final closing = status == AnimationStatus.reverse;
     if (closing != _closing) {
       setState(() => _closing = closing);
@@ -194,10 +215,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
   void dispose() {
     _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
     // 清空路由动画（壳层恢复折叠态）；旧实例不能清掉新实例刚写入的动画。
-    _routeAnimNotifier?.clear(_routeAnimation);
-    // 收起真正完成（路由已移出导航栈）：复位开关守卫，并执行收起期间
-    // 挂起的打开请求。不能依赖 push future —— 它在 pop 的瞬间就完成了。
-    notifyPlayerPageDisposed();
+    // 帧末生效，避免在卸载期写 provider 触发「构建期修改」断言。
+    _routeAnimNotifier?.clearDeferred(_routeAnimation);
+    // 事件：本页的路由已从树上卸载（正常 pop / 整栈替换都会走到这里）。
+    // 状态机据此收敛为 closed 并补发收起期间挂起的打开请求；旧实例晚于新实例
+    // 卸载时，该事件会因动画不同而被忽略，不会清掉新实例的状态。
+    PlayerRouteController.instance.routeDetached(_routeAnimation);
     _hideTimer?.cancel();
     _coverPulse.dispose();
     super.dispose();
