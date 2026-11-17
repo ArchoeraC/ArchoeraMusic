@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:sqlite3/sqlite3.dart';
@@ -119,10 +120,26 @@ class TracksDb {
   final Database _db;
 
   /// 打开曲库。默认 [LibraryScanner.defaultDbPath]。
-  /// 文件不存在时抛出（需先运行扫描建库）。
+  ///
+  /// 文件不存在时抛出（需先运行扫描建库）。注意 `sqlite3.open` 对不存在的路径
+  /// 会**新建空库**——随后任何 `FROM tracks` 都报 `no such table: tracks`
+  /// （2026-11-17 实测：UI 抢在首次扫描前打开，留下空库并把错误刷进日志）。
+  /// 这里先校验文件与表结构，避免「打开即污染」。
   static TracksDb open([String? dbPath]) {
     final path = dbPath ?? LibraryScanner.defaultDbPath();
+    if (!File(path).existsSync()) {
+      throw StateError('曲库尚未建立（缺少 $path）：请先扫描本地音乐');
+    }
     final db = sqlite3.open(path);
+    final hasTracks = db
+        .select(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='tracks' LIMIT 1",
+        )
+        .isNotEmpty;
+    if (!hasTracks) {
+      db.close();
+      throw StateError('曲库结构缺失（$path）：请重新扫描本地音乐');
+    }
     return TracksDb._(db);
   }
 
