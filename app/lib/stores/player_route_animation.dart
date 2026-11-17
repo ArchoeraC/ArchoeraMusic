@@ -11,6 +11,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// 驱动主页的收缩/展开：由于该动画由播放页路由的 Ticker 驱动（一定在逐帧
 /// 推进），壳层无需自建 Ticker——从而绕开「下方路由被 Overlay 置为 offstage
 /// 时自建 Ticker 不逐帧推进」的问题，且与播放页进出天然同帧同步。
+///
+/// ## 这是**渲染专用通道**
+/// 壳层与顶栏只能从这里取动画。2026-11-17 曾把二者改成从开关状态机
+/// (`PlayerRouteController`) 取动画，实测打开播放页时会出现「整窗黑一帧」
+/// （首帧只剩 DEBUG 角标），恢复本 provider 链路后即消失（具体机制未定位）。
+/// 状态机只负责开关状态与路由动作，不要让它参与渲染。
 final playerRouteAnimationProvider =
     NotifierProvider<PlayerRouteAnimationNotifier, Animation<double>?>(
       PlayerRouteAnimationNotifier.new,
