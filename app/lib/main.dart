@@ -60,6 +60,17 @@ Future<void> main(List<String> args) async {
     level: _logLevelFromEnv(),
     fileEnabled: prefs.logToFile,
   );
+  // 原生层硬崩溃（SIGSEGV / SIGBUS / SIGABRT…）不会经过任何 Dart 异常通道，
+  // 统一日志只会「说到一半就没了」。安装信号级崩溃捕获后，终止前会把信号、
+  // 崩溃线程、调用栈与最近日志写进 `<dataDir>/logs/crash-*.txt`，随后照常
+  // 重新抛出（保留 core dump）。见 docs/troubleshooting.md §0。
+  Log.installCrashHandler();
+  // 启动标记：与退出标记配对，用于区分「闪退」与「被外部结束 / 正常退出」。
+  Log.i(
+    'startup',
+    'ArchoeraMusic 启动 pid=$pid platform=${Platform.operatingSystem} '
+    'logLevel=${Log.minLevel.label}',
+  );
   // 查询日志（本机 JSONL，供 T2-7 助词容错矩阵分析）：与「日志落盘」同一开关，
   // 关闭时不装配 sink（记录调用变成零成本 no-op）。
   QueryLogger.configure(dataDir: resolveDataDir(), prefs: prefs);
@@ -145,6 +156,8 @@ Future<void> main(List<String> args) async {
   preloadBundledSqlite();
   // 版本号（NekoMusic 请求标识用）自内置 pubspec.yaml 读取。
   await loadAppVersion();
+  // 版本一并落日志：崩溃报告里的调用栈偏移要与对应构建的二进制对齐。
+  Log.i('startup', '版本 $appVersion');
   // NT 封面 CDN 拒绝 Dart 默认 UA（403）；Image.network 经 NetworkImage
   // 以 add 语义追加自定义头，传 UA 会与默认 Dart UA 叠加成双头被拒收。
   // 改全局 HttpClient 默认 UA 为浏览器 UA，天然保证单头（第三方 CDN 需要）。

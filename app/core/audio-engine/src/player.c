@@ -647,12 +647,23 @@ static void stream_data_cb(ma_device *pDevice, void *pOutput, const void *pInput
     if (!p || !pOutput) return;
     float *dst = (float *)pOutput;
     ma_uint32 ch = p->stream_dev_ch;
+    const ma_uint32 out_ch = pDevice->playback.channels;
     const size_t cap = p->ring_cap;
+    /* 防御：缓冲已释放 / 声道未知时只输出静音（音频线程绝不 deref 空 ring）。 */
+    if (ch == 0) ch = out_ch;
+    if (!p->ring || cap == 0 || ch == 0) {
+        if (out_ch > 0) {
+            memset(pOutput, 0, (size_t)frameCount * out_ch * sizeof(float));
+        }
+        return;
+    }
     const size_t w = QA_LOAD_ACQ(&p->ring_w);
     const size_t r = QA_LOAD_RELAXED(&p->ring_r);
     const size_t avail = w - r;
-    const size_t n = (avail < (size_t)frameCount) ? avail : (size_t)frameCount;
+    size_t n = (avail < (size_t)frameCount) ? avail : (size_t)frameCount;
     const size_t mask = cap - 1;
+    /* 计数器异常（重建瞬间的撕裂读等）时绝不超过环容量。 */
+    if (n > cap) n = cap;
 
     if (n > 0) {
         const size_t start = r & mask;
@@ -754,11 +765,25 @@ static void stream_data_cb(ma_device *pDevice, void *pOutput, const void *pInput
     }
 }
 
-/* 从底层 ma_device 停止设备（在音频回调线程之外调用） */
+/* 从底层 ma_device 停止设备（在音频回调线程之外调用）。
+ *
+ * 不变量：停止必须以 miniaudio 自身状态为准。`stream_dev_started` 只是快路径
+ * 提示；一旦两者不一致（标志=停、实际仍在跑），跳过 ma_device_stop 就会让
+ * 音频线程在 ring / 多重奏历史环被 free 之后继续读取 → 段错误。 */
 static void stream_device_stop(PlayerCtx *p)
 {
-    if (!p->stream_dev_inited || !QA_LOAD_ACQ(&p->stream_dev_started)) return;
-    ma_device_stop(&p->stream_device);
+    int flagged;
+    int running;
+    if (!p || !p->stream_dev_inited) return;
+    flagged = QA_LOAD_ACQ(&p->stream_dev_started) ? 1 : 0;
+    running = ma_device_is_started(&p->stream_device) ? 1 : 0;
+    if (running) {
+        if (!flagged) {
+            ERA_LOGW(NULL, "[player] 设备状态不一致（标志=停 / 实际=运行），"
+                           "已强制停止以避免回调读取已释放缓冲\n");
+        }
+        (void)ma_device_stop(&p->stream_device);
+    }
     QA_STORE_REL(&p->stream_dev_started, 0);
 }
 

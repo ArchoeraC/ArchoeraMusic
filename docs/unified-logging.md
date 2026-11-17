@@ -113,6 +113,25 @@ Dart ──▶ archoera_log_write ──▶ [HH:mm:ss LEVEL] [tag] msg ──▶
 - **vault 子进程**：其 stderr 经 Dart 转发时同样经过 `Log.at` → `_emit` → `scrub`，
   且 vault 自身不打印主密钥材料（SEC-02）。
 
+### 3.1 崩溃捕获（CRASH-01）
+
+Dart 的 `FlutterError.onError` / `PlatformDispatcher.onError` 只覆盖 Dart 异常；
+原生层（C 引擎 / Zig 内核 / Rust / .NET AOT / 平台桥接）发生段错误、总线错误、
+非法指令、浮点异常或 `abort` 时进程会被内核直接终止，日志只停在崩溃前最后一行。
+
+`main()` 在 `Log.init` 之后调用 `Log.installCrashHandler()`，由 `libarchoera_log`
+安装致命信号处理器（POSIX `sigaction` + 备用信号栈；Windows
+`SetUnhandledExceptionFilter`）。处理器：
+
+1. 把信号 / `si_code` / 故障地址、崩溃线程名、调用栈（`backtrace_symbols_fd`，
+   模块 + 偏移）、最近 64 条统一日志写入 `<dataDir>/logs/crash-<pid>-<epoch>.txt`；
+2. 恢复默认处理并重新抛出信号——**不吞崩溃**，core dump / 退出码语义不变。
+
+约束：处理器运行在崩溃线程上，只使用 async-signal-safe 调用（`open`/`write`/
+`close`/`raise`/`sigaction`），不取日志互斥量、不分配内存；日志环形缓冲的读取
+不加锁，最坏读到半行也不会死锁。崩溃报告是诊断材料，不参与正常轮转（每个崩溃
+一个文件，体积约几 KB）。
+
 ## 4. 在代码里加日志
 
 - **Dart**：`import '.../services/log/log.dart';` → `Log.w('scraper', '降级：$e')`。

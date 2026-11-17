@@ -14,6 +14,7 @@
 
 #include <errno.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -27,13 +28,24 @@
 #define era_mkdir_one(p) _mkdir(p)
 #define era_access(p) _access((p), 0)
 #else
+#include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #define ERA_PATH_SEP '/'
 #define era_mkdir_one(p) mkdir((p), 0755)
 #define era_access(p) access((p), F_OK)
+#if defined(__has_include)
+#if __has_include(<execinfo.h>)
+#include <execinfo.h>
+#define ERA_HAVE_BACKTRACE 1
+#endif
+#endif
+#if defined(__linux__)
+#include <sys/prctl.h>
+#endif
 #endif
 
 /* ── 预算常量（无动态分配的依据）────────────────────────────────── */
@@ -66,6 +78,21 @@ static char g_dir[ERA_LOG_PATH_MAX];
 static char g_base[ERA_LOG_BASE_MAX];
 static char g_path[ERA_LOG_PATH_MAX];
 static int g_ready; /* init 过（即使 dir=NULL） */
+
+/* ── 崩溃报告（CRASH-01）────────────────────────────────────────────
+ * 最近日志环形缓冲：崩溃处理器在崩溃线程上读取，**不取锁**（可能与正在
+ * 写日志的线程交错，最坏读到半行，但不死锁）。每条与落盘行同格式。 */
+#define ERA_CRASH_RING_LINES 64
+#define ERA_CRASH_RING_LINE_MAX 512
+#define ERA_CRASH_ALTSTACK_BYTES (64u * 1024u)
+static char g_crash_ring[ERA_CRASH_RING_LINES][ERA_CRASH_RING_LINE_MAX];
+static unsigned g_crash_ring_pos;   /* 下一个写入槽位 */
+static unsigned g_crash_ring_total; /* 已写入行数（用于首轮未填满时定位） */
+static char g_crash_dir[ERA_LOG_PATH_MAX];
+static volatile int g_crash_installed;
+#if !defined(_WIN32)
+static char g_crash_altstack[ERA_CRASH_ALTSTACK_BYTES];
+#endif
 
 /* ── 小工具 ─────────────────────────────────────────────────────── */
 
@@ -203,6 +230,21 @@ static void era_write_file_locked(const char *line, size_t len) {
     }
     if (fwrite(line, 1, len, g_file) == len) g_file_size += (long)len;
     fflush(g_file);
+}
+
+/* 把一条已格式化（纯文本）日志行压入崩溃环形缓冲（调用方持锁）。
+ * 不做整槽清零：每行写完即补 '\0'，代价只有一次 memcpy。 */
+static void era_crash_ring_push(const char *line) {
+    unsigned slot;
+    size_t n;
+    if (line == NULL) return;
+    slot = g_crash_ring_pos % ERA_CRASH_RING_LINES;
+    n = strlen(line);
+    if (n >= ERA_CRASH_RING_LINE_MAX) n = ERA_CRASH_RING_LINE_MAX - 1;
+    memcpy(g_crash_ring[slot], line, n);
+    g_crash_ring[slot][n] = '\0';
+    g_crash_ring_pos = (g_crash_ring_pos + 1u) % ERA_CRASH_RING_LINES;
+    g_crash_ring_total++;
 }
 
 /* 组装正文（tag + message）到 body；返回写入长度。 */
@@ -475,11 +517,14 @@ void archoera_log_write(int level, const char *tag, const char *message) {
     fputs(line, stderr);
     fflush(stderr);
 
+    /* 崩溃环形缓冲：与落盘同格式（纯文本），供致命信号处理器转储。 */
+    snprintf(line, sizeof(line), "[%02d:%02d:%02d %s] %s\n", tmv.tm_hour,
+             tmv.tm_min, tmv.tm_sec, era_level_name(lv), body);
+    era_crash_ring_push(line);
+
     /* 文件（纯文本，无 ANSI）；关闭落盘时跳过。 */
     if (g_file_enabled) {
         if (g_file == NULL && g_path[0] != '\0') era_open_locked();
-        snprintf(line, sizeof(line), "[%02d:%02d:%02d %s] %s\n", tmv.tm_hour,
-                 tmv.tm_min, tmv.tm_sec, era_level_name(lv), body);
         era_write_file_locked(line, strlen(line));
     }
 
@@ -524,3 +569,309 @@ int archoera_log_set_color(int color_mode) {
 }
 
 int archoera_log_level(void) { return g_level; }
+
+/* ── 崩溃捕获（CRASH-01）────────────────────────────────────────────
+ * 原生层致命信号（段错误/总线错误/非法指令/浮点异常/abort）默认直接终止进程，
+ * Dart 的 onError 不会被调用，日志「说到一半就没了」。本处理器在终止前把
+ * 信号、线程名、故障地址、调用栈与最近日志写入独立报告文件，然后恢复默认
+ * 处理并重新抛出（保留 core dump 与崩溃语义）。
+ *
+ * 处理器只使用 async-signal-safe 调用（open/write/close/raise/sigaction +
+ * backtrace），不取日志互斥量、不 malloc，避免「崩溃时正持锁」导致死锁。
+ */
+
+#if defined(_WIN32)
+
+static LONG WINAPI era_crash_filter(EXCEPTION_POINTERS *ep) {
+    char path[ERA_LOG_PATH_MAX];
+    wchar_t wpath[ERA_LOG_PATH_MAX];
+    char buf[1024];
+    HANDLE h;
+    DWORD written;
+    SYSTEMTIME st;
+    DWORD code;
+    void *frames[48];
+    USHORT nframes;
+    int i;
+
+    if (!g_crash_installed) return EXCEPTION_CONTINUE_SEARCH;
+    code = (ep && ep->ExceptionRecord) ? ep->ExceptionRecord->ExceptionCode : 0;
+    GetLocalTime(&st);
+    snprintf(path, sizeof(path), "%s%ccrash-%lu-%lu.txt", g_crash_dir,
+             ERA_PATH_SEP, (unsigned long)GetCurrentProcessId(),
+             (unsigned long)time(NULL));
+    /* 路径为 UTF-8（Dart toNativeUtf8）：必须经 WideChar 打开，否则中文用户名
+       下的数据目录会被 ANSI 代码页误解而导致报告静默丢失。 */
+    h = INVALID_HANDLE_VALUE;
+    if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath,
+                            (int)(sizeof(wpath) / sizeof(wpath[0]))) > 0) {
+        h = CreateFileW(wpath, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    }
+    if (h == INVALID_HANDLE_VALUE) {
+        h = GetStdHandle(STD_ERROR_HANDLE);
+        if (h == INVALID_HANDLE_VALUE || h == NULL) return EXCEPTION_CONTINUE_SEARCH;
+    }
+#define ERA_WIN_W(s) do { const char *era_s = (s); \
+    WriteFile(h, era_s, (DWORD)strlen(era_s), &written, NULL); } while (0)
+    ERA_WIN_W("\n=== ArchoeraMusic 崩溃报告 ===\n");
+    snprintf(buf, sizeof(buf), "time=%04u-%02u-%02u %02u:%02u:%02u\n",
+             (unsigned)st.wYear, (unsigned)st.wMonth, (unsigned)st.wDay,
+             (unsigned)st.wHour, (unsigned)st.wMinute, (unsigned)st.wSecond);
+    ERA_WIN_W(buf);
+    snprintf(buf, sizeof(buf), "pid=%lu tid=%lu\n",
+             (unsigned long)GetCurrentProcessId(),
+             (unsigned long)GetCurrentThreadId());
+    ERA_WIN_W(buf);
+    snprintf(buf, sizeof(buf), "exception=0x%08lX address=%p\n",
+             (unsigned long)code,
+             (ep && ep->ExceptionRecord) ? ep->ExceptionRecord->ExceptionAddress
+                                         : (void *)0);
+    ERA_WIN_W(buf);
+    nframes = CaptureStackBackTrace(0, 48, frames, NULL);
+    ERA_WIN_W("--- 调用栈 ---\n");
+    for (i = 0; i < (int)nframes; i++) {
+        snprintf(buf, sizeof(buf), "#%02d %p\n", i, frames[i]);
+        ERA_WIN_W(buf);
+    }
+    ERA_WIN_W("--- 最近日志 ---\n");
+    {
+        unsigned total = g_crash_ring_total;
+        unsigned n = total < ERA_CRASH_RING_LINES ? total : ERA_CRASH_RING_LINES;
+        unsigned start = (g_crash_ring_pos + ERA_CRASH_RING_LINES - n) % ERA_CRASH_RING_LINES;
+        for (i = 0; i < (int)n; i++) {
+            const char *l = g_crash_ring[(start + (unsigned)i) % ERA_CRASH_RING_LINES];
+            ERA_WIN_W(l);
+        }
+    }
+    ERA_WIN_W("=== 报告结束 ===\n");
+#undef ERA_WIN_W
+    if (h != GetStdHandle(STD_ERROR_HANDLE)) {
+        FlushFileBuffers(h);
+        CloseHandle(h);
+    } else {
+        FlushFileBuffers(h);
+    }
+    return EXCEPTION_CONTINUE_SEARCH; /* 交给系统默认处理（保留 WER/core） */
+}
+
+int archoera_crash_install(const char *dir) {
+    if (dir != NULL && dir[0] != '\0') {
+        snprintf(g_crash_dir, sizeof(g_crash_dir), "%s", dir);
+    } else if (g_dir[0] != '\0') {
+        snprintf(g_crash_dir, sizeof(g_crash_dir), "%s", g_dir);
+    } else {
+        return -1;
+    }
+    (void)era_mkdir_p(g_crash_dir);
+    SetUnhandledExceptionFilter(era_crash_filter);
+    g_crash_installed = 1;
+    archoera_log_writef(ERA_LOG_INFO, "crash",
+                        "崩溃捕获已启用：报告目录 %s", g_crash_dir);
+    return 0;
+}
+
+void archoera_crash_uninstall(void) {
+    if (!g_crash_installed) return;
+    SetUnhandledExceptionFilter(NULL);
+    g_crash_installed = 0;
+}
+
+#else /* POSIX */
+
+/* 小工具：全部 async-signal-safe（仅 write/strlen 循环）。 */
+static void era_cw(int fd, const char *s) {
+    size_t n;
+    if (s == NULL) return;
+    n = strlen(s);
+    while (n > 0) {
+        ssize_t w = write(fd, s, n);
+        if (w <= 0) return;
+        s += (size_t)w;
+        n -= (size_t)w;
+    }
+}
+
+static void era_cw_dec(int fd, unsigned long long v) {
+    char b[32];
+    int i = (int)sizeof(b);
+    if (v == 0) {
+        b[--i] = '0';
+    } else {
+        while (v > 0 && i > 0) {
+            b[--i] = (char)('0' + (int)(v % 10u));
+            v /= 10u;
+        }
+    }
+    while (i < (int)sizeof(b)) {
+        ssize_t w = write(fd, &b[i], (size_t)((int)sizeof(b) - i));
+        if (w <= 0) return;
+        i += (int)w;
+    }
+}
+
+static void era_cw_hex(int fd, unsigned long long v) {
+    static const char digits[] = "0123456789abcdef";
+    char b[2 + 16];
+    int i;
+    b[0] = '0';
+    b[1] = 'x';
+    for (i = 0; i < 16; i++) {
+        b[2 + i] = digits[(v >> ((15 - i) * 4)) & 0xFu];
+    }
+    {
+        ssize_t w = write(fd, b, sizeof(b));
+        (void)w;
+    }
+}
+
+static const char *era_sig_name(int sig) {
+    switch (sig) {
+        case SIGSEGV: return "SIGSEGV";
+        case SIGBUS:  return "SIGBUS";
+        case SIGILL:  return "SIGILL";
+        case SIGFPE:  return "SIGFPE";
+        case SIGABRT: return "SIGABRT";
+        case SIGSYS:  return "SIGSYS";
+        default:      return "SIG?";
+    }
+}
+
+static void era_crash_handler(int sig, siginfo_t *si, void *uc) {
+    char path[ERA_LOG_PATH_MAX];
+    char tname[64];
+    int fd;
+    int i;
+    unsigned total, n, start;
+
+    (void)uc;
+    snprintf(path, sizeof(path), "%s%ccrash-%lu-%lu.txt", g_crash_dir,
+             ERA_PATH_SEP, (unsigned long)getpid(), (unsigned long)time(NULL));
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) fd = 2; /* 报告文件不可写：至少写到 stderr */
+
+    tname[0] = '\0';
+#if defined(__linux__)
+    /* prctl 读取本线程名（glibc 的 pthread_getname_np 需 _GNU_SOURCE）。 */
+    if (prctl(PR_GET_NAME, (unsigned long)tname, 0UL, 0UL, 0UL) != 0) tname[0] = '\0';
+#elif defined(__APPLE__)
+    if (pthread_getname_np(pthread_self(), tname, sizeof(tname)) != 0) tname[0] = '\0';
+#endif
+
+    era_cw(fd, "\n=== ArchoeraMusic 崩溃报告 ===\n");
+    era_cw(fd, "time=");
+    era_cw_dec(fd, (unsigned long long)time(NULL));
+    era_cw(fd, " pid=");
+    era_cw_dec(fd, (unsigned long long)getpid());
+    era_cw(fd, " signal=");
+    era_cw_dec(fd, (unsigned long long)sig);
+    era_cw(fd, " (");
+    era_cw(fd, era_sig_name(sig));
+    era_cw(fd, ")\n");
+    if (si != NULL) {
+        era_cw(fd, "si_code=");
+        era_cw_dec(fd, (unsigned long long)(long long)si->si_code);
+        era_cw(fd, " fault_addr=");
+        era_cw_hex(fd, (unsigned long long)(uintptr_t)si->si_addr);
+        era_cw(fd, "\n");
+    }
+    era_cw(fd, "thread=");
+    era_cw(fd, tname[0] != '\0' ? tname : "<unnamed>");
+    era_cw(fd, "\n");
+
+#if defined(ERA_HAVE_BACKTRACE)
+    era_cw(fd, "--- 调用栈（module + offset）---\n");
+    {
+        void *frames[64];
+        int nf = backtrace(frames, 64);
+        if (nf > 0) backtrace_symbols_fd(frames, nf, fd);
+    }
+#else
+    era_cw(fd, "--- 调用栈不可用（缺 execinfo.h）---\n");
+#endif
+
+    era_cw(fd, "--- 最近日志 ---\n");
+    total = g_crash_ring_total;
+    n = total < ERA_CRASH_RING_LINES ? total : ERA_CRASH_RING_LINES;
+    start = (g_crash_ring_pos + ERA_CRASH_RING_LINES - n) % ERA_CRASH_RING_LINES;
+    for (i = 0; i < (int)n; i++) {
+        era_cw(fd, g_crash_ring[(start + (unsigned)i) % ERA_CRASH_RING_LINES]);
+    }
+    era_cw(fd, "=== 报告结束 ===\n");
+
+    if (fd > 2) {
+        if (fsync(fd) != 0) { /* 忽略：报告已写出即达成目的 */ }
+        close(fd);
+    } else {
+        if (fsync(2) != 0) { /* 忽略 */ }
+    }
+
+    /* 恢复默认处理、解除阻塞后重新抛出：保留 core dump / 退出码语义。 */
+    {
+        struct sigaction dfl;
+        sigset_t unblock;
+        memset(&dfl, 0, sizeof(dfl));
+        dfl.sa_handler = SIG_DFL;
+        sigemptyset(&dfl.sa_mask);
+        sigaction(sig, &dfl, NULL);
+        sigemptyset(&unblock);
+        sigaddset(&unblock, sig);
+        sigprocmask(SIG_UNBLOCK, &unblock, NULL);
+    }
+    raise(sig);
+    _exit(128 + sig); /* 理论上不会到达（除非 raise 被忽略） */
+}
+
+int archoera_crash_install(const char *dir) {
+    static const int kSigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT};
+    struct sigaction sa;
+    stack_t ss;
+    size_t i;
+
+    if (dir != NULL && dir[0] != '\0') {
+        snprintf(g_crash_dir, sizeof(g_crash_dir), "%s", dir);
+    } else if (g_dir[0] != '\0') {
+        snprintf(g_crash_dir, sizeof(g_crash_dir), "%s", g_dir);
+    } else {
+        return -1;
+    }
+    if (era_mkdir_p(g_crash_dir) != 0) return -1;
+
+    if (!g_crash_installed) {
+        /* 备用信号栈：栈溢出导致的 SIGSEGV 仍能进入处理器。 */
+        memset(&ss, 0, sizeof(ss));
+        ss.ss_sp = g_crash_altstack;
+        ss.ss_size = sizeof(g_crash_altstack);
+        ss.ss_flags = 0;
+        (void)sigaltstack(&ss, NULL);
+    }
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = era_crash_handler;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESETHAND;
+    sigemptyset(&sa.sa_mask);
+
+    for (i = 0; i < sizeof(kSigs) / sizeof(kSigs[0]); i++) {
+        (void)sigaction(kSigs[i], &sa, NULL);
+    }
+    g_crash_installed = 1;
+    archoera_log_writef(ERA_LOG_INFO, "crash",
+                        "崩溃捕获已启用：报告目录 %s", g_crash_dir);
+    return 0;
+}
+
+void archoera_crash_uninstall(void) {
+    static const int kSigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT};
+    size_t i;
+    if (!g_crash_installed) return;
+    for (i = 0; i < sizeof(kSigs) / sizeof(kSigs[0]); i++) {
+        struct sigaction dfl;
+        memset(&dfl, 0, sizeof(dfl));
+        dfl.sa_handler = SIG_DFL;
+        sigemptyset(&dfl.sa_mask);
+        sigaction(kSigs[i], &dfl, NULL);
+    }
+    g_crash_installed = 0;
+}
+
+#endif /* _WIN32 */

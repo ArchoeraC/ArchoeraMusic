@@ -44,6 +44,10 @@ class Log {
   static _LogBinding? _binding;
   static bool _debugPrintHooked = false;
 
+  /// [init] 配置的日志目录（[installCrashHandler] 未显式给目录时复用）。
+  static String? _logDir;
+  static bool _crashInstalled = false;
+
   /// 原生 `archoera_log_write` 指针，供其它原生模块注入 sink；未加载时为 null。
   ///
   /// 跨 isolate 安全：`Log.init` 通常只在主 isolate 执行，而原生模块可能在
@@ -94,6 +98,7 @@ class Log {
     bool fileEnabled = true,
   }) {
     minLevel = level;
+    _logDir = (dir == null || dir.isEmpty) ? null : dir;
     try {
       final path = NativeLibPaths.resolve(NativeModule.log);
       if (path != null) {
@@ -138,6 +143,42 @@ class Log {
   /// 运行期开启/关闭日志落盘（使用 [init] 配置的目录；false = 仅控制台）。
   static void setFileEnabled(bool enabled) {
     _binding?.setFileEnabled(enabled ? 1 : 0);
+  }
+
+  /// 安装原生崩溃捕获（CRASH-01）：段错误/总线错误/abort 等致命信号发生时，
+  /// 由 `libarchoera_log` 在进程终止前把信号、崩溃线程、调用栈与最近日志写入
+  /// `<dir>/crash-<pid>-<时间戳>.txt`，随后恢复默认处理并重新抛出信号
+  /// （保留 core dump）。Dart 侧的 `FlutterError.onError` / isolate 错误只覆盖
+  /// Dart 异常，**覆盖不到原生层硬崩溃**——那类崩溃此前完全没有日志。
+  ///
+  /// [dir] 为空时复用 [init] 的日志目录。返回是否安装成功（旧版核心无该符号 /
+  /// 目录不可用 → false，不影响启动）。
+  static bool installCrashHandler({String? dir}) {
+    final target = (dir == null || dir.isEmpty) ? _logDir : dir;
+    final binding = _binding;
+    if (binding == null || target == null || target.isEmpty) return false;
+    final Pointer<Utf8> dirPtr = target.toNativeUtf8();
+    try {
+      final install = binding.crashInstall;
+      if (install == null) return false;
+      final rc = install(dirPtr);
+      _crashInstalled = rc == 0;
+      return _crashInstalled;
+    } catch (_) {
+      // 旧版核心无 archoera_crash_install：静默跳过（日志能力不因此降级）。
+      return false;
+    } finally {
+      malloc.free(dirPtr);
+    }
+  }
+
+  /// 卸载崩溃捕获（主要供测试/宿主接管；正常运行时无需调用）。
+  static void uninstallCrashHandler() {
+    if (!_crashInstalled) return;
+    try {
+      _binding?.crashUninstall?.call();
+    } catch (_) {}
+    _crashInstalled = false;
   }
 
   /// 运行时调整最小级别（同时下发原生核心）。
@@ -307,10 +348,15 @@ typedef _LogWriteDart = void Function(
     int level, Pointer<Utf8> tag, Pointer<Utf8> message);
 typedef _LogSetIntNative = Int32 Function(Int32 value);
 typedef _LogSetIntDart = int Function(int value);
+typedef _CrashInstallNative = Int32 Function(Pointer<Utf8> dir);
+typedef _CrashInstallDart = int Function(Pointer<Utf8> dir);
+typedef _CrashUninstallNative = Void Function();
+typedef _CrashUninstallDart = void Function();
 
 class _LogBinding {
   _LogBinding(DynamicLibrary lib)
-      : init = lib.lookupFunction<_LogInitNative, _LogInitDart>(
+      : _lib = lib,
+        init = lib.lookupFunction<_LogInitNative, _LogInitDart>(
             'archoera_log_init'),
         write = lib
             .lookup<NativeFunction<LogWriteNative>>('archoera_log_write')
@@ -328,6 +374,30 @@ class _LogBinding {
         setFileEnabled = lib.lookupFunction<_LogSetIntNative, _LogSetIntDart>(
             'archoera_log_set_file_enabled');
 
+  /// 崩溃捕获符号**懒查**：旧版核心没有这两个符号时不应让整个日志绑定失败
+  /// （否则日志直接退化为 Dart 控制台输出）。
+  late final _CrashInstallDart? crashInstall = _lookupCrashInstall();
+  late final _CrashUninstallDart? crashUninstall = _lookupCrashUninstall();
+
+  _CrashInstallDart? _lookupCrashInstall() {
+    try {
+      return _lib.lookupFunction<_CrashInstallNative, _CrashInstallDart>(
+          'archoera_crash_install');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  _CrashUninstallDart? _lookupCrashUninstall() {
+    try {
+      return _lib.lookupFunction<_CrashUninstallNative, _CrashUninstallDart>(
+          'archoera_crash_uninstall');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  final DynamicLibrary _lib;
   final _LogInitDart init;
   final _LogWriteDart write;
   final Pointer<NativeFunction<LogWriteNative>> writePointer;
