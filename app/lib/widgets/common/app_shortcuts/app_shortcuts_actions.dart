@@ -13,7 +13,7 @@ extension _AppShortcutsView on AppShortcuts {
     for (final action in ShortcutAction.values) {
       final raw = prefs.bindingFor(action);
       if (raw.isEmpty) continue;
-      final activator = parseBinding(raw);
+      final activator = parseBinding(raw, includeRepeats: action.repeats);
       if (activator == null) continue;
       shortcuts.putIfAbsent(activator, () => _ShortcutIntent(action));
     }

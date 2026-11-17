@@ -11,6 +11,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// 驱动主页的收缩/展开：由于该动画由播放页路由的 Ticker 驱动（一定在逐帧
 /// 推进），壳层无需自建 Ticker——从而绕开「下方路由被 Overlay 置为 offstage
 /// 时自建 Ticker 不逐帧推进」的问题，且与播放页进出天然同帧同步。
+///
+/// ## 这是**渲染专用通道**
+/// 壳层与顶栏只能从这里取动画。2026-11-17 曾把二者改成从开关状态机
+/// (`PlayerRouteController`) 取动画，实测打开播放页时会出现「整窗黑一帧」
+/// （首帧只剩 DEBUG 角标），恢复本 provider 链路后即消失（具体机制未定位）。
+/// 状态机只负责开关状态与路由动作，不要让它参与渲染。
 final playerRouteAnimationProvider =
     NotifierProvider<PlayerRouteAnimationNotifier, Animation<double>?>(
       PlayerRouteAnimationNotifier.new,
@@ -34,5 +40,19 @@ class PlayerRouteAnimationNotifier extends Notifier<Animation<double>?> {
     if (animation == null) return;
     if (!identical(state, animation)) return;
     state = null;
+  }
+
+  /// 帧末清空：`PlayerPage.dispose` 专用。
+  ///
+  /// `dispose` 属于 widget 卸载期，此时直接写 provider 会触发 Riverpod 的
+  /// 「构建期修改 provider」断言（`_UncontrolledProviderScopeState` 在构建中
+  /// 不允许 `setState`），故推迟到当前帧结束后的 microtask；归属判断仍在
+  /// [clear] 内完成（旧实例不能抹掉新实例刚写入的动画）。
+  void clearDeferred(Animation<double>? animation) {
+    if (animation == null) return;
+    Future.microtask(() {
+      if (!ref.mounted) return;
+      clear(animation);
+    });
   }
 }
