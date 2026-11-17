@@ -59,4 +59,28 @@ void main() {
     final ok = await Isolate.run(() => Log.nativeWritePointer != null);
     expect(ok, isTrue);
   });
+
+  test('崩溃捕获可安装（CRASH-01）：启用后日志有记录、可卸载', () {
+    final libPath = NativeLibPaths.resolve(NativeModule.log);
+    if (libPath == null) {
+      markTestSkipped('libarchoera_log 未构建（先跑 app/native/log 的 CMake）');
+      return;
+    }
+    final dir = Directory.systemTemp.createTempSync('archoera-crash-it');
+    try {
+      Log.init(
+        dir: dir.path,
+        fileBase: 'crashtest',
+        level: LogLevel.info,
+        color: false,
+      );
+      expect(Log.installCrashHandler(), isTrue,
+          reason: '当前原生核心应导出 archoera_crash_install');
+      final text = File('${dir.path}/crashtest.log').readAsStringSync();
+      expect(text, contains('[crash] 崩溃捕获已启用'));
+      Log.uninstallCrashHandler();
+    } finally {
+      dir.deleteSync(recursive: true);
+    }
+  });
 }

@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../apis/runtime.dart';
 import '../services/playback/playback_notifier.dart';
+import '../services/log/log.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../stores/vault_session_store.dart';
 
@@ -29,6 +30,7 @@ import '../stores/vault_session_store.dart';
 /// - vault 会话写队列 flush（save/clear 为异步 enqueue，exit 会丢 pending）；
 /// - 短暂等待引擎 FFI / 后台 isolate 收尾（引擎线程随进程退出回收）。
 Future<void> quitApplication(WidgetRef ref) async {
+  Log.i('lifecycle', '正常退出（用户请求）');
   // 播放现场同步落盘（会话记忆关闭时 _persistSession 内部自行跳过）
   ref.read(playbackProvider.notifier).persistNow();
   // vault 会话写队列 flush（登录态/凭据不丢；仅 vault 实现有异步队列）
