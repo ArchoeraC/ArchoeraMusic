@@ -47,6 +47,13 @@ internal static class SearchQuery
     /// </summary>
     public const string ReadingColumns = "reading_meta_tok lyrics_rom_tok";
 
+    /// <summary>用户可见文本列：歌名 / 歌手 / 专辑 / 文件名，不含派生转写列。</summary>
+    public const string VisibleTextColumns = "title_tok artist_tok album_tok filename_tok";
+
+    /// <summary>拉丁单字查询允许的列：可见文本 + 首字母（真实的首字母检索），不含拼音与歌词。</summary>
+    public const string SingleCharLatinColumns =
+        "title_tok artist_tok album_tok filename_tok initials_meta_tok";
+
     /// <summary>单次模糊编译的变体总数默认上限（防止长串 / 多词元生成巨型 MATCH）。</summary>
     public const int DefaultMaxFuzzyVariants = 500;
 
@@ -55,6 +62,36 @@ internal static class SearchQuery
 
     /// <summary>CJK 子序列长度硬上限：超长（粘贴整段文本）放弃容错，避免 O(L²) 膨胀。</summary>
     public const int MaxCjkQueryLength = 64;
+
+    /// <summary>CJK 容错（删除 / 换位）的最小字数：两字删一字会退化成宽覆盖的单字查询。</summary>
+    public const int MinCjkFuzzyLength = 3;
+
+    /// <summary>拉丁模糊趟的最小词长：过短的词做编辑距离扩展只会引入高频噪声。</summary>
+    public const int MinFuzzyWordLength = 3;
+
+    /// <summary>首字母支的整体最小长度：单字母首字母串在真实曲库里过于稠密，不生成该支。</summary>
+    public const int MinInitialsBranchLength = 2;
+
+    /// <summary>跨语言释义支的最小 CJK 字数：单字释义极度发散，不生成「汉字 → 英文」候选。</summary>
+    public const int MinCrossLingualCjkLength = 2;
+
+    /// <summary>拼音宽松趟每次查询的变体总预算（跨音节累计）。</summary>
+    public const int DefaultMaxPinyinVariants = 16;
+
+    /// <summary>主趟读音支（拼音 / 首字母）的 CJK 字数下限。</summary>
+    public const int ReadingBranchMinCjkLength = 2;
+
+    /// <summary>末词前缀同时保留精确词，让 bm25 把字面命中排前（精确 ⊂ 前缀，不改变命中集合）。</summary>
+    public static readonly bool PairExactWithPrefix = true;
+
+    /// <summary>多词查询命中不足时允许丢词降级（仍是字面匹配，方向最安全）。</summary>
+    public static readonly bool AllowDropTokens = true;
+
+    /// <summary>单字查询限定在可见文本列，不扫歌词与派生转写列。</summary>
+    public static readonly bool RequireMetadataForSingleChar = true;
+
+    /// <summary>首字符不同的替换变体不生成（编辑距离只有 ≤1 一档，首错等价于 2 错）。</summary>
+    public static readonly bool FirstCharTypoCostsTwo = true;
 
     /// <summary>拼音 / 拉丁词元加前缀 <c>*</c> 的最小长度。</summary>
     public const int MinPrefixTokenLength = 3;
@@ -122,16 +159,32 @@ internal static class SearchQuery
     {
         var branches = new List<string>();
         Add(branches, LexicalBranch(tokens.Lexical));
-        Add(branches, PinyinBranch(tokens.Pinyin));
-        Add(branches, InitialsBranch(tokens.PinyinInitials));
-        if (includeCrossLingual) Add(branches, CrossLingualBranch(tokens.CrossLingual));
+        var singleChar = RestrictSingleCharToMetadata(tokens);
+        if (!singleChar && AllowReadingBranch(tokens))
+        {
+            // 单字查询已由下面的列门控处理（拉丁单字经 initials_meta_tok 命中），
+            // 这里只负责多字查询的拼音 / 首字母支。
+            Add(branches, PinyinBranch(tokens));
+            Add(branches, InitialsBranch(tokens));
+        }
+        if (includeCrossLingual) Add(branches, CrossLingualBranch(tokens));
+        if (singleChar)
+        {
+            if (branches.Count == 0) return null;
+            var joined = string.Join(" OR ", branches);
+            var columns = tokens.HasCjk ? VisibleTextColumns : SingleCharLatinColumns;
+            return $"{{{columns}}} : ({joined})";
+        }
         return JoinBranches(branches, metadata);
     }
+
+    /// <summary>仅编译词法支（不含拼音 / 首字母），供字段亲和度探测等诊断用途。</summary>
+    public static string? CompileLexical(QueryTokens tokens) => LexicalBranch(tokens.Lexical);
 
     /// <summary>跨语言候选分支（T1）：候选逐字加引号后 OR；无候选返回 <c>null</c>。</summary>
     public static string? CompileCrossLingual(QueryTokens tokens, bool metadata)
     {
-        var branch = CrossLingualBranch(tokens.CrossLingual);
+        var branch = CrossLingualBranch(tokens);
         if (branch is null) return null;
         return metadata ? $"{{{MetadataColumns}}} : {branch}" : branch;
     }
@@ -146,14 +199,29 @@ internal static class SearchQuery
     /// </summary>
     public static string? CompilePinyinLoose(QueryTokens tokens, bool metadata)
     {
+        // 缺读音字的 CJK 查询不可做「音节位置无关 AND」：少一个音节就退化成高频单音节。
+        if (tokens.HasCjk && !tokens.PinyinComplete) return null;
         var clean = Clean(tokens.Pinyin);
         if (clean.Count < 2) return null;
+
+        // 总变体预算从尾部音节开始分配（尾部通常是查询里最不确定的部分），
+        // 预算耗尽后剩余音节退回纯原形，避免超长输入的组合爆炸。
+        var budget = Math.Max(1, DefaultMaxPinyinVariants);
+        var variantsPerSyllable = new List<List<string>>(clean.Count);
+        for (var i = 0; i < clean.Count; i++) variantsPerSyllable.Add(new List<string>());
+        for (var i = clean.Count - 1; i >= 0; i--)
+        {
+            var take = Math.Min(MaxPinyinVariantsPerSyllable, budget);
+            var variants = PinyinFuzzyVariants(clean[i], take);
+            variantsPerSyllable[i] = variants;
+            budget = Math.Max(0, budget - variants.Count);
+        }
 
         var chunks = new List<string>(clean.Count);
         for (var i = 0; i < clean.Count; i++)
         {
             var prefix = i == clean.Count - 1 && clean[i].Length >= MinPrefixTokenLength;
-            var variants = PinyinFuzzyVariants(clean[i], MaxPinyinVariantsPerSyllable);
+            var variants = variantsPerSyllable[i];
             if (variants.Count == 1)
             {
                 chunks.Add(prefix ? Quote(variants[0]) + "*" : Quote(variants[0]));
@@ -290,19 +358,22 @@ internal static class SearchQuery
     {
         var branches = new List<string>();
         Add(branches, FuzzyLexicalBranch(tokens.Lexical, maxVariants, vocabulary));
-        Add(branches, PinyinBranch(tokens.Pinyin));
-        Add(branches, InitialsBranch(tokens.PinyinInitials));
+        Add(branches, PinyinBranch(tokens));
+        Add(branches, InitialsBranch(tokens));
         return JoinBranches(branches, metadata);
     }
 
     /// <summary>
     /// 生成 CJK 编辑距离 ≤1 变体（删除任一字符 / 相邻换位）；不含原串，去重保序。
-    /// 子序列长度 &lt;2 或 &gt;<see cref="MaxCjkQueryLength"/> 返回空。
+    /// 子序列长度 &lt;<see cref="MinCjkFuzzyLength"/> 或 &gt;<see cref="MaxCjkQueryLength"/>
+    /// 返回空；查询混入拉丁 / 数字时也返回空（容错只能覆盖索引脚本，丢掉它们会改变原查询）。
     /// </summary>
     public static List<string> CjkVariants(string query, int maxVariants = DefaultMaxCjkVariants)
     {
+        if (HasNonIndexedLetterOrDigit(query)) return new List<string>();
         var sequence = CjkSubsequence(query);
-        if (sequence.Length < 2 || sequence.Length > MaxCjkQueryLength) return new List<string>();
+        if (sequence.Length < MinCjkFuzzyLength || sequence.Length > MaxCjkQueryLength)
+            return new List<string>();
 
         var output = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal) { sequence };
@@ -338,6 +409,8 @@ internal static class SearchQuery
         if (clean.Count == 0) return null;
 
         var chunks = new List<string>();
+        // 每个 chunk 对应的独立词元；短语块为 null，不能做前缀改写。
+        var chunkTerms = new List<string?>();
         var i = 0;
         while (i < clean.Count)
         {
@@ -348,37 +421,54 @@ internal static class SearchQuery
                 var run = clean.GetRange(i, j - i);
                 // 连续 ≥2 个 bigram → 引号短语；单个 bigram → 原样加引号。
                 chunks.Add(Quote(run.Count >= 2 ? string.Join(' ', run) : run[0]));
+                chunkTerms.Add(null);
                 i = j;
             }
             else
             {
                 chunks.Add(Quote(clean[i]));
+                chunkTerms.Add(clean[i]);
                 i++;
             }
         }
 
-        var prefixLast = IsPrefixable(clean[^1]) && clean[^1].Length >= MinPrefixTokenLength;
+        var last = clean[^1];
+        if (IsPrefixable(last) && last.Length >= MinPrefixTokenLength)
+            chunks[^1] = PrefixTerm(last);
+
+        // 索引里已无「中间字」的 unigram（analyzer v13），单字必须改走前缀 `字*`，
+        // 才能命中以该字开头的 bigram。只改独立成块的单字，短语块保持原样。
         for (var k = 0; k < chunks.Count; k++)
         {
-            if (k == chunks.Count - 1 && prefixLast) chunks[k] += "*";
+            var term = chunkTerms[k];
+            if (term is null || !IsSingleCjkChar(term)) continue;
+            chunks[k] = PrefixTerm(term);
         }
         return string.Join(" AND ", chunks);
     }
 
-    private static string? PinyinBranch(IReadOnlyList<string> terms)
+    private static string? PinyinBranch(QueryTokens tokens)
     {
-        var clean = Clean(terms);
+        // 缺读音字的 CJK 查询：拼音整段串会少音节，退化成高频单音节宽命中。
+        if (tokens.HasCjk && !tokens.PinyinComplete) return null;
+        var clean = Clean(tokens.Pinyin);
         if (clean.Count == 0) return null;
         if (clean.Count == 1)
             return $"{{{PinyinColumns}}} : {QuotedAnd(clean, clean[^1].Length >= MinPrefixTokenLength)}";
         return $"{{{PinyinColumns}}} : {Quote(string.Join(' ', clean))}";
     }
 
-    private static string? InitialsBranch(string? initials)
+    private static string? InitialsBranch(QueryTokens tokens)
     {
-        if (string.IsNullOrWhiteSpace(initials)) return null;
-        var terms = initials.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (tokens.HasCjk && !tokens.PinyinComplete) return null;
+        if (string.IsNullOrWhiteSpace(tokens.PinyinInitials)) return null;
+        var terms = tokens.PinyinInitials!.Split(
+            (char[]?)null, StringSplitOptions.RemoveEmptyEntries).ToList();
         if (terms.Count == 0) return null;
+        // 单字母首字母串不生成该支：单字母 token 在歌词 / 文件名 / 单字标题里密集存在，
+        // 按精确 term 匹配会命中整库。
+        var totalLength = terms.Sum(t => t.Length);
+        if (totalLength < MinInitialsBranchLength) return null;
         var body = QuotedAnd(terms, terms[^1].Length >= MinInitialsPrefixLength);
         // 整体加括号：列过滤与 OR 混排时边界更明确（列过滤只作用于本支）。
         // 注意多列过滤必须用**花括号**：FTS5 的 `a b : expr` 是「列 a 后接词元 b」，
@@ -386,10 +476,19 @@ internal static class SearchQuery
         return $"({{{InitialsColumns}}} : {body})";
     }
 
-    private static string? CrossLingualBranch(IReadOnlyList<string> terms)
+    /// <summary>
+    /// 跨语言候选分支。查询只含一个汉字时，丢掉「汉字 → 英文释义」方向的候选：
+    /// 单字释义极度发散，会把这个查询放大到近乎整库；「拉丁词 → 候选汉字」方向不受影响。
+    /// </summary>
+    private static string? CrossLingualBranch(QueryTokens tokens)
     {
-        var clean = Clean(terms);
+        var clean = Clean(tokens.CrossLingual);
         if (clean.Count == 0) return null;
+        if (tokens.CjkCharCount > 0 && tokens.CjkCharCount < MinCrossLingualCjkLength)
+        {
+            clean = clean.Where(IsCjkText).ToList();
+            if (clean.Count == 0) return null;
+        }
         return clean.Count == 1
             ? Quote(clean[0])
             : "(" + string.Join(" OR ", clean.Select(Quote)) + ")";
@@ -524,8 +623,152 @@ internal static class SearchQuery
     }
 
     /* ------------------------------------------------------------------ */
+    /* 丢词降级                                                            */
+    /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 丢掉第 <paramref name="dropIndex"/> 个词后的 MATCH 表达式；不适用时返回 <c>null</c>。
+    ///
+    /// 只重新编译「词法支 + 读音支」，不含跨语言 / 容错：本趟的语义是
+    /// 「字面少匹配一个词」，不是放宽匹配维度。
+    /// </summary>
+    public static string? CompileDropTokens(
+        QueryTokens tokens, string query, bool metadata, int dropIndex)
+    {
+        if (!AllowDropTokens) return null;
+        var words = SplitQueryWords(query);
+        if (words.Count < 2 || dropIndex < 0 || dropIndex >= words.Count) return null;
+
+        var keptWords = new List<string>(words.Count - 1);
+        for (var i = 0; i < words.Count; i++)
+        {
+            if (i != dropIndex) keptWords.Add(words[i]);
+        }
+        if (keptWords.Count == 0) return null;
+
+        var keptTokens = Analyzer.AnalyzeQuery(string.Join(' ', keptWords));
+        if (keptTokens.Lexical.Count == 0) return null;
+
+        var expression = CompileMatch(keptTokens, metadata, includeCrossLingual: false);
+        if (expression is null) return null;
+        var original = CompileMatch(tokens, metadata, includeCrossLingual: false);
+        return string.Equals(expression, original, StringComparison.Ordinal) ? null : expression;
+    }
+
+    /// <summary>
+    /// 丢词降级的候选丢法，按优先级排序。
+    ///
+    /// 中文音乐检索的主流写法是「歌手 + 歌名」，歌名在尾部且最该保留，
+    /// 因此含 CJK 的查询先丢首位词；纯拉丁查询仍按尾部优先。
+    /// </summary>
+    public static List<int> DropTokenCandidates(QueryTokens tokens, string query)
+    {
+        var words = SplitQueryWords(query);
+        if (words.Count < 2) return new List<int>();
+        var indices = new List<int>(words.Count);
+        if (tokens.HasCjk)
+        {
+            for (var i = 0; i < words.Count; i++) indices.Add(i);
+        }
+        else
+        {
+            for (var i = words.Count - 1; i >= 0; i--) indices.Add(i);
+        }
+        return indices;
+    }
+
+    /// <summary>
+    /// 按「词在 title / artist 列的命中分布」重排丢词候选：
+    /// 越像歌名的词越晚丢，越像歌手的词越早丢；信息不足时保持原顺序。
+    /// </summary>
+    public static List<int> OrderDropsByFieldAffinity(
+        List<int> candidates, IReadOnlyList<int> titleCounts, IReadOnlyList<int> artistCounts)
+    {
+        if (candidates.Count <= 1) return candidates;
+        var positions = new Dictionary<int, int>(candidates.Count);
+        for (var i = 0; i < candidates.Count; i++) positions[candidates[i]] = i;
+
+        var ordered = new List<int>(candidates);
+        ordered.Sort((a, b) =>
+        {
+            var cmp = Affinity(a, titleCounts, artistCounts)
+                .CompareTo(Affinity(b, titleCounts, artistCounts));
+            return cmp != 0 ? cmp : positions[a].CompareTo(positions[b]);
+        });
+        return ordered;
+    }
+
+    private static int Affinity(int index, IReadOnlyList<int> titleCounts, IReadOnlyList<int> artistCounts)
+        => index < 0 || index >= titleCounts.Count || index >= artistCounts.Count
+            ? 0
+            : titleCounts[index] - artistCounts[index];
+
+    private static List<string> SplitQueryWords(string? query)
+    {
+        var words = new List<string>();
+        if (string.IsNullOrWhiteSpace(query)) return words;
+        foreach (var part in query.Trim().Split(
+                     (char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            words.Add(part);
+        }
+        return words;
+    }
+
+    /* ------------------------------------------------------------------ */
     /* 工具                                                                */
     /* ------------------------------------------------------------------ */
+
+    /// <summary>
+    /// 读音支（拼音 / 首字母）是否允许进入主趟：CJK 输入产出的拼音是派生的，
+    /// 单字查询没有必要再扩宽；只有拉丁输入或 CJK 字数达标时才允许。
+    /// </summary>
+    private static bool AllowReadingBranch(QueryTokens tokens)
+        => !tokens.HasCjk || tokens.CjkCharCount >= ReadingBranchMinCjkLength;
+
+    /// <summary>单字查询的列门控：只在查询恰好含一个可见字符时生效。</summary>
+    private static bool RestrictSingleCharToMetadata(QueryTokens tokens)
+        => RequireMetadataForSingleChar && tokens.VisibleCharCount == 1;
+
+    /// <summary>词元是否为单个索引脚本字符（这类词元在索引里不一定有独立 unigram，须走前缀）。</summary>
+    private static bool IsSingleCjkChar(string token)
+    {
+        var runes = token.EnumerateRunes().ToArray();
+        return runes.Length == 1 && runes[0].Value <= char.MaxValue
+            && IsIndexedScript((char)runes[0].Value);
+    }
+
+    /// <summary>末词编译为 <c>("tok" OR "tok"*)</c>，或纯前缀 <c>"tok"*</c>。</summary>
+    private static string PrefixTerm(string token)
+        => PairExactWithPrefix
+            ? "(" + Quote(token) + " OR " + Quote(token) + "*)"
+            : Quote(token) + "*";
+
+    /// <summary>整串是否只由索引脚本（汉字 / 假名 / 谚文）构成（跨语言候选归属判定用）。</summary>
+    private static bool IsCjkText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (rune.Value > char.MaxValue || !IsIndexedScript((char)rune.Value)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>查询是否含不属于索引脚本的字母或数字（拉丁词 / 数字；中文容错趟的门控）。</summary>
+    private static bool HasNonIndexedLetterOrDigit(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (Rune.IsLetterOrDigit(rune)
+                && (rune.Value > char.MaxValue || !IsIndexedScript((char)rune.Value)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private static string? JoinBranches(List<string> branches, bool metadata)
     {
@@ -561,7 +804,7 @@ internal static class SearchQuery
         for (var i = 0; i < terms.Count; i++)
         {
             var prefixed = i == terms.Count - 1 && prefixLast;
-            parts.Add(prefixed ? Quote(terms[i]) + "*" : Quote(terms[i]));
+            parts.Add(prefixed ? PrefixTerm(terms[i]) : Quote(terms[i]));
         }
         return string.Join(" AND ", parts);
     }
@@ -587,8 +830,9 @@ internal static class SearchQuery
             (chars[i], chars[i + 1]) = (chars[i + 1], chars[i]);
             Add(new string(chars));
         }
-        // 替换：逐位用受限候选替换。
-        for (var i = 0; i < word.Length; i++)
+        // 替换：逐位用受限候选替换。首字符不生成：编辑距离只有 ≤1 一档，
+        // 首字符不同往往意味着另一个词（首错等价于 2 错）。
+        for (var i = FirstCharTypoCostsTwo ? 1 : 0; i < word.Length; i++)
         {
             if (!SubstitutionAlternatives.TryGetValue(word[i], out var alternatives)) continue;
             foreach (var ch in alternatives)
@@ -609,10 +853,10 @@ internal static class SearchQuery
     private static bool IsPrefixable(string token)
         => !token.EnumerateRunes().Any(r => r.Value <= char.MaxValue && IsIndexedScript((char)r.Value));
 
-    /// <summary>纯小写拉丁 / 数字词元（可做编辑距离扩展）。</summary>
+    /// <summary>纯小写拉丁 / 数字词元（可做编辑距离扩展）；过短词不扩展，避免高频噪声。</summary>
     private static bool IsFuzzyEligible(string token)
     {
-        if (token.Length == 0) return false;
+        if (token.Length < MinFuzzyWordLength) return false;
         foreach (var rune in token.EnumerateRunes())
         {
             var isLower = rune.Value >= 0x61 && rune.Value <= 0x7A;
