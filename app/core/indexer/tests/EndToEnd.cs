@@ -90,7 +90,7 @@ internal static class EndToEnd
         Program.Check("世代化: 无 search.db.tmp", !File.Exists(index + ".tmp"));
         Program.Check("世代化: 无 search.db.tmp-wal", !File.Exists(index + ".tmp-wal"));
 
-        Program.Check("meta.analyzer_version==12", Meta(index, "analyzer_version") == "12", Meta(index, "analyzer_version"));
+        Program.Check("meta.analyzer_version==13", Meta(index, "analyzer_version") == "13", Meta(index, "analyzer_version"));
         Program.Check("meta.schema_version==7", Meta(index, "schema_version") == "7", Meta(index, "schema_version"));
         Program.Check("meta.index_lrc==0", Meta(index, "index_lrc") == "0", Meta(index, "index_lrc"));
         Program.Check("meta.pinyin==1", Meta(index, "pinyin") == "1", Meta(index, "pinyin"));
@@ -595,7 +595,7 @@ internal static class EndToEnd
         Program.Check("T1 素材: AnalyzeQuery('love') 候选含 爱",
             Analyzer.AnalyzeQuery("love").CrossLingual.Contains("爱"));
         Program.Check("T1 素材: 候选 '爱' 命中 tB 原文",
-            MatchContainsTrack(index, "{lyrics_tok} : \"爱\"", "tB"));
+            MatchContainsTrack(index, "{lyrics_tok} : \"爱\"*", "tB"));
         // 反向：汉字「爱」的英文释义词含 love；可命中含 love 的英文层（tB 译文）。
         Program.Check("T1 素材: AnalyzeQuery('爱') 候选含 love",
             Analyzer.AnalyzeQuery("爱").CrossLingual.Contains("love"));

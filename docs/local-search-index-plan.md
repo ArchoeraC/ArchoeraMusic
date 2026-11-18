@@ -1,7 +1,7 @@
 # 本地曲库搜索索引：歌词模糊搜索设计（Local Library Search Index）
 
 > 状态：**已实施（P0–P5 落地）** 设计稿 2026-10-13，实现随分支演进持续更新
-> （schema v7 / `AnalyzerVersion` 11；查询层已整体下沉 C# 索引器，见 §9.3）。
+> （schema v7 / `AnalyzerVersion` 13；查询层已整体下沉 C# 索引器，见 §9.3）。
 > 范围：为本地曲库增加索引能力，支持**歌词 / 元数据的模糊搜索**（中文优先），
 > 重点是 **拼音搜索**与**多语言歌词层（原文 / 译文 / 音译）搜索**；
 > `.lrc` 侧车歌词**可选索引（子开关，默认关闭）**。
@@ -280,9 +280,9 @@ indexer 现在是纯 `library.db → search.db` 变换器（除自身产物外**
 
 | 脚本 | 分词 | 拼音 / 首字母列 |
 |---|---|---|
-| 汉字（统一表意 + 扩展 A + 兼容表意） | `bigram + unigram`（bigram 位置连续，便于短语） | ✅（ToolGood 读音 / 首字母） |
-| **假名（平 / 片 / 半角 / 音标扩展）** | `bigram + unigram` | ❌（无拼音读音，镜像过去只是噪声与体积） |
-| **谚文（音节 / 字母 / 兼容字母）** | `bigram + unigram` | ❌ |
+| 汉字（统一表意 + 扩展 A + 兼容表意） | `bigram + 首尾 unigram`（v13；中间字走前缀 `字*`，bigram 位置连续，便于短语） | ✅（ToolGood 读音 / 首字母） |
+| **假名（平 / 片 / 半角 / 音标扩展）** | `bigram + 首尾 unigram`（v13） | ❌（无拼音读音，镜像过去只是噪声与体积） |
+| **谚文（音节 / 字母 / 兼容字母）** | `bigram + 首尾 unigram`（v13） | ❌ |
 | 拉丁 / 数字 | 整词（末词 ≥3 字符可前缀） | ✅（整词原样镜像，保持既有语义） |
 
 > **P5 真实曲库实测修订**：旧实现只有「汉字」需要子串索引，假名 / 谚文落进「拉丁」分支 →
@@ -482,23 +482,34 @@ indexer 现在是纯 `library.db → search.db` 变换器（除自身产物外**
 表达式编译与 CJK 变体在 `app/core/indexer/SearchQuery.cs`，多趟调度 / bm25 排序 /
 `docId → trackId` 映射在 `SearchSession.cs`（经 `indexer_query` 一次 FFI 调用返回结果）；
 Dart 侧 `search_index.dart` 只是薄 FFI 客户端（组装请求 JSON、映射结果、累加诊断计数）。
-不引入索引侧词典 / 触发器，在**查询编译**侧做**分级（渐进六趟）**——逐趟递进、命中足够即短路：
+不引入索引侧词典 / 触发器，在**查询编译**侧做**分级（渐进多趟）**——逐趟递进、命中足够即短路：
 
 1. **主趟** `SearchQuery.CompileMatch`：三条支 `OR`（词法 / 拼音 / 首字母；跨语言支**不并入**主趟）；
-   相邻短语拼音 + **独立首字母列** + **前缀长度门控**（见 §4.2）；
+   相邻短语拼音 + **独立首字母列** + **前缀长度门控**（见 §4.2）。
+   **v13 门控**：单字查询（1 个可见字符）只搜可见文本列（`title/artist/album/filename`，
+   拉丁单字额外含 `initials_meta`），不扫歌词 / 派生转写列；CJK 单字不生成读音支，
+   多字 CJK 若存在「无拼音读音的字」则整支跳过拼音 / 首字母（缺字会把短语退化成高频单音节）；
+   首字母支整体长度 <2 不生成；末词前缀同时保留精确词 `("tok" OR "tok"*)`，让 bm25 把字面命中排前。
+1.5 **丢词降级** `SearchQuery.CompileDropTokens`（多词主趟不足时）：先试「少匹配一个词」，
+   仍是字面匹配。CJK 查询按「歌名在尾部」先丢首位词；再用 `title_tok` / `artist_tok` 的
+   命中数（`FtsStore.CountMatches`）判断字段亲和度，越像歌手的词越早丢。
 2. **拼音宽松兜底** `SearchQuery.CompilePinyinLoose`（主趟 0 命中时）：音节**位置无关 `AND`**——
    纯 CJK 的**漏字（音节子集）/ 换位（音节集合不变）**靠这一趟召回（`周伦` → `周杰伦`、
    `爱我` → `我爱你`）；并对每个**有效拼音音节**（英文词不扩展）生成模糊音变体：
    声母 `zh/z、ch/c、sh/s、n/l、f/h`、韵母 `ang/an、eng/en、ing/in`（双向，原形 + 声母 +
    韵母 + 组合，每音节 ≤ 4），同音节内 `OR`、音节间仍 `AND`（`zoulun` → `zhou` ∧ `lun`）。
+   变体总预算 16，从**尾部音节**开始分配（尾部通常最不确定），耗尽后其余音节退回原形。
    代价是命中集可能很大，故只在主趟不足时付；
 2.5 **日文读音兜底** `SearchQuery.CompileReading`（v5，仍不足时）：拉丁词元的字母 bigram
    短语 `AND` 到 `reading_meta_tok lyrics_rom_tok`（假名 → 罗马字 + Unihan 汉字音训读；
    音译歌词列仅在开启 T2-9「歌词罗马音生成」时含读音 bigram，LRC 音译整词不会被短语误命中），
    覆盖日文曲库的罗马字检索；
 3. **跨语言兜底** `SearchQuery.CompileCrossLingual`（仍 0 命中时）：T1 候选 `OR`（见下）；
+   查询只含一个汉字时，丢掉「汉字 → 英文释义」方向的候选（单字释义极度发散）；
+   「拉丁词 → 候选汉字」方向不受影响；
 4. **模糊趟**（含拉丁/数字词元时）`SearchQuery.CompileFuzzy`：把这些词元展开为**编辑距离 ≤ 1 的变体 OR 组**
    （删除 / 相邻换位 / **受限字母表替换**，不含插入；原词保留），变体仍逐个转义、末词元按门控加前缀；
+   单词长度 <3 不扩展；首字符不生成替换变体（首错等价于 2 错）；
    单次变体总数受 `maxVariants`（默认 500）约束，超限只扩展末个拉丁词元。
    拼音支天然覆盖**同音错字**，故不重复扩展；模糊仅为精确的**超集**。
    **词典化（T1-8）**：变体只在索引真实存在的词表内枚举——`FtsStore.LoadFuzzyVocabulary()` 用
@@ -512,7 +523,9 @@ Dart 侧 `search_index.dart` 只是薄 FFI 客户端（组装请求 JSON、映�
 5. **CJK 变体趟**（仍不足且查询含 CJK）`SearchQuery.CjkVariants`：取查询的 CJK 子序列生成
    **编辑距离 ≤ 1 变体**（**删除任一字符 / 相邻换位**，预算默认 ≤ 200，C# 纯函数；
    不含插入），每个变体经**同一分析器**（`Analyzer.AnalyzeQuery`，保证同构）分析 → `CompileMatch`，
-   再合并为**单条** OR `MATCH` 一次查询。各趟结果合并去重、**前面的趟次优先**。
+   再合并为**单条** OR `MATCH` 一次查询。子序列 <3 字不生成（两字删一字会退化成宽覆盖单字），
+   查询混入拉丁 / 数字时也跳过（容错只能覆盖索引脚本，丢掉它们会改变原查询）。
+   各趟结果合并去重、**前面的趟次优先**。
    **替换型非同音错字（周杰伦→周杰轮）** 仍需相似字表，**不在本期**。
 
 **跨语言查询扩展（T1，`Analyzer.AnalyzeQuery` + `SearchQuery.cs`）**：独立兜底趟——
@@ -579,9 +592,12 @@ CREATE VIRTUAL TABLE search_fts USING fts5(
 ```
 
 - 排序：`ORDER BY bm25(search_fts, w_…)`，权重（实现值、列序一致）：
-  title 4.0 / artist 3.0 / album 2.0 / lyrics 1.5 / lyrics_tr 1.0 / lyrics_rom 0.5 /
-  **pinyin_meta 2.0 / pinyin_lyrics 1.5** / **reading_meta 2.0** / filename 1.0 /
-  **initials_meta 2.0 / initials_lyrics 1.5**。
+  title 4.0 / artist 3.0 / album 2.0 / lyrics 0.6 / lyrics_tr 1.0 / lyrics_rom 0.5 /
+  **pinyin_meta 2.0 / pinyin_lyrics 0.5** / **reading_meta 2.0** / filename 1.0 /
+  **initials_meta 2.0 / initials_lyrics 0.5**。
+  歌词列取低权重：歌词的文档频率天然偏高，且长文本的单曲内重复会放大词频，容易让
+  「歌词里恰好出现」压过「歌名就是它」；非零值保留「搜歌词找歌」这一用法。
+  拼音 / 首字母歌词列与原文歌词同档，避免同一行歌词经两个派生列各命中一次导致权重翻倍。
 - **列序 = bm25 权重序，冻结**（每次 schema 变更只允许「改名 + 追加」，C# 侧同步
   `FtsStore.FtsColumns` / `FtsStore.Bm25Weights` / `SearchQuery.MetadataColumns`，
   Dart 侧同步 `SearchIndex.expectedSchemaVersion`）。

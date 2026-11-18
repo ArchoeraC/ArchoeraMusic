@@ -66,13 +66,23 @@ void main() {
 
     test('趟名按查询层的渐进顺序输出', () {
       const counts = PassCounts(
+        dropTokens: 1,
         pinyinLoose: 1,
         reading: 1,
         crossLingual: 0,
         fuzzy: 1,
         cjkFuzzy: 0,
       );
-      expect(passesOf(counts), const ['pinyinLoose', 'reading', 'fuzzy']);
+      expect(
+        passesOf(counts),
+        const ['dropTokens', 'pinyinLoose', 'reading', 'fuzzy'],
+      );
+    });
+
+    test('丢词降级也计入差值', () {
+      const before = PassCounts(dropTokens: 2);
+      const after = PassCounts(dropTokens: 3);
+      expect((after - before).dropTokens, 1);
     });
   });
 
