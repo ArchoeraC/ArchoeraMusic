@@ -1249,7 +1249,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('高速换行仍走弹簧（不硬切，对齐 AMLL）', (tester) async {
+    testWidgets('高速换行不硬切（降级为整墙刚性滚动）', (tester) async {
       // 间隔 200ms 的密集歌词
       final fast = <LyricGroup>[
         for (var i = 0; i < 60; i++)
@@ -1271,10 +1271,11 @@ void main() {
       final centers = s.debugCenters() as List<double>;
       double target(int i) => centers[i] - (centers[anchor] - 500 * 0.5);
       expect(anchor, anchor0 + 1);
+      expect(s.debugGlide(), isTrue, reason: '高速段应降级为整墙刚性滚动');
       expect(
         (y[anchor] - target(anchor)).abs(),
         greaterThan(0.5),
-        reason: '高速换行应仍处于弹簧途中，不得硬切吸附',
+        reason: '高速换行应处于平滑滚动途中，不得硬切吸附',
       );
     });
 
@@ -1297,6 +1298,97 @@ void main() {
         greaterThan(0.5),
         reason: '正常间隔的换行应仍在弹簧途中，不能被吸附吞掉',
       );
+    });
+
+    testWidgets('高速换行降级为整墙刚性滚动（取消级联，行距不抖）', (tester) async {
+      final fast = <LyricGroup>[
+        for (var i = 0; i < 60; i++)
+          LyricGroup(
+            original: LyricLine(timeMs: i * 200, text: '第 $i 行'),
+            endMs: (i + 1) * 200,
+          ),
+      ];
+      await tester.pumpWidget(buildWall(fast, 20 * 200));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final anchor0 = s.debugAnchor() as int;
+      await tester.pumpWidget(buildWall(fast, (anchor0 + 1) * 200));
+      await tester.pump(const Duration(milliseconds: 16));
+
+      s = stateOf(tester);
+      expect(s.debugGlide(), isTrue, reason: '200ms 间隔应进入整墙刚性滚动');
+      final anchor = s.debugAnchor() as int;
+      final y0 = s.debugY() as List<double>;
+      final centers = s.debugCenters() as List<double>;
+      // 取锚点上下各一行：刚性滚动期间它们之间的行距必须恒定。
+      final a = math.max(0, anchor - 1);
+      final b = math.min(y0.length - 1, anchor + 1);
+      final gap0 = y0[a] - y0[b];
+      final anchorY0 = y0[anchor];
+
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      final y1 = s.debugY() as List<double>;
+      expect(y1[a] - y1[b], closeTo(gap0, 1e-6), reason: '整墙刚性滚动时行距不得变化');
+      expect(
+        y1[anchor],
+        isNot(closeTo(anchorY0, 1e-6)),
+        reason: '应处于连续滚动过程中，而不是瞬移或静止',
+      );
+      final target = centers[anchor] - (centers[anchor] - 500 * 0.5);
+      expect(
+        (y1[anchor] - target).abs(),
+        greaterThan(0.5),
+        reason: '高速段也应平滑滚动到位，不做硬切',
+      );
+    });
+
+    testWidgets('低速换行不进入刚性滚动', (tester) async {
+      final slow = buildGroups(60); // 每行 1000ms
+      await tester.pumpWidget(buildWall(slow, 20 * 1000));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final anchor0 = s.debugAnchor() as int;
+      await tester.pumpWidget(buildWall(slow, (anchor0 + 1) * 1000));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      expect(s.debugGlide(), isFalse, reason: '1000ms 间隔应保持逐行弹簧');
+    });
+
+    testWidgets('高速段结束后带回差退出刚性滚动', (tester) async {
+      final mixed = <LyricGroup>[
+        for (var i = 0; i < 40; i++)
+          LyricGroup(
+            original: LyricLine(timeMs: i * 200, text: '快 $i'),
+            endMs: (i + 1) * 200,
+          ),
+        for (var i = 40; i < 60; i++)
+          LyricGroup(
+            original: LyricLine(
+              // 快歌段最后一行 7800ms；慢歌第一行留 1000ms 间隔（8800ms）。
+              timeMs: 7800 + 1000 + (i - 40) * 1000,
+              text: '慢 $i',
+            ),
+            endMs: 7800 + 1000 + (i - 39) * 1000,
+          ),
+      ];
+      await tester.pumpWidget(buildWall(mixed, 38 * 200));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+
+      // 进入最后一行快歌：下一行间隔 1000ms，但当前间隔 200ms → 仍处于刚性滚动。
+      await tester.pumpWidget(buildWall(mixed, 39 * 200));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      expect(s.debugGlide(), isTrue);
+
+      // 进入慢歌段：当前与下一行都 >450ms → 等共享弹簧收敛后交回逐行弹簧。
+      await tester.pumpWidget(buildWall(mixed, 7800 + 1000));
+      await tester.pump(const Duration(milliseconds: 16));
+      await settle(tester, frames: 90);
+      s = stateOf(tester);
+      expect(s.debugGlide(), isFalse, reason: '慢歌段应退出刚性滚动，交回逐行弹簧');
     });
 
     testWidgets('鼠标悬停时取消失焦（对齐 AMLL :hover filter: unset）', (tester) async {

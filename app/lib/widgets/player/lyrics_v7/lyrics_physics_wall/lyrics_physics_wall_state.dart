@@ -65,6 +65,15 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   Timer? _userReset;
   bool _dragging = false;
 
+  /// 高速换行降级：整墙共用一个滚动偏移平滑上移（不再逐行级联）。
+  bool _glide = false;
+
+  /// 已满足退出条件、等共享弹簧收敛后再交回逐行弹簧。
+  bool _glideExitPending = false;
+
+  /// 刚性滚动共用的偏移弹簧（只有一条，所有行按同一偏移平移）。
+  final Spring1D _glideSpring = Spring1D();
+
   /// 新歌 / 首次布局时让整墙从下方飞入（对齐 AMLL RebuildView 的
   /// `resetPosition`：行初始位置放在视口下方，再由弹簧归位）。
   bool _flyIn = true;
@@ -82,6 +91,104 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     final g = widget.groups;
     if (index <= 0 || index >= g.length) return null;
     return g[index].original.timeMs - g[index - 1].original.timeMs;
+  }
+
+  /// 跳过背景人声行后的相邻行间隔（毫秒；同刻行返回 null）。
+  ///
+  /// [forward] 为真取「本行 → 下一条非背景行」，否则取「上一条非背景行 → 本行」。
+  /// 背景人声行与主行同刻，直接按相邻下标算会得到 0ms 的假「高速」。
+  int? _lineGapMs(int index, {required bool forward}) {
+    final g = widget.groups;
+    if (index < 0 || index >= g.length) return null;
+    final base = g[index].original.timeMs;
+    if (forward) {
+      for (var j = index + 1; j < g.length; j++) {
+        if (g[j].isBG) continue;
+        final gap = g[j].original.timeMs - base;
+        return gap > 0 ? gap : null;
+      }
+    } else {
+      for (var j = index - 1; j >= 0; j--) {
+        if (g[j].isBG) continue;
+        final gap = base - g[j].original.timeMs;
+        return gap > 0 ? gap : null;
+      }
+    }
+    return null;
+  }
+
+  /// 当前锚点是否处在高速换行段（带迟滞：≤[kFastLineChangeEnterMs] 进入，
+  /// 当前行与下一行都 >[kFastLineChangeExitMs] 才退出）。
+  ///
+  /// 同时看「下一行」间隔：进入密集段的第一行时，本行与上一行的间隔可能
+  /// 仍是前一段的长间隙，只看本行会晚一行才降级，第一下仍会抖。
+  bool _isFastLineChange(int anchor) {
+    final current = _lineGapMs(anchor, forward: false);
+    final next = _lineGapMs(anchor, forward: true);
+    if (!_glide) {
+      return (current != null && current <= kFastLineChangeEnterMs) ||
+          (next != null && next <= kFastLineChangeEnterMs);
+    }
+    final currentSlow = current == null || current > kFastLineChangeExitMs;
+    final nextSlow = next == null || next > kFastLineChangeExitMs;
+    return !(currentSlow && nextSlow);
+  }
+
+  /// 刚性滚动模式下，锚点行对齐到 [LyricsPhysicsWall] 视口比例所需的
+  /// **共享偏移**：`y_i = center_i + offset`。
+  double _glideTargetOffset(int anchor) {
+    final centers = _c.centers;
+    if (centers.isEmpty) return 0;
+    final h = _c.h > 0 ? _c.h : 400.0;
+    return h * _c.align - centers[anchor];
+  }
+
+  /// 把所有窗口内行按同一个偏移重新定位（刚性滚动）。
+  void _applyGlide(double offset) {
+    final centers = _c.centers;
+    if (centers.isEmpty) return;
+    final we = math.min(_winEnd, centers.length);
+    for (var i = _winStart; i < we; i++) {
+      _c.y[i] = centers[i] + offset + _user;
+    }
+  }
+
+  /// 进入刚性滚动（[initial] 为真时从锚点行的当前位姿起步，保证不跳变）。
+  void _enterGlide(int anchor, int oldAnchor, {required bool initial}) {
+    _glide = true;
+    _glideExitPending = false;
+    _c.staticIdle = false;
+    _glideSpring.params = _resolveSpringParams(
+      seeking: false,
+      interludeActive: false,
+    );
+    if (initial) {
+      final centers = _c.centers;
+      final old = (oldAnchor >= 0 && oldAnchor < centers.length)
+          ? oldAnchor
+          : anchor;
+      // 用旧锚点行当前所在位置反推偏移：进入瞬间整墙保持原样，
+      // 下一步才由共享弹簧把新锚点送到对齐位置。
+      final start = _c.y[old] - centers[old] - _user;
+      _glideSpring.hardSet(start);
+    }
+    _glideSpring.setTarget(_glideTargetOffset(anchor));
+    _applyGlide(_glideSpring.current);
+    _ensureTicker();
+  }
+
+  /// 交回逐行弹簧：各行从当前刚性位置停驻，下一次换行重新按普通路径走。
+  ///
+  /// 只在共享弹簧收敛后调用（退出阈值 > 进入阈值，通常有足够时间），
+  /// 因此不会产生速度突变；用户拖拽 / seek 等交互允许立即交回。
+  void _finishGlide() {
+    if (!_glide) return;
+    _glide = false;
+    _glideExitPending = false;
+    final n = math.min(_c.y.length, _y.length);
+    for (var i = 0; i < n; i++) {
+      _y[i].park(_c.y[i]);
+    }
   }
 
   SpringParams _resolveSpringParams({
@@ -721,9 +828,11 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     // 锚点位移超过一屏视作跨屏跳转：所有行同步位移（无级联），
     // 保证行距不塌陷、不产生“炸动画”或重叠伪影。仅触摸拖拽/性能模式瞬移。
     final shift = (_c.centers[anchor] - _c.centers[oldAnchor]).abs();
-    // 只保留「拖拽/性能模式」与「禁用动画」的硬切；高速换行**不再吸附**——对齐 AMLL：
-    // 换行一律走弹簧 retarget（保速），高速时由更硬的弹簧策略（resolvePosYSpringPolicy
-    // 按行间隔提高刚度）追赶，绝不硬切。
+    final h = _c.h > 0 ? _c.h : 400.0;
+    final multiStep = (anchor - oldAnchor).abs() != 1;
+    final bigShift = shift > h * kFastLineChangeMaxShiftRatio;
+    // 只保留「拖拽/性能模式」与「禁用动画」的硬切；高速换行改走**整墙刚性
+    // 平滑滚动**（见下）——不再把多条来不及安顿的逐行弹簧叠在一起。
     final snap = snapNow || !widget.animate;
     final noCascade = !stagger || (oldAnchor != anchor && shift > _c.h);
     _ever = true;
@@ -733,6 +842,53 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
     _updateWindow();
     _ensureMeasured(_winStart, _winEnd);
     _updateWindow();
+
+    // 高速换行降级：取消逐行级联，整墙共用一条偏移弹簧平滑上移。
+    // 只在「正常播放推进一行 + 位移不超过 0.4 屏」时启用；seek、跨屏跳转、
+    // 间奏、拖拽、性能模式仍走原来的慢速/瞬移路径。
+    final oldAligned =
+        (_c.y[oldAnchor] - _targetForUser(oldAnchor, oldAnchor)).abs() <=
+        kFastLineChangeSettlePx;
+    final fast =
+        !snap &&
+        !force &&
+        !seekSnap &&
+        interludeIdx < 0 &&
+        !multiStep &&
+        !bigShift &&
+        (_glide || oldAligned) &&
+        _isFastLineChange(anchor);
+    if (fast) {
+      _enterGlide(anchor, oldAnchor, initial: !_glide);
+      _repaint.notify();
+      return;
+    }
+    if (_glide) {
+      // 退出条件已满足：交互/跳转立即交回；正常段落等共享弹簧收敛后再交回，
+      // 避免在半途硬切速度。
+      final immediate =
+          snap ||
+          force ||
+          seekSnap ||
+          interludeIdx >= 0 ||
+          multiStep ||
+          bigShift;
+      if (immediate) {
+        _finishGlide();
+      } else {
+        _glideExitPending = true;
+        _glideSpring.params = _resolveSpringParams(
+          seeking: false,
+          interludeActive: false,
+        );
+        _glideSpring.setTarget(_glideTargetOffset(anchor));
+        _applyGlide(_glideSpring.current);
+        _ensureTicker();
+        _repaint.notify();
+        return;
+      }
+    }
+
     final ws = _winStart;
     final we = _winEnd;
     if (snap) {
@@ -813,6 +969,8 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
 
   /// 手动浏览：重置 5s 无操作后回弹到当前行（对齐上游）。
   void _beginUserScroll() {
+    // 用户接管滚动：立即交回逐行弹簧（刚性滚动只服务于自动跟随）。
+    _finishGlide();
     _dragging = true;
     // 立即切换到「浏览态」外观（全行清晰、不按距离压暗），不等下一帧 tick。
     _c.userScrolling = true;
@@ -866,12 +1024,25 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
 
     // 只推进视口窗口内的弹簧：窗口外的行已「停驻」在目标，无需每帧求解。
     var springsMoved = false;
-    final we = math.min(_winEnd, _y.length);
-    for (var i = _winStart; i < we; i++) {
-      final s = _y[i];
-      if (!s.arrived()) {
-        _c.y[i] = s.update(dt);
+    if (_glide) {
+      // 刚性滚动：所有行按同一条偏移弹簧平移，行距不会抖。
+      if (!_glideSpring.arrived()) {
+        _glideSpring.update(dt);
+        _applyGlide(_glideSpring.current);
         springsMoved = true;
+      }
+      if (_glideExitPending && _glideSpring.arrived()) {
+        _finishGlide();
+        _repaint.notify();
+      }
+    } else {
+      final we = math.min(_winEnd, _y.length);
+      for (var i = _winStart; i < we; i++) {
+        final s = _y[i];
+        if (!s.arrived()) {
+          _c.y[i] = s.update(dt);
+          springsMoved = true;
+        }
       }
     }
     if (springsMoved) moving = true;
@@ -1074,6 +1245,14 @@ class _AmllPhysicsWallState extends State<AmllPhysicsWall>
   /// 当前布局锚点索引。
   @visibleForTesting
   int debugAnchor() => _anchorIdx;
+
+  /// 是否处于「高速换行 → 整墙刚性平滑滚动」降级模式。
+  @visibleForTesting
+  bool debugGlide() => _glide;
+
+  /// 刚性滚动的共享偏移（测试用）。
+  @visibleForTesting
+  double debugGlideOffset() => _glideSpring.current;
 
   /// 当前用户浏览偏移（0 = 未浏览，回弹后归零）。
   @visibleForTesting
