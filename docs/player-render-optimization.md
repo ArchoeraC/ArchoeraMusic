@@ -1,9 +1,9 @@
 # 播放页渲染优化专项（Player Render Optimization）
 
-> 状态：**进行中（2026-09-11；2026-09-20 更新；2026-11-03 更新）**——P1（歌词缓存）、P3（频谱批处理）**已实现**；
-> **P0 测量基建已实现（2026-11-03）**：帧耗时分组统计（`frame_timing_stats.dart`）、
-> build/paint 探针（`build_paint_probe.dart`）与「零构建」headless 回归
-> （`test/frame_probe_test.dart`），见 §5.1/D1；**真机基线仍待**（本机 WSL 无 GPU）；
+> 状态：**进行中（2026-09-11；2026-09-20 更新；2026-11-03 更新；2026-11-18 更新）**——P1（歌词缓存）、P3（频谱批处理）**已实现**；
+> **P0 测量基建（2026-11-03）**：帧耗时分组统计（`frame_timing_stats.dart`）保留；
+> 早期 build/paint 计数探针与「零构建」headless 回归已于 2026-11-18 移除
+> （发布构建不再带统计探针），见 §5.1/D1；**真机基线仍待**（本机 WSL 无 GPU）；
 > **D2a 歌词墙稳态烘焙已实现（2026-11-03）**：整层档稳态每帧只贴图 + 激活行，
 > 见 §4.2c；
 > **歌词表现层已对齐 AMLL（§4.2b：时钟插值/羽化扫亮/景深/逐词动画/间奏识别/背景人声；间奏三点等待动画已移除）**；
@@ -246,8 +246,8 @@ iGPU 瓶颈 = 填充率 / 显存带宽 / overdraw。原则：
   - 当前行按离视口中心距离连续变化颜色 / 缩放 / 透明度；逐字歌词按片段
     时长连续扫亮（不是「唱到就整字换色」）。
   - 上下渐隐直接乘进行颜色（零离屏层），`wall` 档对 simple 也生效。
-  - 回归：`lyrics_view_test`（换行 / 居中 / 跳转）、`lyrics_view_rebuild_test`
-    （视口窗口 < 50 行、20 tick 0 次 TextPainter 排版）。
+  - 回归：`lyrics_view_test`（换行 / 居中 / 跳转）；重建计数探针已于
+    2026-11-18 随 build/paint 计数一并移除。
 - **歌词上下渐隐 / 全屏封面右缘渗入：保持 `ShaderMask`（dstIn）**。
   2026-11-03 曾尝试「`RepaintBoundary` + dstOut 叠加」免每帧离屏层——软件
   光栅下逐像素等价（差 ≤ 2/255）、测试通过，但**真机上 dstOut 未被边界
@@ -441,9 +441,9 @@ ARCHOERA_COVER_MASK=off       # 跳过全屏封面右缘渗入遮罩（仅诊断
 - `FragmentProgram` 加载 + `FragmentShader` 实例缓存（背景、歌词后处理共用）。
 - 统一性能开关与「不可见即停表」。
 - 统一 `RepaintBoundary`/图层隔离策略。
-- 帧测量基建（2026-11-03）：`frame_timing_stats.dart`（分位数分组）+
-  `build_paint_probe.dart`（build/paint 探针）；歌词墙已建立「0 build」基线
-  （`test/frame_probe_test.dart`），D2 Retained 化改造前后共用同一断言。
+- 帧测量基建（2026-11-03）：`frame_timing_stats.dart`（分位数分组）。
+  早期 build/paint 计数探针（`build_paint_probe.dart`）与「0 build」headless
+  回归于 2026-11-18 移除；留存 `FrameTimingStats` 作为帧耗时基线来源。
 - **共享模糊输入（D3，2026-11-03 已实现）**：`GlassBlur.backdropIsBakedBlur`
   ——调用方保证面板背后只有预烘焙的模糊背景（图片风格壳层背景是一次烘焙的
   模糊壁纸）且无动态内容穿过时，免掉 `BackdropFilter`（对已模糊图再做 σ16
@@ -465,7 +465,7 @@ ARCHOERA_COVER_MASK=off       # 跳过全屏封面右缘渗入遮罩（仅诊断
 
 | 阶段 | 内容 | 验收 |
 |---|---|---|
-| **P0 部分✅** | 测量基建（2026-11-03）：`FrameTimingStats`（build/raster/队列/vsync 分组，avg/p50/p95/p99/max，环形 600 帧）+ `BuildPaintProbe`（build ≠ paint 分开计数）+ `test/frame_probe_test.dart`（歌词墙连续滚动 60 帧 **0 build** 基线）；FPS 浮层展开态显示 UI/R/队列 p50/p95。**真机 profile 基线仍待**：全屏 2K/4K、120Hz | 产出基线与瓶颈归属报告 |
+| **P0 部分✅** | 测量基建（2026-11-03）：`FrameTimingStats`（build/raster/队列/vsync 分组，avg/p50/p95/p99/max，环形 600 帧）；FPS 浮层展开态显示 UI/R/队列 p50/p95。早期 `BuildPaintProbe` + `test/frame_probe_test.dart`（歌词墙连续滚动 60 帧 **0 build** 基线）已于 2026-11-18 移除。**真机 profile 基线仍待**：全屏 2K/4K、120Hz | 产出基线与瓶颈归属报告 |
 | **P1 ✅** | 歌词：Paragraph 缓存（可见窗口）+ 去 `saveLayer` | 全屏歌词区 UI 线程帧时间显著下降；歌词回归测试全绿；常驻内存符合 §3.4 |
 | **P2 ✅** | 背景：`FragmentProgram`（单 pass + 封面模糊预烘焙；CPU 仅失败兜底） | 着色器四后端（SKSL/GLES3/Vulkan/Metal）编译通过；CPU 回退可用；三端视觉/帧时间待真机 |
 | **P2b** | 半分辨率离屏降采样（仅当实测 iGPU 仍不足） | 帧时间进一步下降、视觉可接受 |
