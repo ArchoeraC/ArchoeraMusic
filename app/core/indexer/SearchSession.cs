@@ -107,7 +107,6 @@ internal sealed class PassCounts
     public int CrossLingual { get; set; }
     public int Fuzzy { get; set; }
     public int CjkFuzzy { get; set; }
-    public int DropTokens { get; set; }
 }
 
 /// <summary>查询结果（按趟次合并去重后的 top-k）。</summary>
@@ -322,28 +321,6 @@ internal sealed class SearchSession : IDisposable
             }
         }
 
-        // 丢词降级：多词查询主趟不足时，先试「少匹配一个词」，而不是直接换读音维度。
-        // 减词仍是字面匹配；逐轮尝试，命中达标即停。
-        if (result.Items.Count < request.MinExact && SearchQuery.AllowDropTokens)
-        {
-            var candidates = SearchQuery.DropTokenCandidates(tokens, request.Query);
-            if (candidates.Count > 0)
-            {
-                var (titleCounts, artistCounts) = ProbeFieldAffinity(request.Query, candidates.Count);
-                candidates = SearchQuery.OrderDropsByFieldAffinity(
-                    candidates, titleCounts, artistCounts);
-            }
-            foreach (var dropIndex in candidates)
-            {
-                var dropped = SearchQuery.CompileDropTokens(
-                    tokens, request.Query, request.Metadata, dropIndex);
-                if (dropped is null) continue;
-                result.Passes.DropTokens = 1;
-                Merge(dropped);
-                if (result.Items.Count >= request.MinExact) break;
-            }
-        }
-
         // 兜底趟只在主趟命中不足时付钱（渐进式，绝大多数查询止步于此）。
         if (result.Items.Count < request.MinExact)
         {
@@ -456,49 +433,6 @@ internal sealed class SearchSession : IDisposable
     ///
     /// 只裁「不可能命中」的方向，不裁整趟——纯英文库里输入「爱」仍能经英文释义候选命中英文标题。
     /// </summary>
-    /// <summary>
-    /// 探测每个查询词在 title / artist 列的命中数（精度审计 §23）。
-    ///
-    /// 用于判断「哪个词是歌名」：只在 title 命中、或 title 远多于 artist 的词是歌名，
-    /// 应当最后才丢。这样 <c>晴天 周杰伦</c>（反向写法）也能保留歌名。
-    ///
-    /// **只在丢词趟需要时调用**（主趟 0 命中的多词查询，罕见路径），
-    /// 且每个词只做 2 次 COUNT 查询。返回的两个数组与 <c>words</c> 的顺序一一对应。
-    /// </summary>
-    private (List<int> TitleCounts, List<int> ArtistCounts) ProbeFieldAffinity(
-        string query, int wordCount)
-    {
-        var title = new List<int>(wordCount);
-        var artist = new List<int>(wordCount);
-
-        var words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        for (var i = 0; i < wordCount; i++)
-        {
-            if (i >= words.Length)
-            {
-                title.Add(0);
-                artist.Add(0);
-                continue;
-            }
-
-            // 用该词自己的词元编译（与检索同源），再限定到单列。
-            var tokens = Analyzer.AnalyzeQuery(words[i]);
-            var lexical = SearchQuery.CompileMatch(tokens, metadata: false);
-            if (lexical is null)
-            {
-                title.Add(0);
-                artist.Add(0);
-                continue;
-            }
-
-            // 直接复用编译结果，只把列过滤换成单列。CompileMatch 在没有 metadata
-            // 时不套列过滤，所以这里包一层。
-            title.Add(_store.CountMatches($"{{title_tok}} : ({lexical})"));
-            artist.Add(_store.CountMatches($"{{artist_tok}} : ({lexical})"));
-        }
-        return (title, artist);
-    }
-
     private List<string> FilterCrossLingual(List<string> candidates)
     {
         var output = new List<string>(candidates.Count);
