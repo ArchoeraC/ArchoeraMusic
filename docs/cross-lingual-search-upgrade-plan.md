@@ -278,3 +278,8 @@ ToolGood.Words（NuGet，静态编入）提供，SQLite 由 `libe_sqlite3` 随�
 - 不动手：本文档评审通过前不改 `Analyzer`、`Japanese.cs`、`SearchQuery.cs` 等任何实现。
 - 改动 `AnalyzerVersion` 语义的项必须递增版本并说明（变更即触发全量重建）。
 - 任何新增查询成本必须走「兜底趟/画像门控」路径，不得进入主趟常驻开销。
+- **新增召回能力必须先过「不增加误召回」这一关**：本文各项（拼音宽松 / 读音 / 跨语言 / 模糊）
+  本身都是**放宽型**改动，叠加后会使「库内无匹配时返回一堆」更严重。误召回的现状、机制与
+  门控参数（短查询门控、匹配类型分层、高频 term 不纠错）见
+  [local-search-recall-precision-audit.md](local-search-recall-precision-audit.md)；
+  新项评审时必须同时给出「该项在负例集上的表现」，不能只报召回提升。

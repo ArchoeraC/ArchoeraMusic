@@ -56,7 +56,11 @@ enum LocalSearchScope {
 
 /// 单条本地搜索命中（`track_id` = `tracks.id`，与 UI 曲目 id 一致）。
 class LocalSearchHit {
-  const LocalSearchHit({required this.trackId, required this.score});
+  const LocalSearchHit({
+    required this.trackId,
+    required this.score,
+    this.pass = LocalSearchPass.lexical,
+  });
 
   /// 曲目 id（`search_docs.track_id` / `tracks.id`）。
   final String trackId;
@@ -64,8 +68,51 @@ class LocalSearchHit {
   /// BM25 相关度（FTS5 `bm25()` 原始值；越负越相关，升序即最佳在前）。
   final double score;
 
+  /// **命中原由**：本命中由哪一趟召回（诊断 / 排障用，见精度审计 §6.3）。
+  ///
+  /// 旧版索引器不返回该字段，此时按 [LocalSearchPass.lexical] 兜底。
+  final LocalSearchPass pass;
+
   @override
-  String toString() => 'LocalSearchHit($trackId, $score)';
+  String toString() => 'LocalSearchHit($trackId, $score, ${pass.name})';
+}
+
+/// 命中趟次（与 C# `SearchPassNames` / `PassCounts` 一一对应）。
+///
+/// 「字面命中」([lexical]) 与各类兜底命中（拼音 / 读音 / 跨语言 / 容错）分开，
+/// 排障时可直接回答「这首歌为什么被搜出来」。
+enum LocalSearchPass {
+  /// 主趟：词法 / 拼音 / 首字母（精确表达式）。
+  lexical,
+
+  /// 拼音宽松兜底。
+  pinyinLoose,
+
+  /// 日文 / 韩文读音兜底。
+  reading,
+
+  /// 跨语言释义兜底（Unihan）。
+  crossLingual,
+
+  /// 拉丁编辑距离容错。
+  fuzzy,
+
+  /// 中文删字 / 换位容错。
+  cjkFuzzy,
+
+  /// 丢词降级：多词查询命中不足时丢掉末词，仍按字面匹配（精度审计 §18）。
+  ///
+  /// 这是**最安全**的放宽方向（减词而非改读音），故排在 [pinyinLoose] 等兜底趟之前。
+  dropTokens;
+
+  /// FFI 返回的趟次名 → 枚举；未知 / 缺省一律按 [lexical]（前向兼容）。
+  static LocalSearchPass fromName(Object? name) {
+    if (name is! String) return LocalSearchPass.lexical;
+    for (final value in LocalSearchPass.values) {
+      if (value.name == name) return value;
+    }
+    return LocalSearchPass.lexical;
+  }
 }
 
 /// 索引器运行结果摘要（对齐 C# `IndexerResult` JSON：type=done）。

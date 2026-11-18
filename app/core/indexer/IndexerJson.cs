@@ -172,6 +172,8 @@ internal static class IndexerJson
             w.WriteStartObject();
             w.WriteString("trackId", hit.TrackId);
             w.WriteNumber("score", hit.Score);
+            // 命中原由归因（精度审计 §6.3）：Dart 侧据此区分「字面命中」与「兜底命中」。
+            w.WriteString("pass", hit.Pass);
             w.WriteEndObject();
         }
         w.WriteEndArray();
@@ -183,6 +185,7 @@ internal static class IndexerJson
         w.WriteNumber("crossLingual", result.Passes.CrossLingual);
         w.WriteNumber("fuzzy", result.Passes.Fuzzy);
         w.WriteNumber("cjkFuzzy", result.Passes.CjkFuzzy);
+        w.WriteNumber("dropTokens", result.Passes.DropTokens);
         w.WriteEndObject();
         w.WriteEndObject();
     });
