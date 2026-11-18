@@ -178,6 +178,7 @@ internal static class IndexerJson
         w.WritePropertyName("passes");
         w.WriteStartObject();
         w.WriteNumber("pinyinLoose", result.Passes.PinyinLoose);
+        w.WriteNumber("dropTokens", result.Passes.DropTokens);
         w.WriteNumber("reading", result.Passes.Reading);
         w.WriteNumber("crossLingual", result.Passes.CrossLingual);
         w.WriteNumber("fuzzy", result.Passes.Fuzzy);

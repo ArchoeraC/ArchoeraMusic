@@ -59,6 +59,10 @@ class SearchIndex {
   @visibleForTesting
   int pinyinLooseQueries = 0;
 
+  /// 本连接已执行的**丢词降级**查询次数（诊断 / 测试接缝）。
+  @visibleForTesting
+  int dropTokenQueries = 0;
+
   /// 本连接已执行的**日文读音兜底**查询次数（诊断 / 测试接缝）。
   @visibleForTesting
   int readingQueries = 0;
@@ -69,6 +73,7 @@ class SearchIndex {
   /// 需在查询前后各取一次并相减（见 `SearchService.search`）。
   PassCounts get passCounts => PassCounts(
     pinyinLoose: pinyinLooseQueries,
+    dropTokens: dropTokenQueries,
     reading: readingQueries,
     crossLingual: crossLingualQueries,
     fuzzy: fuzzyQueries,
@@ -141,6 +146,7 @@ class SearchIndex {
     final passes = root['passes'];
     if (passes is Map<String, dynamic>) {
       pinyinLooseQueries += _intOf(passes['pinyinLoose']);
+      dropTokenQueries += _intOf(passes['dropTokens']);
       readingQueries += _intOf(passes['reading']);
       crossLingualQueries += _intOf(passes['crossLingual']);
       fuzzyQueries += _intOf(passes['fuzzy']);

@@ -65,6 +65,27 @@ public sealed class QueryTokens
     /// 索引侧不使用此列（T1 不重建索引）。
     /// </summary>
     public List<string> CrossLingual { get; } = new();
+
+    /// <summary>查询是否含 CJK 段（汉字；假名 / 谚文不计）。</summary>
+    public bool HasCjk { get; internal set; }
+
+    /// <summary>
+    /// CJK 段每个字都成功产出拼音音节。含无读音扩展汉字时为 <c>false</c>，
+    /// 此时拼音 / 首字母支不可信（缺字会把短语退化成高频单音节），编译器应跳过它们。
+    /// </summary>
+    public bool PinyinComplete { get; internal set; } = true;
+
+    /// <summary>
+    /// 查询是否含不属于 CJK / 假名 / 谚文索引脚本的字母或数字（如拉丁字母、阿拉伯数字）。
+    /// 中文容错趟只能覆盖索引脚本，混入其它字符时删字会改变原查询，故跳过该趟。
+    /// </summary>
+    public bool HasNonIndexedLetterOrDigit { get; internal set; }
+
+    /// <summary>查询中非空白可见字符数（按码点计；单字判定用）。</summary>
+    public int VisibleCharCount { get; internal set; }
+
+    /// <summary>查询中 CJK 汉字数（按码点计；读音支 / 跨语言单字门控用）。</summary>
+    public int CjkCharCount { get; internal set; }
 }
 
 /// <summary>
@@ -110,8 +131,13 @@ public static class Analyzer
     /// （Unicode 16.0.0）改为纯 .NET <c>string.Normalize(FormKC)</c>（ICU / Unicode 17.0），
     /// 唯一内容差异是新增 <c>U+A7F1 → S</c>（Unicode 17 新增字符）。表内容变了，
     /// 按「表变即重建」的既定规则递增版本，避免新旧表混用产生难以复现的词元差异。
+    /// v13：**CJK / 假名 / 谚文段只保留首尾 unigram**（中间字由 bigram 覆盖）——单字在
+    /// 真实曲库里的文档频率极高，「歌词含某个字」几乎不构成检索意图，却是单字查询扫全库
+    /// 的结构性根源。去掉中间字后，单字查询改走前缀 <c>字*</c>（命中以该字开头的 bigram）。
+    /// 末尾字必须保留：它只作为某个 bigram 的第二个字符存在，不留 unigram 将彻底查不到。
+    /// 索引内容变化，必须全量重建。
     /// </summary>
-    public const int AnalyzerVersion = 12;
+    public const int AnalyzerVersion = 13;
 
     /// <summary>查询侧跨语言候选（<see cref="QueryTokens.CrossLingual"/>）合并去重后的总预算。</summary>
     public const int CrossLingualBudget = 32;
@@ -180,6 +206,11 @@ public static class Analyzer
         }
 
         query.PinyinInitials = parts.HasCjk ? string.Join(' ', parts.Initials) : null;
+        query.HasCjk = parts.HasCjk;
+        query.CjkCharCount = parts.CjkCharCount;
+        query.VisibleCharCount = parts.VisibleCharCount;
+        query.HasNonIndexedLetterOrDigit = parts.HasNonIndexedLetterOrDigit;
+        query.PinyinComplete = !parts.HasCjk || parts.PinyinSyllableCount >= parts.CjkCharCount;
         query.CrossLingual.AddRange(CollectCrossLingual(text));
         RemovePinyinCollisions(query);
         return query;
@@ -252,6 +283,10 @@ public static class Analyzer
         public readonly List<string> Pinyin = new();
         public readonly List<string> Initials = new();
         public bool HasCjk;
+        public int CjkCharCount;
+        public int PinyinSyllableCount;
+        public int VisibleCharCount;
+        public bool HasNonIndexedLetterOrDigit;
     }
 
     private static Parts AnalyzeCore(string text)
@@ -261,6 +296,7 @@ public static class Analyzer
 
         foreach (var segment in SplitSegments(Normalize(text)))
         {
+            parts.VisibleCharCount += CountRunes(segment.Text);
             if (segment.Kind == ScriptKind.Cjk)
             {
                 parts.HasCjk = true;
@@ -268,12 +304,13 @@ public static class Analyzer
             }
             else if (segment.Kind == ScriptKind.Substring)
             {
-                // 假名 / 谚文：只做子串索引（bigram + unigram），不进拼音 / 首字母列。
+                // 假名 / 谚文：只做子串索引（bigram + 首尾 unigram），不进拼音 / 首字母列。
                 AddSubstringSegment(segment.Text, parts);
             }
             else
             {
                 // 拉丁 / 数字段：整词原样进入三列。
+                parts.HasNonIndexedLetterOrDigit = true;
                 parts.Tokens.Add(segment.Text);
                 parts.Pinyin.Add(segment.Text);
                 parts.Initials.Add(segment.Text);
@@ -282,43 +319,70 @@ public static class Analyzer
         return parts;
     }
 
+    /// <summary>段内码点数（非 BMP 按一个字符计，避免代理对重复计数）。</summary>
+    private static int CountRunes(string text)
+    {
+        var count = 0;
+        foreach (var _ in text.EnumerateRunes()) count++;
+        return count;
+    }
+
     /// <summary>
-    /// CJK 段分词：先按序输出 bigram（相邻二字，位置连续便于短语），再输出 unigram
-    /// （保证单字查询命中）；拼音列按**整段**词级消歧取音节，首字母列合并为一个 token。
+    /// CJK 段分词：先按序输出 bigram（相邻二字，位置连续便于短语），再输出**首尾**
+    /// unigram（中间字由 bigram 覆盖，见 <see cref="AnalyzerVersion"/> v13）；拼音列按
+    /// **整段**词级消歧取音节，首字母列合并为一个 token。
+    ///
+    /// 首尾 unigram 的取舍：末字只作为某个 bigram 的第二个字符存在，不留 unigram 会
+    /// 彻底查不到；首字保证段首检索不受影响。中间字查询在编译器侧改写为前缀
+    /// <c>字*</c>（命中以该字开头的 bigram），命中集合不缩小。
     /// </summary>
     private static void AddCjkSegment(string segment, Parts parts)
     {
-        if (segment.Length >= 2)
+        var runes = segment.EnumerateRunes().ToArray();
+        parts.CjkCharCount += runes.Length;
+        if (runes.Length >= 2)
         {
-            for (int i = 0; i + 1 < segment.Length; i++)
-                parts.Tokens.Add(segment.Substring(i, 2));
+            for (int i = 0; i + 1 < runes.Length; i++)
+                parts.Tokens.Add(runes[i].ToString() + runes[i + 1].ToString());
+            parts.Tokens.Add(runes[0].ToString());
+            parts.Tokens.Add(runes[^1].ToString());
         }
-        foreach (var ch in segment)
-            parts.Tokens.Add(ch.ToString());
+        else if (runes.Length == 1)
+        {
+            parts.Tokens.Add(runes[0].ToString());
+        }
 
         // 整段一次性过 ToolGood：词级多音字消歧（重庆→chong qing）。
-        parts.Pinyin.AddRange(Pinyin.FromCjkRun(segment));
+        var pinyin = Pinyin.FromCjkRun(segment);
+        parts.Pinyin.AddRange(pinyin);
+        parts.PinyinSyllableCount += pinyin.Count;
         var initials = Pinyin.Initials(segment);
         if (initials.Length > 0) parts.Initials.Add(initials);
     }
 
     /// <summary>
-    /// 假名 / 谚文段分词：<c>bigram + unigram</c>（与 CJK 同构，故子串 / 前缀 / 词组查询都能命中），
-    /// **不产出拼音 / 首字母**。
+    /// 假名 / 谚文段分词：<c>bigram + 首尾 unigram</c>（与 CJK 同构，故子串 / 前缀 / 词组
+    /// 查询都能命中），**不产出拼音 / 首字母**。
     ///
     /// 旧实现把假名 / 谚文归入「拉丁」分支 → 整段一个 token，子串查询必然落空
     /// （真实库实测：`くらりん` ⊂ `きゅうくらりん`，命中 0）。N-gram 取 2 与汉字一致，
     /// 查询侧同一套 <c>bigram</c> 组合即可（见 Dart <c>_isCjkBigram</c> 的对应实现）。
+    /// 首尾 unigram 规则与 CJK 相同（v13）：单字查询走前缀，避免全库高频单字倒排。
     /// </summary>
     private static void AddSubstringSegment(string segment, Parts parts)
     {
-        if (segment.Length >= 2)
+        var runes = segment.EnumerateRunes().ToArray();
+        if (runes.Length >= 2)
         {
-            for (int i = 0; i + 1 < segment.Length; i++)
-                parts.Tokens.Add(segment.Substring(i, 2));
+            for (int i = 0; i + 1 < runes.Length; i++)
+                parts.Tokens.Add(runes[i].ToString() + runes[i + 1].ToString());
+            parts.Tokens.Add(runes[0].ToString());
+            parts.Tokens.Add(runes[^1].ToString());
         }
-        foreach (var ch in segment)
-            parts.Tokens.Add(ch.ToString());
+        else if (runes.Length == 1)
+        {
+            parts.Tokens.Add(runes[0].ToString());
+        }
     }
 
     /// <summary>

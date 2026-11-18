@@ -76,6 +76,7 @@ internal readonly record struct SearchHit(string TrackId, double Score);
 /// <summary>本次查询实际执行的兜底趟（0 / 1；用于诊断与回归计数）。</summary>
 internal sealed class PassCounts
 {
+    public int DropTokens { get; set; }
     public int PinyinLoose { get; set; }
     public int Reading { get; set; }
     public int CrossLingual { get; set; }
@@ -254,6 +255,28 @@ internal sealed class SearchSession : IDisposable
         // 主趟：精确表达式（词法 / 拼音 / 首字母）。
         Merge(SearchQuery.CompileMatch(tokens, request.Metadata));
 
+        // 丢词降级：多词查询主趟不足时，先试「少匹配一个词」，而不是直接换读音维度。
+        // 减词仍是字面匹配；逐轮尝试，命中达标即停。
+        if (result.Items.Count < request.MinExact && SearchQuery.AllowDropTokens)
+        {
+            var candidates = SearchQuery.DropTokenCandidates(tokens, request.Query);
+            if (candidates.Count > 0)
+            {
+                var (titleCounts, artistCounts) = ProbeFieldAffinity(request.Query, candidates.Count);
+                candidates = SearchQuery.OrderDropsByFieldAffinity(
+                    candidates, titleCounts, artistCounts);
+            }
+            foreach (var dropIndex in candidates)
+            {
+                var dropped = SearchQuery.CompileDropTokens(
+                    tokens, request.Query, request.Metadata, dropIndex);
+                if (dropped is null) continue;
+                result.Passes.DropTokens = 1;
+                Merge(dropped);
+                if (result.Items.Count >= request.MinExact) break;
+            }
+        }
+
         // 兜底趟只在主趟命中不足时付钱（渐进式，绝大多数查询止步于此）。
         if (result.Items.Count < request.MinExact)
         {
@@ -324,6 +347,39 @@ internal sealed class SearchSession : IDisposable
                 : joined);
         }
         return result;
+    }
+
+    /// <summary>
+    /// 探测每个查询词在 title / artist 列的命中数，用于判断「哪个词是歌名」。
+    /// 只在主趟不足的多词查询上执行，每词两次计数查询。
+    /// </summary>
+    private (List<int> Title, List<int> Artist) ProbeFieldAffinity(string query, int wordCount)
+    {
+        var title = new List<int>(wordCount);
+        var artist = new List<int>(wordCount);
+        var words = string.IsNullOrWhiteSpace(query)
+            ? Array.Empty<string>()
+            : query.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+
+        for (var i = 0; i < wordCount; i++)
+        {
+            if (i >= words.Length)
+            {
+                title.Add(0);
+                artist.Add(0);
+                continue;
+            }
+            var lexical = SearchQuery.CompileLexical(Analyzer.AnalyzeQuery(words[i]));
+            if (lexical is null)
+            {
+                title.Add(0);
+                artist.Add(0);
+                continue;
+            }
+            title.Add(_store.CountMatches($"{{title_tok}} : ({lexical})"));
+            artist.Add(_store.CountMatches($"{{artist_tok}} : ({lexical})"));
+        }
+        return (title, artist);
     }
 
     /// <summary>

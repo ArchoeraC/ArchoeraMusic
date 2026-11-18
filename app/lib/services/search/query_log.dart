@@ -59,6 +59,7 @@ class QueryLogEntry {
 class PassCounts {
   const PassCounts({
     this.pinyinLoose = 0,
+    this.dropTokens = 0,
     this.reading = 0,
     this.crossLingual = 0,
     this.fuzzy = 0,
@@ -66,6 +67,7 @@ class PassCounts {
   });
 
   final int pinyinLoose;
+  final int dropTokens;
   final int reading;
   final int crossLingual;
   final int fuzzy;
@@ -74,6 +76,7 @@ class PassCounts {
   /// 逐字段相减（`this - earlier`），用于把累加计数器还原成单次查询的趟次。
   PassCounts operator -(PassCounts earlier) => PassCounts(
     pinyinLoose: pinyinLoose - earlier.pinyinLoose,
+    dropTokens: dropTokens - earlier.dropTokens,
     reading: reading - earlier.reading,
     crossLingual: crossLingual - earlier.crossLingual,
     fuzzy: fuzzy - earlier.fuzzy,
@@ -84,6 +87,7 @@ class PassCounts {
   ///
   /// 只保留**非零**项：值为 0 表示该趟未执行（命中已足够而短路）。
   List<String> get labels => [
+    if (dropTokens > 0) 'dropTokens',
     if (pinyinLoose > 0) 'pinyinLoose',
     if (reading > 0) 'reading',
     if (crossLingual > 0) 'crossLingual',
