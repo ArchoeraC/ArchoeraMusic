@@ -10,6 +10,11 @@
 //     不生成 .1/.2/.3 等兄弟文件，磁盘占用有界（一个文件）。
 //   - 可完全关闭落盘（仅 stderr）。
 
+/* REG_RIP 等 ucontext 寄存器名需要 _GNU_SOURCE（glibc）；必须早于任何系统头。 */
+#if !defined(_WIN32) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE 1
+#endif
+
 #include "archoera_log.h"
 
 #include <errno.h>
@@ -34,6 +39,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#include <ucontext.h>
+#endif
 #define ERA_PATH_SEP '/'
 #define era_mkdir_one(p) mkdir((p), 0755)
 #define era_access(p) access((p), F_OK)
@@ -737,14 +746,102 @@ static const char *era_sig_name(int sig) {
     }
 }
 
+/* si_code 语义提示：SIGSEGV 的 1=未映射、2=已映射但无权限（含取指 NX）。
+   两者定位方向完全不同（UAF 释放/卸载 vs 跳到不可执行页），报告必须写清。 */
+static const char *era_si_hint(int sig, int code) {
+    if (sig == SIGSEGV) {
+        if (code == 1) return " (MAPERR: 地址未映射)";
+        if (code == 2) return " (ACCERR: 已映射但无访问/执行权限)";
+    }
+    if (sig == SIGBUS) {
+        if (code == 1) return " (BUS_ADRALN: 地址未对齐)";
+        if (code == 2) return " (BUS_ADRERR: 物理地址不存在)";
+    }
+    return "";
+}
+
+/* 从 ucontext 取故障指令地址与栈指针。
+ *
+ * 为什么必须取 ucontext：信号处理器不一定由内核直接进入。若进程内其它运行库
+ * （如 .NET NativeAOT 的 SIGSEGVHandler）先安装处理器、再链式调用本处理器，
+ * backtrace() 的栈顶只会是「链式调用者」，真正的崩溃点（pc）会丢失——本报告
+ * 曾因此只剩两层无害帧。ucontext 是唯一可靠的崩溃现场。 */
+static int era_fault_regs(void *uc, unsigned long long *pc,
+                          unsigned long long *sp) {
+    *pc = 0;
+    *sp = 0;
+    if (uc == NULL) return 0;
+#if defined(__linux__) && defined(__x86_64__)
+    {
+        ucontext_t *c = (ucontext_t *)uc;
+        *pc = (unsigned long long)c->uc_mcontext.gregs[REG_RIP];
+        *sp = (unsigned long long)c->uc_mcontext.gregs[REG_RSP];
+        return 1;
+    }
+#elif defined(__linux__) && defined(__aarch64__)
+    {
+        ucontext_t *c = (ucontext_t *)uc;
+        *pc = (unsigned long long)c->uc_mcontext.pc;
+        *sp = (unsigned long long)c->uc_mcontext.sp;
+        return 1;
+    }
+#elif defined(__linux__) && defined(__arm__)
+    {
+        ucontext_t *c = (ucontext_t *)uc;
+        *pc = (unsigned long long)c->uc_mcontext.arm_pc;
+        *sp = (unsigned long long)c->uc_mcontext.arm_sp;
+        return 1;
+    }
+#elif defined(__APPLE__)
+    {
+        ucontext_t *c = (ucontext_t *)uc;
+#if defined(__x86_64__)
+        *pc = (unsigned long long)c->uc_mcontext->__ss.__rip;
+        *sp = (unsigned long long)c->uc_mcontext->__ss.__rsp;
+#elif defined(__aarch64__)
+        *pc = (unsigned long long)c->uc_mcontext->__ss.__pc;
+        *sp = (unsigned long long)c->uc_mcontext->__ss.__sp;
+#endif
+        return 1;
+    }
+#else
+    return 0;
+#endif
+}
+
+/* 解析地址所属 module + offset（同 backtrace_symbols_fd 的 dladdr 口径）。
+ * dladdr 不在 POSIX 的 async-signal-safe 清单内，但本处理器已用
+ * backtrace_symbols_fd（同样依赖 dladdr）；崩溃时可接受的最后手段。
+ * 解析不到 = 该地址当前不属于任何已加载对象（典型：dlclose 后的代码页，
+ * 或已被回收/复用的堆区）——这本身就是重要线索，输出 <unmapped>。 */
+static void era_cw_addr(int fd, unsigned long long addr) {
+    void *p = (void *)(uintptr_t)addr;
+    Dl_info info;
+    era_cw_hex(fd, addr);
+    memset(&info, 0, sizeof(info));
+    if (dladdr(p, &info) != 0 && info.dli_fname != NULL) {
+        era_cw(fd, " [");
+        era_cw(fd, info.dli_fname);
+        era_cw(fd, "+");
+        era_cw_hex(fd, addr - (unsigned long long)(uintptr_t)info.dli_fbase);
+        if (info.dli_sname != NULL) {
+            era_cw(fd, " ");
+            era_cw(fd, info.dli_sname);
+        }
+        era_cw(fd, "]");
+    } else {
+        era_cw(fd, " <unmapped>");
+    }
+}
+
 static void era_crash_handler(int sig, siginfo_t *si, void *uc) {
     char path[ERA_LOG_PATH_MAX];
     char tname[64];
     int fd;
     int i;
     unsigned total, n, start;
+    unsigned long long pc, sp;
 
-    (void)uc;
     snprintf(path, sizeof(path), "%s%ccrash-%lu-%lu.txt", g_crash_dir,
              ERA_PATH_SEP, (unsigned long)getpid(), (unsigned long)time(NULL));
     fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -771,6 +868,7 @@ static void era_crash_handler(int sig, siginfo_t *si, void *uc) {
     if (si != NULL) {
         era_cw(fd, "si_code=");
         era_cw_dec(fd, (unsigned long long)(long long)si->si_code);
+        era_cw(fd, era_si_hint(sig, si->si_code));
         era_cw(fd, " fault_addr=");
         era_cw_hex(fd, (unsigned long long)(uintptr_t)si->si_addr);
         era_cw(fd, "\n");
@@ -779,11 +877,22 @@ static void era_crash_handler(int sig, siginfo_t *si, void *uc) {
     era_cw(fd, tname[0] != '\0' ? tname : "<unnamed>");
     era_cw(fd, "\n");
 
+    /* 崩溃现场（真实故障点；见 era_fault_regs 注释）。 */
+    if (era_fault_regs(uc, &pc, &sp)) {
+        era_cw(fd, "pc=");
+        era_cw_addr(fd, pc);
+        era_cw(fd, "\nsp=");
+        era_cw_hex(fd, sp);
+        era_cw(fd, "\n");
+    }
+
 #if defined(ERA_HAVE_BACKTRACE)
     era_cw(fd, "--- 调用栈（module + offset）---\n");
     {
         void *frames[64];
         int nf = backtrace(frames, 64);
+        /* 栈顶是本处理器，且可能被其它运行库的链式信号处理器挡住（见
+           era_fault_regs）：以 pc= 为准，本段仅作辅助。 */
         if (nf > 0) backtrace_symbols_fd(frames, nf, fd);
     }
 #else
