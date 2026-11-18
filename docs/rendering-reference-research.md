@@ -156,7 +156,7 @@ Flutter engine 在 pass 内缓存这三类状态。这解释了「Impeller GLES 
 
 | # | 机制 | 参考项目出处（行为描述） | 我们的落点 | 优先级 |
 |---|---|---|---|---|
-| D1 | **测量补全**：FrameTiming 百分位分组 + build/paint 计数 + 「N 帧 0 构建」headless 回归 | 渲染审计文档 §Report sources、§3.3 回归形态 | `player-render-optimization.md` **P0**（**已落地 2026-11-03**：`frame_timing_stats.dart` + `build_paint_probe.dart` + `test/frame_probe_test.dart`；真机基线仍待） | **已落地** |
+| D1 | **测量补全**：FrameTiming 百分位分组 + build/paint 计数 + 「N 帧 0 构建」headless 回归 | 渲染审计文档 §Report sources、§3.3 回归形态 | `player-render-optimization.md` **P0**（2026-11-03 落地 `frame_timing_stats.dart` + `build_paint_probe.dart` + `test/frame_probe_test.dart`；build/paint 计数探针已于 2026-11-18 移除，仅保留 FrameTimingStats；真机基线仍待） | **已落地** |
 | D2 | **Retained 化**：连续运动收敛到 render object（ValueListenable → 自研 RenderObject）；以及「显式栅格化缓存」（静态内容烘焙成 `ui.Image`） | 其 SDK 包 retained 三件套（§3.3）；图标显式栅格（§3.1） | **部分落地（2026-11-03，D2a）**：歌词墙整层档稳态逐行烘焙（`lyrics_physics_wall_bake.dart`，稳态每帧只贴图 + 激活行）；逐行 Retained 化与精灵图集保留为候选，待 P0 真机实测 | 高（稳态烘焙已落地） |
 | D3 | **玻璃共享模糊输入**：同屏多 `GlassBlur` 共享一次「下层合成 + 高斯」，面板只做形状/色调 | 玻璃提案 方案 1/2 | **已落地（2026-11-03）**：`GlassBlur.backdropIsBakedBlur`——停靠播放条复用壳层预烘焙模糊壁纸的那次高斯，免每帧整条离屏 pass（`player_bar_sections.dart`）；背后有动态内容的玻璃面（悬浮条/搜索下拉/队列面板/弹窗）保留真毛玻璃 | **已落地**（剩余收益待 P0 真机实测评估） |
 | D4 | **显式栅格化纪律**：需要缓存的矢量/静态装饰显式栅格，不依赖 `RepaintBoundary` | 其图标组件（§3.1） | 排查项目内「包 `RepaintBoundary` 当缓存」的假设；封面/封面占位已走预烘焙 | 中 |

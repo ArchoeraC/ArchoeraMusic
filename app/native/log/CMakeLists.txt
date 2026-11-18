@@ -60,6 +60,12 @@ else()
   # 严格 C11 下暴露 POSIX / XSI（fileno/localtime_r/mkdir/access/isatty，
   # 以及崩溃捕获用的 sigaltstack / SA_ONSTACK）。
   target_compile_definitions(archoera_log PRIVATE _POSIX_C_SOURCE=200809L _XOPEN_SOURCE=700)
+  if(APPLE)
+    # Darwin 的 pthread_getname_np 只在 __DARWIN_C_FULL 下声明；上面收紧到
+    # POSIX.1-2008 后会被隐藏（macOS CI 报 implicit declaration）。补开 Darwin
+    # 扩展即可暴露它，同时不影响已启用的 POSIX 接口。
+    target_compile_definitions(archoera_log PRIVATE _DARWIN_C_SOURCE=1)
+  endif()
 endif()
 
 if(UNIX AND NOT APPLE)

@@ -33,6 +33,8 @@ fi
 cp "$TRANSCODER_SRC" "$ROOT/build/"
 
 echo "[subsonic] 符号检查:"
-nm -D "$ROOT/build/libarchoera_subsonic.$EXT" | grep -E 'archoera_(subsonic|songloft)' || true
-nm -D "$ROOT/build/libarchoera_transcoder.$EXT" | grep -E 'archoera_transcode' || true
+# `nm -g`（外部符号）三端通用；`-D` 是 GNU 专有，macOS 的 nm 会报
+# "File format has no dynamic symbol table"（虽不影响构建，但会污染 CI 日志）。
+nm -g "$ROOT/build/libarchoera_subsonic.$EXT" | grep -E 'archoera_(subsonic|songloft)' || true
+nm -g "$ROOT/build/libarchoera_transcoder.$EXT" | grep -E 'archoera_transcode' || true
 echo "[subsonic] 构建完成"
