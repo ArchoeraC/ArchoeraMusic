@@ -12,7 +12,7 @@ namespace Archoera.Indexer;
 /// 用法：
 ///   archoera-indexer build [--full] [--index-lrc] [--no-pinyin] [--romaji-lyrics]
 ///                          [--db &lt;library.db&gt;] [--index &lt;search.db&gt;] [--batch &lt;n&gt;]
-///   archoera-indexer query &lt;text&gt; [--index &lt;search.db&gt;] [--limit &lt;n&gt;] [--raw]
+///   archoera-indexer query &lt;text&gt; [--index &lt;search.db&gt;] [--limit &lt;n&gt;] [--raw] [--session]
 ///   archoera-indexer analyze &lt;field&gt; &lt;text&gt;
 ///   archoera-indexer version
 ///
@@ -115,7 +115,8 @@ public static class Program
     {
         if (args.Length == 0 || args[0].StartsWith('-'))
         {
-            Console.Error.WriteLine("用法: indexer query <text> [--index <search.db>] [--limit <n>] [--raw]");
+            Console.Error.WriteLine(
+                "用法: indexer query <text> [--index <search.db>] [--limit <n>] [--raw] [--session]");
             return 1;
         }
 
@@ -123,12 +124,16 @@ public static class Program
         var raw = false;
         var limit = 20;
         string? indexPath = null;
+        // --session：走**生产查询路径**（SearchSession：六趟渐进 + 趟次归因 pass）。
+        // 默认（无该开关）只做单条 MATCH 的裸排名，是更早的人工判读工具。
+        var session = false;
 
         for (int i = 1; i < args.Length; i++)
         {
             switch (args[i])
             {
                 case "--raw": raw = true; break;
+                case "--session": session = true; break;
                 case "--index": if (i + 1 < args.Length) indexPath = args[++i]; break;
                 case "--limit": if (i + 1 < args.Length && int.TryParse(args[++i], out var n)) limit = n; break;
             }
@@ -139,6 +144,25 @@ public static class Program
         {
             Log.LogError("indexer", $"索引不存在: {indexPath}");
             return 1;
+        }
+
+        // 生产查询路径：逐趟渐进 + 每条命中带 pass 归因（精度审计 §6.3 / §7.3）。
+        // 排障「这首歌为什么被搜出来」应当用这个，而不是默认的裸 MATCH。
+        if (session)
+        {
+            if (raw)
+            {
+                Console.Error.WriteLine("--session 与 --raw 互斥（--session 自己编译表达式）。");
+                return 1;
+            }
+            var result = SearchSession.Run(indexPath, new SearchRequest
+            {
+                Query = text,
+                Limit = limit,
+                Fuzzy = true,
+            });
+            Console.WriteLine(IndexerJson.QueryResult(result));
+            return 0;
         }
 
         // 默认把输入当“人话”，经同一分析器归一为词元（AND 短语）；--raw 则原样作 FTS5 表达式。
@@ -229,8 +253,10 @@ public static class Program
                                      [--merge-every <n>]
                   构建 / 增量更新搜索索引（默认增量）。stdout 输出 JSON 进度与结果。
                   --merge-every 累计改写多少首后做一次 FTS5 全段合并（默认 30）。
-              archoera-indexer query <text> [--index <search.db>] [--limit <n>] [--raw]
+              archoera-indexer query <text> [--index <search.db>] [--limit <n>] [--raw] [--session]
                   调试查询（bm25 排序）。默认经分析器归一；--raw 传入原始 FTS5 MATCH 表达式。
+                  --session 走生产查询路径（六趟渐进），每条命中附 pass 归因——
+                  排障「这首歌为什么被搜出来」用这个。
               archoera-indexer analyze <field> <text>
                   分析文本，stdout 输出 {"tokens":"...","pinyin":"...","initials":"..."}
               archoera-indexer version

@@ -64,6 +64,7 @@ class PassCounts {
     this.crossLingual = 0,
     this.fuzzy = 0,
     this.cjkFuzzy = 0,
+    this.dropTokens = 0,
   });
 
   final int pinyinLoose;
@@ -72,6 +73,7 @@ class PassCounts {
   final int crossLingual;
   final int fuzzy;
   final int cjkFuzzy;
+  final int dropTokens;
 
   /// 逐字段相减（`this - earlier`），用于把累加计数器还原成单次查询的趟次。
   PassCounts operator -(PassCounts earlier) => PassCounts(
@@ -81,6 +83,7 @@ class PassCounts {
     crossLingual: crossLingual - earlier.crossLingual,
     fuzzy: fuzzy - earlier.fuzzy,
     cjkFuzzy: cjkFuzzy - earlier.cjkFuzzy,
+    dropTokens: dropTokens - earlier.dropTokens,
   );
 
   /// 本次实际执行的兜底趟名（顺序与查询层的渐进趟一致，便于对照文档）。
