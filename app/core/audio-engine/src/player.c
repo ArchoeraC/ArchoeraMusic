@@ -470,6 +470,9 @@ PlayerCtx *player_start_opts(const char *ogg_path,
             ma_engine_config fcfg = ma_engine_config_init();
             r = ma_engine_init(&fcfg, &p->engine);
         }
+        /* 设备已打开：固定运行时插件模块（ALSA→PipeWire 等）。必须在任何
+           ma_context_uninit 之前，避免关闭时 unmap 仍有线程在跑的插件代码。 */
+        audio_output_pin_runtime_modules();
         p->context_initialized = (r == MA_SUCCESS && ctx_inited) ? 1 : 0;
         if (r != MA_SUCCESS) {
             ERA_LOGE(NULL, "[player] ma_engine_init 失败: %d\n", (int)r);
@@ -1121,6 +1124,9 @@ PlayerCtx *player_stream_open(const char *sink_id,
             fcfg.pUserData         = p;
             r = ma_device_init(NULL, &fcfg, &p->stream_device);
         }
+        /* 设备已打开（含失败的部分打开）：固定运行时插件模块，再走任何
+           ma_context_uninit —— 否则关闭时可能 unmap 仍活着的 data-loop 线程。 */
+        audio_output_pin_runtime_modules();
         if (r != MA_SUCCESS) {
             ERA_LOGW(NULL, "[player] 流设备 init 失败: %d（无声路径，继续转码落盘）\n",
                     (int)r);
@@ -1497,6 +1503,8 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
         }
         r = ma_device_init(ctx_inited ? &p->context : NULL, &dcfg,
                            &p->stream_device);
+        /* 切 sink 也重开设备：同样先固定插件模块，再关闭旧 context。 */
+        audio_output_pin_runtime_modules();
         if (r != MA_SUCCESS) {
             ERA_LOGE(NULL, "[player] 流设备切 sink init 失败 %d\n", (int)r);
             p->stream_dev_inited = 0;
