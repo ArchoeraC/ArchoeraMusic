@@ -196,6 +196,28 @@ const double kViewportWindowMarginRatio = 0.6;
 /// 视口窗口余量下限（逻辑像素）。
 const double kViewportWindowMarginMinPx = 180.0;
 
+/// 高速换行降级：相邻行间隔 ≤ 该值（毫秒）时进入「整墙刚性平滑滚动」。
+///
+/// 密集歌词段每条行目标只隔 100~350ms，逐行弹簧还没安顿就要换下一条，
+/// 50ms 级联会把多段未完成的弹簧叠在一起（观感是「按规则追赶」）。
+/// 此时取消级联，整墙共用一个滚动偏移平滑上移，等价于普通滚动。
+const int kFastLineChangeEnterMs = 350;
+
+/// 退出「整墙刚性平滑滚动」的间隔阈值（毫秒）。
+///
+/// 比进入阈值宽（350 → 450）：歌词段的行间隔会抖动，没有迟滞会在阈值
+/// 附近来回切换，反而产生顿挫。
+const int kFastLineChangeExitMs = 450;
+
+/// 高速换行判定的位移上限（视口高度比例）：超过按跨屏跳转处理，不降级。
+const double kFastLineChangeMaxShiftRatio = 0.4;
+
+/// 进入刚性滚动前，旧锚点行必须已基本对齐的容差（逻辑像素）。
+///
+/// 新歌飞入 / 上一次换行还没安顿时，各行位置差会被「整墙共用一个偏移」
+/// 抹平；先等旧锚点归位再降级，避免进入瞬间的跳变。
+const double kFastLineChangeSettlePx = 2.0;
+
 /// 「滚动预滚」提前量（毫秒）——对齐 AMLL `applyScrollPreroll`。
 ///
 /// 与前一行无重叠时提前 [kScrollPrerollNoOverlapMs] 起滚（不早于上一组结束）；
