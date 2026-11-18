@@ -1419,7 +1419,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   `.c` 源码与头文件，见 §2.1）；
 - 接管判定：某格式 Zig 实现对照全绿（bit-exact/误差界）即开启对应格式开关（`-Dzig-<fmt>=true`）
   正式接管；全部 T0/T1 接管后可 `-Dzig-main=true` 升主（默认仍 FFmpeg，§8.3）。
-- **FLAC 对照验收（2026-08-16，已完成）**：`kernel/flac_dump.zig` 导出 PCM 与
+- **FLAC 对照验收（2026-08-16，已完成）**：`kernel/flac_dump.zig`（本地 `*_dump` 工具，已按约定从仓库移除） 导出 PCM 与
   `ffmpeg -i <x.flac> -f s16le/s32le` 参考输出逐字节比对，全样本 bit-exact：
 
   | 样本 | 规格 | 参考格式 | 结果 |
@@ -1517,7 +1517,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   非整字节帧边界 bit-exact（`wav_dump` 复跑 5 样本与 FFmpeg 逐字节一致）；G.722/
   G.726 均为全 Zig 自研实现，无头文件/外部依赖。
 
-- **ALAC/M4A 对照验收（2026-08-16，已完成）**：`kernel/alac_dump.zig` 导出 PCM（16bit 样本 →
+- **ALAC/M4A 对照验收（2026-08-16，已完成）**：`kernel/alac_dump.zig`（本地 `*_dump` 工具，已按约定从仓库移除） 导出 PCM（16bit 样本 →
   s16；24bit 样本 → s32 左移 8，对齐 FFmpeg）与 `ffmpeg -i <x.m4a> -f s16le/s32le` 参考
   输出逐字节比对，全样本 bit-exact：
 
@@ -1537,7 +1537,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   误启，AAC 轨（实测 ffmpeg 编码 AAC m4a 样本）经 `fmt/m4a` 判 UnsupportedFormat 回退
   FFmpeg 主后端。
 
-- **WavPack 对照验收（2026-08-17，已完成）**：`kernel/wv_dump.zig` 直连 `fmt/wv/lib.zig`
+- **WavPack 对照验收（2026-08-17，已完成）**：`kernel/wv_dump.zig`（本地 `*_dump` 工具，已按约定从仓库移除） 直连 `fmt/wv/lib.zig`
   导出 PCM，与 `ffmpeg -i <x.wv> -f s16le/s32le/f32le` 参考输出逐字节比对，全样本 bit-exact：
 
   | 样本 | 规格 | 参考格式 | 结果 |
@@ -1554,7 +1554,7 @@ void        zk_dsp_destroy(ZkDspChain *d);
   上线：`probe.formats.wv = true`（WavPack 接管）；DSD 调制在 `fmt/wv` open 判
   `error.UnsupportedFormat` 回退 FFmpeg 主后端（§9）。
 
-- **APE 对照验收（2026-08-17，已完成）**：`kernel/ape_dump.zig` 直连 `fmt/ape/lib.zig`
+- **APE 对照验收（2026-08-17，已完成）**：`kernel/ape_dump.zig`（本地 `*_dump` 工具，已按约定从仓库移除） 直连 `fmt/ape/lib.zig`
   导出 PCM（16bit 样本 → s16；24bit 样本 → s32 顶对齐），与
   `ffmpeg -i <x.ape> -f s16le/s32le` 参考输出逐字节比对，全样本 bit-exact：
 

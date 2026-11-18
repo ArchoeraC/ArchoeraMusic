@@ -131,13 +131,9 @@ extension _LyricsViewBuild on _LyricsViewState {
                 // widget 直接短路，位置 tick（~20Hz）不再重建/重绘这些行。
                 if (i != index) {
                   final cached = _lineCache[i];
-                  if (cached != null) {
-                    _cacheHits += 1;
-                    return cached;
-                  }
+                  if (cached != null) return cached;
                 }
                 final group = widget.groups[i];
-                _builtLines += 1;
                 final line = _Line(
                   group: group,
                   line: balanced[i],

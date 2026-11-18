@@ -409,7 +409,7 @@ URL 末尾附 `access_token=<当前 token>`（Songloft 支持 query 鉴权），
 ## 11. 测试
 
 - Go 侧：`httptest` 假 Songloft，覆盖登录/刷新/401 重放/分页/错误码/超时/
-  封面落盘；**默认不联网**，真实服务器用例以 `ARCHOERA_ONLINE_TEST=1` 显式启用；
+  封面落盘；**全部不联网**（真实服务器用例已移除）；
 - Dart 侧：`songloft_client_ffi_test.dart` 用真实 c-shared + 本机假服务端，
   覆盖登录、目录、播放 URL、歌词（含逐字/翻译/罗马音）、封面落盘；
   库未构建/缺符号时自动跳过；

@@ -163,7 +163,7 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
   wmapro/wmalossless 截断样本 mine=解码真值（ffprobe PTS 估算不可靠）。矩阵详见报告：
   wav/flac/mka/mp3/wv/ape/tta/tak/mpc/dsd=exact；adts/latm/amr/amrwb/dts/wma=exact；ac3/ec3=estimate；
   shn/mlp/truehd=unknown。
-- **工具**：`kernel/info_dump.zig`（全链路 Info 打印，审查用）。
+- **工具**：`kernel/info_dump.zig`（全链路 Info 打印，审查用；按 `*_dump` 约定仅本地保留，已从仓库移除）。
 - 审查期间并行代理现象记录：并行代理曾报 engine Stable 段错误为**并发重链瞬时态**，收敛后 Stable 正常。
 
 
@@ -293,8 +293,8 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
   `ARCHOERA_EVENT_POLL_FALLBACK=1` 回退；testHarness 不变。
 - 验证：ready ~6–18ms 即时；空闲 CPU 0（无周期唤醒）；ctest 5/5（新增 wait 测试：阻塞/超时/销毁唤醒）；
   60s 本地曲 done 在曲尾实时到达、1200+ 事件无丢失；3 轮 start/stop 稳定；dart analyze 0；gate/session 12/12。
-- 备注：online_playback_test（网络曲目）按旧“全速转码”假设等 engine.done 180s，流式语义下 done 需实时播到
-  曲尾才达——该测试为语义/环境遗留（本地曲目验证正确），建议后续按流式语义重写。
+- 备注：原 online_playback_test（网络曲目）已随真实网络用例移除（2026-11-18），
+  不再按旧“全速转码”假设等 engine.done；本地曲目验证仍正确。
 
 
 ## 15. 2026-09-05 其它轮询清理
@@ -314,7 +314,7 @@ delay(12bit)/padding(12bit)，起始跳 delay、末尾按 total−padding 截断
 - 新增 lib/services/qqmusic/qqmusic_api.dart（结果映射到 netease Track/Cover 层 + resolvePlayUrl + QR 登录/登出）。
 - UI：搜索页 QM 段（四分类+点播）、QM 扫码登录对话框（QM/微信）、顶栏账号菜单 QM 登录/登出、歌单/专辑/歌手弹窗、
   QM 歌词、playback 源解析/音质；l10n 9 语种。真实链路验证：搜索→免费曲访客直链 HTTP200 可播；VIP 按接口返回
-  “需会员/无版权”语义；QM 扫码出码。回归测试 qqmusic_direct_test 8 项。
+  “需会员/无版权”语义；QM 扫码出码。回归测试 qqmusic_direct_test 8 项（真实网络用例已于 2026-11-18 移除）。
 - 诚实边界：不绕过付费；扫码 check_sig/微信 405 多跳需真机验证；榜单未接 QM UI（首页榜单为 Kugou 专属）；
   红心收藏 QM 无官方 like API 故隐藏；接口风控/限流需随上游单点修。
 

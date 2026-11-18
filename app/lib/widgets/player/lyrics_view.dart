@@ -160,20 +160,6 @@ class _LyricsViewState extends State<LyricsView> {
   /// 不入缓存。缓存随当前行翻转 / 配置 / 主题变化整体作废。
   final _lineCache = <int, Widget>{};
 
-  // ---- 测试探针（仅统计用，不参与运行逻辑）----
-
-  /// 实际构造的 `_Line` 实例数（含当前行与首次进入视口的行）。
-  int _builtLines = 0;
-
-  /// 非当前行命中缓存实例的次数。
-  int _cacheHits = 0;
-
-  @visibleForTesting
-  int debugBuiltLines() => _builtLines;
-
-  @visibleForTesting
-  int debugLineCacheHits() => _cacheHits;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();

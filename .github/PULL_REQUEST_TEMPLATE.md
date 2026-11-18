@@ -32,7 +32,7 @@
 <!-- 跑了哪些测试 / 手动验证步骤 / 覆盖到的平台（Linux / Windows / macOS）；未覆盖的平台说明原因 -->
 
 - [ ] `cd app && dart analyze lib` 0 issue
-- [ ] `cd app && flutter test` 全绿（真实网络用例可用 `ARCHOERA_ONLINE_TEST=1` 单独跑）
+- [ ] `cd app && flutter test` 全绿（测试不得依赖外部网络，仅本地 mock / 假服务端）
 - [ ] 改动原生模块时，已跑对应构建 / 测试（注明模块与命令）：
 
 ## 截图 / 录屏
