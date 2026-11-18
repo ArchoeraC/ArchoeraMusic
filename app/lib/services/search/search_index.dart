@@ -67,10 +67,6 @@ class SearchIndex {
   @visibleForTesting
   int readingQueries = 0;
 
-  /// 本连接已执行的**丢词降级**查询次数（诊断 / 测试接缝）。
-  @visibleForTesting
-  int dropTokensQueries = 0;
-
   /// 当前**累加**的兜底趟计数器快照。
   ///
   /// 各字段是累加值（每查一次 `+=`），调用方若只想要「本次查询实际执行了哪些趟」，
@@ -82,7 +78,6 @@ class SearchIndex {
     crossLingual: crossLingualQueries,
     fuzzy: fuzzyQueries,
     cjkFuzzy: cjkFuzzyQueries,
-    dropTokens: dropTokensQueries,
   );
 
   /// 打开 `search.db`（只读）。文件缺失 / schema 版本不符返回 null。
@@ -156,7 +151,6 @@ class SearchIndex {
       crossLingualQueries += _intOf(passes['crossLingual']);
       fuzzyQueries += _intOf(passes['fuzzy']);
       cjkFuzzyQueries += _intOf(passes['cjkFuzzy']);
-      dropTokensQueries += _intOf(passes['dropTokens']);
     }
 
     final items = root['items'];
