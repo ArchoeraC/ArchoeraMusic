@@ -25,9 +25,9 @@ aiding	aiding	ai ding	*
 shanghai	shanghai	shang hai	*
 # 4) 带空格全拼：逐音节（与旧行为一致）
 wo ai ni	wo ai ni	wo ai ni	*
-# 5) 中文：拼音逐字主读音，首字母整串
-我爱你	我爱 爱你 我 爱 你	wo ai ni	wan
-# 6) 中英混合：CJK 段逐字词元 + 拉丁整词（woaini 在拼音列切分）
+# 5) 中文：bigram + 首尾 unigram（v13），拼音逐字主读音，首字母整串
+我爱你	我爱 爱你 我 你	wo ai ni	wan
+# 6) 中英混合：CJK 段 bigram + 首尾 unigram（v13）+ 拉丁整词（woaini 在拼音列切分）
 我爱woaini	我爱 我 爱 woaini	wo ai wo ai ni	wa woaini
 # 7) NFKC 折叠与索引侧同构：ﬁ→fi（查询侧词元/拼音一致）
 ﬁ	fi	fi	*
@@ -36,5 +36,5 @@ wo ai ni	wo ai ni	wo ai ni	*
 # 9) 词级多音字消歧（v4，ToolGood.Words）：CJK 查询按词取正确读音
 重庆	重庆 重 庆	chong qing	cq
 银行	银行 银 行	yin hang	yh
-# 5) 假名查询：词法即子串 bigram；无拼音 / 首字母
-きゅうくらりん	きゅ ゅう うく くら らり りん き ゅ う く ら り ん		
+# 5) 假名查询：词法即子串 bigram + 首尾 unigram；无拼音 / 首字母
+きゅうくらりん	きゅ ゅう うく くら らり りん き ん		
