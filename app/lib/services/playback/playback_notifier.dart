@@ -56,6 +56,13 @@ abstract class _PlaybackNotifierBase extends Notifier<PlaybackState> {
   /// engine.stop()（join 解码线程）之后 segstore_destroy，避免同句柄重复释放。
   SegStoreHandle _engineStore = 0;
 
+  /// 在途的原生会话收尾（`engine.stop()` = destroy + join）。切歌时
+  /// [load] 先发起一次（不阻塞 UI），随后 [_startSession] 再调 [_stopEngine]
+  /// **必须复用同一 future**：`_engine` 已被前一次置空，若第二次直接返回，
+  /// 旧会话的原生 destroy 就会与新会话的 create 并行（见
+  /// [AudioEngineProcess] 的 NativeSessionGate 注释与 2026-11-18 崩溃报告）。
+  Future<void>? _engineStopInFlight;
+
   /// M2.3b：在途整首下载（新 load 取代时 cancel，避免浪费拉流）。
   WholeTrackFetch? _storeFetch;
 
