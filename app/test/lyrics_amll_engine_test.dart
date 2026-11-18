@@ -1356,6 +1356,42 @@ void main() {
       expect(s.debugGlide(), isFalse, reason: '1000ms 间隔应保持逐行弹簧');
     });
 
+    testWidgets('300ms 间隔进入刚性滚动（阈值 350ms）', (tester) async {
+      final groups = <LyricGroup>[
+        for (var i = 0; i < 60; i++)
+          LyricGroup(
+            original: LyricLine(timeMs: i * 300, text: '第 $i 行'),
+            endMs: (i + 1) * 300,
+          ),
+      ];
+      await tester.pumpWidget(buildWall(groups, 20 * 300));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final anchor0 = s.debugAnchor() as int;
+      await tester.pumpWidget(buildWall(groups, (anchor0 + 1) * 300));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      expect(s.debugGlide(), isTrue, reason: '300ms ≤ 350ms 应降级为刚性滚动');
+    });
+
+    testWidgets('400ms 间隔不进入刚性滚动', (tester) async {
+      final groups = <LyricGroup>[
+        for (var i = 0; i < 60; i++)
+          LyricGroup(
+            original: LyricLine(timeMs: i * 400, text: '第 $i 行'),
+            endMs: (i + 1) * 400,
+          ),
+      ];
+      await tester.pumpWidget(buildWall(groups, 20 * 400));
+      await settle(tester);
+      dynamic s = stateOf(tester);
+      final anchor0 = s.debugAnchor() as int;
+      await tester.pumpWidget(buildWall(groups, (anchor0 + 1) * 400));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      expect(s.debugGlide(), isFalse, reason: '400ms > 350ms 应保持逐行弹簧');
+    });
+
     testWidgets('高速段结束后带回差退出刚性滚动', (tester) async {
       final mixed = <LyricGroup>[
         for (var i = 0; i < 40; i++)
