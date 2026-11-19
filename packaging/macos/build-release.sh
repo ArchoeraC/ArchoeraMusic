@@ -516,6 +516,17 @@ PY
   log "archoerashell --version"
   "$exe" archoerashell --version
 
+  # 代码签名自洽性：ad-hoc 签名过不了 Gatekeeper（下载后需用户放行），但
+  # **必须自洽**——一旦资源封印/嵌套 cdhash 不匹配，用户那边看到的正是
+  # 「已损坏，无法打开」（2026-11-19 反馈的排查起点，当时产物实际是好的）。
+  log "codesign --verify --deep --strict"
+  if ! codesign --verify --deep --strict --verbose=2 "$app"; then
+    die "代码签名校验失败：这种产物在用户机上会提示「已损坏」"
+  fi
+  if codesign -dv "$app" 2>&1 | grep -qi 'adhoc'; then
+    log "签名类型：ad-hoc（未公证；首次打开需用户放行，见包内《首次打开说明》）"
+  fi
+
   log "verify 完成（${arch}）"
 }
 
@@ -530,44 +541,60 @@ do_package() {
   base="$dist/$APP_NAME-$version-macos-$arch"
   rm -f "$base.dmg" "$base.zip" "$base.dmg.sig1" "$base.zip.sig1" "$base.info.txt"
 
-  log "zip（ditto，保留符号链接与可执行位）"
-  ditto -c -k --sequesterRsrc --keepParent "$app" "$base.zip"
+  work="$(mktemp -d "${TMPDIR:-/tmp}/archoera-pkg.XXXXXX")"
+  stage="$work/stage"
+  zipstage="$work/zipstage"
+  mkdir -p "$stage" "$zipstage"
+
+  # 说明文本：DMG 与 zip **都**放一份（仅 DMG 有说明时，zip 用户看不到）。
+  # 顺序按用户实际最常遇到的提示排：「已损坏」在前（macOS 14+ 对带隔离属性
+  # 的 ad-hoc 签名应用常直接报这个，不是文件损坏）。
+  cat > "$stage/首次打开说明.txt" <<'NOTE'
+ArchoeraMusic（macOS）首次打开说明
+==================================
+
+本构建未使用 Apple Developer ID 签名与公证（项目未购买付费证书），
+从网络下载后 macOS Gatekeeper 会拦截。按提示类型处理：
+
+一、提示「已损坏，无法打开」/「移到废纸篓」
+   这是下载带来的隔离属性（quarantine）导致的，**文件并没有损坏**。
+   打开「终端」，把应用拖进「应用程序」后执行：
+     xattr -dr com.apple.quarantine /Applications/ArchoeraMusic.app
+   还没移动的话，把上面的路径换成实际位置，例如：
+     xattr -dr com.apple.quarantine ~/Downloads/ArchoeraMusic.app
+   然后重新双击打开。
+
+二、提示「无法验证开发者」/「Apple 无法检查是否包含恶意软件」
+   1. 在访达里右键（或 Control+点击）ArchoeraMusic →「打开」，
+      在弹窗中再点一次「打开」；
+   2. 或打开「系统设置 → 隐私与安全性」，在页面底部点「仍要打开」。
+
+放行一次后，之后双击即可正常运行。
+
+架构：Apple 芯片选 arm64，Intel 选 x64。
+校验：发布资产带 .sig1 分离签名与公钥，校验方法见仓库 app/tool/verify_release.sh。
+
+项目主页：https://github.com/ArchoeraC/ArchoeraMusic
+NOTE
+
+  # zip：.app 与说明平铺在顶层（与 DMG 内同名），不带外层父目录。
+  log "zip（ditto，保留符号链接与可执行位；附首次打开说明）"
+  ditto "$app" "$zipstage/$APP_NAME.app"
+  cp "$stage/首次打开说明.txt" "$zipstage/"
+  ditto -c -k --sequesterRsrc "$zipstage" "$base.zip"
   log "zip: $base.zip ($(du -h "$base.zip" | cut -f1 | tr -d ' '))"
 
   printf 'bundle-id=com.archoera.archoeraMusic\nversion=%s\narch=%s\n' \
     "$version" "$arch" > "$base.info.txt"
 
   if [ "${SKIP_DMG:-0}" = "1" ]; then
+    rm -rf "$work"
     log "SKIP_DMG=1，跳过 DMG"
     return 0
   fi
 
-  work="$(mktemp -d "${TMPDIR:-/tmp}/archoera-dmg.XXXXXX")"
-  stage="$work/stage"
-  mkdir -p "$stage"
   ditto "$app" "$stage/$APP_NAME.app"
   ln -s /Applications "$stage/应用程序"
-  cat > "$stage/首次打开说明.txt" <<'NOTE'
-ArchoeraMusic（macOS）首次打开说明
-==================================
-
-本版本未使用 Apple Developer ID 签名与公证（项目未购买付费证书），
-macOS Gatekeeper 首次运行会提示「无法验证开发者」。
-
-正确打开方式（任选其一）：
-  1. 在「访达 → 应用程序」中右键（或按住 Control 点击）ArchoeraMusic，
-     选择「打开」，随后在弹窗中再次点「打开」；
-  2. 打开「系统设置 → 隐私与安全性」，在页面底部点「仍要打开」。
-
-首次打开成功一次后，之后双击即可正常运行。
-
-若提示「已损坏，无法打开」（多见于下载后带隔离属性），可执行：
-  xattr -dr com.apple.quarantine /Applications/ArchoeraMusic.app
-
-架构：请确认与你的 Mac 匹配（Apple 芯片选 arm64，Intel 选 x64）。
-
-项目主页：https://github.com/ArchoeraC/ArchoeraMusic
-NOTE
 
   log "hdiutil 生成 DMG"
   hdiutil create \
@@ -592,6 +619,7 @@ NOTE
   rm -rf "$work"
 
   log "dmg: $base.dmg ($(du -h "$base.dmg" | cut -f1 | tr -d ' '))"
+  log "提示：ad-hoc 签名未公证；用户首次打开需手动放行（包内《首次打开说明》已带步骤）"
 }
 
 case "$step" in

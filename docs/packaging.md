@@ -115,9 +115,16 @@ bash packaging/macos/build-release.sh all --arch arm64
 > 且上述守卫与 loadpath 归一化都在 CI 门禁里。
 
 **签名与公证**：当前**未做** Developer ID 签名与 Apple 公证（需付费证书）。
-因此首次打开会触发 Gatekeeper 拦截，用户须右键「打开」或在「系统设置 →
-隐私与安全性」点「仍要打开」——DMG 内已附说明。这属于已知限制，不视为打包
-错误；`docs/supply-chain.md` 里登记为待办。
+因此首次打开会触发 Gatekeeper 拦截。注意 macOS 14+ 对「带隔离属性的
+ad-hoc 签名应用」常直接报**「已损坏，无法打开」**——这不是文件损坏，而是
+隔离属性（quarantine）；用户执行
+`xattr -dr com.apple.quarantine /Applications/ArchoeraMusic.app` 即可。
+DMG 与 zip 内都已附《首次打开说明》，其中这条排在前面。
+
+`verify` 阶段会跑 `codesign --verify --deep --strict`：ad-hoc 签名过不了
+Gatekeeper 是预期行为，但**签名自身必须自洽**（资源封印 / 嵌套 cdhash 一致），
+否则用户看到的同样是「已损坏」——这一步用于把「真损坏」与「Gatekeeper 拦截」
+区分开。这属于已知限制，不视为打包错误；`docs/supply-chain.md` 里登记为待办。
 
 架构：arm64 与 x86_64 **分别构建、分别发包**，不做 universal（`native/` 下
 FFmpeg、NativeAOT、Rust/Go 模块均为单架构）。部署目标 macOS 14.0。
