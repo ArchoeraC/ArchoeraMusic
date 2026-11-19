@@ -1173,11 +1173,43 @@ class AppLocalizationsFr extends AppLocalizations {
   String get settingsNekoNotLoggedIn => 'Non connecté';
 
   @override
+  String get settingsNekoPasswordLogin => 'Connexion par mot de passe intégrée';
+
+  @override
+  String get settingsNekoPasswordLoginDesc =>
+      'Expérimental : connexion dans l app avec le compte et le mot de passe NekoAuth. Désactivé, seule la connexion QR est disponible';
+
+  @override
   String get nekoLoginTitle => 'Se connecter à NekoMusic';
 
   @override
   String get nekoLoginQrHint =>
       'Scannez avec l\'application NekoMusic pour vous connecter';
+
+  @override
+  String get nekoLoginTabPassword => 'Compte';
+
+  @override
+  String get nekoLoginTabQr => 'QR code';
+
+  @override
+  String get nekoLoginAccountHint => 'E-mail, nom utilisateur ou téléphone';
+
+  @override
+  String get nekoLoginPasswordHint => 'Mot de passe';
+
+  @override
+  String get nekoLoginSubmit => 'Se connecter';
+
+  @override
+  String get nekoLoginAccountRequired => 'Saisissez votre compte';
+
+  @override
+  String get nekoLoginPasswordRequired => 'Saisissez votre mot de passe';
+
+  @override
+  String get nekoLoginPasswordNote =>
+      'Le mot de passe sert uniquement à obtenir un jeton NekoAuth et n\'est jamais stocké sur cet appareil';
 
   @override
   String get nekoQrScanned => 'Scanné, confirmez sur votre téléphone';
@@ -3705,7 +3737,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get settingsPrivacy2Body =>
-      '· Informations que vous fournissez : identifiants des plateformes musicales tierces (cookies / jetons obtenus par connexion QR, compte et mot de passe, etc.), l\'adresse et le compte de serveurs multimédias auto-hébergés ou autorisés tels que Subsonic, et les répertoires musicaux locaux que vous sélectionnez. Les identifiants sont chiffrés et stockés dans le « coffre » local (v1 stockage sécurisé du système / v2 protection par phrase secrète / v3 liaison à l\'appareil) et ne sont jamais téléversés vers le développeur ou un serveur non lié à la plateforme.\n· Données locales d\'exécution et de cache : métadonnées de la bibliothèque (titres, artistes, albums, etc.), historique de lecture, favoris, enregistrements de téléchargements, caches de paroles et de pochettes, et préférences telles que la langue de l\'interface et le thème.\n· Journaux d\'exécution locaux : pour faciliter le dépannage, le logiciel génère des journaux d\'exécution sur votre appareil (limite de 4 Mio par fichier, tronqué sur place au-delà). Les journaux ne sont conservés que sur votre appareil et ne sont jamais téléversés automatiquement, sauf si vous les extrayez activement et les fournissez au développeur.\n\n';
+      '· Informations que vous fournissez : identifiants des plateformes musicales tierces (cookies / jetons obtenus par connexion QR, etc. ; le mot de passe sert uniquement à obtenir un jeton de connexion et n\'est jamais stocké sur cet appareil), l\'adresse et le compte de serveurs multimédias auto-hébergés ou autorisés tels que Subsonic, et les répertoires musicaux locaux que vous sélectionnez. Les identifiants sont chiffrés et stockés dans le « coffre » local (v1 stockage sécurisé du système / v2 protection par phrase secrète / v3 liaison à l\'appareil) et ne sont jamais téléversés vers le développeur ou un serveur non lié à la plateforme.\n· Données locales d\'exécution et de cache : métadonnées de la bibliothèque (titres, artistes, albums, etc.), historique de lecture, favoris, enregistrements de téléchargements, caches de paroles et de pochettes, et préférences telles que la langue de l\'interface et le thème.\n· Journaux d\'exécution locaux : pour faciliter le dépannage, le logiciel génère des journaux d\'exécution sur votre appareil (limite de 4 Mio par fichier, tronqué sur place au-delà). Les journaux ne sont conservés que sur votre appareil et ne sont jamais téléversés automatiquement, sauf si vous les extrayez activement et les fournissez au développeur.\n\n';
 
   @override
   String get settingsPrivacy3Title => '3. Finalités d\'utilisation\n';

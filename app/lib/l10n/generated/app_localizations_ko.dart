@@ -1142,10 +1142,42 @@ class AppLocalizationsKo extends AppLocalizations {
   String get settingsNekoNotLoggedIn => '로그인 안 됨';
 
   @override
+  String get settingsNekoPasswordLogin => '앱 내 비밀번호 로그인';
+
+  @override
+  String get settingsNekoPasswordLoginDesc =>
+      '실험적: 앱에서 NekoAuth 계정과 비밀번호를 직접 입력해 로그인합니다. 끄면 QR 로그인만 사용할 수 있습니다';
+
+  @override
   String get nekoLoginTitle => 'NekoMusic 로그인';
 
   @override
   String get nekoLoginQrHint => 'NekoMusic 모바일 앱으로 스캔하여 로그인';
+
+  @override
+  String get nekoLoginTabPassword => '계정';
+
+  @override
+  String get nekoLoginTabQr => 'QR 코드';
+
+  @override
+  String get nekoLoginAccountHint => '이메일 / 사용자 이름 / 휴대폰 번호';
+
+  @override
+  String get nekoLoginPasswordHint => '비밀번호';
+
+  @override
+  String get nekoLoginSubmit => '로그인';
+
+  @override
+  String get nekoLoginAccountRequired => '계정을 입력하세요';
+
+  @override
+  String get nekoLoginPasswordRequired => '비밀번호를 입력하세요';
+
+  @override
+  String get nekoLoginPasswordNote =>
+      '비밀번호는 NekoAuth 토큰 발급에만 사용되며 기기에 저장되지 않습니다';
 
   @override
   String get nekoQrScanned => '스캔됨, 휴대폰에서 확인하세요';
@@ -3518,7 +3550,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get settingsPrivacy2Body =>
-      '· 귀하가 직접 제공하는 정보: 제3자 음악 플랫폼의 계정 자격 증명(QR 로그인으로 획득한 Cookie / 토큰, 계정과 비밀번호 등), 자체 구축 또는 접근 권한이 있는 Subsonic 등 미디어 서버의 주소와 계정, 귀하가 선택한 로컬 음악 디렉터리 등. 자격 증명은 로컬 「자격 증명 금고」에 암호화되어 저장되며(v1 시스템 보안 저장소 / v2 암호 보호 / v3 기기 바인딩), 개발자나 플랫폼 이외의 서버로 업로드되지 않습니다.\n· 로컬 실행 및 캐시 데이터: 라이브러리 메타데이터(곡명, 아티스트, 앨범 등), 재생 기록, 즐겨찾기, 다운로드 기록, 가사와 커버 캐시, 인터페이스 언어와 테마 등 환경 설정.\n· 로컬 실행 로그: 장애 해결을 돕기 위해 소프트웨어는 로컬에 실행 로그를 생성합니다(단일 파일 상한 4 MiB, 초과 시 제자리에서 잘림). 로그는 로컬에만 보관되며, 귀하가 직접 추출하여 개발자에게 제공하지 않는 한 자동으로 업로드되지 않습니다.\n\n';
+      '· 귀하가 직접 제공하는 정보: 제3자 음악 플랫폼의 계정 자격 증명(QR 로그인으로 획득한 Cookie / 토큰 등. 계정 비밀번호는 로그인 토큰 발급에만 사용되며 이 기기에 저장되지 않습니다), 자체 구축 또는 접근 권한이 있는 Subsonic 등 미디어 서버의 주소와 계정, 귀하가 선택한 로컬 음악 디렉터리 등. 자격 증명은 로컬 「자격 증명 금고」에 암호화되어 저장되며(v1 시스템 보안 저장소 / v2 암호 보호 / v3 기기 바인딩), 개발자나 플랫폼 이외의 서버로 업로드되지 않습니다.\n· 로컬 실행 및 캐시 데이터: 라이브러리 메타데이터(곡명, 아티스트, 앨범 등), 재생 기록, 즐겨찾기, 다운로드 기록, 가사와 커버 캐시, 인터페이스 언어와 테마 등 환경 설정.\n· 로컬 실행 로그: 장애 해결을 돕기 위해 소프트웨어는 로컬에 실행 로그를 생성합니다(단일 파일 상한 4 MiB, 초과 시 제자리에서 잘림). 로그는 로컬에만 보관되며, 귀하가 직접 추출하여 개발자에게 제공하지 않는 한 자동으로 업로드되지 않습니다.\n\n';
 
   @override
   String get settingsPrivacy3Title => '3. 정보의 사용 목적\n';

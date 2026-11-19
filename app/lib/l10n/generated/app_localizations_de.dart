@@ -1176,10 +1176,42 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsNekoNotLoggedIn => 'Nicht angemeldet';
 
   @override
+  String get settingsNekoPasswordLogin => 'Passwort-Anmeldung in der App';
+
+  @override
+  String get settingsNekoPasswordLoginDesc =>
+      'Experimentell: direkt in der App mit NekoAuth-Konto und Passwort anmelden. Ausgeschaltet ist nur QR-Anmeldung verfügbar';
+
+  @override
   String get nekoLoginTitle => 'Bei NekoMusic anmelden';
 
   @override
   String get nekoLoginQrHint => 'Mit der NekoMusic-App scannen und anmelden';
+
+  @override
+  String get nekoLoginTabPassword => 'Konto';
+
+  @override
+  String get nekoLoginTabQr => 'QR-Code';
+
+  @override
+  String get nekoLoginAccountHint => 'E-Mail, Benutzername oder Telefon';
+
+  @override
+  String get nekoLoginPasswordHint => 'Passwort';
+
+  @override
+  String get nekoLoginSubmit => 'Anmelden';
+
+  @override
+  String get nekoLoginAccountRequired => 'Konto eingeben';
+
+  @override
+  String get nekoLoginPasswordRequired => 'Passwort eingeben';
+
+  @override
+  String get nekoLoginPasswordNote =>
+      'Das Passwort dient nur zum Abrufen eines NekoAuth-Tokens und wird nicht auf diesem Gerät gespeichert';
 
   @override
   String get nekoQrScanned => 'Gescannt, bitte am Handy bestätigen';
@@ -3673,7 +3705,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsPrivacy2Body =>
-      '· Von Ihnen bereitgestellte Informationen: Zugangsdaten für Musikplattformen Dritter (Cookies / Token aus der QR-Anmeldung, Konto und Passwort usw.), die Adresse und das Konto selbst gehosteter oder autorisierter Medienserver wie Subsonic sowie die von Ihnen gewählten lokalen Musikverzeichnisse. Zugangsdaten werden verschlüsselt im lokalen „Tresor\" gespeichert (v1 Systemsicherer Speicher / v2 Passphrasenschutz / v3 Gerätebindung) und niemals an den Entwickler oder einen Nicht-Plattform-Server hochgeladen.\n· Lokale Laufzeit- und Cache-Daten: Bibliotheksmetadaten (Titel, Künstler, Alben usw.), Wiedergabeverlauf, Favoriten, Downloadaufzeichnungen, Liedtext- und Cover-Caches sowie Einstellungen wie Oberflächensprache und Design.\n· Lokale Laufzeitprotokolle: Zur Fehlerbehebung erzeugt die Software Laufzeitprotokolle auf Ihrem Gerät (Dateigrößenlimit 4 MiB, bei Überschreitung wird die Datei an Ort und Stelle gekürzt). Protokolle verbleiben ausschließlich auf Ihrem Gerät und werden nur dann automatisch hochgeladen, wenn Sie sie aktiv entnehmen und dem Entwickler bereitstellen.\n\n';
+      '· Von Ihnen bereitgestellte Informationen: Zugangsdaten für Musikplattformen Dritter (Cookies / Token aus der QR-Anmeldung usw.; Kontopasswörter dienen nur zum Abrufen eines Anmelde-Tokens und werden nicht auf diesem Gerät gespeichert), die Adresse und das Konto selbst gehosteter oder autorisierter Medienserver wie Subsonic sowie die von Ihnen gewählten lokalen Musikverzeichnisse. Zugangsdaten werden verschlüsselt im lokalen „Tresor\" gespeichert (v1 Systemsicherer Speicher / v2 Passphrasenschutz / v3 Gerätebindung) und niemals an den Entwickler oder einen Nicht-Plattform-Server hochgeladen.\n· Lokale Laufzeit- und Cache-Daten: Bibliotheksmetadaten (Titel, Künstler, Alben usw.), Wiedergabeverlauf, Favoriten, Downloadaufzeichnungen, Liedtext- und Cover-Caches sowie Einstellungen wie Oberflächensprache und Design.\n· Lokale Laufzeitprotokolle: Zur Fehlerbehebung erzeugt die Software Laufzeitprotokolle auf Ihrem Gerät (Dateigrößenlimit 4 MiB, bei Überschreitung wird die Datei an Ort und Stelle gekürzt). Protokolle verbleiben ausschließlich auf Ihrem Gerät und werden nur dann automatisch hochgeladen, wenn Sie sie aktiv entnehmen und dem Entwickler bereitstellen.\n\n';
 
   @override
   String get settingsPrivacy3Title => '3. Zwecke der Verwendung\n';

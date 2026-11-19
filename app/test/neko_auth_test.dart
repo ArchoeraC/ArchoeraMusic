@@ -6,8 +6,9 @@
 // - `/api/user/qrlogin/claim` 用 deliveryKey 换取 token；
 // - 退出登录调用 `/api/user/logout` 并清理本地会话。
 //
-// OAuth（`/api/user/sso/*` 与 `nekomusic://` 深链）已于 2026-11-09 整体移除，
-// 对应测试一并删除（破坏性变更，见 CHANGELOG）。
+// 账号密码登录（`NekoAuthClient` 的 SSO 兑换链路）见
+// `neko_password_login_test.dart`；2026-11-09 移除的「浏览器 OAuth +
+// `nekomusic://` 深链」没有恢复，也未在此测试。
 
 import 'package:flutter_test/flutter_test.dart';
 
