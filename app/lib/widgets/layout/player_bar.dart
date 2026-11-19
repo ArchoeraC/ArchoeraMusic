@@ -34,6 +34,19 @@ part 'player_bar/player_bar_view.dart';
 part 'player_bar/player_bar_sections.dart';
 part 'player_bar/player_bar_widgets.dart';
 
+/// 停靠播放条顶部进度条高度。
+const double kPlayerBarProgressHeight = 22;
+
+/// 停靠播放条主体行高度（封面/控制/频谱）。
+const double kPlayerBarMainRowHeight = 60;
+
+/// 停靠播放条总高度。
+///
+/// 壳层内容层按此值做底部让位（`PlayerBarDockInset`），必须与上面两段
+/// 实际布局高度一致，否则会出现「让位区空着」或「内容被条压住」。
+const double kDockedPlayerBarHeight =
+    kPlayerBarProgressHeight + kPlayerBarMainRowHeight;
+
 /// 底部播放条（对齐原项目 PlayerBar.vue，应用壳常驻，§10.7）。
 ///
 /// 布局：顶部进度条（拖动 seek，后端重启引擎）+
