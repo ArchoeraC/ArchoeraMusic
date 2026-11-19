@@ -16,7 +16,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 import 'package:archoera_music/l10n/generated/app_localizations.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
-import 'package:archoera_music/stores/prefs_appearance.dart';
 import 'package:archoera_music/widgets/layout/nav_header.dart';
 import 'package:archoera_music/widgets/layout/window_controls.dart';
 import 'package:archoera_music/widgets/player/s_controls.dart';
