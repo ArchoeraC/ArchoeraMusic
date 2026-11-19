@@ -118,6 +118,8 @@ permissions:
 # 发布通道（应用内 `ReleaseChannel`，0–3）：
 #   push tag v* → 0 Release；schedule（夜间）→ 3 Nightly；手动派发 → 1 Beta。
 #   本地构建不设置 → 默认 2 Dev。
+# 构建时间（设置页「版本」右侧展示）：手动派发与夜间构建注入 UTC 时间
+#   （preflight 生成一次，全平台共用）；tag 发版与本地构建不注入 → 不展示。
 env:
   ARCHOERA_CHANNEL: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && '0' || (github.event_name == 'schedule' && '3' || '1') }}
 
@@ -148,12 +150,27 @@ jobs:
       linux_nix: ${{ steps.sel.outputs.linux_nix }}
       build_matrix: ${{ steps.sel.outputs.build_matrix }}
       all_selected: ${{ steps.sel.outputs.all_selected }}
+      # 构建时间：仅手动派发（含手动 Nightly）与定时 Nightly 注入；tag 发版为空。
+      build_time: ${{ steps.buildtime.outputs.build_time }}
     steps:
       # 夜间构建去重：当前提交与 `nightly` 标签相同 → 直接跳过（不构建、不发布）。
       # 手动派发不跳过（可强制重建同一提交）。
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 1
+      # 构建时间（UTC ISO8601，应用内转本地时区展示）：只给手动派发与夜间
+      # 构建注入，tag 发版与本地构建不注入（设置页不显示该行）。
+      - id: buildtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+            echo "构建时间：$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          else
+            echo "build_time=" >> "$GITHUB_OUTPUT"
+            echo "构建时间：不注入（$GITHUB_EVENT_NAME）"
+          fi
       - id: nc
         shell: bash
         env:
@@ -308,6 +325,8 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.preflight.outputs.build_matrix) }}
     runs-on: ${{ matrix.runner }}
+    env:
+      ARCHOERA_BUILD_TIME: ${{ needs.preflight.outputs.build_time }}
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -631,7 +650,10 @@ jobs:
         # Release 默认 universal，会和 native/ 的单架构 FFI 库错配。
         env:
           FLUTTER_XCODE_ARCHS: ${{ matrix.arch }}
-        run: flutter build macos --release --dart-define=ARCHOERA_CHANNEL="${ARCHOERA_CHANNEL:-2}"
+        run: |
+          flutter build macos --release \
+            --dart-define=ARCHOERA_CHANNEL="${ARCHOERA_CHANNEL:-2}" \
+            --dart-define=ARCHOERA_BUILD_TIME="${ARCHOERA_BUILD_TIME:-}"
 
       - name: Build Flutter Windows
         if: matrix.os == 'windows'
@@ -641,7 +663,10 @@ jobs:
         env:
           CPPWINRT_INCLUDE: C:\vcpkg\installed\x64-windows-release\include
         shell: pwsh
-        run: flutter build windows --release --dart-define=ARCHOERA_CHANNEL=$env:ARCHOERA_CHANNEL
+        run: |
+          flutter build windows --release `
+            --dart-define=ARCHOERA_CHANNEL=$env:ARCHOERA_CHANNEL `
+            --dart-define=ARCHOERA_BUILD_TIME=$env:ARCHOERA_BUILD_TIME
 
       # ─────────── Windows：装配 + 校验 + 打包（单脚本）───────────
       # 逻辑全部在 packaging/windows/build-release.ps1（**Windows 专用**）：
@@ -716,6 +741,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       BUILD_BASE: ubuntu-24.04
+      ARCHOERA_BUILD_TIME: ${{ needs.preflight.outputs.build_time }}
     steps:
       - name: Install system dependencies
         run: |
@@ -775,6 +801,7 @@ jobs:
     container: linuxdeepin/deepin:25
     env:
       BUILD_BASE: deepin-25
+      ARCHOERA_BUILD_TIME: ${{ needs.preflight.outputs.build_time }}
     steps:
       - name: Install system dependencies
         run: |
@@ -823,6 +850,7 @@ jobs:
     container: fedora:43
     env:
       BUILD_BASE: fedora
+      ARCHOERA_BUILD_TIME: ${{ needs.preflight.outputs.build_time }}
     steps:
       - name: Install system dependencies
         run: |
@@ -868,6 +896,7 @@ jobs:
     container: archlinux:latest
     env:
       BUILD_BASE: archlinux
+      ARCHOERA_BUILD_TIME: ${{ needs.preflight.outputs.build_time }}
     steps:
       - name: Install system dependencies
         run: |

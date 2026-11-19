@@ -116,17 +116,27 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
             else
               _envRowWidget(
                 l10n.settingsEnvVersion,
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                // 版本 · 通道徽标 · 构建时间（仅 CI 手动派发 / Nightly 注入）。
+                // 用 Wrap 而不是 Row：窄窗口下构建时间自动换行，不撑破设置页。
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Flexible(
-                      child: SelectableText(
-                        widget.version,
-                        style: const TextStyle(fontSize: 13, height: 1.5),
-                      ),
+                    SelectableText(
+                      widget.version,
+                      style: const TextStyle(fontSize: 13, height: 1.5),
                     ),
-                    const SizedBox(width: 8),
                     const ReleaseChannelBadge(),
+                    if (buildTimeLabel.isNotEmpty)
+                      SelectableText(
+                        buildTimeLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.5,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -375,9 +385,11 @@ class _AboutSectionState extends ConsumerState<AboutSection> {
   }
 
   String _envText(AppLocalizations l10n) {
+    final time = buildTimeLabel;
     final v = widget.version.isEmpty
         ? l10n.settingsVersionUnknown
-        : '${widget.version} · ${ReleaseChannel.current.label}';
+        : '${widget.version} · ${ReleaseChannel.current.label}'
+              '${time.isEmpty ? '' : ' · $time'}';
     return '${l10n.settingsEnvVersion}: $v\n'
         '${l10n.settingsEnvPlatform}: ${Platform.operatingSystem} '
         '${Platform.operatingSystemVersion}\n'
