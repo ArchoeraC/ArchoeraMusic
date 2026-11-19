@@ -234,8 +234,9 @@ void main() {
     expect(en2cjk.map((h) => h.trackId), contains('t1'));
     expect(index.crossLingualQueries, 1, reason: '精确 / 拼音皆空 → 跑一次跨语言兜底');
 
-    // ③ 中文 → 英文：`恋`（unihan: 恋 → love）在语料里不存在 → 兜底趟命中 t2。
-    final cjk2en = index.search('恋');
+    // ③ 中文 → 英文（两字）：`恋爱`（unihan: 恋 → love）在语料里不存在 → 兜底趟命中 t2。
+    //    单字查询已不做「汉字 → 英文释义」扩展（单字释义发散，v13 门控）。
+    final cjk2en = index.search('恋爱');
     expect(cjk2en.map((h) => h.trackId), contains('t2'));
     expect(index.crossLingualQueries, 2);
   }, skip: skip);

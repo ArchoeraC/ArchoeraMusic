@@ -51,9 +51,15 @@ public sealed class FtsStore : IIndexStoreAdmin
 
     /// <summary>
     /// bm25 权重，顺序与 <see cref="FtsColumns"/> 严格一致：
-    /// title 4.0 / artist 3.0 / album 2.0 / lyrics 1.5 / lyrics_tr 1.0 / lyrics_rom 0.5 /
-    /// pinyin_meta 2.0 / pinyin_lyrics 1.5 / filename 1.0 / initials_meta 2.0 / initials_lyrics 1.5
+    /// title 4.0 / artist 3.0 / album 2.0 / lyrics 0.6 / lyrics_tr 1.0 / lyrics_rom 0.5 /
+    /// pinyin_meta 2.0 / pinyin_lyrics 0.5 / reading_meta 2.0 / filename 1.0 /
+    /// initials_meta 2.0 / initials_lyrics 0.5
     /// （设计文档 §5.2 / 交付约定）。
+    ///
+    /// 歌词列（原文 / 拼音 / 首字母）取低权重：歌词的文档频率天然偏高，且长文本的单曲内
+    /// 重复会进一步放大词频，容易让「歌词里恰好出现」压过「歌名就是它」。取非零值是为了
+    /// 保留「搜歌词找歌」这一真实用法。拼音 / 首字母歌词列与原文歌词同档下调，
+    /// 否则同一行歌词会经两个派生列各命中一次，权重被动翻倍。
     ///
     /// <c>initials_tok</c> 是**独立列**（v3 起）：v2 把首字母串混在 <c>pinyin_tok</c> 里，
     /// 于是首字母查询（`"wan"*`）会命中拼音音节（完 / 万 / 晚…），命中集近乎整库
@@ -65,16 +71,16 @@ public sealed class FtsStore : IIndexStoreAdmin
         4.0,  // title
         3.0,  // artist
         2.0,  // album
-        1.5,  // lyrics（原文）
+        0.6,  // lyrics（原文）
         1.0,  // lyrics_tr（译文）
         0.5,  // lyrics_rom（音译）
         2.0,  // pinyin_meta（元数据拼音：与 title/artist 同档）
-        1.5,  // pinyin_lyrics（歌词拼音：与歌词原文同档）
+        0.5,  // pinyin_lyrics（歌词拼音：与歌词原文同档）
         2.0,  // reading_meta（日文读音：与拼音同档；**只索引元数据**——歌词罗马字检索是伪需求，
               //        且整段歌词读音 bigram 会把索引推高约 2×，见设计文档 §4.2）
         1.0,  // filename
         2.0,  // initials_meta
-        1.5,  // initials_lyrics
+        0.5,  // initials_lyrics
     };
 
     private SqliteConnection? _conn;
@@ -289,6 +295,33 @@ public sealed class FtsStore : IIndexStoreAdmin
         while (reader.Read())
             results.Add((reader.GetInt64(0), reader.GetDouble(1)));
         return results;
+    }
+
+    /// <summary>
+    /// 统计某个 MATCH 表达式命中的文档数（只走计数路径，不排序、不取行）。
+    ///
+    /// 表达式由调用方保证已转义；语法错误按 0 处理，让调用方退回默认策略，
+    /// 而不是让整次搜索失败。
+    /// </summary>
+    public int CountMatches(string matchExpr)
+    {
+        if (string.IsNullOrWhiteSpace(matchExpr)) return 0;
+
+        var conn = EnsureOpen();
+        CommitTx();
+        try
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM search_fts WHERE search_fts MATCH @q";
+            cmd.Parameters.AddWithValue("@q", matchExpr);
+            using var reader = cmd.ExecuteReader();
+            return reader.Read() ? reader.GetInt32(0) : 0;
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException)
+        {
+            // 语法错误 / 列过滤不适用于该表达式：当作「信息不足」，不打断搜索。
+            return 0;
+        }
     }
 
     /// <summary>批量把 <c>doc_id</c> 映射回 <c>track_id</c>（查询结果组装用）。</summary>

@@ -26,6 +26,7 @@ import '../widgets/library/library_empty_state.dart';
 import '../widgets/library/library_header.dart';
 import '../widgets/list/song_list.dart';
 import '../widgets/player/s_controls.dart';
+import '../widgets/common/cross_fade_switcher.dart';
 import '../widgets/common/toast.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -62,6 +63,18 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   void _toast(String msg) {
     if (!mounted) return;
     toast(msg);
+  }
+
+  /// 列表体状态身份（供 [CrossFadeSwitcher] 识别切换）：错误 / 空态 / 无命中 / 列表。
+  String _bodyPhase(LibraryState state) {
+    if (state.error != null) return 'error';
+    if (state.initialized &&
+        state.totalCount == 0 &&
+        state.searchQuery.isEmpty) {
+      return 'empty';
+    }
+    if (state.totalCount == 0 && state.searchQuery.isNotEmpty) return 'noMatch';
+    return 'list';
   }
 
   @override

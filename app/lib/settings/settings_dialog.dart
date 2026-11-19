@@ -23,6 +23,7 @@ import '../stores/app_prefs.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_version.dart';
 import '../widgets/common/anim.dart';
+import '../widgets/common/cross_fade_switcher.dart';
 import '../widgets/common/glass_surface.dart';
 import '../widgets/common/ink_clip.dart';
 import '../widgets/common/smooth_wheel_scroll_controller.dart';
@@ -106,8 +107,17 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog>
   /// 右侧内容区锚点（搜索跳转的高亮框用它做坐标参照系）。
   final GlobalKey _contentHostKey = GlobalKey();
 
-  /// 右侧内容滚动控制（切分类回顶 / 搜索跳转定位用）。
-  final ScrollController _contentScrollCtrl = SmoothWheelScrollController();
+  /// 内容区滚动控制：**按相位各持一份**。
+  ///
+  /// 分类/搜索切换做交叉淡化时新旧两层会同时挂载，共用一个 Controller 会
+  /// 出现两个 ScrollPosition 抢同一份状态；按相位分桶后各层互不干扰。
+  /// 相位是「分类 id / search」，因此回到同一分类时沿用其 Controller 的
+  /// 初始位置（滚动视图重新挂载即回到顶部，与原先「切分类回顶」一致）。
+  final Map<String, ScrollController> _contentScrolls = {};
+
+  /// 取（并按需创建）相位对应的内容区滚动控制。
+  ScrollController _contentScrollFor(String phase) =>
+      _contentScrolls.putIfAbsent(phase, SmoothWheelScrollController.new);
 
   /// 搜索结果滚动控制（滚轮 / 触控板与内容区同款弹簧跟随）。
   final ScrollController _searchScrollCtrl = SmoothWheelScrollController();
@@ -142,7 +152,9 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog>
   void dispose() {
     _flashCtrl.dispose();
     _searchCtrl.dispose();
-    _contentScrollCtrl.dispose();
+    for (final ctrl in _contentScrolls.values) {
+      ctrl.dispose();
+    }
     _searchScrollCtrl.dispose();
     _catScrollCtrl.dispose();
     _devHoldTimer?.cancel();
@@ -165,10 +177,10 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog>
   }
 
   void _setCategory(SettingsCategory category) {
-    // 切分类即取消上一轮高亮（它的坐标已无意义），并把内容区回到顶部：
-    // 否则新分类会继承上一个分类的滚动偏移。
+    // 切分类即取消上一轮高亮（它的坐标已无意义）。滚动位置无需手动归零：
+    // 每个分类各自持有内容区滚动控制（见 _contentScrollFor），新分类的
+    // 滚动视图是全新挂载，天然从顶部开始，且不会打断正在淡出的旧分类。
     _flashCtrl.stop();
-    if (_contentScrollCtrl.hasClients) _contentScrollCtrl.jumpTo(0);
     setState(() {
       _category = category;
       _flashRect = null;
@@ -222,7 +234,7 @@ class _SettingsDialogState extends ConsumerState<SettingsDialog>
       duration: animDuration(context, const Duration(milliseconds: 320)),
       curve: Curves.easeOutCubic,
     );
-    if (!mounted || !target.mounted) return;
+        if (!mounted || !target.mounted) return;
     _startFlash(target);
   }
 

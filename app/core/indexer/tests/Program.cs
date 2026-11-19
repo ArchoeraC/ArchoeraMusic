@@ -52,7 +52,7 @@ public static class Program
 
     private static void RunDirectAssertions()
     {
-        Assert("AnalyzerVersion == 12", Analyzer.AnalyzerVersion == 12,
+        Assert("AnalyzerVersion == 13", Analyzer.AnalyzerVersion == 13,
             Analyzer.AnalyzerVersion.ToString());
 
         // 假名 / 谚文：子串分词（bigram+unigram），**不进拼音 / 首字母列**。
@@ -136,10 +136,25 @@ public static class Program
         // 查询侧结构化结果。
         Assert("AnalyzeQuery initials", Analyzer.AnalyzeQuery("我爱你").PinyinInitials == "wan",
             Analyzer.AnalyzeQuery("我爱你").PinyinInitials);
-        Assert("AnalyzeQuery lexical 数", Analyzer.AnalyzeQuery("我爱你").Lexical.Count == 5,
+        Assert("AnalyzeQuery lexical 数", Analyzer.AnalyzeQuery("我爱你").Lexical.Count == 4,
             Analyzer.AnalyzeQuery("我爱你").Lexical.Count.ToString());
         Assert("AnalyzeQuery pinyin", string.Join(' ', Analyzer.AnalyzeQuery("我爱你").Pinyin) == "wo ai ni");
         Assert("AnalyzeQuery 无 CJK → initials null", Analyzer.AnalyzeQuery("hello").PinyinInitials is null);
+
+        // ---- analyzer v13：CJK / 假名 / 谚文段只留首尾 unigram ----
+        Assert("v13 CJK 中间字不留 unigram", Analyzer.Analyze("我爱你").Tokens == "我爱 爱你 我 你",
+            Analyzer.Analyze("我爱你").Tokens);
+        Assert("v13 CJK 首尾 unigram 保留", Analyzer.Analyze("我好爱你啊").Tokens == "我好 好爱 爱你 你啊 我 啊",
+            Analyzer.Analyze("我好爱你啊").Tokens);
+        Assert("v13 单字仍入索引", Analyzer.Analyze("爱").Tokens == "爱", Analyzer.Analyze("爱").Tokens);
+        Assert("v13 假名只留首尾 unigram", Analyzer.Analyze("きゅうくらりん").Tokens == "きゅ ゅう うく くら らり りん き ん",
+            Analyzer.Analyze("きゅうくらりん").Tokens);
+        Assert("v13 查询侧单字计数", Analyzer.AnalyzeQuery("爱").VisibleCharCount == 1
+            && Analyzer.AnalyzeQuery("爱").CjkCharCount == 1,
+            $"{Analyzer.AnalyzeQuery("爱").VisibleCharCount}/{Analyzer.AnalyzeQuery("爱").CjkCharCount}");
+        Assert("v13 查询侧多字计数", Analyzer.AnalyzeQuery("我爱你").VisibleCharCount == 3
+            && Analyzer.AnalyzeQuery("我爱你").CjkCharCount == 3,
+            $"{Analyzer.AnalyzeQuery("我爱你").VisibleCharCount}/{Analyzer.AnalyzeQuery("我爱你").CjkCharCount}");
 
         // P4 查询侧连写全拼切分（设计文档 §4.2）：woaini → wo ai ni
         Assert("AnalyzeQuery 连写 woaini", Pinyin(Analyzer.AnalyzeQuery("woaini")) == "wo ai ni",
