@@ -74,48 +74,54 @@ extension _HistoryPageView on _HistoryPageState {
           const SizedBox(height: 12),
           const Divider(height: 1),
           // ── 内容区 ───────────────────────────────────────────
+          // 加载 / 空态 / 列表 交叉淡化：清空历史、载入完成都不再整块瞬切。
           Expanded(
-            child: _loading
-                ? const Center(
-                    child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    ),
-                  )
-                : !hasHistory
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          EtaIcons.history,
-                          size: 48,
-                          color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          l10n.pageHistoryEmpty,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          l10n.pageHistoryEmptyHint,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
+            child: CrossFadeSwitcher(
+              switchKey: _loading ? 'loading' : (hasHistory ? 'list' : 'empty'),
+              child: _loading
+                  ? const Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                    )
+                  : !hasHistory
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            EtaIcons.history,
+                            size: 48,
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 10),
+                          Text(
+                            l10n.pageHistoryEmpty,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            l10n.pageHistoryEmptyHint,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : SongList(
+                      key: const PageStorageKey('page.history'),
+                      items: _tracks,
+                      playingId: playingId,
+                      isPlaying: isPlaying,
+                      onPlay: _playTrack,
+                      onContextMenu: _onRowMenu,
                     ),
-                  )
-                : SongList(
-                    key: const PageStorageKey('page.history'),
-                    items: _tracks,
-                    playingId: playingId,
-                    isPlaying: isPlaying,
-                    onPlay: _playTrack,
-                    onContextMenu: _onRowMenu,
-                  ),
+            ),
           ),
         ],
       ),

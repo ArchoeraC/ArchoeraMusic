@@ -222,7 +222,7 @@ static void macos_classify(const ma_context *ctx, audio_output *io)
 }
 
 static const audio_output_provider kMacosProvider = {
-    "macos", NULL, macos_begin, NULL, macos_classify, NULL
+    "macos", NULL, macos_begin, NULL, macos_classify, NULL, NULL
 };
 
 const audio_output_provider *audio_output_platform_provider(void)

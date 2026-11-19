@@ -266,7 +266,7 @@ static void windows_classify(const ma_context *ctx, audio_output *io)
 }
 
 static const audio_output_provider kWindowsProvider = {
-    "windows", NULL, windows_begin, NULL, windows_classify, NULL
+    "windows", NULL, windows_begin, NULL, windows_classify, NULL, NULL
 };
 
 const audio_output_provider *audio_output_platform_provider(void)

@@ -123,12 +123,22 @@ Dart 的 `FlutterError.onError` / `PlatformDispatcher.onError` 只覆盖 Dart �
 安装致命信号处理器（POSIX `sigaction` + 备用信号栈；Windows
 `SetUnhandledExceptionFilter`）。处理器：
 
-1. 把信号 / `si_code` / 故障地址、崩溃线程名、调用栈（`backtrace_symbols_fd`，
-   模块 + 偏移）、最近 64 条统一日志写入 `<dataDir>/logs/crash-<pid>-<epoch>.txt`；
+1. 把信号 / `si_code`（含 `MAPERR`/`ACCERR` 语义提示）/ 故障地址、崩溃线程名、
+   **故障指令地址 `pc=`（含模块 + 偏移，解析不到则标 `<unmapped>`）**、调用栈
+   （`backtrace_symbols_fd`，模块 + 偏移）、最近 64 条统一日志写入
+   `<dataDir>/logs/crash-<pid>-<epoch>.txt`；
 2. 恢复默认处理并重新抛出信号——**不吞崩溃**，core dump / 退出码语义不变。
 
-约束：处理器运行在崩溃线程上，只使用 async-signal-safe 调用（`open`/`write`/
-`close`/`raise`/`sigaction`），不取日志互斥量、不分配内存；日志环形缓冲的读取
+> `pc=` 取自 `ucontext`，是**唯一可信的崩溃现场**：进程内其它运行库（如 .NET
+> NativeAOT）可能先装自己的 `SIGSEGV` 处理器再链式调用本处理器，此时
+> `backtrace()` 的栈顶只会是「链式调用者」，看不出真正的崩溃点。栈段仅作辅助，
+> 先看 `pc=`。`pc=` 落在 `<unmapped>` 通常意味着跳进了已 `dlclose` 的代码页，
+> 而 `si_code=2 (ACCERR)` 则常见于跳进不可执行页（如被复用为数据映射）。
+
+约束：处理器运行在崩溃线程上，以 async-signal-safe 调用为主
+（`open`/`write`/`close`/`raise`/`sigaction`），不取日志互斥量、不分配内存；
+符号化用 `backtrace_symbols_fd` / `dladdr`（严格意义上非 async-signal-safe，
+但崩溃现场无替代方案，且不依赖日志锁）。日志环形缓冲的读取
 不加锁，最坏读到半行也不会死锁。崩溃报告是诊断材料，不参与正常轮转（每个崩溃
 一个文件，体积约几 KB）。
 

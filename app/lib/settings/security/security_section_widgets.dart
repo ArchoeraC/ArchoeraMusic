@@ -324,7 +324,7 @@ class _SchemeCard extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: busy ? null : () => onTap(value),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: animDuration(context, const Duration(milliseconds: 150)),
           curve: Curves.easeOut,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(

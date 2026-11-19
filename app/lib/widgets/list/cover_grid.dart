@@ -7,13 +7,13 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../services/netease/netease_api.dart';
 import '../../stores/app_prefs.dart';
-import '../../services/source/media_request_headers.dart';
 import '../../services/source/source_platform.dart';
 import '../../easter_egg/mouse_dodge.dart';
 import '../../l10n/l10n.dart';
 import '../common/anim.dart';
 import '../common/ink_clip.dart';
 import '../common/smooth_wheel_scroll_controller.dart';
+import 'cover_image.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 

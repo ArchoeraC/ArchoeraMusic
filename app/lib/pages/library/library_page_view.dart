@@ -41,87 +41,82 @@ extension _LibraryPageView on _LibraryPageState {
           const LibraryHeader(),
           const Divider(height: 1),
           // ── 曲目列表 / 空状态 ─────────────────────────────────
-          if (state.error != null)
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      EtaIcons.alertOutline,
-                      size: 40,
-                      color: scheme.error.withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      state.error!,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: scheme.onSurfaceVariant,
+          // 列表体四态（错误 / 未扫码空态 / 搜索无命中 / 列表）统一交叉淡化；
+          // 每次切换只构建目标态，未展示的分支不触发取页/监听。
+          Expanded(
+            child: CrossFadeSwitcher(
+              switchKey: _bodyPhase(state),
+              child: switch (_bodyPhase(state)) {
+                'error' => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        EtaIcons.alertOutline,
+                        size: 40,
+                        color: scheme.error.withValues(alpha: 0.6),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      Text(
+                        state.error!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            )
-          else if (state.initialized &&
-              state.totalCount == 0 &&
-              state.searchQuery.isEmpty)
-            Expanded(
-              child: LibraryEmptyState(
-                hasDirs: state.scanDirs.isNotEmpty,
-                scanning: state.scanning,
-                onAddFolder: () => _handleEmptyAddFolder(state),
-              ),
-            )
-          else if (state.totalCount == 0 && state.searchQuery.isNotEmpty)
-            Expanded(
-              child: Center(
-                child: Text(
-                  l10n.libraryNoMatch,
-                  style: const TextStyle(fontSize: 13),
+                'empty' => LibraryEmptyState(
+                  hasDirs: state.scanDirs.isNotEmpty,
+                  scanning: state.scanning,
+                  onAddFolder: () => _handleEmptyAddFolder(state),
                 ),
-              ),
-            )
-          else
-            Expanded(
-              child: SongList(
-                key: const PageStorageKey('page.library'),
-                // 窗口模式：items 传空，由 totalCount + itemAt 按全局 index
-                // 映射到有界页缓存；未驻留页渲染占位并触发异步取页。
-                items: const [],
-                totalCount: state.totalCount,
-                itemAt: (index) {
-                  final row = notifier.rowAt(index);
-                  return row == null ? null : trackFromRow(row);
-                },
-                onMissingIndex: notifier.ensureIndex,
-                playingIndexOverride: notifier.playingIndexOf(playingId),
-                playingId: playingId,
-                isPlaying: isPlaying,
-                showAlbum: true,
-                showDuration: true,
-                onPlay: _play,
-                onContextMenu: _onTrackMenu,
-                onBatchEditMetadata: _batchEditMetadata,
-                highlightOf: highlighter?.call,
-                // 歌词命中片段：仅搜索态（highlighter 非空）透传查表回调；关闭态 /
-                // 非搜索态传 null，行外观与现状逐像素一致（零成本）。
-                lyricSnippetOf: highlighter == null
-                    ? null
-                    : (t) => state.lyricSnippets[t.id],
-                onReachBottom: () => notifier.loadMore(),
-                hasMore: state.hasMore,
-                loadingMore: state.loadingMore,
-                // 「全选」= 全库（当前搜索条件），批量操作按全量执行；
-                // UI 仍只渲染分页窗口，全量仅在批量模式期间驻留。
-                loadAllItems: () async {
-                  final rows = await notifier.allTracks();
-                  return rows.map(trackFromRow).toList();
-                },
-              ),
+                'noMatch' => Center(
+                  child: Text(
+                    l10n.libraryNoMatch,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                _ => SongList(
+                  key: const PageStorageKey('page.library'),
+                  // 窗口模式：items 传空，由 totalCount + itemAt 按全局 index
+                  // 映射到有界页缓存；未驻留页渲染占位并触发异步取页。
+                  items: const [],
+                  totalCount: state.totalCount,
+                  itemAt: (index) {
+                    final row = notifier.rowAt(index);
+                    return row == null ? null : trackFromRow(row);
+                  },
+                  onMissingIndex: notifier.ensureIndex,
+                  playingIndexOverride: notifier.playingIndexOf(playingId),
+                  playingId: playingId,
+                  isPlaying: isPlaying,
+                  showAlbum: true,
+                  showDuration: true,
+                  onPlay: _play,
+                  onContextMenu: _onTrackMenu,
+                  onBatchEditMetadata: _batchEditMetadata,
+                  highlightOf: highlighter?.call,
+                  // 歌词命中片段：仅搜索态（highlighter 非空）透传查表回调；关闭态 /
+                  // 非搜索态传 null，行外观与现状逐像素一致（零成本）。
+                  lyricSnippetOf: highlighter == null
+                      ? null
+                      : (t) => state.lyricSnippets[t.id],
+                  onReachBottom: () => notifier.loadMore(),
+                  hasMore: state.hasMore,
+                  loadingMore: state.loadingMore,
+                  // 「全选」= 全库（当前搜索条件），批量操作按全量执行；
+                  // UI 仍只渲染分页窗口，全量仅在批量模式期间驻留。
+                  loadAllItems: () async {
+                    final rows = await notifier.allTracks();
+                    return rows.map(trackFromRow).toList();
+                  },
+                ),
+              },
             ),
+          ),
         ],
       ),
     );

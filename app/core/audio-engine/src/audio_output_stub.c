@@ -16,7 +16,7 @@ static void stub_classify(const ma_context *ctx, audio_output *io)
 }
 
 static const audio_output_provider kStubProvider = {
-    "stub", NULL, NULL, NULL, stub_classify, NULL
+    "stub", NULL, NULL, NULL, stub_classify, NULL, NULL
 };
 
 const audio_output_provider *audio_output_platform_provider(void)

@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../../stores/app_prefs.dart';
 import 'engine_bindings.dart';
+import 'native_session_gate.dart';
 
 /// 引擎控制事件（事件驱动推送 / 回退轮询接收的 JSON 行）。
 sealed class EngineEvent {
@@ -233,6 +234,14 @@ class AudioEngineProcess {
   /// 会话目录序号：与微秒时间戳共同保证并发会话目录唯一（无缝切换会短时并存两会话）。
   static int _sessionSeq = 0;
 
+  /// 原生会话生命周期闸门：create（[start]）与 destroy（[stop]）串行执行。
+  ///
+  /// 切歌会「先停旧、再建新」；两者都经 `Isolate.run` 落到不同原生线程，
+  /// 若并发进入引擎库，输出后端（PipeWire ALSA 插件的进程级全局 context）
+  /// 的关闭与打开就会互相踩踏 —— 崩溃报告里 `thread=data-loop.0` 即该全局
+  /// 数据环线程。串行化只覆盖原生调用本身，不阻塞下载/UI。
+  static final NativeSessionGate _nativeGate = NativeSessionGate();
+
   AudioEngineProcess._({
     required this.handle,
     required this.sockDir,
@@ -407,7 +416,9 @@ class AudioEngineProcess {
     EngineBindings.pin();
     // FFI create 在后台 isolate 执行：pipeline_create 打开解码器/网络 IO 可能
     // 耗时数百 ms，避免阻塞 UI isolate。config 参数以标量值跨 isolate 传递。
-    final handleAddr = await Isolate.run<int>(() {
+    // 经 [_nativeGate] 串行：必须等上一会话的 destroy（join + 关设备）真正
+    // 返回后再创建，避免输出后端全局 context 被并发开/关。
+    final handleAddr = await _nativeGate.run(() => Isolate.run<int>(() {
       // 解码引擎偏好（'eraudio' → engineMode 1；其余稳定 FFmpeg → 0）：
       // 引擎模式在会话创建时读取持久化偏好，不随会话热替换，改动需冷启动生效。
       final engineMode = AppPrefs.load().engine == 'eraudio' ? 1 : 0;
@@ -446,7 +457,7 @@ class AudioEngineProcess {
         // 本 isolate 的 open 必须配对 close，否则引用计数不归零、引擎库不卸载。
         EngineBindings.release();
       }
-    });
+    }));
 
     final engine = AudioEngineProcess._(
       handle: handleAddr,
@@ -819,7 +830,9 @@ class AudioEngineProcess {
 
     if (handle != 0) {
       final h = handle;
-      await Isolate.run<void>(() {
+      // 与 [start] 的 create 共用生命周期闸门：destroy 必须与下一次 create
+      // 串行，否则输出后端全局 context 会被并发关闭/打开（data-loop 崩溃）。
+      await _nativeGate.run(() => Isolate.run<void>(() {
         // destroy join 引擎线程（最长数百 ms），后台 isolate 避免阻塞 UI；
         // 内部唤醒阻塞中的 wait_event → 接收 isolate 收到 -1 自行退出。
         try {
@@ -827,7 +840,7 @@ class AudioEngineProcess {
         } finally {
           EngineBindings.release(); // 配对本 isolate 的 open
         }
-      });
+      }));
       // 事件泵自退（已收 -1）：有界等其完全退场，避免停用后还有事件串在途
       await _awaitPumpExit();
     }
