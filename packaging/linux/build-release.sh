@@ -127,6 +127,10 @@ do_build() {
     if [ -n "${ARCHOERA_CHANNEL:-}" ]; then
       channel_args+=(--dart-define="ARCHOERA_CHANNEL=${ARCHOERA_CHANNEL}")
     fi
+    # 构建时间：CI 手动派发 / Nightly 会注入，这里只透传；本地构建为空 → 不传。
+    if [ -n "${ARCHOERA_BUILD_TIME:-}" ]; then
+      channel_args+=(--dart-define="ARCHOERA_BUILD_TIME=${ARCHOERA_BUILD_TIME}")
+    fi
     flutter build linux --release "${channel_args[@]}"
   )
 }

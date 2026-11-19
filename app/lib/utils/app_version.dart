@@ -28,6 +28,40 @@ String get appVersion => _appVersion;
 /// 语义版本（截断构建号；供客户端标识）。
 String get clientVersion => _clientVersion;
 
+/// 构建时间（编译期 `--dart-define=ARCHOERA_BUILD_TIME=<ISO8601 UTC>`）。
+///
+/// 只在 CI 的**手动派发**（含手动 Nightly）与**定时 Nightly**构建时注入；
+/// tag 发版与本地构建不注入 → [buildTimeLabel] 为空串，界面不展示。
+const String _buildTimeDefine = String.fromEnvironment('ARCHOERA_BUILD_TIME');
+
+DateTime? _buildTimeCache;
+bool _buildTimeResolved = false;
+
+/// 构建时间（已转本地时区）；未注入 / 解析失败为 null。
+DateTime? get buildTime {
+  if (!_buildTimeResolved) {
+    _buildTimeResolved = true;
+    final raw = _buildTimeDefine.trim();
+    if (raw.isNotEmpty) {
+      _buildTimeCache = DateTime.tryParse(raw)?.toLocal();
+    }
+  }
+  return _buildTimeCache;
+}
+
+/// 构建时间展示文本（`yyyy-MM-dd HH:mm`，本地时区）；未注入为空串。
+String get buildTimeLabel {
+  final time = buildTime;
+  return time == null ? '' : formatBuildTime(time);
+}
+
+/// 把构建时间格式化成 `yyyy-MM-dd HH:mm`（本地时区展示，避免依赖 intl 区域）。
+String formatBuildTime(DateTime time) {
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${time.year}-${two(time.month)}-${two(time.day)} '
+      '${two(time.hour)}:${two(time.minute)}';
+}
+
 /// 发布通道（编译期 `--dart-define=ARCHOERA_CHANNEL=…`）。
 ///
 /// - `0` Release（正式版）
