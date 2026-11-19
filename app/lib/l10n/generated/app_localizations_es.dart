@@ -1175,11 +1175,44 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsNotLoggedIn => 'Sin iniciar sesión';
 
   @override
+  String get settingsPasswordLogin =>
+      'Inicio de sesión con contraseña en la app';
+
+  @override
+  String get settingsPasswordLoginDesc =>
+      'Experimental: inicia sesión con tu cuenta y contraseña de Auth dentro de la app. Si está desactivado, solo está disponible el acceso por QR';
+
+  @override
   String get LoginTitle => 'Iniciar sesión en ';
 
   @override
   String get LoginQrHint =>
       'Escanea con la app  para iniciar sesión';
+
+  @override
+  String get LoginTabPassword => 'Cuenta';
+
+  @override
+  String get LoginTabQr => 'Código QR';
+
+  @override
+  String get LoginAccountHint => 'Correo, usuario o teléfono';
+
+  @override
+  String get LoginPasswordHint => 'Contraseña';
+
+  @override
+  String get LoginSubmit => 'Iniciar sesión';
+
+  @override
+  String get LoginAccountRequired => 'Introduce tu cuenta';
+
+  @override
+  String get LoginPasswordRequired => 'Introduce tu contraseña';
+
+  @override
+  String get LoginPasswordNote =>
+      'La contraseña solo se usa para obtener un token de Auth y no se guarda en este dispositivo';
 
   @override
   String get QrScanned => 'Escaneado, confirma en el teléfono';
@@ -3702,7 +3735,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsPrivacy2Body =>
-      '· Información que usted proporciona: credenciales de plataformas musicales de terceros (cookies / tokens obtenidos mediante inicio de sesión por QR, cuenta y contraseña, etc.), la dirección y la cuenta de servidores multimedia propios o autorizados como Subsonic, y los directorios de música local que usted seleccione. Las credenciales se cifran y almacenan en la «caja fuerte» local (v1 almacenamiento seguro del sistema / v2 protección con contraseña / v3 vinculación al dispositivo) y nunca se suben al desarrollador ni a ningún servidor ajeno a la plataforma.\n· Datos locales de ejecución y caché: metadatos de la biblioteca (títulos, artistas, álbumes, etc.), historial de reproducción, favoritos, registros de descargas, cachés de letras y carátulas, y preferencias como el idioma de la interfaz y el tema.\n· Registros locales de ejecución: para facilitar la resolución de problemas, el software genera registros de ejecución en su dispositivo (límite de 4 MiB por archivo, truncado en el mismo archivo al superarse). Los registros se conservan únicamente en su dispositivo y nunca se suben automáticamente a menos que usted los extraiga activamente y los facilite al desarrollador.\n\n';
+      '· Información que usted proporciona: credenciales de plataformas musicales de terceros (cookies / tokens obtenidos mediante inicio de sesión por QR, etc.; la contraseña solo se usa para obtener un token de inicio de sesión y no se guarda en este dispositivo), la dirección y la cuenta de servidores multimedia propios o autorizados como Subsonic, y los directorios de música local que usted seleccione. Las credenciales se cifran y almacenan en la «caja fuerte» local (v1 almacenamiento seguro del sistema / v2 protección con contraseña / v3 vinculación al dispositivo) y nunca se suben al desarrollador ni a ningún servidor ajeno a la plataforma.\n· Datos locales de ejecución y caché: metadatos de la biblioteca (títulos, artistas, álbumes, etc.), historial de reproducción, favoritos, registros de descargas, cachés de letras y carátulas, y preferencias como el idioma de la interfaz y el tema.\n· Registros locales de ejecución: para facilitar la resolución de problemas, el software genera registros de ejecución en su dispositivo (límite de 4 MiB por archivo, truncado en el mismo archivo al superarse). Los registros se conservan únicamente en su dispositivo y nunca se suben automáticamente a menos que usted los extraiga activamente y los facilite al desarrollador.\n\n';
 
   @override
   String get settingsPrivacy3Title => '3. Finalidades del uso\n';

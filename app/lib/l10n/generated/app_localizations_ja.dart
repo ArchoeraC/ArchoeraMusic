@@ -1140,10 +1140,42 @@ class AppLocalizationsJa extends AppLocalizations {
   String get settingsNotLoggedIn => '未ログイン';
 
   @override
+  String get settingsPasswordLogin => 'アプリ内パスワードログイン';
+
+  @override
+  String get settingsPasswordLoginDesc =>
+      '実験的：アプリ内で Auth のアカウントとパスワードを直接入力してログインします。オフの場合は QR ログインのみ利用できます';
+
+  @override
   String get LoginTitle => ' にログイン';
 
   @override
   String get LoginQrHint => ' アプリでスキャンしてログイン';
+
+  @override
+  String get LoginTabPassword => 'アカウント';
+
+  @override
+  String get LoginTabQr => 'QR コード';
+
+  @override
+  String get LoginAccountHint => 'メール / ユーザー名 / 電話番号';
+
+  @override
+  String get LoginPasswordHint => 'パスワード';
+
+  @override
+  String get LoginSubmit => 'ログイン';
+
+  @override
+  String get LoginAccountRequired => 'アカウントを入力してください';
+
+  @override
+  String get LoginPasswordRequired => 'パスワードを入力してください';
+
+  @override
+  String get LoginPasswordNote =>
+      'パスワードは Auth のトークン取得のみに使用され、本機には保存されません';
 
   @override
   String get QrScanned => 'スキャン済み。スマホで確認してください';
@@ -3516,7 +3548,7 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get settingsPrivacy2Body =>
-      '· お客様が自ら提供する情報：第三者音楽プラットフォームのアカウント資格情報（QR ログインで取得した Cookie / トークン、アカウントとパスワードなど）、自前またはアクセス権のある Subsonic 等のメディアサーバーのアドレスとアカウント、お客様が選択したローカル音楽ディレクトリなど。資格情報は本機の「資格情報保管庫」で暗号化して保存され（v1 システム安全ストレージ / v2 パスフレーズ保護 / v3 デバイスバインド）、開発者やプラットフォーム以外のサーバーへアップロードされることはありません。\n· ローカルの実行・キャッシュデータ：ライブラリメタデータ（曲名、アーティスト、アルバムなど）、再生履歴、お気に入り、ダウンロード記録、歌詞とカバーのキャッシュ、インターフェース言語やテーマなどの環境設定。\n· ローカルの実行ログ：障害調査のため、ソフトウェアは本機で実行ログを生成します（単一ファイル上限 4 MiB、超過時はその場で切り詰め）。ログは本機にのみ保存され、お客様が自ら抽出して開発者に提供しない限り、自動的にアップロードされることはありません。\n\n';
+      '· お客様が自ら提供する情報：第三者音楽プラットフォームのアカウント資格情報（QR ログインで取得した Cookie / トークンなど。アカウントのパスワードはログイン用トークンの取得にのみ使用され、本機には保存されません）、自前またはアクセス権のある Subsonic 等のメディアサーバーのアドレスとアカウント、お客様が選択したローカル音楽ディレクトリなど。資格情報は本機の「資格情報保管庫」で暗号化して保存され（v1 システム安全ストレージ / v2 パスフレーズ保護 / v3 デバイスバインド）、開発者やプラットフォーム以外のサーバーへアップロードされることはありません。\n· ローカルの実行・キャッシュデータ：ライブラリメタデータ（曲名、アーティスト、アルバムなど）、再生履歴、お気に入り、ダウンロード記録、歌詞とカバーのキャッシュ、インターフェース言語やテーマなどの環境設定。\n· ローカルの実行ログ：障害調査のため、ソフトウェアは本機で実行ログを生成します（単一ファイル上限 4 MiB、超過時はその場で切り詰め）。ログは本機にのみ保存され、お客様が自ら抽出して開発者に提供しない限り、自動的にアップロードされることはありません。\n\n';
 
   @override
   String get settingsPrivacy3Title => '3. 情報の利用目的\n';

@@ -914,6 +914,12 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
     state.save();
   }
 
+  /// 设置  应用内账号密码登录（默认关；关闭时只提供扫码）。
+  void setPasswordLogin(bool value) {
+    state = state.copyWithPasswordLogin(value);
+    state.save();
+  }
+
   /// 设置「我喜欢 / 收藏 / 搜索」等页面的默认音源（`auto` = 自动）。
   void setDefaultSource(String value) {
     state = state.copyWithDefaultSource(value);
