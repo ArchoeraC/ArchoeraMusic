@@ -94,7 +94,15 @@ int audio_output_context_open(ma_context *ctx)
 
 int audio_output_collect(ma_context *ctx, audio_output_entry **out)
 {
+    return audio_output_collect_ex(ctx, out, 0);
+}
+
+int audio_output_collect_ex(ma_context *ctx, audio_output_entry **out,
+                            int light)
+{
     const audio_output_provider *prov = audio_output_provider_get();
+    /* 轻量模式只对 ALSA 生效：它是唯一会为「查格式」真正打开 PCM 的后端。 */
+    const int do_probe = !light || !ctx || ctx->backend != ma_backend_alsa;
     ma_device_info *pPlay = NULL, *pCap = NULL;
     ma_uint32 nPlay = 0, nCap = 0;
     audio_output_entry *arr;
@@ -136,9 +144,12 @@ int audio_output_collect(ma_context *ctx, audio_output_entry **out)
         io->flags = AUDIO_OUTPUT_F_AVAILABLE | AUDIO_OUTPUT_F_PLUGGED;
         if (pPlay[i].isDefault) io->flags |= AUDIO_OUTPUT_F_DEFAULT;
 
-        /* native 格式：逐个查（pulse 填 sink sample_spec 等） */
+        /* native 格式：逐个查（pulse 填 sink sample_spec 等）。
+           轻量模式下 ALSA 后端跳过：该查询会 snd_pcm_open，和播放会话抢同一
+           份进程级插件状态。 */
         memset(&di, 0, sizeof(di));
-        if (ma_context_get_device_info(ctx, ma_device_type_playback,
+        if (do_probe &&
+            ma_context_get_device_info(ctx, ma_device_type_playback,
                                        &pPlay[i].id, &di) == MA_SUCCESS &&
             di.nativeDataFormatCount > 0) {
             io->sample_rate = di.nativeDataFormats[0].sampleRate;
