@@ -10,7 +10,7 @@ part of '../settings_sections.dart';
 ///
 /// 当前仅接入 （标识 ``，显示名 NK）：统一 REST + token 的
 /// 第三方音源。**默认关闭**；关闭时不参与搜索 / 我喜欢 / 收藏，也不发请求。
-/// 仅提供登录（账号密码 + 二维码），不含注册与 VIP 购买。
+/// 仅提供登录（二维码 + 需显式开启的账号密码），不含注册与 VIP 购买。
 ///
 /// 服务器地址固定（不对外暴露为可设置项）。
 class ExperimentalSourceSection extends ConsumerStatefulWidget {
@@ -39,6 +39,17 @@ class _ExperimentalSourceSectionState
     if (mounted) setState(() {});
   }
 
+  void _togglePasswordLogin(bool value) {
+    ref.read(appPrefsProvider.notifier).setPasswordLogin(value);
+    toast(
+      value
+          ? context.l10n.settingsPasswordLogin
+          : context.l10n.settingsPasswordLoginDesc,
+      type: value ? ToastType.success : ToastType.info,
+    );
+    setState(() {});
+  }
+
   void _logout() {
     unawaited(ref.read(ApiProvider).logout());
     ref.read(likeControllerProvider).sync();
@@ -50,6 +61,9 @@ class _ExperimentalSourceSectionState
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final enabled = ref.watch(appPrefsProvider.select(SourceUsable));
+    final passwordLogin = ref.watch(
+      appPrefsProvider.select((p) => p.PasswordLoginEnabled),
+    );
     // 登录态变化时重建（账号名 / 登录按钮）。
     final  = ref.watch(ApiProvider);
     final account = .account;
@@ -94,6 +108,16 @@ class _ExperimentalSourceSectionState
                       label: l10n.settingsLogin,
                       onPressed: enabled ? _login : null,
                     ),
+            ),
+            SettingTile(
+              icon: EtaIcons.shieldOutline,
+              title: l10n.settingsPasswordLogin,
+              subtitle: l10n.settingsPasswordLoginDesc,
+              enabled: enabled,
+              trailing: Switch(
+                value: passwordLogin,
+                onChanged: enabled ? _togglePasswordLogin : null,
+              ),
             ),
           ],
         ),

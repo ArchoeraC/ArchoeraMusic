@@ -107,7 +107,16 @@ final qqMusicApiProvider = ChangeNotifierProvider<QqMusicApi>(
 ///
 /// **实验性音源，默认关闭**（`source..enabled`）：关闭时 UI 不展示
 ///  平台、也不发请求。登录态变化（token 恢复 / 登录 / 登出）时通知 UI。
-final ApiProvider = ChangeNotifierProvider<Api>((ref) => Api());
+///  音源服务。
+///
+/// 账号密码登录与兼容 `Origin` 由用户在设置里显式开启，故这里传入**读取时**
+/// 才求值的开关（切换开关不需要重建整个服务，也就不会丢当前登录态）。
+final ApiProvider = ChangeNotifierProvider<Api>(
+  (ref) => Api(
+    passwordLoginEnabled: () =>
+        ref.read(appPrefsProvider).PasswordLoginEnabled,
+  ),
+);
 
 ///  下载歌词重写（ 元数据已规范，仅下载时把站点广告歌词换成标准 LRC）。
 final LyricRewriterProvider = Provider<LyricRewriter>(

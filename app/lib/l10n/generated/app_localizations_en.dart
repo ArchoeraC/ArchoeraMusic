@@ -1166,10 +1166,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsNotLoggedIn => 'Not signed in';
 
   @override
+  String get settingsPasswordLogin => 'In-app password login';
+
+  @override
+  String get settingsPasswordLoginDesc =>
+      'Experimental: sign in with your Auth account and password inside the app. When off, only QR login is available';
+
+  @override
   String get LoginTitle => 'Sign in to ';
 
   @override
   String get LoginQrHint => 'Scan with the  mobile app to sign in';
+
+  @override
+  String get LoginTabPassword => 'Account';
+
+  @override
+  String get LoginTabQr => 'QR code';
+
+  @override
+  String get LoginAccountHint => 'Email, username or phone';
+
+  @override
+  String get LoginPasswordHint => 'Password';
+
+  @override
+  String get LoginSubmit => 'Sign in';
+
+  @override
+  String get LoginAccountRequired => 'Enter your account';
+
+  @override
+  String get LoginPasswordRequired => 'Enter your password';
+
+  @override
+  String get LoginPasswordNote =>
+      'Your password is only used to obtain a Auth token and is never stored on this device';
 
   @override
   String get QrScanned => 'Scanned, confirm on your phone';
@@ -3634,7 +3666,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPrivacy2Body =>
-      '· Information you provide: credentials for third-party music platforms (cookies / tokens obtained via QR login, account and password, etc.), the address and account of self-hosted or authorized media servers such as Subsonic, and the local music directories you select. Credentials are encrypted and stored in the local “credential vault” (v1 system secure storage / v2 passphrase protection / v3 device binding) and are never uploaded to the developer or any non-platform server.\n· Local runtime and cache data: library metadata (track names, artists, albums, etc.), playback history, favorites, download records, lyrics and cover caches, and preferences such as interface language and theme.\n· Local runtime logs: to help troubleshoot, the software generates runtime logs on your device (single-file cap 4 MiB, truncated in place once exceeded). Logs are kept only on your device and are never uploaded automatically unless you actively extract and provide them to the developer.\n\n';
+      '· Information you provide: credentials for third-party music platforms (cookies / tokens obtained via QR login etc.; account passwords are only used to obtain a login token and are never stored on this device), the address and account of self-hosted or authorized media servers such as Subsonic, and the local music directories you select. Credentials are encrypted and stored in the local “credential vault” (v1 system secure storage / v2 passphrase protection / v3 device binding) and are never uploaded to the developer or any non-platform server.\n· Local runtime and cache data: library metadata (track names, artists, albums, etc.), playback history, favorites, download records, lyrics and cover caches, and preferences such as interface language and theme.\n· Local runtime logs: to help troubleshoot, the software generates runtime logs on your device (single-file cap 4 MiB, truncated in place once exceeded). Logs are kept only on your device and are never uploaded automatically unless you actively extract and provide them to the developer.\n\n';
 
   @override
   String get settingsPrivacy3Title => '3. Purposes of use\n';

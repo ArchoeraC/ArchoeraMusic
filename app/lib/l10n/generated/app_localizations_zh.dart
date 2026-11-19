@@ -1132,10 +1132,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsNotLoggedIn => '未登录';
 
   @override
+  String get settingsPasswordLogin => '应用内账号密码登录';
+
+  @override
+  String get settingsPasswordLoginDesc =>
+      '实验性：在软件内直接输入 Auth 账号密码登录；关闭时只提供扫码登录';
+
+  @override
   String get LoginTitle => '登录 ';
 
   @override
   String get LoginQrHint => '请使用  手机 App 扫码登录';
+
+  @override
+  String get LoginTabPassword => '账号密码';
+
+  @override
+  String get LoginTabQr => '扫码登录';
+
+  @override
+  String get LoginAccountHint => '邮箱 / 用户名 / 手机号';
+
+  @override
+  String get LoginPasswordHint => '密码';
+
+  @override
+  String get LoginSubmit => '登录';
+
+  @override
+  String get LoginAccountRequired => '请输入账号';
+
+  @override
+  String get LoginPasswordRequired => '请输入密码';
+
+  @override
+  String get LoginPasswordNote => '密码仅用于向 Auth 换取令牌，不会保存在本机';
 
   @override
   String get QrScanned => '已扫码，请在手机上确认';
@@ -3473,7 +3504,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsPrivacy2Body =>
-      '· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token、账号密码等）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n';
+      '· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token 等；账号密码仅用于换取登录令牌、不在本机保存）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n';
 
   @override
   String get settingsPrivacy3Title => '三、信息的使用目的\n';
@@ -7386,10 +7417,41 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get settingsNotLoggedIn => '未登录';
 
   @override
+  String get settingsPasswordLogin => '应用内账号密码登录';
+
+  @override
+  String get settingsPasswordLoginDesc =>
+      '实验性：在软件内直接输入 Auth 账号密码登录；关闭时只提供扫码登录';
+
+  @override
   String get LoginTitle => '登录 ';
 
   @override
   String get LoginQrHint => '请使用  手机 App 扫码登录';
+
+  @override
+  String get LoginTabPassword => '账号密码';
+
+  @override
+  String get LoginTabQr => '扫码登录';
+
+  @override
+  String get LoginAccountHint => '邮箱 / 用户名 / 手机号';
+
+  @override
+  String get LoginPasswordHint => '密码';
+
+  @override
+  String get LoginSubmit => '登录';
+
+  @override
+  String get LoginAccountRequired => '请输入账号';
+
+  @override
+  String get LoginPasswordRequired => '请输入密码';
+
+  @override
+  String get LoginPasswordNote => '密码仅用于向 Auth 换取令牌，不会保存在本机';
 
   @override
   String get QrScanned => '已扫码，请在手机上确认';
@@ -9727,7 +9789,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get settingsPrivacy2Body =>
-      '· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token、账号密码等）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n';
+      '· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token 等；账号密码仅用于换取登录令牌、不在本机保存）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n';
 
   @override
   String get settingsPrivacy3Title => '三、信息的使用目的\n';
@@ -13640,10 +13702,41 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get settingsNotLoggedIn => '未登入';
 
   @override
+  String get settingsPasswordLogin => '應用程式內帳號密碼登入';
+
+  @override
+  String get settingsPasswordLoginDesc =>
+      '實驗性：在軟體內直接輸入 Auth 帳號密碼登入；關閉時只提供掃碼登入';
+
+  @override
   String get LoginTitle => '登入 ';
 
   @override
   String get LoginQrHint => '請使用  手機 App 掃碼登入';
+
+  @override
+  String get LoginTabPassword => '帳號密碼';
+
+  @override
+  String get LoginTabQr => '掃碼登入';
+
+  @override
+  String get LoginAccountHint => '電子郵件 / 使用者名稱 / 手機號碼';
+
+  @override
+  String get LoginPasswordHint => '密碼';
+
+  @override
+  String get LoginSubmit => '登入';
+
+  @override
+  String get LoginAccountRequired => '請輸入帳號';
+
+  @override
+  String get LoginPasswordRequired => '請輸入密碼';
+
+  @override
+  String get LoginPasswordNote => '密碼僅用於向 Auth 換取權杖，不會保存在本機';
 
   @override
   String get QrScanned => '已掃碼，請在手機上確認';
@@ -15981,7 +16074,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get settingsPrivacy2Body =>
-      '· 您主動提供的資訊：登入第三方音樂平台的帳號憑證（掃碼登入所得 Cookie / Token、帳號密碼等）、自建或自有權限存取的 Subsonic 等媒體伺服器位址與帳號、您選擇的本機音樂目錄等。憑證由本機「憑證保險庫」加密保存（v1 系統安全儲存 / v2 口令保護 / v3 裝置綁定），不會上傳至開發者或任何非平台伺服器。\n· 本機執行與快取資料：曲庫中繼資料（曲名、歌手、專輯等）、播放歷史、收藏、下載紀錄、歌詞與封面快取、介面語言與主題等偏好設定。\n· 本機執行紀錄：為便於排查故障，軟體在本機產生執行紀錄（單一檔案上限 4 MiB，超限原地截斷）。紀錄僅保存在本機，除非您主動提取並提供給開發者，否則不會被自動上傳。\n\n';
+      '· 您主動提供的資訊：登入第三方音樂平台的帳號憑證（掃碼登入所得 Cookie / Token 等；帳號密碼僅用於換取登入權杖、不在本機保存）、自建或自有權限存取的 Subsonic 等媒體伺服器位址與帳號、您選擇的本機音樂目錄等。憑證由本機「憑證保險庫」加密保存（v1 系統安全儲存 / v2 口令保護 / v3 裝置綁定），不會上傳至開發者或任何非平台伺服器。\n· 本機執行與快取資料：曲庫中繼資料（曲名、歌手、專輯等）、播放歷史、收藏、下載紀錄、歌詞與封面快取、介面語言與主題等偏好設定。\n· 本機執行紀錄：為便於排查故障，軟體在本機產生執行紀錄（單一檔案上限 4 MiB，超限原地截斷）。紀錄僅保存在本機，除非您主動提取並提供給開發者，否則不會被自動上傳。\n\n';
 
   @override
   String get settingsPrivacy3Title => '三、資訊的使用目的\n';
