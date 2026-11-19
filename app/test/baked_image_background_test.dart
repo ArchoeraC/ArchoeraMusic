@@ -13,7 +13,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:archoera_music/app/appearance_styles/image_appearance_style.dart';
 import 'package:archoera_music/stores/app_prefs.dart';
-import 'package:archoera_music/stores/prefs_appearance.dart';
 import 'package:archoera_music/widgets/common/baked_image_background.dart';
 
 /// 1x1 透明 PNG（避免引入额外测试依赖）。
