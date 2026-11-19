@@ -52,3 +52,27 @@
   样式仍保留独立模块与稳定 id。
 - 背景样式切换与封面 `fade` 共用 `widgets/common/cross_fade_switcher.dart`；
   系统关闭动画时统一直切。
+
+## 5. 内容状态过渡（不是可配样式，不要新增注册表）
+
+页面里「加载 / 错误 / 空态 / 内容」的切换、设置分类与搜索态切换、详情页首屏
+都属于**状态机**过渡，没有用户可选样式，因此不放进上面的样式注册表，而是统一
+复用同一个基元：`widgets/common/cross_fade_switcher.dart`。
+
+- 用法：外层 `CrossFadeSwitcher(switchKey: 状态身份, child: 目标态)`；同一状态
+  内的数据刷新不换 key，因此不会为每次刷新加淡入。
+- 身份划分要**粗**：只区分状态（`loading` / `empty` / `list`…），不要把关键词、
+  tab、滚动位置放进 key——搜索输入、切 tab 这类高频操作加动效只会拖慢手感。
+- 时长固定 200ms / `Curves.ease`，内部经 `animDuration` 处理；性能模式
+  （`MediaQuery.disableAnimations`）自动归零，调用方不要再包一层判断。
+- 过渡期间两层同时挂载：离场层是 `IgnorePointer` + 排除语义；新层的 `State`
+  会在过渡结束时**保留**（`CrossFadeSwitcher` 用稳定 key 做元素复用），所以
+  列表滚动位置、输入焦点不会被重置。
+- 两层同时挂载意味着同一份 `ScrollController` 可能被两个滚动视图同时 attach。
+  需要滚动的内容要给每个状态身份各自持有一份 controller（设置弹窗即按相位
+  分桶），不要在过渡内容里复用同一个 `ScrollController` 实例。
+
+封面像素层的淡入不是「状态过渡」，走 `widgets/list/cover_image.dart` 的
+`CoverArt` + `coverFrameFade`：只在**这张图自己的解码首帧**到达时做一次
+180ms 淡入；图片由解码采样批量出帧，不要做排队/错峰延迟，缓存同步命中
+（`wasSynchronouslyLoaded`）直接出图，滚动回看不重放。

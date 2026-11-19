@@ -12,7 +12,7 @@ extension _SongListFloatActionsView on _SongListFloatActionsState {
       child: IgnorePointer(
         ignoring: !_visible,
         child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 180),
+          duration: animDuration(context, const Duration(milliseconds: 180)),
           opacity: _visible ? 1 : 0,
           child: Column(
             mainAxisSize: MainAxisSize.min,

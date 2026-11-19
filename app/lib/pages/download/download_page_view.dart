@@ -21,7 +21,14 @@ extension _DownloadPageView on _DownloadPageState {
           children: [
             _buildHeader(context, state),
             const SizedBox(height: 16),
-            Expanded(child: _buildBody(context, state)),
+            // 初始化 / 错误 / 空态 / 列表 四态交叉淡化：任务清空、初始化完成
+            // 不再是整块瞬切（列表本身仍按任务事件增量刷新）。
+            Expanded(
+              child: CrossFadeSwitcher(
+                switchKey: _bodyPhase(state),
+                child: _buildBody(context, state),
+              ),
+            ),
           ],
         ),
       ),

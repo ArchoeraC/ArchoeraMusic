@@ -10,6 +10,7 @@ import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 import '../../services/source/media_request_headers.dart';
 import '../../stores/app_prefs.dart';
+import '../common/anim.dart';
 
 /// 网络封面浏览器 UA（NT 封面 CDN `p1.music.126.net` 对 Dart 默认 UA 403）。
 ///
@@ -24,6 +25,9 @@ const coverUserAgent =
 ///
 /// 供歌曲列表、播放栏、全屏播放器等处复用：[cover] 为空、路径不可解析
 /// 或加载失败时显示 [EtaIcons.music] 占位（[primaryContainer] 底）。
+///
+/// 像素与占位**分层**：占位常驻底层（几何稳定、立即可见），像素层
+/// [CoverArt] 在解码首帧到达时淡入，见 [coverFrameFade]。
 class CoverImage extends ConsumerWidget {
   const CoverImage({
     super.key,
@@ -49,8 +53,8 @@ class CoverImage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
-    final double r = radius ??
-        ref.watch(appPrefsProvider.select((p) => p.coverRadius));
+    final double r =
+        radius ?? ref.watch(appPrefsProvider.select((p) => p.coverRadius));
     final placeholder = Container(
       width: width,
       height: height,
@@ -61,50 +65,92 @@ class CoverImage extends ConsumerWidget {
       child: Icon(EtaIcons.music, size: iconSize, color: scheme.primary),
     );
 
-    var c = cover;
-    if (c == null || c.isEmpty) return placeholder;
-    // 协议相对 URL（QQ 等 CDN 常见）补 https，避免被下方判成“本地文件”而显示占位。
-    if (c.startsWith('//')) c = 'https:$c';
-
     // 解码降采样：按显示尺寸 × dpr 解码，避免大图整幅解码后缩小的内存浪费
     // （封面原图常为 500~1000px，小尺寸展示时解码开销可降 90%+）。
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final targetW = (width * dpr).round().clamp(1, 2048);
     final targetH = (height * dpr).round().clamp(1, 2048);
 
-    final ImageProvider base;
-    if (!c.startsWith('http')) {
-      // 本地文件：file:// 前缀剥离后按绝对路径读
-      final filePath = c.startsWith('file://') ? c.substring(7) : c;
-      final file = File(filePath);
-      if (!file.existsSync()) return placeholder;
-      base = FileImage(file);
-    } else {
-      base = NetworkImage(c, headers: mediaHeadersForUrl(c));
-    }
-
-    final Widget image = Image(
-      // 双边 target 解码必须保比例：ResizeImage 默认 policy=exact，非等比源
-      // 会被拉成 target 比例（16:9 视频封面在 1:1 卡片里「全幅内容 + 变形」，
-      // painting 的 cover 裁切无从谈起）。policy=fit 解码保比例（contain 语义），
-      // 裁切填框交给 painting 的 BoxFit.cover。
-      image: ResizeImage(
-        base,
-        width: targetW,
-        height: targetH,
-        policy: ResizeImagePolicy.fit,
-        allowUpscaling: false,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(r),
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            placeholder,
+            CoverArt(cover: cover, decodeWidth: targetW, decodeHeight: targetH),
+          ],
+        ),
       ),
-      width: width,
-      height: height,
-      fit: BoxFit.cover,
-      errorBuilder: (_, _, _) => placeholder,
-      loadingBuilder: (context, child, progress) =>
-          progress == null ? child : placeholder,
     );
-
-    return ClipRRect(borderRadius: BorderRadius.circular(r), child: image);
   }
+}
+
+/// 封面像素层（无占位、无裁剪）：铺满父级并按 [BoxFit.cover] 绘制。
+///
+/// 调用方负责在它**下层**放占位（[CoverImage] 与封面网格都这么做）：
+/// - 解码未完成 → 本层透明，露出占位；
+/// - 首帧到达 → 180ms 淡入，占位被逐帧覆盖。
+///
+/// [cover] 为空 / 路径不存在 / 加载失败时返回 [SizedBox.shrink]。
+class CoverArt extends StatelessWidget {
+  const CoverArt({
+    super.key,
+    required this.cover,
+    this.decodeWidth,
+    this.decodeHeight,
+    this.fit = BoxFit.cover,
+  });
+
+  /// 封面地址：http(s) URL / file:// 路径 / 磁盘绝对路径。
+  final String? cover;
+
+  /// 解码降采样目标尺寸（null = 按原图解码）。
+  final int? decodeWidth;
+  final int? decodeHeight;
+
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = coverImageProvider(
+      cover,
+      decodeWidth: decodeWidth,
+      decodeHeight: decodeHeight,
+      policy: ResizeImagePolicy.fit,
+    );
+    if (provider == null) return const SizedBox.shrink();
+    return Image(
+      image: provider,
+      fit: fit,
+      // 失败同样回到占位层：本层留空即可，不做额外分支。
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      frameBuilder: coverFrameFade,
+    );
+  }
+}
+
+/// 封面解码首帧淡入（180ms easeOut）。
+///
+/// 只依赖 **这张图自己的首帧**：图片由解码采样批量出帧，到达时机不受 UI
+/// 控制，这里既不排队也不做错峰延迟，避免把批量解码伪装成「逐张弹出」。
+/// 缓存命中（`wasSynchronouslyLoaded`）直接出图，滚动回看不重放淡入；
+/// 性能模式下整层不建，直接出像素（占位仍在调用方下层，视觉一致）。
+Widget coverFrameFade(
+  BuildContext context,
+  Widget child,
+  int? frame,
+  bool wasSynchronouslyLoaded,
+) {
+  if (wasSynchronouslyLoaded || noAnim(context)) return child;
+  return AnimatedOpacity(
+    opacity: frame == null ? 0 : 1,
+    duration: animDuration(context, const Duration(milliseconds: 180)),
+    curve: Curves.easeOut,
+    child: child,
+  );
 }
 
 /// 封面地址 → 按「实际需要的最大位图」在**解码阶段**降采样的 [ImageProvider]。
@@ -115,10 +161,15 @@ class CoverImage extends ConsumerWidget {
 ///
 /// 地址解析与 [CoverImage] 一致：`//` 协议相对补 https；http(s) 走 [NetworkImage]，
 /// 其余按 `file://` / 绝对路径读盘。返回 null 表示无封面或本地文件不存在。
+///
+/// [policy] 决定双边降采样的语义：封面类（方形裁切展示）一律传
+/// [ResizeImagePolicy.fit]，否则 16:9 等非等比源会在解码层被拉变形
+/// （painting 的 [BoxFit.cover] 只能在已变形的图上裁切）。
 ImageProvider? coverImageProvider(
   String? cover, {
   int? decodeWidth,
   int? decodeHeight,
+  ResizeImagePolicy policy = ResizeImagePolicy.exact,
 }) {
   if (cover == null || cover.isEmpty) return null;
   var c = cover;
@@ -140,6 +191,7 @@ ImageProvider? coverImageProvider(
     base,
     width: w,
     height: h,
+    policy: policy,
     allowUpscaling: false,
   );
 }

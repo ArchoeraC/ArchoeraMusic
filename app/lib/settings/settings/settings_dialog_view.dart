@@ -266,80 +266,105 @@ extension _SettingsDialogView on _SettingsDialogState {
     );
   }
 
+  /// 内容区相位：搜索结果 / 具体分类。作为交叉淡化的切换身份。
+  ///
+  /// 只区分「搜索态」与「分类」，不含分类内滚动位置或查询词：
+  /// 关键词每敲一个字都重建列表，给这种高频输入加淡入只会拖慢手感。
+  String get _contentPhase =>
+      _query.trim().isNotEmpty ? 'search' : 'category:${_category.name}';
+
   Widget _buildContent(ColorScheme scheme, AppLocalizations l10n) {
-    final searching = _query.trim().isNotEmpty;
+    final phase = _contentPhase;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 搜索框留在过渡之外：交叉淡化期间新旧两层若各持一个 TextField，
+        // 输入焦点与已选文本会在切换瞬间丢失。
         _buildSearchField(scheme, l10n),
         const SizedBox(height: 14),
-        if (searching)
-          Expanded(child: _buildSearchResults(scheme, l10n))
-        else ...[
-          Text(
-            _category.label(l10n),
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: scheme.onSurface,
+        Expanded(
+          child: CrossFadeSwitcher(
+            switchKey: phase,
+            child: phase == 'search'
+                ? _buildSearchResults(scheme, l10n)
+                : _buildCategoryBody(scheme, l10n, phase),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryBody(
+    ColorScheme scheme,
+    AppLocalizations l10n,
+    String phase,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          _category.label(l10n),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: scheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          _category.subtitle(l10n),
+          style: TextStyle(
+            fontSize: 12,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Expanded(
+          child: InkClip(
+            child: SingleChildScrollView(
+              controller: _contentScrollFor(phase),
+              child: switch (_category) {
+                SettingsCategory.appearance => const AppearanceSection(),
+                SettingsCategory.playback => const PlaybackSection(),
+                SettingsCategory.audioEffects => const AudioEffectsSection(),
+                SettingsCategory.shortcuts => const ShortcutsSection(),
+                SettingsCategory.lyrics => const LyricsSection(),
+                SettingsCategory.preset => const PresetSection(),
+                SettingsCategory.render => const RenderSection(),
+                SettingsCategory.download => const DownloadSection(),
+                SettingsCategory.storage => const Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    CacheSection(),
+                    HistorySection(),
+                    StorageSection(),
+                    SecuritySection(),
+                  ],
+                ),
+                SettingsCategory.scrape => const ScrapeSection(),
+                SettingsCategory.scanner => const ScansSection(),
+                SettingsCategory.searchIndex => const SearchSection(),
+                SettingsCategory.mediaSource => StreamingServerList(),
+                SettingsCategory.experimentalSource =>
+                  const ExperimentalSourceSection(),
+                SettingsCategory.mcp => const McpSection(),
+                SettingsCategory.about => AboutSection(
+                  version: _version,
+                  devHolding: _devHolding,
+                  devHoldProgress: _devHoldProgress,
+                  eggUnlocked: _eggUnlocked,
+                  onDevHoldStart: _startDevHold,
+                  onDevHoldCancel: _cancelDevHold,
+                ),
+                SettingsCategory.developer => DeveloperSection(
+                  onDeveloperDisabled: () {
+                    if (mounted) _setCategory(SettingsCategory.about);
+                  },
+                ),
+              },
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            _category.subtitle(l10n),
-            style: TextStyle(
-              fontSize: 12,
-              color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Expanded(
-            child: InkClip(
-              child: SingleChildScrollView(
-                controller: _contentScrollCtrl,
-                child: switch (_category) {
-                  SettingsCategory.appearance => const AppearanceSection(),
-                  SettingsCategory.playback => const PlaybackSection(),
-                  SettingsCategory.audioEffects => const AudioEffectsSection(),
-                  SettingsCategory.shortcuts => const ShortcutsSection(),
-                  SettingsCategory.lyrics => const LyricsSection(),
-                  SettingsCategory.preset => const PresetSection(),
-                  SettingsCategory.render => const RenderSection(),
-                  SettingsCategory.download => const DownloadSection(),
-                  SettingsCategory.storage => const Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      CacheSection(),
-                      HistorySection(),
-                      StorageSection(),
-                      SecuritySection(),
-                    ],
-                  ),
-                  SettingsCategory.scrape => const ScrapeSection(),
-                  SettingsCategory.scanner => const ScansSection(),
-                  SettingsCategory.searchIndex => const SearchSection(),
-                  SettingsCategory.mediaSource => StreamingServerList(),
-                  SettingsCategory.experimentalSource =>
-                    const ExperimentalSourceSection(),
-                  SettingsCategory.mcp => const McpSection(),
-                  SettingsCategory.about => AboutSection(
-                    version: _version,
-                    devHolding: _devHolding,
-                    devHoldProgress: _devHoldProgress,
-                    eggUnlocked: _eggUnlocked,
-                    onDevHoldStart: _startDevHold,
-                    onDevHoldCancel: _cancelDevHold,
-                  ),
-                  SettingsCategory.developer => DeveloperSection(
-                    onDeveloperDisabled: () {
-                      if (mounted) _setCategory(SettingsCategory.about);
-                    },
-                  ),
-                },
-              ),
-            ),
-          ),
-        ],
+        ),
       ],
     );
   }

@@ -113,12 +113,18 @@ extension _KgQrLoginDialogView on _KgQrLoginDialogState {
                           // 切换方式：**全部隐藏再显示**（对齐 WebWord 登录窗）——
                           // AnimatedOpacity 整体淡出/淡入 + AnimatedSize 动画高度。
                           AnimatedSize(
-                            duration: const Duration(milliseconds: 250),
+                            duration: animDuration(
+                              context,
+                              const Duration(milliseconds: 250),
+                            ),
                             curve: Curves.easeInOutCubic,
                             alignment: Alignment.topCenter,
                             child: AnimatedOpacity(
                               opacity: _switching ? 0 : 1,
-                              duration: const Duration(milliseconds: 180),
+                              duration: animDuration(
+                                context,
+                                const Duration(milliseconds: 180),
+                              ),
                               curve: Curves.easeInOut,
                               child: switch (_displayTab) {
                                 0 => _qrTab(theme, scheme, l10n),

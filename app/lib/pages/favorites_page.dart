@@ -15,6 +15,7 @@ import '../widgets/list/cover_grid.dart';
 import '../widgets/dialogs/collection_platform.dart';
 import '../widgets/dialogs/playlist_create_dialog.dart';
 import '../widgets/player/s_controls.dart';
+import '../widgets/common/cross_fade_switcher.dart';
 import '../widgets/streaming/empty_state.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';

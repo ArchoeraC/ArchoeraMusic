@@ -47,12 +47,15 @@ extension _SearchPageView on _SearchPageState {
           ),
           const Divider(height: 1),
           Expanded(
-            child: _buildContent(
-              l10n: l10n,
-              playingId: playingId,
-              isPlaying: isPlaying,
-              coverRadius: coverRadius,
-              rowLikedIds: rowLikedIds,
+            child: CrossFadeSwitcher(
+              switchKey: _contentPhase,
+              child: _buildContent(
+                l10n: l10n,
+                playingId: playingId,
+                isPlaying: isPlaying,
+                coverRadius: coverRadius,
+                rowLikedIds: rowLikedIds,
+              ),
             ),
           ),
         ],
