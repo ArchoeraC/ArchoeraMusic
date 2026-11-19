@@ -82,6 +82,13 @@ const char *player_sink_class_str(int cls);
  */
 int player_list_sinks(player_sink_info *out, int cap);
 
+/**
+ * 带轻量开关的枚举（`light != 0` 时 ALSA 后端不打开 PCM，native 格式置 0）。
+ * 语义见 `audio_output_collect_ex` 的注释；`light == 0` 等价于
+ * [player_list_sinks]。
+ */
+int player_list_sinks_ex(player_sink_info *out, int cap, int light);
+
 /** 播放器创建选项（普通启动用默认；切 sink 平滑重启时由调用方填恢复参数）。 */
 typedef struct {
     int    start_paused;  /* 1=创建后不自动播放（等待 seek/音量后再由调用方 play） */

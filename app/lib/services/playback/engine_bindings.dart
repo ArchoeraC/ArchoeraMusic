@@ -138,6 +138,8 @@ typedef _DestroyNative = Void Function(Pointer<Opaque>);
 typedef _DestroyDart = void Function(Pointer<Opaque>);
 typedef _ListSinksNative = Int32 Function(Pointer<Uint8>, Int32);
 typedef _ListSinksDart = int Function(Pointer<Uint8>, int);
+typedef _ListSinksExNative = Int32 Function(Pointer<Uint8>, Int32, Int32);
+typedef _ListSinksExDart = int Function(Pointer<Uint8>, int, int);
 
 // 可用内存（MB）：archoera_mediaengine_mem_available_mb（M3 预算管理器）
 typedef _MemAvailNative = Int64 Function();
@@ -272,6 +274,17 @@ class EngineBindings {
       .lookupFunction<_ListSinksNative, _ListSinksDart>(
         'archoera_mediaengine_list_sinks',
       );
+
+  /// 轻量枚举符号：旧引擎可能没有（缺失时回退完整枚举）。
+  late final _ListSinksExDart? _listSinksEx = () {
+    try {
+      return _lib.lookupFunction<_ListSinksExNative, _ListSinksExDart>(
+        'archoera_mediaengine_list_sinks_ex',
+      );
+    } catch (_) {
+      return null;
+    }
+  }();
   late final _MemAvailDart _memAvailFfi = _lib
       .lookupFunction<_MemAvailNative, _MemAvailDart>(
         'archoera_mediaengine_mem_available_mb',
@@ -443,16 +456,24 @@ class EngineBindings {
   /// 字段（旧版缺省，Dart 侧按 `unknown` 兼容解析）。空/失败返回 null。
   /// 调用方须捕获缺库 / 符号未导出等运行时异常（引擎侧符号与 Dart 契约
   /// 并行收敛，缺失时不可用而非崩溃）。
-  String? listSinks({int cap = 16384}) {
+  ///
+  /// [light] 默认 `true`：ALSA 后端不做逐设备开 PCM 的格式探测（会与播放
+  /// 会话抢同一份进程级插件状态），此时 `rate`/`channels` 为 0（未知）。
+  /// 需要格式时传 `false`（例如播放空闲时的显式刷新）。
+  String? listSinks({int cap = 16384, bool light = true}) {
     final buf = calloc<Uint8>(cap);
     try {
-      final r = _listSinks(buf, cap);
+      final ex = _listSinksEx;
+      final r = ex != null
+          ? ex(buf, cap, light ? 1 : 0)
+          : _listSinks(buf, cap); // 旧引擎：只能完整枚举
       if (r <= 0) return null;
       return buf.cast<Utf8>().toDartString(length: r);
     } finally {
       calloc.free(buf);
     }
   }
+
 
   /// M3：当前可用内存（MB）；<0 = 不可得（调用方回落保守下限）。
   int memAvailableMb() => _memAvailFfi();

@@ -126,6 +126,22 @@ ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_list_sinks(
     char *buf, int cap);
 
 /**
+ * 轻量枚举（推荐给「设置页展示设备列表」这类不急着要格式的场景）。
+ *
+ * @param light 非 0 = 轻量：ALSA 后端**不逐设备打开 PCM**（该查询会
+ *              `snd_pcm_open`，与正在播放的会话共用 ALSA/PipeWire 插件的
+ *              进程级全局状态，并发可能干扰甚至打断播放）。此时
+ *              `rate`/`channels` 报 0（= 未知），`class` 仍按名称/总线判定。
+ *              PulseAudio/WASAPI/CoreAudio 的查询不打开 PCM，仍照常填充。
+ *              传 0 等价于 [archoera_mediaengine_list_sinks]（完整枚举）。
+ *
+ * 其余语义（缓冲、返回值、JSON 结构）与完整版一致；旧客户端可继续用
+ * [archoera_mediaengine_list_sinks]（符号保留，行为不变）。
+ */
+ARCHOERA_MEDIAENGINE_API int archoera_mediaengine_list_sinks_ex(
+    char *buf, int cap, int light);
+
+/**
  * set_sink 运行时命令（JSON 行，经 archoera_mediaengine_command 发送）：
  *   {"type":"set_sink","id":"<list_sinks 中的设备 id，或空串 = 系统默认>"}
  *
