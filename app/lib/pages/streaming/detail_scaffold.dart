@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../../l10n/l10n.dart';
+import '../../widgets/common/cross_fade_switcher.dart';
 import '../../widgets/list/cover_image.dart';
 import '../../widgets/player/s_controls.dart';
 import 'package:archoera_music/eta/icon/eta_icons.dart';
@@ -154,41 +155,46 @@ class DetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
-    }
-    if (error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              EtaIcons.alertOutline,
-              size: 36,
-              color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              error == 'no-server' ? l10n.streamingEmptyNotConnected : '$error',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12.5,
-                color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+    // 加载 / 错误 / 内容 交叉淡化：详情页首屏不再整块瞬切。
+    final phase = loading ? 'loading' : (error != null ? 'error' : 'content');
+    return CrossFadeSwitcher(
+      switchKey: phase,
+      child: phase == 'loading'
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          : phase == 'error'
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    EtaIcons.alertOutline,
+                    size: 36,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    error == 'no-server'
+                        ? l10n.streamingEmptyNotConnected
+                        : '$error',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SButton(
+                    label: l10n.commonRetry,
+                    icon: EtaIcons.refresh,
+                    variant: SButtonVariant.secondary,
+                    size: SButtonSize.small,
+                    onPressed: onRetry,
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 12),
-            SButton(
-              label: l10n.commonRetry,
-              icon: EtaIcons.refresh,
-              variant: SButtonVariant.secondary,
-              size: SButtonSize.small,
-              onPressed: onRetry,
-            ),
-          ],
-        ),
-      );
-    }
-    return child;
+            )
+          : child,
+    );
   }
 }
 

@@ -14,6 +14,7 @@ import '../../l10n/l10n.dart';
 import '../widgets/list/cover_grid.dart';
 import '../widgets/dialogs/netease_login_dialog.dart';
 import '../widgets/player/s_controls.dart';
+import '../widgets/common/cross_fade_switcher.dart';
 import '../widgets/common/smooth_wheel_scroll_controller.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/dialogs/track_list_dialog.dart';
@@ -52,6 +53,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   _HomeData _data = const _HomeData();
   bool _loading = false;
   String _error = '';
+
+  /// 内容区状态身份（供 [CrossFadeSwitcher] 切换识别）：加载 / 错误 / 内容。
+  String get _contentPhase => _loading && !_data.loaded
+      ? 'loading'
+      : (_error.isNotEmpty && !_data.loaded ? 'error' : 'content');
 
   /// 页面纵向滚动控制器：滚轮 / 触控板带与列表一致的弹簧跟随；
   /// 触摸拖拽与键盘滚动不经过 `pointerScroll`，行为与原生一致。

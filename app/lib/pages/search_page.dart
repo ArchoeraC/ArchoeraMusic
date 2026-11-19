@@ -21,10 +21,12 @@ import '../widgets/list/cover_grid.dart';
 import '../widgets/player/s_controls.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/list/song_list.dart';
+import '../widgets/common/cross_fade_switcher.dart';
 import '../widgets/dialogs/track_context_menu.dart';
 import '../widgets/search/search_empty_state.dart';
 import '../widgets/search/search_error_state.dart';
 import '../widgets/search/search_source_state.dart';
+
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 
 part 'search/search_page_actions.dart';
@@ -161,6 +163,19 @@ class _SearchPageState extends ConsumerState<SearchPage>
 
   /// 当前 tab 已加载且为空。
   bool get _emptyResult => _currentState.loaded && _currentState.items.isEmpty;
+
+  /// 内容区状态身份（供 [CrossFadeSwitcher] 识别切换）：
+  /// 输入前 / 错误 / 首屏加载 / 无结果 / 结果。
+  ///
+  /// 不含关键词与 tab：同一状态下换关键词或换已加载 tab 直接替换内容，
+  /// 不为每次输入/切 tab 加淡入（那是高频操作，动效只会拖慢手感）。
+  String get _contentPhase {
+    if (_query.isEmpty) return 'idle';
+    if (_error.isNotEmpty) return 'error';
+    if (_initialLoading) return 'loading';
+    if (_emptyResult) return 'empty';
+    return 'results';
+  }
 
   @override
   Widget build(BuildContext context) => _buildPage(context);

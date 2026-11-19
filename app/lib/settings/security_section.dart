@@ -40,6 +40,7 @@ import '../../stores/data_dir.dart';
 import '../../stores/providers.dart';
 import '../../stores/vault_session_store.dart';
 import '../../stores/vault_unlock_refresh.dart';
+import '../../widgets/common/anim.dart';
 import '../../widgets/common/toast.dart';
 import '../../widgets/dialogs/s_dialog.dart';
 import '../../widgets/player/s_controls.dart';
