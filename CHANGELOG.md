@@ -27,8 +27,9 @@
 
 ### 修复
 
-1、macOS 包：zip 内也附带《首次打开说明》，并把「已损坏，无法打开」的处理（`xattr -dr com.apple.quarantine`）放到最前——这是下载隔离属性导致的拦截，不是文件损坏；发布前新增 `codesign --verify --deep --strict` 守卫，用来区分「签名真的坏了」和「Gatekeeper 拦截」
-2、修复切歌 / 打开输出设置后的偶发闪退：流式会话结束时没有释放音频输出上下文，ALSA/PipeWire 的数据环线程会继续访问已释放的状态（崩溃报告特征 `thread=data-loop.0`、`si_code=2`）；同时把「枚举输出设备」与播放会话排进同一把原生生命周期锁
+1、**修复 macOS 包内两个 dylib 的签名不完整**：`dylibbundler` / `install_name_tool` 改写头页后没有重签，arm64 上会被 dyld 拒载，Gatekeeper 也可能判为「已损坏」；现在打包时逐个重签 `native/` 下所有 Mach-O，并在发布前逐个 `codesign --verify --strict`
+2、macOS 包：zip 内也附带《首次打开说明》，并把「已损坏，无法打开」的处理（`xattr -dr com.apple.quarantine`）放到最前——下载隔离属性也会造成同样的提示；发布前新增整包签名校验，用来区分「签名真的坏了」和「Gatekeeper 拦截」
+3、修复切歌 / 打开输出设置后的偶发闪退：流式会话结束时没有释放音频输出上下文，ALSA/PipeWire 的数据环线程会继续访问已释放的状态（崩溃报告特征 `thread=data-loop.0`、`si_code=2`）；同时把「枚举输出设备」与播放会话排进同一把原生生命周期锁
 
 ## [1.0.7+0] - 2026-11-15
 

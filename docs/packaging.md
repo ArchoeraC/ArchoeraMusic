@@ -101,8 +101,10 @@ bash packaging/macos/build-release.sh all --arch arm64
    `LC_LOAD_DYLIB` 改成 `@loader_path/<basename>`——dylibbundler 只管 `-x`
    指定的库，downloader/transcoder/log/platform/scanner/indexer 等模块的
    install_name 仍会是 `/Users/runner/...`；
-4. 重新 ad-hoc 签名（`codesign --force --deep --sign -`），因为改写 dylib 会使
-   原签名失效（Apple Silicon 拒载未签名库）；
+4. **逐个重签** `Contents/native/` 下的每个 Mach-O（`codesign --force --sign -`），
+   再 `codesign --force --deep --sign -` 重签整包。dylibbundler / install_name_tool
+   改写头页会让链接器签名失效，而 `--deep` **不遍历**散装 dylib——漏签时
+   arm64 dyld 会拒载（表现为播放/刮削崩溃，Gatekeeper 也可能判「已损坏」）；
 5. 生成 `ARCHOERA-NATIVE-MANIFEST.txt`（SEC-08，必须在 3/4 之后）；
 6. 脚本内置的 `verify_deps` 守卫：单一架构、
    无构建机绝对路径、无 `libssl/libcrypto/libcurl`（含 `libcrypto.N.dylib`
