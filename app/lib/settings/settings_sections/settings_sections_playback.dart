@@ -48,7 +48,10 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
     List<_SinkDevice>? sinks;
     var failed = false;
     try {
-      final raw = EngineBindings.instance.listSinks();
+      // 与播放会话串行：枚举会开临时 context / PCM，不能与 create/destroy 并发。
+      final raw = await AudioEngineProcess.runGated(
+        () async => EngineBindings.instance.listSinks(),
+      );
       sinks = raw == null ? null : _parseSinks(raw);
       if (sinks != null && sinks.isEmpty) sinks = null;
     } catch (_) {
