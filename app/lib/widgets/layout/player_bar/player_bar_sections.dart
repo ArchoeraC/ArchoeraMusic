@@ -22,7 +22,7 @@ extension _PlayerBarSections on _PlayerBarState {
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          height: 22,
+          height: kPlayerBarProgressHeight,
           // 进度每 50ms 更新：独立重绘层，避免带动整条播放条重绘
           child: RepaintBoundary(
             child: PlaybackProgressSlider(
@@ -35,7 +35,7 @@ extension _PlayerBarSections on _PlayerBarState {
           ),
         ),
         SizedBox(
-          height: 60,
+          height: kPlayerBarMainRowHeight,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
@@ -313,8 +313,9 @@ extension _PlayerBarSections on _PlayerBarState {
     required bool imageMode,
     required Widget bar,
   }) {
-    // 停靠模式：内容层底部已让位 82px（shell.dart），条背后只有壳层的
-    // 预烘焙模糊壁纸，无动态内容穿过 → 共享背景那次模糊（D3）。
+    // 停靠模式：内容层底部已让位（`PlayerBarDockInset`，高度即
+    // `kDockedPlayerBarHeight`），条背后只有壳层的预烘焙模糊壁纸，
+    // 无动态内容穿过 → 共享背景那次模糊（D3）。
     return _glass(
       imageMode,
       backdropIsBakedBlur: true,

@@ -140,15 +140,27 @@ final appRouter = GoRouter(
           if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
             return child;
           }
-          // 纯垂直上滑（对齐原版 FullPlayer 的 `translate-y-full → 0`，
-          // 时长见 `kPlayerRouteTransitionDuration`）。
+          // 纯垂直上滑（对齐原版 FullPlayer 的 `translate-y-full → 0`）。
           // 曲线改成单峰：展开先快后慢、收起先慢后快（见
           // `player_route_curves.dart`）；收起走 reverseCurve，Flutter 直接把它
           // 作用在 1 → 0 的递减值上，因此两条曲线都用 ease-out 形状。
+          //
+          // `Interval(kPlayerBarPhase, 1)` 把转场切成两段：前段（播放条相位）
+          // 播放页停在 `Offset(0, 1)` 不动，让播放条先滑出（见
+          // `PlayerBarExitTransition`）；后段才整页上滑。收起时反向读同一个
+          // Interval，于是页面先下去、播放条最后回来——正是展开的倒序。
           final curved = CurvedAnimation(
             parent: animation,
-            curve: kPlayerRouteOpenCurve,
-            reverseCurve: kPlayerRouteCloseCurve,
+            curve: Interval(
+              kPlayerBarPhase,
+              1.0,
+              curve: kPlayerRouteOpenCurve,
+            ),
+            reverseCurve: Interval(
+              kPlayerBarPhase,
+              1.0,
+              curve: kPlayerRouteCloseCurve,
+            ),
           );
           return SlideTransition(
             position: Tween<Offset>(
