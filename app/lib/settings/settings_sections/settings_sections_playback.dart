@@ -48,7 +48,8 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
     List<_SinkDevice>? sinks;
     var failed = false;
     try {
-      // 与播放会话串行：枚举会开临时 context / PCM，不能与 create/destroy 并发。
+      // 与播放会话串行（枚举会自建/拆除一个 context），并走**轻量**枚举：
+      // ALSA 后端不逐设备开 PCM，避免打断正在播放的流。
       final raw = await AudioEngineProcess.runGated(
         () async => EngineBindings.instance.listSinks(),
       );
@@ -294,11 +295,16 @@ class _PlaybackSectionState extends ConsumerState<PlaybackSection> {
         return 0;
       });
     for (final d in sorted) {
-      final fmt = l10n.settingsOutputDeviceFormat(
-        channels: d.channels,
-        rate: d.rate,
-      );
-      final desc = d.description.isNotEmpty ? '${d.description} · $fmt' : fmt;
+      // 轻量枚举不探测原生格式（rate/channels=0=未知）：不展示“0 Hz · 0 声道”。
+      final fmt = (d.rate > 0 && d.channels > 0)
+          ? l10n.settingsOutputDeviceFormat(
+              channels: d.channels,
+              rate: d.rate,
+            )
+          : '';
+      final desc = d.description.isNotEmpty
+          ? (fmt.isEmpty ? d.description : '${d.description} · $fmt')
+          : fmt;
       rows.add(
         _EngineOptionTile(
           icon: d.isCall
