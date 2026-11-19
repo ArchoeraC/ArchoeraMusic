@@ -242,6 +242,14 @@ class AudioEngineProcess {
   /// 数据环线程。串行化只覆盖原生调用本身，不阻塞下载/UI。
   static final NativeSessionGate _nativeGate = NativeSessionGate();
 
+  /// 在原生会话闸门内执行一次引擎 FFI（目前用于设置页枚举输出设备）。
+  ///
+  /// 枚举会临时 `ma_context_init` 并逐个探测设备（ALSA 插件会开 PCM），
+  /// 与正在播放的会话并发时会踩到插件的进程级全局 context（同样表现为
+  /// `data-loop.0` 崩溃）。与 [start]/[stop] 共用同一闸门即可避免。
+  /// 调用本身很快，且调用方已是异步上下文，不再额外起 isolate。
+  static Future<T> runGated<T>(Future<T> Function() op) => _nativeGate.run(op);
+
   AudioEngineProcess._({
     required this.handle,
     required this.sockDir,
