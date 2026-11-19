@@ -8,16 +8,21 @@
 /// NekoAuth access token（无签名 / 无防重放 / 无客户端指纹）。本类聚合
 /// 登录会话、搜索、收藏（我喜欢）、歌单、播放 URL 与歌词，供各页面 provider 复用。
 ///
-/// **登录方式**：扫码登录（`/api/user/qrlogin/{create,status,claim}`），confirmed
-/// 后用创建响应的 `deliveryKey` 领取 token。
+/// **登录方式**（两条，都无需打开系统浏览器）：
 ///
-/// **破坏性变更（2026-11-09）**：已移除 NekoAuth OAuth（浏览器回调 +
-/// `nekomusic://` 深链）与传统账号密码登录；本客户端不再调用
-/// `/api/user/sso/*` 与 `/api/user/login`。
+/// - **账号密码**：`NekoAuthClient` 复刻官方 PC 客户端的 SSO 链路
+///   （start → 登录 → 授权码 → 回调 handoff → claim），全程内置 HTTP；
+///   拿到的 token 绑定 Auth 会话族，约一年有效，会话族过期前可静默续期。
+/// - **扫码**：`/api/user/qrlogin/{create,status,claim}`，confirmed 后用创建
+///   响应的 `deliveryKey` 领取 token（手机端已是登录态时最快）。
 ///
-/// **边界**：不接入注册 / 邮箱验证码 / 滑块验证 / VIP 开通等付费能力。
+/// 两条路互斥：切换登录方式会重置保存的 Auth 刷新令牌，避免把两套账号
+/// 凭据混在一起（静默续期只对「最后登录的那个账号」有效）。
 ///
-/// 登录态（token + 用户资料）经 [SessionStore]（vault，平台键
+/// **边界**：不接入注册 / 邮箱验证码 / 滑块验证 / VIP 开通等付费能力；
+/// 账号密码不做本地保存。
+///
+/// 登录态（token + 用户资料 + Auth 刷新令牌）经 [SessionStore]（vault，平台键
 /// `'neko'`）加密落盘；服务器地址固定，不对外暴露。
 library;
 
@@ -26,6 +31,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../../apis/neko/neko_auth_client.dart';
 import '../../apis/neko/neko_client.dart';
 import '../../apis/runtime.dart';
 import '../log/log.dart';
@@ -40,16 +46,50 @@ const String kNekoSessionPlatform = 'neko';
 
 /// Neko 音源服务。
 class NekoApi extends ChangeNotifier {
-  NekoApi({NekoClient Function(String baseUrl, String? token)? clientFactory})
-    : _clientFactory = clientFactory ?? _defaultClient;
+  NekoApi({
+    NekoClient Function(String baseUrl, String? token)? clientFactory,
+    this.authFactory,
+    bool Function()? passwordLoginEnabled,
+  }) : _clientFactory = clientFactory ?? _defaultClient,
+       _passwordLoginEnabled = passwordLoginEnabled ?? _neverEnabled;
 
   final NekoClient Function(String baseUrl, String? token) _clientFactory;
+
+  /// 测试注入的认证实现；生产环境（null）按开关现建。
+  final NekoAuthService Function()? authFactory;
+
+  /// 用户是否打开了「应用内账号密码登录」（设置里显式开启，默认关）。
+  final bool Function() _passwordLoginEnabled;
 
   static NekoClient _defaultClient(String baseUrl, String? token) =>
       NekoClient(baseUrl: baseUrl, token: token);
 
+  static bool _neverEnabled() => false;
+
+  /// 按当前开关构造认证实现（每次调用重新读取开关）。
+  NekoAuthService _newAuth() {
+    final factory = authFactory;
+    if (factory != null) return factory();
+    return NekoAuthClient(musicBaseUrl: kDefaultNekoBaseUrl);
+  }
+
   String? _token;
   NekoUser? _account;
+
+  /// access token 过期时间（JWT `exp`；未知为 null）。
+  DateTime? _tokenExpiresAt;
+
+  /// NekoAuth 会话刷新令牌（vault 加密保存；只由账号密码登录获得）。
+  String _authRefreshToken = '';
+
+  /// 最近一次成功续期时间（用于定期保活 Auth 会话族）。
+  DateTime? _authRefreshedAt;
+
+  /// Auth 根地址（注销会话用；登录 / 续期时由服务端返回的授权地址推断）。
+  String _authBaseUrl = '';
+
+  /// 正在进行的静默续期（避免 401 风暴触发并发续期）。
+  Future<bool>? _refreshing;
 
   /// 正在做 401 复核（避免 401 风暴触发并发的探测请求）。
   bool _checkingSession = false;
@@ -106,12 +146,69 @@ class NekoApi extends ChangeNotifier {
         Log.w('neko', '接口返回 401（$message），但会话仍有效：保留登录态');
         return;
       }
+      if (await _silentRefresh()) {
+        Log.i('neko', '接口返回 401（$message），已静默续期并保留登录态');
+        return;
+      }
       Log.w('neko', '登录态已失效（401：$message），清除本地会话，请重新登录');
       _clearSession();
     } catch (e) {
       Log.w('neko', '登录态复核失败（保留会话）：$e');
     } finally {
       _checkingSession = false;
+    }
+  }
+
+  /// 是否需要主动续期：令牌临近过期，或距上次续期超过 7 天（保活会话族）。
+  bool _needsSilentRefresh() {
+    if (_authRefreshToken.isEmpty) return false;
+    final now = DateTime.now();
+    final expiresAt = _tokenExpiresAt;
+    if (expiresAt != null &&
+        expiresAt.difference(now) < const Duration(days: 1)) {
+      return true;
+    }
+    final last = _authRefreshedAt;
+    return last == null || now.difference(last) > const Duration(days: 7);
+  }
+
+  /// 用保存的 Auth 刷新令牌静默续期（单飞：并发调用复用同一次请求）。
+  Future<bool> _silentRefresh() {
+    final inFlight = _refreshing;
+    if (inFlight != null) return inFlight;
+    final future = _doSilentRefresh().whenComplete(() => _refreshing = null);
+    _refreshing = future;
+    return future;
+  }
+
+  Future<bool> _doSilentRefresh() async {
+    final refreshToken = _authRefreshToken;
+    if (refreshToken.isEmpty) return false;
+    try {
+      final session = await _newAuth().refresh(refreshToken);
+      if (session.token.isEmpty) return false;
+      _applyLogin(
+        session.token,
+        user: session.user,
+        authRefreshToken: session.authRefreshToken,
+        authBaseUrl: session.authBaseUrl ?? _authBaseUrl,
+        expiresAt: session.expiresAt,
+      );
+      Log.i('neko', '登录态已静默续期');
+      notifyListeners();
+      unawaited(refreshAccount());
+      return true;
+    } on NekoApiException catch (e) {
+      if (e.kind == NekoErrorKind.auth) {
+        Log.w('neko', '账号会话已失效（${e.message}），需要重新登录');
+        _clearSession();
+      } else {
+        Log.w('neko', '静默续期失败（保留登录态）：${e.message}');
+      }
+      return false;
+    } catch (e) {
+      Log.w('neko', '静默续期异常（保留登录态）：$e');
+      return false;
     }
   }
 
@@ -138,29 +235,34 @@ class NekoApi extends ChangeNotifier {
     final s = store.get(kNekoSessionPlatform);
     final token = s['token'];
     if (token == null || token.isEmpty) {
-      _token = null;
-      _account = null;
+      _resetSessionState();
       notifyListeners();
       return;
     }
     if ((s['baseUrl'] ?? '') != baseUrl) {
       // 服务器变更：旧 token 不通用，清掉避免持续 401。
       store.clear(kNekoSessionPlatform);
-      _token = null;
-      _account = null;
+      _resetSessionState();
       notifyListeners();
       return;
     }
     _token = token;
     _account = NekoUser.fromSessionMap(s);
+    _tokenExpiresAt = DateTime.tryParse(s['tokenExpiresAt'] ?? '');
+    _authRefreshToken = s['authRefreshToken'] ?? '';
+    _authBaseUrl = s['authBaseUrl'] ?? '';
+    _authRefreshedAt = DateTime.tryParse(s['authRefreshedAt'] ?? '');
     notifyListeners();
     // 服务端资料（昵称 / VIP）可能已变：启动后静默刷新一次（失败不影响已恢复的登录态）。
     unawaited(refreshAccount());
+    // 令牌临近过期 / Auth 会话族需要保活 → 后台静默续期（失败保留登录态）。
+    if (_needsSilentRefresh()) unawaited(_silentRefresh());
   }
 
   /// 拉取当前登录用户资料（`GET /api/user/info`）并落盘。
   ///
-  /// 客户端只持久化 token，昵称/VIP 等启动时以服务端为准，避免本地缓存过期。
+  /// 昵称 / VIP 等以服务端为准（每次启动与每次续期后刷新一次），避免本地
+  /// 缓存过期；凭据只持久化 token 与 Auth 刷新令牌。
   /// 未登录 / 服务端未升级（404） / 离线时静默返回，不抛错。
   Future<void> refreshAccount() async {
     if (!isLoggedIn) return;
@@ -176,6 +278,35 @@ class NekoApi extends ChangeNotifier {
     } catch (_) {
       // 静默：离线 / 服务端未提供该接口时保留本地会话
     }
+  }
+
+  /// 账号密码登录（NekoAuth）。成功后立即落盘并拉取资料。
+  ///
+  /// 必须在设置里打开「应用内账号密码登录」；未打开时直接拒绝（界面也不会
+  /// 显示该页）。密码只用于本次向 NekoAuth 换取令牌，不落盘；服务端错误
+  /// 文案（账号或密码错误、尝试过于频繁等）原样抛给界面。
+  Future<void> loginWithPassword({
+    required String identifier,
+    required String password,
+  }) async {
+    if (!_passwordLoginEnabled()) {
+      throw NekoApiException(
+        '未启用应用内账号密码登录（设置 → 实验性音源 → NekoMusic）',
+      );
+    }
+    final session = await _newAuth().signIn(
+      identifier: identifier.trim(),
+      password: password,
+    );
+    _applyLogin(
+      session.token,
+      user: session.user,
+      authRefreshToken: session.authRefreshToken,
+      authBaseUrl: session.authBaseUrl ?? '',
+      expiresAt: session.expiresAt,
+    );
+    notifyListeners();
+    unawaited(refreshAccount());
   }
 
   /// 创建二维码登录会话。
@@ -248,31 +379,71 @@ class NekoApi extends ChangeNotifier {
     return true;
   }
 
-  /// 退出登录：吊销服务端 access token 并清理本地会话。
+  /// 退出登录：吊销本机全部 NekoAuth 凭据并清理本地会话。
   ///
-  /// 只吊销本客户端的 token；扫码前若曾在网页端登录，其浏览器会话由用户
-  /// 在账号中心自行退出。
+  /// 账号密码登录会在服务端留下一个 Auth 会话族（access token 与所有 OAuth
+  /// 授权链的根，默认可用 14 天）。退出时必须**同时**：
+  ///   1. `POST /api/user/logout` 吊销本机 access token；
+  ///   2. `POST /api/auth/logout` 注销该 Auth 会话族（只这一族，不影响用户
+  ///      其它设备与网页登录），让它派生出的全部令牌立即失效；
+  ///   3. 清空 vault 里的 token / 刷新令牌 / 过期时间。
+  ///
+  /// 扫码登录没有 Auth 刷新令牌，只做第 1、3 步。
   Future<void> logout() async {
     final token = _token;
+    final refreshToken = _authRefreshToken;
+    final authBase = _authBaseUrl;
     _clearSession();
-    if (token == null || token.isEmpty) return;
-    final client = _clientFactory(baseUrl, token);
+    if (token != null && token.isNotEmpty) {
+      final client = _clientFactory(baseUrl, token);
+      try {
+        await client.postJson('/api/user/logout');
+      } catch (e) {
+        Log.w('neko', '退出登录时吊销服务端令牌失败（本地已退出）：$e');
+      }
+    }
+    if (refreshToken.isEmpty) return;
     try {
-      await client.postJson('/api/user/logout');
+      await _newAuth().revokeSession(
+        refreshToken,
+        authBaseUrl: authBase,
+      );
+      Log.i('neko', '已注销 NekoAuth 登录会话（本机凭据全部失效）');
     } catch (e) {
-      Log.w('neko', '退出登录时吊销服务端令牌失败（本地已退出）：$e');
+      Log.w('neko', '注销 NekoAuth 登录会话失败（本地已退出）：$e');
     }
   }
 
-  void _applyLogin(String token, {NekoUser? user}) {
+  void _applyLogin(
+    String token, {
+    NekoUser? user,
+    String authRefreshToken = '',
+    String authBaseUrl = '',
+    DateTime? expiresAt,
+  }) {
     _token = token;
-    _account = user;
+    // 服务端未返回资料时保留已有账号信息，避免界面短暂显示「未登录」。
+    if (user != null) _account = user;
+    // 未提供刷新令牌（扫码登录 / 从未下发）→ 清掉旧值：静默续期只允许
+    // 对「最后登录的账号」生效，避免把两个账号的凭据混在一起。
+    _authRefreshToken = authRefreshToken;
+    _authRefreshedAt = authRefreshToken.isEmpty ? null : DateTime.now();
+    _authBaseUrl = authRefreshToken.isEmpty ? '' : authBaseUrl;
+    _tokenExpiresAt = expiresAt;
     _persistSession();
   }
 
-  void _clearSession() {
+  void _resetSessionState() {
     _token = null;
     _account = null;
+    _tokenExpiresAt = null;
+    _authRefreshToken = '';
+    _authRefreshedAt = null;
+    _authBaseUrl = '';
+  }
+
+  void _clearSession() {
+    _resetSessionState();
     getRuntime().sessionStore.clear(kNekoSessionPlatform);
     notifyListeners();
   }
@@ -287,6 +458,12 @@ class NekoApi extends ChangeNotifier {
     getRuntime().sessionStore.save(kNekoSessionPlatform, {
       'token': token,
       'baseUrl': baseUrl,
+      if (_tokenExpiresAt != null)
+        'tokenExpiresAt': _tokenExpiresAt!.toIso8601String(),
+      if (_authRefreshToken.isNotEmpty) 'authRefreshToken': _authRefreshToken,
+      if (_authBaseUrl.isNotEmpty) 'authBaseUrl': _authBaseUrl,
+      if (_authRefreshedAt != null)
+        'authRefreshedAt': _authRefreshedAt!.toIso8601String(),
       ...(account?.toSessionMap() ?? const <String, String>{}),
     });
   }

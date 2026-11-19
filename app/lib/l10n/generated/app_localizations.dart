@@ -2202,6 +2202,18 @@ abstract class AppLocalizations {
   /// **'未登录'**
   String get settingsNekoNotLoggedIn;
 
+  /// No description provided for @settingsNekoPasswordLogin.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'应用内账号密码登录'**
+  String get settingsNekoPasswordLogin;
+
+  /// No description provided for @settingsNekoPasswordLoginDesc.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'实验性：在软件内直接输入 NekoAuth 账号密码登录；关闭时只提供扫码登录'**
+  String get settingsNekoPasswordLoginDesc;
+
   /// No description provided for @nekoLoginTitle.
   ///
   /// In zh_CN, this message translates to:
@@ -2213,6 +2225,54 @@ abstract class AppLocalizations {
   /// In zh_CN, this message translates to:
   /// **'请使用 NekoMusic 手机 App 扫码登录'**
   String get nekoLoginQrHint;
+
+  /// No description provided for @nekoLoginTabPassword.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'账号密码'**
+  String get nekoLoginTabPassword;
+
+  /// No description provided for @nekoLoginTabQr.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'扫码登录'**
+  String get nekoLoginTabQr;
+
+  /// No description provided for @nekoLoginAccountHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'邮箱 / 用户名 / 手机号'**
+  String get nekoLoginAccountHint;
+
+  /// No description provided for @nekoLoginPasswordHint.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'密码'**
+  String get nekoLoginPasswordHint;
+
+  /// No description provided for @nekoLoginSubmit.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'登录'**
+  String get nekoLoginSubmit;
+
+  /// No description provided for @nekoLoginAccountRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入账号'**
+  String get nekoLoginAccountRequired;
+
+  /// No description provided for @nekoLoginPasswordRequired.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'请输入密码'**
+  String get nekoLoginPasswordRequired;
+
+  /// No description provided for @nekoLoginPasswordNote.
+  ///
+  /// In zh_CN, this message translates to:
+  /// **'密码仅用于向 NekoAuth 换取令牌，不会保存在本机'**
+  String get nekoLoginPasswordNote;
 
   /// No description provided for @nekoQrScanned.
   ///
@@ -6451,7 +6511,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsPrivacy2Body.
   ///
   /// In zh_CN, this message translates to:
-  /// **'· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token、账号密码等）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n'**
+  /// **'· 您主动提供的信息：登录第三方音乐平台的账号凭据（扫码登录所得 Cookie / Token 等；账号密码仅用于换取登录令牌、不在本机保存）、自建或有权访问的 Subsonic 等媒体服务器的地址与账号、您选择的本地音乐目录等。凭据由本机「凭据保险库」加密保存（v1 系统安全存储 / v2 口令保护 / v3 设备绑定），不会上传至开发者或任何非平台服务器。\n· 本地运行与缓存数据：曲库元数据（曲名、歌手、专辑等）、播放历史、收藏、下载记录、歌词与封面缓存、界面语言与主题等偏好设置。\n· 本地运行日志：为便于排查故障，软件在本机生成运行日志（单文件上限 4 MiB，超限原地截断）。日志仅保存在本机，除非您主动提取并提供给开发者，否则不会被自动上传。\n\n'**
   String get settingsPrivacy2Body;
 
   /// No description provided for @settingsPrivacy3Title.
