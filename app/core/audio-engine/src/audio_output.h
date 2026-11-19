@@ -127,6 +127,21 @@ int  audio_output_context_open(ma_context *ctx);
  */
 int  audio_output_collect(ma_context *ctx, audio_output_entry **out);
 
+/**
+ * 带「轻量」开关的枚举（会话无关查询用）。
+ *
+ * `light != 0` 时：**ALSA 后端跳过逐设备的 native 格式查询**——ALSA 的
+ * `ma_context_get_device_info` 会 `snd_pcm_open` 再关闭，与正在播放的会话
+ * 共用 ALSA/PipeWire 插件的进程级全局状态（`data-loop` 线程），并发时可能
+ * 把播放流推倒重来甚至崩溃。PulseAudio/WASAPI/CoreAudio 的查询走已有连接或
+ * 系统 API，不打开 PCM，仍照常填充（蓝牙 HFP/低质判定依赖它）。
+ *
+ * 轻量结果中 rate/channels 为 0、has_native 为 0（= 未知），调用方按未知展示。
+ * `light == 0` 等价于旧的完整枚举。
+ */
+int  audio_output_collect_ex(ma_context *ctx, audio_output_entry **out,
+                             int light);
+
 /** 释放 audio_output_collect 返回的数组。 */
 void audio_output_free(audio_output_entry *entries);
 

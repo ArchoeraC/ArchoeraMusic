@@ -252,7 +252,17 @@ typedef audio_output_entry player_probe_entry;
 /* 采集候选列表：转调 audio_output 模块（通用枚举 + 平台分类），保留原接口。
    返回堆上数组（calloc），*p_count 个数；失败/无设备返回 NULL。
    返回数组需 player_probe_free 释放。 */
+static player_probe_entry *player_probe_collect_ex(ma_context *pCtx,
+                                                   int *p_count, int light);
+
 static player_probe_entry *player_probe_collect(ma_context *pCtx, int *p_count)
+{
+    return player_probe_collect_ex(pCtx, p_count, 0);
+}
+
+/* light != 0：不做 ALSA 的逐设备开 PCM 探测（见 audio_output_collect_ex）。 */
+static player_probe_entry *player_probe_collect_ex(ma_context *pCtx,
+                                                   int *p_count, int light)
 {
     audio_output_entry *entries = NULL;
     int n;
@@ -260,7 +270,7 @@ static player_probe_entry *player_probe_collect(ma_context *pCtx, int *p_count)
     if (p_count) *p_count = 0;
     if (pCtx == NULL) return NULL;
 
-    n = audio_output_collect(pCtx, &entries);
+    n = audio_output_collect_ex(pCtx, &entries, light);
     if (n <= 0) return entries;  /* NULL（失败/无设备） */
     if (p_count) *p_count = n;
     return entries;
@@ -287,6 +297,11 @@ const char *player_sink_class_str(int cls)
 
 int player_list_sinks(player_sink_info *out, int cap)
 {
+    return player_list_sinks_ex(out, cap, 0);
+}
+
+int player_list_sinks_ex(player_sink_info *out, int cap, int light)
+{
     ma_context ctx;
     int n = 0;
     int i;
@@ -295,7 +310,7 @@ int player_list_sinks(player_sink_info *out, int cap)
     if (!out || cap <= 0) return -1;
     if (player_context_open(&ctx) != 0) return -1;
 
-    probes = player_probe_collect(&ctx, &n);
+    probes = player_probe_collect_ex(&ctx, &n, light);
     if (probes == NULL || n <= 0) {
         if (probes) player_probe_free(probes);
         ma_context_uninit(&ctx);

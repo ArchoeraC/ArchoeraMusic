@@ -285,10 +285,16 @@ static void linux_classify(const ma_context *ctx, audio_output *io)
             int low = io->has_native &&
                       (io->sample_rate < 44100u || io->channels < 2u);
             if (s->is_bt) {
-                if (s->codec[0] != '\0' || !low)
+                /* codec 字段是有 A2DP 编解码器的直接证据；没有 codec 时只能
+                   靠 native 格式区分 A2DP/HFP。轻量枚举不探测格式，此时
+                   报 unknown（不误导成 A2DP，也不误报 HFP）。 */
+                if (s->codec[0] != '\0')
                     io->cls = AUDIO_OUTPUT_CLASS_A2DP;
+                else if (io->has_native)
+                    io->cls = low ? AUDIO_OUTPUT_CLASS_HFP
+                                  : AUDIO_OUTPUT_CLASS_A2DP;
                 else
-                    io->cls = AUDIO_OUTPUT_CLASS_HFP;
+                    io->cls = AUDIO_OUTPUT_CLASS_UNKNOWN;
             } else if (s->is_hdmi) {
                 io->cls = AUDIO_OUTPUT_CLASS_HDMI;
             } else if (low) {

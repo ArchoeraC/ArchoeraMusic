@@ -3218,6 +3218,11 @@ void archoera_mediaengine_destroy(ArchoeraMediaEngine *e)
 
 int archoera_mediaengine_list_sinks(char *buf, int cap)
 {
+    return archoera_mediaengine_list_sinks_ex(buf, cap, 0);
+}
+
+int archoera_mediaengine_list_sinks_ex(char *buf, int cap, int light)
+{
     player_sink_info *infos;
     char *jbuf;
     size_t used = 0, jcap;
@@ -3228,7 +3233,7 @@ int archoera_mediaengine_list_sinks(char *buf, int cap)
     /* 枚举（自建/拆 context）：数量上限 64，防极端多 sink 撑爆栈 */
     infos = (player_sink_info *)calloc(64, sizeof(*infos));
     if (!infos) return -1;
-    n = player_list_sinks(infos, 64);
+    n = player_list_sinks_ex(infos, 64, light);
     if (n <= 0) {
         free(infos);
         return 0; /* 无设备：返回 0（≤0 语义），不写 buf */
