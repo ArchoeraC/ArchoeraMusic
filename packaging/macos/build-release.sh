@@ -426,6 +426,19 @@ do_bundle() {
   log "install_name 归一化"
   normalize_loadpaths "$native"
 
+  # dylibbundler / install_name_tool 改写 Mach-O 头页（LC_ID_DYLIB /
+  # LC_LOAD_DYLIB）会让链接器签名失效；arm64 上 dyld 加载时校验代码页，
+  # 第 0 页不匹配即拒载（播放/刮削直接崩，Gatekeeper 也可能判「已损坏」）。
+  # `codesign --deep` **不会**遍历 Contents/native/ 下的散装 dylib，
+  # 必须在这里逐个重签（2026-11-19 用户反馈里的两处签名缺陷即此）。
+  log "重签 native/ 下的 Mach-O（改写过头页的库）"
+  for f in "$native"/*; do
+    [ -f "$f" ] || continue
+    case "$(file -b "$f")" in
+      *Mach-O*) codesign --force --sign - "$f" ;;
+    esac
+  done
+
   # LGPL 合规：FFmpeg / TagLib 许可文本 + 聚合声明
   bash "$ROOT/app/core/bundle-licenses.sh" "$app/Contents"
 
@@ -526,6 +539,20 @@ PY
   if codesign -dv "$app" 2>&1 | grep -qi 'adhoc'; then
     log "签名类型：ad-hoc（未公证；首次打开需用户放行，见包内《首次打开说明》）"
   fi
+
+  # 散装 dylib 的签名 `--deep` 不覆盖：逐个 `codesign --verify --strict`。
+  # 曾经漏签 → 第 0 页哈希不符 → arm64 dyld 拒载（且 Gatekeeper 可能判损坏）。
+  log "codesign --verify --strict（native/ 每个 Mach-O）"
+  for f in "$native"/*; do
+    [ -f "$f" ] || continue
+    case "$(file -b "$f")" in
+      *Mach-O*)
+        if ! codesign --verify --strict "$f"; then
+          die "native/$(basename "$f") 签名不自洽（改写后未重签）"
+        fi
+        ;;
+    esac
+  done
 
   log "verify 完成（${arch}）"
 }
