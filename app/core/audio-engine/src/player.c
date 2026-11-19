@@ -1136,6 +1136,11 @@ PlayerCtx *player_stream_open(const char *sink_id,
             return NULL;
         }
         p->stream_dev_inited = 1;
+        /* 提交 context 所有权：player_stop() 只按该标志决定是否
+           ma_context_uninit。流式路径此前从未置位 → 会话结束时直接 free(p)，
+           ALSA/PipeWire 插件的数据环线程继续引用已释放的 context 状态，
+           表现为 data-loop.0 线程跳进栈内存（si_code=2 / ACCERR）。 */
+        p->context_initialized = ctx_inited;
         QA_STORE_REL(&p->stream_dev_started, 0);
         QA_STORE_REL(&p->stream_active, 0);
     }
@@ -1399,6 +1404,7 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
 {
     ma_result r;
     int ctx_inited;
+    int ctx_opened = 0; /* 本次调用新建了 context（失败时须回收） */
     int sel_idx = -1;
     char reason[192];
     unsigned sink_rate = 0, sink_ch = 0;
@@ -1425,7 +1431,7 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
     if (!ctx_inited) {
         if (player_context_open(&p->context) != 0) return -1;
         ctx_inited = 1;
-        p->context_initialized = 0; /* 由下方一致处理 */
+        ctx_opened = 1;
     }
 
     {
@@ -1508,6 +1514,7 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
         if (r != MA_SUCCESS) {
             ERA_LOGE(NULL, "[player] 流设备切 sink init 失败 %d\n", (int)r);
             p->stream_dev_inited = 0;
+            if (ctx_opened) ma_context_uninit(&p->context);
             return -1; /* 设备格式字段未改动，ring/位置基保持原样 */
         }
     }
@@ -1517,6 +1524,7 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
     if (!keep_ring && stream_ring_realloc(p, dev_rate, dev_ch) != 0) {
         ma_device_uninit(&p->stream_device);
         p->stream_dev_inited = 0;
+        if (ctx_opened) ma_context_uninit(&p->context);
         ERA_LOGE(NULL, "[player] 流式切 sink 重建 ring 失败（rate=%u ch=%u）\n",
                  dev_rate, dev_ch);
         return -1;
@@ -1544,6 +1552,8 @@ int player_stream_switch_sink(PlayerCtx *p, const char *sink_id)
     }
 
     p->stream_dev_inited = 1;
+    /* 提交 context 所有权（复用旧 context 时重复置位无副作用）。 */
+    p->context_initialized = ctx_inited;
     QA_STORE_REL(&p->stream_dev_started, 0);
     if (QA_LOAD_ACQ(&p->playing)) {
         stream_device_start(p);
