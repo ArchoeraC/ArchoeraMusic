@@ -16,6 +16,7 @@ library;
 
 import 'dart:async';
 
+import 'package:archoera_music/services/playback/audio_engine_process.dart';
 import 'package:archoera_music/services/playback/native_session_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -89,5 +90,36 @@ void main() {
     }
     await Future.wait(futures).timeout(const Duration(seconds: 2));
     expect(order, [0, 1, 2, 3]);
+  });
+
+  test('设备枚举与 create/destroy 共用同一闸门（runGated）', () async {
+    final events = <String>[];
+    final release = Completer<void>();
+
+    final destroy = AudioEngineProcess.runGated(() async {
+      events.add('destroy:start');
+      await release.future;
+      events.add('destroy:end');
+      return 1;
+    });
+    final listSinks = AudioEngineProcess.runGated(() async {
+      events.add('sinks:start');
+      events.add('sinks:end');
+      return 2;
+    });
+
+    await _flush();
+    // destroy 未返回：枚举不得进入原生层（否则并发开/关 ALSA context）。
+    expect(events, ['destroy:start']);
+
+    release.complete();
+    expect(await destroy.timeout(const Duration(seconds: 1)), 1);
+    expect(await listSinks.timeout(const Duration(seconds: 1)), 2);
+    expect(events, [
+      'destroy:start',
+      'destroy:end',
+      'sinks:start',
+      'sinks:end',
+    ]);
   });
 }

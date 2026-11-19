@@ -37,6 +37,7 @@ import '../services/downloader/download_controller.dart';
 import '../services/log/log.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../services/platform/window_decor.dart';
+import '../services/playback/audio_engine_process.dart';
 import '../services/playback/engine_bindings.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/render/image_luminance.dart';
