@@ -123,6 +123,10 @@ ad-hoc 签名应用」常直接报**「已损坏，无法打开」**——这不
 `xattr -dr com.apple.quarantine /Applications/ArchoeraMusic.app` 即可。
 DMG 与 zip 内都已附《首次打开说明》，其中这条排在前面。
 
+从 QQ / 微信 / 网盘接收的 zip 常常被第三方解压器破坏（丢符号链接、写入
+FinderInfo），表现为「已损坏」且去掉 quarantine 也无效——说明里已引导这类
+用户改用 DMG，或在终端用 `ditto -x -k` 解压。
+
 `verify` 阶段会跑 `codesign --verify --deep --strict`：ad-hoc 签名过不了
 Gatekeeper 是预期行为，但**签名自身必须自洽**（资源封印 / 嵌套 cdhash 一致），
 否则用户看到的同样是「已损坏」——这一步用于把「真损坏」与「Gatekeeper 拦截」

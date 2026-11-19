@@ -598,6 +598,16 @@ ArchoeraMusic（macOS）首次打开说明
 
 放行一次后，之后双击即可正常运行。
 
+三、如果是从 QQ / 微信 / 网盘接收的压缩包
+   这类客户端自带的解压可能丢掉符号链接、或往包里写入 Finder 信息，
+   应用会被判定为「已损坏」，此时只去 quarantine 是修不好的。
+   优先用 DMG：双击挂载后，把 ArchoeraMusic 拖进「应用程序」。
+   只能用 zip 时，请在「终端」里解压（保留符号链接与权限）：
+     ditto -x -k ~/Downloads/ArchoeraMusic-*-macos-arm64.zip /Applications
+   不要用第三方解压工具。
+   如果已经被解压坏了，可再执行一次（清掉全部扩展属性）：
+     xattr -cr /Applications/ArchoeraMusic.app
+
 架构：Apple 芯片选 arm64，Intel 选 x64。
 校验：发布资产带 .sig1 分离签名与公钥，校验方法见仓库 app/tool/verify_release.sh。
 
