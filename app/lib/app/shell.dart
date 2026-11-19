@@ -17,6 +17,9 @@ import '../widgets/layout/player_bar.dart';
 import '../widgets/layout/side_bar.dart';
 import '../widgets/common/offstage_when_complete.dart';
 import 'appearance_styles/appearance_style_registry.dart';
+import 'player_bar_dock_inset.dart';
+import 'player_bar_exit_transition.dart';
+import 'player_route_curves.dart';
 import 'route_transitions/route_transition_registry.dart';
 import 'shell_expand_transition.dart';
 
@@ -97,11 +100,29 @@ class AppShell extends ConsumerWidget {
           Positioned.fill(child: occludedWhenPlayerOpen(background)),
         // 内容层（停靠模式且播放条可见时底部让位；悬浮模式占满全高）
         Positioned.fill(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: !floating && showBar ? 82 : 0),
+          // 让位跟随播放条的**真实可见性**（自身显隐 300ms + 播放页让出
+          // 相位），不再「只要有曲目就立刻占满一条」——见 PlayerBarDockInset。
+          child: PlayerBarDockInset(
+            visible: showBar && !floating,
+            routeAnimation: playerRouteAnim,
+            duration: animDuration(context, const Duration(milliseconds: 300)),
             child: ShellExpandTransition(
               animation: playerRouteAnim,
               disableAnimations: noAnim(context),
+              // 壳内容的淡出/缩放与**播放页滑动**严格同步：前
+              // `kPlayerBarPhase` 段是播放条让出/回位，内容保持原状（展开时
+              // 不让内容先暗下去、收起时不让页面落到底后壳层还停在半透明）；
+              // 两条 Interval 同形，动画中途反向也不会跳变。
+              curve: Interval(
+                kPlayerBarPhase,
+                1.0,
+                curve: kPlayerRouteOpenCurve,
+              ),
+              reverseCurve: Interval(
+                kPlayerBarPhase,
+                1.0,
+                curve: kPlayerRouteCloseCurve,
+              ),
               // 完全展开后只停绘/停布局，壳内容与 State 保留，收起即恢复。
               child: content,
             ),
@@ -119,7 +140,16 @@ class AppShell extends ConsumerWidget {
               : 0,
           right: 0,
           bottom: 0,
-          child: occludedWhenPlayerOpen(const PlayerBar()),
+          // 展开：播放条先滑出，播放页随后上滑；收起：页面先下去，播放条
+          // 最后回位（倒序）——两段共用播放页路由动画，见
+          // `PlayerBarExitTransition` / `player_route_curves.dart`。
+          child: occludedWhenPlayerOpen(
+            PlayerBarExitTransition(
+              animation: playerRouteAnim,
+              disableAnimations: noAnim(context),
+              child: const PlayerBar(),
+            ),
+          ),
         ),
         // Dev 模式性能监控（右上角小窗；默认 SizedBox.shrink 零开销）
         const Positioned(top: 10, right: 10, child: FpsMonitorHost()),

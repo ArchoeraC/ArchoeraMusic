@@ -18,6 +18,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/l10n.dart';
+import '../common/anim.dart';
 
 import 'package:archoera_music/eta/icon/eta_icons.dart';
 

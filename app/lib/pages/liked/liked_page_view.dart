@@ -44,6 +44,17 @@ extension _LikedPageView on _LikedPageState {
     final view = adapter.likedView(ref);
     final available = adapter.likedAvailable(ref);
 
+    // 内容区状态身份：未登录 / 加载 / 错误 / 空态 / 列表。
+    final bodyPhase = !available
+        ? 'login'
+        : (view.loading && !view.loaded)
+        ? 'loading'
+        : (view.error.isNotEmpty && !view.loaded)
+        ? 'error'
+        : view.tracks.isEmpty
+        ? 'empty'
+        : 'list';
+
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -64,14 +75,17 @@ extension _LikedPageView on _LikedPageState {
           const SizedBox(height: 12),
           const Divider(height: 1),
           Expanded(
-            child: _buildContent(
-              theme: theme,
-              scheme: scheme,
-              l10n: l10n,
-              adapter: adapter,
-              view: view,
-              playingId: playingId,
-              isPlaying: isPlaying,
+            child: CrossFadeSwitcher(
+              switchKey: bodyPhase,
+              child: _buildContent(
+                theme: theme,
+                scheme: scheme,
+                l10n: l10n,
+                adapter: adapter,
+                view: view,
+                playingId: playingId,
+                isPlaying: isPlaying,
+              ),
             ),
           ),
         ],

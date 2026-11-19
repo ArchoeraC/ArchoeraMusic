@@ -455,7 +455,11 @@ ARCHOERA_COVER_MASK=off       # 跳过全屏封面右缘渗入遮罩（仅诊断
   与停靠播放条被播放页整幅不透明背景完全盖住。用 `OffstageWhenComplete`
   （`widgets/common/offstage_when_complete.dart`）在路由动画完成（≥0.999）
   后停绘二者，**保留 element/state**（返回无重建闪烁）；播放页收起过渡期间
-  自动恢复绘制。
+  自动恢复绘制。播放条另有 120ms 让出相位（`PlayerBarExitTransition`，见
+  `docs/architecture.md` 布局骨架）：条本体的让出只做 paint 级位移 + 透明度；
+  内容层底部让位（`PlayerBarDockInset`）是布局级动画，但只在播放条显隐
+  （300ms）与播放页进出（120ms）期间发生，且与播放条内部 `AnimatedSwitcher`
+  同曲线，底部边缘始终咬合，不再出现「先占位再滑入 / 条走了还留空条」。
 - 统一自适应画质控制器（帧时间滑动窗口 → 档位）：**首个落地是歌词失焦**
   （`lyrics_blur_budget.dart`，§4.2.1），后续频谱/背景可复用同一守卫。
 

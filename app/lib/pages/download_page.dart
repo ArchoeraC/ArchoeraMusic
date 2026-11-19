@@ -14,6 +14,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/downloader/download_controller.dart';
 import '../services/platform/platform_capabilities.dart';
 import '../../l10n/l10n.dart';
+import '../widgets/common/cross_fade_switcher.dart';
 import '../widgets/common/smooth_wheel_scroll_controller.dart';
 import '../widgets/common/toast.dart';
 import '../widgets/download/delete_dialog.dart';
@@ -66,6 +67,14 @@ class _DownloadPageState extends ConsumerState<DownloadPage> {
   bool get _allSelected {
     final tasks = ref.read(downloadControllerProvider).tasks;
     return tasks.isNotEmpty && _selected.length == tasks.length;
+  }
+
+  /// 列表体状态身份（供 [CrossFadeSwitcher] 识别切换）。
+  String _bodyPhase(DownloadState state) {
+    if (state.initializing) return 'init';
+    if (state.initError != null) return 'error';
+    if (state.tasks.isEmpty) return 'empty';
+    return 'list';
   }
 
   void _enterSelectMode() => setState(() => _selectMode = true);

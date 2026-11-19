@@ -20,6 +20,7 @@ internal static class SearchLayerTests
     public static void Run()
     {
         CompilerGolden();
+        QueryGates();
         EscapingSafety();
         CjkVariants();
         ReadingTiers();
@@ -37,9 +38,9 @@ internal static class SearchLayerTests
     private static void CompilerGolden()
     {
         var tokens = Analyzer.AnalyzeQuery("我爱你");
-        const string expected = "(\"我爱 爱你\" AND \"我\" AND \"爱\" AND \"你\""
+        const string expected = "(\"我爱 爱你\" AND (\"我\" OR \"我\"*) AND (\"你\" OR \"你\"*)"
             + " OR {pinyin_meta_tok pinyin_lyrics_tok} : \"wo ai ni\""
-            + " OR ({initials_meta_tok initials_lyrics_tok} : \"wan\"*))";
+            + " OR ({initials_meta_tok initials_lyrics_tok} : (\"wan\" OR \"wan\"*)))";
         var match = SearchQuery.CompileMatch(tokens, metadata: false);
         Program.Check("查询编译器: 我爱你 主趟", match == expected, match ?? "<null>");
 
@@ -127,6 +128,81 @@ internal static class SearchLayerTests
     }
 
     /// <summary>
+    /// v13 查询门控：单字列限制、读音支脚本分流、缺读音跳过、跨语言单字裁剪、
+    /// 丢词降级与模糊短词 / 首字符约束。
+    /// </summary>
+    private static void QueryGates()
+    {
+        // 单字 CJK：只在可见文本列；单字改前缀（索引里已无中间字 unigram）。
+        var singleCjk = SearchQuery.CompileMatch(Analyzer.AnalyzeQuery("爱"), metadata: false);
+        Program.Check("门控: 单字 CJK 限定可见文本列 + 前缀",
+            singleCjk == "{title_tok artist_tok album_tok filename_tok} : ((\"爱\" OR \"爱\"*))",
+            singleCjk ?? "<null>");
+
+        // 单字拉丁：是真实的首字母检索，保留首字母列但跳过拼音支。
+        var singleLatin = SearchQuery.CompileMatch(Analyzer.AnalyzeQuery("a"), metadata: false);
+        Program.Check("门控: 单字拉丁限定可见文本 + 首字母",
+            singleLatin == "{title_tok artist_tok album_tok filename_tok initials_meta_tok} : (\"a\")",
+            singleLatin ?? "<null>");
+
+        // 两字 CJK：拼音 / 首字母支仍保留。
+        var twoCjk = SearchQuery.CompileMatch(Analyzer.AnalyzeQuery("重庆"), metadata: false);
+        Program.Check("门控: 两字 CJK 保留拼音支",
+            twoCjk is not null && twoCjk.Contains("{pinyin_meta_tok pinyin_lyrics_tok}", StringComparison.Ordinal),
+            twoCjk ?? "<null>");
+
+        // 生僻字缺读音：拼音 / 首字母支不可信，整支跳过。
+        var incomplete = Tokens(lexical: new[] { "周杰" });
+        incomplete.Pinyin.Add("zhou");
+        incomplete.HasCjk = true;
+        incomplete.PinyinComplete = false;
+        incomplete.VisibleCharCount = 2;
+        incomplete.CjkCharCount = 2;
+        var incompleteMatch = SearchQuery.CompileMatch(incomplete, metadata: false);
+        Program.Check("门控: 缺读音跳过拼音 / 首字母支",
+            incompleteMatch == "\"周杰\"", incompleteMatch ?? "<null>");
+
+        // 单字母首字母串不生成首字母支。
+        Program.Check("门控: 单字母首字母支不生成",
+            SearchQuery.CompileMatch(Tokens(initials: "a"), metadata: false) is null);
+
+        // 跨语言：单字查询丢掉「汉字 → 英文释义」方向，两字保留。
+        var crossSingle = SearchQuery.CompileCrossLingual(Analyzer.AnalyzeQuery("爱"), metadata: false);
+        Program.Check("门控: 单字不做汉字→英文扩展", crossSingle is null, crossSingle ?? "<null>");
+        var crossTwo = SearchQuery.CompileCrossLingual(Analyzer.AnalyzeQuery("爱心"), metadata: false);
+        Program.Check("门控: 两字保留汉字→英文扩展",
+            crossTwo is not null && crossTwo.Contains("\"love\"", StringComparison.Ordinal),
+            crossTwo ?? "<null>");
+
+        // 丢词降级：丢掉首词后表达式等价于只搜剩余词。
+        var query = Analyzer.AnalyzeQuery("周杰伦 晴天");
+        var dropFirst = SearchQuery.CompileDropTokens(query, "周杰伦 晴天", metadata: false, dropIndex: 0);
+        var onlyTitle = SearchQuery.CompileMatch(Analyzer.AnalyzeQuery("晴天"), metadata: false);
+        Program.Check("丢词: 丢首词后仅剩歌名", dropFirst == onlyTitle, dropFirst ?? "<null>");
+        Program.Check("丢词: CJK 先丢首位词",
+            JoinInts(SearchQuery.DropTokenCandidates(query, "周杰伦 晴天")) == "0,1",
+            JoinInts(SearchQuery.DropTokenCandidates(query, "周杰伦 晴天")));
+        Program.Check("丢词: 拉丁尾部优先",
+            JoinInts(SearchQuery.DropTokenCandidates(
+                Analyzer.AnalyzeQuery("hello world"), "hello world")) == "1,0");
+        Program.Check("丢词: 字段亲和度排序把歌手词排前",
+            JoinInts(SearchQuery.OrderDropsByFieldAffinity(
+                new List<int> { 0, 1 }, new List<int> { 10, 1 }, new List<int> { 1, 10 })) == "1,0");
+
+        // 模糊：短词不扩展；首字符不生成替换变体（首错等价于 2 错）。
+        Program.Check("门控: 两字母不做模糊扩展",
+            !SearchQuery.HasFuzzyEligible(Analyzer.AnalyzeQuery("ab")));
+        Program.Check("门控: 三字母可模糊",
+            SearchQuery.HasFuzzyEligible(Analyzer.AnalyzeQuery("abc")));
+        var fuzzy = SearchQuery.CompileFuzzy(Analyzer.AnalyzeQuery("dello"), metadata: false);
+        Program.Check("门控: 首字符不生成替换变体",
+            fuzzy is not null && !fuzzy.Contains("\"tello\"", StringComparison.Ordinal),
+            fuzzy ?? "<null>");
+    }
+
+    private static string JoinInts(IEnumerable<int> values) => string.Join(',', values);
+
+    /// <summary>
     /// 转义安全：查询串里的 FTS5 语法字符（<c>"</c> / <c>*</c> / <c>(</c> / <c>:</c> /
     /// <c>OR</c>）必须被当作**字面量**，不得闭合引号、不得改变表达式结构。
     ///
@@ -150,11 +226,11 @@ internal static class SearchLayerTests
         // 末词元 ≥3 字符照常加前缀 `*`（合法行为），关键是**没有**产生真实 OR 运算符。
         var injected = SearchQuery.CompileMatch(Tokens(lexical: new[] { "x\" OR \"y" }), metadata: false);
         Program.Check("转义: 注入 OR 被当字面量",
-            injected == "\"x\"\" OR \"\"y\"*", injected ?? "<null>");
+            injected == "(\"x\"\" OR \"\"y\" OR \"x\"\" OR \"\"y\"*)", injected ?? "<null>");
         Program.Check("转义: 注入不产生额外 OR 分支",
             injected is not null
-                && injected.Count(c => c == '"') == 6
-                && !injected.StartsWith('('),
+                && injected.Count(c => c == '"') == 12
+                && injected.StartsWith('('),
             injected ?? "<null>");
 
         // 含引号的「类 bigram」不入短语（仅 1 个 CJK 字符），仍逐字转义。
@@ -165,7 +241,7 @@ internal static class SearchLayerTests
         // 首字母串含引号 / 空格：列过滤仍闭合（列过滤前缀不被词元内容带偏）。
         var initials = SearchQuery.CompileMatch(Tokens(initials: "a\"b"), metadata: false);
         Program.Check("转义: 首字母含引号仍闭合列过滤",
-            initials == "({initials_meta_tok initials_lyrics_tok} : \"a\"\"b\"*)",
+            initials == "({initials_meta_tok initials_lyrics_tok} : (\"a\"\"b\" OR \"a\"\"b\"*))",
             initials ?? "<null>");
 
         // 跨语言候选含引号：同样按字面量转义。
@@ -190,16 +266,21 @@ internal static class SearchLayerTests
 
     private static void CjkVariants()
     {
-        Program.Check("中文变体: 周伦 → 伦 / 周 / 伦周",
-            Join(SearchQuery.CjkVariants("周伦")) == "伦,周,伦周",
-            Join(SearchQuery.CjkVariants("周伦")));
-        Program.Check("中文变体: 一一 去重（换位无意义）",
-            Join(SearchQuery.CjkVariants("一一")) == "一",
-            Join(SearchQuery.CjkVariants("一一")));
+        Program.Check("中文变体: 周杰美 → 杰美 / 周美 / 周杰 / 换位",
+            Join(SearchQuery.CjkVariants("周杰美")) == "杰美,周美,周杰,杰周美,周美杰",
+            Join(SearchQuery.CjkVariants("周杰美")));
+        Program.Check("中文变体: 三字全同去重（换位无意义）",
+            Join(SearchQuery.CjkVariants("一一一")) == "一一",
+            Join(SearchQuery.CjkVariants("一一一")));
+        Program.Check("中文变体: 两字不生成（删一字退化成宽覆盖单字）",
+            SearchQuery.CjkVariants("周伦").Count == 0);
         Program.Check("中文变体: 单字不生成",
             SearchQuery.CjkVariants("我").Count == 0);
         Program.Check("中文变体: 纯拉丁不生成",
             SearchQuery.CjkVariants("hello").Count == 0);
+        Program.Check("中文变体: 混入拉丁 / 数字不生成",
+            SearchQuery.CjkVariants("周杰伦jay").Count == 0
+                && SearchQuery.CjkVariants("周杰伦2010").Count == 0);
         Program.Check("中文变体: 超长放弃",
             SearchQuery.CjkVariants(new string('我', SearchQuery.MaxCjkQueryLength + 1)).Count == 0);
         Program.Check("中文变体: 预算截断",
@@ -268,10 +349,14 @@ internal static class SearchLayerTests
                     """[{"name":"銀河"}]""", null, null, 10000);
                 EndToEnd.InsertTrack(conn, "t11", Path.Combine(media, "k.mp3"), "きみのしつけ",
                     """[{"name":"テスト"}]""", null, null, 11000);
+                // 单字查询只搜可见文本列（analyzer v13 / 单字门控）；两首标题含「爱」
+                // 才能验证 limit / offset 翻页。
+                EndToEnd.InsertTrack(conn, "t12", Path.Combine(media, "l.mp3"), "爱情",
+                    """[{"name":"テスト"}]""", null, null, 12000);
             }
 
             var built = EndToEnd.RunEngine(db, index, full: true, lrc: false);
-            Program.Check("查询层: 建库 11 首", built.Indexed == 11, built.Indexed.ToString());
+            Program.Check("查询层: 建库 12 首", built.Indexed == 12, built.Indexed.ToString());
 
             // T1-8：模糊词典直接读索引自身的 FTS 词表（不落盘、不改 schema）。
             using (var store = new FtsStore())
@@ -394,6 +479,19 @@ internal static class SearchLayerTests
                 page1.Items.Count == 1 && page2.Items.Count == 1
                 && page1.Items[0].TrackId != page2.Items[0].TrackId,
                 Dump(page1) + " | " + Dump(page2));
+
+            // 9b) 单字门控（v13）：只搜可见文本列，不再扫歌词 / 派生转写列。
+            var single = Run(index, "爱");
+            Program.Check("查询层: 单字命中标题（t2 / t12）",
+                Has(single, "t2") && Has(single, "t12"), Dump(single));
+            Program.Check("查询层: 单字不再命中歌词（t1）",
+                !Has(single, "t1"), Dump(single));
+
+            // 9c) 丢词降级（多词主趟不足时先试「少匹配一个词」）。
+            var dropped = Run(index, "周杰伦 晴夭", fuzzy: true);
+            Program.Check("查询层: 丢词降级命中 t1", Has(dropped, "t1"), Dump(dropped));
+            Program.Check("查询层: 丢词降级计一次趟次",
+                dropped.Passes.DropTokens == 1, Dump(dropped));
         }
         finally
         {
@@ -448,9 +546,14 @@ internal static class SearchLayerTests
             Program.Check("语言画像: 纯拉丁库裁剪汉字候选",
                 moon.Passes.CrossLingual == 0, Dump(moon));
 
-            // 反方向保留：汉字查询仍经英文释义候选命中英文标题。
-            var ai = Run(index, "爱", fuzzy: true);
-            Program.Check("语言画像: 汉字查询仍跨语言命中英文标题", Has(ai, "p1"), Dump(ai));
+            // 单字查询不再做「汉字 → 英文释义」扩展（v13 门控：单字释义极度发散）。
+            var single = Run(index, "爱", fuzzy: true);
+            Program.Check("语言画像: 单字不做汉字→英文扩展",
+                single.Passes.CrossLingual == 0, Dump(single));
+
+            // 反方向保留（两字）：汉字查询仍经英文释义候选命中英文标题。
+            var ai = Run(index, "爱心", fuzzy: true);
+            Program.Check("语言画像: 两字查询仍跨语言命中英文标题", Has(ai, "p1"), Dump(ai));
             Program.Check("语言画像: 汉字方向跨语言趟执行一次",
                 ai.Passes.CrossLingual == 1, Dump(ai));
         }
@@ -654,7 +757,7 @@ internal static class SearchLayerTests
             using (var conn = EndToEnd.Open(db))
             {
                 // 三首歌的区别只在「标题命中」vs「仅歌词命中」的次数，便于用 bm25 列权重
-                // 拉开差距：标题命中（权重 4.0）应稳定排在仅歌词命中（1.5）之前。
+                // 拉开差距：标题命中（权重 4.0）应稳定排在仅歌词命中（0.6）之前。
                 EndToEnd.InsertTrack(conn, "title", Path.Combine(media, "t.mp3"), "晴天",
                     """[{"name":"A"}]""", null, null, 1000);
                 EndToEnd.InsertTrack(conn, "lyrics", Path.Combine(media, "l.mp3"), "别的名字",
@@ -708,7 +811,8 @@ internal static class SearchLayerTests
 
     private static string Dump(SearchResult result)
         => "[" + string.Join(',', result.Items.Select(hit => hit.TrackId))
-            + $"] pinyin={result.Passes.PinyinLoose} reading={result.Passes.Reading}"
+            + $"] drop={result.Passes.DropTokens} pinyin={result.Passes.PinyinLoose}"
+            + $" reading={result.Passes.Reading}"
             + $" cross={result.Passes.CrossLingual} fuzzy={result.Passes.Fuzzy}"
             + $" cjk={result.Passes.CjkFuzzy}";
 }

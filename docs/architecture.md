@@ -554,6 +554,16 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
   自动重复（`ShortcutAction.repeats`），按住不会反复 push/pop。debug 下每次阶段迁移都会
   打印 `[player-route] a → b（原因）`，现场复现后看最后一条迁移即可定位停住的阶段；
   关闭播放页前还会确认该路由是栈顶（顶上有弹窗时忽略，避免误 pop）。
+- **播放条让出相位（2026-11-19）**：`/player` 转场总时长 **470ms** =
+  播放条 120ms + 页面滑动 350ms。路由动画前段用 `Interval(kPlayerBarPhase, 1)`
+  把播放页钉在 `Offset(0, 1)`（屏幕下方不动），这段只让底部播放条滑出
+  （`app/player_bar_exit_transition.dart`，淡出 + 整条下滑，不参与布局）；
+  收起时反向读同一个 Interval，于是自动倒序：**页面先滑走，播放条最后回位**。
+  纯渲染侧改动：不新增状态机阶段、不延迟 push/pop、不引入定时器，两条时间线
+  共用 `playerRouteAnimationProvider` 的同一条路由动画（同帧同步、可中途反向）。
+  内容层底部让位由 `PlayerBarDockInset` 按「播放条真实可见性」逐帧给出
+  （自身显隐 300ms × 播放页让出相位），不再按布尔值瞬间写死 82px——历史实现
+  会在「拉起播放条」时先空出一条占位、在播放条滑走时留着空条。
 
 **组件重写清单（S* 组件库 → Flutter）**
 - 交互类：SButton/SInput/SSelect/SCombobox/SRadio/SRadioGroup/SCheckbox/SSwitch/SSlider/SNumberInput → Material / 自绘

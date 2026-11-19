@@ -98,10 +98,24 @@ typedef struct audio_output_provider {
     /* 是否保留该条目（去重/剔除垃圾设备）。NULL = 全部保留。
        被 keep 剔除的设备不会返回给 Dart（连「展开显示」也不可见）。 */
     int  (*keep)(const audio_output *io);
+
+    /* 设备打开后的运行时模块固定（可为 NULL）。平台在**输出设备初始化之后**
+       调用：把已加载的第三方音频插件模块（如 ALSA→PipeWire 插件 / libpipewire）
+       额外 dlopen 一次并永不释放，避免关闭设备时 dlclose 掉仍有线程在执行的
+       代码段（崩溃报告 thread=data-loop.0 的成因）。必须幂等、快速、不阻塞。 */
+    void (*pin_runtime_modules)(void);
 } audio_output_provider;
 
 /** 当前平台 provider（编译期选择，永不返回 NULL）。 */
 const audio_output_provider *audio_output_provider_get(void);
+
+/**
+ * 固定运行期已加载的第三方音频插件模块（每个平台自行实现；无操作返回）。
+ *
+ * 调用时机：每次 `ma_device_init` / `ma_engine_init` 返回后（无论成败）。
+ * 目的：关闭设备不会 unmap 仍在运行的插件线程代码（见 provider 注释）。
+ */
+void audio_output_pin_runtime_modules(void);
 
 /** 按 provider 的后端优先级打开一个枚举用 context。0=成功，<0=失败。 */
 int  audio_output_context_open(ma_context *ctx);
