@@ -66,6 +66,13 @@ static void audio_output_id_from_device(const ma_context *ctx,
     }
 }
 
+/* 固定第三方音频插件模块：见 audio_output_provider 注释。provider 未实现时无事。 */
+void audio_output_pin_runtime_modules(void)
+{
+    const audio_output_provider *prov = audio_output_provider_get();
+    if (prov && prov->pin_runtime_modules) prov->pin_runtime_modules();
+}
+
 int audio_output_context_open(ma_context *ctx)
 {
     const audio_output_provider *prov = audio_output_provider_get();
@@ -160,6 +167,10 @@ int audio_output_collect(ma_context *ctx, audio_output_entry **out)
     }
 
     if (prov && prov->end) prov->end(ctx);
+
+    /* 枚举本身可能已用 ALSA/PipeWire 插件探测过格式（如 ALSA 的
+       ma_context_get_device_info 会开 PCM）：立刻固定其模块代码段。 */
+    audio_output_pin_runtime_modules();
 
     if (n == 0) {
         free(arr);

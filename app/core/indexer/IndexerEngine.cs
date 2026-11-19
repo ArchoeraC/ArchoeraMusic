@@ -355,12 +355,19 @@ public sealed class IndexerEngine
             LyricsTrTok = translation.Tokens,
             LyricsRomTok = lyricsRom,
             // 拼音 / 首字母**按元数据段与歌词段分列**（v4）：元数据查询（列过滤）才收得住。
+            //
+            // **文件名不进这两列**（精度审计 D-4）：文件名已被 <see cref="FilenameTok"/> 独立索引
+            // （整词 + bigram），再混进拼音 / 首字母列会带来两重污染——
+            // ① 文件名里的数字 / 序号（`t164` / `track01`）会产出 `t` / `164` 这类 token，
+            //    单字母恰是「单字查询整库命中」的燃料（见 SearchQuery.InitialsBranch 门控）；
+            // ② `01 - 某人 - 恨` 这类文件名会把标题之外的信息塞进首字母串，令首字母检索失真。
+            // 去掉后「用文件名搜歌」仍完整可用（走 filename_tok）。
             PinyinMetaTok = options.Pinyin
-                ? CombinePinyin(title, artist, album, filename)
+                ? CombinePinyin(title, artist, album)
                 : "",
             PinyinLyricsTok = options.Pinyin ? CombinePinyin(lyrics) : "",
             InitialsMetaTok = options.Pinyin
-                ? CombineInitials(title, artist, album, filename)
+                ? CombineInitials(title, artist, album)
                 : "",
             InitialsLyricsTok = options.Pinyin ? CombineInitials(lyrics) : "",
             ReadingMetaTok = reading,
@@ -406,8 +413,10 @@ public sealed class IndexerEngine
     }
 
     /// <summary>
-    /// 拼音列 = 各源（title/artist/album/lyrics/filename）的全拼 + 首字母，空格连接。
-    /// 空串段自动跳过，避免多余空格。
+    /// 拼音列 = 各源的拼音音节（空格连接）。空串段自动跳过，避免多余空格。
+    ///
+    /// 调用方传入 title / artist / album（元数据）与 lyrics（歌词段），**不含文件名**——
+    /// 文件名走独立的 <c>filename_tok</c> 列（见精度审计 D-4）。
     /// </summary>
     private static string CombinePinyin(params AnalysisResult[] sources)
     {
@@ -434,11 +443,15 @@ public sealed class IndexerEngine
     }
 
     /// <summary>
-    /// 首字母列 = 各源（title/artist/album/lyrics/filename）的拼音首字母串（空格连接）。
+    /// 首字母列 = 各源的拼音首字母串（空格连接）。
     ///
     /// v3 起**独立列**：v2 把首字母串与全拼音节混在 <c>pinyin_tok</c>，导致首字母查询
     /// （`"wan"*`）命中拼音音节（完 / 万 / 晚…）——30k 语料实测命中 29985/30000、单条 56ms。
     /// 拆列后首字母只与首字母互比，命中集回归「真正以该首字母串开头的短语」。
+    ///
+    /// 调用方传入 title / artist / album（元数据）与 lyrics（歌词段），**不含文件名**：
+    /// 文件名里的序号（`t164` / `track01`）会产出单字母 token，正是单字查询整库命中的燃料
+    /// （见精度审计 D-4 与 <see cref="SearchQuery.MinInitialsBranchLength"/>）。
     /// </summary>
     private static string CombineInitials(params AnalysisResult[] sources)
     {

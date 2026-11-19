@@ -358,7 +358,10 @@ mixin _PlaybackNotifierSession
   }
 
   @override
-  Future<void> _stopEngine() async {
+  Future<void> _stopEngine() {
+    // 已有在途收尾：复用同一 future（**必须等它真正 join 完成**，见字段注释）。
+    final inFlight = _engineStopInFlight;
+    if (inFlight != null) return inFlight;
     _sessionReady = false;
     for (final s in _engineSubs) {
       s.cancel();
@@ -373,12 +376,31 @@ mixin _PlaybackNotifierSession
     _spectrumTiltValue = 0.0;
     final store = _engineStore;
     _engineStore = 0;
-    if (engine != null) {
-      await engine.stop();
+    final done = _stopEngineNative(engine, store);
+    _engineStopInFlight = done;
+    return done.whenComplete(() {
+      if (identical(_engineStopInFlight, done)) _engineStopInFlight = null;
+    });
+  }
+
+  Future<void> _stopEngineNative(
+    AudioEngineProcess? engine,
+    SegStoreHandle store,
+  ) async {
+    try {
+      if (engine != null) {
+        await engine.stop();
+      }
+    } catch (e) {
+      // 收尾失败不能阻塞切歌/停止（_stopEngine 多为 unawaited 调用）；句柄已
+      // 置空，不会重复停止。留日志定位原生 destroy 异常。
+      _log('引擎收尾失败: $e');
+    } finally {
+      // store 释放点（docs/audio-memory-source.md §12）：紧跟引擎 destroy（已
+      // join 解码线程）之后 destroy SegStore，释放驻留字节；同句柄只经本处
+      // 释放一次。destroy 抛错也必须释放，避免句柄泄漏。
+      _destroyStore(store);
     }
-    // store 释放点（docs/audio-memory-source.md §12）：紧跟引擎 destroy（已 join
-    // 解码线程）之后 destroy SegStore，释放驻留字节；同句柄只经本处释放一次。
-    _destroyStore(store);
   }
 
   /// 切换音质（**无缝**）：**同一会话内**预打开+预解码新音质到引擎暂存缓冲，

@@ -488,6 +488,55 @@ void main() {
       await settle(tester, frames: 10);
       expect(stateOf(tester).debugActive(), 1);
     });
+
+    testWidgets('高速刚性滚动退出时，500ms 逐字提前换行仍生效', (tester) async {
+      // 0~39 行每 200ms（无间隙 → 不触发提前换行）；第 40 行 8800ms 开始，
+      // 上一行逐字 7900ms 唱完 → 预滚窗口 8200ms、提前换行窗口 8300ms。
+      final groups = <LyricGroup>[
+        for (var i = 0; i < 40; i++)
+          LyricGroup(
+            original: LyricLine(timeMs: i * 200, text: '快 $i'),
+            endMs: (i + 1) * 200,
+            fragments: const [
+              LyricFragment(text: '快', startMs: 0, durationMs: 100),
+            ],
+          ),
+        LyricGroup(
+          original: const LyricLine(timeMs: 8800, text: '慢行'),
+          endMs: 12000,
+          fragments: const [
+            LyricFragment(text: '慢', startMs: 0, durationMs: 200),
+          ],
+        ),
+      ];
+      // 快歌段最后一行：已进入整墙刚性滚动。
+      await tester.pumpWidget(buildWall(groups, 38 * 200));
+      await settle(tester);
+      await tester.pumpWidget(buildWall(groups, 39 * 200));
+      await tester.pump(const Duration(milliseconds: 16));
+      dynamic s = stateOf(tester);
+      expect(s.debugGlide(), isTrue);
+      expect(s.debugAnchor(), 39);
+
+      // 预滚 600ms：8200ms 滚动锚点已切到慢行；高亮仍在提前窗口之外。
+      await tester.pumpWidget(buildWall(groups, 8200));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      expect(s.debugAnchor(), 40);
+      expect(s.debugActive(), -1, reason: '8300ms 之前不提前高亮');
+
+      // 进入 500ms 提前窗口：高亮切到慢行；滚动锚点早已就位，两者不互相改写。
+      await tester.pumpWidget(buildWall(groups, 8300));
+      await tester.pump(const Duration(milliseconds: 16));
+      s = stateOf(tester);
+      expect(s.debugActive(), 40);
+      expect(s.debugAnchor(), 40);
+
+      // 共享弹簧收敛后退出刚性滚动，在行开始（8800ms）前交回逐行弹簧。
+      await settle(tester, frames: 90);
+      s = stateOf(tester);
+      expect(s.debugGlide(), isFalse);
+    });
   });
 
   group('Spring1D 延迟语义', () {

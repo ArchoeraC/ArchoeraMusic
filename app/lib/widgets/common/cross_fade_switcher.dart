@@ -79,9 +79,12 @@ class _CrossFadeSwitcherState extends State<CrossFadeSwitcher>
   void _onStatus(AnimationStatus status) {
     if (status != AnimationStatus.completed || _outgoing == null) return;
     // 交叉淡化结束：释放旧 child，后续直接渲染新 child。
+    // 同步 `_shown`：过渡期间 child 可能已随状态更新（同一 switchKey 下重建），
+    // 不刷新会让下一次切换把「旧相位的过期快照」当作离场层。
     setState(() {
       _outgoing = null;
       _outgoingKey = null;
+      _shown = widget.child;
     });
   }
 
@@ -107,8 +110,14 @@ class _CrossFadeSwitcherState extends State<CrossFadeSwitcher>
           // 播放页布局切换时共享元素会临时飞出自己的槽位，不能在这里裁切。
           clipBehavior: Clip.none,
           children: [
+            // 两层都用**稳定 key**：离场层结束时会从 children 中移除，若两
+            // 层都是 keyless，Flutter 会按**下标**复用元素——新层直接顶替
+            // 旧层的元素槽，其 child 的 KeyedSubtree key 又不同，于是整棵
+            // 子树（列表滚动位置、输入框状态…）被重建。带 key 后移除离场层
+            // 时按 key 复用当前层，过渡结束不会重置内容。
             if (outgoing != null)
               Opacity(
+                key: const ValueKey('crossfade.out'),
                 opacity: (1 - t).clamp(0.0, 1.0),
                 child: IgnorePointer(
                   child: ExcludeSemantics(
@@ -120,6 +129,7 @@ class _CrossFadeSwitcherState extends State<CrossFadeSwitcher>
                 ),
               ),
             Opacity(
+              key: const ValueKey('crossfade.in'),
               opacity: t.clamp(0.0, 1.0),
               child: KeyedSubtree(
                 key: ValueKey(widget.switchKey),

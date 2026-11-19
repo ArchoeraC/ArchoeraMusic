@@ -51,6 +51,17 @@ extension _FavoritesPageView on _FavoritesPageState {
     final loggedIn = _loggedIn;
     final subtitle = adapter.favTabSubtitle(l10n, _tab, count, loggedIn);
 
+    // 内容区状态身份：未登录 / 加载 / 错误 / 空态 / 网格。
+    final bodyPhase = !loggedIn
+        ? 'login'
+        : (loading && !_loaded.contains(_cacheKey))
+        ? 'loading'
+        : (error.isNotEmpty && items.isEmpty)
+        ? 'error'
+        : items.isEmpty
+        ? 'empty'
+        : 'grid';
+
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -130,87 +141,94 @@ extension _FavoritesPageView on _FavoritesPageState {
           const SizedBox(height: 12),
           const Divider(height: 1),
           // ── 内容区状态机 ─────────────────────────────────────
+          // 未登录 / 加载 / 错误 / 空态 / 网格 交叉淡化（平台与分类切换仍直接
+          // 换缓存内容，避免整块网格重复淡入）。
           Expanded(
-            child: !loggedIn
-                ? StreamingEmptyState(
-                    icon: EtaIcons.starOutline,
-                    title: l10n.pageFavLoginTitle,
-                    subtitle: adapter.favLoginDesc(l10n),
-                    buttonLabel: l10n.navHeaderQrLogin,
-                    buttonIcon: EtaIcons.qrcode,
-                    onButton: _login,
-                  )
-                : loading && !_loaded.contains(_cacheKey)
-                ? const Center(
-                    child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    ),
-                  )
-                : error.isNotEmpty && items.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          EtaIcons.alertOutline,
-                          size: 48,
-                          color: scheme.error,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          l10n.pageFavLoadFailed,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          error,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
+            child: CrossFadeSwitcher(
+              switchKey: bodyPhase,
+              child: !loggedIn
+                  ? StreamingEmptyState(
+                      icon: EtaIcons.starOutline,
+                      title: l10n.pageFavLoginTitle,
+                      subtitle: adapter.favLoginDesc(l10n),
+                      buttonLabel: l10n.navHeaderQrLogin,
+                      buttonIcon: EtaIcons.qrcode,
+                      onButton: _login,
+                    )
+                  : loading && !_loaded.contains(_cacheKey)
+                  ? const Center(
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                    )
+                  : error.isNotEmpty && items.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            EtaIcons.alertOutline,
+                            size: 48,
+                            color: scheme.error,
                           ),
-                        ),
-                        const SizedBox(height: 14),
-                        SButton(
-                          label: l10n.commonRetry,
-                          icon: EtaIcons.refresh,
-                          variant: SButtonVariant.secondary,
-                          onPressed: _fetch,
-                        ),
-                      ],
-                    ),
-                  )
-                : items.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          selectedTab.icon,
-                          size: 48,
-                          color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          l10n.pageFavEmpty,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          adapter.favEmptyHint(l10n),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
+                          const SizedBox(height: 10),
+                          Text(
+                            l10n.pageFavLoadFailed,
+                            style: theme.textTheme.bodyMedium,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            error,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          SButton(
+                            label: l10n.commonRetry,
+                            icon: EtaIcons.refresh,
+                            variant: SButtonVariant.secondary,
+                            onPressed: _fetch,
+                          ),
+                        ],
+                      ),
+                    )
+                  : items.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            selectedTab.icon,
+                            size: 48,
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            l10n.pageFavEmpty,
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            adapter.favEmptyHint(l10n),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : CoverGrid(
+                      key: const PageStorageKey('page.favorites'),
+                      items: items,
+                      onTap: _onCoverTap,
+                      maxCrossAxisExtent: selectedTab.extent,
                     ),
-                  )
-                : CoverGrid(
-                    key: const PageStorageKey('page.favorites'),
-                    items: items,
-                    onTap: _onCoverTap,
-                    maxCrossAxisExtent: selectedTab.extent,
-                  ),
+            ),
           ),
         ],
       ),

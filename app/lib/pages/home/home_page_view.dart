@@ -45,30 +45,34 @@ extension _HomePageView on _HomePageState {
                   onOpenArtists: _openMoreArtists,
                 ),
                 const SizedBox(height: 24),
-                if (_loading && !_data.loaded)
-                  const _HomeLoading()
-                else if (_error.isNotEmpty && !_data.loaded)
-                  _HomeError(
-                    theme: theme,
-                    l10n: l10n,
-                    error: _error,
-                    onRetry: _fetchAll,
-                  )
-                else
-                  _HomeSections(
-                    l10n: l10n,
-                    data: _data,
-                    coverRadius: coverRadius,
-                    loading: _loading,
-                    onOpenMorePlaylists: _openMorePlaylists,
-                    onOpenMoreAlbums: _openMoreAlbums,
-                    onOpenMoreArtists: _openMoreArtists,
-                    onOpenPlaylist: _openPlaylist,
-                    onOpenAlbum: _openAlbum,
-                    onOpenArtist: _openArtist,
-                    onPlayPlaylist: _playAllPlaylist,
-                    onPlayAlbum: _playAllAlbum,
-                  ),
+                // 内容四态（加载 / 错误 / 数据）统一交叉淡化，避免整页内容瞬切；
+                // 首帧直接出内容，不做入场动画（见 CrossFadeSwitcher）。
+                CrossFadeSwitcher(
+                  switchKey: _contentPhase,
+                  child: switch (_contentPhase) {
+                    'loading' => const _HomeLoading(),
+                    'error' => _HomeError(
+                      theme: theme,
+                      l10n: l10n,
+                      error: _error,
+                      onRetry: _fetchAll,
+                    ),
+                    _ => _HomeSections(
+                      l10n: l10n,
+                      data: _data,
+                      coverRadius: coverRadius,
+                      loading: _loading,
+                      onOpenMorePlaylists: _openMorePlaylists,
+                      onOpenMoreAlbums: _openMoreAlbums,
+                      onOpenMoreArtists: _openMoreArtists,
+                      onOpenPlaylist: _openPlaylist,
+                      onOpenAlbum: _openAlbum,
+                      onOpenArtist: _openArtist,
+                      onPlayPlaylist: _playAllPlaylist,
+                      onPlayAlbum: _playAllAlbum,
+                    ),
+                  },
+                ),
               ],
             ),
           ),
