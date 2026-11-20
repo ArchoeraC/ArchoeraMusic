@@ -159,7 +159,7 @@
 4. 每个 vendored 组件必须登记"是否可自研"的裁决结论（§3.7），新格式一律先按自研评估（AAC 依此由 🔴 改 ✅ 自研，§9）
 5. FFmpeg（LGPL；Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）：**保持为默认主解码引擎**（`-Duse-ffmpeg` 默认开启，动态链接 + 内嵌运行库），
    保证现状解码能力零回归；Zig 内核逐格式验收后**按格式接管**（§8.3），发布版默认带（LGPL 合规说明同现状）；
-   明确不引入：faad2（GPL）、libfdk-aac（非自由）、任何 GPL/SSPL/商业源可用（[docs/licensing.md §2.5](licensing.md#25-第三方代码的约束)）
+   明确不引入：faad2（GPL）、libfdk-aac（非自由）、任何 GPL/SSPL/商业源可用（[docs/licensing.md §2.2](licensing.md#22-第三方代码的约束)）
 ```
 
 ### 3.4 与已归档 C 方案（`archive/audio-kernel-no-ffmpeg.md`）的差异

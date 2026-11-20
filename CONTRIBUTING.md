@@ -3,7 +3,7 @@
 > **温馨提醒**：开发者可能呆但不傻，请在完整阅读完贡献条款，确认您可以接受后，再进行 fork、PR 等操作。
 
 > **太长不看版**：
-> 1. 向本仓库提交代码即表示接受 [贡献者授权](docs/licensing.md#22-贡献者授权contributor-license-grant)（AGPL-3.0-or-later 不可撤销再许可授权）；
+> 1. 向本仓库提交代码即表示接受 [贡献者授权](docs/licensing.md#21-贡献者授权contributor-license-grant)（AGPL-3.0-or-later 不可撤销再许可授权）；
 > 2. 提交前本地跑通 `flutter analyze` + `flutter test`（改动原生模块时另跑对应构建/测试）；
 > 3. Commit 遵循 `type(scope): 中文描述`（Conventional Commits，见 §7）；
 > 4. 新增第三方依赖必须 AGPL 兼容，并在对应模块 `THIRD-PARTY-LICENSES.md` 逐项登记（§9）；
@@ -38,8 +38,8 @@
 ## 1. 许可与贡献者授权（先读这个）
 
 - 本项目整体以 **AGPL-3.0-or-later** 发布（仓库根 `LICENSE`）。任何 PR / patch / 直接推送均视为
-  已接受 [§2.2 贡献者授权](docs/licensing.md#22-贡献者授权contributor-license-grant)：
-  授权版权持有者 BetaStudio2 将贡献代码连同项目整体以「AGPL-3.0 及任何更高版本」再许可、分发与修改。
+  已接受 [§2.1 贡献者授权](docs/licensing.md#21-贡献者授权contributor-license-grant)：
+  授权版权持有者 BetaStudio2 将贡献代码连同项目整体以「AGPL-3.0-or-later」再许可、分发与修改。
   **PR 合入前需要通过签名或显式确认接受该条款**。
 - 贡献者署名权保留（git author / changelog），署名请使用真实可追溯的身份标识。
 - 对许可证边界有疑问（尤其是第三方代码引入、闭源集成）：**先开 Issue 咨询，再动手**。
@@ -417,7 +417,7 @@ PR 描述需包含：
 
 ## 9. 第三方依赖与许可合规
 
-> 详见 [许可与授权 §2.5](docs/licensing.md#25-第三方代码的约束)，本节为执行清单。
+> 详见 [许可与授权 §2.2](docs/licensing.md#22-第三方代码的约束)，本节为执行清单。
 
 - **许可白名单基线**：MIT / BSD / Apache-2.0 / ISC / MIT-0 / CC0 / OFL，以及 weak-copyleft
   （LGPL-2.1+ / LGPL-3.0+ / MPL-2.0）在逐项登记后可引入。
@@ -484,7 +484,7 @@ PR 描述需包含：
 - 功能开发用特性分支（`feat/xxx`、`fix/xxx`），PR 合入，不直接推主干（维护者小修可直接推但需符合 commit 规范）。
 - **历史保护**：`main` 禁止 force push 与已推送历史的改写 / rebase；纠错走新提交（优先 `revert`）。
 - **签名要求**：维护者的敏感提交——LICENSE 变更、版本发布（`chore(version)`）、本规范与 CI 变更——
-  必须 GPG / SSH 签名（许可升级的签名要求见 [§2.4 升级流程](docs/licensing.md#24-升级流程预先约定)）。
+  必须 GPG / SSH 签名。
 
 ## 12. Issue 与缺陷报告
 
@@ -516,4 +516,4 @@ PR 描述需包含：
   追加编号条目 + 修订相关专题文档 + 在 PR 中显著标注，必要时开公告 Issue 收集反馈。
 - **评审纪律（§2.6）**：禁止借权限威胁、禁止设隐性合并门槛、禁止无故搁置合格 PR；
   拒绝合并须给出书面理由（红线命中除外，按无解释直接关闭执行）。
-- **许可升级**：仅按 [§2.4 升级流程](docs/licensing.md#24-升级流程预先约定) 执行（公告期 ≥ 30 天 + 签名提交）。
+- **许可变更**：须以签名提交更新 `LICENSE` 与 [许可与授权](docs/licensing.md)，并在 PR 中显著标注。

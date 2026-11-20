@@ -45,7 +45,7 @@ flutter run -d linux      # 或 windows / macos
 - [平台能力外观层](docs/platform-capability-facade.md) —— 防休眠 / 媒体会话 / 系统定位的能力接口
 - [解码基准（EraAudio vs FFmpeg）](docs/benchmark-2026-09-21.md) —— 出厂最小 FFmpeg 基线 + 多轮稳定性
 - [音频 Zig 解码内核路线图](docs/audio-kernel-zig.md) —— 内核架构 / 第三方来源登记
-- [许可与授权](docs/licensing.md) —— AGPL-3.0-or-later / 贡献者授权 / 未来许可升级策略
+- [许可与授权](docs/licensing.md) —— AGPL-3.0-or-later / 贡献者授权 / 第三方代码约束
 - [凭据保险库安全说明](docs/vault-security-notes.md) —— 测试后门边界 / 二进制替换防护 / 威胁模型
 - [第三方声明与特别鸣谢](docs/acknowledgements.md) —— 运行库许可 / 字体 / 图标 / 开源项目致谢
 - [第三方运行库许可声明](THIRD-PARTY-NOTICES.md) —— 随发布产物分发的内嵌运行库
@@ -57,7 +57,7 @@ flutter run -d linux      # 或 windows / macos
 在遵守 AGPL 义务（分发或提供网络服务时开放源码、保留声明并标注修改）的前提下，自由使用、学习、修改与再分发（含商业用途）均被许可；本项目不提供闭源商业授权。
 
 > 「不提供闭源商业授权」是**作者的意向声明**，不构成对 AGPL 的附加限制：任何人仍可依 AGPL 将本项目用于闭源产品，但须完整履行 AGPL 义务（开放源码、保留声明、标注修改）。
-> 贡献者授权与未来许可升级策略见 [docs/licensing.md](docs/licensing.md)，用户可读声明见 [docs/software-declaration.md](docs/software-declaration.md)。
+> 贡献者授权与第三方代码约束见 [docs/licensing.md](docs/licensing.md)，用户可读声明见 [docs/software-declaration.md](docs/software-declaration.md)。
 
 ## 支持项目
 
@@ -80,4 +80,4 @@ flutter run -d linux      # 或 windows / macos
 
 - 仓库：<https://github.com/ArchoeraC/ArchoeraMusic>
 - 贡献前请阅读 **[CONTRIBUTING.md](CONTRIBUTING.md)**；安全漏洞请按 [SECURITY.md](SECURITY.md) 隐式报告。
-- PR 合入前需通过签名或显式确认接受 [贡献者授权](docs/licensing.md#22-贡献者授权contributor-license-grant)。
+- PR 合入前需通过签名或显式确认接受 [贡献者授权](docs/licensing.md#21-贡献者授权contributor-license-grant)。
