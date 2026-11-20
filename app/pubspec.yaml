@@ -24,6 +24,8 @@ version: 1.0.7+0
 
 environment:
   # 桌面平台能力经自研桥接（apl_*）；Flutter 3.47+ 为依赖链下限。
+  # 本地/CI 固定 Flutter 3.50.1（Dart 3.14.0）；Nix 源构建仍用 nixpkgs 的
+  # Flutter 3.47（Dart 3.13），所以下限保持 3.47、由 pubspec.lock 各自解析。
   sdk: ^3.13.0
   flutter: ">=3.47.0"
 
