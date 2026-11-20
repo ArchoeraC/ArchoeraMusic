@@ -14,7 +14,7 @@
 
 part of '../settings_dialog.dart';
 
-/// 由设置源码生成的搜索索引（292 条）。
+/// 由设置源码生成的搜索索引（286 条）。
 List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
   // 设置行与小节标题（按分类顺序）。
   _SearchEntry(
@@ -1506,30 +1506,6 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
     SettingsCategory.mediaSource.icon,
   ),
   _SearchEntry(
-    SettingsCategory.experimentalSource,
-    l10n.settingsTitle,
-    l10n.settingsEnableDesc,
-    SettingsCategory.experimentalSource.icon,
-  ),
-  _SearchEntry(
-    SettingsCategory.experimentalSource,
-    l10n.settingsEnable,
-    l10n.settingsEnableDesc,
-    SettingsCategory.experimentalSource.icon,
-  ),
-  _SearchEntry(
-    SettingsCategory.experimentalSource,
-    l10n.settingsLogin,
-    '',
-    SettingsCategory.experimentalSource.icon,
-  ),
-  _SearchEntry(
-    SettingsCategory.experimentalSource,
-    l10n.settingsPasswordLogin,
-    l10n.settingsPasswordLoginDesc,
-    SettingsCategory.experimentalSource.icon,
-  ),
-  _SearchEntry(
     SettingsCategory.mcp,
     l10n.settingsMcpTitle,
     '',
@@ -1718,18 +1694,6 @@ List<_SearchEntry> _generatedSettingsSearchIndex(AppLocalizations l10n) => [
   _SearchEntry(
     SettingsCategory.about,
     l10n.settingsCommunityRepo,
-    '',
-    SettingsCategory.about.icon,
-  ),
-  _SearchEntry(
-    SettingsCategory.about,
-    l10n.settingsSectionThirdPartyService,
-    '',
-    SettingsCategory.about.icon,
-  ),
-  _SearchEntry(
-    SettingsCategory.about,
-    l10n.settingsApiDocs,
     '',
     SettingsCategory.about.icon,
   ),

@@ -13,7 +13,6 @@ import '../services/log/log.dart';
 import '../services/playback/playback_notifier.dart';
 import '../services/qqmusic/qqmusic_api.dart' show kQqFavExperimental;
 import '../services/search/search_service.dart';
-import '../stores/app_prefs.dart';
 import '../stores/providers.dart';
 import '../widgets/common/splash_screen.dart';
 import '../widgets/dialogs/kugou_risk_verify_dialog.dart';
@@ -42,8 +41,6 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
         await Future.wait([
           ref.read(playbackProvider.notifier).restore(),
           ref.read(neteaseAuthProvider.notifier).init(),
-          // 实验性音源 ：恢复登录态（未启用时也只是读一次空会话）。
-          ref.read(ApiProvider).restore(),
         ]);
       } catch (e, s) {
         // 现场恢复 / 登录态初始化异常不阻塞后续初始化（下载引擎等），
@@ -117,12 +114,6 @@ class _AuthBootstrapState extends ConsumerState<AuthBootstrap> {
     ref.listen(bilibiliApiProvider.select((s) => s.isLoggedIn), (prev, next) {
       if (prev == next) return;
       ref.read(downloadControllerProvider.notifier).syncSessions();
-    });
-    // 实验性音源  登录态变化：同步红心集合（仅在该音源启用时）。
-    ref.listen(ApiProvider.select((s) => s.isLoggedIn), (prev, next) {
-      if (prev == next) return;
-      if (!SourceUsable(ref.read(appPrefsProvider))) return;
-      ref.read(likeControllerProvider).sync();
     });
     return widget.child;
   }

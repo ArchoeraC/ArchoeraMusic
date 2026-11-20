@@ -22,7 +22,6 @@ import 'prefs_download.dart';
 import 'prefs_easter_egg.dart';
 import 'prefs_history.dart';
 import 'prefs_lyrics.dart';
-import 'prefs_.dart';
 import 'prefs_player.dart';
 import 'prefs_power.dart';
 import 'prefs_preset.dart';
@@ -45,7 +44,6 @@ export 'prefs_download.dart';
 export 'prefs_easter_egg.dart';
 export 'prefs_history.dart';
 export 'prefs_lyrics.dart';
-export 'prefs_.dart';
 export 'prefs_player.dart';
 export 'prefs_power.dart';
 export 'prefs_preset.dart';
@@ -905,18 +903,6 @@ class AppPrefsNotifier extends Notifier<AppPrefs> {
   /// 设置「关闭应用时」行为（ask=每次询问 / background=后台播放 / quit=直接退出）。
   void setCloseBehavior(String value) {
     state = state.copyWithCloseBehavior(value);
-    state.save();
-  }
-
-  /// 设置实验性音源  总开关（默认关）。
-  void setEnabled(bool value) {
-    state = state.copyWithEnabled(value);
-    state.save();
-  }
-
-  /// 设置  应用内账号密码登录（默认关；关闭时只提供扫码）。
-  void setPasswordLogin(bool value) {
-    state = state.copyWithPasswordLogin(value);
     state.save();
   }
 

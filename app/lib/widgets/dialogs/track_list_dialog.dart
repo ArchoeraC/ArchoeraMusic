@@ -208,69 +208,6 @@ Future<void> showNeteaseArtistDialog(BuildContext context, CoverItem artist) {
   );
 }
 
-/// 曲目列表弹窗（歌手单曲 / 我喜欢 复用）。
-Future<void> showTracksDialog(
-  BuildContext context, {
-  required String title,
-  String? subtitle,
-  String? cover,
-  String? playlistId,
-  String playlistSource = 'netease',
-  required Future<List<Track>> Function(WidgetRef ref) loadTracks,
-}) => showKugouTracksDialog(
-  context,
-  title: title,
-  subtitle: subtitle,
-  cover: cover,
-  playlistId: playlistId,
-  playlistSource: playlistSource,
-  loadTracks: loadTracks,
-);
-
-/// 公开歌单详情弹窗（搜索结果的歌单）。
-Future<void> showPlaylistDetailDialog(
-  BuildContext context,
-  CoverItem playlist,
-) {
-  return showTracksDialog(
-    context,
-    title: playlist.title,
-    subtitle: playlist.subtitle,
-    cover: playlist.cover,
-    playlistId: playlist.id,
-    playlistSource: '',
-    loadTracks: (ref) => ref.read(ApiProvider).playlistTracks(playlist.id),
-  );
-}
-
-/// 收藏歌单详情弹窗（收藏页「收藏的歌单」）。
-Future<void> showFavoritePlaylistDialog(
-  BuildContext context,
-  CoverItem playlist,
-) {
-  return showTracksDialog(
-    context,
-    title: playlist.title,
-    subtitle: playlist.subtitle,
-    cover: playlist.cover,
-    playlistId: playlist.id,
-    playlistSource: '',
-    loadTracks: (ref) =>
-        ref.read(ApiProvider).favoritePlaylistTracks(playlist.id),
-  );
-}
-
-/// 歌手详情弹窗（歌手全部曲目）。
-Future<void> showArtistDialog(BuildContext context, CoverItem artist) {
-  return showTracksDialog(
-    context,
-    title: artist.title,
-    subtitle: context.l10n.trackListArtistHotSongs,
-    cover: artist.cover,
-    loadTracks: (ref) => ref.read(ApiProvider).artistTracks(artist.id),
-  );
-}
-
 /// 打开每日推荐弹窗（需登录；未登录返回空列表由 UI 提示）。
 Future<void> showDailyRecommendDialog(BuildContext context) {
   final l10n = context.l10n;

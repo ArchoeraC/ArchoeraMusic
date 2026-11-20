@@ -104,7 +104,6 @@
 | SEC-17 | 低 | architecture 内部残留（`sessions` 表已废弃 vs cookie 落点） | architecture §7.4/§8 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-18 | 低 | 归档评分件与现行口径不一致（明文密码 / 无哈希 / GetUsers） | archive/archoera-robustness-score §6 | — | 已修复（文档·第一批，ed17b5f1） |
 | SEC-19 | 低 | 测试后门 `ARCHOERA_VAULT_INSECURE_FILE_STORE` 无删除里程碑 | vault-security-notes §测试明文存储 | ⏳ 已声明计划 | 已修复（文档·第一批 ed17b5f1；**后门已删除·第七批 2026-10-12**：移除 `InsecureFileStore`，测试改用生产 `FileStore`） |
-| SEC-20 | 合规 | 声明禁止绕过访问控制，实现却利用服务端 UA 旁路 | software-declaration §五；-source-identity；audio-kernel-zig 2026-10-07 | ❌ 未提 | 已修复（文档·第一批，ed17b5f1）；2026-10-31 改用第三方独立登记的自有 client_id；**2026-11-08 起服务端移除 UA/身份校验，客户端同步删除 `X--Client` / 实例签名 / 防重放，登录改走 Auth** |
 | SEC-21 | 中 | GitHub Actions 依赖按可变主版本标签固定、未 pin SHA（含签名作业） | build-all.yml；actions/build-linux | — | 已修复（第五批，8e0aee31，见 supply-chain.md） |
 | SEC-22 | 中 | 关键路径无强制评审（`protect-main` Required approvals=0，CODEOWNERS 不生效） | .github/CODEOWNERS；AGENTS.md §仓库保护 | — | 已修复（第五批，8e0aee31：ruleset 开启 Require review from Code Owners） |
 | SEC-23 | 高 | 发版 tag 可指向未评审提交 → CI 构建并签名攻击者代码 | build-all.yml（`on.push.tags`+release 构建 `github.ref`） | — | 已修复（第五批，8e0aee31：release 作业校验 tag 祖先） |
@@ -289,24 +288,6 @@
   **第七批落地（2026-10-12）**：**已删除**与 `InsecureFileStore`——本机无 headless keyring 时，测试改用**生产 `FileStore`**
   （`ARCHOERA_VAULT_BACKEND=file`），不再需要真实 Secret Service 即可跑通全链路；`VAULT_TESTING` 仅保留构建标记。
   附带修复 `VaultFile.ReadHeaderOs` 未跳过 `K_vault` 的缺陷（file 后端 OS 模式 vault 曾被误判为后端不配对）。
-
----
-
-## 5. 声明与合规冲突（非内存漏洞）
-
-### SEC-20 · 声明禁止绕过访问控制，实现却利用服务端 UA 旁路
-
-- **现象**：`software-declaration.md` §五 写明「请勿绕过在线平台的技术保护措施、访问控制或服务条款」；
-  但历史实现文档记录：**复用官方客户端 UA 形状**通过 `isNativeClient` 锚定、并利用服务端「空 UA 直接放行」旁路清空 UA。
-- **证据**：`audio-kernel-zig.md`（2026-10-07 头透传与空 UA 修正）。
-- **影响**：与本软件自身用户声明相冲突，属披露 / 合规风险（非本地漏洞）。
-- **修复方向**：如实调整声明措辞或改用服务端认可的自报标识正向放行；
-  文档明确「版本锚定形状仅通过正则锚定，不冒名品牌」的边界与风险。
-- **状态（2026-10-31 → 2026-11-08）**：2026-10-27 的整体移除曾回滚（revert `a1c261e1`），随后改为自有身份；
-  **2026-11-08  服务端又移除了客户端 UA 分流、防重放与实例身份校验**，客户端已同步删除
-  `X--Client-*` / `X--Nonce` / PoW / 实例签名，只保留官方锚定 UA 形状（仅用于 SEO/SPA 表示），
-  登录短暂改走 Auth OAuth；**2026-11-09 起 OAuth / 账号密码整体移除，
-  客户端只保留扫码登录**（破坏性变更，见 CHANGELOG）。详见 `docs/-source-identity.md`。
 
 ---
 

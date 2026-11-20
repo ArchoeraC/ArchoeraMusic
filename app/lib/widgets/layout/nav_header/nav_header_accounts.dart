@@ -15,38 +15,23 @@ class _AccountsMenu extends ConsumerWidget {
     final kugouApi = ref.read(kugouApiProvider);
     final qqApi = ref.read(qqMusicApiProvider);
     final biliApi = ref.read(bilibiliApiProvider);
-    final Enabled = ref.watch(appPrefsProvider.select(SourceUsable));
-    final Api = ref.read(ApiProvider);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([kugouApi, qqApi, biliApi, Api]),
+      listenable: Listenable.merge([kugouApi, qqApi, biliApi]),
       builder: (context, _) {
         final kugou = kugouApi.session;
         final qqProfile = qqApi.profile;
         final qqLogged = qqApi.isLoggedIn;
         final biliProfile = biliApi.profile;
         final biliLogged = biliApi.isLoggedIn;
-        final Logged = Api.isLoggedIn;
-        final AvatarUrl = Api.userAvatarUrl(Api.account?.id);
 
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
         final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
         final primaryBili =
             !primaryNetease && !primaryKugou && !primaryQq && biliLogged;
-        final primary =
-            !primaryNetease &&
-            !primaryKugou &&
-            !primaryQq &&
-            !primaryBili &&
-            Enabled &&
-            Logged;
         final anyLoggedIn =
-            primaryNetease ||
-            primaryKugou ||
-            primaryQq ||
-            primaryBili ||
-            primary;
+            primaryNetease || primaryKugou || primaryQq || primaryBili;
 
         final avatarUrl = netease?.avatarUrl?.trim();
         final neteaseNick = netease?.nickname.trim() ?? '';
@@ -71,11 +56,6 @@ class _AccountsMenu extends ConsumerWidget {
           primary = _AccountAvatar(
             avatarUrl: biliProfile?.avatarUrl,
             nickname: biliNick.isEmpty ? 'B' : biliNick,
-          );
-        } else if (primary) {
-          primary = _AccountAvatar(
-            avatarUrl: AvatarUrl,
-            nickname: Api.account?.displayName ?? '',
           );
         } else {
           primary = Container(
@@ -128,16 +108,6 @@ class _AccountsMenu extends ConsumerWidget {
                 toast(
                   context.l10n.loginLoggedOut(
                     platform: context.l10n.brandBilibili,
-                  ),
-                );
-              case 'login_':
-                showLoginDialog(context);
-              case 'logout_':
-                unawaited(Api.logout());
-                ref.read(likeControllerProvider).sync();
-                toast(
-                  context.l10n.loginLoggedOut(
-                    platform: l10n.settingsTitle,
                   ),
                 );
             }
@@ -193,21 +163,6 @@ class _AccountsMenu extends ConsumerWidget {
               avatarName: biliNick.isEmpty ? 'B' : biliNick,
               displayName: biliNick.isEmpty ? l10n.brandBilibili : biliNick,
             ),
-            // 实验性音源 （仅启用时显示）。
-            if (Enabled)
-              ..._platformSection(
-                l10n: l10n,
-                title: l10n.settingsTitle,
-                loggedIn: Logged,
-                loginValue: 'login_',
-                logoutValue: 'logout_',
-                nameValue: 'name_',
-                avatarUrl: AvatarUrl,
-                avatarName: Api.account?.displayName ?? '',
-                displayName:
-                    Api.account?.displayName ??
-                    l10n.settingsNotLoggedIn,
-              ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -228,9 +183,7 @@ class _AccountsMenu extends ConsumerWidget {
                           ? (qqNick.isEmpty ? l10n.brandQqMusic : qqNick)
                           : primaryBili
                           ? (biliNick.isEmpty ? l10n.brandBilibili : biliNick)
-                          : (Api.account?.displayName.isNotEmpty ?? false)
-                          ? Api.account!.displayName
-                          : l10n.settingsTitle,
+                          : '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

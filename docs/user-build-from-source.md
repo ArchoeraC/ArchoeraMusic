@@ -102,11 +102,6 @@ dart analyze lib         # 可选：静态检查
 flutter build linux --release
 ```
 
-> **可选：启用  音源**。该音源默认关闭，在「设置 → 实验性音源」
-> 打开即可；登录可选「应用内账号密码」或「扫码」（账号密码只用于向 Auth
-> 换取令牌，不保存在本机），不再需要构建期注入客户端标识，也不需要额外
-> `--dart-define`。
-
 **产物位置**：`app/build/linux/x64/release/bundle/`
 - `archoera_music`（可执行文件）
 - `data/`（Flutter assets + icudtl）

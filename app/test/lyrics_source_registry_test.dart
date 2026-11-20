@@ -5,11 +5,10 @@
 /// 歌词来源注册表守卫：
 /// - 每个 [SourcePlatform.lyricSources] 声明的来源 id 必须与音源 `source` 一致，
 ///   且全局唯一（防止新增/重构歌词来源时漏登记或串台）；
-/// -  的富歌词来源（`-v1`）只参与  曲目的标准源回退，不得出现在
-///   其它平台的候选里。
+/// - 在线源按默认顺序回退到其它平台，非在线源只用自己的来源。
 ///
-/// 背景：`-v1` 解析接入后，来源层只负责 I/O，格式优先级统一交给
-/// `apis/lyric/format.dart`；注册关系不变，但需要一条回归守卫避免后续
+/// 背景：来源层只负责 I/O，格式优先级统一交给
+/// `apis/lyric/format.dart`；注册关系需要回归守卫，避免后续
 /// 「解析器能力」与「注册表登记」再次脱节。
 library;
 
@@ -62,7 +61,6 @@ void main() {
         'netease',
         'kugou',
         'qqmusic',
-        '',
         'local',
         'streaming',
       ]),
@@ -70,20 +68,15 @@ void main() {
     expect(registered.keys, isNot(contains('bilibili')));
   });
 
-  test(' 富歌词来源参与自身回退，不进入其它平台候选', () {
+  test('在线源按默认顺序回退，非在线源只用自身来源', () {
     final container = ProviderContainer.test();
     final engine = LyricsEngine(container.read(_allSourcesProvider));
 
-    expect(
-      engine.orderedSources('', defaultLyricSourceOrder).map((s) => s.id),
-      ['', 'netease', 'qqmusic', 'kugou'],
-    );
     // 非在线源只用自己的来源，不做在线回退。
     expect(
       engine.orderedSources('local', defaultLyricSourceOrder).map((s) => s.id),
       ['local'],
     );
-    // 其它平台不会把  来源加入候选。
     expect(
       engine
           .orderedSources('netease', defaultLyricSourceOrder)

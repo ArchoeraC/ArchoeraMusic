@@ -1124,126 +1124,8 @@ class AppLocalizationsDe extends AppLocalizations {
       'Datei konnte nicht angezeigt werden (kein Dateimanager verfügbar)';
 
   @override
-  String get settingsSectionThirdPartyService => 'Drittanbieter-Dienste';
-
-  @override
-  String get settingsAttribution =>
-      'Bereitgestellt mit Unterstützung der  Music API';
-
-  @override
-  String get settingsApiDocs => ' Music API-Dokumentation';
-
-  @override
   String get settingsSongCacheMemoryHint =>
       '„In-Memory-Wiedergabe“ ist aktiv – der Song-Cache wird nicht auf die Festplatte geschrieben';
-
-  @override
-  String get platform => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => 'Experimentelle Quellen';
-
-  @override
-  String get settingsExperimentalSourceSubtitle =>
-      'Drittanbieter-Quellen (standardmäßig aus)';
-
-  @override
-  String get settingsTitle => '';
-
-  @override
-  String get settingsNote =>
-      'Experimentelle Drittanbieter-Quelle, inoffiziell; nur Anmeldung (keine Registrierung/VIP-Kauf). Kann jederzeit ausfallen.';
-
-  @override
-  String get settingsEnable => ' aktivieren';
-
-  @override
-  String get settingsEnableDesc =>
-      'NK in Suche, Favoriten und Bibliothek anzeigen (standardmäßig aus)';
-
-  @override
-  String get settingsLogin => 'Anmelden';
-
-  @override
-  String get settingsLogout => 'Abmelden';
-
-  @override
-  String settingsLoggedInAs({required Object name}) {
-    return 'Angemeldet als $name';
-  }
-
-  @override
-  String get settingsNotLoggedIn => 'Nicht angemeldet';
-
-  @override
-  String get settingsPasswordLogin => 'Passwort-Anmeldung in der App';
-
-  @override
-  String get settingsPasswordLoginDesc =>
-      'Experimentell: direkt in der App mit Auth-Konto und Passwort anmelden. Ausgeschaltet ist nur QR-Anmeldung verfügbar';
-
-  @override
-  String get LoginTitle => 'Bei  anmelden';
-
-  @override
-  String get LoginQrHint => 'Mit der -App scannen und anmelden';
-
-  @override
-  String get LoginTabPassword => 'Konto';
-
-  @override
-  String get LoginTabQr => 'QR-Code';
-
-  @override
-  String get LoginAccountHint => 'E-Mail, Benutzername oder Telefon';
-
-  @override
-  String get LoginPasswordHint => 'Passwort';
-
-  @override
-  String get LoginSubmit => 'Anmelden';
-
-  @override
-  String get LoginAccountRequired => 'Konto eingeben';
-
-  @override
-  String get LoginPasswordRequired => 'Passwort eingeben';
-
-  @override
-  String get LoginPasswordNote =>
-      'Das Passwort dient nur zum Abrufen eines Auth-Tokens und wird nicht auf diesem Gerät gespeichert';
-
-  @override
-  String get QrScanned => 'Gescannt, bitte am Handy bestätigen';
-
-  @override
-  String get QrCanceled => 'Anmeldung abgebrochen';
-
-  @override
-  String get QrExpired => 'QR-Code abgelaufen, bitte neu erzeugen';
-
-  @override
-  String get toastLoginRequired =>
-      'Aktion fehlgeschlagen (bitte prüfen, ob du bei deinem NK-Konto angemeldet bist)';
-
-  @override
-  String get pageLikedLoginHint =>
-      'Melde dich bei NK an, um deine Lieblingssongs zu sehen';
-
-  @override
-  String get pageLikedLoginDesc =>
-      'Melde dich bei  an, um Lieblingssongs zu synchronisieren';
-
-  @override
-  String get pageLikedEmptyHint =>
-      'Noch keine Lieblingssongs – tippe in der Suche auf das Herz';
-
-  @override
-  String get pageFavLoginDesc =>
-      'Melde dich bei  an, um Playlists und Favoriten zu sehen';
-
-  @override
-  String get pageFavEmptyHint => 'Noch keine Playlists oder Favoriten';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -6101,7 +5983,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      'Verwendung: archoerashell search <Quelle> <Begriff> [-n Anzahl] [-p Seite]\n\nSongs auf einer Quelle suchen.\n  Quelle: netease | kugou | qqmusic | \n  -n, --limit <n>   Anzahl (1-50, Standard 20)\n  -p, --page <n>    Seite (ab 1)\nBeispiel: archoerashell search netease Jay -n 10';
+      'Verwendung: archoerashell search <Quelle> <Begriff> [-n Anzahl] [-p Seite]\n\nSongs auf einer Quelle suchen.\n  Quelle: netease | kugou | qqmusic\n  -n, --limit <n>   Anzahl (1-50, Standard 20)\n  -p, --page <n>    Seite (ab 1)\nBeispiel: archoerashell search netease Jay -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>

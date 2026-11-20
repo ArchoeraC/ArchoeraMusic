@@ -21,14 +21,6 @@ extension _LikedPageView on _LikedPageState {
         ref.listen(signal, (_, _) => _onAuthChanged(p.source));
       }
     }
-    // 实验性音源开关影响下拉选项（collectionPlatforms 读 enabled）：watch 触发重建。
-    ref.watch(appPrefsProvider.select(SourceUsable));
-    // 已启用平台集合变化：当前平台被关闭则退回默认平台。
-    ref.listen(appPrefsProvider.select(SourceUsable), (prev, next) {
-      if (!collectionPlatform(_platform).enabled(ref)) {
-        _switchPlatform(defaultLikedPlatform(ref));
-      }
-    });
     // 默认音源设置变化：页面尚未手动切换过时，跟随新的默认音源。
     ref.listen(appPrefsProvider.select((p) => p.defaultSource), (prev, next) {
       if (ref.read(likedPlatformProvider) != null) return;

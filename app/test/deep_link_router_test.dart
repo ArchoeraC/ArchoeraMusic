@@ -4,7 +4,7 @@
 
 /// 深链路由回归：
 /// - 启动期（`markReady` 之前）到达的 `archoera://` 先缓冲；
-/// - 已移除的 `://` 登录回调不再被派发（未知 scheme 一律忽略）。
+/// - 未知 scheme 的深链一律忽略。
 library;
 
 import 'dart:async';
@@ -61,7 +61,7 @@ void main() {
     expect(fake.activated, 0, reason: '启动完成前不派发页面路由');
   });
 
-  test(':// 登录回调已移除：不置前窗口、不派发', () async {
+  test('未知 scheme 不置前窗口、不派发', () async {
     final fake = _FakeDeepLink();
     addTearDown(fake.dispose);
     final router = DeepLinkRouter(fake);
@@ -69,7 +69,7 @@ void main() {
     router.start();
     router.markReady();
 
-    fake.emit(Uri.parse('://sso/complete?handoff=stale'));
+    fake.emit(Uri.parse('unknownscheme://path?x=1'));
     await Future<void>.delayed(Duration.zero);
     expect(fake.activated, 0);
   });
@@ -81,7 +81,7 @@ void main() {
     addTearDown(router.dispose);
     router.start();
 
-    fake.emit(Uri.parse('://sso/complete?handoff=early'));
+    fake.emit(Uri.parse('unknownscheme://path?x=early'));
     await Future<void>.delayed(Duration.zero);
     expect(fake.activated, 0);
 
