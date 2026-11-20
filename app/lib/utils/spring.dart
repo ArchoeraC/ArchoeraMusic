@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 /// 歌词 v7 一维弹簧引擎（移植自 AMLL
-/// `amll-dev/applemusic-like-lyrics`，MIT）。
+/// `amll-dev/applemusic-like-lyrics`，AGPL-3.0-only）。
 ///
 /// 基于阻尼振荡器的闭式解：无需逐帧积分，把帧间隔（秒）喂给 [Spring1D.update]
 /// 即可直接求值当前位置。按阻尼比 ζ = damping / (2·√(stiffness·mass)) 分支：
