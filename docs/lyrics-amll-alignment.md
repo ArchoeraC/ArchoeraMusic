@@ -4,7 +4,8 @@
 > 范围：AMLL 引擎（`lyrics.engine = 'amll'`）的**表现层**——时钟、扫亮、景深、
 > 逐词动画、间奏识别、背景人声行。布局/弹簧/缓存的既有设计不变。
 > （间奏三点等待动画已移除：间奏期间保持不点亮任何行、锚点停在间奏前一行。）
-> 上游参考：`amll-dev/applemusic-like-lyrics`（`packages/core/src/lyric-player`，MIT）。
+> 上游参考：`amll-dev/applemusic-like-lyrics`（`packages/core/src/lyric-player`，AGPL-3.0-only；
+> 本项目为 Dart 衍生实现，随本项目以 AGPL-3.0 分发，保留上游版权声明与修改说明）。
 > 关联：[player-render-optimization.md](player-render-optimization.md) §4.2 / §4.2b、
 > [architecture.md](architecture.md) §10.2。
 
