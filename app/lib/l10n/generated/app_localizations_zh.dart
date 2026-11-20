@@ -1085,115 +1085,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toastRevealFileFailed => '无法定位文件（系统文件管理器不可用）';
 
   @override
-  String get settingsSectionThirdPartyService => '第三方服务致谢';
-
-  @override
-  String get settingsAttribution => '本程序由  歌姬计划 API 提供技术支持';
-
-  @override
-  String get settingsApiDocs => ' 歌姬计划 API 文档';
-
-  @override
   String get settingsSongCacheMemoryHint => '已开启「纯内存播放」，歌曲缓存不会写入磁盘';
-
-  @override
-  String get platform => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => '实验性音源';
-
-  @override
-  String get settingsExperimentalSourceSubtitle => '第三方音源（默认关闭）';
-
-  @override
-  String get settingsTitle => '';
-
-  @override
-  String get settingsNote => '第三方实验音源，非官方接入；仅支持登录，不提供注册与 VIP 开通，接口可能随时失效。';
-
-  @override
-  String get settingsEnable => '启用 ';
-
-  @override
-  String get settingsEnableDesc => '在搜索、我喜欢、收藏中显示 NK（默认关闭）';
-
-  @override
-  String get settingsLogin => '登录';
-
-  @override
-  String get settingsLogout => '退出登录';
-
-  @override
-  String settingsLoggedInAs({required Object name}) {
-    return '已登录：$name';
-  }
-
-  @override
-  String get settingsNotLoggedIn => '未登录';
-
-  @override
-  String get settingsPasswordLogin => '应用内账号密码登录';
-
-  @override
-  String get settingsPasswordLoginDesc =>
-      '实验性：在软件内直接输入 Auth 账号密码登录；关闭时只提供扫码登录';
-
-  @override
-  String get LoginTitle => '登录 ';
-
-  @override
-  String get LoginQrHint => '请使用  手机 App 扫码登录';
-
-  @override
-  String get LoginTabPassword => '账号密码';
-
-  @override
-  String get LoginTabQr => '扫码登录';
-
-  @override
-  String get LoginAccountHint => '邮箱 / 用户名 / 手机号';
-
-  @override
-  String get LoginPasswordHint => '密码';
-
-  @override
-  String get LoginSubmit => '登录';
-
-  @override
-  String get LoginAccountRequired => '请输入账号';
-
-  @override
-  String get LoginPasswordRequired => '请输入密码';
-
-  @override
-  String get LoginPasswordNote => '密码仅用于向 Auth 换取令牌，不会保存在本机';
-
-  @override
-  String get QrScanned => '已扫码，请在手机上确认';
-
-  @override
-  String get QrCanceled => '已取消登录';
-
-  @override
-  String get QrExpired => '二维码已过期，请重新生成';
-
-  @override
-  String get toastLoginRequired => '操作失败（请确认已登录 NK 账号）';
-
-  @override
-  String get pageLikedLoginHint => '登录 NK 后查看我喜欢';
-
-  @override
-  String get pageLikedLoginDesc => '登录  后同步「我喜欢」收藏';
-
-  @override
-  String get pageLikedEmptyHint => '还没有喜欢的歌曲，去搜索页点亮红心吧';
-
-  @override
-  String get pageFavLoginDesc => '登录  后查看歌单与收藏';
-
-  @override
-  String get pageFavEmptyHint => '还没有歌单或收藏';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -5750,7 +5642,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      '用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic | \n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10';
+      '用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic\n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>
@@ -7370,115 +7262,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
   String get toastRevealFileFailed => '无法定位文件（系统文件管理器不可用）';
 
   @override
-  String get settingsSectionThirdPartyService => '第三方服务致谢';
-
-  @override
-  String get settingsAttribution => '本程序由  歌姬计划 API 提供技术支持';
-
-  @override
-  String get settingsApiDocs => ' 歌姬计划 API 文档';
-
-  @override
   String get settingsSongCacheMemoryHint => '已开启「纯内存播放」，歌曲缓存不会写入磁盘';
-
-  @override
-  String get platform => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => '实验性音源';
-
-  @override
-  String get settingsExperimentalSourceSubtitle => '第三方音源（默认关闭）';
-
-  @override
-  String get settingsTitle => '';
-
-  @override
-  String get settingsNote => '第三方实验音源，非官方接入；仅支持登录，不提供注册与 VIP 开通，接口可能随时失效。';
-
-  @override
-  String get settingsEnable => '启用 ';
-
-  @override
-  String get settingsEnableDesc => '在搜索、我喜欢、收藏中显示 NK（默认关闭）';
-
-  @override
-  String get settingsLogin => '登录';
-
-  @override
-  String get settingsLogout => '退出登录';
-
-  @override
-  String settingsLoggedInAs({required Object name}) {
-    return '已登录：$name';
-  }
-
-  @override
-  String get settingsNotLoggedIn => '未登录';
-
-  @override
-  String get settingsPasswordLogin => '应用内账号密码登录';
-
-  @override
-  String get settingsPasswordLoginDesc =>
-      '实验性：在软件内直接输入 Auth 账号密码登录；关闭时只提供扫码登录';
-
-  @override
-  String get LoginTitle => '登录 ';
-
-  @override
-  String get LoginQrHint => '请使用  手机 App 扫码登录';
-
-  @override
-  String get LoginTabPassword => '账号密码';
-
-  @override
-  String get LoginTabQr => '扫码登录';
-
-  @override
-  String get LoginAccountHint => '邮箱 / 用户名 / 手机号';
-
-  @override
-  String get LoginPasswordHint => '密码';
-
-  @override
-  String get LoginSubmit => '登录';
-
-  @override
-  String get LoginAccountRequired => '请输入账号';
-
-  @override
-  String get LoginPasswordRequired => '请输入密码';
-
-  @override
-  String get LoginPasswordNote => '密码仅用于向 Auth 换取令牌，不会保存在本机';
-
-  @override
-  String get QrScanned => '已扫码，请在手机上确认';
-
-  @override
-  String get QrCanceled => '已取消登录';
-
-  @override
-  String get QrExpired => '二维码已过期，请重新生成';
-
-  @override
-  String get toastLoginRequired => '操作失败（请确认已登录 NK 账号）';
-
-  @override
-  String get pageLikedLoginHint => '登录 NK 后查看我喜欢';
-
-  @override
-  String get pageLikedLoginDesc => '登录  后同步「我喜欢」收藏';
-
-  @override
-  String get pageLikedEmptyHint => '还没有喜欢的歌曲，去搜索页点亮红心吧';
-
-  @override
-  String get pageFavLoginDesc => '登录  后查看歌单与收藏';
-
-  @override
-  String get pageFavEmptyHint => '还没有歌单或收藏';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -12035,7 +11819,7 @@ class AppLocalizationsZhCn extends AppLocalizationsZh {
 
   @override
   String get mcpShellHelpSearch =>
-      '用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic | \n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10';
+      '用法: archoerashell search <音源> <关键词> [-n 条数] [-p 页码]\n\n在指定音源搜索歌曲。\n  音源: netease | kugou | qqmusic\n  -n, --limit <n>   返回条数（1~50，默认 20）\n  -p, --page <n>    页码（从 1 开始）\n示例: archoerashell search netease 周杰伦 -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>
@@ -13655,115 +13439,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get toastRevealFileFailed => '無法定位檔案（系統檔案管理員不可用）';
 
   @override
-  String get settingsSectionThirdPartyService => '第三方服務致謝';
-
-  @override
-  String get settingsAttribution => '本程式由  歌姬計劃 API 提供技術支援';
-
-  @override
-  String get settingsApiDocs => ' 歌姬計劃 API 文件';
-
-  @override
   String get settingsSongCacheMemoryHint => '已開啟「純記憶體播放」，歌曲快取不會寫入磁碟';
-
-  @override
-  String get platform => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => '實驗性音源';
-
-  @override
-  String get settingsExperimentalSourceSubtitle => '第三方音源（預設關閉）';
-
-  @override
-  String get settingsTitle => '';
-
-  @override
-  String get settingsNote => '第三方實驗音源，非官方接入；僅支援登入，不提供註冊與 VIP 開通，介面可能隨時失效。';
-
-  @override
-  String get settingsEnable => '啟用 ';
-
-  @override
-  String get settingsEnableDesc => '在搜尋、我喜歡、收藏中顯示 NK（預設關閉）';
-
-  @override
-  String get settingsLogin => '登入';
-
-  @override
-  String get settingsLogout => '登出';
-
-  @override
-  String settingsLoggedInAs({required Object name}) {
-    return '已登入：$name';
-  }
-
-  @override
-  String get settingsNotLoggedIn => '未登入';
-
-  @override
-  String get settingsPasswordLogin => '應用程式內帳號密碼登入';
-
-  @override
-  String get settingsPasswordLoginDesc =>
-      '實驗性：在軟體內直接輸入 Auth 帳號密碼登入；關閉時只提供掃碼登入';
-
-  @override
-  String get LoginTitle => '登入 ';
-
-  @override
-  String get LoginQrHint => '請使用  手機 App 掃碼登入';
-
-  @override
-  String get LoginTabPassword => '帳號密碼';
-
-  @override
-  String get LoginTabQr => '掃碼登入';
-
-  @override
-  String get LoginAccountHint => '電子郵件 / 使用者名稱 / 手機號碼';
-
-  @override
-  String get LoginPasswordHint => '密碼';
-
-  @override
-  String get LoginSubmit => '登入';
-
-  @override
-  String get LoginAccountRequired => '請輸入帳號';
-
-  @override
-  String get LoginPasswordRequired => '請輸入密碼';
-
-  @override
-  String get LoginPasswordNote => '密碼僅用於向 Auth 換取權杖，不會保存在本機';
-
-  @override
-  String get QrScanned => '已掃碼，請在手機上確認';
-
-  @override
-  String get QrCanceled => '已取消登入';
-
-  @override
-  String get QrExpired => '二維碼已過期，請重新產生';
-
-  @override
-  String get toastLoginRequired => '操作失敗（請確認已登入 NK 帳號）';
-
-  @override
-  String get pageLikedLoginHint => '登入 NK 後查看我喜歡';
-
-  @override
-  String get pageLikedLoginDesc => '登入  後同步「我喜歡」收藏';
-
-  @override
-  String get pageLikedEmptyHint => '還沒有喜歡的歌曲，去搜尋頁點亮紅心吧';
-
-  @override
-  String get pageFavLoginDesc => '登入  後查看歌單與收藏';
-
-  @override
-  String get pageFavEmptyHint => '還沒有歌單或收藏';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -18321,7 +17997,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get mcpShellHelpSearch =>
-      '用法: archoerashell search <音源> <關鍵字> [-n 數量] [-p 頁碼]\n\n在指定音源搜尋歌曲。\n  音源: netease | kugou | qqmusic | \n  -n, --limit <n>   回傳數量（1~50，預設 20）\n  -p, --page <n>    頁碼（從 1 開始）\n範例: archoerashell search netease 周杰倫 -n 10';
+      '用法: archoerashell search <音源> <關鍵字> [-n 數量] [-p 頁碼]\n\n在指定音源搜尋歌曲。\n  音源: netease | kugou | qqmusic\n  -n, --limit <n>   回傳數量（1~50，預設 20）\n  -p, --page <n>    頁碼（從 1 開始）\n範例: archoerashell search netease 周杰倫 -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>

@@ -154,14 +154,15 @@ Future<void> main(List<String> args) async {
   // 使 dart sqlite3 与 scanner-ffi 共享同一 SQLite 实例（同版本），避免
   // 双版本并行写同一 WAL 库导致删除写入丢失。必须在任何 sqlite3.open 前。
   preloadBundledSqlite();
-  // 版本号（ 请求标识用）自内置 pubspec.yaml 读取。
+
+  /// 版本号自内置 pubspec.yaml 读取。
   await loadAppVersion();
   // 版本一并落日志：崩溃报告里的调用栈偏移要与对应构建的二进制对齐。
   Log.i('startup', '版本 $appVersion');
   // NT 封面 CDN 拒绝 Dart 默认 UA（403）；Image.network 经 NetworkImage
   // 以 add 语义追加自定义头，传 UA 会与默认 Dart UA 叠加成双头被拒收。
   // 改全局 HttpClient 默认 UA 为浏览器 UA，天然保证单头（第三方 CDN 需要）。
-  //  请求的客户端标识在对应请求处单独附加，不在此覆盖全局 UA。
+  // 第三方源的客户端标识在对应请求处单独附加，不在此覆盖全局 UA。
   HttpOverrides.global = _BrowserUserAgentOverrides();
   // 会话存储：vault 加密持久化（先加载/迁移旧明文，再注入宿主运行时，
   // 保证 kugou/netease 提供者首次读取时已就绪）。默认加密方案（crypto
@@ -218,8 +219,7 @@ Future<void> main(List<String> args) async {
   );
 }
 
-/// 是否是本应用接受的深链参数（仅 `archoera://`；`://` 已随
-/// OAuth 拆除，见 CHANGELOG「破坏性变更」）。
+/// 是否是本应用接受的深链参数（仅 `archoera://`；其它 scheme 一律忽略）。
 bool _isDeepLinkArg(String arg) {
   return arg.toLowerCase().startsWith('archoera://');
 }
@@ -247,7 +247,7 @@ LogLevel _logLevelFromEnv() {
 }
 
 /// 让所有 HttpClient（含 Flutter Image.network 共享 client）默认携带浏览器 UA
-/// （第三方 CDN 需要）。 请求在其请求处另行附加客户端标识。
+/// （第三方 CDN 需要）。第三方源的请求在其请求处另行附加客户端标识。
 class _BrowserUserAgentOverrides extends HttpOverrides {
   _BrowserUserAgentOverrides();
 

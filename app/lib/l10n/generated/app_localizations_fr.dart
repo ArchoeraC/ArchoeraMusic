@@ -1122,127 +1122,8 @@ class AppLocalizationsFr extends AppLocalizations {
       'Impossible de localiser le fichier (aucun gestionnaire de fichiers disponible)';
 
   @override
-  String get settingsSectionThirdPartyService => 'Services tiers';
-
-  @override
-  String get settingsAttribution => 'Propulsé par l\'API  Music';
-
-  @override
-  String get settingsApiDocs => 'Documentation de l\'API  Music';
-
-  @override
   String get settingsSongCacheMemoryHint =>
       'La « lecture en mémoire » est activée — le cache des morceaux ne sera pas écrit sur le disque';
-
-  @override
-  String get platform => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => 'Sources expérimentales';
-
-  @override
-  String get settingsExperimentalSourceSubtitle =>
-      'Sources tierces (désactivées par défaut)';
-
-  @override
-  String get settingsTitle => '';
-
-  @override
-  String get settingsNote =>
-      'Source expérimentale tierce, non officielle ; connexion uniquement (ni inscription ni achat VIP). Peut cesser de fonctionner à tout moment.';
-
-  @override
-  String get settingsEnable => 'Activer ';
-
-  @override
-  String get settingsEnableDesc =>
-      'Afficher NK dans la recherche, les favoris et la bibliothèque (désactivé par défaut)';
-
-  @override
-  String get settingsLogin => 'Se connecter';
-
-  @override
-  String get settingsLogout => 'Se déconnecter';
-
-  @override
-  String settingsLoggedInAs({required Object name}) {
-    return 'Connecté en tant que $name';
-  }
-
-  @override
-  String get settingsNotLoggedIn => 'Non connecté';
-
-  @override
-  String get settingsPasswordLogin => 'Connexion par mot de passe intégrée';
-
-  @override
-  String get settingsPasswordLoginDesc =>
-      'Expérimental : connexion dans l app avec le compte et le mot de passe Auth. Désactivé, seule la connexion QR est disponible';
-
-  @override
-  String get LoginTitle => 'Se connecter à ';
-
-  @override
-  String get LoginQrHint =>
-      'Scannez avec l\'application  pour vous connecter';
-
-  @override
-  String get LoginTabPassword => 'Compte';
-
-  @override
-  String get LoginTabQr => 'QR code';
-
-  @override
-  String get LoginAccountHint => 'E-mail, nom utilisateur ou téléphone';
-
-  @override
-  String get LoginPasswordHint => 'Mot de passe';
-
-  @override
-  String get LoginSubmit => 'Se connecter';
-
-  @override
-  String get LoginAccountRequired => 'Saisissez votre compte';
-
-  @override
-  String get LoginPasswordRequired => 'Saisissez votre mot de passe';
-
-  @override
-  String get LoginPasswordNote =>
-      'Le mot de passe sert uniquement à obtenir un jeton Auth et n\'est jamais stocké sur cet appareil';
-
-  @override
-  String get QrScanned => 'Scanné, confirmez sur votre téléphone';
-
-  @override
-  String get QrCanceled => 'Connexion annulée';
-
-  @override
-  String get QrExpired => 'Code QR expiré, veuillez le régénérer';
-
-  @override
-  String get toastLoginRequired =>
-      'Échec de l\'opération (vérifiez que vous êtes connecté à votre compte NK)';
-
-  @override
-  String get pageLikedLoginHint =>
-      'Connectez-vous à NK pour voir vos titres aimés';
-
-  @override
-  String get pageLikedLoginDesc =>
-      'Connectez-vous à  pour synchroniser vos titres aimés';
-
-  @override
-  String get pageLikedEmptyHint =>
-      'Aucun titre aimé pour l\'instant — touchez le cœur dans la recherche';
-
-  @override
-  String get pageFavLoginDesc =>
-      'Connectez-vous à  pour voir playlists et favoris';
-
-  @override
-  String get pageFavEmptyHint =>
-      'Aucune playlist ni favori pour l\'instant';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -6136,7 +6017,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      'Utilisation : archoerashell search <source> <texte> [-n nombre] [-p page]\n\nRechercher des titres sur une source.\n  source : netease | kugou | qqmusic | \n  -n, --limit <n>   nombre de résultats (1-50, défaut 20)\n  -p, --page <n>    page (à partir de 1)\nExemple : archoerashell search netease Jay -n 10';
+      'Utilisation : archoerashell search <source> <texte> [-n nombre] [-p page]\n\nRechercher des titres sur une source.\n  source : netease | kugou | qqmusic\n  -n, --limit <n>   nombre de résultats (1-50, défaut 20)\n  -p, --page <n>    page (à partir de 1)\nExemple : archoerashell search netease Jay -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>

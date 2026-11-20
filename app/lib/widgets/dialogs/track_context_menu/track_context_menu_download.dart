@@ -50,7 +50,7 @@ Future<void> downloadTracks(
   var ok = 0;
   for (final t in online) {
     if (!context.mounted) return;
-    // 入队前预处理由注册表提供（KG 补 hash /  元数据补全并重写歌词）。
+    // 入队前预处理由注册表提供（KG 补 hash / 实验源元数据补全等）。
     final target = await sourcePlatform(t.source).prepareForDownload(ref, t);
     if (controller.enqueue(target, quality: quality) != null) ok++;
   }

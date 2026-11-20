@@ -12,7 +12,6 @@ library;
 
 import '../../apis/bilibili/core/config.dart'
     show kBilibiliReferer, kBilibiliUserAgent;
-import '..//_identity.dart';
 
 /// 单条媒体请求头解析器：命中则返回需附加的请求头，否则返回 null。
 typedef MediaHeaderResolver = Map<String, String>? Function(Uri uri);
@@ -30,8 +29,6 @@ final List<MediaHeaderResolver> _resolvers = <MediaHeaderResolver>[
     }
     return null;
   },
-  //  封面 / 头像：标识头（UA 由全局 HttpClient 决定）。
-  MediaHeaderResolver,
 ];
 
 /// 解析某媒体 URL 对应的请求头；未命中返回 null。

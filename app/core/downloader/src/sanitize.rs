@@ -23,10 +23,6 @@ const AD_MARKERS: &[&str] = &[
     "http://",
     "https://",
     "www.",
-    "music.core.cn",
-    "云音乐",
-    " cloud music",
-    " music",
     "资源来自",
     "获取更多无损音乐",
     "更多免费无损音乐",
@@ -77,9 +73,9 @@ mod tests {
 
     #[test]
     fn detects_promo_text() {
-        assert!(is_ad_text("资源来自云音乐 Resources from  Cloud Music"));
-        assert!(is_ad_text("获取更多无损音乐https://music.core.cn/"));
-        assert!(is_ad_text("更多免费无损音乐就来云音乐"));
+        assert!(is_ad_text("资源来自某音乐站"));
+        assert!(is_ad_text("获取更多无损音乐https://example.com/"));
+        assert!(is_ad_text("更多免费无损音乐就关注公众号"));
         assert!(is_ad_text("关注公众号：xxx"));
         assert!(!is_ad_text("[00:12.34]晴天"));
         assert!(!is_ad_text(""));
@@ -87,8 +83,8 @@ mod tests {
 
     #[test]
     fn lyrics_keep_real_lines_drop_ads() {
-        let raw = "[00:00.05]资源来自云音乐 Resources from  Cloud Music\n\
-                   [00:00.10]获取更多无损音乐https://music.core.cn/\n\
+        let raw = "[00:00.05]资源来自某音乐站\n\
+                   [00:00.10]获取更多无损音乐https://example.com/\n\
                    [00:12.34]故事的小黄花\n\
                    [00:15.00]从出生那年就飘着";
         let out = sanitize_lyrics(raw).unwrap();
@@ -97,15 +93,15 @@ mod tests {
 
     #[test]
     fn lyrics_all_ads_yields_none() {
-        let raw = "资源来自云音乐\n更多免费无损音乐https://music.core.cn";
+        let raw = "资源来自某音乐站\n更多免费无损音乐https://example.com";
         assert!(sanitize_lyrics(raw).is_none());
     }
 
     #[test]
     fn field_ad_removed_clean_kept() {
-        assert!(sanitize_field("更多免费无损音乐就来云音乐 https://music.core.cn").is_none());
-        assert!(sanitize_field(" Music").is_none());
-        assert!(sanitize_field("music.core.cn").is_none());
+        assert!(sanitize_field("更多免费无损音乐就来关注公众号 https://example.com").is_none());
+        assert!(sanitize_field("关注公众号").is_none());
+        assert!(sanitize_field("https://example.com").is_none());
         assert_eq!(sanitize_field("  三拜红尘凉 ").as_deref(), Some("三拜红尘凉"));
         assert_eq!(sanitize_field("尹昔眠").as_deref(), Some("尹昔眠"));
     }

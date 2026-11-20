@@ -673,8 +673,8 @@ SELECT key, value FROM search_meta;   -- analyzer_version / schema_version / has
 ## 11. S0 真实库诊断结果（2026-11-16，只读）
 
 > 数据来源：一份他人服务器的 `search.db`（SQLite FTS5，**48,759 首**，`schema_version=7` /
-> `analyzer_version=**12**`，即 **D-4 修复前**的索引）+ 同库导出的 MySQL `_music.sql`
-> （含 `user_search_history` **1,262 条真实查询**，唯一 1,162 条）。
+> `analyzer_version=**12**`，即 **D-4 修复前**的索引）+ 同库导出的 MySQL 查询历史表
+> （`user_search_history` **1,262 条真实查询**，唯一 1,162 条）。
 > 全部为只读操作：`fts5vocab` 统计 + 现成 CLI `query --session` / `--raw`，未改代码、未重编索引。
 > ⚠️ 该库 `analyzer_version=12`，**不能**用来验证 D-4 修复是否生效；它的价值是「修复前的基线」。
 

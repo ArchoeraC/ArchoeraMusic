@@ -345,8 +345,6 @@ extension _SettingsDialogView on _SettingsDialogState {
                 SettingsCategory.scanner => const ScansSection(),
                 SettingsCategory.searchIndex => const SearchSection(),
                 SettingsCategory.mediaSource => StreamingServerList(),
-                SettingsCategory.experimentalSource =>
-                  const ExperimentalSourceSection(),
                 SettingsCategory.mcp => const McpSection(),
                 SettingsCategory.about => AboutSection(
                   version: _version,
