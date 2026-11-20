@@ -446,12 +446,15 @@ do_bundle() {
   mkdir -p "$app/Contents/Resources"
   cp "$ROOT/app/tool/watermark_pub.pem" "$app/Contents/Resources/ARCHOERA_PUBKEY.pem"
 
+  # 完整性清单必须在 dylibbundler / 逐库重签 **之后**生成（二者改写字节），
+  # 但必须在整包签名**之前**写入 Contents —— 清单是 `.app` 的 sealed resource，
+  # 签名后再新增会让 `codesign --verify` 报 "a sealed resource is missing or
+  # invalid"（用户机上即「已损坏」）。
+  sh "$ROOT/app/tool/gen_native_manifest.sh" "$native" "$exe"
+
   # 新增/改写 dylib 使原 ad-hoc 签名失效（Apple Silicon 拒载未签名 dylib）→ 重签整包
   log "codesign --deep --sign -"
   codesign --force --deep --sign - "$app"
-
-  # 完整性清单必须在 dylibbundler + codesign **之后**生成（二者改写字节）
-  sh "$ROOT/app/tool/gen_native_manifest.sh" "$native" "$exe"
   log "bundle 完成"
 }
 
@@ -465,7 +468,13 @@ do_verify() {
   log "verify: 依赖守卫（--arch ${arch}）"
   verify_deps
 
-  require_tools lipo otool
+  require_tools codesign lipo otool
+
+  # verify_deps 会写入 Contents/ARCHOERA-SYSTEM-DEPS.txt（随包分发的系统依赖
+  # 清单）。它同样是 `.app` 的 sealed resource，签名后新增会让最终
+  # `codesign --verify` 失败；故写入后重签整包，再继续签名校验。
+  log "verify: 系统依赖清单写入后重签整包"
+  codesign --force --deep --sign - "$app"
   fail=0
 
   # 单架构：主程序 / Flutter 引擎 / 全部 native 产物
