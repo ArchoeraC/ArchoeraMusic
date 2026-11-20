@@ -35,7 +35,6 @@ class VaultSessionStore implements SessionStore {
     // 退出登录不能丢设备，否则每次重登都被当作新设备（风控信号）。
     'qqmusic_device',
     'bilibili',
-    'neko',
   ];
   static const String _uidPrefix = 'session:';
 

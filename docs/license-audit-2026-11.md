@@ -16,7 +16,7 @@
 | 数据转录 | minimp3 解码表 | CC0-1.0 | ✅ | **本次修正文件头 SPDX** |
 | vendored | stb_vorbis / OpenCORE AMR | PD / Apache-2.0 | ✅ | 保留原文件头 |
 | 思路参考 | denial（GPL-3.0-or-later） | GPL-3.0+ | ✅（GPLv3 系可与 AGPLv3 聚合），且**未复制代码** | 仅文档致谢 |
-| 思路参考 | SPlayer-Next（AGPL-3.0）、NekoMusic API（AGPL-3.0 + §7 附加条款） | AGPL-3.0 | ✅；Neko 须署名 | 已在其「关于」页署名 |
+| 思路参考 | SPlayer-Next（AGPL-3.0） | AGPL-3.0 | ✅ | 仅文档致谢 |
 | 思路参考 | **MoeKoeMusic（GPL-2.0-only）** | GPL-2.0-only | ❌ **不可合并**（AGPL-3.0 与 GPL-2.0-only 不兼容） | **本次移除代码级引用，改按公开行为独立实现** |
 | 思路参考 | **Mineradio（未声明许可）** | 无许可 | ⚠ 默认「保留所有权利」 | **仅思路，未复制代码/素材；文档已注明** |
 
@@ -87,7 +87,6 @@
   参考实现的源码复制；TTA / TAK / Shorten 的实现均沿 FFmpeg（LGPL）通道，
   与模块文档一致；
 - 未发现 Mineradio 的代码或美术资源；
-- NekoMusic 音源为公开 HTTP 互操作，且「设置 → 关于」已包含其要求的署名文案。
 
 ## 后续维护要求
 

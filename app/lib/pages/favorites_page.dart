@@ -57,8 +57,8 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   @override
   void initState() {
     super.initState();
-    // 恢复上次平台选择（壳内容因播放页展开被卸载后重建）；实验性音源已关闭
-    // 时不保留 NK 选择（避免对其发请求）。无显式选择时使用「默认音源」设置。
+    // 恢复上次平台选择（壳内容因播放页展开被卸载后重建）；平台已被关闭
+    // 时不保留该选择（避免对其发请求）。无显式选择时使用「默认音源」设置。
     var source =
         ref.read(favoritesPlatformProvider) ?? preferredCollectionSource(ref);
     // 已关闭（如实验性音源开关）的平台不保留选择：回退首个已启用平台。

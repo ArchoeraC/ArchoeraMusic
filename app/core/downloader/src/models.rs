@@ -77,10 +77,6 @@ pub enum SourcePlatform {
     Kugou,
     Netease,
     Qqmusic,
-    /// 实验性第三方音源 NekoMusic（可选音质流：`standard`/`hq`/`sq`/`hires`，
-    /// 服务端 302 → `/media/music/...`；Rust 无自研解析，恒走 Dart 播放管线
-    /// 回退预解析 URL；元数据依赖 enqueue 传入 + 兜底源）。
-    Neko,
     /// 流媒体（Subsonic/Jellyfin 等）：直链由 Dart 侧带鉴权生成
     /// （`/rest/stream?format=raw`，原文件）。Rust 无自研解析，
     /// 恒走 Dart 播放管线回退预解析 URL。
@@ -102,7 +98,6 @@ impl SourcePlatform {
             SourcePlatform::Kugou => "kugou",
             SourcePlatform::Netease => "netease",
             SourcePlatform::Qqmusic => "qqmusic",
-            SourcePlatform::Neko => "neko",
             SourcePlatform::Streaming => "streaming",
             SourcePlatform::Bilibili => "bilibili",
             SourcePlatform::Unknown => "unknown",
@@ -119,7 +114,6 @@ impl SourcePlatform {
             "kugou" => SourcePlatform::Kugou,
             "netease" => SourcePlatform::Netease,
             "qqmusic" => SourcePlatform::Qqmusic,
-            "neko" => SourcePlatform::Neko,
             "streaming" => SourcePlatform::Streaming,
             "bilibili" => SourcePlatform::Bilibili,
             _ => SourcePlatform::Unknown,
@@ -163,7 +157,7 @@ pub struct EnqueueRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover_url: Option<String>,
     /// 强制重写歌词（标准 LRC 文本）。非空时在元数据合并中**优先于内嵌/平台
-    /// 歌词**——Neko 等直传源在入队前由 Dart 取标准源歌词注入（其内嵌/平台
+    /// 歌词**——直传源在入队前由 Dart 取标准源歌词注入（其内嵌/平台
     /// 歌词常为站点广告或非标准格式，不可信）。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lyrics: Option<String>,
@@ -254,7 +248,6 @@ mod tests {
             ("\"kugou\"", SourcePlatform::Kugou, "kugou"),
             ("\"netease\"", SourcePlatform::Netease, "netease"),
             ("\"qqmusic\"", SourcePlatform::Qqmusic, "qqmusic"),
-            ("\"neko\"", SourcePlatform::Neko, "neko"),
             ("\"streaming\"", SourcePlatform::Streaming, "streaming"),
             ("\"bilibili\"", SourcePlatform::Bilibili, "bilibili"),
         ] {
@@ -271,7 +264,6 @@ mod tests {
             "kugou",
             "netease",
             "qqmusic",
-            "neko",
             "streaming",
             "bilibili",
             "unknown",

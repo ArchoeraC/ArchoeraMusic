@@ -1628,11 +1628,11 @@ mod tests {
         let out = render_styled(json!({"ok": true, "volume": 0.5}), 80);
         assert!(out.contains('✓'));
         assert!(out.contains("vol 50%"));
-        let liked = render_styled(json!({"ref": "neko:1", "liked": true}), 80);
+        let liked = render_styled(json!({"ref": "netease:1", "liked": true}), 80);
         assert!(liked.contains('♥'));
         assert!(liked.contains("liked"));
-        let playing = render_styled(json!({"ok": true, "ref": "neko:1"}), 80);
-        assert!(playing.contains("playing neko:1"));
+        let playing = render_styled(json!({"ok": true, "ref": "netease:1"}), 80);
+        assert!(playing.contains("playing netease:1"));
     }
 
     #[test]
@@ -1674,7 +1674,7 @@ mod tests {
     fn narrow_never_overflows() {
         let v = json!({
             "playing": true, "positionMs": 1, "durationMs": 2,
-            "track": {"title": "非常非常非常非常非常非常非常长", "artists": ["很长很长的歌手"], "ref": "neko:25880"}
+            "track": {"title": "非常非常非常非常非常非常非常长", "artists": ["很长很长的歌手"], "ref": "netease:25880"}
         });
         let out = render_styled(v, 20);
         for line in out.lines() {

@@ -51,8 +51,7 @@ const List<String> defaultLyricSourceOrder = ['netease', 'qqmusic', 'kugou'];
 
 /// 用户可排序的歌词格式（来自跨平台格式注册表 `lyricFormatIds`）。
 ///
-/// yrc/qrc/krc 为逐字富格式，lrc 为标准格式；Neko 的 `neko-v1` 属平台扩展
-/// 富格式，不单列，跟随 `preferWordByWord` 的逐字类别。
+/// yrc/qrc/krc 为逐字富格式，lrc 为标准格式。
 const List<String> lyricFormats = lyricFormatIds;
 
 /// 默认歌词格式优先级（逐字优先，其次标准 LRC；顺序即注册表默认值）。

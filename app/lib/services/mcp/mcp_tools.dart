@@ -1070,12 +1070,7 @@ List<McpTool> buildMcpTools(McpActions api) => [
     openWorld: true,
     inputSchema: _schema(
       {
-        'source': _enumProp('音源', const [
-          'netease',
-          'kugou',
-          'qqmusic',
-          'neko',
-        ]),
+        'source': _enumProp('音源', const ['netease', 'kugou', 'qqmusic']),
         'query': _stringProp('搜索关键词', minLength: 1, maxLength: 200),
         'limit': _intProp('每页条数', min: 1, max: 50, default_: 20),
         'page': _intProp('页码（从 1 开始）', min: 1, max: 100, default_: 1),
@@ -1249,12 +1244,7 @@ List<McpTool> buildMcpTools(McpActions api) => [
     openWorld: true,
     inputSchema: _schema(
       {
-        'source': _enumProp('音源', const [
-          'netease',
-          'kugou',
-          'qqmusic',
-          'neko',
-        ]),
+        'source': _enumProp('音源', const ['netease', 'kugou', 'qqmusic']),
         'limit': _intProp('返回条数', min: 1, max: 500, default_: 100),
       },
       required: ['source'],

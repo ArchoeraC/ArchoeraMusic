@@ -616,7 +616,7 @@ pub const Reader = struct {
 >   进程退出，shell 报 "I/O possible"）。
 
 > **落地（2026-10-07）：在线源请求头透传 + FFmpeg 在线 TLS**
-> - 背景：NekoMusic 等站点的 `/api/*` 防爬要求客户端标识；内核原生 HTTP 固定发
+> - 背景：部分在线源的 `/api/*` 防爬要求客户端标识；内核原生 HTTP 固定发
 >   `ArchoeraMusic/0.9 (EraAudio)` 会被判爬虫 → 302 到 SEO HTML → 探测失败
 >   `status=1`；而 FFmpeg 回退因最小构建无 TLS 直接 `Protocol not found`。
 > - 内核：`HttpStream` 新增自有 `headers`（`Options.headers`）；`writeRequest` 规范化追加、
@@ -627,25 +627,8 @@ pub const Reader = struct {
 >   `decoder_apply_http_headers`（`User-Agent`→`user_agent`，其余→`headers`）供
 >   `decoder_open_headers` 与 AVIO 路径复用。
 > - Dart：`EngineBindings.create(headers)` → `AudioEngineProcess.start(headers)` →
->   `engineHeadersForTrack(track)`（取自 `SourcePlatform.mediaHeaders`，Neko 源为
->   **分层身份 UA** + `X-Neko-Client: archoera+<版本>`，版本启动时自 `pubspec.yaml`
->   读取，**不硬编码**）。旧库缺 `_with_headers` 符号时自动回退。
-> - **修正（2026-10-07，后续）**：NekoMusic 服务端 `/api/*` 防爬**只看 `User-Agent`**，
->   未知 UA 的 `POST` → 403、`GET` → 直出 SEO HTML（非 302，也不认 `X-Neko-Client`）；
->   其文档为不发 UA 的桌面端保留「**空 UA 直接放行**」。客户端据此改走空 UA：REST/SSE/
->   下载/引擎 AVIO/内核原生 HTTP 一律显式置空 `User-Agent`（`dart:io` 默认 `Dart/…`
->   会被拦）。故 `decoder_apply_http_headers` 对**空值**也须写入 `user_agent`，否则 FFmpeg
->   回落默认 `Lavf/…` 同样被拦。封面/头像经全局浏览器 UA 的图片请求无法清空 UA，改补
->   `Accept` + `Accept-Language` 走其「浏览器完整性」放行。
-> - **修正（2026-10-08）**：NekoMusic 服务端已**拆除「空 UA 直接放行」**（空 / 缺失 UA
->   一律按爬虫处理）。改走**分层客户端身份**：主路径以本体自报 `ArchoeraMusic/<版本> (<平台>)`
->   + `X-Neko-Client: archoera+<版本>`；被服务端按爬虫降级时，进程内回退为纯 NekoMusic 桌面 UA
->   形状 `NekoMusic-<平台>/<版本>`（不冒名 Android、不伪装浏览器）。`decoder_apply_http_headers`
->   仍对空值写 `user_agent`，但 Neko 源不再发空 UA。详见 `docs/neko-source-identity.md`。
-> - **更新（2026-11-08）**：NekoMusic 服务端移除了 `X-Neko-Client-*` 身份头、防重放 nonce 与
->   PoW；Neko 源现在只发送官方锚定的 `NekoMusic-PC/<版本>` UA（仅表示选择，不参与鉴权）与
->   `Authorization` 用户令牌，登录改走 NekoAuth OAuth。`decoder_apply_http_headers` 的头透传
->   机制不变。详见 `docs/neko-source-identity.md`。
+>   `engineHeadersForTrack(track)`（取自 `SourcePlatform.mediaHeaders`，版本启动时自
+>   `pubspec.yaml` 读取，**不硬编码**）。旧库缺 `_with_headers` 符号时自动回退。
 > - FFmpeg 在线 TLS：Linux/macOS 由 `build-ffmpeg-minimal.sh` 构建**自包含 mbedTLS**
 >   （`--enable-mbedtls`、`https,tls` 协议、静态链接；旧前缀经 `.mbedtls-system-ca`
 >   标记重建，并应用 `patches/ffmpeg-9.0.1-mbedtls-system-ca.patch` 让其回退系统信任库）；
