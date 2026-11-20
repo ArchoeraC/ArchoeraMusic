@@ -26,3 +26,4 @@
 | `engine-master-pool-design.md` | 设计稿 · 已被取代 | 常驻池已落地，实现与设计稿不再一致 | `../audio-kernel-zig.md` |
 | `engine-event-push-plan.md` | 规划稿 · 已实施 | 事件推送与降频协商已落地 | `../platform-native-bridge.md` |
 | `third-party-source-migration-report.md` | 调研稿 · 已完成 | 结论已采纳，相关音源已上线 | `../download-module.md` |
+| `agpl-v4-upgrade-policy.md` | 许可策略 · 已取消 | 不再考虑升级到 AGPL-v4 及以后版本 | `../licensing.md` §2 |

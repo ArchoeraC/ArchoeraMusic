@@ -13,12 +13,17 @@
 | 内核移植 | FFmpeg `libavcodec`/`libavformat` → Zig | LGPL-2.1-or-later | ✅（衍生部分仍为 LGPL） | **本次修正文件头 SPDX + 溯源** |
 | 内核移植 | libopus（SILK / kissfft / 静态模式表） | BSD-3-Clause | ✅（须保留版权声明） | **本次修正文件头 SPDX + 版权行** |
 | 内核移植 | WavPack / dsd2pcm | BSD-3 / BSD | ✅ | **本次修正文件头 SPDX** |
+| 歌词引擎移植 | AMLL（applemusic-like-lyrics） | AGPL-3.0-only | ✅（同为 AGPLv3 系；衍生实现随本项目以 AGPL-3.0 分发） | 保留版权声明与源码溯源（2026-11 上游许可由 MIT 调整为 AGPL-3.0） |
 | 数据转录 | minimp3 解码表 | CC0-1.0 | ✅ | **本次修正文件头 SPDX** |
 | vendored | stb_vorbis / OpenCORE AMR | PD / Apache-2.0 | ✅ | 保留原文件头 |
 | 思路参考 | denial（GPL-3.0-or-later） | GPL-3.0+ | ✅（GPLv3 系可与 AGPLv3 聚合），且**未复制代码** | 仅文档致谢 |
 | 思路参考 | SPlayer-Next（AGPL-3.0） | AGPL-3.0 | ✅ | 仅文档致谢 |
 | 思路参考 | **MoeKoeMusic（GPL-2.0-only）** | GPL-2.0-only | ❌ **不可合并**（AGPL-3.0 与 GPL-2.0-only 不兼容） | **本次移除代码级引用，改按公开行为独立实现** |
 | 思路参考 | **Mineradio（未声明许可）** | 无许可 | ⚠ 默认「保留所有权利」 | **仅思路，未复制代码/素材；文档已注明** |
+
+> 2026-11-20 补记：AMLL 上游许可已由 MIT 调整为 **AGPL-3.0-only**。本项目歌词引擎为其
+> Dart 衍生实现，随本项目以 AGPL-3.0 分发，并在 `docs/acknowledgements.md` 与
+> `docs/lyrics-amll-alignment.md` 保留版权声明与溯源。
 
 **总体判断**：项目仍可作为 **AGPL-3.0 聚合作品**分发。需要保证的是：
 
@@ -92,7 +97,7 @@
 
 1. 新增任何「移植 / 转录 / vendored」文件时，**文件头 SPDX 必须写上游许可**，
    并在模块 `THIRD-PARTY-LICENSES.md` 登记来源文件；
-2. 只允许引入 LGPL-2.1+ / LGPL-3+ / BSD / MIT / Apache-2.0 / CC0 / PD 来源；
+2. 只允许引入 LGPL-2.1+ / LGPL-3+ / BSD / MIT / Apache-2.0 / CC0 / PD / AGPL-3.0（同为 v3 系）来源；
    **GPL-2.0-only、无许可项目一律只可参考思路，禁止复制代码/素材**；
 3. 发布包 `licenses/` 与 `THIRD-PARTY-NOTICES.md` 需随新依赖同步更新；
 4. 若日后有文件被认定为衍生而当前标为 AGPL，按上游许可补标即可，不影响整体分发。

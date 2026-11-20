@@ -37,7 +37,7 @@
 - **[KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi)（MIT）** —— KG 平台接口与设备字段约定参考
 - **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)（MIT）** —— NT 平台接口流程参考
 - **[ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs)（WTFPL）** —— Rust 化签名实现方案参考
-- **[AMLL（Apple Music-like Lyrics）](https://github.com/Steve-xmh/applemusic-like-lyrics)（MIT）** —— Apple Music 风格动态歌词引擎参考（歌词墙整墙滚动、逐字扫光、行级弹簧等观感的原创来源；本项目以 Dart 重实现）
+- **[AMLL（Apple Music-like Lyrics）](https://github.com/amll-dev/applemusic-like-lyrics)（AGPL-3.0-only）** —— Apple Music 风格动态歌词引擎参考（歌词墙整墙滚动、逐字扫光、行级弹簧等观感的原创来源；本项目以 Dart 重实现，与本项目同为 AGPLv3 系，保留上游版权声明与修改说明）
 - **[FFmpeg](https://ffmpeg.org)（Linux/macOS LGPL-3.0+、Windows LGPL-2.1+）** —— 主解码 / 重采样引擎，多格式移植的参考源
 - **[Opus / libopus](https://opus-codec.org)（BSD-3-Clause，IETF RFC 6716）** —— SILK/CELT 移植与静态模式表参考
 - **[miniaudio](https://github.com/mackron/miniaudio)（MIT-0 / Public Domain）** —— 通用跨平台音频输出（David Reid）
