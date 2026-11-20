@@ -191,9 +191,9 @@ Windows 隐藏消息窗口只在首实例创建，第二实例转发时跳过自
 D-Bus（回退 GIO 默认应用打开所在目录）；Windows 走 `SHOpenFolderAndSelectItems` /
 `ShellExecute`；macOS 走 `NSWorkspace`。
 
-> **ABI v7（2026-11-09，破坏性）**：随 NekoAuth OAuth / 账号密码登录的拆除，
-> 删除 `apl_open_url` 与 `APL_CAP_OPEN_URL`（该能力原先只供 Neko「忘记密码」
-> 打开浏览器）。Dart 侧 `aplAbiVersion` 同步升到 7，旧桥接库会被版本门禁拒绝。
+> **ABI v7（2026-11-09，破坏性）**：随浏览器打开登录回调能力的拆除，
+> 删除 `apl_open_url` 与 `APL_CAP_OPEN_URL`。Dart 侧 `aplAbiVersion` 同步升到 7，
+> 旧桥接库会被版本门禁拒绝。
 
 提权探测（`APL_CAP_ELEVATION`，ABI v6 起）：`apl_process_elevation()` **只读**返回
 `APL_ELEVATION_NONE` / `ROOT` / `ADMIN`——Linux / POSIX 与 macOS 查 `geteuid() == 0`

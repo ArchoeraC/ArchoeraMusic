@@ -15,38 +15,23 @@ class _AccountsMenu extends ConsumerWidget {
     final kugouApi = ref.read(kugouApiProvider);
     final qqApi = ref.read(qqMusicApiProvider);
     final biliApi = ref.read(bilibiliApiProvider);
-    final nekoEnabled = ref.watch(appPrefsProvider.select(nekoSourceUsable));
-    final nekoApi = ref.read(nekoApiProvider);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([kugouApi, qqApi, biliApi, nekoApi]),
+      listenable: Listenable.merge([kugouApi, qqApi, biliApi]),
       builder: (context, _) {
         final kugou = kugouApi.session;
         final qqProfile = qqApi.profile;
         final qqLogged = qqApi.isLoggedIn;
         final biliProfile = biliApi.profile;
         final biliLogged = biliApi.isLoggedIn;
-        final nekoLogged = nekoApi.isLoggedIn;
-        final nekoAvatarUrl = nekoApi.userAvatarUrl(nekoApi.account?.id);
 
         final primaryNetease = netease != null;
         final primaryKugou = !primaryNetease && kugou != null;
         final primaryQq = !primaryNetease && !primaryKugou && qqLogged;
         final primaryBili =
             !primaryNetease && !primaryKugou && !primaryQq && biliLogged;
-        final primaryNeko =
-            !primaryNetease &&
-            !primaryKugou &&
-            !primaryQq &&
-            !primaryBili &&
-            nekoEnabled &&
-            nekoLogged;
         final anyLoggedIn =
-            primaryNetease ||
-            primaryKugou ||
-            primaryQq ||
-            primaryBili ||
-            primaryNeko;
+            primaryNetease || primaryKugou || primaryQq || primaryBili;
 
         final avatarUrl = netease?.avatarUrl?.trim();
         final neteaseNick = netease?.nickname.trim() ?? '';
@@ -71,11 +56,6 @@ class _AccountsMenu extends ConsumerWidget {
           primary = _AccountAvatar(
             avatarUrl: biliProfile?.avatarUrl,
             nickname: biliNick.isEmpty ? 'B' : biliNick,
-          );
-        } else if (primaryNeko) {
-          primary = _AccountAvatar(
-            avatarUrl: nekoAvatarUrl,
-            nickname: nekoApi.account?.displayName ?? '',
           );
         } else {
           primary = Container(
@@ -128,16 +108,6 @@ class _AccountsMenu extends ConsumerWidget {
                 toast(
                   context.l10n.loginLoggedOut(
                     platform: context.l10n.brandBilibili,
-                  ),
-                );
-              case 'login_neko':
-                showNekoLoginDialog(context);
-              case 'logout_neko':
-                unawaited(nekoApi.logout());
-                ref.read(likeControllerProvider).sync();
-                toast(
-                  context.l10n.loginLoggedOut(
-                    platform: l10n.settingsNekoTitle,
                   ),
                 );
             }
@@ -193,21 +163,6 @@ class _AccountsMenu extends ConsumerWidget {
               avatarName: biliNick.isEmpty ? 'B' : biliNick,
               displayName: biliNick.isEmpty ? l10n.brandBilibili : biliNick,
             ),
-            // 实验性音源 Neko（仅启用时显示）。
-            if (nekoEnabled)
-              ..._platformSection(
-                l10n: l10n,
-                title: l10n.settingsNekoTitle,
-                loggedIn: nekoLogged,
-                loginValue: 'login_neko',
-                logoutValue: 'logout_neko',
-                nameValue: 'name_neko',
-                avatarUrl: nekoAvatarUrl,
-                avatarName: nekoApi.account?.displayName ?? '',
-                displayName:
-                    nekoApi.account?.displayName ??
-                    l10n.settingsNekoNotLoggedIn,
-              ),
           ],
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -228,9 +183,7 @@ class _AccountsMenu extends ConsumerWidget {
                           ? (qqNick.isEmpty ? l10n.brandQqMusic : qqNick)
                           : primaryBili
                           ? (biliNick.isEmpty ? l10n.brandBilibili : biliNick)
-                          : (nekoApi.account?.displayName.isNotEmpty ?? false)
-                          ? nekoApi.account!.displayName
-                          : l10n.settingsNekoTitle,
+                          : '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

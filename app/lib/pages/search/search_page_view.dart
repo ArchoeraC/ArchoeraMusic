@@ -18,15 +18,8 @@ extension _SearchPageView on _SearchPageState {
       ...like.idsFor('netease'),
       ...like.idsFor('kugou'),
       ...like.idsFor('qqmusic'),
-      ...like.idsFor('neko'),
     };
-    // 订阅实验源开关：变化时重建，使 `sourcePlatforms(ref)` 下拉选项同步增减。
-    ref.watch(appPrefsProvider.select(nekoSourceUsable));
-    // 已启用音源集合变化：当前音源被关闭则退回 NT（避免选择项消失后仍发请求）。
-    ref.listen(appPrefsProvider.select(nekoSourceUsable), (prev, next) {
-      if (!sourcePlatform(_platform).enabled(ref)) _switchPlatform('netease');
-    });
-    // 默认音源设置变化：页面尚未手动切换过时，跟随新的默认音源。
+    // 订阅默认音源设置：变化时同步当前音源（页面尚未手动切换过时）。
     ref.listen(appPrefsProvider.select((p) => p.defaultSource), (prev, next) {
       if (ref.read(searchPlatformProvider) != null) return;
       final target = preferredSearchSource(ref);

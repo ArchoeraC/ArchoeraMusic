@@ -12,7 +12,7 @@
 ///   `archoera://artist/<id>`           打开流媒体歌手详情
 ///
 /// 启动期（播放现场恢复完成前）到达的链接先缓冲，[markReady] 后统一派发。
-/// 未知 scheme（例如已移除的 `nekomusic://` 登录回调）一律忽略。
+/// 未知 scheme（例如其它应用的自定义协议）一律忽略。
 library;
 
 import 'dart:async';

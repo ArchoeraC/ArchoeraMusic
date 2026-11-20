@@ -1115,124 +1115,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t reveal the file (no file manager available)';
 
   @override
-  String get settingsSectionThirdPartyService => 'Third-party services';
-
-  @override
-  String get settingsNekoAttribution => 'Powered by Neko Music API';
-
-  @override
-  String get settingsNekoApiDocs => 'Neko Music API docs';
-
-  @override
   String get settingsSongCacheMemoryHint =>
       '\"In-memory playback\" is on — song cache won\'t be written to disk';
-
-  @override
-  String get platformNeko => 'NK';
-
-  @override
-  String get settingsCatExperimentalSource => 'Experimental sources';
-
-  @override
-  String get settingsExperimentalSourceSubtitle =>
-      'Third-party sources (off by default)';
-
-  @override
-  String get settingsNekoTitle => 'NekoMusic';
-
-  @override
-  String get settingsNekoNote =>
-      'Third-party experimental source, unofficial; login only — no sign-up or VIP purchase. May stop working at any time.';
-
-  @override
-  String get settingsNekoEnable => 'Enable NekoMusic';
-
-  @override
-  String get settingsNekoEnableDesc =>
-      'Show NK in search, liked and favorites (off by default)';
-
-  @override
-  String get settingsNekoLogin => 'Log in';
-
-  @override
-  String get settingsNekoLogout => 'Log out';
-
-  @override
-  String settingsNekoLoggedInAs({required Object name}) {
-    return 'Signed in as $name';
-  }
-
-  @override
-  String get settingsNekoNotLoggedIn => 'Not signed in';
-
-  @override
-  String get settingsNekoPasswordLogin => 'In-app password login';
-
-  @override
-  String get settingsNekoPasswordLoginDesc =>
-      'Experimental: sign in with your NekoAuth account and password inside the app. When off, only QR login is available';
-
-  @override
-  String get nekoLoginTitle => 'Sign in to NekoMusic';
-
-  @override
-  String get nekoLoginQrHint => 'Scan with the NekoMusic mobile app to sign in';
-
-  @override
-  String get nekoLoginTabPassword => 'Account';
-
-  @override
-  String get nekoLoginTabQr => 'QR code';
-
-  @override
-  String get nekoLoginAccountHint => 'Email, username or phone';
-
-  @override
-  String get nekoLoginPasswordHint => 'Password';
-
-  @override
-  String get nekoLoginSubmit => 'Sign in';
-
-  @override
-  String get nekoLoginAccountRequired => 'Enter your account';
-
-  @override
-  String get nekoLoginPasswordRequired => 'Enter your password';
-
-  @override
-  String get nekoLoginPasswordNote =>
-      'Your password is only used to obtain a NekoAuth token and is never stored on this device';
-
-  @override
-  String get nekoQrScanned => 'Scanned, confirm on your phone';
-
-  @override
-  String get nekoQrCanceled => 'Sign-in canceled';
-
-  @override
-  String get nekoQrExpired => 'QR code expired, please regenerate';
-
-  @override
-  String get toastLoginRequiredNeko =>
-      'Operation failed (please make sure you are logged in to your NK account)';
-
-  @override
-  String get pageLikedNekoLoginHint => 'Sign in to NK to view your liked songs';
-
-  @override
-  String get pageLikedNekoLoginDesc =>
-      'Sign in to NekoMusic to sync your liked songs';
-
-  @override
-  String get pageLikedNekoEmptyHint =>
-      'No liked songs yet — tap the heart on the search page';
-
-  @override
-  String get pageFavNekoLoginDesc =>
-      'Sign in to NekoMusic to view playlists and favorites';
-
-  @override
-  String get pageFavNekoEmptyHint => 'No playlists or favorites yet';
 
   @override
   String toastPlayedAll({required Object count}) {
@@ -6038,7 +5922,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mcpShellHelpSearch =>
-      'Usage: archoerashell search <source> <query> [-n limit] [-p page]\n\nSearch songs on a source.\n  source: netease | kugou | qqmusic | neko\n  -n, --limit <n>   result count (1-50, default 20)\n  -p, --page <n>    page (1-based)\nExample: archoerashell search netease Jay -n 10';
+      'Usage: archoerashell search <source> <query> [-n limit] [-p page]\n\nSearch songs on a source.\n  source: netease | kugou | qqmusic\n  -n, --limit <n>   result count (1-50, default 20)\n  -p, --page <n>    page (1-based)\nExample: archoerashell search netease Jay -n 10';
 
   @override
   String get mcpShellHelpSearchAll =>
