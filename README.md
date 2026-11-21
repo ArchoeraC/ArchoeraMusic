@@ -46,6 +46,7 @@ flutter run -d linux      # 或 windows / macos
 - [解码基准（EraAudio vs FFmpeg）](docs/benchmark-2026-09-21.md) —— 出厂最小 FFmpeg 基线 + 多轮稳定性
 - [音频 Zig 解码内核路线图](docs/audio-kernel-zig.md) —— 内核架构 / 第三方来源登记
 - [许可与授权](docs/licensing.md) —— AGPL-3.0-or-later / 贡献者授权 / 第三方代码约束
+- [UI 设计基准](docs/ui-design-baseline.md) —— 视觉规格唯一来源（ArchoeraMusic-UI skill）/ MIT↔AGPL 边界
 - [凭据保险库安全说明](docs/vault-security-notes.md) —— 测试后门边界 / 二进制替换防护 / 威胁模型
 - [第三方声明与特别鸣谢](docs/acknowledgements.md) —— 运行库许可 / 字体 / 图标 / 开源项目致谢
 - [第三方运行库许可声明](THIRD-PARTY-NOTICES.md) —— 随发布产物分发的内嵌运行库

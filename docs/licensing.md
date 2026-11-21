@@ -59,6 +59,7 @@
 - 严禁引入 **SSPL / BSL / SSPL / 商业源可用但禁止商业使用** 以及各类源码可用但非OSI/FSF认可的许可（自定义禁止商业使用协议等）的代码链接进本项目；
   > 备注：仅作为完全独立外部工具、不构成衍生作品的脚本不在此限制，但原则上也不建议合入主仓库。
 - 所有引入的第三方代码必须在**对应模块**的 `THIRD-PARTY-LICENSES.md` 中逐项列明（包括上游来源、许可证、版权、涉及的模块与文件范围）。
+- **UI 设计规格（[ArchoeraMusic-UI](https://github.com/ArchoeraC/ArchoeraMusic-UI)）**：现行版本为 **MIT**，早期版本为 **AGPL-3.0-or-later**（按所钉 commit 的 `LICENSE` 判定）。MIT 允许复制、修改、合并、再许可与分发，与本仓库 AGPL-3.0-or-later 兼容；复制其内容时唯一硬性义务是保留版权与许可声明（登记 [acknowledgements.md](acknowledgements.md) 属溯源惯例，非许可条件）。反向：AGPL 代码放进 MIT 仓库不会变成 MIT，含 AGPL 代码的分发须整体满足 AGPL；要保持该仓库纯 MIT 就不要混入。另注意 MIT 不改变应用源码 / 品牌 / 字体 / 封面美术的许可。边界见 [ui-design-baseline.md](ui-design-baseline.md)。
 
 ## 3. 打赏与商业合作（不构成授权）
 
