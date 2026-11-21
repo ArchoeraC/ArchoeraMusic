@@ -34,6 +34,8 @@
 
 ### 代码 / 参考实现致谢（精确归属与许可）
 
+- **[ArchoeraMusic-UI](https://github.com/ArchoeraC/ArchoeraMusic-UI)（现行 MIT；早期版本 AGPL-3.0-or-later）** —— 面向 AI Agent 的 UI 设计规格（dark-first 近黑外壳、常驻 82 px 播放条、Split / Poster / Classic 三种播放页、封面取色与歌词排版等 token 与布局测量）。本项目按 MIT 条款使用其规格（复制 / 修改 / 合并均可，保留版权与许可声明）；当前实现为 Flutter 原生转译，未内嵌其 HTML / CSS / JS 或预览图。引用版本、许可边界与自查清单见 [ui-design-baseline.md](ui-design-baseline.md)。版权：Archoera && BetaStudio2。
+
 - **[KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi)（MIT）** —— KG 平台接口与设备字段约定参考
 - **[NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)（MIT）** —— NT 平台接口流程参考
 - **[ncm-api-rs](https://github.com/SPlayer-Dev/ncm-api-rs)（WTFPL）** —— Rust 化签名实现方案参考

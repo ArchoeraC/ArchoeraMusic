@@ -507,6 +507,11 @@ WAL + busy_timeout 并发访问（scanner 直写媒体库、subsonic FFI 直读�
 
 ### 10.7 UI 适配（Web/Vue → Flutter）
 
+> **设计基准已变更（2026-11-21）**：本节是 2026-08 的历史迁移记录，仅用于追溯实现沿革与
+> 行为映射。**新页面 / 改版的视觉规格一律以 [ArchoeraMusic-UI skill](https://github.com/ArchoeraC/ArchoeraMusic-UI)
+> 为准**（见 [ui-design-baseline.md](ui-design-baseline.md)），不得再以本仓库现有 UI 源码、
+> 截图或历史 Web 版本反推设计。
+
 **总体策略**：信息架构与交互模型保留，全部组件用 Flutter 原生重写（不复用 Web 组件与 CSS）；首期按自用子集裁剪，后期按需补齐。
 
 **页面映射（首期子集）**
@@ -700,3 +705,4 @@ ArchoeraMusic/
 22. **MCP 控制服务（2026-10-07，可选）**：默认关闭；开启后默认仅绑定回环 `127.0.0.1`（非特权端口），可手动开启「允许局域网访问」绑定 `0.0.0.0`（默认关、需用户确认 + 仍要求密钥）。以标准协议（MCP Streamable HTTP / REST / WebSocket，均 JSON-RPC 2.0 / HTTP+JSON）暴露播放/队列/搜索/曲库/偏好只读/外观/收藏/历史/歌词能力；默认要求访问密钥、能力组默认全关。纯 Dart 实现（`dart:io`，事件循环驱动、无轮询），不参与播放链路（仍为进程内 FFI），是对「桌面端零 TCP 端口」的显式可选例外。另随二进制内置命令行客户端 `archoera_music archoerashell ...`（类 Unix 语法，经 REST 与运行实例通信，不启动 GUI）。详见 `docs/mcp.md`。
 23. **图片背景可读性下限（2026-11-09，移植自 ArchoeraCX）**：图片外观（`appearanceStyle=image`）强制暗色主题后正文恒为 `#ECECEC`，仅靠用户设置的遮罩（0.3~0.9）在亮图上可能仍不可读。选图/启动时把图片解码成 32×32、取不透明像素相对亮度的 **90 分位**（避免亮天空/灯被暗部平均掉），反解出让正文达到 4.5:1 的最小黑色遮罩，作为遮罩滑块的**下限**（封顶 0.75）。生效值 = max(用户值, 下限)，存盘 `appearance.backgroundDim` 仍是用户意图（换成暗图会自动回落）；下限采样值缓存为 `appearance.backgroundLuminance` 保证重启首帧正确，并在后台重采样。采样在 widget 测试环境跳过（避免临时图被后台读句柄锁住）。
 24. **渲染帧数上限（2026-11-09）**：设置「性能 / 渲染」新增 30~165 FPS 的全局帧率上限（默认 60；>60 滑块转黄、>100 转红）。经既有 `PowerSavingFrameBinding.scheduleFrame` 合并帧请求实现（Flutter 无公开帧率 API）：目标帧率不低于显示器刷新率时不节流，否则按 `1/fps` 提前 4% 合并（避免定时器与 vsync 同刻偶发丢帧）；与节能档位取更严格者（失焦/熄屏仍 1 FPS，最小化仍停帧）。它只是上限，实际帧率仍受 vsync 与 GPU 负载约束。
+25. **UI 设计基准单一来源（2026-11-21）**：新页面 / 改版 / 视觉评审的唯一设计原型改为 [`ArchoeraC/ArchoeraMusic-UI`](https://github.com/ArchoeraC/ArchoeraMusic-UI)（Agent Skill `archoera-music-ui`），**禁止**以本仓库整套应用代码、现有 UI 源码 / 截图或 §10.7 的历史 Web/Vue 版本反推规格；现有实现只保留行为与数据契约。落地用 Flutter 原生实现；复制 skill 的文本 / 代码 / 资源时按 MIT 保留声明即可。许可：skill 现行 MIT、早期版本 AGPL-3.0-or-later，可与本仓库 AGPL-3.0-or-later 自由组合；反向把本仓库 AGPL 源码放进 MIT 仓库不会改变其许可，含 AGPL 代码的分发须整体满足 AGPL。细则与自查清单：`docs/ui-design-baseline.md`。

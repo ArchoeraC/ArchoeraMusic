@@ -73,6 +73,13 @@ cd app/core/vault-rs && ./build-test.sh && ./test.sh
 - **测试只在本地跑，CI 一行都不跑**：`flutter test` / `cargo test` / `ctest` / `go test` / `dotnet test` 等一律不进 `.github/workflows` 与 `.github/actions`。CI 只做编译、依赖守卫、启动冒烟与打包；审阅 workflow 时人工确认没有测试步骤（`dart analyze` 属编译级静态检查，仍保留在 CI）。
 - **macOS 的 shell 约束**：系统自带 `/bin/bash` 恒为 **3.2**（Apple 因 GPLv3 不升级，GitHub macOS runner 同样是 3.2）。macOS 侧脚本不得使用 `mapfile`/`readarray`、`declare -A`/`-n`、`${v^^}`/`${v,,}`、`shopt -s globstar`，且不要在 `set -u` 下展开可能为空的数组。macOS 侧脚本改完请在本机（或 macOS job）上实跑一次 `bash -n` + 该脚本的 `--help`/`verify`，不要只靠 Linux 上的 `bash -n`。
 
+## UI 设计基准（硬性）
+- **唯一设计原型是 [`ArchoeraC/ArchoeraMusic-UI`](https://github.com/ArchoeraC/ArchoeraMusic-UI)（skill `archoera-music-ui`，现行 MIT）**。新页面、改版、视觉评审先读其 `SKILL.md`（需要时再读 `references/`、`assets/tokens.json`），并在提交说明里注明依据的 commit / tag。
+- **禁止把本仓库整套代码当 UI 原型**：不照抄 / 反推 `app/lib/**` 现有页面、组件、主题常量、动效参数来设计界面；`screenshot.png`、`site/`、`docs/architecture.md` §10.7 的历史 Web/Vue 记录也只是现状与沿革，不是规格。现有实现只提供行为 / 数据契约。
+- **只转译规格**：落地用 Flutter 原生组件实现，skill 的 HTML / CSS / JS 是规格与预览载体，不是产品组件；如确实复制其文本 / 代码 / 资源，保留 MIT 声明即可。
+- **许可（按 MIT / AGPL 原文，不额外加码）**：skill 现行 MIT，允许复制、修改、合并、再许可与分发，**唯一硬性义务是复制其内容时保留版权与许可声明**（登记 `docs/acknowledgements.md` 属溯源惯例，不是许可前提）；本仓库整体仍按 AGPL-3.0-or-later 分发，二者兼容。反向把本仓库 AGPL 代码放进 MIT 仓库不会变成 MIT——含 AGPL 代码的分发须整体满足 AGPL，要保持该仓库纯 MIT 就不要混入。字体 / 图标 / 封面 / 品牌按各自条款，不随 skill 授权。
+- 细则与自查清单见 `docs/ui-design-baseline.md`。
+
 ## 架构约定（摘要，完整规则见 `CONTRIBUTING.md` §4）
 - **系统能力只走 C++ 桥接器**：一律在 `app/native/platform` 实现，Dart 仅经 `apl_*` C ABI 调用；禁止 MethodChannel/插件、`Process.run`、Dart 侧解析平台数据。新增能力流程见 `docs/platform-native-bridge.md`。
 - **最小权限**：运行时不得请求管理员/root，不写 `HKLM`/系统目录，不装服务或驱动；需要提权的能力放弃或降级。唯一例外是 Windows 安装向导的可选 per-machine 模式（默认必须 per-user 免提权）。

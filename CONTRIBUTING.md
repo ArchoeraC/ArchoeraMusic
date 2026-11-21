@@ -241,6 +241,7 @@ cd app && flutter run -d linux      # 本地调试
 | 10 | **FFI 契约零回归** | `engine_bindings` / `scanner-ffi` 等既有符号与行为是契约；变更须保持向后兼容（或同步更新两侧 + 文档 + 测试），行为零回归 |
 | 11 | **禁大子进程 / 非 FFI 运行时（去侧车化不可逆）** | Node、Python、JVM 等无法与 Dart FFI 直连的运行时一律不引入（Node 侧车已于 2026-09-06 整体废弃，见 §2.2）；子进程仅限 `archoera-vault`（安全边界，stdio）；新语言栈先走 §13 决策修订 |
 | 12 | **多端一等公民** | Linux / Windows / macOS 三端能力对齐；平台差异收敛到平台能力外观（`docs/platform-capability-facade.md`）+ 每平台 adapter，能力缺失静默降级；**禁止「只在一端悄悄可用」**；平台相关改动（路径 / 编码 / 窗口 / 系统集成）三端审视（Windows 侧注意 ANSI 代码页 / 窄路径等编码边界，参考 e4840c2f），未验证的端在 PR 显式说明；合并口径：仅平台硬性限制导致的局部功能缺失可协商合入（附依据），其余跨平台兼容冲突一律不合并（红线 §2.2） |
+| 13 | **UI 规格单一来源** | 新页面 / 改版 / 视觉评审以 [`ArchoeraC/ArchoeraMusic-UI`](https://github.com/ArchoeraC/ArchoeraMusic-UI)（skill `archoera-music-ui`）为唯一设计原型；**禁止**以本仓库现有 UI 源码 / 截图或历史 Web 版本反推规格；落地用 Flutter 原生实现，复制其文本 / 资源时按 MIT 保留声明即可；AGPL 边界见 [docs/ui-design-baseline.md](docs/ui-design-baseline.md) |
 
 ## 5. 代码规范（分语言）
 
@@ -270,6 +271,11 @@ cd app && flutter run -d linux      # 本地调试
   - **清理**：删除功能时同步从所有 `app_*.arb` 移除不再引用的 key（含其 `@key` 元数据）。
 - **图标**：统一用自建 `EtaIcons`（必要时 `EtaMark`），不混用 Material Icons 字形；
   新字形按 `app/eta-tools/eta_icons/` 流程从源集生成登记，不手写字体。
+- **UI 设计来源**：视觉规格只取自 [`archoera-music-ui`](https://github.com/ArchoeraC/ArchoeraMusic-UI)
+  skill（及其 `references/`、`assets/tokens.json`），提交说明注明依据的 commit / tag；
+  **不得**照抄 / 反推 `app/lib/**` 现有界面或历史 Web 版本来"设计"新页面。现有实现只作为
+  行为 / 数据契约；skill 覆盖不到的先用最接近的 token 组合并记录缺口。许可与自查清单见
+  [docs/ui-design-baseline.md](docs/ui-design-baseline.md)（架构戒律 §4 #13）。
 - **注释与文档**：公共 API（service / binding / store 层）给出 dartdoc；涉及协议、坑点
   （如 SQLite 双库并发、`source: process` 预加载）注释写清「为什么」。
 - **日志**：不使用 `print` / `debugPrint` 直出敏感信息（cookie / 密钥 / vault 内容）；
@@ -408,6 +414,9 @@ PR 描述需包含：
   （对齐 `docs/architecture.md` 的写法）。
 - **影响架构决策的 PR 必须同步文档**：`docs/architecture.md`（含「附：已确认决策记录」追加条目）、
   受影响的专题文档、README / docs 相应章节。
+- **UI 规格变更**：改视觉基准（skill 版本 / token / 布局语义）时同步
+  [docs/ui-design-baseline.md](docs/ui-design-baseline.md) 与 `docs/architecture.md` 决策记录，
+  只改实现不改文档视为未完成。
 - **面向用户的功能**（设置项、扫描/刮削行为、快捷操作）同步更新 docs/ 对应功能文档（如 [docs/local-library.md](docs/local-library.md)）。
 - 模块内约定写模块 `README.md`（如 `app/lib/eta/README.md` 图标体系），不堆进根文档。
 - 文档语言：中文为主，代码 / 符号 / 命令保留原文。
@@ -431,6 +440,13 @@ PR 描述需包含：
   升级依赖须在 PR 说明动机与 diff 审查结论；构建期不得联网拉取未登记产物。
 - **登记义务**：每个引入的第三方依赖（直接与间接）必须在**对应模块**的
   `THIRD-PARTY-LICENSES.md` 逐项列明：上游来源、许可证、版权、涉及文件范围。
+- **UI 设计规格（ArchoeraMusic-UI）**：skill 仓库现行 **MIT**（早期版本为
+  AGPL-3.0-or-later，按所钉 commit 的 `LICENSE` 为准），可与本仓库 AGPL-3.0-or-later
+  自由组合。复制其文本 / token / 预览代码 / 图片时，**只需保留版权与许可声明**；
+  在 [docs/acknowledgements.md](docs/acknowledgements.md) 与相关模块登记是溯源惯例，
+  不是 MIT 的许可条件。反向把本仓库 AGPL 源码放进 MIT 仓库不会改变其许可：含 AGPL
+  代码的分发须整体满足 AGPL，保持该仓库纯 MIT 就不要混入。详见
+  [docs/ui-design-baseline.md](docs/ui-design-baseline.md)。
 - **字体 / 图标资源**同样受管：新字形来源与改作说明进 `app/eta-tools/` 对应 README 与 [docs/acknowledgements.md](docs/acknowledgements.md)；
   非 OFL 字体（MiSans / HarmonyOS Sans）不得二次分发源文件或改编。
 - **品牌与 fork（品牌未授权）**：AGPL 授予的是**代码**自由，不含品牌——项目名 ArchoeraMusic、logo、
