@@ -52,9 +52,11 @@ trap cleanup EXIT
 cp -al "$ART"/. "$STAGE"/ 2>/dev/null || cp -a "$ART"/. "$STAGE"/
 
 # ── 2) 各生态锁文件（只取清单，不需要源码）──────────────────────────
-mkdir -p "$STAGE/src"/{dart,rust/downloader,rust/shell,rust/vault,rust/tempo,rust/transcoder,go/subsonic,nuget/scanner,nuget/indexer}
+# 目标目录由 copy_manifest 自行创建：新增生态时只需加一行清单，不必再同步维护
+# 一份目录列表（漏同步会让 cp 目标不存在而整步失败，见 1.0.7 SBOM 事故）。
 copy_manifest() {
   local src="$1" dir="$2"
+  mkdir -p "$STAGE/src/$dir"
   if [ -f "$src" ]; then
     cp "$src" "$STAGE/src/$dir/"
   else
